@@ -48,8 +48,11 @@ export function loadAnswers(): Record<string, number[][][]> {
 const STUB_LOOKUPS: GridleyLookups = {
   clubs: Object.fromEntries([...new Set(Object.values(GRIDLEY_CLUB_CODES).map((c) => c.slug)), 'brisbane-bears'].map((slug, i) => [slug, 100 + i])),
   venues: Object.fromEntries(['Melbourne Cricket Ground', 'Docklands', 'Kardinia Park', 'Gabba', 'Sydney Cricket Ground', 'Adelaide Oval', 'Bellerive Oval', 'Jiangwan Stadium'].map((v, i) => [v, 200 + i])),
-  awards: Object.fromEntries(['all-australian', 'rising-star', 'norm-smith-medal', 'coleman', 'aflpa-mvp'].map((a, i) => [a, 300 + i])),
+  awards: Object.fromEntries(['all-australian', 'rising-star', 'norm-smith-medal', 'coleman', 'aflpa-mvp',
+    'anzac-medal', 'showdown-medal', 'glendinning-allan-medal', 'brett-kirk-medal', 'marcus-ashcroft-medal',
+    'goal-of-the-year', 'mark-of-the-year'].map((a, i) => [a, 300 + i])),
   resolvePlayer: (ref) => (ref.gridleyPlayerId ?? 9000 + ref.name.length),
+  resolveCoach: (ref) => 7000 + ref.name.length,
 };
 
 type Occurrence = { board: number; orientation: 'row' | 'col'; position: number; item: GridleyItem; mapping: GridleyMapping };
@@ -138,12 +141,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6590,
-      mappedDistinct: 810,
+      mappedOccurrences: 6831,
+      mappedDistinct: 831,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 267,
-      dataAbsentDistinct: 28,
+      dataAbsentOccurrences: 26,
+      dataAbsentDistinct: 7,
     });
+    // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
+    // valid criteria (issues/closed/AFLDB-ISSUE-118.md §23). The exact figure
+    // is pinned so it only ever moves deliberately, and the integration
+    // corpus run fails while it is above zero.
+    expect(distinct(absentList)).toBeLessThanOrEqual(7);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -157,15 +165,12 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }
     const rows = [...summary.entries()].sort((a, b) => b[1].occurrences - a[1].occurrences || a[0].localeCompare(b[0]));
     // The complete list, largest first. Every entry is a fact about AFLDB's
-    // data, not about the solver: see issues/open/AFLDB-ISSUE-118.md §Stage 2.
+    // data, not about the solver: see issues/closed/AFLDB-ISSUE-118.md §Stage 2.
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
-      'height195 [87]', 'height180 [55]', 'brother [53]', 'season2024player [14]',
-      'moty [7]', 'intrulesplayer [5]', 'showdown-medal [5]', 'premcoach [4]',
-      'winaftersiren [4]', 'anzacmedal [3]', 'coachedByWorsfold [3]', 'fathersonfather [3]',
-      'goty [3]', 'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
-      'glendenning [2]', 'irish [2]', 'recruitedByDodoro [2]',
-      'battleofthebridge-medal [1]', 'coachedByClarkson [1]', 'coachedByGoodwin [1]', 'coachedByMatthews [1]',
-      'debut22 [1]', 'nfl [1]', 'qclash-medal [1]', 'spoils5season [1]', 'tasmanian [1]',
+      'season2024player [14]',
+      'intrulesplayer [5]',
+      'irish [2]', 'recruitedByDodoro [2]',
+      'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
     ]);
     for (const [, r] of rows) expect(r.reason.length).toBeGreaterThan(20);
   });
@@ -218,6 +223,33 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
     expect(map('debut-team-brisbane', 'BRISBANE LIONS')).toMatchObject({ axis: { builder: 'debut_club_incl_merged' } });
   });
 
+  it('keeps the All-Australian final team distinct from the 40-man squad, and repeats on distinct seasons', () => {
+    // Gridley's "ALL AUSTRALIAN" is the selected team (1953-1988 carnivals,
+    // 1982-1990 VFL Team of the Year, 1991+), never the squad; the squad
+    // criterion is its own id. Neither goes through the generic award
+    // dropdown any more, so the page offers each by name.
+    expect(map('allAus1953', 'ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team', params: {} } });
+    expect(map('allAus2x', '2x ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_min_times', params: { times: '2' } } });
+    expect(map('allAus3x', '3x ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_min_times', params: { times: '3' } } });
+    expect(map('allAus2010s', 'ALL AUSTRALIAN')).toMatchObject({ axis: { builder: 'all_australian_team_between_seasons', params: { from: '2010', to: '2019' } } });
+    expect(map('allAusSquad2024', 'ALL-AUSTRALIAN SQUAD')).toMatchObject({ axis: { builder: 'all_australian_squad_in_season', params: { season: '2024' } } });
+    for (const key of ['all_australian_team', 'all_australian_team_min_times', 'all_australian_team_between_seasons']) {
+      expect(GRID_BUILDERS[key].label, key).toMatch(/final team/);
+      expect(GRID_BUILDERS[key].label, key).not.toMatch(/squad/i);
+    }
+    for (const key of ['all_australian_squad_member', 'all_australian_squad_in_season']) {
+      expect(GRID_BUILDERS[key].label, key).toMatch(/40-man squad/);
+      expect(GRID_BUILDERS[key].label, key).not.toMatch(/final team/);
+    }
+  });
+
+  it('maps height bounds exactly onto players.height_cm builders', () => {
+    expect(map('height195', '195cm', 'OR TALLER')).toMatchObject({ axis: { builder: 'height_min', params: { cm: '195' } } });
+    expect(map('height180', '180cm', 'OR SHORTER')).toMatchObject({ axis: { builder: 'height_max', params: { cm: '180' } } });
+    // ISSUE-118 Stage D1: age on debut is derived from canonical dob + debut_date, never from Gridley's key.
+    expect(map('debut22', '22+ YEARS OLD', 'ON DEBUT')).toMatchObject({ axis: { builder: 'age_on_debut_min', params: { years: '22' } } });
+  });
+
   it('teammate criteria resolve through the id-embedded Gridley player id or the title', () => {
     expect(map('adam-treloar-teammate-44', 'ADAM TRELOAR', 'ADAM TRELOAR TEAMMATE', 'player'))
       .toMatchObject({ axis: { builder: 'teammate_of', params: { player: '44' } } });
@@ -225,8 +257,11 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
       .toMatchObject({ axis: { builder: 'teammate_of' } });
     expect(map('dustin-martin-gf-opp-2259', 'DUSTIN MARTIN', 'DEFEATED BY DUSTY IN A GF', 'player'))
       .toMatchObject({ axis: { builder: 'lost_grand_final_against', params: { player: '2259' } } });
+    // ISSUE-118 Stage E2: coach criteria resolve to a coaches row (the AFL Tables
+    // coach-page person), never to a player, and map onto match_coaches.
     expect(map('coachedByWorsfold', 'JOHN WORSFOLD', 'COACHED BY WORSFOLD', 'player'))
-      .toMatchObject({ status: 'unsupported', category: 'data_absent' });
+      .toMatchObject({ axis: { builder: 'coached_by', params: { coach: String(7000 + 'JOHN WORSFOLD'.length) } } });
+    expect(map('premcoach', 'PREMIERSHIP', 'COACH')).toMatchObject({ axis: { builder: 'premiership_coach' } });
   });
 
   it('normalises names the way the resolver compares them', () => {

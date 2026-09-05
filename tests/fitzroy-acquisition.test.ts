@@ -348,10 +348,21 @@ describe("in-season acquisition adapter (AFLDB-ISSUE-099)", () => {
 describe("snapshot layout", () => {
   it("keeps raw snapshots gitignored while manifests stay tracked", () => {
     const gitignore = readFileSync(path.join(root, ".gitignore"), "utf8");
-    // /data/* ignores the whole data tree (opt-ins excepted); no opt-in may
-    // expose the raw fitzRoy working area, and docs/ is never ignored.
+    // /data/* ignores the whole data tree (opt-ins excepted); docs/ is never
+    // ignored.
     expect(gitignore).toContain("/data/*");
-    expect(gitignore).not.toContain("!/data/sources");
     expect(gitignore).not.toMatch(/^docs\b/m);
+    // AFLDB-ISSUE-118 §23.28 tracks two small parsed coach CSVs under a deep
+    // scoped opt-in. That is the ONLY thing un-ignored under data/sources/: the
+    // raw fitzRoy / DraftGuru / AFL API working areas beside them stay ignored.
+    // A new opt-in that exposed one of those would change this list and fail.
+    const sourceOptIns = gitignore.split(/\r?\n/).filter((l) => l.startsWith("!/data/sources"));
+    expect(sourceOptIns).toEqual([
+      "!/data/sources/",
+      "!/data/sources/afltables/",
+      "!/data/sources/afltables/coaches/",
+      "!/data/sources/afltables/coaches/*/",
+      "!/data/sources/afltables/coaches/*/parsed/",
+    ]);
   });
 });

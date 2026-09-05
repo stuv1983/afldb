@@ -26,7 +26,12 @@ that is deliberate and must survive verbatim).
 This family has **two** provenance sources and they must not be flattened:
 ``source`` is ``draftguru`` (906 rows, 1979-2025, the detailed table with
 position, captaincy and a "N time All-Australian" note) or ``wikipedia``
-(252 rows, 1953-1990, the carnival-era history with neither). Per-row
+(338 rows, 1953-1990, the carnival-era history with neither: the 252
+bootstrap rows plus the 1983, 1986, 1987 and 1988 VFL Teams of the Year —
+86 rows curated from the Wikipedia "All-Australian team" article's
+"VFL/AFL Team of the Year: 1982–1990" section under AFLDB-ISSUE-118 §23.14,
+because in those four seasons two teams were named and the bootstrap held
+only the State of Origin carnival team). Per-row
 ``source`` decides the reload ``source_id``; ``source_citation`` records
 the same value at source granularity only, per the operator policy for
 this family — it is not a claim that any row identifies the exact page or
@@ -48,10 +53,13 @@ collapsed: the 1984 carnival team lists nine players under both their club
 and their state selection (``Ross Glendinning`` / ``North Melbourne`` and
 ``Ross Glendinning*`` / ``WA``), and 2016 selected two different
 footballers both named ``Josh Kennedy`` (Sydney and West Coast). Every one
-is a distinct row with its own ``source_key``. The parser therefore does
-**not** enforce ``(season, player)`` uniqueness; it enforces
-``source_key`` uniqueness and the finer ``(season, player, club)``
-identity, both of which these rows satisfy (measured collision-free).
+is a distinct row with its own ``source_key``, as is a player named in
+both the carnival team and the VFL Team of the Year of the same season
+(``Michael Tuck`` / ``Hawthorn`` in 1983, once per provenance). The parser
+therefore does **not** enforce ``(season, player)`` or
+``(season, player, club)`` uniqueness; it enforces ``source_key``
+uniqueness and the ``(source, season, player, club)`` identity, both of
+which these rows satisfy (measured collision-free).
 """
 
 from __future__ import annotations
@@ -92,13 +100,13 @@ EXPECTED_HEADER = (
 # (AFLDB-ISSUE-112 §14.4 / §21). A row count, season span or per-family
 # distribution outside this is a source contract change, not a formatting
 # slip — bump these when a later season's team is curated in.
-EXPECTED_TOTAL = 1158
+EXPECTED_TOTAL = 1244
 MIN_SEASON = 1953
 MAX_SEASON = 2025
 # The carnival era is not contiguous (1953, 1956, 1958, 1961, 1966, 1969,
 # 1972, then 1979 on), so this is a distinct-count check, not span + 1.
 EXPECTED_DISTINCT_SEASONS = 53
-EXPECTED_LINKED = 1078
+EXPECTED_LINKED = 1164
 EXPECTED_POSITION_PRESENT = 760
 EXPECTED_NOTE_PRESENT = 906
 EXPECTED_CAPTAINS = 34
@@ -109,7 +117,7 @@ EXPECTED_VICE_CAPTAINS = 21
 # operator decision, not a parser change.
 SOURCES = {"draftguru", "wikipedia"}
 SOURCE_CITATIONS = {"draftguru", "wikipedia"}
-EXPECTED_BY_SOURCE = {"draftguru": 906, "wikipedia": 252}
+EXPECTED_BY_SOURCE = {"draftguru": 906, "wikipedia": 338}
 
 # The link_status enum (migration 005) and the subset that requires a
 # player_id (the migration 019/053 invariant, enforced here rather than
@@ -399,13 +407,19 @@ def load_all_australian(
                 # NOT (season, player): the 1984 club/state dual selections
                 # and the 2016 Josh Kennedy pair are legitimate same-season
                 # same-name rows. (season, player, club) distinguishes every
-                # one of them and is measured collision-free.
-                natural_key = (season, player, club or "")
+                # one of them within a provenance. Across provenances it does
+                # not: in 1983, 1986, 1987 and 1988 two different teams were
+                # named (the State of Origin carnival team, draftguru, and
+                # the VFL Team of the Year, wikipedia — AFLDB-ISSUE-118
+                # §23.14) and a player selected in both is one row per team
+                # with the same club string. Identity is therefore
+                # (source, season, player, club), measured collision-free.
+                natural_key = (source, season, player, club or "")
                 if natural_key in natural_keys:
                     raise AllAustralianSourceError(
                         f"line {line}: duplicate natural identity "
-                        f"(season, player, club) = "
-                        f"{(season, player, club)!r}"
+                        f"(source, season, player, club) = "
+                        f"{(source, season, player, club)!r}"
                     )
 
                 source_keys.add(source_key)

@@ -1,8 +1,15 @@
 source_key,season,club,player,player_id,link_status,role,period,note,source_citation
+00022d09403c51be40ee7b7b,1916,Fitzroy,Wally Johnson,5470,unique,Captain,1916,,wikipedia
 0038312095ebd09b9311daf3,2015,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 006d7c7125d56e9b1cf89ece,2020,Adelaide,Rory Sloane,11792,unique,Captain,2020–2022,,wikipedia
+007f36e40b96325d0593b063,1973,Fitzroy,John Murphy,2017,unique,Captain,1973–1977,,wikipedia
+00912e079ddc44e3eabe4453,1929,Fitzroy,Charles Chapman,2667,unique,Captain,1929,,wikipedia
 00a5524a3011227af9033457,1928,Footscray,Paddy Scanlan,3662,unique,Captain,1927–1928,,wikipedia
+00ae5a280c48b244611cd250,1921,Fitzroy,Percy Parratt,5746,unique,Captain,1921,,wikipedia
+00c8e7c74c4ebd8f416a47e9,1910,University,Edgar Kneen,5156,unique,Captain,1910,,wikipedia
+00d5d75d11b868e3c2524c57,2005,Hawthorn,Richard Vandenberg,667,unique,Captain,2005–2007,,wikipedia
 00e05f798458b05e1a57c5d9,2019,Fremantle,Nat Fyfe,11834,unique,Captain,2017–2022,,wikipedia
+00f3f689864fd473b19a33e3,1898,Geelong,Jack Conway,4386,unique,Captain,1897–1899,,wikipedia
 0115a938e8c747594a716320,1939,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
 017cff3c968723a1e6c658c0,1920,Richmond,Dan Minogue,6022,unique,Captain,1920–1925,1920 Premiership Captain1921 Premiership Captain,wikipedia
 01b195c60f0c191b2ce9c9e9,2012,Essendon,Jobe Watson,1461,unique,Captain,2010–2016,,wikipedia
@@ -10,31 +17,43 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 02200a8e235f64580a3876b0,1959,North Melbourne,John Brady,1544,unique,Captain,1957–1959,,wikipedia
 024bf706f1e91c016a061b08,1937,Essendon,Keith Forbes,1729,unique,Captain,1937,,wikipedia
 02876198e6153b13e12c4cf4,1947,North Melbourne,Kevin Dynon,1693,unique,Captain,1947,,wikipedia
+02a7d1dd1b3235cae9d2403f,2014,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
 02c4f1a1f9c819be12709f6c,1931,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
 02dc476ec409e76b32755054,2011,Collingwood,Nick Maxwell,3980,unique,Captain,2009–2013,,wikipedia
 0300e1c8511f94ebe6c0056a,1961,Melbourne,Ron Barassi,2521,unique,Captain,1960–1964,,wikipedia
+035d5ce69788dcdbcc17e561,1952,Fitzroy,Alan Ruthven,2136,unique,Captain,1951–1954,,wikipedia
 036735cfc242f22043fbc3e0,1920,Essendon,Percy Ogden,5293,unique,Captain,1920–1921,,wikipedia
 0370190f3b00661685f067c7,1900,St Kilda,Cecil Sandford,4410,unique,Captain,1900,,wikipedia
 03a13c576271a0abd9894e2b,1940,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
 03bd80f8877871ef02c2af50,1920,Melbourne,George Heinz,5870,unique,Captain,1919–1920,,wikipedia
 03cdc0dbd81294951fe6f0fb,1946,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
+03f07965c00d07211d441386,1975,Geelong,Sam Newman,2028,unique,Captain,1974–1975,,wikipedia
 0401675765bb00f492a75896,2021,Carlton,Patrick Cripps,12261,unique,Captain,2019–2021,,wikipedia
 040e0bf52320415e654791f3,1948,St Kilda,Harold Bray,2587,unique,Captain,1948,,wikipedia
 04209236739be07db9a8638b,2014,Sydney,Jarrad McVeigh,3950,unique,Captain,2013–2016,,wikipedia
 0455435275826666976f9f5f,1978,Carlton,Robert Walls,2248,unique,Captain,1978,,wikipedia
 049c5993d0efc415f44ac0f0,1923,Melbourne,Percy Wilson,5775,unique,Captain,1921–1923,,wikipedia
+04f762ab06dcb7aea9bb6c98,1949,Geelong,Jim Fitzgerald,2883,unique,Captain,1949,,wikipedia
 04f9a8b80109e0454de1a81a,1999,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
 0502dfe4afe31946ec52bd0b,2009,Port Adelaide,Domenic Cassisi,1193,unique,Captain,2009–2012,,wikipedia
 051981b60afc2dd0938acf2d,1933,North Melbourne,Dick Taylor,3770,unique,Captain,1932–1933,,wikipedia
+053495c31e96c765f456f43b,1912,Geelong,Bill Eason,4972,unique,Captain,1910–1913,,wikipedia
 0534b55d0733e2c425177302,2013,Melbourne,Jack Trengove,11803,unique,Captain,2012–2013,,wikipedia
+0535365b8693ab4bd4c04bcb,2002,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
+0539ab9d33431d0aa417fc23,1925,Hawthorn,Jim Jackson,3113,unique,Captain,1925,,wikipedia
 0540362775ed67d7b9b4bf0f,1965,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
 055ad5920152758275cbe3e3,1929,Richmond,Cyril Lilburne,7183,resolved,Captain,1929,,wikipedia
 055ff0ba61703d593d7e8b89,2014,North Melbourne,Andrew Swallow,4176,unique,Captain,2012–2016,,wikipedia
+057bd17fe2a3de1c27601a6f,1900,Fitzroy,Alec Sloan,4377,unique,Captain,1898–1900,,wikipedia
+057ec94433754f9fba35b90f,2024,Hawthorn,James Sicily,12332,unique,Captain,2023–2025,,wikipedia
+059b175639f85cac6a141aeb,1929,Geelong,Arthur Coghlan,2700,unique,Captain,1929–1930,,wikipedia
 05a292cbad6124d2ba599272,1919,Collingwood,Con McCarthy,6393,unique,Captain,1919,,wikipedia
 05a5e7d5e70ef41872172c43,1974,St Kilda,Barry Lawrence,1915,unique,Captain,1974–75,,wikipedia
 05b6d860b01845a8f091fb2d,1999,Fremantle,Chris Bond,525,unique,Captain,1999,,wikipedia
 05de56fa83fe22855f63234b,2025,Port Adelaide,Connor Rozee,12697,unique,Captain,2024–,,wikipedia
 05e94054c8ff1efa4a18cdd7,2005,Sydney,Brett Kirk,1015,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
+05ec7c923220468d496ca465,2015,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
+0629f8007996b5e169c9786a,1964,Fitzroy,Kevin Murray,2018,unique,Captain,1963–1964,,wikipedia
 066e8905ca84a59c1efd8e65,1939,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
 06888331204a63924a2de0ba,1933,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
 06befbe14f5839ce92d53ef1,1934,Carlton,Maurie Johnson,3127,unique,Captain,1934,,wikipedia
@@ -43,8 +62,10 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 070b6c556ee7564acbf17ebf,1927,Essendon,Frank Maher,3255,unique,Captain,1925–1928,,wikipedia
 07103d839fbccde066754fe1,2005,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 072f0e69af348a82005f07e6,1975,Carlton,Alex Jesaulenko,1844,unique,Captain,1975–1976,,wikipedia
+0746dfd9c2b7bd9d66190831,1898,Fitzroy,Alec Sloan,4377,unique,Captain,1898–1900,,wikipedia
 0762b9b2851b0479937e9064,1984,Richmond,Barry Rowlings,2133,unique,Captain,1983–1984,,wikipedia
 0783693407247acf6e4bb38f,2019,Carlton,Patrick Cripps,12261,unique,Captain,2019–2021,,wikipedia
+07b20372729fe91574fee8b4,1897,Geelong,Jack Conway,4386,unique,Captain,1897–1899,,wikipedia
 07c16362ffcf1573e704815e,1945,St Kilda,Clarrie Vontom,3827,unique,Captain,1945,,wikipedia
 07d2e9785f3a6733f4822f9f,1989,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
 07e3748e774b916bf6ac7cda,2013,Gold Coast,Gary Ablett Jr.,1105,unique,Captain,2011–2016,,wikipedia
@@ -55,9 +76,13 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 08e892185836baa472a5e073,1943,Footscray,Arthur Olliver,3476,unique,Captain,1943–1946,,wikipedia
 090ffc843194de1450cffb25,2002,Port Adelaide,Matthew Primus,407,unique,Captain,2001–2005,,wikipedia
 094823d46de698323333eefd,1968,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
+096585ff1610fe01b1812ba4,1957,Geelong,Bob Davis,1967,unique,Captain,1955–1958,,wikipedia
 097b7e7da11da61747aedc44,2007,Richmond,Kane Johnson,43,unique,Captain,2005–2008,,wikipedia
 09a5d92b6ecccbd59f3b8e8b,2023,North Melbourne,Jy Simpkin,12502,unique,Captain,2023–2024,,wikipedia
+09ca0a087b4a6e20b03a1640,1985,Hawthorn,Leigh Matthews,1949,unique,Captain,1981–1985,,wikipedia
+09cf1bb8a3f8b2720704c5af,1993,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 09d45aa2f329acb1df3185f5,2020,Carlton,Patrick Cripps,12261,unique,Captain,2019–2021,,wikipedia
+09d90f8126155ec3468fccd5,1970,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
 09e1a17c29c916b133b39e8f,1974,South Melbourne,Peter Bedford,1519,unique,Captain,1973–1976,,wikipedia
 09f494a3b62709c6b8de6dc9,1934,Essendon,Keith Forbes,1729,unique,Captain,1934–1935,,wikipedia
 0a6ebd6d5032e3e6faa28b6f,2019,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
@@ -65,25 +90,33 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 0ac1c0107c8033cbe8c0a633,1981,Carlton,Mike Fitzpatrick,1722,unique,Captain,1980–1983,,wikipedia
 0ace352b780b17dc713caaac,1991,Sydney,Dennis Carroll,1268,unique,Captain,1986–1992,,wikipedia
 0ad446369863c38ffa2d242a,1975,Essendon,Des Tuddenham,2228,unique,Captain,1972–1975,,wikipedia
+0b05801d7d06b79e0023b2e4,2014,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 0b0e0a5cb35c8152b69a8ad8,1961,St Kilda,Neil Roberts,2116,unique,Captain,1959–62,,wikipedia
 0b0e8f11539a1822d1c7384f,2014,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 0b6e055ff6777a542f80d7b5,2008,Brisbane Lions,Luke Power,1084,unique,Captain,2008,,wikipedia
 0b799ba178a12c3d6985209a,1969,Collingwood,Des Tuddenham,2228,unique,Captain,1966–1969,,wikipedia
+0b8423b1de17d44f9682ba18,1948,Hawthorn,Alec Albiston,2485,unique,Captain,1947–1949,,wikipedia
 0c253b4fcc1333e74fe668b2,2023,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
+0c3ae921e65220cf28ce4298,2012,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
 0c467d43864e8dd43f49fba1,2008,Port Adelaide,Warren Tredrea,831,unique,Captain,2006–2008,,wikipedia
 0c94c99b2c04fab9ff347489,1937,Footscray,Alby Morrison,3383,unique,Captain,1937,,wikipedia
 0c976216e42f569c9e36f22a,2013,Collingwood,Nick Maxwell,3980,unique,Captain,2009–2013,,wikipedia
+0ca61a14dcc6ad070bbd8de3,1938,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
+0cb9314540a2cfb9e58acd54,1989,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
 0cc9699745ec01cc5bd21e8c,1960,St Kilda,Neil Roberts,2116,unique,Captain,1959–62,,wikipedia
 0ce264512067250313099c25,2015,Western Bulldogs,Robert Murphy,468,unique,Captain,2015–2017,,wikipedia
 0d21052c934f4a5a91901466,1953,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
+0d2ebbcb434a0d9a4a862efa,2005,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
 0d31f5e2bb07b0112dcc4031,2013,Western Bulldogs,Matthew Boyd,1450,unique,Captain,2011–2013,,wikipedia
 0d4a609d4a1078f030dfe69e,1988,North Melbourne,Wayne Schimmelbusch,2145,resolved,Captain,1988,,wikipedia
 0d5327ffd0a1f9d9a92cd8af,1986,Melbourne,Robert Flower,1725,unique,Captain,1981–1987,,wikipedia
 0d5a124654e74782ef0e6a27,1943,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
+0d6e8241ff9b1a7c1df1b301,2003,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
 0d7ecf7e5a0af00ef510f4b0,1971,Richmond,Roger Dean,2343,unique,Captain,1968–1971,1969 Premiership Captain,wikipedia
 0d873fb55b373ca34cbdc4a6,1911,Melbourne,Vin Coutie,4805,unique,Captain,1910–1911,,wikipedia
 0d8a2097b9fdfa92c759fd74,1943,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
 0d8db863af83fb45a3f143cd,1990,Sydney,Dennis Carroll,1268,unique,Captain,1986–1992,,wikipedia
+0dc6de28b1866b3116baf0b8,1923,Geelong,Bert Rankin,6099,unique,Captain,1923,,wikipedia
 0dd0830bf895b68e14ca74ff,2011,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
 0de1887d2bfef1e53ba9079a,2007,Brisbane Lions,Nigel Lappin,100,unique,Captain,2007,,wikipedia
 0e76990217d304fa2d7c3ac4,1985,Melbourne,Robert Flower,1725,unique,Captain,1981–1987,,wikipedia
@@ -92,8 +125,11 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 0ed4370194dae20707af9610,1926,Carlton,Ray Brew,2591,unique,Captain,1925–1926,,wikipedia
 0edd9e5339554409edf9aad2,1980,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1980–1987,,wikipedia
 0f5fee1e255fb28d0ee243f5,2001,Kangaroos,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
+0f93b21a81cc393ca2f39cf4,1989,Geelong,Damian Bourke,109,unique,Captain,1987–1989,,wikipedia
 0fdf2a80afded2131443be56,1936,North Melbourne,Charlie Gaudion,2918,unique,Captain,1936,,wikipedia
 0ff1f81d3239909b83a284a7,1930,Footscray,Allan Hopkins,1467,unique,Captain,1929–1930,,wikipedia
+1000552bc35242df93f645ee,1944,Geelong,Jack Butcher,2624,unique,Captain,1944–1945,,wikipedia
+1011951da62c50a317bc3882,1949,Geelong,Tom Morrow,3389,unique,Captain,1949,,wikipedia
 10408bf76831e8f341f8c4c3,2020,Port Adelaide,Tom Jonas,12002,unique,Captain,2020–2023,,wikipedia
 104ae3207bb199350501391a,1932,Essendon,Garnet Campbell,1889,unique,Captain,1931–1933,,wikipedia
 10939691abb422366e67e753,2020,Fremantle,Nat Fyfe,11834,unique,Captain,2017–2022,,wikipedia
@@ -101,11 +137,13 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 10a66fec88a21425ab86f10a,2025,Collingwood,Darcy Moore,12372,unique,Captain,2023–,,wikipedia
 10b1e06c8e2b848554e8c11a,1973,Footscray,David Thorpe,2216,unique,Captain,1973,,wikipedia
 110516dc74d3f162acda6098,2005,Fremantle,Peter Bell,486,unique,Captain,2002–2006,,wikipedia
+111754b460cfb3f606bb044f,1988,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
 116eef5337936be863353133,1941,St Kilda,Jack Knight,3173,unique,Captain,1941,,wikipedia
 11771f29a9df4c90f27028fb,1924,Collingwood,Charlie Tyson,3817,resolved,Captain,1924–1926,,wikipedia
 11a205cf8eec7ac98759b996,1922,Richmond,Dan Minogue,6022,unique,Captain,1920–1925,1920 Premiership Captain1921 Premiership Captain,wikipedia
 11ab29653e07f940eb575459,1952,Carlton,Ken Hands,1781,unique,Captain,1952,,wikipedia
 11c1997ceea993ec51e0053b,1949,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
+11f547d81f5318828838f4b2,1907,Fitzroy,Ern Jenkins,4356,unique,Captain,1906–1907,,wikipedia
 11ff764cd7ec8e7612d92f30,1904,Essendon,Jim Anderson,4308,unique,Captain,1903–1904,,wikipedia
 1206cc3b4790213385ebefac,2008,Carlton,Chris Judd,1122,unique,Captain,2008–2012,,wikipedia
 122b0983d6bd1a826de70c10,1903,Carlton,Joe McShane,4399,unique,Captain,1902–1904,,wikipedia
@@ -114,11 +152,15 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 12ffb225619f7316579d9a84,2006,Richmond,Kane Johnson,43,unique,Captain,2005–2008,,wikipedia
 1330031bc4f6d64657a9e0be,2018,Western Bulldogs,Easton Wood,11788,unique,Captain,2018–2019,2016 premiership captain,wikipedia
 134ec9591e09ced5895d2d0f,1996,Collingwood,Gavin Brown,216,unique,Captain,1994–1998,,wikipedia
+136c9b26164424c5c642d4f4,1909,Fitzroy,Jim Sharp,4862,unique,Captain,1908–1910,,wikipedia
+138fcb707b344c75a6d8f2bd,1960,Geelong,Ron Hovey,3086,unique,Captain,1960,,wikipedia
+13b43f68b982e2e18fe31656,2013,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 13c81a267e5dfd7c28d40faa,1940,Carlton,Brighton Diggins,2782,unique,Captain,1938–1940,,wikipedia
 13d010e53c9fcd129fe0f28b,1968,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
 13fe74f81305f696909ad6cd,1948,Melbourne,Don Cordner,2475,unique,Captain,1948–1949,,wikipedia
 145b6d62ddb95d8f70ea1e51,1995,Richmond,Tony Free,858,unique,Captain,1994–1996,,wikipedia
 146cd4bb85b8d2fd8512fb50,1928,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
+1475137d151dd08a8c3b98c7,1933,Fitzroy,Jack Sexton,3678,unique,Captain,1933,,wikipedia
 147f701d552ba7546e160237,1930,Essendon,Norm Beckton,2539,unique,Captain,1929–1930,,wikipedia
 14a33a39cc70f191190307de,1962,Carlton,Graham Donaldson,2794,unique,Captain,1961–1962,,wikipedia
 14c0e7d3e976b185ae1949f6,2020,St Kilda,Jarryn Geary,11630,unique,Captain,2017–2020,,wikipedia
@@ -126,6 +168,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 15157277670ed9ab20f4d885,2023,Carlton,Patrick Cripps,12261,unique,Captain,2022–present,,wikipedia
 152c99d9b720d2fd052e6acd,1941,Footscray,Norman Ware,3846,resolved,Captain,1940–1942,,wikipedia
 153c81166d53a2ad1f62ac28,1990,North Melbourne,Matthew Larkin,1303,unique,Captain,1990–1992,,wikipedia
+157b2e82f057e40dba5a64cd,2002,Geelong,Ben Graham,556,unique,Captain,2000–2002,,wikipedia
 15a5626ed4fe959829251d75,2006,Kangaroos,Adam Simpson,780,unique,Captain,2004–2008,,wikipedia
 15a64d0f6070a62d22b9c35c,1935,Carlton,Charlie Davey,1648,unique,Captain,1935,,wikipedia
 15f90642894842528ab3b548,1970,Carlton,John Nicholls,3422,unique,Captain,1969–1973,,wikipedia
@@ -149,16 +192,24 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 176e6e8b363b988db12b72e6,1950,Melbourne,Shane McGrath,8305,unique,Captain,1950,,wikipedia
 1772f3e69832d5c9c1673794,1981,Footscray,Geoff Jennings,1842,unique,Captain,1979–1981,,wikipedia
 177dab1c8a3dad82f3097951,1973,Carlton,John Nicholls,3422,unique,Captain,1969–1973,,wikipedia
+179c952bb7b89737ef05d624,2006,Hawthorn,Richard Vandenberg,667,unique,Captain,2005–2007,,wikipedia
+17ad52ae4447c574902f7fa5,1968,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 17ae92b8925b608006941987,2018,St Kilda,Jarryn Geary,11630,unique,Captain,2017–2020,,wikipedia
 17b98286e6480b9fe616be40,1991,Adelaide,Chris McDermott,17,unique,Captain,1991–1994,,wikipedia
 17dc39c411b0849e606d17c2,1984,Essendon,Terry Daniher,1311,unique,Captain,1983–1988,1984 and 1985 premiership captain,wikipedia
+18254bed974c5c8859662e71,1924,Fitzroy,Jim Atkinson,2501,unique,Captain,1924–1925,,wikipedia
+18922e4c7f1daf5674fbf1fb,1967,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 18a56076f37cdaf98c0f27bd,1915,Melbourne,Jack McKenzie,4851,unique,Captain,1915,,wikipedia
 18a601b61886d811ad4e5f74,1912,Essendon,Allan Belcher,5187,unique,Captain,1912–1915,1912 premiership captain,wikipedia
 18b1b1d1008a5e507957592d,1959,Melbourne,John Beckwith,2540,unique,Captain,1957–1959,,wikipedia
 18eb9fefb11b99573e7f24cc,1926,Melbourne,Albert Chadwick,2666,resolved,Captain,1924–1927,,wikipedia
+19114fa5ac68c0098e01c743,1938,Fitzroy,Frank Curcio,2745,unique,Captain,1938–1941,,wikipedia
 1928a8638c96e5a0c24e9931,2008,Essendon,Matthew Lloyd,336,unique,Captain,2006–2009,,wikipedia
+192cb1aea7d8c9b99254729c,2025,West Coast,Liam Duggan,12334,unique,Captain,2024–,,wikipedia
+194b30a798af28c42cb57322,1960,Geelong,Colin Rice,3585,unique,Captain,1960,,wikipedia
 1996fe5f1bfd47d86fce0df4,1929,Carlton,Ray Brew,2591,unique,Captain,1928–1931,,wikipedia
 19e47ff022612cc62116079c,1933,Carlton,Frank Gill,1754,unique,Captain,1933,,wikipedia
+1a33f7ea3e43b9da5536a664,1933,Fitzroy,Jack Moriarty,3382,unique,Captain,1933,,wikipedia
 1a3e6c181db0f8ae37236e85,1919,Essendon,Allan Belcher,5187,unique,Captain,1919,,wikipedia
 1aadc30aded13102052d3f02,2001,St Kilda,Robert Harvey,930,unique,Captain,2001–02,,wikipedia
 1accb624eb75da8cde7f26eb,2014,Western Bulldogs,Ryan Griffen,4080,unique,Captain,2014,,wikipedia
@@ -194,22 +245,32 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 1f8b3128257e4ba27cd2b1d0,2001,Western Bulldogs,Chris Grant,422,unique,Captain,2001–2004,,wikipedia
 1fb056368b684cb9e9e139f8,2007,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 1fd59b477fddacf9393c5cee,1908,Essendon,William Griffith,4671,resolved,Captain,1907–1909,,wikipedia
+207171b309497f4c57f18489,1903,Fitzroy,Gerald Brosnan,4759,unique,Captain,1903–1905,,wikipedia
 2088c8e32cb463b51c030165,1982,Essendon,Neale Daniher,1646,resolved,Captain,1982,,wikipedia
 20da9175de220a8525ccc893,2019,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
 212620cc41b3b400ec51f3e5,2007,Essendon,Matthew Lloyd,336,unique,Captain,2006–2009,,wikipedia
+214bed2ab48ae70b3b9b6ad9,1967,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
+215a2e591b62f8ce2710f291,1941,Geelong,Tom Arklay,2499,unique,Captain,1941,,wikipedia
+215a324b364860c80812a0c2,1991,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 2162fe3d1ac01891bbc702ad,2026,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
 219fe2370d19687a71be7269,1966,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
 21aaea8179deb862cc693fba,2009,Sydney,Adam Goodes,1012,unique,Captain,2009–2010,,wikipedia
 21b1bc0e9159204c0ceecd4d,2008,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
+22075c2352fa2fd035dba061,1988,Geelong,Damian Bourke,109,unique,Captain,1987–1989,,wikipedia
 22326fe7410dccbe3b6ce0ff,2026,Greater Western Sydney,Toby Greene,12025,unique,Captain,"2022 (co-captain), 2023– (sole captain)",,wikipedia
+223a4d5a769121c542dccdd0,1989,Fitzroy,Paul Roos,985,unique,Captain,1988–1990,,wikipedia
 229fd3ead79e7137af9291eb,1979,Footscray,Geoff Jennings,1842,unique,Captain,1979–1981,,wikipedia
+22cbe9c36ab8af1662ff6879,1964,Geelong,Fred Wooller,3915,unique,Captain,1963–1964,,wikipedia
 22ddfa99de8ffc0f73910da9,1962,Richmond,Ron Branton,1545,unique,Captain,1960–1962,,wikipedia
 22f65cf7ffebc620a8498920,1934,St Kilda,Colin Watson,3852,unique,Captain,1934,,wikipedia
+22f8abb750291bffd159cfc0,1923,Fitzroy,Gordon Rattray,6458,unique,Captain,1923,,wikipedia
 2313a24f9e1b5918be79e4c6,1941,Collingwood,Jack Regan,3570,unique,Captain,1940–1941,,wikipedia
 234bf6903521074a00fb203b,1990,Richmond,Dale Weightman,1256,unique,Captain,1988–1992,,wikipedia
+238e73b36f3d19556cbdebbf,1992,Geelong,Mark Bairstow,1201,unique,Captain,1992–1994,,wikipedia
 2393acdd6c429bce40e4affe,1954,Melbourne,Geoff Collins,1615,unique,Captain,1954,,wikipedia
 23d11cb006bc1a388bc47082,1980,Essendon,Simon Madden,1302,unique,Captain,1980–1981,,wikipedia
 23e8d942862817890f27b5f8,2015,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
+23f3d4d43bb1a1a2f428e802,1986,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
 23f6e2299ffb3ee3a6f068e6,1939,Footscray,Roy Evans,2847,unique,Captain,1938–1939,,wikipedia
 2404e239ef4ba79cb0c95ecf,2011,North Melbourne,Brent Harvey,788,unique,Captain,2009–2011,,wikipedia
 2413c4856079e174d8b18eb0,2015,Brisbane Lions,Tom Rockliff,11787,unique,Captain,2015–2016,,wikipedia
@@ -221,14 +282,20 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 257be2af4bbaa5484fb054e9,2013,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
 258c4c8640868f2fdb2b4ff6,2002,Western Bulldogs,Chris Grant,422,unique,Captain,2001–2004,,wikipedia
 25a56e47c123622ce7515cb1,1963,Collingwood,Murray Weideman,3865,unique,Captain,1960–1963,,wikipedia
+26166b3534eba48e546aacd1,1947,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
 262ddbe0966b0f09c09787cb,1938,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
+262f0e8fd754883a61b1d971,2002,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
 263e6ff690dac106fa98abee,1900,Carlton,Will Stuckey,4701,resolved,Captain,1900–1901,,wikipedia
+264e68a5954b4da2be005237,1974,Fitzroy,John Murphy,2017,unique,Captain,1973–1977,,wikipedia
 2657b0350c9fff57c2591c86,1917,Collingwood,Percy Wilson,5775,unique,Captain,1917,,wikipedia
 2675df3a32ca0a93e1e50da8,1995,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
 26c8d0724dca70db1a2da5ae,1992,Footscray,Doug Hawkins,380,unique,Captain,1990–1993,,wikipedia
+26dfeb6512911c1acfb15bc3,1899,Geelong,Jack Conway,4386,unique,Captain,1897–1899,,wikipedia
+26f6b283b5045c004bab59aa,1997,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 2729d647f9569b8f123fd7ff,1981,Collingwood,Peter Moore,2000,unique,Captain,1981–1982,,wikipedia
 277582c6c99e200569e021c0,2014,Melbourne,Nathan Jones,2447,unique,Captain,2014,,wikipedia
 277e2501fe920495be900ca9,1915,Richmond,Bill Thomas,5247,unique,Captain,1914–1916,,wikipedia
+2783c548a752f02c0ef570ad,2025,Hawthorn,James Sicily,12332,unique,Captain,2023–2025,,wikipedia
 27993ef881b899ea9200f5ab,2018,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 27d6caae62127c07fb002cea,1929,North Melbourne,Charlie Tyson,3817,resolved,Captain,1929,,wikipedia
 28040de35f503be3f4c2a568,2003,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
@@ -240,20 +307,25 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 28607e8c23fd667944229bda,1937,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
 28687b4faf016362984aab7b,2009,Sydney,Brett Kirk,1015,unique,Captain,2009–2010,,wikipedia
 286def559eac7e98d25d41f4,2023,Richmond,Dylan Grimes,11879,unique,Captain,2022–2023,Co-captains,wikipedia
+287b142da5e877dcdf4639b8,1959,Fitzroy,Alan Gale,1744,unique,Captain,1958–1961,,wikipedia
 28900f9ddb07dabe0a58f6d4,1987,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
+28ac42e02b9c16b5f63cee64,1975,Hawthorn,Peter Crimmins,1636,unique,Captain,1974–1975,,wikipedia
 28ad0b2c04ac8edbd679f76a,1986,Footscray,Rick Kennedy,1871,unique,Captain,1986–1988,,wikipedia
 28b1767bbb2c0ed6c598d7e0,1960,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
 28dad2a808c37acff83e45fe,1957,Melbourne,John Beckwith,2540,unique,Captain,1957–1959,,wikipedia
 291a5703ae4489b5fdccad4f,1956,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
 2935da2e54f0cd3c4850ecaa,1970,Collingwood,Terry Waters,3857,unique,Captain,1970,,wikipedia
+294f7093dca8b242cf2330db,1989,Brisbane Bears,Mark Mickan,1308,unique,Captain,1989,,wikipedia
 2987bf989cbb077a2ffd11ee,1939,Carlton,Brighton Diggins,2782,unique,Captain,1938–1940,,wikipedia
 29b72e9a5d83a48cd8f0bd6f,1952,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
 2a109eabcc736122edb29c2b,1976,Footscray,Laurie Sandilands,2423,unique,Captain,1974–1976,,wikipedia
 2a236dbb05f6f886d66f1f58,1982,Essendon,Ron Andrews,1487,unique,Captain,1982,,wikipedia
 2a3c3c367f51f35cf63e40d3,2016,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
+2a8c2c156f2f08d70bb78cdb,1974,Geelong,Sam Newman,2028,unique,Captain,1974–1975,,wikipedia
 2ab4d6282671b6fb56d51e99,2024,Richmond,Toby Nankervis,12374,unique,Captain,2024–,,wikipedia
 2ab881fb8534a3631abda73f,2017,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
 2ac7c96fcf3e8c054dc2d765,1957,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
+2aea38dd6e9a009e15bb70bf,2001,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
 2b596bf9a8359cc95fea5f85,1991,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
 2b813198d9f467e95b4c2c67,2019,Adelaide,Taylor Walker,11713,unique,Captain,2019,,wikipedia
 2b95702ae62868f6c1eb8306,1963,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
@@ -274,6 +346,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 2d0a1e834f725aa0171458a6,2020,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
 2d2857a3628b1b946b1034aa,2012,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
 2d3df1e5e8806f66c9310110,2013,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
+2d5b9e7f2a27ae1f7cbd4d7e,1941,Hawthorn,Bert Mills,1986,unique,Captain,1940–1941,,wikipedia
 2d743719f87070ac0facbe59,1909,St Kilda,Vic Barwick,5021,unique,Captain,1909,,wikipedia
 2db51a3da9ff95be3318b7fd,2013,Adelaide,Nathan van Berlo,4075,unique,Captain,2011–2014,,wikipedia
 2e32ae775e5157021113e93e,1924,Carlton,Paddy O'Brien,3437,unique,Captain,1924,,wikipedia
@@ -282,28 +355,44 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 2f76d2a264f50451ff5b7800,1969,South Melbourne,Bob Skilton,3702,resolved,Captain,1961–1971,,wikipedia
 2f8f2472e67076eb68370020,1900,Melbourne,Dick Wardill,4235,unique,Captain,1900,,wikipedia
 2f99201908c726270064525d,2015,Melbourne,Nathan Jones,2447,unique,Captain,2015–2016,,wikipedia
+2f9d1820cbf5116de9ce6a1c,1922,Fitzroy,Chris Lethbridge,6184,unique,Captain,1922,,wikipedia
 2fa47593c57a17f9bb79a713,1971,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 2fb8417c972051f243ec87d3,2012,Sydney,Adam Goodes,1012,unique,Captain,2011–2012,Jarrad McVeigh 2012 premiership captain,wikipedia
+2fcaaafdccadefc2ec6089e3,2020,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 2fdb8e868a9ebd24f5181800,1951,Melbourne,Denis Cordner,1892,unique,Captain,1951–1953,,wikipedia
 2fe0e23856f2c8d6d4dc467c,2003,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 2ff07b45bb2297590b1740ec,2005,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 2ff4aaa57d2ead0fddd4add5,2014,Essendon,Jobe Watson,1461,unique,Captain,2010–2016,,wikipedia
+2ffd1a6858830a09825eec6a,1933,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 3010f46e15739f777806173c,1991,Footscray,Doug Hawkins,380,unique,Captain,1990–1993,,wikipedia
 301c36c943d987b35bdb8201,1933,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
 305197eecee9962369d22ffc,1906,Essendon,Jack McKenzie,4851,unique,Captain,1906,,wikipedia
 30a40b67abaa3edc563ff6fa,2018,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
 30c0d50a0e5b94abafca9d5f,1985,Carlton,Wayne Johnston,1849,unique,Captain,1984–1985,,wikipedia
+30fb74d6f5625f5ec726df94,1912,Fitzroy,Jack Cooper,5467,unique,Captain,1912,,wikipedia
+31450628cb565fe45ca6bc9b,1996,Hawthorn,Jason Dunstall,632,unique,Captain,1995–1998,,wikipedia
 3169d48aa9dc1544f0447297,1956,Collingwood,Neil Mann,1937,unique,Captain,1955–1956,,wikipedia
 3172dd80aa0d5e03a89307ad,2008,Sydney,Barry Hall,953,unique,Captain,2008,,wikipedia
+31d1c1bb8cdaa9ef16035ec1,1971,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
 3206e0603ca8ccbebd94ee7d,1956,Melbourne,Noel McMahen,1977,unique,Captain,1955–1956,,wikipedia
+32307c6a8a44adda83a9a277,2022,West Coast,Luke Shuey,11805,unique,Captain,2020–2023,,wikipedia
+3266af0ee6c1cef3dabedd43,1928,Geelong,Tom Fitzmaurice,2881,unique,Captain,1928,,wikipedia
+32d1529478b1267d3d719e11,1998,Hawthorn,Jason Dunstall,632,unique,Captain,1995–1998,,wikipedia
+335577d63641c9e1033c1671,1942,Hawthorn,Jack Carmody,2646,unique,Captain,1942,,wikipedia
 3365b0039549f5aea517dcb0,1992,Essendon,Mark Thompson,326,unique,Captain,1992–1995,1993 premiership captain,wikipedia
 3397a0b6202078390f67a943,2007,Western Bulldogs,Brad Johnson,421,unique,Captain,2007–2010,,wikipedia
 3398a6d3d64159c37a282868,1928,St Kilda,Bill Cubbins,1642,unique,Captain,1928,,wikipedia
+33e80abdb89635d726871d23,1939,Fitzroy,Frank Curcio,2745,unique,Captain,1938–1941,,wikipedia
 33f47fa244829dd1265c23b3,1982,Collingwood,Peter Moore,2000,unique,Captain,1981–1982,,wikipedia
 34620662f9e9600b8f80c80e,1971,Collingwood,Terry Waters,3857,unique,Captain,1971,,wikipedia
 347b2c2c2602d66bc469674d,1949,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 347eabffd5713ae75c969282,2016,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
+348227ccf794daf6887be1e4,1904,Fitzroy,Gerald Brosnan,4759,unique,Captain,1903–1905,,wikipedia
+348bae886ef02581a20b09be,1996,Geelong,Barry Stoneham,584,unique,Captain,1995–1998,,wikipedia
+34ad0992577497f252c2ef2e,1945,Geelong,Jack Butcher,2624,unique,Captain,1944–1945,,wikipedia
 34ada26bff2963dea7f3c270,2024,Essendon,Zach Merrett,12241,unique,Captain,2023–2025,,wikipedia
+34b78524b58859c32fc48a2c,1937,Fitzroy,Haydn Bunton,1466,unique,Captain,1936–1937,,wikipedia
+34c162c0a6e64c8ae8e658c7,1993,Hawthorn,Gary Ayres,1257,unique,Captain,1992–1993,,wikipedia
 34cce6f3b3dbaf0475e973c9,2010,Western Bulldogs,Brad Johnson,421,unique,Captain,2007–2010,,wikipedia
 34e6fbf72de673fa46d53578,1942,Carlton,Jim Francis,1738,unique,Captain,1941–1943,,wikipedia
 34f7128d198e88a59423bf0c,1974,Carlton,Alex Jesaulenko,1844,unique,Captain,1974,,wikipedia
@@ -315,44 +404,58 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 358f460df11eef615d6153b1,1995,North Melbourne,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
 35faa7bbafee68e0557d5e26,1914,Richmond,Charlie Ricketts,5339,unique,Captain,1914,,wikipedia
 361fac57813802ec777293de,2009,North Melbourne,Brent Harvey,788,unique,Captain,2009–2011,,wikipedia
+363286d4e09725cb9bb4b10e,1960,Fitzroy,Alan Gale,1744,unique,Captain,1958–1961,,wikipedia
 363a8d3d25f63152db98d6f0,1946,Footscray,Arthur Olliver,3476,unique,Captain,1943–1946,,wikipedia
 3654d5203729c1fe391d8490,1966,Collingwood,Des Tuddenham,2228,unique,Captain,1966–1969,,wikipedia
 366f90c9d335b7ab8ca251da,2018,North Melbourne,Jack Ziebell,11724,unique,Captain,2017–2022,,wikipedia
 36745c458b56bde33d18c270,1944,Collingwood,Pat Fricker,2903,unique,Captain,1944,,wikipedia
+36ab0f45ed562ff95038241d,1991,Geelong,Andrew Bews,94,unique,Captain,1990–1991,,wikipedia
 36ba19a80f50fe7ef087380f,1909,Richmond,John Lawson,5190,resolved,Captain,1909,,wikipedia
 36ce147009f6ba0a7e5cc79b,1943,North Melbourne,Bill Findlay,2875,unique,Captain,1942–1943,,wikipedia
 3710531b3b0a37390766fdea,1993,Adelaide,Chris McDermott,17,unique,Captain,1991–1994,,wikipedia
 37270da43243a25631ae9061,1994,Adelaide,Chris McDermott,17,unique,Captain,1991–1994,,wikipedia
 374056732cf597f4e3d5a414,1903,Collingwood,Lardie Tulloch,4483,unique,Captain,1902–1904,,wikipedia
 3740a943d4080685a0c899d1,1970,St Kilda,Ross Smith,2429,unique,Captain,1970–72,,wikipedia
+376e9b6dc98a0a17c3a3a097,1990,Geelong,Andrew Bews,94,unique,Captain,1990–1991,,wikipedia
+37728fae6fea65503134e1ec,1945,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
 37abc750baf6656c14dfbde4,1975,Footscray,Laurie Sandilands,2423,unique,Captain,1974–1976,,wikipedia
 37f5c1b64bfd5d958a589774,1941,North Melbourne,Jock Cordner,2724,unique,Captain,1941,,wikipedia
 381afaa94bf713597022c194,1984,Melbourne,Robert Flower,1725,unique,Captain,1981–1987,,wikipedia
 382a5c9055b87fe359d38192,1990,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
 382b587921a2af0c0122fb2f,1920,Collingwood,Dick Lee,5405,unique,Captain,1920–1921,,wikipedia
+383525117e3224085a4b42ee,2017,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
+38fce3221746f665bf2374a9,1946,Hawthorn,Jim Bohan,2568,unique,Captain,1946,,wikipedia
 390143fb463303bb8baab0b6,1997,Adelaide,Mark Bickley,12,unique,Captain,1997–2000,1997 premiership captain1998 premiership captain,wikipedia
 391320568e28910ba0134d40,2021,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 39478765a05c21111e81402b,1934,North Melbourne,Tom Fitzmaurice,2881,unique,Captain,1934,,wikipedia
 398a76ece1cc4b03332f2d38,2020,Sydney,Josh Kennedy,11672,unique,Captain,2019–2021,,wikipedia
+39b01414b11b8be3b2bd4203,1915,Geelong,Billy Orchard,5379,unique,Captain,1914–1915,,wikipedia
 39cc91c0cae9d1553f5b5a33,1989,Richmond,Dale Weightman,1256,unique,Captain,1988–1992,,wikipedia
 39d69daa98065745994295c2,2023,Essendon,Zach Merrett,12241,unique,Captain,2023–2025,,wikipedia
 39f3b03e56d0549b319bf0c2,1926,North Melbourne,Wels Eicke,2835,unique,Captain,1926,,wikipedia
 3a245fd341d5edbc2b357bd6,1962,Collingwood,Murray Weideman,3865,unique,Captain,1960–1963,,wikipedia
+3a35149b3658ccb481e8f0f5,1927,Fitzroy,Len Wigraft,3877,unique,Captain,1927,,wikipedia
 3a5afc4c90f3965aba7ab9a9,1994,North Melbourne,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
+3a5e24a6f2633fa59a5d15ce,1994,Fitzroy,Paul Roos,985,unique,Captain,1992–1994,,wikipedia
 3a8f17891292334743147c3b,2000,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 3aa8dc014bbd2a9198fb087c,2026,Brisbane Lions,Josh Dunkley,12408,unique,Captain,2026–,,wikipedia
 3b086e452325b0a94420b328,1950,St Kilda,Fred Green,2965,unique,Captain,1949–50,,wikipedia
+3b204adc40265ba55eb4c735,1987,Geelong,Damian Bourke,109,unique,Captain,1987–1989,,wikipedia
 3b7868bb2467546e4d88728b,2019,Port Adelaide,Ollie Wines,12150,unique,Captain,2019,,wikipedia
+3b8285980502eda341744201,1926,Geelong,Cliff Rankin,3561,unique,Captain,1925–1927,,wikipedia
 3b8a2e09acca21135ceb0edd,1952,North Melbourne,Kevin Dynon,1693,unique,Captain,1952–1953,,wikipedia
 3b9d931ce908dc9c528e4484,1939,North Melbourne,Keith Forbes,1729,unique,Captain,1938–1939,,wikipedia
 3be468403f0ce04eb183bb0b,1942,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
 3c0b9cac3e4de62d6b20bbe7,1903,South Melbourne,Tom Fogarty,4513,unique,Captain,1903,,wikipedia
 3c2de26431f6244c737369d1,1979,North Melbourne,Keith Greig,1765,unique,Captain,1979,,wikipedia
+3c5b93ec7592723673628edf,1904,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 3c61da4ab9fe979d48ff1944,1946,Melbourne,Norm Smith,3711,unique,Captain,1945–1947,,wikipedia
 3c74b986d392ec81954ff1f3,2009,Sydney,Craig Bolton,1090,unique,Captain,2009–2010,,wikipedia
 3ccb6d72a637a85498eb7fb9,1924,Essendon,Syd Barker,5531,unique,Captain,1922–1924,1923 and 1924 premiership captain,wikipedia
+3cd7712a06ba8022be805e84,2021,Hawthorn,Ben McEvoy,11682,unique,Captain,2021–2022,,wikipedia
 3ce6457aad4cb55f1fc29225,2021,Brisbane Lions,Dayne Zorko,12076,unique,Captain,2018–2022,,wikipedia
 3d554384fa2c8ade0528c09d,1931,Footscray,Bill Cubbins,1642,unique,Captain,1931–1932,,wikipedia
+3d6b816bf84b796709596cee,1906,Fitzroy,Ern Jenkins,4356,unique,Captain,1906–1907,,wikipedia
 3d6f632e684f5a0d355d7415,1970,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 3d8fc02fd54d5de8be4bbe1d,1958,South Melbourne,Ron Clegg,1605,unique,Captain,1957–1960,,wikipedia
 3dac0a24699ffb780dfa1c5a,1918,St Kilda,Harry Lever,5223,unique,Captain,1918,,wikipedia
@@ -363,13 +466,17 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 3e2c4d3e08c4fc630628fa19,2003,Adelaide,Mark Ricciuto,4,unique,Captain,2001–2007,,wikipedia
 3e7d9a937be7eb11815ead4f,1913,Collingwood,Jock McHale,5099,unique,Captain,1912–1913,,wikipedia
 3e7e939196685408a3df0b84,1932,Melbourne,Francis Vine,3824,unique,Captain,1932–1933,,wikipedia
+3e9a2d10d79b98b6f71582d0,1999,West Coast,Guy McKenna,1032,unique,Captain,1998–2000,,wikipedia
 3ea8977fb7ce41a227864925,1934,North Melbourne,Dick Taylor,3770,unique,Captain,1934,,wikipedia
 3ec7465612847b03bd430241,1936,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
 3efa41886c6f57623496baaa,1911,Essendon,David Smith,5065,resolved,Captain,1911,1911 premiership captain,wikipedia
+3f1f80dbc5b4ee99f02413a5,1994,Hawthorn,Chris Langford,639,unique,Captain,1994,,wikipedia
 3f6a0118fc9d148ba535e488,2025,Adelaide,Jordan Dawson,12516,unique,Captain,2023–,,wikipedia
+3f8b63a269e2ab12f7d612ec,2026,West Coast,Liam Duggan,12334,unique,Captain,2024–,,wikipedia
 3f918fe4a83dcfdb59626e83,2011,Port Adelaide,Domenic Cassisi,1193,unique,Captain,2009–2012,,wikipedia
 3feeb7e2b977e427e5a1b331,1950,Carlton,Ern Henfry,3040,unique,Captain,1947–1951,,wikipedia
 3feff0e386eb63bce379e882,1948,Carlton,Ern Henfry,3040,unique,Captain,1947–1951,,wikipedia
+4009055ea0238f3637183ca0,1956,Geelong,Bob Davis,1967,unique,Captain,1955–1958,,wikipedia
 401dde31d80e6f017f916785,1993,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 4023d5bad1b719ecfa4033be,1966,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 4036116b10b959d2bfbec33c,2004,Adelaide,Mark Ricciuto,4,unique,Captain,2001–2007,,wikipedia
@@ -379,75 +486,108 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 40e6f2acc33833ff9821a749,2005,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
 40f2573284bfa5638cb7adde,2017,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 411f7950eae53df8539d584d,1959,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
+41375cdf2dde0880c96c6bf4,2016,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
 414bf97c02a7b8b0a428c0c4,1902,St Kilda,Joe Hogan,4255,unique,Captain,1902,,wikipedia
 41a3a51e3a9afcf497c223e2,2024,Greater Western Sydney,Toby Greene,12025,unique,Captain,"2022 (co-captain), 2023– (sole captain)",,wikipedia
 41e39c0d3e8d11b6c4f43e90,1927,Carlton,Horrie Clover,2694,unique,Captain,1927,,wikipedia
+4221ed8fd9aedded2203fde6,2009,Hawthorn,Sam Mitchell,1135,unique,Captain,2008–2010,,wikipedia
 42286811099d74b3f00776cc,2021,Adelaide,Rory Sloane,11792,unique,Captain,2020–2022,,wikipedia
+4240bc0d5c796f03a45117ff,1985,Fitzroy,Matthew Rendell,1347,unique,Captain,1985–1987,,wikipedia
 425fb1b2476186156be36931,1968,Essendon,Ken Fraser,2901,unique,Captain,1965–1968,1965 premiership captain,wikipedia
 4277f2f397c5696be6be55df,1936,South Melbourne,Jack Bisset,1531,unique,Captain,1933–1936,1933 premiership captain,wikipedia
+42b84acd9110b9863bfee462,1929,Hawthorn,Bert Chadwick,2666,unique,Captain,1929,,wikipedia
 42cd2fbaf3fc7a8c6e852400,2016,Essendon,Brendon Goddard,1443,unique,Captain,2016,,wikipedia
 42f6879dd0874161268ac397,1964,Carlton,Sergio Silvagni,3696,unique,Captain,1964,,wikipedia
 431a365a147155c54ba67ddc,1933,Essendon,Garnet Campbell,1889,unique,Captain,1931–1933,,wikipedia
+432a3abea995d5bab18c4c65,2015,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
+435b8d0939eb5de38d98ad54,1953,Fitzroy,Alan Ruthven,2136,unique,Captain,1951–1954,,wikipedia
 4367bfc1044b1c30e23a8f2b,2015,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
+436d9d713d19a42561bb7ad9,1968,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
 43c7a294d277fd3058d7fdf9,2022,Gold Coast,Jarrod Witts,12177,unique,Captain,2022–2024,,wikipedia
 43db6b68e79bcafc281c3c0e,1993,Essendon,Mark Thompson,326,unique,Captain,1992–1995,1993 premiership captain,wikipedia
 43f145dc7bc86745dce8007f,1919,South Melbourne,Jim Caldwell,5710,unique,Captain,1918–1919,1918 premiership captain,wikipedia
+43f1fcdc0680491ac694caaf,1992,Hawthorn,Gary Ayres,1257,unique,Captain,1992–1993,,wikipedia
 440908e33431ac98fada57d2,1931,Melbourne,Ivor Warne-Smith,2253,unique,Captain,1928–1931,,wikipedia
+441f63707cca76d891a24930,1931,Geelong,Edward Baker,1500,unique,Captain,1931,,wikipedia
 442404bc5a6fd93ab6108c83,1919,St Kilda,Wels Eicke,2835,unique,Captain,1919,,wikipedia
 443e2ea0132b713bbefa6eaf,1996,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 44568e97e2c17f10b30e6d3c,1989,North Melbourne,John Law,1390,unique,Captain,1989,,wikipedia
 44595453ab220f02517939e2,1995,Essendon,Mark Thompson,326,unique,Captain,1992–1995,1993 premiership captain,wikipedia
 4466edcba8b8ed74f4a962fb,1898,Collingwood,Bill Proudfoot,4477,unique,Captain,1898,,wikipedia
 4486bfcd8e9951c3f600eeba,1956,Footscray,Wally Donald,1677,unique,Captain,1956,,wikipedia
+44fc8a106cc8c5468e56e362,2011,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
 45108443a334ee6cccc48d09,2021,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
+452d20d6137438f9598be937,1980,Fitzroy,Ron Alexander,1480,unique,Captain,1979–1980,,wikipedia
+453a50cdd9ed2d245ece8c18,2010,Hawthorn,Sam Mitchell,1135,unique,Captain,2008–2010,,wikipedia
 453bc26478a831d7fee5d1d9,1947,Carlton,Ern Henfry,3040,unique,Captain,1947–1951,,wikipedia
 4585e248c4643b9b34fa0815,2021,Sydney,Luke Parker,11953,unique,Captain,2019–2021,,wikipedia
 45d0263c23f866949f254d18,2006,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 45e5c9ab187eca2012268539,2010,North Melbourne,Brent Harvey,788,unique,Captain,2009–2011,,wikipedia
 45eb7237c1a148293216c5b1,2021,Gold Coast,David Swallow,11919,unique,Captain,2019–2021,,wikipedia
 45eefb0790839ddae030ddcf,1995,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
+4603a03e8221f6a480735374,1991,Fitzroy,Richard Osborne,253,unique,Captain,1991,,wikipedia
 462940c953df8eaf8df595a9,1976,Essendon,Graham Moss,2007,unique,Captain,1976,,wikipedia
+46463d70a9b358f7716bd152,1922,Geelong,Harold Craven,6377,unique,Captain,1921–1922,,wikipedia
 466cbb90993095662fbd95ac,2012,Gold Coast,Gary Ablett Jr.,1105,unique,Captain,2011–2016,,wikipedia
 4681474152e3677972af1e45,1934,South Melbourne,Jack Bisset,1531,unique,Captain,1933–1936,1933 premiership captain,wikipedia
 46a69d289cde0ff946abde36,1942,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
 46ae2031853808b627e4915a,2017,North Melbourne,Jack Ziebell,11724,unique,Captain,2017–2022,,wikipedia
 46c14fe2bc271f95aa01f69d,2007,Brisbane Lions,Chris Johnson,385,unique,Captain,2007,,wikipedia
 46d29252f1c6d144ac7d665a,1909,Melbourne,Bernie Nolan,5104,unique,Captain,1909,,wikipedia
+46f6dc62bd1e527f9b7c98ee,2007,Geelong,Tom Harley,608,unique,Captain,2007–2009,,wikipedia
 46fcb8a7fbbc3842815e6c9e,1936,Carlton,Jim Francis,1738,unique,Captain,1936,,wikipedia
+4719032062515d1a5a6fd897,1961,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 471e6fbc68c7e560bcf60c52,1961,Richmond,Ron Branton,1545,unique,Captain,1960–1962,,wikipedia
+473bfa15c87f7d2393f3120a,1976,Geelong,Bruce Nankervis,2022,unique,Captain,1976–1977,,wikipedia
 47a64f7558015e234e521e9b,2023,Sydney,Callum Mills,12413,unique,Captain,2022–2023,,wikipedia
 47d25b8d4afc1cf37042d308,2014,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
+47f06706299f90f21d0e488e,1934,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 47fda5fac2d345bee8fce7b0,1964,North Melbourne,Allen Aylett,1498,unique,Captain,1961–1964,,wikipedia
 480288a865623db81942a5ab,1901,Melbourne,William C. McClelland,4495,resolved,Captain,1901–1904,,wikipedia
 481b60870d576149ddc791f9,1949,North Melbourne,Les Foote,1728,unique,Captain,1948–1951,,wikipedia
 4852be4f41dc996fc65b52c8,1989,Footscray,Stephen Wallis,413,unique,Captain,1989,,wikipedia
 4861cc4ec4b2ec6ada5e23fd,2024,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
+48d878da01cefab43a12ee25,1995,Brisbane Bears,Roger Merrett,107,unique,Captain,1995,,wikipedia
 48f6df2f3d9b545527a95cbf,1940,North Melbourne,Jim Adamson,2504,unique,Captain,1940,,wikipedia
 4919ca33043f9d08a07c204a,1970,Melbourne,Robert Johnson,2341,resolved,Captain,1970,,wikipedia
+49623fcf501b35b4118d8640,1958,Hawthorn,John Kennedy,1893,unique,Captain,1955–1959,,wikipedia
+498cc854cf1e00c4e22c7905,1990,Brisbane Bears,Roger Merrett,107,unique,Captain,1990,,wikipedia
+49d3ba82874ae158bad2f79f,1913,Fitzroy,Bill Walker,5071,unique,Captain,1913,,wikipedia
+4a046862f93cbddeeae8b615,2022,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
+4a0487a7026cf89ca7db1ae8,1927,Hawthorn,Clarrie Lethlean,6735,unique,Captain,1927,,wikipedia
 4a2d6a45da090506d8fd928e,1912,St Kilda,George Morrissey,5433,unique,Captain,1912,,wikipedia
 4aa0a9250ba5c8241649599b,2015,Adelaide,Taylor Walker,11713,unique,Captain,2015–2018,,wikipedia
 4b28f3abf9437611904e2fde,1932,St Kilda,Stuart King,3167,unique,Captain,1932,,wikipedia
 4bd0a513d628b7a6a2279ac9,1949,St Kilda,Fred Green,2965,unique,Captain,1949–50,,wikipedia
+4bd17c426ff419cabdd55fd8,2019,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
+4c0d3b38709e0954cd066d41,2001,West Coast,Dean Kemp,1028,unique,Captain,2001,,wikipedia
+4c0e2df980fb372883183b15,2021,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 4cb7d0d64451154119c8d736,2025,Essendon,Zach Merrett,12241,unique,Captain,2023–2025,,wikipedia
 4cd1ce13626245973a3fdee2,1988,Melbourne,Greg Healy,1408,unique,Captain,1988–1990,,wikipedia
 4cf3c5d74555945a2993eba0,1955,Collingwood,Lou Richards,3582,unique,Captain,1952–1955,,wikipedia
+4d48d7ade6127a642d3dfb27,1906,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 4d7d4c1f80236a49aa5db779,2010,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
 4d7ee774611523c5df2fe757,2023,Brisbane Lions,Lachie Neale,12055,unique,Captain,2023–2025,,wikipedia
 4da05bb834bf672ec028e1e3,1991,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
 4dc5b7706189279395866440,1950,Footscray,Arthur Olliver,3476,unique,Captain,1948–1950,,wikipedia
 4df486f08985c77bbe380f7d,1913,Carlton,Jack Wells,5325,unique,Captain,1912–1913,,wikipedia
 4df91116f27c85b81a77b030,2019,North Melbourne,Jack Ziebell,11724,unique,Captain,2017–2022,,wikipedia
+4e1759f32a3044554955667a,2010,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 4e179f9676159e58170f2d2c,2000,Kangaroos,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
+4e5080f81889a23a218a57a7,2023,Geelong,Patrick Dangerfield,11700,unique,Captain,2023–,,wikipedia
+4e5c5c96da0697b77196f91e,2015,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
 4e6a7399db9c83f103dfc64a,1925,Carlton,Maurie Beasy,2533,unique,Captain,1925,,wikipedia
 4e9ec3451816fe52c6d16d50,2016,Gold Coast,Gary Ablett Jr.,1105,unique,Captain,2011–2016,,wikipedia
 4ea4a86085fb2662daefb60b,1978,Essendon,Ken Fletcher,1724,unique,Captain,1977–1979,,wikipedia
 4eb7f8bc5fe6e4e0053da8f3,1975,Richmond,Royce Hart,2367,unique,Captain,1972–1975,1973 Premiership Captain1974 Premiership Captain,wikipedia
+4ed82a0e292c57eacdde0c63,1995,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 4edcf101cc5874566d96e460,1964,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
 4f2b6a101fdb059558506b8c,1923,St Kilda,Dave McNamara,5226,unique,Captain,1923,,wikipedia
 4f2d4f10758aaa003a2250ac,1940,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 4f74422315bb170e27da62ab,1940,Collingwood,Jack Regan,3570,unique,Captain,1940–1941,,wikipedia
 4f9415eba5c7580072240e3a,2017,Adelaide,Taylor Walker,11713,unique,Captain,2015–2018,,wikipedia
 4f9c8c843e476bd7d750579a,1997,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
+4faacad6002968349baad168,1997,Hawthorn,Jason Dunstall,632,unique,Captain,1995–1998,,wikipedia
 4fcae7b3c621dcef08f82fb3,1997,Brisbane Lions,Michael Voss,102,unique,Captain,1997–2000,,wikipedia
 4fcd230302d4fc92f99b91af,1929,Footscray,Allan Hopkins,1467,unique,Captain,1929–1930,,wikipedia
 4fd29f76d4adeae703ae600b,2002,Fremantle,Peter Bell,486,unique,Captain,2002–2006,,wikipedia
@@ -457,13 +597,18 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 503958dbcb03be0a2cadb765,1922,St Kilda,Bill Cubbins,1642,unique,Captain,1922,,wikipedia
 505fdee4cb091d04911b136b,1965,North Melbourne,Noel Teasdale,3772,unique,Captain,1965–1967,,wikipedia
 508792b372bc9753ab3f8458,1965,Collingwood,John Henderson,3042,unique,Captain,1965,,wikipedia
+50a2c820f58766580a4be34e,2004,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
 50a6cf1dc4eabc18e17e499a,1989,Essendon,Tim Watson,1162,unique,Captain,1989–1991,,wikipedia
+50ed4157687dc1b8766a51ab,1913,Geelong,Bill Eason,4972,unique,Captain,1910–1913,,wikipedia
 510368e49f1cafbbd672f3de,1993,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
+513e5ed6707794bbfa830b32,1909,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 514dc61c2bdafd53bbd82ae0,2018,Brisbane Lions,Dayne Zorko,12076,unique,Captain,2018–2022,,wikipedia
 514edbbd1edebfd6a97cf3ea,1994,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
+5163ad1ce335bba99ce4957a,2005,Geelong,Steven King,587,unique,Captain,2003–2006,,wikipedia
 518b1dd7cbda9c3e9255c47b,1996,North Melbourne,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
 51bc8e0736f6715b68f45b84,2013,North Melbourne,Andrew Swallow,4176,unique,Captain,2012–2016,,wikipedia
 51f23868a006de65249ea9da,1972,Essendon,Des Tuddenham,2228,unique,Captain,1972–1975,,wikipedia
+51f312b1eb0b80ceaaf12908,1910,Geelong,Bill Eason,4972,unique,Captain,1910–1913,,wikipedia
 520d521a68501cd839148775,2026,St Kilda,Callum Wilkie,12703,unique,Captain,2026–,,wikipedia
 5233f1d421a0addb12b19627,1914,St Kilda,Dave McNamara,5226,unique,Captain,1914,,wikipedia
 524862f72473eba94eb4b3a8,1939,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
@@ -475,9 +620,14 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 530214662054234159580160,2019,Gold Coast,David Swallow,11919,unique,Captain,2019–2021,,wikipedia
 53029c74cc30e10b0a17509e,1971,Footscray,Gary Dempsey,1667,unique,Captain,1971–1972,,wikipedia
 5314fa344494228d48650e7b,1909,South Melbourne,Charlie Ricketts,5339,unique,Captain,1909,1909 premiership captain,wikipedia
+5398b900bcab9518cf710195,1918,Fitzroy,George Holden,5598,unique,Captain,1917–1918,,wikipedia
+53b047429f3963ee91f3fb30,1914,University,Jack West,5312,unique,Captain,1914,,wikipedia
+53bfc9bad5bea45682c04828,1902,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 53cf48f046afae4bf01bd0a8,1959,Collingwood,Frank Tuck,3807,unique,Captain,1958–1959,,wikipedia
 53e407680d662bd27b132cf5,1973,North Melbourne,Barry Davis,1654,unique,Captain,1973–1975,1975 Premiership Captain,wikipedia
 541286837375d362ccfe22fb,1960,Melbourne,Ron Barassi,2521,unique,Captain,1960–1964,,wikipedia
+543d7fca83d5eff8e3dba3d9,1973,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
+5457ce3509498e54ab5b198e,1944,Hawthorn,Jim Bohan,2568,unique,Captain,1944,,wikipedia
 547cad38edc5ef3d47dbcf1c,1925,South Melbourne,Paddy Scanlan,3662,unique,Captain,1923–1925,,wikipedia
 54815c234ef5304fd6d56bd0,1997,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 548a132a5f84802e52a995e2,1946,South Melbourne,Jack Graham,2951,unique,Captain,1946–1948,,wikipedia
@@ -489,6 +639,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 5573ff84e55d4cdccae2e153,2007,Brisbane Lions,Luke Power,1084,unique,Captain,2007,,wikipedia
 55beabd3585ebcdbcbb647e1,1908,Collingwood,Robert Nash,5193,resolved,Captain,1908,,wikipedia
 55f7a1db7ee8562c86982604,2005,Sydney,Stuart Maxfield,867,unique,Captain,2003–2005,,wikipedia
+55f7ce7a5c9023e90ccbcfe1,1936,Hawthorn,Ivan McAlpine,1470,unique,Captain,1935–1937,,wikipedia
 55fefa10bb4e2c1676f5a6bf,2026,Brisbane Lions,Harris Andrews,12340,unique,Captain,2026–,,wikipedia
 5616f979196e56129104641f,1928,Richmond,Allan Geddes,1749,unique,Captain,1927–1928,,wikipedia
 562a7e27ffbb2beb2b94627e,2011,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2009–2012,,wikipedia
@@ -498,8 +649,10 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 5728c872f2710141149c2fbf,2024,Gold Coast,Jarrod Witts,12177,unique,Captain,2022–2024,,wikipedia
 5754a9612c03af0c2647e333,2023,Gold Coast,Jarrod Witts,12177,unique,Captain,2022–2024,,wikipedia
 5768f2641d346591b09f62a4,1900,South Melbourne,George Davidson,4284,unique,Captain,1900,,wikipedia
+57c2713f34400cde42cba4c1,1963,Fitzroy,Kevin Murray,2018,unique,Captain,1963–1964,,wikipedia
 57ea2ac424ec2d0cedf50fe8,1934,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
 582d86ffdbc278892a248858,2026,Fremantle,Alex Pearce,12352,unique,Captain,2023–,,wikipedia
+58b4a52ab5dbb0b9e59fe98d,1953,Geelong,Fred Flanagan,2887,unique,Captain,1951–1954,,wikipedia
 58da3a50e4a3eab7a8e894f9,1958,Richmond,Roy Wright,2296,unique,Captain,1958–1959,,wikipedia
 58f750d0b63d9c38f335fe48,1913,St Kilda,Harry Lever,5223,unique,Captain,1913,,wikipedia
 58f7e610a469b6f1f817a992,1948,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
@@ -509,18 +662,26 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 5a0f8670c6f4fd4c0139b1cf,1992,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
 5a47557d139ceae34e870b47,2007,St Kilda,Nick Riewoldt,981,unique,Captain,2007,,wikipedia
 5a500e131201fac41278e775,1974,Collingwood,Wayne Richardson,2109,unique,Captain,1972–1975,,wikipedia
+5aa29fe3d0b67aa265dbd897,1947,Hawthorn,Alec Albiston,2485,unique,Captain,1947–1949,,wikipedia
 5aafc0e1a0f85453c2e1d5fc,1902,South Melbourne,Bill Windley,4307,unique,Captain,1902,,wikipedia
 5ada41a96723cef0e3931376,1952,Carlton,Ern Henfry,3040,unique,Captain,1952,,wikipedia
 5b73340bf3fea6f65041196a,1977,South Melbourne,Ricky Quade,2089,unique,Captain,1977–1979,,wikipedia
 5b8910c83f15220c6447b8ba,2015,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
+5bc2c452a544ce53359678e7,1969,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
 5c11e7b9a1ed4861e1802da9,1938,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
+5c2306e574a4c006b533802c,1958,Geelong,Bob Davis,1967,unique,Captain,1955–1958,,wikipedia
 5c31ab84fe47d36c27d496d1,1984,Footscray,Jim Edmond,1698,unique,Captain,1983–1985,,wikipedia
 5c9fff1d21db4d97cc88c9ee,2003,Fremantle,Peter Bell,486,unique,Captain,2002–2006,,wikipedia
 5ca96fd8a632732696bfebcd,1905,Melbourne,Frank Langley,4720,unique,Captain,1905,,wikipedia
+5cc2fe445274932396927cab,1978,Hawthorn,Don Scott,2147,unique,Captain,1976–1980,,wikipedia
+5cd5d12849d7073bcad87a11,1972,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
+5cde9660390ab9f185daea19,2006,Geelong,Steven King,587,unique,Captain,2003–2006,,wikipedia
 5ce211ae7622941e24c963c7,2024,Adelaide,Jordan Dawson,12516,unique,Captain,2023–,,wikipedia
 5d288f9c889cd92ee4785789,2025,Brisbane Lions,Lachie Neale,12055,unique,Captain,2023–2025,,wikipedia
 5d8d621cfa7345c8e930bc1e,2024,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
+5da2782bd0f38243bb0e7fac,2016,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
 5dab662219a0df9e37fd606f,1931,Essendon,Garnet Campbell,1889,unique,Captain,1931–1933,,wikipedia
+5dcaa00bfd013e765beba80e,1933,Hawthorn,Bill Twomey,6546,unique,Captain,1933,,wikipedia
 5dddc7395f41409c31144f95,1974,Richmond,Royce Hart,2367,unique,Captain,1972–1975,1973 Premiership Captain1974 Premiership Captain,wikipedia
 5deaeb777a15dea504b7550c,1902,Melbourne,William C. McClelland,4495,resolved,Captain,1901–1904,,wikipedia
 5dfe2a096194520a28936622,1961,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
@@ -531,23 +692,35 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 5eb492ffdc317cb15575caa8,1906,St Kilda,Jimmy Smith,4648,unique,Captain,1906,,wikipedia
 5edf4301aa0bfc3817e5c0a2,1957,Footscray,Ted Whitten,2268,unique,Captain,1957,Ted Whitten Longest Serving Captain,wikipedia
 5f55be031e0641ec39d28625,1898,South Melbourne,Bill Fraser,4288,unique,Captain,1897–1898,Inaugural captain,wikipedia
+5f577badd00136a9bed78aff,2019,Hawthorn,Ben Stratton,11824,unique,Captain,2019–2020,,wikipedia
 5f75476a7a172b3d68d1b82e,1967,Richmond,Fred Swift,3760,unique,Captain,1967,1967 Premiership Captain,wikipedia
 5ffbfb24291258c375fefbaf,2003,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 60001bbe4f9574c5de84d640,1898,St Kilda,Billy Shaw,4272,unique,Captain,1897-99,,wikipedia
 600d03085dc2ce7c91296a9a,1925,Melbourne,Albert Chadwick,2666,resolved,Captain,1924–1927,,wikipedia
+6025c69c5a5851e73a608864,2019,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
+602f7c516bdd58e56a7a9303,1954,Hawthorn,Ted Fletcher,1723,unique,Captain,1953–1954,,wikipedia
+6077bb689a52689a081da729,1960,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 6088c531928b932fc93eef2b,2017,Sydney,Josh Kennedy,11672,unique,Captain,2017–2018,,wikipedia
+609bf1d380997c702c61db19,1914,Fitzroy,Percy Parratt,5746,unique,Captain,1914–1915,,wikipedia
+60aadde4183fd27c7cb25190,2017,Hawthorn,Jarryd Roughead,4078,unique,Captain,2017–2018,,wikipedia
 60ea48e7506555f94eac66de,1998,St Kilda,Stewart Loewe,927,unique,Captain,1996–98,,wikipedia
 60f2aac6c671d16cc8401762,2021,Carlton,Sam Docherty,12170,unique,Captain,2019–2021,,wikipedia
 610aa7602e4236c776380a3d,2021,Essendon,Dyson Heppell,11896,unique,Captain,2017–2022,,wikipedia
 610b670c54b66891869249cb,1961,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
 6128b21b0bfb4cb8c7439b89,2010,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2009–2012,,wikipedia
 612fc77ea52db3f7521080c6,1945,Melbourne,Norm Smith,3711,unique,Captain,1945–1947,,wikipedia
+615909caa494829121c78df0,1974,Hawthorn,Peter Crimmins,1636,unique,Captain,1974–1975,,wikipedia
 6159cccd27c3e2d8a5fba6e4,2015,Carlton,Marc Murphy,4148,unique,Captain,2013–2018,,wikipedia
+618522290574936fc6251a41,1940,Hawthorn,Bert Mills,1986,unique,Captain,1940–1941,,wikipedia
 61d8fcc3ab36b9fde2ef62c2,1977,Carlton,Robert Walls,2248,unique,Captain,1977,,wikipedia
 62568c02836b601f8dc9500b,1934,Footscray,Bill Cubbins,1642,unique,Captain,1934,,wikipedia
 6264d54b584370fbbeef3b03,2025,Fremantle,Alex Pearce,12352,unique,Captain,2023–,,wikipedia
+62edd74c34c283dee201d112,1991,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
+6344c485fc0cf7f41f0f776b,1976,Fitzroy,John Murphy,2017,unique,Captain,1973–1977,,wikipedia
 634ed0009686eabbdb92f959,1927,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
+63cac5caaf9d4db786dd82d4,1965,Geelong,Graham Farmer,2861,unique,Captain,1965–1967,,wikipedia
 641df40f50d3946ae3b958af,1898,Carlton,Ernie Walton,4450,unique,Captain,1898–1899,,wikipedia
+642775caba9d914013bd8fb4,1927,Geelong,Cliff Rankin,3561,unique,Captain,1925–1927,,wikipedia
 6480fcc9379661b47f6b9ad8,1922,Collingwood,Tom Drummond,6421,unique,Captain,1922,,wikipedia
 64a3c5ed5c8e64b1c8aff2b5,1935,Footscray,Alby Morrison,3383,unique,Captain,1935,,wikipedia
 64e11902f83c19d89fa36aa2,1929,St Kilda,Bill Cubbins,1642,unique,Captain,1929–30,,wikipedia
@@ -556,10 +729,13 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 6528b57c06ccfc57061fc40b,1945,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 6534fde56740682468d5557e,2010,Richmond,Chris Newman,1150,unique,Captain,2009–2012,,wikipedia
 65465279f4128093a4e6b6ad,1940,North Melbourne,Len Thomas,3779,unique,Captain,1940,,wikipedia
+655dc27ac6be24057215c5d8,1973,Geelong,Geoff Ainsworth,2311,unique,Captain,1973,,wikipedia
+6563f57a5460c60c6f18ac4d,1899,Fitzroy,Alec Sloan,4377,unique,Captain,1898–1900,,wikipedia
 6579703e1e6b1097f89cd1c0,1938,North Melbourne,Keith Forbes,1729,unique,Captain,1938–1939,,wikipedia
 658841acab1ffb62e0e6f519,1971,Collingwood,Wayne Richardson,2109,unique,Captain,1971,,wikipedia
 65aae83f113b179633bed24d,2013,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
 65c6ced5c84488a4005ebc0f,1914,South Melbourne,Vic Belcher,5438,unique,Captain,1914–1915; 1917,,wikipedia
+65e43718e60df4e34721b8ce,1985,Geelong,Michael Turner,2230,unique,Captain,1984–1986,,wikipedia
 663d76a18e93f1b134579794,2004,Port Adelaide,Matthew Primus,407,unique,Captain,2001–2005,,wikipedia
 6640666d58ac791fe637534c,1982,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1980–1987,,wikipedia
 664c347a93db95ab3382858b,1951,Footscray,Charlie Sutton,3756,unique,Captain,1951–1955,1954 Premiership Captain,wikipedia
@@ -569,7 +745,9 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 66e46c31851080041e465756,1950,Collingwood,Gordon Hocking,3063,unique,Captain,1950–1951,,wikipedia
 672dbf6b49d80903f30e2097,1983,Essendon,Terry Daniher,1311,unique,Captain,1983–1988,1984 and 1985 premiership captain,wikipedia
 67557c9ce7b951987381418b,1899,St Kilda,Billy Shaw,4272,unique,Captain,1897-99,,wikipedia
+6774ef1a60d1d4277cbc0450,1917,Geelong,Harry Marsham,5755,unique,Captain,1917,,wikipedia
 67866ee7a92ccb2ab2794a36,1918,South Melbourne,Jim Caldwell,5710,unique,Captain,1918–1919,1918 premiership captain,wikipedia
+67c99108450f0b41b0822c0d,1941,Fitzroy,Frank Curcio,2745,unique,Captain,1938–1941,,wikipedia
 67ce5c6cadf266304f3eec66,1972,North Melbourne,David Dench,1669,unique,Captain,1972,,wikipedia
 67d01f632b50c6495371a460,1996,Fremantle,Ben Allan,481,unique,Captain,1995–1996,,wikipedia
 6871c331d31f64c46dfb5fbc,1964,Richmond,Neville Crowe,2737,unique,Captain,1963–1966,,wikipedia
@@ -577,24 +755,30 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 689c001fb04307e2952bf27f,2005,Sydney,Barry Hall,953,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
 68fd9cc85007c0be71ead5d7,1933,Melbourne,Francis Vine,3824,unique,Captain,1932–1933,,wikipedia
 6901adee4bfd4a7ae4bd6280,1997,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
+6902ccd962d8aaf7798b3537,1932,Fitzroy,Haydn Bunton,1466,unique,Captain,1932,,wikipedia
 694e31d97a09faae82522726,2009,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2009–2012,,wikipedia
 69691eaf7b470a4fe3967806,1991,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
 698de0e170125dd6951844b1,1954,South Melbourne,Ron Clegg,1605,unique,Captain,1953–1954,,wikipedia
+69d7aded5214f31a782e5c95,1920,Fitzroy,Percy Parratt,5746,unique,Captain,1920,,wikipedia
 69e1a2f3bd480326e4b8af64,1996,St Kilda,Stewart Loewe,927,unique,Captain,1996–98,,wikipedia
 69e6279fc56edc8e425cc252,1976,Richmond,Francis Bourke,1539,unique,Captain,1976–1977,,wikipedia
 6a023a81b60fe5039729e807,1920,Carlton,Paddy O'Brien,3437,unique,Captain,1920,,wikipedia
 6a18a3a18a99b532efc7ef43,1965,Melbourne,Hassa Mann,3261,unique,Captain,1965–1969,,wikipedia
 6a28c5300de1196d3bf3632f,1920,South Melbourne,Vic Belcher,5438,unique,Captain,1920,,wikipedia
+6a60f769e2c0d59aee7f6555,1908,University,Tom Fogarty,4513,unique,Captain,1908,,wikipedia
 6a67c357b683af3d4a91c7a2,2004,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 6a7896d87ed7a28a4a0659c3,1965,Essendon,Ken Fraser,2901,unique,Captain,1965–1968,1965 premiership captain,wikipedia
 6a9c99c34d41df77cbcd6774,1995,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 6ad8b9484c92c065f536f7f5,1935,South Melbourne,Jack Bisset,1531,unique,Captain,1933–1936,1933 premiership captain,wikipedia
+6ada21323223a9b73c27679a,1917,Fitzroy,George Holden,5598,unique,Captain,1917–1918,,wikipedia
 6af88186559d44efc1e8ff79,2025,Brisbane Lions,Harris Andrews,12340,unique,Captain,2023–2025,,wikipedia
 6b06e02c12703e7506b8ed0d,2008,Adelaide,Simon Goodwin,51,unique,Captain,2008–2010,,wikipedia
 6b0f2fe0a7cc161ed3e50c99,2007,Carlton,Lance Whitnall,173,unique,Captain,2007,,wikipedia
+6ba1c20b89a06d4b81796320,1969,Hawthorn,David Parkin,2055,unique,Captain,1969–1973,,wikipedia
 6ba35cda2cf7c9f101914258,1999,Melbourne,Todd Viney,700,unique,Captain,1998–1999,,wikipedia
 6bd40c7aa7067f13a57facb6,2022,Richmond,Dylan Grimes,11879,unique,Captain,2022–2023,Co-captains,wikipedia
 6c25534c1ce086c5c22d40f5,1997,St Kilda,Nathan Burke,919,unique,Captain,1996–98,,wikipedia
+6c347dd4d8e2068e2388f35b,1925,Geelong,Cliff Rankin,3561,unique,Captain,1925–1927,,wikipedia
 6c3af3d0a9d8256e0f640a6d,1967,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
 6c776f0feebab916fb937ec1,1962,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
 6ca59c3eb73ba7de299cb19b,1905,Collingwood,Charlie Pannam,4474,unique,Captain,1905,,wikipedia
@@ -612,6 +796,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 6ec09fc18873821824575361,1944,Footscray,Arthur Olliver,3476,unique,Captain,1943–1946,,wikipedia
 6ec1fce1acf19dbbba6f49d6,1988,Essendon,Terry Daniher,1311,unique,Captain,1983–1988,1984 and 1985 premiership captain,wikipedia
 6eca45d226613639acd3cc6a,2022,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
+6efb1738e2fcb54f2db45184,1949,Fitzroy,Norm Smith,3711,unique,Captain,1949,,wikipedia
 6f04d178e4e7693e9386c688,1944,Melbourne,Percy Beames,1516,unique,Captain,1942–1944,,wikipedia
 6f1a0e27d0dc1918a2a9b61b,2018,Sydney,Josh Kennedy,11672,unique,Captain,2017–2018,,wikipedia
 6f4e943e0b530c41a738e45a,1942,Footscray,Norman Ware,3846,resolved,Captain,1940–1942,,wikipedia
@@ -619,6 +804,8 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 6fbdc428931d8514cb4f71de,1978,Carlton,Alex Jesaulenko,1844,unique,Captain,1978,,wikipedia
 6fbe52760f161e18f910f82f,1910,Richmond,Billy Schmidt,5546,unique,Captain,1910,,wikipedia
 701dc26b6e795cdecef080c1,1968,Carlton,Ron Barassi,2521,unique,Captain,1968,,wikipedia
+704469b433af934bd4ad036c,1951,Fitzroy,Alan Ruthven,2136,unique,Captain,1951–1954,,wikipedia
+7079376b1fd250842c7ee6a9,2012,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 7097f3a35dc53ee6f6375cfa,1935,North Melbourne,Tom Fitzmaurice,2881,unique,Captain,1935,,wikipedia
 70bcbd2be6d862d0360645c0,1952,Footscray,Charlie Sutton,3756,unique,Captain,1951–1955,1954 Premiership Captain,wikipedia
 70c78ee41c2fec2715057014,1986,Richmond,Mark Lee,1363,unique,Captain,1985–1987,,wikipedia
@@ -629,14 +816,18 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 7140cf281a79a8e891fb0bf3,2020,Sydney,Dane Rampe,12140,unique,Captain,2019–2021,,wikipedia
 71454cd0c0af9c6d81127df7,1996,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
 719441c3aeda3255fcd57de5,1906,South Melbourne,Herb Howson,4291,resolved,Captain,1906,,wikipedia
+71c3eacbb8a29e2ea009cc0e,1909,University,Harry Cordner,5012,unique,Captain,1909,,wikipedia
 71ca74c506043b9fd764105d,2022,Port Adelaide,Tom Jonas,12002,unique,Captain,2020–2023,,wikipedia
+71cb1673919ed93e9cf0fdbc,1979,Fitzroy,Ron Alexander,1480,unique,Captain,1979–1980,,wikipedia
 72172983f275a0f556a17637,2023,Collingwood,Darcy Moore,12372,unique,Captain,2023–,,wikipedia
 723625ac921f321db663c77b,2021,St Kilda,Jarryn Geary,11630,unique,Captain,2021,,wikipedia
+7239ab8e0d9f83ece0234134,2026,Hawthorn,Jai Newcombe,12915,unique,Captain,2026–,,wikipedia
 72483013f859ad77ba2b2cf3,2024,St Kilda,Jack Steele,12368,unique,Captain,2022–2025,,wikipedia
 7285d1344a23608529c73620,1999,Brisbane Lions,Michael Voss,102,unique,Captain,1997–2000,,wikipedia
 72939b4756f0ed3b1fbb9cc7,1907,Carlton,Jim Flynn,4388,unique,Captain,1905–1907,,wikipedia
 72d3990d67eb8f11a41a4ff4,2017,Melbourne,Nathan Jones,2447,unique,Captain,2017–2019,,wikipedia
 7308cfcb1d0a46ffc6459d64,1938,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
+7319095a886d2e5915a9a7c2,1919,Geelong,Jim Kearney,6381,unique,Captain,1918–1919,,wikipedia
 73bc0b61179bece4acb99990,2012,North Melbourne,Andrew Swallow,4176,unique,Captain,2012–2016,,wikipedia
 73cfb2c1a1e90793957d192d,1914,Essendon,Allan Belcher,5187,unique,Captain,1912–1915,1912 premiership captain,wikipedia
 73ffabd0ff761da06c915426,1897,South Melbourne,Bill Fraser,4288,unique,Captain,1897–1898,Inaugural captain,wikipedia
@@ -646,41 +837,55 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 74539ae5ac622a636dbc05ca,1952,St Kilda,Keith Drinan,1682,unique,Captain,1951–53,,wikipedia
 74706ec154913f3d628d6a46,1922,Essendon,Syd Barker,5531,unique,Captain,1922–1924,1923 and 1924 premiership captain,wikipedia
 747db2329c768af98fd565f0,2001,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
+747fba5d9e3c7f14af795285,1996,Brisbane Bears,Roger Merrett,107,unique,Captain,1996,,wikipedia
 7499005fd20d73283c15145b,2015,Essendon,Jobe Watson,1461,unique,Captain,2010–2016,,wikipedia
 74acfff9d129874a72c17446,2017,Essendon,Dyson Heppell,11896,unique,Captain,2017–2022,,wikipedia
+74d739c8a2c698f6d564a45f,2022,Hawthorn,Ben McEvoy,11682,unique,Captain,2021–2022,,wikipedia
 74e64240b4a2c850a65c8920,1901,Collingwood,Bill Proudfoot,4477,unique,Captain,1901,,wikipedia
 7539a60bbd91c4fe0c2047fb,1991,Essendon,Tim Watson,1162,unique,Captain,1989–1991,,wikipedia
 7595bf19b5fa19a4c6cf2101,1935,Essendon,Keith Forbes,1729,unique,Captain,1934–1935,,wikipedia
 75db1a52647b56b5337e09b2,1969,Carlton,John Nicholls,3422,unique,Captain,1969–1973,,wikipedia
 75fc3d10d8d0418a1058ba28,2015,North Melbourne,Andrew Swallow,4176,unique,Captain,2012–2016,,wikipedia
 7608f90f50fea0597f8d6fbc,2005,Western Bulldogs,Luke Darcy,436,unique,Captain,2005–2006,,wikipedia
+7613f6c1d90ae99477949d72,2003,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
 76536fca0a8fe322e89caebc,1898,Essendon,George Stuckey,4337,unique,Captain,1897–1900,1897 premiership captain,wikipedia
 76ab8b4418502d1f1075fe9a,1910,St Kilda,Sam Gravenall,5024,unique,Captain,1910,,wikipedia
 76b2ccca937d58eb38c0a1be,2006,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 76e03a87d9b4efc9206bcf73,1965,Collingwood,Ray Gabelich,2906,unique,Captain,1965,,wikipedia
+76e7c7e2ca22d848fba7988b,1940,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 76f3a9a3c2f2fbf86bd93ca1,2019,Melbourne,Nathan Jones,2447,unique,Captain,2017–2019,,wikipedia
 7703bc0023bffbfa766b56bf,1901,South Melbourne,Albert Trim,4560,unique,Captain,1901,,wikipedia
 773195605ad2489c2f051cdf,1925,Carlton,Ray Brew,2591,unique,Captain,1925–1926,,wikipedia
+7777db63f495a1f6c0424806,1961,Geelong,John Yeates,3921,unique,Captain,1961–1962,,wikipedia
 778bf640fac9e8ec36f20e8d,1994,Collingwood,Gavin Brown,216,unique,Captain,1994–1998,,wikipedia
 77a0f17f091ece1cfef2278e,1930,Richmond,Allan Geddes,1749,unique,Captain,1930,,wikipedia
 77ae670a455cbfc98e7f7578,1928,South Melbourne,Joe Scanlan,2143,unique,Captain,1928,,wikipedia
 77f6e41461b223b65fcd4c96,1998,Western Bulldogs,Scott Wynd,424,unique,Captain,1994–2000,,wikipedia
 77fec032436dec8f6d3d5353,1977,Melbourne,Greg Wells,2260,unique,Captain,1977–1978,,wikipedia
 782d580069482e2ac9ebb42d,1962,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
+7832a1b69a91e8ae0fa49a84,1995,Geelong,Ken Hinkley,559,unique,Captain,1995,,wikipedia
+7839cd744acfca3c1e18d6f9,1995,Fitzroy,Brad Boyd,374,unique,Captain,1995–1996,,wikipedia
 7898d0cf7e2236a20095f51b,1985,Richmond,Mark Lee,1363,unique,Captain,1985–1987,,wikipedia
 78d65150f640115ac6b543b4,1987,Sydney,Dennis Carroll,1268,unique,Captain,1986–1992,,wikipedia
+7911a0f4f1ed9f547d2a4baf,1962,Geelong,John Yeates,3921,unique,Captain,1961–1962,,wikipedia
+791a69476222137f8595a427,2020,West Coast,Luke Shuey,11805,unique,Captain,2020–2023,,wikipedia
 79444c80ff192627d4c863a8,1966,Melbourne,Hassa Mann,3261,unique,Captain,1965–1969,,wikipedia
 7949ba79c6fdc60a0877e658,1965,Carlton,Ron Barassi,2521,unique,Captain,1965–1967,,wikipedia
+798a86ffaa4a305cedd4395f,1953,Hawthorn,Ted Fletcher,1723,unique,Captain,1953–1954,,wikipedia
 799e177ddfd01a4f9035949e,2007,Brisbane Lions,Simon Black,1083,unique,Captain,2007,,wikipedia
 79b0b82f64554e5402f44467,1931,Carlton,Ray Brew,2591,unique,Captain,1928–1931,,wikipedia
 79bec6efc1693a7ddb61b8bb,1930,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
+79f8f37696b729b6f191fd51,2023,West Coast,Luke Shuey,11805,unique,Captain,2020–2023,,wikipedia
 7a7b491af12732f6375b0be4,1962,St Kilda,Neil Roberts,2116,unique,Captain,1959–62,,wikipedia
 7aa3a8d63cd4143fe396a244,2026,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
 7aaa2e85f95b6a83a2a9672b,1977,North Melbourne,Keith Greig,1765,unique,Captain,1976–1978,,wikipedia
+7aab305a4a23f61d64b44601,1998,Geelong,Barry Stoneham,584,unique,Captain,1995–1998,,wikipedia
 7ad2dbad08073415d49e59a8,2022,Greater Western Sydney,Toby Greene,12025,unique,Captain,"2022 (co-captain), 2023– (sole captain)",,wikipedia
 7ae77263d7bcb2c17fb1e88e,2026,Sydney,Callum Mills,12413,unique,Captain,2024–,,wikipedia
 7b0c7391e66d029e1a6f9ec0,1957,St Kilda,Keith Drinan,1682,unique,Captain,1956–57,,wikipedia
+7b0f29cf65185aa5bad9d64d,1977,Fitzroy,John Murphy,2017,unique,Captain,1973–1977,,wikipedia
 7b31a1d8d254aab0df73b0f6,1939,Collingwood,Harry Collier,1612,unique,Captain,1935–1939,,wikipedia
+7b34de5838c6c7305ad4561f,1935,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 7b4532822d1432d01f6306e5,1930,South Melbourne,Joe Scanlan,2143,unique,Captain,1930–1931,,wikipedia
 7b5a577440fbeb7ae9eeb28a,1997,Essendon,Gary O'Donnell,318,unique,Captain,1996–1997,,wikipedia
 7b97b6502038490af6949ac9,2017,Fremantle,Nat Fyfe,11834,unique,Captain,2017–2022,,wikipedia
@@ -702,12 +907,17 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 7dbc795b85de1ad725545fe2,2016,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
 7ddeb1a65400d138123efc2a,1998,Richmond,Matthew Knights,865,unique,Captain,1997–2000,,wikipedia
 7e860ef9e5a108530bb9f1e1,1988,Footscray,Rick Kennedy,1871,unique,Captain,1986–1988,,wikipedia
+7e8f7483b91504f2c7af6fe1,1942,Fitzroy,Maurie Hearn,3030,unique,Captain,1942,,wikipedia
 7e96793ef05ccf9302a13f35,1944,St Kilda,Clarrie Vontom,3827,unique,Captain,1944,,wikipedia
+7e990978211118dd509c8009,1921,Fitzroy,Chris Lethbridge,6184,unique,Captain,1921,,wikipedia
 7eaa61ff6e6c586540a7e355,1983,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1980–1987,,wikipedia
 7ec6cc8b6c8a7d5cac4abdcf,1937,St Kilda,Bill Mohr,1993,unique,Captain,1937,,wikipedia
 7ed2c6124938a5202ad0549d,1957,Collingwood,"Bill Twomey, Jr.",3816,unique,Captain,1957,,wikipedia
+7eda4f1355bb57d2882b0496,2013,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 7f4b778ae43f023764adee63,1921,Essendon,Percy Ogden,5293,unique,Captain,1920–1921,,wikipedia
+7f4f5b7d25a4434fe17599f6,1987,Brisbane Bears,Mark Mickan,1308,unique,Captain,1987,,wikipedia
 7f59293acdafe8e123e34bd2,2001,Carlton,Craig Bradley,151,unique,Captain,1998–2001,,wikipedia
+7f6a4d58bd30e65f5409a7c7,2017,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 7fa567c05d107b4815e64a3f,1906,Collingwood,Arthur Leach,4327,unique,Captain,1906,,wikipedia
 7ffe4b86e225f1b69da0a4bc,1995,Fremantle,Ben Allan,481,unique,Captain,1995–1996,,wikipedia
 8052b3a1c52db44f0da74706,2012,Melbourne,Jack Grimes,11707,unique,Captain,2012–2013,,wikipedia
@@ -723,6 +933,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 82d602f21785ca2b8c608f81,2006,Sydney,Barry Hall,953,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
 83459097d05e88ff6f6af29e,1998,Melbourne,Todd Viney,700,unique,Captain,1998–1999,,wikipedia
 834c9b298286c4dc58919690,2023,St Kilda,Jack Steele,12368,unique,Captain,2022–2025,,wikipedia
+836aa4a409f84c5c99add616,1994,Geelong,Mark Bairstow,1201,unique,Captain,1992–1994,,wikipedia
 83cfa7de8146fc1d830e0471,1903,Melbourne,William C. McClelland,4495,resolved,Captain,1901–1904,,wikipedia
 83ee2b32d8dcbd8492bdedfd,1998,Fremantle,Peter Mann,478,unique,Captain,1997–1998,,wikipedia
 83f8d54af0c7860699e0dc81,2002,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
@@ -731,15 +942,19 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 841d499f74b7a1e7e97ab135,2009,Adelaide,Simon Goodwin,51,unique,Captain,2008–2010,,wikipedia
 8462aeaceee19968cbefc120,2025,Sydney,Callum Mills,12413,unique,Captain,2024–,,wikipedia
 84646897103568881aa997e5,1945,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
+84b603c59339ccabf38b0aaf,1991,Brisbane Bears,Roger Merrett,107,unique,Captain,1991,,wikipedia
 84fcb251a52a01aef7020788,1956,St Kilda,Keith Drinan,1682,unique,Captain,1956–57,,wikipedia
 8519e57a0d6e0f424598b711,1955,Melbourne,Noel McMahen,1977,unique,Captain,1955–1956,,wikipedia
 8522ff7c3293d39e4e3ed4e8,1973,Melbourne,Stan Alves,1485,unique,Captain,1973–1976,,wikipedia
+853a4d5b1f116ef57cf26483,1919,Geelong,Alec Eason,5753,unique,Captain,1919–1920,,wikipedia
 855bd6a8145efb3bbd83afbd,2025,Gold Coast,Noah Anderson,12767,unique,Captain,2025–,,wikipedia
 8565e74ee3d3d89f3eb4c3e2,2023,Port Adelaide,Tom Jonas,12002,unique,Captain,2020–2023,,wikipedia
+85710761b0ddab2d60e609b9,1987,West Coast,Ross Glendinning,1757,unique,Captain,1987–1988,,wikipedia
 857efdb54c2ea95815e3f0a1,1927,Footscray,Paddy Scanlan,3662,unique,Captain,1927–1928,,wikipedia
 85942b9bdf43bbe3feac774b,1926,South Melbourne,Charlie Pannam,3499,resolved,Captain,1926–1927,,wikipedia
 85c7890d9aa6bbe00d56967c,2017,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
 85d0d2ad080a188e57c04629,1974,Footscray,Laurie Sandilands,2423,unique,Captain,1974–1976,,wikipedia
+85dc977100361058a05ce123,1986,Geelong,Michael Turner,2230,unique,Captain,1984–1986,,wikipedia
 85fc195362c9df3041a57ab7,1909,Collingwood,Robert Nash,5193,resolved,Captain,1909,,wikipedia
 86200389ac5cfd3913fa46f9,2009,Collingwood,Nick Maxwell,3980,unique,Captain,2009–2013,,wikipedia
 862d93da742d8ab3ef1a836e,1963,St Kilda,Darrel Baldock,2518,unique,Captain,1963–68,1966 Premiership Captain,wikipedia
@@ -749,6 +964,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 8698f1b4de456c732c41430f,1951,Carlton,Ern Henfry,3040,unique,Captain,1947–1951,,wikipedia
 870765758c3200aefc08a078,1994,Essendon,Mark Thompson,326,unique,Captain,1992–1995,1993 premiership captain,wikipedia
 8717f1015ef85040fec626fa,1964,Collingwood,Ray Gabelich,2906,unique,Captain,1964,,wikipedia
+8727967bd8f507a2a411138f,1961,Fitzroy,Alan Gale,1744,unique,Captain,1958–1961,,wikipedia
 876015cd002989f95f130a5f,1928,Carlton,Ray Brew,2591,unique,Captain,1928–1931,,wikipedia
 876d944eb15c945eaf1c9337,1933,St Kilda,Clarrie Hindson,3058,unique,Captain,1933,,wikipedia
 87951efea0dfe4fafce6e9c7,2010,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
@@ -762,6 +978,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 88b05a377bbd14e4146e2f63,1975,South Melbourne,Peter Bedford,1519,unique,Captain,1973–1976,,wikipedia
 88ca8368660ad65376d6d916,1904,Essendon,Hugh Gavin,4321,unique,Captain,1904,,wikipedia
 891a5f6415a22341d8436b8c,2018,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
+893fa419101da2bbfafa03e5,1958,Fitzroy,Alan Gale,1744,unique,Captain,1958–1961,,wikipedia
 8976f17af10769084c4e22f7,2011,Carlton,Chris Judd,1122,unique,Captain,2008–2012,,wikipedia
 89fbdcc896f2f96406000fae,1951,St Kilda,Keith Drinan,1682,unique,Captain,1951–53,,wikipedia
 8a010b3bd6494bf01e59e4cd,1951,North Melbourne,Les Foote,1728,unique,Captain,1948–1951,,wikipedia
@@ -775,22 +992,30 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 8b5dd72deaa55fc4eed7f27e,1907,St Kilda,Jack Wells,5325,unique,Captain,1907,,wikipedia
 8b96bfb8acdc515029308cec,1973,South Melbourne,Peter Bedford,1519,unique,Captain,1973–1976,,wikipedia
 8b9bda176f0e590974ee1822,2000,Fremantle,Shaun McManus,504,unique,Captain,2000–2001,,wikipedia
+8c648545fcce9dba6aa2e49a,1988,Fitzroy,Paul Roos,985,unique,Captain,1988–1990,,wikipedia
 8c7176bcb77370d79cd77592,2022,Adelaide,Rory Sloane,11792,unique,Captain,2020–2022,,wikipedia
 8c86a8ac35de9bdeadacb231,1978,St Kilda,Gary Colling,1617,unique,Captain,1978,,wikipedia
 8c8ea6261e6e833544c27cf9,1980,South Melbourne,Barry Round,2131,unique,Captain,1980–1983,,wikipedia
 8cc891e34efe769a96f0db00,2017,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
+8cd6602d7896d52bc2511621,1907,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 8cdce51b37e0212a284e2418,1992,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
+8d0d55b240eae157f763d2f3,1926,Fitzroy,Bill Adams,2481,unique,Captain,1926,,wikipedia
 8d12f59e2aaf0c751bb0dd2f,1919,Melbourne,George Heinz,5870,unique,Captain,1919–1920,,wikipedia
 8d1a26ce4cff55b6980da6b8,1976,Collingwood,Des Tuddenham,2228,unique,Captain,1976,,wikipedia
 8d2f2e4a4b9e894b208f0f3a,2019,Adelaide,Rory Sloane,11792,unique,Captain,2019,,wikipedia
+8d43c7e6dcff43be1ffbc1b2,1924,Geelong,Lloyd Hagger,2986,unique,Captain,1924,,wikipedia
 8df40d1d066e6e847551ebdd,1942,Collingwood,Phonse Kyne,3182,unique,Captain,1942,,wikipedia
 8df67d80ed8ff460332df838,1897,Melbourne,Ned Sutton,4233,unique,Captain,1897–1898,,wikipedia
 8dfddb3b74153a0e81ab1c7b,1940,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
 8e2c2a1fc8722847f82df0b4,1911,Carlton,Fred Elliott,4624,unique,Captain,1908–1911,,wikipedia
 8e6cee66643c278917d6571b,1924,South Melbourne,Paddy Scanlan,3662,unique,Captain,1923–1925,,wikipedia
 8e91934f0af3de5a944fcdfd,1998,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
+8ec5442e19850e382520f6b2,1971,Geelong,Bill Goggin,2940,unique,Captain,1968–1971,,wikipedia
 8ecdb7c2af382b8b5168cac5,2015,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
+8f15b38e8f69bb2d34df0c79,1963,Geelong,Fred Wooller,3915,unique,Captain,1963–1964,,wikipedia
+8f248867b98668df94817a76,1937,Hawthorn,Ivan McAlpine,1470,unique,Captain,1935–1937,,wikipedia
 8f2fc7bdff7b9d0844e19561,1969,Richmond,Roger Dean,2343,unique,Captain,1968–1971,1969 Premiership Captain,wikipedia
+8f49fc6b5504a148c37fc4d8,1984,Geelong,Michael Turner,2230,unique,Captain,1984–1986,,wikipedia
 8f90859093bf4ed276eb222a,2007,Sydney,Leo Barry,1003,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
 8f9587830546cc5711b8bf0d,2012,Richmond,Chris Newman,1150,unique,Captain,2009–2012,,wikipedia
 8fd2c9999380148869476711,1929,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
@@ -799,6 +1024,7 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 90c0579763b3edbd7d2f38cb,2012,Western Bulldogs,Matthew Boyd,1450,unique,Captain,2011–2013,,wikipedia
 90e40798d67ed83d1d894e92,1899,South Melbourne,Dave Adamson,4280,unique,Captain,1899,,wikipedia
 90e5025475a6b6a840dfb86f,2026,St Kilda,Jack Sinclair,12325,unique,Captain,2026–,,wikipedia
+90eada865502aaebeeeb19a7,1913,University,Bert Hurrey,5583,unique,Captain,1913,,wikipedia
 90f9f2f99f2446015968d632,1994,Richmond,Tony Free,858,unique,Captain,1994–1996,,wikipedia
 910e0a0f263acf2283cf2b9f,1900,Essendon,George Stuckey,4337,unique,Captain,1897–1900,1897 premiership captain,wikipedia
 912417410361dcbfbb1136c4,1957,South Melbourne,Ron Clegg,1605,unique,Captain,1957–1960,,wikipedia
@@ -809,10 +1035,14 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 9194c8fac92d617bb16f1629,1965,Richmond,Neville Crowe,2737,unique,Captain,1963–1966,,wikipedia
 919f97e7aef9300c1aab92bc,1979,Richmond,Kevin Bartlett,1509,unique,Captain,1979,,wikipedia
 91cfdb25dac34bc7c949651f,2016,Essendon,Jobe Watson,1443,resolved,Captain,2010–2016,,wikipedia
+91d19bf3995c858b0826bc38,1992,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 920392bb9c1a39b0725b837f,1921,Carlton,Gordon Green,6009,unique,Captain,1921,,wikipedia
+92063421be4ad761b4b2a5d1,1995,Geelong,Barry Stoneham,584,unique,Captain,1995–1998,,wikipedia
 92220fe91161fe92016364de,2007,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
+9222cfdd95c509dc3524e191,1982,Hawthorn,Leigh Matthews,1949,unique,Captain,1981–1985,,wikipedia
 9240edb89db7824bfaf1a0fb,2002,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 92874cd696e69c0506485f6e,2014,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
+928dde50ce17e78685633668,2000,West Coast,Guy McKenna,1032,unique,Captain,1998–2000,,wikipedia
 92fdc338987268f6f25b9a09,2026,Carlton,Patrick Cripps,12261,unique,Captain,2022–present,,wikipedia
 93244d3b9147babaccf993d2,1947,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 93a732c41cc45bc778ef1318,1936,Essendon,Jack Baggott,2505,unique,Captain,1936–1937,,wikipedia
@@ -820,58 +1050,85 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 9421ccff9e6edcd9b9745526,1935,Collingwood,Harry Collier,1612,unique,Captain,1935–1939,,wikipedia
 94221a4eb42451d81b3e2487,1970,Essendon,Barry Davis,1654,unique,Captain,1970–1971,,wikipedia
 94371ff79d29b178bf88c962,1912,South Melbourne,Charlie Ricketts,5339,unique,Captain,1912,,wikipedia
+949d5a1773dea5d7d7072061,2025,Geelong,Patrick Dangerfield,11700,unique,Captain,2023–,,wikipedia
 94bbb520bd76ee8914df97f9,1926,Footscray,Allan Hopkins,1467,unique,Captain,1926,,wikipedia
 94d3e588f8852f1f4bcd88fe,2012,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 94ea916ee0c1b9d9503294af,2013,Essendon,Jobe Watson,1461,unique,Captain,2010–2016,,wikipedia
 9514b99747e5d5954bd4fce5,1934,Footscray,Alby Morrison,3383,unique,Captain,1934,,wikipedia
+954148e13f2142ccccf10117,1911,University,George Elliott,5267,unique,Captain,1911,,wikipedia
 957d3ca0d6aeab85e14d8c28,2019,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 9580a2eb4cc76980d8760ddc,1949,South Melbourne,Bert Lucas,3237,unique,Captain,1949,,wikipedia
 9594caf4853dc97ce0dbac57,2000,Brisbane Lions,Michael Voss,102,unique,Captain,1997–2000,,wikipedia
 95fc6e07311dd2074f435172,1916,Carlton,Billy Dick,5593,unique,Captain,1914–1917,,wikipedia
 96231187bc813906c6470a3b,1986,Essendon,Terry Daniher,1311,unique,Captain,1983–1988,1984 and 1985 premiership captain,wikipedia
 964d98e3972425f3ed227928,2025,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
+9653c0646a797c3b0a73ea48,1982,Fitzroy,Garry Wilson,2274,unique,Captain,1981–1984,,wikipedia
+96a1f66ec4ad3b294e2d1ba5,1911,Fitzroy,Harold McLennan,5471,unique,Captain,1911,,wikipedia
+96c78e0e2004469abe6ca08e,1987,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
 96d6b72028882c532121e9e2,2018,Melbourne,Nathan Jones,2447,unique,Captain,2017–2019,,wikipedia
 9700c6a255276e4e57528b92,2002,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 972afd3ab08ef20471d05fdb,1979,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1979,,wikipedia
+973a977c9e273a583c28b4a8,1931,Hawthorn,John Harris,1785,unique,Captain,1930–1931,,wikipedia
 976f0e1bdb6391e9aac81d50,1988,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 9788d43faaa3500a2d327133,2018,Fremantle,Nat Fyfe,11834,unique,Captain,2017–2022,,wikipedia
 97c368af54a431bd261f6cfe,1944,North Melbourne,Dally O'Brien,3440,unique,Captain,1944–1945,,wikipedia
 97d7422a3553e0f7f558ab31,1985,Collingwood,Mark Williams,2281,unique,Captain,1983–1986,,wikipedia
 97e4ad35be1974b8231188da,1976,Melbourne,Stan Alves,1485,unique,Captain,1973–1976,,wikipedia
+97e78f7719eee21d79a6fc89,1944,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
+97f0d6c5961bd22c2838f317,1935,Fitzroy,Charlie Cameron,1577,unique,Captain,1935,,wikipedia
 97f162e83480056c985a8f1e,1955,St Kilda,Les Foote,1728,unique,Captain,1954–55,,wikipedia
 97fc02fda46ecf4f1a1077c6,2022,Carlton,Patrick Cripps,12261,unique,Captain,2022–present,,wikipedia
 9838e5e08123691d482bc7e9,1987,Footscray,Rick Kennedy,1871,unique,Captain,1986–1988,,wikipedia
+9848d8a6c37f798a71d2c1b3,1957,Fitzroy,Bill Stephen,2192,unique,Captain,1955–1957,,wikipedia
+988c00a3e38d88d76fe07da1,1959,Hawthorn,John Kennedy,1893,unique,Captain,1955–1959,,wikipedia
+98b389983fdd8301bc5ec212,2024,West Coast,Oscar Allen,12655,unique,Captain,2024–2025,,wikipedia
 98b856e4acde2e22b3229493,1989,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 98dd9ea5ad7d1cc83fcd906c,1916,Richmond,Bill Thomas,5247,unique,Captain,1914–1916,,wikipedia
 98f055054871220eed8db987,1924,St Kilda,Wels Eicke,2835,unique,Captain,1924,,wikipedia
 9914c71cb8530e1e49fcb8e4,1926,Richmond,Mel Morris,6755,unique,Captain,1926,,wikipedia
 99172599bb42f0d2b047ac50,2009,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
 99446b6742388f45f827afcb,1988,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
+994b1568d7ac0327c9b98f85,1986,Fitzroy,Matthew Rendell,1347,unique,Captain,1985–1987,,wikipedia
 9982f95414c09e557cb29de8,1904,South Melbourne,Billy McGee,5046,unique,Captain,1904–1905,,wikipedia
+99c7ad4e3feab3e75ceacc1a,1970,Geelong,Bill Goggin,2940,unique,Captain,1968–1971,,wikipedia
 99dd960a5007300f8b00b180,1960,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
 99f34b7dbc1b9c52f76477b5,1921,Richmond,Dan Minogue,6022,unique,Captain,1920–1925,1920 Premiership Captain1921 Premiership Captain,wikipedia
 9a0ca0adf6032c29e47bed07,1966,Essendon,Ken Fraser,2901,unique,Captain,1965–1968,1965 premiership captain,wikipedia
 9a134c66bdaaf4e4fa67c882,1947,St Kilda,Allan Hird,3060,unique,Captain,1946–47,,wikipedia
 9a17253b09ba66ae2e305458,1956,North Melbourne,Bob Brooker,1556,unique,Captain,1956,,wikipedia
+9a3ad9752954fc51fcae7f82,1983,Hawthorn,Leigh Matthews,1949,unique,Captain,1981–1985,,wikipedia
 9a4a72d5b0721e83d03ff78c,1979,St Kilda,Barry Breen,1548,unique,Captain,1979,,wikipedia
 9a98b482495b84c4bbf6f375,1938,Collingwood,Harry Collier,1612,unique,Captain,1935–1939,,wikipedia
+9adbd68a716306b5c10f1841,2014,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
+9af6b062a60ec6ac4edb237d,1911,Geelong,Bill Eason,4972,unique,Captain,1910–1913,,wikipedia
 9b3c39d1129d1e2f4987a1c6,1972,Collingwood,Wayne Richardson,2109,unique,Captain,1972–1975,,wikipedia
 9b465ec2291eb6973a2a729c,1981,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1980–1987,,wikipedia
+9b7ad9a21afd57f63c891859,1955,Geelong,Bob Davis,1967,unique,Captain,1955–1958,,wikipedia
 9b8323ddeea5a193a56a3482,1997,Collingwood,Gavin Brown,216,unique,Captain,1994–1998,,wikipedia
+9ba08db3bc480ecad1635a11,2013,Hawthorn,Luke Hodge,1134,unique,Captain,2011–2016,,wikipedia
 9bb526201466bd8efb544b02,2015,Sydney,Jarrad McVeigh,3950,unique,Captain,2013–2016,,wikipedia
 9bedb605e77dcbcab6892be6,2008,Collingwood,Scott Burns,211,unique,Captain,2008,,wikipedia
+9bfacb8396f78ba806022ee0,1978,Fitzroy,Harvey Merrigan,1984,unique,Captain,1978,,wikipedia
 9c0af88e28eb4c6c1fe5b0b6,1931,North Melbourne,Johnny Lewis,1469,resolved,Captain,1930–1931,,wikipedia
+9c13a98d88486d08d7126c22,2023,Hawthorn,James Sicily,12332,unique,Captain,2023–2025,,wikipedia
 9c74e6134639cebe7c79c7c1,1930,North Melbourne,Johnny Lewis,1469,resolved,Captain,1930–1931,,wikipedia
 9cafbb1621ad65720fef2cdb,1959,St Kilda,Neil Roberts,2116,unique,Captain,1959–62,,wikipedia
 9cb5190591cfb3410b57648c,1945,Carlton,Bob Chitty,2681,unique,Captain,1945–1946,,wikipedia
 9cf2d457cfcdf7470e01f45e,1909,Richmond,Dick Condon,4455,unique,Captain,1909,,wikipedia
+9cfb033eb837b2badca0de73,2008,Geelong,Tom Harley,608,unique,Captain,2007–2009,,wikipedia
+9d1a73d2ac91b6a65ce8ef64,1905,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
+9d1aa97d0a549cc722cec579,1954,Geelong,Fred Flanagan,2887,unique,Captain,1951–1954,,wikipedia
 9d35225eee0dee4daf80226f,1998,Collingwood,Gavin Brown,216,unique,Captain,1994–1998,,wikipedia
 9d48e5b5f9622ba0c1c4aa69,2005,St Kilda,Nick Riewoldt,981,unique,Captain,2005,,wikipedia
+9d98d95a0e3e9e7ecfc1e218,1964,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 9dad931b4147206ffc18a612,2007,Kangaroos,Adam Simpson,780,unique,Captain,2004–2008,,wikipedia
 9db29e90308ed468618c5bfe,2020,Brisbane Lions,Dayne Zorko,12076,unique,Captain,2018–2022,,wikipedia
 9dec233628d084a5f851e5a7,1949,Collingwood,Phonse Kyne,3182,unique,Captain,1946–1949,,wikipedia
 9e177e04116ccdbd098c10c9,1974,Melbourne,Stan Alves,1485,unique,Captain,1973–1976,,wikipedia
 9e3582f7659a02faef97840d,1997,Richmond,Matthew Knights,865,unique,Captain,1997–2000,,wikipedia
+9e3d6cfdf4cabf645339c4a5,1963,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
+9e6b8992ca4afd817651415d,1998,West Coast,Guy McKenna,1032,unique,Captain,1998–2000,,wikipedia
+9e745bcfc36ffb813fc89306,1946,Geelong,Jack Grant,7986,unique,Captain,1946,,wikipedia
 9e827572807eea142f37bc2f,1966,Richmond,Neville Crowe,2737,unique,Captain,1963–1966,,wikipedia
 9eb4fb6c9885ff2c6fb155c1,2022,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 9ec1a0bf1b6f3804a6a129bf,2022,Sydney,Dane Rampe,12140,unique,Captain,2022–2023,,wikipedia
@@ -881,7 +1138,9 @@ source_key,season,club,player,player_id,link_status,role,period,note,source_cita
 9f265b6b6eee7489f78095aa,1978,South Melbourne,Ricky Quade,2089,unique,Captain,1977–1979,,wikipedia
 9f51670aac12502ce4d906d8,1960,Richmond,Ron Branton,1545,unique,Captain,1960–1962,,wikipedia
 9f62baf7d27bfa04775f0298,1994,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
+9f712c4afae6acf5c6ee3584,1987,Fitzroy,Matthew Rendell,1347,unique,Captain,1985–1987,,wikipedia
 9f7280da8a5fb497c65ece9e,1904,Melbourne,William C. McClelland,4495,resolved,Captain,1901–1904,,wikipedia
+9f7518acb801a079f2304b5f,1992,Fitzroy,Paul Roos,985,unique,Captain,1992–1994,,wikipedia
 9f7b55c2c38a27dcd2c79804,2024,Collingwood,Darcy Moore,12372,unique,Captain,2023–,,wikipedia
 9fd6a8277894d22b09293ed1,1971,North Melbourne,Barry Goodingham,2358,unique,Captain,1971,,wikipedia
 a007b9b5ef111276e879b42f,1922,Melbourne,Percy Wilson,5775,unique,Captain,1921–1923,,wikipedia
@@ -890,6 +1149,7 @@ a04b1b44bafeb4968b7d8f93,1928,Essendon,Frank Maher,3255,unique,Captain,1925–19
 a09721beee4de2a4cde075a1,2016,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 a0ae3f14b966f03f9022747c,1908,Richmond,Charlie Pannam,4474,unique,Captain,1908,,wikipedia
 a0b9a2428a11db4e2fa01d9a,2012,Port Adelaide,Domenic Cassisi,1193,unique,Captain,2009–2012,,wikipedia
+a0bdff4fe0e7234639893c22,1981,Fitzroy,Garry Wilson,2274,unique,Captain,1981–1984,,wikipedia
 a0c40c718dc14f790cc3f9df,2012,Collingwood,Nick Maxwell,3980,unique,Captain,2009–2013,,wikipedia
 a202d87388d97477c0ee6180,1950,South Melbourne,Gordon Lane,3194,unique,Captain,1950–1952,,wikipedia
 a2139040686152aa9b475d30,1989,Melbourne,Greg Healy,1408,unique,Captain,1988–1990,,wikipedia
@@ -900,9 +1160,12 @@ a2829e3c45ea9ef79ac1ddbc,1926,St Kilda,Bill Cubbins,1642,unique,Captain,1926,,wi
 a29a41aa95571afa9547d929,2022,Sydney,Luke Parker,11953,unique,Captain,2022–2023,,wikipedia
 a2bd392983805f4dce30d423,1910,Melbourne,Vin Coutie,4805,unique,Captain,1910–1911,,wikipedia
 a2db8441dd99b855ec367f7c,1981,St Kilda,Bruce Duperouzel,1691,unique,Captain,1981,,wikipedia
+a30e0e0e0d092ae9a3521731,1977,Geelong,Bruce Nankervis,2022,unique,Captain,1976–1977,,wikipedia
 a31a08462b1f1afb07564307,1901,Carlton,Will Stuckey,4701,resolved,Captain,1900–1901,,wikipedia
 a32f01465335e9ca7d550c99,2007,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2007,,wikipedia
 a3514bfbe6ca62ce9927be37,1954,Collingwood,Lou Richards,3582,unique,Captain,1952–1955,,wikipedia
+a35460a307dfb2247f27055a,1938,Hawthorn,Bert Mills,1986,unique,Captain,1938,,wikipedia
+a36f8b4102af0fd3db4c5110,1950,Fitzroy,Alan Ruthven,2136,unique,Captain,1950,,wikipedia
 a3a59dc10e5e11c028b1b97e,2016,Brisbane Lions,Tom Rockliff,11787,unique,Captain,2015–2016,,wikipedia
 a3d1f13ab6f532257b7c537a,1957,North Melbourne,John Brady,1544,unique,Captain,1957–1959,,wikipedia
 a3e8bd351ccd03ddd721992f,1952,South Melbourne,Gordon Lane,3194,unique,Captain,1950–1952,,wikipedia
@@ -910,10 +1173,12 @@ a3f3d48a06843374ca34554c,1971,St Kilda,Ross Smith,2429,unique,Captain,1970–72,
 a43870216d7696e631383ef9,2009,Melbourne,James McDonald,730,unique,Captain,2009–2010,,wikipedia
 a43f1f3c0cc6e3e78cdd7429,1913,South Melbourne,Harvey Kelly,4940,unique,Captain,1913,,wikipedia
 a4585d8ef4096910264c0863,2025,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
+a480219f081877b63d7c0b7a,2026,Hawthorn,James Sicily,12332,unique,Captain,2026–,,wikipedia
 a4b40618ccc8015016f28eb9,2014,Adelaide,Nathan van Berlo,4075,resolved,Captain,2011–2014,,wikipedia
 a53bebe976f212e003ea9c2f,2000,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 a5428204f0f7af2700082d31,2000,Carlton,Craig Bradley,151,unique,Captain,1998–2001,,wikipedia
 a59963c19d814488a01413ec,2000,Western Bulldogs,Scott Wynd,424,unique,Captain,1994–2000,,wikipedia
+a5e26d101f1cdaf23d07781f,1956,Fitzroy,Bill Stephen,2192,unique,Captain,1955–1957,,wikipedia
 a5ffd09cb47d8f22cef87e15,1982,St Kilda,Bruce Duperouzel,1691,unique,Captain,1982,,wikipedia
 a62cdcf47c92d57449f7d790,2014,Gold Coast,Gary Ablett Jr.,1105,unique,Captain,2011–2016,,wikipedia
 a68956de54e23b90bb29b0d2,1986,Carlton,Mark Maclure,1931,unique,Captain,1986,,wikipedia
@@ -922,18 +1187,24 @@ a690336a3c7fe7abf2669736,1913,Richmond,Hugh James,5698,resolved,Captain,1913,,wi
 a6aca828746345ef17754819,2011,Melbourne,Brad Green,748,unique,Captain,2011,,wikipedia
 a6bdb8961c19e2a8181b4b25,2005,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 a713811fd907dfe90395dc0b,1946,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
+a74811c946a682af727929df,1966,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 a7dc1e62ed971132f37f3e37,1899,Essendon,George Stuckey,4337,unique,Captain,1897–1900,1897 premiership captain,wikipedia
 a7f65e99bb2315aae611011f,2026,Collingwood,Darcy Moore,12372,unique,Captain,2023–,,wikipedia
 a81941f4b6e82e3c5c53468e,2006,Port Adelaide,Warren Tredrea,831,unique,Captain,2006–2008,,wikipedia
 a85dc12cc05d785f94fd8331,1907,Collingwood,Arthur Leach,4327,unique,Captain,1907,,wikipedia
+a877ac4736364ffb1a13e1a2,1994,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
+a8bfa347c998dbe114379b60,1984,Hawthorn,Leigh Matthews,1949,unique,Captain,1981–1985,,wikipedia
 a8f064c75e94e109e449736d,1933,South Melbourne,Jack Bisset,1531,unique,Captain,1933–1936,1933 premiership captain,wikipedia
 a8f975fb82f8d130b3871330,1944,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
+a904a3cc9e6c725bb95d423c,1951,Hawthorn,Kevin Curran,2748,unique,Captain,1950–1951,,wikipedia
 a95b08306a0383f78e16758c,2016,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 a97b6e8e78ea7feabf98556a,2015,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
 a97bb4707b2c2844f53e5657,1927,North Melbourne,Charlie Tyson,3817,resolved,Captain,1927,,wikipedia
 a9af5907868acce44e89ae74,1925,Collingwood,Charlie Tyson,3817,resolved,Captain,1924–1926,,wikipedia
 a9bba4b44610adfdc7d2b5b1,1974,Essendon,Des Tuddenham,2228,unique,Captain,1972–1975,,wikipedia
 a9c65c10deef27e36aac368e,1960,North Melbourne,Al Mantello,3260,resolved,Captain,1960,,wikipedia
+a9e9774ea985bc228a9d4c66,1968,Geelong,Bill Goggin,2940,unique,Captain,1968–1971,,wikipedia
+aac4c195771c42114a80ef02,1926,Hawthorn,Paddy Burke,7114,unique,Captain,1926,,wikipedia
 aacba7f20efdfc4fe13b36ee,2010,Carlton,Chris Judd,1122,unique,Captain,2008–2012,,wikipedia
 ab2bdb78c3c70c4f771497df,1905,South Melbourne,Billy McGee,5046,unique,Captain,1904–1905,,wikipedia
 ab40391c363f0460d1ff5d16,1979,Essendon,Ken Fletcher,1724,unique,Captain,1977–1979,,wikipedia
@@ -944,21 +1215,29 @@ abea5a7ae42801b33779397f,1919,Richmond,Bill Thomas,5247,unique,Captain,1919,,wik
 ac0d956c121374c9c3debfff,2005,Richmond,Kane Johnson,43,unique,Captain,2005–2008,,wikipedia
 ac7bbf5db514335d60e7e495,1999,Carlton,Craig Bradley,151,unique,Captain,1998–2001,,wikipedia
 ac820bbb9b524c53558e9382,2007,Adelaide,Mark Ricciuto,4,unique,Captain,2001–2007,,wikipedia
+ac9224d55d018a9317a0634e,2018,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
 acc6d27e5a954e71ab5dfe02,1936,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
+acdfc04d660a856d802d806d,1934,Fitzroy,Jack Cashman,2657,unique,Captain,1934,,wikipedia
 acf18af73fb013edd3086c46,2008,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
 ad10acb1a8a5d9c71588a669,1911,South Melbourne,William Thomas,5247,resolved,Captain,1910–1911,,wikipedia
+ad2e00e6fbb8a489e5e5d9af,2012,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 ad4451f79894d906b0108f15,1917,South Melbourne,Vic Belcher,5438,unique,Captain,1914–1915; 1917,,wikipedia
 ad9d53fd9a6126a3f6f05e69,2020,Greater Western Sydney,Stephen Coniglio,12028,unique,Captain,"2020–2021 (sole captain), 2022 (co-captain)",,wikipedia
 ada3663b2632abb3e6e3610b,2019,Sydney,Luke Parker,11953,unique,Captain,2019–2021,,wikipedia
 adb9895ce11a014bb50132db,1993,Melbourne,Garry Lyon,695,unique,Captain,1991–1997,,wikipedia
+ae2caa719d3451f05ad92c31,1971,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
 ae3f7c19682d768ec808658d,1954,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
 ae56bb911944a67f59cd118b,1971,Melbourne,Frank Davis,2341,unique,Captain,1971–1972,,wikipedia
 ae5f232b7b47305890299538,1925,Richmond,Dan Minogue,6022,unique,Captain,1920–1925,1920 Premiership Captain1921 Premiership Captain,wikipedia
 ae731f9f337c649c662dd477,1961,Collingwood,Murray Weideman,3865,unique,Captain,1960–1963,,wikipedia
+ae848edc5d19654926d96eea,1984,Fitzroy,Garry Wilson,2274,unique,Captain,1981–1984,,wikipedia
+aea5540330f974ec065ac1d1,1935,Hawthorn,Ivan McAlpine,1470,unique,Captain,1935–1937,,wikipedia
 aed5c2863c20aa74c962ce65,1985,Sydney,Mark Browning,1557,unique,Captain,1985,,wikipedia
 aede52f14ad38fa339ab3149,1995,Collingwood,Gavin Brown,216,unique,Captain,1994–1998,,wikipedia
+aee466a94912e5b885f53b94,1952,Geelong,Fred Flanagan,2887,unique,Captain,1951–1954,,wikipedia
 aeececc3e95b915ce14dada5,2012,Melbourne,Jack Trengove,11803,unique,Captain,2012–2013,,wikipedia
 af109fe37979d9de91eade9a,1930,Melbourne,Ivor Warne-Smith,2253,unique,Captain,1928–1931,,wikipedia
+af2f5920cf734c683ca9c7c6,1999,Geelong,Leigh Colbert,557,unique,Captain,1999,,wikipedia
 af30db5cf444720c42b1ec38,2004,Fremantle,Peter Bell,486,unique,Captain,2002–2006,,wikipedia
 af532f7902a891cb605cb4e3,2002,Adelaide,Mark Ricciuto,4,unique,Captain,2001–2007,,wikipedia
 aff600794070435b0d562e39,1932,South Melbourne,Johnny Leonard,3209,unique,Captain,1932,,wikipedia
@@ -970,6 +1249,7 @@ b1435585c64d734f0e43be62,1958,Collingwood,Frank Tuck,3807,unique,Captain,1958–
 b15389a7ebbe227bd3afef4e,2021,North Melbourne,Jack Ziebell,11724,unique,Captain,2017–2022,,wikipedia
 b18169524d612ef5464bf373,2001,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 b19376a92ff13e68810dbcf3,1973,Collingwood,Wayne Richardson,2109,unique,Captain,1972–1975,,wikipedia
+b19cd7a3f2b76464985f1eb4,2004,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
 b1abf699b091712184caeefd,1998,North Melbourne,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
 b1d93541f7abd20396a649df,1991,Richmond,Dale Weightman,1256,unique,Captain,1988–1992,,wikipedia
 b20692fa1e00303d143b58f2,2013,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2016,Longest-serving captain,wikipedia
@@ -985,16 +1265,20 @@ b42f155dce345327b914c9b4,1986,St Kilda,Trevor Barker,1511,unique,Captain,1983–
 b4827b4527d96c4d9da241ea,1908,Carlton,Fred Elliott,4624,unique,Captain,1908–1911,,wikipedia
 b4b1db626d8bea5bb3aa0158,2007,Port Adelaide,Warren Tredrea,831,unique,Captain,2006–2008,,wikipedia
 b4d85d6cd83f2c5d50f01a7b,1950,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
+b548b442f864b4b58c8e2f0a,2018,Hawthorn,Jarryd Roughead,4078,unique,Captain,2017–2018,,wikipedia
 b562bc1990fdb116be8f8d48,1953,South Melbourne,Ron Clegg,1605,unique,Captain,1953–1954,,wikipedia
 b5f6ce8d1fcee415c292bd22,1937,North Melbourne,Jim Adamson,2504,unique,Captain,1937,,wikipedia
 b622fa70376e326906d41f68,2013,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 b638b69a3e12ecc612dd4233,1933,St Kilda,Col Deane,2763,unique,Captain,1933,,wikipedia
 b663b6759b7192487ac206f6,2017,St Kilda,Jarryn Geary,11630,unique,Captain,2017–2020,,wikipedia
 b693eb2adc3f0d030d6c263c,2009,Carlton,Chris Judd,1122,unique,Captain,2008–2012,,wikipedia
+b6c40e4e916b718756baf789,1943,Hawthorn,Bob Williams,3887,unique,Captain,1943,,wikipedia
 b6d4244f135a98640f9711d9,1982,Footscray,Kelvin Templeton,2210,unique,Captain,1982,,wikipedia
 b6df640b0137f7a3eb0aca4c,2014,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
+b6e314ab8c97d90d2b3da7c9,2020,Hawthorn,Ben Stratton,11824,unique,Captain,2019–2020,,wikipedia
 b6e7b6b1e97c87d910e802ee,1937,North Melbourne,Charlie Gaudion,2918,unique,Captain,1937,,wikipedia
 b6f629180b5868e2dc54534c,2004,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
+b7021edf062174c87f3aed87,1962,Fitzroy,Owen Abrahams,2453,unique,Captain,1962,,wikipedia
 b706148163771d026353506b,1897,St Kilda,Billy Shaw,4272,unique,Captain,1897-99,,wikipedia
 b70d235e7204ba85cbc27609,1991,North Melbourne,Matthew Larkin,1303,unique,Captain,1990–1992,,wikipedia
 b718872e2db1ab46676871b4,1936,Collingwood,Harry Collier,1612,unique,Captain,1935–1939,,wikipedia
@@ -1006,61 +1290,91 @@ b7e31fdcd50f2652c041fe30,1945,Collingwood,Alby Pannam,3500,resolved,Captain,1945
 b80e543a3fb5bd4c9af43087,1987,Melbourne,Robert Flower,1725,unique,Captain,1981–1987,,wikipedia
 b811a6321aa7dd9f8b70bc21,1979,Melbourne,Carl Ditterich,1675,unique,Captain,1979–1980,,wikipedia
 b8504a51c7e875c532637dd1,2013,Melbourne,Jack Grimes,11707,unique,Captain,2012–2013,,wikipedia
+b8c399282527e7d9c389e7a5,1926,Hawthorn,Dan Minogue,6022,unique,Captain,1926,,wikipedia
 b8c478e7918cb0bd0beed162,2022,Sydney,Callum Mills,12413,unique,Captain,2022–2023,,wikipedia
 b8d9a7d35977c21a842123ee,1935,Melbourne,Colin Niven,2029,unique,Captain,1934–1935,,wikipedia
 b9af170c734d8c0ead9323be,1951,South Melbourne,Gordon Lane,3194,unique,Captain,1950–1952,,wikipedia
 b9e5a8f7067cb332cd266f2b,1958,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
 b9f9e93d8d39e002cf70d6bb,2003,Western Bulldogs,Chris Grant,422,unique,Captain,2001–2004,,wikipedia
+ba293b6faebbdfe8e5494156,1921,Geelong,Harold Craven,6377,unique,Captain,1921–1922,,wikipedia
 ba2d1ca24b9cb651f2c02173,2000,St Kilda,Nathan Burke,919,unique,Captain,1998–00,,wikipedia
+ba4c3ff40744b5dbd63d7a85,1949,Hawthorn,Alec Albiston,2485,unique,Captain,1947–1949,,wikipedia
+ba4f1bfea79ddf26240904b9,1939,Hawthorn,Len Thomas,3779,unique,Captain,1939,,wikipedia
 ba7ae1e5273776be076165b4,1916,Collingwood,Dan Minogue,6022,unique,Captain,1914–1916,,wikipedia
 ba878663100dde98d8b30248,1940,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
 babe10ff11c1b4d518f7e100,2020,Sydney,Luke Parker,11953,unique,Captain,2019–2021,,wikipedia
 bb88466cf5749cc735811e94,1992,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
 bb9067fab52f290c11156137,1948,Collingwood,Phonse Kyne,3182,unique,Captain,1946–1949,,wikipedia
 bb954785512632d238620e11,2017,Gold Coast,Tom Lynch,11948,unique,Captain,2017–2018,,wikipedia
+bb999382c030110cd0119b10,1908,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
+bbb999101cdfdaf779e38d6b,1930,Hawthorn,John Harris,1785,unique,Captain,1930–1931,,wikipedia
+bbd3ad6b2739ecffc7547cbf,2007,West Coast,Chris Judd,1122,unique,Captain,2006–2007,,wikipedia
+bc03deb366940ba5adada43e,2001,Geelong,Ben Graham,556,unique,Captain,2000–2002,,wikipedia
+bc35b941e7c6ff8017ab29a3,1966,Fitzroy,John Hayes,3028,unique,Captain,1966,,wikipedia
 bc74628dc57a194eb4f1b85f,1999,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
 bccb05748d20ec8f54f5f3be,1998,Adelaide,Mark Bickley,12,unique,Captain,1997–2000,1997 premiership captain1998 premiership captain,wikipedia
 bccb9330cd8c81862c8bf2dc,1993,Richmond,Jeff Hogg,381,unique,Captain,1993,,wikipedia
 bd56c0622dc527024a1fe078,1958,Carlton,Bruce Comben,1620,unique,Captain,1958–1960,,wikipedia
+bd66738ac252d227bff2365e,2009,Geelong,Tom Harley,608,unique,Captain,2007–2009,,wikipedia
+bd6b2e598363c46ddf491185,1979,Hawthorn,Don Scott,2147,unique,Captain,1976–1980,,wikipedia
 bd9b5344df49760c33dbda78,1963,Carlton,John Nicholls,3422,unique,Captain,1963,,wikipedia
 bdf247ce7475d8642bf7ef5f,1999,Adelaide,Mark Bickley,12,unique,Captain,1997–2000,1997 premiership captain1998 premiership captain,wikipedia
 be033f2b217da098e92b9ff5,1956,South Melbourne,Ian Gillett,9260,unique,Captain,1956,,wikipedia
+be04f1cfb869600eada32f2d,1999,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
 be2841e8cb6bdf8cce1a7798,1938,Carlton,Brighton Diggins,2782,unique,Captain,1938–1940,,wikipedia
 be79d98132db18a286ea68e1,1953,Melbourne,Denis Cordner,1892,unique,Captain,1951–1953,,wikipedia
+be9e3fa2b853331acf7c141d,1994,Brisbane Bears,Roger Merrett,107,unique,Captain,1994,,wikipedia
+bebcac5003012faab5a735cd,1901,Fitzroy,Bill McSpeerin,4364,unique,Captain,1901–1902,,wikipedia
+bef5f4f16320b42fa92ba4f2,2000,Geelong,Ben Graham,556,unique,Captain,2000–2002,,wikipedia
 bf01ccd486879ae7462ba36a,2006,Western Bulldogs,Luke Darcy,436,resolved,Captain,2005–2006,,wikipedia
 bf54b44e7037ad6cbbf7abb0,1970,Richmond,Roger Dean,2343,unique,Captain,1968–1971,1969 Premiership Captain,wikipedia
+bf7468a87039debfff9830e4,1934,Hawthorn,Bert Mills,1986,unique,Captain,1934,,wikipedia
 bf8ee929e64ca9fdbb906e99,1982,Melbourne,Robert Flower,1725,unique,Captain,1981–1987,,wikipedia
 bf92f3f0d18f56088e033f8d,1980,Carlton,Mike Fitzpatrick,1722,unique,Captain,1980–1983,,wikipedia
 bf9a078aa6b97711c021c8b7,1990,Melbourne,Greg Healy,1408,unique,Captain,1988–1990,,wikipedia
+bfb44a3171ebebb3b14553d5,1943,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
 bfd2cc3cd0c8c7dbc599bbee,2018,Gold Coast,Tom Lynch,11948,unique,Captain,2017–2018,,wikipedia
 bff6e33cdb065a4f72224972,1954,St Kilda,Les Foote,1728,unique,Captain,1954–55,,wikipedia
+c0719f716d4719c5dc570c77,1955,Hawthorn,John Kennedy,1893,unique,Captain,1955–1959,,wikipedia
+c078aa0693d268b21de2a164,1993,Fitzroy,Paul Roos,985,unique,Captain,1992–1994,,wikipedia
 c08386037fd5c36f851b347d,1987,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
+c0867da5bac1d9b8650e6750,2011,Geelong,Cameron Ling,617,unique,Captain,2010–2011,,wikipedia
+c098c1803cfdd7df27fe3b67,1998,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 c0cb1bae0c30a349db7a6ea7,2014,Melbourne,Jack Grimes,11707,unique,Captain,2014,,wikipedia
+c0cf0f23aabd18552871c561,1930,Fitzroy,Colin Niven,2029,unique,Captain,1930–1931,,wikipedia
 c0dbbdd3554cde17d3249941,1929,Essendon,Norm Beckton,2539,unique,Captain,1929–1930,,wikipedia
 c140726fb2515cc9b8e64801,1998,Brisbane Lions,Alastair Lynch,104,unique,Captain,1997–2000,,wikipedia
 c15b63380da104bb8666298c,1925,Essendon,Frank Maher,3255,unique,Captain,1925–1928,,wikipedia
 c182ef382eadd5f59a192590,2026,Port Adelaide,Connor Rozee,12697,unique,Captain,2024–,,wikipedia
 c1bb3637105ff59bf7682b1f,1980,Footscray,Geoff Jennings,1842,unique,Captain,1979–1981,,wikipedia
 c1bdd03b5a62da1eff10ff54,2004,Collingwood,Nathan Buckley,217,unique,Captain,1999–2007,,wikipedia
+c1c5beb644da09de9e1d1466,1988,Brisbane Bears,Mark Mickan,1308,unique,Captain,1988,,wikipedia
+c1da1192ea9922cb746fa489,1981,Hawthorn,Leigh Matthews,1949,unique,Captain,1981–1985,,wikipedia
 c1da51d9d39753d338bab6c0,1952,Collingwood,Lou Richards,3582,unique,Captain,1952–1955,,wikipedia
 c21e4c4c803462a6fefd31ed,1967,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
+c22d317005d2893ceedfeb7d,1980,Hawthorn,Don Scott,2147,unique,Captain,1976–1980,,wikipedia
 c2a5120c9cde08f902583858,2026,Richmond,Toby Nankervis,12374,unique,Captain,2024–,,wikipedia
 c2b27b153efbb421ec9064d0,1981,St Kilda,Alex Jesaulenko,1844,unique,Captain,1981,,wikipedia
 c352008de890147161e39924,1899,Carlton,Ernie Walton,4450,unique,Captain,1898–1899,,wikipedia
+c40777da4a5b441d6c95b254,1982,Geelong,Brian Peake,2063,unique,Captain,1982,,wikipedia
+c408457bc73f44b46b82ee5e,1928,Hawthorn,Bert Sutton,6773,unique,Captain,1928,,wikipedia
 c427e2efc54691411a40f120,1990,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
 c45b6fa51f399c4ad819df5e,1975,Melbourne,Stan Alves,1485,unique,Captain,1973–1976,,wikipedia
+c46d4959a199c88a3e496a9d,1959,Geelong,Neil Trezise,2226,unique,Captain,1959,,wikipedia
 c4758ef7fbe274d9baecde79,1984,Collingwood,Mark Williams,2281,unique,Captain,1983–1986,,wikipedia
 c4c944248064d50590219837,1954,Richmond,Des Rowe,2132,unique,Captain,1952–1957,,wikipedia
 c4e1bdbb9834518e2284ff4c,2025,Carlton,Patrick Cripps,12261,unique,Captain,2022–present,,wikipedia
 c4f7210a83aba61966afe52b,2010,Sydney,Brett Kirk,1015,unique,Captain,2009–2010,,wikipedia
 c525fd392ea4ebc4bb04be71,1985,St Kilda,Trevor Barker,1511,unique,Captain,1983–86,,wikipedia
 c55e6dfba88e84c1c3a30502,2020,North Melbourne,Jack Ziebell,11724,unique,Captain,2017–2022,,wikipedia
+c569a3d8cd8ce556c6fa25bf,1955,Fitzroy,Bill Stephen,2192,unique,Captain,1955–1957,,wikipedia
 c578dc4897fdc8b8342e6d73,1957,Footscray,Harvey Stevens,2191,unique,Captain,1957,Ted Whitten Longest Serving Captain,wikipedia
 c57c87f723df42d0db02d999,2020,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 c57efee70d40555d1850aac8,1947,South Melbourne,Jack Graham,2951,unique,Captain,1946–1948,,wikipedia
 c598543dc6df33c15d895603,2017,Western Bulldogs,Robert Murphy,468,unique,Captain,2015–2017,,wikipedia
 c59b9aec3f891b77355bc967,1960,Carlton,Bruce Comben,1620,unique,Captain,1958–1960,,wikipedia
 c5c4972b8da790ef941a922e,1941,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
+c5d4afacc006df8fcc81df5f,1996,West Coast,John Worsfold,1037,unique,Captain,1991–1998,,wikipedia
 c616aef59f0b2d4d3de35d8d,1998,Port Adelaide,Gavin Wanganeen,303,unique,Captain,1997–2000,,wikipedia
 c625e98fddbef0d7dea43b0a,1928,Melbourne,Ivor Warne-Smith,2253,unique,Captain,1928–1931,,wikipedia
 c66ebfec10c044638c64206f,1900,South Melbourne,Bill Windley,4307,unique,Captain,1900,,wikipedia
@@ -1069,13 +1383,19 @@ c6ea677a2da83fe1b8b1b5f0,1949,Melbourne,Don Cordner,2475,unique,Captain,1948–1
 c702aa968c67e1b33814ca7f,1953,St Kilda,Keith Drinan,1682,unique,Captain,1951–53,,wikipedia
 c71c5836192601601f194583,2002,St Kilda,Robert Harvey,930,unique,Captain,2001–02,,wikipedia
 c758872d4e565a063c3d12b1,1939,St Kilda,Ansell Clarke,2684,unique,Captain,1938–39,,wikipedia
+c77ab891da79ad25c016fae0,1940,Fitzroy,Frank Curcio,2745,unique,Captain,1938–1941,,wikipedia
+c788dc9cb33ceffaeb80ccaa,2021,West Coast,Luke Shuey,11805,unique,Captain,2020–2023,,wikipedia
+c804fb2419cba325162c2fc1,1989,West Coast,Murray Rance,2096,unique,Captain,1989,,wikipedia
 c81b16f1af460a7726fa1bd3,2017,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 c81fc0ba6400548da64e76df,2018,Brisbane Lions,Dayne Beams,11728,unique,Captain,2017–2018,,wikipedia
+c85489e0c111e406e48e4a62,1970,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
 c8eedda1ca9d72519d463673,1977,Essendon,Ken Fletcher,1724,unique,Captain,1977–1979,,wikipedia
+c928ed27b9328ac9744118b3,1996,Geelong,Gary Ablett,567,unique,Captain,1995–1996,,wikipedia
 c94749360e137de4586277f6,2006,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 c9ba7620d8fa32c98edc80f6,1927,Melbourne,Albert Chadwick,2666,resolved,Captain,1924–1927,,wikipedia
 c9ed89aa7fd192c61fb54625,1997,Port Adelaide,Gavin Wanganeen,303,unique,Captain,1997–2000,,wikipedia
 ca98c8407fdd0a0d69443dd5,1946,North Melbourne,Fred Fairweather,8697,unique,Captain,1946,,wikipedia
+caa09ba3ad397b8b954c69b7,1966,Geelong,Graham Farmer,2861,unique,Captain,1965–1967,,wikipedia
 cae84595291910b5b362cd33,2020,Essendon,Dyson Heppell,11896,unique,Captain,2017–2022,,wikipedia
 caf3640e5d8dbdf3b9c94788,1948,North Melbourne,Les Foote,1728,unique,Captain,1948–1951,,wikipedia
 cb3912412113aa2a13bbad88,2024,Brisbane Lions,Lachie Neale,12055,unique,Captain,2023–2025,,wikipedia
@@ -1084,21 +1404,27 @@ cb9b6f8e698f447568dd9540,1923,Collingwood,Harry Curtis,6197,unique,Captain,1923,
 cbdec9c8b4b2bd8d855c6b60,1915,Essendon,Allan Belcher,5187,unique,Captain,1912–1915,1912 premiership captain,wikipedia
 cbeba4f07cf486b8e11d13b9,1972,South Melbourne,John Rantall,2095,unique,Captain,1972,,wikipedia
 cbf18734003cf12a1930fda8,1953,Collingwood,Lou Richards,3582,unique,Captain,1952–1955,,wikipedia
+cbf3f53cae545d65341d0a39,1951,Geelong,Fred Flanagan,2887,unique,Captain,1951–1954,,wikipedia
 cc238701c4bbf40d8cf665d7,1925,St Kilda,Barney Carr,2644,unique,Captain,1925,,wikipedia
 cc3b157cee9acb31e4c07eca,1963,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 cc73c6bdc9b8c11610e9ea09,2006,Essendon,Matthew Lloyd,336,unique,Captain,2006–2009,,wikipedia
 cc78ba05ab31cc4b229e8df2,1996,Essendon,Gary O'Donnell,318,unique,Captain,1996–1997,,wikipedia
 cc81ed0865b949760c48bb45,1899,Collingwood,Bill Proudfoot,4477,unique,Captain,1899,,wikipedia
+cc83cc50dc3cd7108e1302e6,2006,West Coast,Chris Judd,1122,unique,Captain,2006–2007,,wikipedia
 ccd55bb1f630907536ef8e2c,1981,Richmond,Bryan Wood,2290,unique,Captain,1981,,wikipedia
 ccd70d568cdd378b9a7a6ea7,2014,Sydney,Kieren Jack,11546,unique,Captain,2013–2016,,wikipedia
 ccee2550a40ebd0a043e6c42,1942,North Melbourne,Bill Findlay,2875,unique,Captain,1942–1943,,wikipedia
 cd0e22fd39697cddbd55c848,1926,Collingwood,Charlie Tyson,3817,resolved,Captain,1924–1926,,wikipedia
 cd6a3b7f0ce9bfb19dd2e4c7,1997,Fremantle,Peter Mann,478,unique,Captain,1997–1998,,wikipedia
+cde73a2b6b023d7b51669cab,2001,West Coast,Ben Cousins,1051,unique,Captain,2001–2005,,wikipedia
+cdf7ea5c8d7a7bfadec2d8d4,1988,West Coast,Ross Glendinning,1757,unique,Captain,1987–1988,,wikipedia
 ce1ebd46e04f5f8e50cfe989,1965,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 ce2e408fcce3aad2335757af,2008,Brisbane Lions,Nigel Lappin,100,unique,Captain,2008,,wikipedia
 ce5c60070f0fb811382f6a45,2013,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2013,,wikipedia
 ce66373ce970100cb8143768,1966,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
+cea402082d8357d831fa9bb3,1990,West Coast,Stephen Malaxos,1370,unique,Captain,1990,,wikipedia
 cecc610396e6756fb66ca012,1905,Carlton,Jim Flynn,4388,unique,Captain,1905–1907,,wikipedia
+cedb0323a5ff6eea58e21df8,2016,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 cef0901dfb01e347fe3c4bf1,1998,Brisbane Lions,Michael Voss,102,unique,Captain,1997–2000,,wikipedia
 cf0e3cc47b524fcb305b162b,2021,Greater Western Sydney,Stephen Coniglio,12028,unique,Captain,"2020–2021 (sole captain), 2022 (co-captain)",,wikipedia
 cf4c847760a26465099bf513,1963,North Melbourne,Allen Aylett,1498,unique,Captain,1961–1964,,wikipedia
@@ -1107,6 +1433,7 @@ cf5f5025acbcd98eebc6c006,1901,St Kilda,Jimmy Smith,4648,unique,Captain,1901,,wik
 cf75a973a0e45dc3b4161d8b,1954,Footscray,Charlie Sutton,3756,unique,Captain,1951–1955,1954 Premiership Captain,wikipedia
 cf85e20c9b23c9c8d4600011,1915,St Kilda,Gordon Dangerfield,5216,unique,Captain,1915,,wikipedia
 cf9269a9c58acd5063e94e51,2005,Adelaide,Mark Ricciuto,4,unique,Captain,2001–2007,,wikipedia
+cfad26465a97ae8867b028bc,1925,Fitzroy,Jim Atkinson,2501,unique,Captain,1924–1925,,wikipedia
 cfcb5fca983ce8e38072e426,1971,Essendon,Barry Davis,1654,unique,Captain,1970–1971,,wikipedia
 d017b654d2354a014ddd9dc6,1993,North Melbourne,Wayne Carey,766,unique,Captain,1993–2001,1996 Premiership Captain1999 Premiership Captain,wikipedia
 d043063258f2886177cc263c,1911,Collingwood,George Angus,5006,unique,Captain,1910–1911,,wikipedia
@@ -1116,23 +1443,32 @@ d0a4f09a0f8d355bc6599aee,2017,Brisbane Lions,Dayne Beams,11728,unique,Captain,20
 d0bfc64f4e4461835df9dcd2,1976,Carlton,Alex Jesaulenko,1844,unique,Captain,1975–1976,,wikipedia
 d0c2886a9ef15ac7d959118e,1924,Richmond,Dan Minogue,6022,unique,Captain,1920–1925,1920 Premiership Captain1921 Premiership Captain,wikipedia
 d0e5d75cd893648306a95a11,1966,North Melbourne,Noel Teasdale,3772,unique,Captain,1965–1967,,wikipedia
+d0e6ee76ca8566bfb4b373d5,1993,Brisbane Bears,Roger Merrett,107,unique,Captain,1993,,wikipedia
+d10c42f62d910e3f0a796a50,1914,Geelong,Billy Orchard,5379,unique,Captain,1914–1915,,wikipedia
 d116055051efed2a88fc6cf3,1898,Melbourne,Ned Sutton,4233,unique,Captain,1897–1898,,wikipedia
 d170c1162e86d43c955cfd6f,1906,Melbourne,Arthur Sowden,4632,unique,Captain,1906,,wikipedia
 d193299d4722f8088f15c29f,1978,North Melbourne,Keith Greig,1765,unique,Captain,1976–1978,,wikipedia
 d19cf8a9aff426e5d874bb48,1918,Carlton,Rod McGregor,5285,unique,Captain,1918,,wikipedia
 d1ced3c319a7bf7d56771e16,1910,Essendon,Allan Belcher,5187,unique,Captain,1910,,wikipedia
+d1cf1b40f82a004743ce2215,1932,Fitzroy,Jack Sexton,3678,unique,Captain,1932,,wikipedia
 d1f7bd8aa54729ee3f3857ca,2020,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
 d23b33ac0ffe4067a263eb36,2006,Fremantle,Peter Bell,486,unique,Captain,2002–2006,,wikipedia
 d243870c6d2effe904990231,1936,Footscray,Stan Penberthy,3523,unique,Captain,1936,,wikipedia
+d2639481647418ec536e3030,1995,Geelong,Gary Ablett,567,unique,Captain,1995–1996,,wikipedia
+d26b43daf024d04dae6ac983,1900,Geelong,Peter Burns,4384,unique,Captain,1900,,wikipedia
+d29997b12873c45e8835f6e1,1932,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 d2c5a8d44c9bfeed221a29eb,1929,North Melbourne,Tim Trevaskis,7029,unique,Captain,1929,,wikipedia
 d2f4188fb44e7e73ffe16dad,1967,Essendon,Ken Fraser,2901,unique,Captain,1965–1968,1965 premiership captain,wikipedia
 d3147324a171f98401ccc26d,2003,Richmond,Wayne Campbell,869,unique,Captain,2001–2004,,wikipedia
 d31ef64d357d7d615a81d604,1908,St Kilda,Jack Wells,5325,unique,Captain,1908,,wikipedia
 d338eb4060de66462b41bee8,2019,Brisbane Lions,Dayne Zorko,12076,unique,Captain,2018–2022,,wikipedia
+d35b0ff3bb1ee088dbdc07dc,1936,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
+d360b3b633d3249b59ce34ed,1969,Geelong,Bill Goggin,2940,unique,Captain,1968–1971,,wikipedia
 d39456c07e9f1b5a90314ad7,2005,Port Adelaide,Matthew Primus,407,unique,Captain,2001–2005,,wikipedia
 d3a442cee5ae3f1fcd424b1e,1992,Richmond,Dale Weightman,1256,unique,Captain,1988–1992,,wikipedia
 d3bc69e979593005b7c5a8a9,1990,Essendon,Tim Watson,1162,unique,Captain,1989–1991,,wikipedia
 d3f134d64669a09394a22258,1980,Melbourne,Carl Ditterich,1675,unique,Captain,1979–1980,,wikipedia
+d406d2a54e45cb16090bffad,1919,Fitzroy,Wally Johnson,5470,unique,Captain,1919,,wikipedia
 d434c497306da42b5e3b51f6,1931,South Melbourne,Joe Scanlan,2143,unique,Captain,1930–1931,,wikipedia
 d49d43a9afb9cdbd2716e8dc,2002,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
 d4edba48b1f50950e8740a38,1953,Richmond,Des Rowe,2132,unique,Captain,1952–1957,,wikipedia
@@ -1142,17 +1478,20 @@ d51ab9d22f38c424a68ab4c1,2011,St Kilda,Nick Riewoldt,981,unique,Captain,2008–2
 d52202529ee396eeb6f259f3,1951,Collingwood,Gordon Hocking,3063,unique,Captain,1950–1951,,wikipedia
 d597b1744c59c047eff6b61c,2018,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 d5b376ac4dd9d11f753b49ca,2001,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
+d5cf03ab092b3ed093ea8a3b,1962,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
 d5f8b1bc9af7c4c4f7d3af8e,1992,Adelaide,Chris McDermott,17,unique,Captain,1991–1994,,wikipedia
 d5ffb2891dfadeda315b73a9,2007,St Kilda,Luke Ball,1430,unique,Captain,2007,,wikipedia
 d62d9ed483d0ffa09409d2d6,1994,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
 d6499393b8788d5e3645e128,1926,Essendon,Frank Maher,3255,unique,Captain,1925–1928,,wikipedia
 d6a28984e0efd1987bf52963,1945,Footscray,Arthur Olliver,3476,unique,Captain,1943–1946,,wikipedia
+d6bb65fa0bc5ccd5cde0788f,2010,Geelong,Cameron Ling,617,unique,Captain,2010–2011,,wikipedia
 d6d276014f36e66c3fd3d592,1944,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
 d713c01034899d2fe10713a1,2019,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
 d742d0e8464eabc45f41aa5b,1908,South Melbourne,Bill Dolphin,5238,unique,Captain,1907–1908,,wikipedia
 d76bd271fa51b4ab7fc81330,1911,Richmond,Len Incigneri,5043,unique,Captain,1911,,wikipedia
 d7721e0c083bd154f6ce1b34,2016,Fremantle,David Mundy,4088,unique,Captain,2016,,wikipedia
 d7d38a80babfe670c34d8350,1926,North Melbourne,Gerry Donnelly,7033,unique,Captain,1926,,wikipedia
+d7e456af8cacac85fa078a20,1990,Fitzroy,Paul Roos,985,unique,Captain,1988–1990,,wikipedia
 d81896c8cb8a2af564aee446,1969,Footscray,Ted Whitten,2268,unique,Captain,1958–1969,Longest Serving Captain,wikipedia
 d81ccd66a81762e370cf86e8,1984,Sydney,Barry Round,2131,unique,Captain,1984,,wikipedia
 d86d7e89be606c0639ccbbe6,1907,Essendon,William Griffith,4671,resolved,Captain,1907–1909,,wikipedia
@@ -1163,14 +1502,18 @@ d8e74daffba281be071f84f4,1987,North Melbourne,Wayne Schimmelbusch,2145,unique,Ca
 d8fbedba08e26f9fc14a501a,1982,Sydney,Barry Round,2131,unique,Captain,1980–1983,,wikipedia
 d931d70fa3bacc2ea078c385,1944,Carlton,Bob Atkinson,8563,unique,Captain,1944,,wikipedia
 d94eee71fe5e728fb8af44c0,2023,Sydney,Luke Parker,11953,unique,Captain,2022–2023,,wikipedia
+d9513b4d4200881b3b21a20e,1937,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
 d9d6a28c95cb5078165f33dc,1993,Collingwood,Tony Shaw,1166,unique,Captain,1987–1993,,wikipedia
 da0742325313345aeb096783,2019,Sydney,Josh Kennedy,11672,unique,Captain,2019–2021,,wikipedia
+da47f92669a152f0207971d6,1990,Hawthorn,Michael Tuck,1319,unique,Captain,1986–1991,,wikipedia
 da4e763c963960853d03ffbc,1897,Carlton,Jimmy Aitken,4416,unique,Captain,1897,,wikipedia
 db172f62e23f60964fad67f9,1967,South Melbourne,Bob Skilton,3702,unique,Captain,1961–1971,,wikipedia
 db34756a7558487bbb917366,2000,Adelaide,Mark Bickley,12,unique,Captain,1997–2000,1997 premiership captain1998 premiership captain,wikipedia
 db3f34f5372791d1d5edc4e4,1948,Footscray,Arthur Olliver,3476,unique,Captain,1948–1950,,wikipedia
 db4fff79d3cad636240d8244,2012,Sydney,Jarrad McVeigh,3950,unique,Captain,2011–2012,Jarrad McVeigh 2012 premiership captain,wikipedia
+db51ef1c1c03ffbbdf1ca261,2008,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 db78c967d4fbb1b19de9204f,1967,Collingwood,Des Tuddenham,2228,unique,Captain,1966–1969,,wikipedia
+db7ba9860c7042deb22606e1,1903,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 db882bc7515e673800f47602,1956,Richmond,Des Rowe,2132,unique,Captain,1952–1957,,wikipedia
 dba2b6d5d3b88a16a0ad4b08,1946,St Kilda,Allan Hird,3060,unique,Captain,1946–47,,wikipedia
 dbb46d640f2f5a09dd097d71,1914,Richmond,Bill Thomas,5247,unique,Captain,1914–1916,,wikipedia
@@ -1178,7 +1521,9 @@ dbded410fadc484e72031234,1921,St Kilda,Charlie Ricketts,5339,unique,Captain,1921
 dbe640e53fa313e4bb487dec,1984,St Kilda,Trevor Barker,1511,unique,Captain,1983–86,,wikipedia
 dbfee8ef0d42de1da6657070,1917,Carlton,Billy Dick,5593,unique,Captain,1914–1917,,wikipedia
 dc167a28bf7b333f08cfb233,2019,Carlton,Sam Docherty,12170,resolved,Captain,2019–2021,,wikipedia
+dc28e079f7497f284c20281b,2008,Hawthorn,Sam Mitchell,1135,unique,Captain,2008–2010,,wikipedia
 dc3d74281bd60b64d846a1ae,2020,Melbourne,Max Gawn,11966,unique,Captain,2020–,,wikipedia
+dc4854bb2043f61674d43e73,1967,Geelong,Graham Farmer,2861,unique,Captain,1965–1967,,wikipedia
 dc806431bcd0d1795b30735f,1958,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
 dc986fc6a87714c4014e142f,2004,St Kilda,Lenny Hayes,966,unique,Captain,2004,,wikipedia
 dcdc52b7f970a46728e5401e,2014,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
@@ -1190,8 +1535,12 @@ dde83bb0f209794dec93cc62,1990,Footscray,Doug Hawkins,380,unique,Captain,1990–1
 de19945a5ce227ddcf9b1384,2010,Sydney,Adam Goodes,1012,unique,Captain,2009–2010,,wikipedia
 de1b5852eb21f5c887b258ef,1941,Melbourne,Allan La Fontaine,3183,unique,Captain,1936–1941,,wikipedia
 de445f97bb87ef3bf10c14e3,1937,South Melbourne,Laurie Nash,3415,unique,Captain,1937,,wikipedia
+de4f3356ab3d9690d8922ec2,1947,Geelong,George Gniel,2939,unique,Captain,1947,,wikipedia
+de54f5e029ac255b5f56e5e1,1972,Fitzroy,Kevin Murray,2018,unique,Captain,1967–1972,,wikipedia
+deb6329f95ee497dbb247429,1932,Hawthorn,Bert Mills,1986,unique,Captain,1932,,wikipedia
 dedd84a6d850347cec8e998a,1927,St Kilda,George Heinz,5870,unique,Captain,1927,,wikipedia
 df2b77fdfe6904bd67ca2175,2003,Carlton,Brett Ratten,135,unique,Captain,2003,,wikipedia
+df54e48613e8648fc6e849ac,1983,Fitzroy,Garry Wilson,2274,unique,Captain,1981–1984,,wikipedia
 e0062defa1c13a3062b23e6e,1915,South Melbourne,Vic Belcher,5438,unique,Captain,1914–1915; 1917,,wikipedia
 e01c48153194a157f6fa7f70,1935,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
 e02a9a76dd51eb5ae7623532,1978,Footscray,Gary Dempsey,1667,unique,Captain,1977–1978,,wikipedia
@@ -1201,6 +1550,8 @@ e070166ea8753be564c6f86d,1901,St Kilda,Dick McCabe,4361,unique,Captain,1901,,wik
 e08a2552819e0398abf98996,2005,Carlton,Anthony Koutoufides,144,unique,Captain,2004–2006,,wikipedia
 e113b4e1adaf79ed828baa98,1937,Essendon,Jack Baggott,2505,unique,Captain,1936–1937,,wikipedia
 e13fb13ebf5ee36f0a959573,1999,St Kilda,Nathan Burke,919,unique,Captain,1998–00,,wikipedia
+e191be0e87493a0e0468429d,1995,Hawthorn,Jason Dunstall,632,unique,Captain,1995–1998,,wikipedia
+e1a4b99a01a8b4ebf46766b4,1936,Fitzroy,Haydn Bunton,1466,unique,Captain,1936–1937,,wikipedia
 e1a5c4c9f93f71632018b4de,1959,Carlton,Bruce Comben,1620,unique,Captain,1958–1960,,wikipedia
 e1f557c2fcad4e1bad92f073,2012,Adelaide,Nathan van Berlo,4075,unique,Captain,2011–2014,,wikipedia
 e23493edec01c0d488655161,1958,North Melbourne,John Brady,1544,unique,Captain,1957–1959,,wikipedia
@@ -1208,9 +1559,11 @@ e269de5f9a47bdcbc0e040e5,2016,Western Bulldogs,Robert Murphy,468,unique,Captain,
 e288cd564d6f1c69df4fc85c,1962,Melbourne,Ron Barassi,2521,unique,Captain,1960–1964,,wikipedia
 e293ed3d78e0a270165f95d7,2025,North Melbourne,Jy Simpkin,12502,unique,Captain,2025,,wikipedia
 e2a6fb8def7d7d61c91f3ef4,2006,St Kilda,Luke Ball,1430,unique,Captain,2006,,wikipedia
+e2cbadb117aab0eb1fdd5c38,1954,Fitzroy,Alan Ruthven,2136,unique,Captain,1951–1954,,wikipedia
 e2d06a62e78846c2ac35b6e4,1949,Carlton,Ern Henfry,3040,unique,Captain,1947–1951,,wikipedia
 e30ec84019df024b068ec98e,2001,Port Adelaide,Matthew Primus,407,unique,Captain,2001–2005,,wikipedia
 e3296e985f0196760b50d9c5,2021,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
+e33369f6537ebdfdd2619718,1957,Hawthorn,John Kennedy,1893,unique,Captain,1955–1959,,wikipedia
 e34b7f1ddab87e75ff4c75e7,2010,Collingwood,Nick Maxwell,3980,unique,Captain,2009–2013,,wikipedia
 e3679131542b026abbcd606c,2011,Gold Coast,Gary Ablett Jr.,1105,unique,Captain,2011–2016,,wikipedia
 e39085527f54dc7fca7f5cc2,1918,Collingwood,Percy Wilson,5775,unique,Captain,1918,,wikipedia
@@ -1226,38 +1579,56 @@ e49deb6cd0d4a6b04d73e472,2004,Western Bulldogs,Chris Grant,422,unique,Captain,20
 e4bbae45e7fb8f6f593c97e9,1983,Collingwood,Mark Williams,2281,unique,Captain,1983–1986,,wikipedia
 e4f060db0eab198bebfb94cc,1969,St Kilda,Ian Stewart,2193,unique,Captain,1969,,wikipedia
 e4f71045a8716c9780861db8,2019,Port Adelaide,Tom Jonas,12002,unique,Captain,2019,,wikipedia
+e51bfe431b3d78737dfb0c56,1966,Fitzroy,Ralph Rogerson,3615,unique,Captain,1966,,wikipedia
+e553d15935d911070c6c733b,1939,Geelong,Reg Hickey,1468,unique,Captain,1932–1940,,wikipedia
+e5574dc8c49b5782b8c7b7e1,2003,Geelong,Steven King,587,unique,Captain,2003–2006,,wikipedia
+e55e5c83467209348760bbc3,1965,Hawthorn,Graham Arthur,2468,unique,Captain,1960–1968,,wikipedia
+e5678c979ce03a87ea2e320b,1946,Fitzroy,Fred Hughson,3097,unique,Captain,1943–1947,,wikipedia
 e5902ffa9e7efecbe719266f,2003,Sydney,Stuart Maxfield,867,unique,Captain,2003–2005,,wikipedia
 e5a06004ea6b478f8e23aa76,1991,Carlton,Stephen Kernahan,148,unique,Captain,1987–1997,,wikipedia
 e5ee69be45d9b9a6592331e2,2024,Fremantle,Alex Pearce,12352,unique,Captain,2023–,,wikipedia
 e6060883ea286cc27643274f,1999,Essendon,James Hird,312,unique,Captain,1998–2005,2000 premiership captain,wikipedia
 e607f8642eeffbc88784da7a,2025,Greater Western Sydney,Toby Greene,12025,unique,Captain,"2022 (co-captain), 2023– (sole captain)",,wikipedia
+e63b66b1e030a81bbe83d048,2000,Hawthorn,Shane Crawford,633,unique,Captain,1999–2004,,wikipedia
+e66a1ba03ec584d321266063,1992,Brisbane Bears,Roger Merrett,107,unique,Captain,1992,,wikipedia
 e69d2447f338ee67739a448d,1972,St Kilda,Ross Smith,2429,unique,Captain,1970–72,,wikipedia
 e6b3102f075a373318aae852,1963,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
 e6bef9d2da10ac366ee3ea3b,2001,Melbourne,David Neitz,689,unique,Captain,2000–2008,,wikipedia
 e6c9c6d60148d0dd9bfefecd,1936,St Kilda,Jack Perkins,7879,unique,Captain,1936,,wikipedia
 e76866765bf35984408704df,1955,Footscray,Charlie Sutton,3756,unique,Captain,1951–1955,1954 Premiership Captain,wikipedia
 e781d3609d37678728f20dce,2008,Western Bulldogs,Brad Johnson,421,unique,Captain,2007–2010,,wikipedia
+e7d266b47fe1d8a34e2c0978,2009,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 e7d615098087ba987af8c129,1970,Footscray,Stuart Magee,2376,unique,Captain,1970,Ted Whitten Longest Serving Captain,wikipedia
 e81c5b613e4bb59779bbce88,1919,Carlton,Charlie Fisher,6305,unique,Captain,1919,,wikipedia
 e88f781c0253f2f062953bba,1941,South Melbourne,Herbie Matthews,3275,unique,Captain,1938–1945,,wikipedia
 e8abbb405fb4d0cf874fc226,2009,Richmond,Chris Newman,1150,unique,Captain,2009–2012,,wikipedia
 e8bb32cc77a15395bbcd7b81,2004,Kangaroos,Adam Simpson,780,unique,Captain,2004–2008,,wikipedia
+e8f2d5210f52ff6cd71460f0,1928,Fitzroy,Gordon Rattray,6458,unique,Captain,1928,,wikipedia
+e8f9e297260d4ef1ea659065,2011,West Coast,Darren Glass,1068,unique,Captain,2008–2014,,wikipedia
 e906df13b7d13d5740ac1f5b,2005,Sydney,Leo Barry,1003,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
+e91369a7ef3f94801dc903ba,1901,Geelong,Henry Young,4414,unique,Captain,1901–1909,,wikipedia
 e9165c64aff9d9a42f542a7d,1947,Collingwood,Phonse Kyne,3182,unique,Captain,1946–1949,,wikipedia
 e946f183376ce1094a6ecca3,2010,Port Adelaide,Domenic Cassisi,1193,unique,Captain,2009–2012,,wikipedia
+e967464b92de88355eca4cf8,1897,Fitzroy,Bill Cleary,4347,unique,Captain,1897,,wikipedia
 e981c644f51a1672ec1fbd03,1976,St Kilda,Carl Ditterich,1675,unique,Captain,1976–77,,wikipedia
 e9c1a82564212b308bad1700,1996,St Kilda,Nathan Burke,919,unique,Captain,1996–98,,wikipedia
 e9dd97e0d1c3dfa30bcc9deb,2018,Essendon,Dyson Heppell,11896,unique,Captain,2017–2022,,wikipedia
+e9ddddcf1e1d00839274ec58,1976,Hawthorn,Don Scott,2147,unique,Captain,1976–1980,,wikipedia
+e9e079ab272ff23fd0c05164,1997,Geelong,Barry Stoneham,584,unique,Captain,1995–1998,,wikipedia
 e9ea95df9b3f3b8dc16d39c9,2007,Fremantle,Matthew Pavlich,544,unique,Captain,2007–2015,,wikipedia
 e9f4fe6053799fa85937356b,2023,Greater Western Sydney,Toby Greene,12025,unique,Captain,"2022 (co-captain), 2023– (sole captain)",,wikipedia
 ea10cf8b4f90ce060099c8e2,2008,Richmond,Kane Johnson,43,unique,Captain,2005–2008,,wikipedia
 ea355d2262431358abc4d43c,2022,Fremantle,Nat Fyfe,11834,unique,Captain,2017–2022,,wikipedia
 ea42f2cae74a8bd0ccfc7480,1899,Collingwood,Dick Condon,4455,unique,Captain,1899,,wikipedia
+ea80c304b255858c19c5c4c1,1902,Fitzroy,Bill McSpeerin,4364,unique,Captain,1901–1902,,wikipedia
 eaa2747ebab17763e9b52a4e,1923,Carlton,Horrie Clover,2694,unique,Captain,1922–1923,,wikipedia
 eab2aa97de78d5b7a315217a,1972,Melbourne,Frank Davis,2341,unique,Captain,1971–1972,,wikipedia
 eab4bfc418e48a7a9146451a,1979,Carlton,Alex Jesaulenko,1844,unique,Captain,1979,,wikipedia
 ead7113fd2304075cf4134db,1996,Footscray,Scott Wynd,424,unique,Captain,1994–2000,,wikipedia
+eb9235dea6bcfa29b5afeb30,1965,Fitzroy,Ralph Rogerson,3615,unique,Captain,1965,,wikipedia
+eba6f447e8583342c68f0a78,1905,Fitzroy,Gerald Brosnan,4759,unique,Captain,1903–1905,,wikipedia
 ebba4d00e99771c23b67a935,1907,South Melbourne,Bill Dolphin,5238,unique,Captain,1907–1908,,wikipedia
+ebc05684d4991f090036cf32,1975,Fitzroy,John Murphy,2017,unique,Captain,1973–1977,,wikipedia
 ec0412a3bc477aa8816a0da6,1942,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 ec4315046499a827139bce2b,1964,Essendon,Jack Clarke,1601,unique,Captain,1958–1964,1962 premiership captain,wikipedia
 ec43589865ff70884416d2a2,1961,Carlton,Graham Donaldson,2794,unique,Captain,1961–1962,,wikipedia
@@ -1265,7 +1636,10 @@ ec46fb714f3099f2afa33c0d,1992,North Melbourne,Matthew Larkin,1303,unique,Captain
 ec9f99dcb9b8bbe9c80a6241,1995,Footscray,Scott Wynd,424,unique,Captain,1994–2000,,wikipedia
 eca091e0dfa02662e7ad856a,1914,Melbourne,Len Incigneri,5043,unique,Captain,1914,,wikipedia
 ed03923ac08e5dce2ded8141,1959,South Melbourne,Ron Clegg,1605,unique,Captain,1957–1960,,wikipedia
+ed1cccccfe726d7b2487c931,1996,Fitzroy,Brad Boyd,374,unique,Captain,1995–1996,,wikipedia
 ed5b28ff079591a844bf2dcd,1975,Collingwood,Wayne Richardson,2109,unique,Captain,1972–1975,,wikipedia
+ed6b9545a621a1110e5c83b9,1977,Hawthorn,Don Scott,2147,unique,Captain,1976–1980,,wikipedia
+ed82cc8e70250040d83e2b80,2004,Geelong,Steven King,587,unique,Captain,2003–2006,,wikipedia
 ed95250b9dd09d1ca0d7253f,1968,Richmond,Roger Dean,2343,unique,Captain,1968–1971,1969 Premiership Captain,wikipedia
 eda1edf5fcb1a2af8ef75145,2022,Greater Western Sydney,Stephen Coniglio,12028,unique,Captain,"2020–2021 (sole captain), 2022 (co-captain)",,wikipedia
 edeb50dc9cd4191674180de0,1915,Carlton,Billy Dick,5593,unique,Captain,1914–1917,,wikipedia
@@ -1284,6 +1658,8 @@ efcc71f1b61b7794d1d1bb87,1987,St Kilda,Danny Frawley,918,unique,Captain,1987–9
 f00e6d7f16f93248df2373f9,1935,North Melbourne,Ted Llewellyn,3217,unique,Captain,1935,,wikipedia
 f047f3bd401f7128f6905d03,1939,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 f053f3c8201dc56bb653469d,1941,Carlton,Jim Francis,1738,unique,Captain,1941–1943,,wikipedia
+f0595f2a34e39e36a289ff4c,1950,Fitzroy,Norm Smith,3711,unique,Captain,1950,,wikipedia
+f0c1d935aa5ee702b978760e,2018,Geelong,Joel Selwood,11538,unique,Captain,2012–2022,,wikipedia
 f0ec8601ec93a2df55afb21b,2004,Brisbane Lions,Michael Voss,102,unique,Captain,2001–2006,,wikipedia
 f0ffab12a176e94cea5fd2ae,1944,Carlton,Jim Francis,1738,resolved,Captain,1944,,wikipedia
 f13ddb62af0fb326a0256962,1905,St Kilda,Vic Barwick,5021,unique,Captain,1905,,wikipedia
@@ -1292,6 +1668,7 @@ f187d0152decd35acda2ca3d,1907,Melbourne,Vin Coutie,4805,unique,Captain,1907,,wik
 f188976275b0518f4a2ef1a5,2003,Port Adelaide,Matthew Primus,407,unique,Captain,2001–2005,,wikipedia
 f191f95edb3ad671fe4e407a,1995,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
 f1bca442ad976287e0c1d177,2000,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
+f1d674a3fb73ffc2afc05a3b,2024,West Coast,Liam Duggan,12334,unique,Captain,2024–,,wikipedia
 f20dd221531e4f375a6d9d27,1917,Collingwood,Jock McHale,5099,unique,Captain,1917,,wikipedia
 f21cb9a752d36c1c9625b348,1942,Melbourne,Percy Beames,1516,unique,Captain,1942–1944,,wikipedia
 f21e5ef96f7310da94b7729e,1983,Footscray,Jim Edmond,1698,unique,Captain,1983–1985,,wikipedia
@@ -1302,27 +1679,38 @@ f2ff63a0557632b68203bb67,1973,St Kilda,Stuart Trott,2437,unique,Captain,1973,,wi
 f3002d666ca07c28a888e74c,1984,Carlton,Wayne Johnston,1849,unique,Captain,1984–1985,,wikipedia
 f3060fb00bd585a7757b5956,2019,Western Bulldogs,Easton Wood,11788,unique,Captain,2018–2019,2016 premiership captain,wikipedia
 f311a7b54f39d76b157b1b91,1985,North Melbourne,Wayne Schimmelbusch,2145,unique,Captain,1980–1987,,wikipedia
+f323bc5d6c06fef6404189da,2026,West Coast,Liam Baker,12661,unique,Captain,2026–,,wikipedia
 f32896fe3da2fef593edb708,1900,Collingwood,Dick Condon,4455,unique,Captain,1900,,wikipedia
+f338ed50faba0cfeda2fbd47,2007,Hawthorn,Richard Vandenberg,667,unique,Captain,2005–2007,,wikipedia
+f37b68c5a06a484600801e60,1931,Fitzroy,Colin Niven,2029,unique,Captain,1930–1931,,wikipedia
 f417c76cc67436e72577d23c,1927,Richmond,Allan Geddes,1749,unique,Captain,1927–1928,,wikipedia
 f4753a04c8846010e7e8ea01,1913,Melbourne,Alf George,5346,unique,Captain,1912–1913,,wikipedia
 f4a34be0b115b4971ec6ce69,1960,Collingwood,Murray Weideman,3865,unique,Captain,1960–1963,,wikipedia
 f4a3731bad1919ad0d5376cf,1951,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
 f4b52dadee092431ffe93bbd,1940,St Kilda,Stan Lloyd,3218,unique,Captain,1940,,wikipedia
+f4bf048d5cb875bf4621499d,1956,Hawthorn,John Kennedy,1893,unique,Captain,1955–1959,,wikipedia
 f4f8075612ec438faea3901b,2016,North Melbourne,Andrew Swallow,4176,unique,Captain,2012–2016,,wikipedia
 f5315db2e957b2e4ab63458d,1946,Carlton,Bob Chitty,2681,unique,Captain,1945–1946,,wikipedia
+f53de5885aec5c0d1c03d53d,1933,Hawthorn,Fred Phillips,2071,resolved,Captain,1933,St Kilda 1925-1932 on AFL Tables; Hawthorn captain-coach 1933 without a senior game recorded (Wikipedia: Fred Phillips (footballer)),wikipedia
 f555cb840fbd4519a42c4bf9,1951,Richmond,Bill Morris,3388,unique,Captain,1950–1951,,wikipedia
 f573ba381a3f805eb11974c1,1998,Sydney,Paul Kelly,993,unique,Captain,1993–2002,,wikipedia
 f5e531b8cd44c0a5b2414560,1937,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
 f60f9672ac83b9046f9c0521,1922,South Melbourne,Mark Tandy,3767,unique,Captain,1922,,wikipedia
+f617bcb6acab811d851970cc,1910,Fitzroy,Jim Sharp,4862,unique,Captain,1908–1910,,wikipedia
+f6475ab8068be4bd73ce65ad,1930,Geelong,Arthur Coghlan,2700,unique,Captain,1929–1930,,wikipedia
+f6e3b46d38e437433c5bd448,2014,West Coast,Shannon Hurn,4162,unique,Captain,2014–2019,,wikipedia
 f73c85b298fd1e2e062ad6e0,1978,Richmond,Kevin Sheedy,2163,unique,Captain,1978,,wikipedia
 f749d52e8cd6847aa0fc0029,1909,Carlton,Fred Elliott,4624,unique,Captain,1908–1911,,wikipedia
 f74ea49547aa6f746c664265,1934,Richmond,Percy Bentley,2546,resolved,Captain,1932–1940,1932 Premiership Captain1934 Premiership Captain,wikipedia
+f7a7237ffb2388fd3bbba1c9,1972,Geelong,Doug Wade,2245,unique,Captain,1972,,wikipedia
 f7b6a354aede05c9e79c5183,2022,St Kilda,Jack Steele,12368,unique,Captain,2022–2025,,wikipedia
 f7ecea8314c21140fd16f587,2023,Western Bulldogs,Marcus Bontempelli,12269,unique,Captain,2020–,,wikipedia
+f80f80e16e7d6334666dd530,1915,Fitzroy,Percy Parratt,5746,unique,Captain,1914–1915,,wikipedia
 f814af8b9998a14023d338a3,1943,Collingwood,Jack Regan,3570,unique,Captain,1943,,wikipedia
 f817ee4754bd984df5ae3152,1914,Collingwood,Dan Minogue,6022,unique,Captain,1914–1916,,wikipedia
 f81dd841ab7075554d0c1d76,1947,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
 f81e14e8ecac3108f9035d2f,1952,Richmond,Des Rowe,2132,unique,Captain,1952–1957,,wikipedia
+f836dac1525f6ac79b04e13d,1950,Hawthorn,Kevin Curran,2748,unique,Captain,1950–1951,,wikipedia
 f85900deecac95c340c9ad0d,2012,Greater Western Sydney,Phil Davis,11825,unique,Captain,2012–2019 (co-captain),,wikipedia
 f89e2826b53ab812ca084b14,2012,Brisbane Lions,Jonathan Brown,1092,unique,Captain,2009–2012,,wikipedia
 f8b0094f747a10a0d137f5da,2016,Sydney,Jarrad McVeigh,3950,unique,Captain,2013–2016,,wikipedia
@@ -1338,8 +1726,11 @@ f9f3def14be60f3d0976daa2,1954,North Melbourne,Gerald Marchesi,3267,unique,Captai
 f9f7f646e741ee4722253339,1934,Melbourne,Colin Niven,2029,unique,Captain,1934–1935,,wikipedia
 fa0eacfd1f338af886e90171,2011,Sydney,Adam Goodes,1012,unique,Captain,2011–2012,Jarrad McVeigh 2012 premiership captain,wikipedia
 fa0ed8e6c61622b129e9e832,2013,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
+fa1e0098dbfba2499f7b35f7,1948,Fitzroy,Alan Ruthven,2136,unique,Captain,1948,,wikipedia
 fa60bccb590877712b999720,1998,Carlton,Craig Bradley,151,unique,Captain,1998–2001,,wikipedia
+fab864b6084b571cca72720b,1918,Geelong,Jim Kearney,6381,unique,Captain,1918–1919,,wikipedia
 fb3fd49d35559bc6053988a2,1986,Sydney,Dennis Carroll,1268,unique,Captain,1986–1992,,wikipedia
+fb6427274bdd4e7d4fdf8518,2026,Geelong,Patrick Dangerfield,11700,unique,Captain,2023–,,wikipedia
 fb6908a7aab18314bcb6ba19,1977,Richmond,Francis Bourke,1539,unique,Captain,1976–1977,,wikipedia
 fb932bd73223ce51f33a6519,1997,Brisbane Lions,Alastair Lynch,104,unique,Captain,1997–2000,,wikipedia
 fb9477690502669b2ef9d8e6,1970,North Melbourne,John Dugdale,2808,unique,Captain,1968–1970,,wikipedia
@@ -1347,30 +1738,38 @@ fb9c2b3b8696d35386efd7a3,2026,Brisbane Lions,Hugh McCluggage,12518,unique,Captai
 fba0e88e155463f5918a4bf7,1968,Carlton,John Nicholls,3422,unique,Captain,1968,,wikipedia
 fba360561659e9e74f7c2799,2016,Adelaide,Taylor Walker,11713,unique,Captain,2015–2018,,wikipedia
 fbb6b16ca2beab8cb1402367,1928,North Melbourne,Charlie Tyson,3817,resolved,Captain,1928,,wikipedia
+fbd3a79fd9adb97624076dac,1920,Geelong,Alec Eason,5753,unique,Captain,1919–1920,,wikipedia
 fbdef0b1a5bc35a96eb57138,2013,Richmond,Trent Cotchin,11666,unique,Captain,2013–2021,2017 Premiership Captain 2019 Premiership Captain 2020 Premiership Captain,wikipedia
 fc0ea1a718f52f0c2c4b3115,1955,Essendon,Bill Hutchison,1828,unique,Captain,1951–1957,,wikipedia
+fc45d6acf1f6f6b996682c2a,1934,Fitzroy,Fred Davies,1650,unique,Captain,1934,,wikipedia
 fc4ce5e6b6f629f38a09f0d2,1945,Richmond,Jack Dyer,2820,unique,Captain,1941–1949,1943 Premiership Captain,wikipedia
 fc67de3c58ad134153beecc5,1969,Essendon,Don McKenzie,1970,unique,Captain,1969,,wikipedia
+fcb9674c663140f56ed439b8,1993,Geelong,Mark Bairstow,1201,unique,Captain,1992–1994,,wikipedia
 fccb6302e24ec6396a52eb04,1903,Essendon,Jim Anderson,4308,unique,Captain,1903–1904,,wikipedia
 fcd71017ee5a29dce3685edd,1983,Carlton,Mike Fitzpatrick,1722,unique,Captain,1980–1983,,wikipedia
 fcda990ef1051a871fe4d747,1966,Carlton,Ron Barassi,2521,unique,Captain,1965–1967,,wikipedia
 fcdb5ddb332a53efa2eab148,1989,St Kilda,Danny Frawley,918,unique,Captain,1987–95,,wikipedia
+fce2898732988c71046df181,2025,West Coast,Oscar Allen,12655,unique,Captain,2024–2025,,wikipedia
 fce9a30fdbacca889fb49451,2003,St Kilda,Aaron Hamill,171,unique,Captain,2003,,wikipedia
+fcf4d7e1d58d38b2855c1871,2024,Geelong,Patrick Dangerfield,11700,unique,Captain,2023–,,wikipedia
 fcffffdbf4434c5eaa0361f6,1930,St Kilda,Bill Cubbins,1642,unique,Captain,1929–30,,wikipedia
 fd0abf6fc7a1c2ca978394ae,2018,Collingwood,Scott Pendlebury,4182,unique,Captain,2014–2022,,wikipedia
 fd22a269f23ec8fe1501fb9e,2018,Melbourne,Jack Viney,12147,unique,Captain,2017–2019,,wikipedia
 fd4c8d4a275e32e9ee35ed90,1929,South Melbourne,Charlie Stanbridge,3731,resolved,Captain,1929,,wikipedia
+fd7ed366c40233e7cf3be37a,1912,University,George Elliott,5267,unique,Captain,1912,,wikipedia
 fdf15f664fe7b3ea3e802a2a,1937,Footscray,Sid Dockendorff,7723,unique,Captain,1937,,wikipedia
 fe18e722d3ae0431372b98bc,1963,Richmond,Neville Crowe,2737,unique,Captain,1963–1966,,wikipedia
 fe19441952f5c0de2f46f7c5,1941,Essendon,Dick Reynolds,3578,unique,Captain,1939–1950,"1942, 1946, 1949 and 1950 premiership captain",wikipedia
 fe2af0a3e28fcd40feefc619,1929,Melbourne,Ivor Warne-Smith,2253,unique,Captain,1928–1931,,wikipedia
 fe7d03237263f5067de2214f,1987,Essendon,Terry Daniher,1311,unique,Captain,1983–1988,1984 and 1985 premiership captain,wikipedia
 fe816e99c9abeb614890cf85,2000,Port Adelaide,Gavin Wanganeen,303,unique,Captain,1997–2000,,wikipedia
+feb052639bf9eb1393702a85,1908,Fitzroy,Jim Sharp,4862,unique,Captain,1908–1910,,wikipedia
 feb7ada72326644bc53029e2,1906,Collingwood,Alf Dummett,4896,unique,Captain,1906,,wikipedia
 fed0992edb90133ec8c9625b,1917,Richmond,Percy Maybury,5825,unique,Captain,1917,,wikipedia
 fef3596c3d94498cb1381869,2014,Greater Western Sydney,Callan Ward,11677,unique,Captain,2012–2019 (co-captain),,wikipedia
 ff2f5204926dbe4b132d492c,2015,Port Adelaide,Travis Boak,11583,unique,Captain,2013–2018,,wikipedia
 ff5fc745ad8de58eb76a2b3c,2026,Adelaide,Jordan Dawson,12516,unique,Captain,2023–,,wikipedia
+ff6683b48da90bc203a6913c,1945,Hawthorn,Keith Shea,3685,unique,Captain,1945,,wikipedia
 ff947f330ca682f167368760,1932,Collingwood,Syd Coventry,1629,unique,Captain,1927–1934,,wikipedia
 ff9b7af454177adcb843cca5,2006,Sydney,Brett Kirk,1015,unique,Captain,2005–2007,Barry Hall 2005 premiership captain,wikipedia
 ffdfdf43d682604ac88a5fab,1973,Richmond,Royce Hart,2367,unique,Captain,1972–1975,1973 Premiership Captain1974 Premiership Captain,wikipedia

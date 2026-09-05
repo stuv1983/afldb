@@ -46,6 +46,7 @@
  * can reach any stage below — it is a different entry point with no stage graph at all.
  */
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
@@ -142,6 +143,53 @@ const COLEMAN_CONTRACT = join('data', 'reference', 'coleman-derivation.json');
  */
 const BROWNLOW_SEASON_MANIFEST = join('data', 'brownlow', 'season-votes.manifest.json');
 export const BROWNLOW_SEASON_LOADER = 'tools/migration/import_brownlow_season.py';
+
+/** AFLDB-ISSUE-118 §23.19. The height stages' loaders and the AFL API source contract. */
+export const HEIGHT_LOADER = 'tools/migration/enrich_heights.py';
+export const AFL_API_HEIGHT_LOADER = 'tools/migration/enrich_heights_afl_api.py';
+export const WIKIPEDIA_HEIGHT_LOADER = 'tools/migration/enrich_heights_wikipedia.py';
+/** The tracked Wikipedia height adjudication set (ISSUE-118 §23.19), keyed by AFL Tables profile. */
+export const WIKIPEDIA_HEIGHT_CSV = join('data', 'players', 'height-evidence-wikipedia.csv');
+const AFL_API_CONTRACT = join('tools', 'rebuild', 'afl_api', 'afl-api-contract.json');
+/**
+ * AFLDB-ISSUE-118 §23.24 Stage D1. The birth-date loader and the direct AFL Tables
+ * acquisition contract that pins the accepted all-time club-list snapshot it reads.
+ */
+export const BIRTH_DATE_LOADER = 'tools/migration/enrich_birth_dates_afltables.py';
+/** AFLDB-ISSUE-118 §23.27 Stage E2: coaches + match_coaches from the pinned coach pages and the baseline's Coach column. */
+export const COACH_LOADER = 'tools/migration/import_match_coaches.py';
+/**
+ * AFLDB-ISSUE-118 §23.29 family F: father–son rule selections from the tracked, normalised
+ * Wikipedia list (profile paths resolved once by `father_son.py normalize`, never a name at
+ * load time), plus the adjudication set and the source provenance the loader carries.
+ */
+export const FATHER_SON_LOADER = 'tools/migration/father_son.py';
+export const FATHER_SON_CSV = join('data', 'players', 'father-son-selections.csv');
+export const FATHER_SON_ADJUDICATIONS = join('data', 'players', 'father-son-adjudications.csv');
+export const FATHER_SON_PROVENANCE = join('data', 'players', 'father-son-selections.source.json');
+/**
+ * AFLDB-ISSUE-118 §23.31 family F (siblings): sibling pairs from the tracked, normalised
+ * export of the Wikipedia football-families list (profile paths resolved once by
+ * `family_siblings.py normalize`, never a name at load time), plus adjudications and provenance.
+ */
+export const SIBLINGS_LOADER = 'tools/migration/family_siblings.py';
+export const SIBLINGS_CSV = join('data', 'players', 'sibling-relationships.csv');
+export const SIBLINGS_ADJUDICATIONS = join('data', 'players', 'sibling-adjudications.csv');
+export const SIBLINGS_PROVENANCE = join('data', 'players', 'sibling-relationships.source.json');
+export const SIBLINGS_SUPPLEMENTS = join('data', 'players', 'sibling-supplements.csv');
+/**
+ * AFLDB-ISSUE-118 §23.33–§23.35 after-the-siren: canonical after_siren_kicks events
+ * (migration 089) from the tracked normalised artefact — a deterministic normalisation of
+ * the Wikipedia "kicks after the siren" table exports. The loader resolves match by
+ * (season, round, kicker's organisation, opponent) with the artefact's own points as the
+ * independent check, and the kicker by match participation, never by name. Adjudications
+ * and provenance are tracked beside it; the raw exports are gitignored and unread at load.
+ */
+export const AFTER_SIREN_LOADER = 'tools/migration/after_siren.py';
+export const AFTER_SIREN_CSV = join('data', 'records', 'after-siren-events.csv');
+export const AFTER_SIREN_ADJUDICATIONS = join('data', 'records', 'after-siren-adjudications.csv');
+export const AFTER_SIREN_PROVENANCE = join('data', 'records', 'after-siren-events.source.json');
+const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
   'data/brownlow/season-votes.manifest.json',
@@ -462,6 +510,129 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-118 §23.19. players.height_cm from the accepted baseline's own AFL
+      // Tables player_details register, reconciled to the snapshot's per-match rows and
+      // joined to players ONLY through the afltables profile-url identities `fitzroy`
+      // registered — so it must follow fitzroy and needs nothing later. The in-season
+      // supplement it reads beside the baseline is pinned in the fitzRoy contract
+      // (datasets.player_details.height_enrichment), never chosen here. No network.
+      id: 'heights',
+      name: `HEIGHTS — AFL Tables register (${fitzroy.label} + ${heightEnrichmentPins().supplements.map((s) => s.label).join(', ')})`,
+      kind: 'data',
+      run: 'command',
+      argv: heightsImportArgv(fitzroy.label, python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.19. The SECOND height evidence source: the AFL API season
+      // rosters (tracked manifest pinned in tools/rebuild/afl_api/afl-api-contract.json,
+      // roster.accepted_snapshot). Corroborating evidence rows only — it never writes
+      // players.height_cm — reconciled through canonical club/season/guernsey facts
+      // `fitzroy` loaded. No network.
+      id: 'heights-afl-api',
+      name: `HEIGHTS (AFL API) — corroborating evidence, ${aflApiRosterPin().label}`,
+      kind: 'data',
+      run: 'command',
+      argv: aflApiHeightsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.19. The THIRD height evidence source: the tracked Wikipedia
+      // infobox transcription for the Gridley height adjudication set (83 players),
+      // keyed by the AFL Tables profile identities `fitzroy` registered. Evidence rows
+      // only; never writes players.height_cm. Tracked artefact, no network.
+      id: 'heights-wikipedia',
+      name: 'HEIGHTS (Wikipedia) — tracked adjudication set, corroborating evidence',
+      kind: 'data',
+      run: 'command',
+      argv: wikipediaHeightsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.24 Stage D1. players.dob from the AFL Tables all-time club
+      // player lists — the very pages the accepted register came from, but keeping the
+      // DOB column and the profile hrefs fitzRoy 1.8.0 drops. Manifest-pinned snapshot
+      // (tools/rebuild/afltables/afltables-contract.json club_player_lists
+      // .accepted_snapshot), joined to players ONLY through the afltables profile-url
+      // identities `fitzroy` registered; fills dob only where NULL, records every date
+      // seen as evidence, never overwrites a fitzRoy date. No network.
+      id: 'birth-dates',
+      name: `BIRTH DATES — AFL Tables club lists, ${afltablesClubListPin().label}`,
+      kind: 'data',
+      run: 'command',
+      argv: birthDatesArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.27 Stage E2. coaches (one row per person, keyed by the AFL
+      // Tables coach page; linked to a players row ONLY through the page's profile path
+      // and the afltables identities `fitzroy` registered — never by name) and
+      // match_coaches (match, club, coach) from the baseline's own per-match Coach
+      // column, reconciled to the pages by exact string. Manifest-pinned snapshot
+      // (afltables-contract.json coaches.accepted_snapshot); the tracked parsed
+      // artefacts are the input bytes. Needs matches, clubs and identities: after
+      // fitzroy; nothing later reads it. No network.
+      id: 'coaches',
+      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + ${fitzroy.label} Coach column`,
+      kind: 'data',
+      run: 'command',
+      argv: coachesImportArgv(fitzroy.label, python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.29 family F. father_son_selections (one row per selection under
+      // the AFL father–son rule: son, father, club, year, pick) and one parent_child row per
+      // pair in player_relationships, from the TRACKED normalised Wikipedia list. Every
+      // person is resolved ONLY through the AFL Tables profile path the artefact carries
+      // and the identities fitzroy registered; the artefact's own row counts are the gates.
+      // Needs players and identities: after fitzroy; nothing later reads it. No network.
+      id: 'father-son',
+      name: `FATHER–SON — tracked Wikipedia list, ${fatherSonMeasures().selections} selections`,
+      kind: 'data',
+      run: 'command',
+      argv: fatherSonArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.31 family F (siblings). One `sibling` row per pair of the
+      // Wikipedia football-families export in player_relationships, from the TRACKED
+      // normalised artefact; every person resolved ONLY through the AFL Tables profile path
+      // it carries. Needs players and identities: after fitzroy; nothing later reads it.
+      id: 'siblings',
+      name: `SIBLINGS — tracked Wikipedia families export, ${siblingMeasures().pairs} pairs`,
+      kind: 'data',
+      run: 'command',
+      argv: siblingsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.33–§23.35 after-the-siren. One after_siren_kicks row per event
+      // of the TRACKED normalised artefact (migration 089); the match is resolved by
+      // (season, round, both organisations) with the artefact's own final score as the
+      // independent check, the kicker by match participation for the kicker's club, never
+      // by name. Needs matches, clubs, player_match_stats and identities: after fitzroy;
+      // nothing later reads it. No network; the raw exports are not read.
+      id: 'after-siren',
+      name: `AFTER-SIREN — tracked Wikipedia siren-kick exports, ${afterSirenMeasures().events} events`,
+      kind: 'data',
+      run: 'command',
+      argv: afterSirenArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.34 U.6. The after-siren reconciliation: re-resolve the tracked
+      // artefact against the just-loaded database and check every canonical row against it.
+      // Every expectation is derived from the artefact or that re-resolution — never a
+      // typed constant — so it is independent of the season baseline. A VALIDATION stage:
+      // it opens one connection and writes nothing.
+      id: 'after-siren-reconcile',
+      name: 'AFTER-SIREN RECONCILE — loaded table against a fresh re-resolution',
+      kind: 'validation',
+      run: 'command',
+      argv: afterSirenReconcileArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
       // Must follow fitzroy: three tracked explicit decisions target canonical AFL Tables
       // identities and the importer HALTs rather than invent a replacement player.
       id: 'draftguru',
@@ -595,15 +766,17 @@ export const AWARDS_HONOURS_GROUPS = [
 export const AWARDS_HONOURS_EXPECTED = {
   honourTeamMembers: 113,
   hallOfFame: 343,
-  captaincies: 1375,
+  /** 1,375 bootstrap rows + 399 AFLDB-ISSUE-118 §23.21 rows for the six missing clubs. */
+  captaincies: 1774,
   risingStarNominations: 766,
   risingStarWinners: 33,
-  allAustralian: 1158,
+  allAustralian: 1244,
   clubBestAndFairest: 752,
-  namedMedals: 979,
+  /** 979 legacy-extracted rows + 328 AFLDB-ISSUE-118 §23.20 medal transcriptions. */
+  namedMedals: 1307,
   under22: 330,
-  /** bf-* (19) + named medals (17) + all-australian + rising-star + 22-under-22. */
-  awardDefinitions: 39,
+  /** bf-* (19) + named medals (24) + all-australian + rising-star + 22-under-22. */
+  awardDefinitions: 46,
 };
 
 /**
@@ -940,7 +1113,8 @@ const MEASURED_SQL: Record<string, string> = {
 const MEASURED_NOT_DB_GATED: Record<string, string> = {
   players_with_dob:
     'birth dates arrive via player_birth_evidence and DOB enrichment (ISSUE-090), so a raw '
-    + 'count is not this baseline’s claim; gated offline by the importer and register.',
+    + 'count is not this baseline’s claim; gated offline by the importer and register. The '
+    + 'rebuilt total is gated by the birth-dates stage (players_with_dob_after_birth_dates).',
   players_with_dob_conflict: 'same evidence model as players_with_dob.',
 };
 
@@ -1016,6 +1190,30 @@ export function finalValidationChecks(
   for (const check of brownlowSeasonChecks(Number(measured.seasons_last))) {
     checks.push(check);
   }
+
+  // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
+  // §H15.5 reason. The expected values are read from the contracts' pin blocks.
+  for (const check of heightChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.24. Added together with the BIRTH DATES stage, for the same
+  // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
+  for (const check of birthDateChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.27. Added together with the COACHES stage, for the same §H15.5
+  // reason. The expected values are read from the AFL Tables contract's coaches pin.
+  for (const check of coachChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.29. Added together with the FATHER–SON stage, for the same §H15.5
+  // reason. The expected values are read from the tracked artefact itself.
+  for (const check of fatherSonChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.31. Added together with the SIBLINGS stage, for the same reason.
+  for (const check of siblingChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.33–§23.35. Added together with the AFTER-SIREN stage. The values
+  // are the tracked artefact's own link-independent counts; the linkage / canonical
+  // invariants are the AFTER-SIREN RECONCILE stage's own 38 checks.
+  for (const check of afterSirenChecks()) checks.push(check);
 
   return checks;
 }
@@ -1463,6 +1661,808 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + 'the artefact, its manifest and the identity adjudication file do not agree. '
       + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
+
+  // AFLDB-ISSUE-118 §23.19. The height stages read two acquired snapshots beside the
+  // baseline — the pinned in-season supplement and the pinned AFL API roster set —
+  // whose raw bytes are gitignored. Prove the manifest bindings (done inside the pin
+  // readers, which refuse on a missing or mismatched manifest) and every artefact hash
+  // offline, before destruction, exactly as the ladder witness is proven.
+  if (source) {
+    const heights = deps.runCommand(heightsValidateArgv(source.label), {});
+    if (heights.status !== 0) {
+      throw new RebuildRefused(
+        `Height preflight failed (${HEIGHT_LOADER} --validate-only). The fitzRoy contract `
+        + 'pins the in-season supplement(s) '
+        + `${heightEnrichmentPins().supplements.map((s) => `'${s.label}'`).join(', ')}, `
+        + 'but the register or a supplement is missing, incomplete or does not match its '
+        + 'manifest. Nothing has been destroyed.\n'
+        + `${heights.stdout}${heights.stderr}`);
+    }
+  }
+  if (!deps.fileExists(WIKIPEDIA_HEIGHT_CSV)) {
+    throw new RebuildRefused(
+      `Wikipedia height preflight: required tracked input is missing: ${WIKIPEDIA_HEIGHT_CSV}. `
+      + 'Nothing has been destroyed.');
+  }
+  const wikipedia = deps.runCommand(wikipediaHeightsValidateArgv(), {});
+  if (wikipedia.status !== 0) {
+    throw new RebuildRefused(
+      `Wikipedia height preflight failed (${WIKIPEDIA_HEIGHT_LOADER} --validate-only): the `
+      + `tracked artefact ${WIKIPEDIA_HEIGHT_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${wikipedia.stdout}${wikipedia.stderr}`);
+  }
+  const roster = deps.runCommand(aflApiHeightsValidateArgv(), {});
+  if (roster.status !== 0) {
+    throw new RebuildRefused(
+      `AFL API roster preflight failed (${AFL_API_HEIGHT_LOADER} --validate-only). The `
+      + `contract pins '${aflApiRosterPin().label}', but its acquired bytes are missing, `
+      + 'incomplete or do not match the manifest. Re-acquire it with '
+      + 'acquire_rosters.R --from 2012 --to <season>. Nothing has been destroyed.\n'
+      + `${roster.stdout}${roster.stderr}`);
+  }
+  // AFLDB-ISSUE-118 §23.24. The birth-date stage reads a third acquired snapshot whose
+  // raw bytes are gitignored: prove the pin binding (inside afltablesClubListPin) and
+  // every parsed and raw artefact hash offline, before destruction.
+  const birthDates = deps.runCommand(birthDatesValidateArgv(), {});
+  if (birthDates.status !== 0) {
+    throw new RebuildRefused(
+      `Birth-date preflight failed (${BIRTH_DATE_LOADER} --validate-only). The AFL Tables `
+      + `contract pins '${afltablesClubListPin().label}', but its acquired bytes are missing, `
+      + 'incomplete or do not match the manifest. Re-acquire it with '
+      + 'tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
+      + `${birthDates.stdout}${birthDates.stderr}`);
+  }
+  // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
+  // parsed artefacts tracked, raw bytes gitignored) and the baseline's own player_stats
+  // files: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  if (source) {
+    const coaches = deps.runCommand(coachesValidateArgv(source.label), {});
+    if (coaches.status !== 0) {
+      throw new RebuildRefused(
+        `Coaches preflight failed (${COACH_LOADER} --validate-only). The AFL Tables contract `
+        + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
+        + 'player_stats files or a pinned supplement are missing, incomplete or do not match '
+        + 'their manifests. Re-acquire the coach pages with '
+        + 'tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
+        + `${coaches.stdout}${coaches.stderr}`);
+    }
+  }
+  // AFLDB-ISSUE-118 §23.29. The father–son stage reads three TRACKED files (the normalised
+  // list, its adjudications and its provenance): prove they are in the checkout and that
+  // the loader accepts the artefact's shape offline, before destruction.
+  for (const path of [FATHER_SON_CSV, FATHER_SON_ADJUDICATIONS, FATHER_SON_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `Father–son preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const fatherSon = deps.runCommand(fatherSonValidateArgv(), {});
+  if (fatherSon.status !== 0) {
+    throw new RebuildRefused(
+      `Father–son preflight failed (${FATHER_SON_LOADER} load --validate-only): the tracked `
+      + `artefact ${FATHER_SON_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${fatherSon.stdout}${fatherSon.stderr}`);
+  }
+  // AFLDB-ISSUE-118 §23.31. The siblings stage likewise reads four TRACKED files (the
+  // supplements are explicitly evidenced pairs the export lacks).
+  for (const path of [SIBLINGS_CSV, SIBLINGS_ADJUDICATIONS, SIBLINGS_SUPPLEMENTS, SIBLINGS_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `Siblings preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const siblings = deps.runCommand(siblingsValidateArgv(), {});
+  if (siblings.status !== 0) {
+    throw new RebuildRefused(
+      `Siblings preflight failed (${SIBLINGS_LOADER} load --validate-only): the tracked `
+      + `artefact ${SIBLINGS_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${siblings.stdout}${siblings.stderr}`);
+  }
+  // AFLDB-ISSUE-118 §23.33–§23.35. The after-siren stage reads three TRACKED files (the
+  // artefact, its adjudications and its provenance); the raw exports are gitignored and
+  // never read at load. Prove they are in the checkout and that the loader accepts the
+  // artefact's shape offline, before destruction.
+  for (const path of [AFTER_SIREN_CSV, AFTER_SIREN_ADJUDICATIONS, AFTER_SIREN_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `After-siren preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const afterSiren = deps.runCommand(afterSirenValidateArgv(), {});
+  if (afterSiren.status !== 0) {
+    throw new RebuildRefused(
+      `After-siren preflight failed (${AFTER_SIREN_LOADER} load --validate-only): the tracked `
+      + `artefact ${AFTER_SIREN_CSV} is malformed or disagrees with its provenance. `
+      + `Nothing has been destroyed.\n${afterSiren.stdout}${afterSiren.stderr}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.19 — the height stages' pinned inputs
+// ---------------------------------------------------------------------------
+
+/** SHA-256 of a tracked manifest's CANONICAL LF bytes (the AFLDB-ISSUE-114 lesson). */
+function manifestSha256(path: string): string | null {
+  if (!existsSync(path)) return null;
+  const bytes = readFileSync(path).toString('utf8').replace(/\r\n/g, '\n');
+  return createHash('sha256').update(bytes, 'utf8').digest('hex');
+}
+
+export type PinnedManifest = { label: string; manifest: string; sha256: string };
+
+/** Refuses unless the pinned manifest exists and hashes to its binding. */
+function provePin(pin: PinnedManifest, what: string): void {
+  const actual = manifestSha256(join(REPO_ROOT, pin.manifest));
+  if (actual === null) {
+    throw new RebuildRefused(
+      `${what} pins '${pin.label}' at ${pin.manifest}, but that manifest is not in this `
+      + 'checkout. The rebuild will not guess an input.');
+  }
+  if (actual !== pin.sha256) {
+    throw new RebuildRefused(
+      `${what} pins '${pin.label}' with manifest_sha256 ${pin.sha256.slice(0, 12)}…, but `
+      + `${pin.manifest} hashes to ${actual.slice(0, 12)}…. A changed manifest is a `
+      + 'successor decision, not something the rebuild resolves.');
+  }
+}
+
+export type HeightEnrichmentPins = {
+  supplements: PinnedManifest[];
+  measured: { playersWithHeight: number; heightWithoutEvidence: number; heightConflictsOpen: number };
+};
+
+/**
+ * The in-season supplement(s) and measured outcome the HEIGHTS stage is bound to, read
+ * from the fitzRoy contract (datasets.player_details.height_enrichment). Never a
+ * default: no pin, no stage. Each supplement's manifest binding is proven on read.
+ */
+export function heightEnrichmentPins(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, FITZROY_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): HeightEnrichmentPins {
+  const contract = readContract();
+  const datasets = contract?.datasets as Record<string, Record<string, unknown>> | undefined;
+  const block = datasets?.player_details?.height_enrichment as Record<string, unknown> | undefined;
+  const supplements = block?.supplements as Array<Record<string, unknown>> | undefined;
+  const measured = block?.measured as Record<string, unknown> | undefined;
+  if (!block || !Array.isArray(supplements) || supplements.length === 0 || !measured) {
+    throw new RebuildRefused(
+      `${FITZROY_CONTRACT} records no height enrichment binding `
+      + '(datasets.player_details.height_enrichment with supplements and measured). '
+      + 'AFLDB-ISSUE-118 §23.19 binds the in-season supplement explicitly; the rebuild '
+      + 'will not pick one.');
+  }
+  const pins: PinnedManifest[] = supplements.map((s) => ({
+    label: String(s.snapshot_label), manifest: String(s.manifest), sha256: String(s.manifest_sha256),
+  }));
+  for (const pin of pins) provePin(pin, 'The fitzRoy contract height_enrichment block');
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(`height_enrichment.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    supplements: pins,
+    measured: {
+      playersWithHeight: int('players_with_height'),
+      heightWithoutEvidence: int('height_without_evidence'),
+      heightConflictsOpen: int('height_conflicts_open'),
+    },
+  };
+}
+
+export type AflApiRosterPin = PinnedManifest & { measured: { playersWithAflApiEvidence: number } };
+
+/** The accepted AFL API roster snapshot, from roster.accepted_snapshot; binding proven. */
+export function aflApiRosterPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFL_API_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflApiRosterPin {
+  const contract = readContract();
+  const roster = contract?.roster as Record<string, unknown> | undefined;
+  const accepted = roster?.accepted_snapshot as
+    { snapshot_label?: unknown; manifest?: unknown; manifest_sha256?: unknown;
+      measured?: { players_with_afl_api_evidence?: unknown } } | undefined;
+  const n = accepted?.measured?.players_with_afl_api_evidence;
+  if (!accepted?.snapshot_label || !accepted.manifest || !accepted.manifest_sha256
+      || typeof n !== 'number' || !Number.isInteger(n)) {
+    throw new RebuildRefused(
+      `${AFL_API_CONTRACT} records no accepted roster snapshot `
+      + '(roster.accepted_snapshot with snapshot_label, manifest, manifest_sha256 and '
+      + 'measured.players_with_afl_api_evidence). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.snapshot_label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256),
+  };
+  provePin(pin, 'The AFL API contract roster.accepted_snapshot block');
+  return { ...pin, measured: { playersWithAflApiEvidence: n } };
+}
+
+/** The HEIGHTS data stage: the baseline register plus every pinned supplement. */
+export function heightsImportArgv(fitzroyLabel: string,
+                                  python: string = resolvePython()): string[] {
+  const argv = [python, HEIGHT_LOADER, '--label', fitzroyLabel];
+  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  return argv;
+}
+
+/** The same argv plus --validate-only: manifests and artefact hashes, no database. */
+export function heightsValidateArgv(fitzroyLabel: string,
+                                    python: string = resolvePython()): string[] {
+  return [...heightsImportArgv(fitzroyLabel, python), '--validate-only'];
+}
+
+export function aflApiHeightsArgv(python: string = resolvePython()): string[] {
+  return [python, AFL_API_HEIGHT_LOADER, '--label', aflApiRosterPin().label];
+}
+
+export function aflApiHeightsValidateArgv(python: string = resolvePython()): string[] {
+  return [...aflApiHeightsArgv(python), '--validate-only'];
+}
+
+export function wikipediaHeightsArgv(python: string = resolvePython()): string[] {
+  return [python, WIKIPEDIA_HEIGHT_LOADER, '--csv', WIKIPEDIA_HEIGHT_CSV];
+}
+
+export function wikipediaHeightsValidateArgv(python: string = resolvePython()): string[] {
+  return [...wikipediaHeightsArgv(python), '--validate-only'];
+}
+
+/**
+ * The adjudication set's size, read from the tracked artefact itself: the loader
+ * refuses to write unless EVERY row resolves to a canonical player, so the number of
+ * players carrying Wikipedia height evidence after a rebuild is exactly its row count.
+ */
+export function wikipediaHeightRows(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, WIKIPEDIA_HEIGHT_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): number {
+  const text = readCsv();
+  if (text === null) {
+    throw new RebuildRefused(`${WIKIPEDIA_HEIGHT_CSV} is not in this checkout.`);
+  }
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (lines.length < 2 || !lines[0].startsWith('afltables_profile,')) {
+    throw new RebuildRefused(`${WIKIPEDIA_HEIGHT_CSV} has no data rows or an unexpected header.`);
+  }
+  return lines.length - 1;
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.19. Heights must survive a rebuild from scratch: the fill count,
+ * the evidence-link invariant and the conflict count are pinned beside the inputs that
+ * produced them, so a rebuild that silently drops the stage (or reproduces fewer
+ * identities) fails here rather than being noticed by a Gridley cell weeks later.
+ */
+export function heightChecks(): FinalCheck[] {
+  const pins = heightEnrichmentPins();
+  const roster = aflApiRosterPin();
+  return [
+    { key: 'players_with_height',
+      sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL',
+      expected: pins.measured.playersWithHeight },
+    { key: 'height_without_evidence',
+      sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL AND height_evidence_id IS NULL',
+      expected: pins.measured.heightWithoutEvidence },
+    { key: 'height_conflicts_open',
+      sql: "SELECT count(*) FROM data_issues WHERE issue_type = 'height_conflict' AND resolved_at IS NULL",
+      expected: pins.measured.heightConflictsOpen },
+    { key: 'players_with_afl_api_height_evidence',
+      sql: "SELECT count(DISTINCT e.player_id) FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key = 'afl_api'",
+      expected: roster.measured.playersWithAflApiEvidence },
+    { key: 'players_with_wikipedia_height_evidence',
+      sql: "SELECT count(DISTINCT e.player_id) FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key = 'wikipedia'",
+      expected: wikipediaHeightRows() },
+  ];
+}
+
+export type AflTablesClubListPin = PinnedManifest & {
+  measured: {
+    playersWithDob: number;
+    dobWithoutEvidence: number;
+    playersWithClubListBirthEvidence: number;
+    clubListBirthConflictPlayers: number;
+    dobDisagreeingWithClubList: number;
+  };
+};
+
+/**
+ * AFLDB-ISSUE-118 §23.24. The accepted AFL Tables all-time club-list snapshot, from
+ * club_player_lists.accepted_snapshot; manifest binding proven on read (the contract
+ * records the LF hash, and manifestSha256 normalises line endings, so a CRLF checkout
+ * still proves). Never a default: no pin, no stage.
+ */
+export function afltablesClubListPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFLTABLES_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflTablesClubListPin {
+  const contract = readContract();
+  const lists = contract?.club_player_lists as Record<string, unknown> | undefined;
+  const accepted = lists?.accepted_snapshot as
+    { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
+      measured?: Record<string, unknown> } | undefined;
+  if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
+      || !accepted.measured) {
+    throw new RebuildRefused(
+      `${AFLTABLES_CONTRACT} records no accepted club-list snapshot `
+      + '(club_player_lists.accepted_snapshot with label, manifest, manifest_sha256_lf and '
+      + 'measured). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256_lf),
+  };
+  provePin(pin, 'The AFL Tables contract club_player_lists.accepted_snapshot block');
+  const measured = accepted.measured;
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(
+        `club_player_lists.accepted_snapshot.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    ...pin,
+    measured: {
+      playersWithDob: int('players_with_dob'),
+      dobWithoutEvidence: int('dob_without_evidence'),
+      playersWithClubListBirthEvidence: int('players_with_club_list_birth_evidence'),
+      clubListBirthConflictPlayers: int('club_list_birth_conflict_players'),
+      dobDisagreeingWithClubList: int('dob_disagreeing_with_club_list'),
+    },
+  };
+}
+
+export function birthDatesArgv(python: string = resolvePython()): string[] {
+  return [python, BIRTH_DATE_LOADER, '--label', afltablesClubListPin().label];
+}
+
+/** The same argv plus --validate-only: manifest and artefact hashes, no database. */
+export function birthDatesValidateArgv(python: string = resolvePython()): string[] {
+  return [...birthDatesArgv(python), '--validate-only'];
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.24. Dates of birth must survive a rebuild from scratch: the
+ * population with a date, the evidence-link invariant, the evidence coverage and the
+ * contract's documented conflict/disagreement state are pinned beside the snapshot that
+ * produced them. A rebuild that silently drops the stage, resolves fewer identities, or
+ * starts overwriting fitzRoy dates fails here.
+ */
+export function birthDateChecks(): FinalCheck[] {
+  const pin = afltablesClubListPin();
+  const clubListEvidence = "player_birth_evidence e JOIN sources s ON s.id = e.source_id "
+    + "WHERE s.key = 'afltables' AND e.evidence_type = 'afltables_club_list'";
+  return [
+    { key: 'players_with_dob_after_birth_dates',
+      sql: 'SELECT count(*) FROM players WHERE dob IS NOT NULL',
+      expected: pin.measured.playersWithDob },
+    { key: 'dob_without_evidence',
+      sql: 'SELECT count(*) FROM players WHERE dob IS NOT NULL AND dob_evidence_id IS NULL',
+      expected: pin.measured.dobWithoutEvidence },
+    { key: 'players_with_club_list_birth_evidence',
+      sql: `SELECT count(DISTINCT e.player_id) FROM ${clubListEvidence}`,
+      expected: pin.measured.playersWithClubListBirthEvidence },
+    { key: 'club_list_birth_conflict_players',
+      sql: `SELECT count(*) FROM (SELECT e.player_id FROM ${clubListEvidence} `
+        + 'GROUP BY e.player_id HAVING count(DISTINCT e.dob) > 1) c',
+      expected: pin.measured.clubListBirthConflictPlayers },
+    { key: 'dob_disagreeing_with_club_list',
+      sql: `SELECT count(DISTINCT e.player_id) FROM ${clubListEvidence} `
+        + 'AND EXISTS (SELECT 1 FROM players p WHERE p.id = e.player_id AND p.dob IS NOT NULL AND p.dob <> e.dob)',
+      expected: pin.measured.dobDisagreeingWithClubList },
+  ];
+}
+
+export type AflTablesCoachesPin = PinnedManifest & {
+  measured: {
+    coaches: number;
+    coachesLinkedToPlayers: number;
+    coachesUnlinked: number;
+    matchCoaches: number;
+    matchesWithBothCoaches: number;
+    matchesWithOneCoach: number;
+    matchesWithoutCoach: number;
+  };
+};
+
+/**
+ * AFLDB-ISSUE-118 §23.27. The accepted AFL Tables coach-page snapshot, from
+ * coaches.accepted_snapshot; manifest binding proven on read (LF hash, so a CRLF
+ * checkout still proves). Never a default: no pin, no stage.
+ */
+export function afltablesCoachesPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFLTABLES_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflTablesCoachesPin {
+  const contract = readContract();
+  const block = contract?.coaches as Record<string, unknown> | undefined;
+  const accepted = block?.accepted_snapshot as
+    { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
+      measured?: Record<string, unknown> } | undefined | null;
+  if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
+      || !accepted.measured) {
+    throw new RebuildRefused(
+      `${AFLTABLES_CONTRACT} records no accepted coaches snapshot `
+      + '(coaches.accepted_snapshot with label, manifest, manifest_sha256_lf and '
+      + 'measured). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256_lf),
+  };
+  provePin(pin, 'The AFL Tables contract coaches.accepted_snapshot block');
+  const measured = accepted.measured;
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(`coaches.accepted_snapshot.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    ...pin,
+    measured: {
+      coaches: int('coaches'),
+      coachesLinkedToPlayers: int('coaches_linked_to_players'),
+      coachesUnlinked: int('coaches_unlinked'),
+      matchCoaches: int('match_coaches'),
+      matchesWithBothCoaches: int('matches_with_both_coaches'),
+      matchesWithOneCoach: int('matches_with_one_coach'),
+      matchesWithoutCoach: int('matches_without_coach'),
+    },
+  };
+}
+
+/** The COACHES data stage: the pinned coach pages, the baseline and every pinned supplement. */
+export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+  const argv = [python, COACH_LOADER, '--label', afltablesCoachesPin().label, '--fitzroy-label', fitzroyLabel];
+  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  return argv;
+}
+
+/** The same argv plus --validate-only: manifests and artefact hashes, no database. */
+export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+  return [...coachesImportArgv(fitzroyLabel, python), '--validate-only'];
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.27. Coaching must survive a rebuild from scratch: every coach page
+ * as a person, the player links exactly those the pages prove (and no link outside a
+ * 'unique' status), the assignment count and the source's own coverage shape. A rebuild
+ * that drops the stage, links by name, or loses assignments fails here.
+ */
+export function coachChecks(): FinalCheck[] {
+  const pin = afltablesCoachesPin();
+  const perMatch = 'SELECT m.id, count(mc.match_id) AS n FROM matches m '
+    + 'LEFT JOIN match_coaches mc ON mc.match_id = m.id GROUP BY m.id';
+  return [
+    { key: 'coaches', sql: 'SELECT count(*) FROM coaches', expected: pin.measured.coaches },
+    { key: 'coaches_linked_to_players',
+      sql: "SELECT count(*) FROM coaches WHERE player_id IS NOT NULL AND link_status_value = 'unique'",
+      expected: pin.measured.coachesLinkedToPlayers },
+    { key: 'coaches_unlinked',
+      sql: 'SELECT count(*) FROM coaches WHERE player_id IS NULL',
+      expected: pin.measured.coachesUnlinked },
+    { key: 'coaches_linked_outside_unique',
+      sql: "SELECT count(*) FROM coaches WHERE player_id IS NOT NULL AND link_status_value <> 'unique'",
+      expected: 0 },
+    { key: 'match_coaches', sql: 'SELECT count(*) FROM match_coaches', expected: pin.measured.matchCoaches },
+    { key: 'matches_with_both_coaches',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 2`, expected: pin.measured.matchesWithBothCoaches },
+    { key: 'matches_with_one_coach',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 1`, expected: pin.measured.matchesWithOneCoach },
+    { key: 'matches_without_coach',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 0`, expected: pin.measured.matchesWithoutCoach },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.29 — father–son rule selections, gated on the tracked artefact
+// ---------------------------------------------------------------------------
+
+export function fatherSonArgv(python: string = resolvePython()): string[] {
+  return [python, FATHER_SON_LOADER, 'load', '--csv', FATHER_SON_CSV, '--provenance', FATHER_SON_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function fatherSonValidateArgv(python: string = resolvePython()): string[] {
+  return [...fatherSonArgv(python), '--validate-only'];
+}
+
+/** A minimal RFC 4180 reader: quoted fields may hold commas, quotes and newlines. */
+export function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 1; } else quoted = false;
+      } else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(field); field = '';
+      if (row.some((f) => f !== '')) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); if (row.some((f) => f !== '')) rows.push(row); }
+  return rows;
+}
+
+export type FatherSonMeasures = { selections: number; sonsLinked: number; fathersLinked: number; distinctFathersLinked: number };
+
+/**
+ * The artefact's own counts. The loader refuses to write unless every non-empty profile
+ * resolves to a canonical identity and every link status agrees with its profile, so the
+ * rows, linked sons and linked fathers after a rebuild are exactly these.
+ */
+export function fatherSonMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, FATHER_SON_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): FatherSonMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${FATHER_SON_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [profile, link, father, fatherLink] = ['drafted_profile', 'drafted_link', 'father_profile', 'father_link'].map(col);
+  if (rows.length < 2 || header[0] !== 'source_key' || [profile, link, father, fatherLink].some((i) => i < 0)) {
+    throw new RebuildRefused(`${FATHER_SON_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  for (const r of data) {
+    if ((r[link] === 'unmatched') !== (r[profile] === '') || (r[fatherLink] === 'unmatched') !== (r[father] === '')) {
+      throw new RebuildRefused(`${FATHER_SON_CSV}: a link status disagrees with its profile (${r[0]}).`);
+    }
+  }
+  return {
+    selections: data.length,
+    sonsLinked: data.filter((r) => r[profile] !== '').length,
+    fathersLinked: data.filter((r) => r[father] !== '').length,
+    distinctFathersLinked: new Set(data.filter((r) => r[father] !== '').map((r) => r[father])).size,
+  };
+}
+
+/**
+ * The father–son stage must survive a rebuild from scratch: every selection, the links
+ * exactly those the artefact proves (none outside a trusted status), and one parent_child
+ * relationship per selection. A rebuild that drops the stage or links by name fails here.
+ */
+export function fatherSonChecks(): FinalCheck[] {
+  const m = fatherSonMeasures();
+  return [
+    { key: 'father_son_selections', sql: 'SELECT count(*) FROM father_son_selections', expected: m.selections },
+    { key: 'father_son_sons_linked',
+      sql: "SELECT count(*) FROM father_son_selections WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')",
+      expected: m.sonsLinked },
+    { key: 'father_son_fathers_linked',
+      sql: "SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')",
+      expected: m.fathersLinked },
+    { key: 'father_son_distinct_fathers',
+      sql: 'SELECT count(DISTINCT father_player_id) FROM father_son_selections WHERE father_player_id IS NOT NULL',
+      expected: m.distinctFathersLinked },
+    { key: 'father_son_links_outside_trusted_status',
+      sql: "SELECT count(*) FROM father_son_selections WHERE (drafted_player_id IS NOT NULL) <> (drafted_link_status IN ('unique', 'resolved')) OR (father_player_id IS NOT NULL) <> (father_link_status IN ('unique', 'resolved'))",
+      expected: 0 },
+    { key: 'player_relationships_parent_child',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'parent_child'",
+      expected: m.selections },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.31 — sibling pairs, gated on the tracked artefact
+// ---------------------------------------------------------------------------
+
+export function siblingsArgv(python: string = resolvePython()): string[] {
+  return [python, SIBLINGS_LOADER, 'load', '--csv', SIBLINGS_CSV, '--provenance', SIBLINGS_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function siblingsValidateArgv(python: string = resolvePython()): string[] {
+  return [...siblingsArgv(python), '--validate-only'];
+}
+
+export type SiblingMeasures = {
+  pairs: number; pairsBothLinked: number; brotherPairsLinked: number; playersWithBrother: number; unlinkedSides: number;
+};
+
+/** The labels under which a linked pair is two brothers (family_siblings.py BROTHER_LABELS). */
+export const BROTHER_LABELS = ['brothers', 'twin brothers'];
+
+/**
+ * The artefact's own counts. The loader refuses to write unless every non-empty profile
+ * resolves to a canonical identity and every link status agrees with its profile, so the
+ * rows, linked sides and brother pairs after a rebuild are exactly these.
+ */
+export function siblingMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, SIBLINGS_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): SiblingMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${SIBLINGS_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [a, aLink, b, bLink, label] = ['person_a_profile', 'person_a_link', 'person_b_profile', 'person_b_link', 'relationship_label'].map(col);
+  if (rows.length < 2 || header[0] !== 'source_key' || [a, aLink, b, bLink, label].some((i) => i < 0)) {
+    throw new RebuildRefused(`${SIBLINGS_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  const linked = (status: string) => status === 'unique' || status === 'resolved';
+  for (const r of data) {
+    if (linked(r[aLink]) !== (r[a] !== '') || linked(r[bLink]) !== (r[b] !== '')) {
+      throw new RebuildRefused(`${SIBLINGS_CSV}: a link status disagrees with its profile (${r[0]}).`);
+    }
+    if (r[a] !== '' && r[a] === r[b]) throw new RebuildRefused(`${SIBLINGS_CSV}: a pair links one player to himself (${r[0]}).`);
+  }
+  const both = data.filter((r) => r[a] !== '' && r[b] !== '');
+  const brothers = both.filter((r) => BROTHER_LABELS.includes(r[label]));
+  return {
+    pairs: data.length,
+    pairsBothLinked: both.length,
+    brotherPairsLinked: brothers.length,
+    playersWithBrother: new Set(brothers.flatMap((r) => [r[a], r[b]])).size,
+    unlinkedSides: data.reduce((n, r) => n + (r[a] === '' ? 1 : 0) + (r[b] === '' ? 1 : 0), 0),
+  };
+}
+
+/**
+ * The siblings stage must survive a rebuild from scratch: every pair, the links exactly
+ * those the artefact proves, no self-pair, no canonical pair twice, and the brother
+ * population the Grid Solver's has_brother builder reads. A rebuild that drops the stage
+ * or links by name fails here.
+ */
+export function siblingChecks(): FinalCheck[] {
+  const m = siblingMeasures();
+  const labels = BROTHER_LABELS.map((l) => `'${l}'`).join(', ');
+  return [
+    { key: 'player_relationships_sibling', sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling'", expected: m.pairs },
+    { key: 'sibling_pairs_both_linked',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL",
+      expected: m.pairsBothLinked },
+    { key: 'sibling_unlinked_sides',
+      sql: "SELECT count(*) FILTER (WHERE person_a_player_id IS NULL) + count(*) FILTER (WHERE person_b_player_id IS NULL) FROM player_relationships WHERE relationship = 'sibling'",
+      expected: m.unlinkedSides },
+    { key: 'sibling_brother_pairs_linked',
+      sql: `SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL`,
+      expected: m.brotherPairsLinked },
+    { key: 'sibling_players_with_brother',
+      sql: `SELECT count(DISTINCT pid) FROM (SELECT person_a_player_id AS pid FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL UNION SELECT person_b_player_id FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) x`,
+      expected: m.playersWithBrother },
+    { key: 'sibling_self_pairs',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id = person_b_player_id",
+      expected: 0 },
+    { key: 'sibling_duplicate_pairs',
+      sql: "SELECT count(*) FROM (SELECT 1 FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL GROUP BY least(person_a_player_id, person_b_player_id), greatest(person_a_player_id, person_b_player_id) HAVING count(*) > 1) d",
+      expected: 0 },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.33–§23.35 — the after-siren stage
+// ---------------------------------------------------------------------------
+
+/** `after_siren.py load` against the tracked artefact and its provenance. */
+export function afterSirenArgv(python: string = resolvePython()): string[] {
+  return [python, AFTER_SIREN_LOADER, 'load', '--csv', AFTER_SIREN_CSV,
+          '--provenance', AFTER_SIREN_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function afterSirenValidateArgv(python: string = resolvePython()): string[] {
+  return [...afterSirenArgv(python), '--validate-only'];
+}
+
+/** `after_siren.py reconcile`: re-resolve the artefact and check the loaded table. */
+export function afterSirenReconcileArgv(python: string = resolvePython()): string[] {
+  return [python, AFTER_SIREN_LOADER, 'reconcile', '--csv', AFTER_SIREN_CSV];
+}
+
+export type AfterSirenMeasures = {
+  events: number; premiershipEvents: number; otherCompetitionEvents: number;
+  qualifyingEvents: number;
+};
+
+/**
+ * The artefact's own link-independent counts. `after_siren.py load` refuses unless the
+ * provenance's measures still equal a fresh read of the artefact, so a rebuild reproduces
+ * exactly these — and none of them depends on identity resolution or the season baseline
+ * (the qualifying predicate is a property of the stored columns, exactly what the
+ * downstream `after_siren_winner` builder / Gridley `winaftersiren` filter reads).
+ */
+export function afterSirenMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, AFTER_SIREN_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): AfterSirenMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${AFTER_SIREN_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [prem, scored, effect] = ['premiership_season', 'kick_scored', 'kick_effect'].map(col);
+  if (rows.length < 2 || header[0] !== 'event_key' || [prem, scored, effect].some((i) => i < 0)) {
+    throw new RebuildRefused(`${AFTER_SIREN_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  const isPrem = (r: string[]) => r[prem] === 'true';
+  return {
+    events: data.length,
+    premiershipEvents: data.filter(isPrem).length,
+    otherCompetitionEvents: data.filter((r) => !isPrem(r)).length,
+    qualifyingEvents: data.filter((r) => isPrem(r)
+      && (r[scored] === 'goal' || r[scored] === 'behind') && r[effect] === 'won').length,
+  };
+}
+
+/**
+ * The after-siren stage must survive a rebuild from scratch: every event loaded, the
+ * premiership / other-competition split intact, the qualifying set the Grid Solver's
+ * `after_siren_winner` builder reads, no event twice, and every row carrying its
+ * provenance. A rebuild that drops the stage fails here; the deeper canonical / linkage
+ * invariants are the separate `after-siren-reconcile` stage's 38 checks.
+ */
+export function afterSirenChecks(): FinalCheck[] {
+  const m = afterSirenMeasures();
+  return [
+    { key: 'after_siren_kicks',
+      sql: 'SELECT count(*) FROM after_siren_kicks', expected: m.events },
+    { key: 'after_siren_premiership_rows',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE premiership_season',
+      expected: m.premiershipEvents },
+    { key: 'after_siren_other_competition_rows',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE NOT premiership_season',
+      expected: m.otherCompetitionEvents },
+    { key: 'after_siren_qualifying_rows',
+      sql: "SELECT count(*) FROM after_siren_kicks WHERE premiership_season "
+        + "AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'",
+      expected: m.qualifyingEvents },
+    { key: 'after_siren_duplicate_events',
+      sql: 'SELECT count(*) FROM (SELECT 1 FROM after_siren_kicks GROUP BY source_id, '
+        + 'source_record_id HAVING count(*) > 1) d',
+      expected: 0 },
+    { key: 'after_siren_rows_missing_provenance',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE source_id IS NULL '
+        + 'OR source_record_id IS NULL OR import_batch_id IS NULL',
+      expected: 0 },
+  ];
 }
 
 /** Offline witness validation — no --compare, so no database is contacted. */

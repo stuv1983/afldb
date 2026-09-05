@@ -15,6 +15,147 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 — after-the-siren in the deterministic rebuild; FK index; final closure proof (Resolved) - 6 September 2026
+
+- **After-the-siren canonical events are now rebuilt from tracked inputs.** `db:test:rebuild` gains a data stage `after-siren` (after `siblings`) that loads `after_siren_kicks` (migration 089) from the tracked normalised artefact, and a validation stage `after-siren-reconcile` that re-resolves the artefact against the just-loaded database (38 checks, every expectation derived, never a typed constant). Six artefact-derived final-validation gates (126 events, 121 premiership / 5 other competition, 64 qualifying, 0 duplicates, 0 missing provenance). Rebuild stages 20 → 22, final validation 79 → 85.
+- **`after_siren.py` no-match player fallback.** The club-season participation fallback now reads `player_match_stats` + `matches` directly instead of the derived `player_club_season_stats`, which is not yet built when the stage runs. Four other-competition rows (a 1980 Escort Championships GF and NAB Cup / JLT rows) that previously loaded unlinked in a full rebuild now link by club-season participation, matching the hand-load state.
+- **Migration `090`** — `ix_players_height_evidence_id` (partial, `WHERE height_evidence_id IS NOT NULL`) covers the foreign key migration `086` added to `players` without an index.
+- **Resolved.** The Gridley compatibility corpus is proven against a fresh 22-stage deterministic `afldb_test` rebuild: every valid criterion in accepted canonical scope is answered or evidence-classified, `incorrect known answer` and ISSUE-118 solver timeouts are zero, all reconciliation and rebuild gates pass, every canonical domain has a public UI exposure path, and exactly the seven §23.36 accepted deferrals (`season2024player`, `intrulesplayer`, `irish`, `recruitedByDodoro`, `nfl`, `spoils5season`, `tasmanian`) remain unsupported. Runbook `issues/closed/AFLDB-ISSUE-118.md` §23.38.
+
+### AFLDB-ISSUE-118 public UI exposure — coach-only profiles, after-the-siren, disclosure consistency - 6 September 2026
+
+- **Coach-only public profiles.** New `/coaches/[slug]-id` route: a coaching-first profile (games, win %, record, finals, Grand Finals, premierships, club-by-club stints) for a `coaches.player_id IS NULL` person. A coach linked to a player permanently redirects to that player's canonical page instead of a second profile. New `/coaches` discovery index lists every coach, linked ones routing straight to their player page. New read models `getCoach` (thin identity) and `listCoaches`.
+- **After-the-siren on player profiles.** New `getPlayerAfterSirenEvents` read model over `after_siren_kicks` (migration 089), read-only. New `PlayerAfterSirenEvents` component: a collapsed-by-default ruled list with plain-language wording (`Goal/Behind after the siren to win/draw`, `Missed after the siren`, explicit extra-time wording, `Missed before extra time`), match and club links where canonical routing resolves them, and a visible "uncited" note for an uncited event. Renders nothing for a player with no events.
+- **Coach discovery/search.** New search result type `coach`; `searchCoaches` (scoped to `player_id IS NULL`, so a player who also coached is never listed twice) wired into global search and autocomplete.
+- **Player profile — disclosure and accessibility polish.** Family and Honours are now `CollapsiblePanel` sections (Family notes a relative count); the generic Honours list no longer independently repeats the Brownlow Medal (already covered by the stat strip and the dedicated Brownlow section); the disputed-date-of-birth explanation is now visible text rather than a `title` attribute; Career & Biography now groups identity facts (date of birth, height, weight) before career-record facts. Default section order updated: Family and Coaching Career now follow Match log, and a new After-the-siren section (collapsed by default) follows Coaching Career.
+- **Sitemap.** `/coaches` and coach-only profile URLs added.
+
+### AFLDB-ISSUE-118 after-the-siren — Grid Solver `after_siren_winner`, Gridley `winaftersiren` mapped - 5 September 2026
+
+- **Grid Solver.** New builder `after_siren_winner` (*Single-game feats*; `GRID_BUILDERS` 158): a canonically linked kicker of a goal or behind after the final (or end-of-extra-time) siren that won a premiership-season match, read from `after_siren_kicks` (migration 089). Misses, draws, other competitions and unlinked kickers never qualify. 63 rows / 61 players on `afldb_test`.
+- **Gridley corpus.** `winaftersiren` mapped (data-absent criteria 8 → 7); `unsupported` 90 → 78 cells, cells solved 9,842 → 9,854, `incorrect known answer` 0, the only after-siren findings `time of board`; `after_siren_kicks` added to the corpus dataset-gap probe.
+
+### AFLDB-ISSUE-118 after-the-siren — canonical `after_siren_kicks` model (migration 089) and the tracked normalised artefact - 5 September 2026
+
+- **Model.** New table `after_siren_kicks` (migration `089`), on the `player_achievements` (053) discipline but a dedicated match-event shape: kicker (nullable link, source spelling kept), opponent, competition + `premiership_season`, season, verbatim round, nullable match, what the kick scored (goal / behind / none), what it did to the result (won / drew / none), the kicker's result, which siren it followed (final / end of regulation / end of extra time), the source's verbatim final score and points, `cited`. CHECKs enforce the event semantics. Nothing in it is specific to a Grid Solver criterion. Applied to `afldb_test` (and to `afldb_dev`, schema only).
+- **Artefact.** `tools/migration/after_siren.py normalize [--check]` normalises the eight Wikipedia table exports ("List of kicks after the siren in the VFL/AFL"; raw files untracked) into the tracked `data/records/after-siren-events.csv` (126 events: 62 goal-won, 6 behind-won, 9 goal-drawn, 3 behind-drawn, 46 missed; 121 premiership-season + 5 pre-season/night-series kept with their competition), its provenance and four evidence-dated adjudications (Shuey 2017 extra-time goal to win; King 1994 regulation-time miss before an extra-time win; Zurhaar 2026 uncited; Hickey 1944 source score arithmetic). Offline, deterministic, byte-identical regeneration; every source row represented once. Tests: `tests/after-siren-normalisation.test.ts`.
+- **Loader.** `after_siren.py load` (`--validate-only`, `--dry-run`, `--dsn-env`; idempotent) resolves each event canonically and fail-closed, with no fuzzy matching and no name-only link: club by name/alias to exactly one club organisation; match by (season, round, both organisations) with the source's own points as the independent check (which is what separates the drawn 1972 semi-final from its replay) and the Opening-Round retry only in a season of that shape; kicker as the one player of that name in that match for that club from `player_match_stats`, falling back to club-season participation where there is no match, with `father_son.py`'s generational-suffix rule for same-name players. A linked kicker's goals/behinds in the match must not be a recorded zero; a NULL is "not recorded", never zero. On `afldb_test`: **126 rows, 120 kickers linked (111 distinct) and 6 unresolved, 116 matches linked and 10 NULL** — the 5 other-competition rows by model, and 5 2026 rows plus one 2011 pre-season kicker because this rebuild carries no 2026 season and no 2011 premiership game for that name. `winaftersiren`'s later filter selects 64 rows over 62 kickers. Second and third identical runs: 0 inserted, 0 changed, 0 stale removed, every row still on its first batch.
+- **Reconciliation.** `after_siren.py reconcile` re-resolves the artefact against the same database and checks the loaded table against it — counts, link and match tallies, duplicate and source-uniqueness gates, and each of the four adjudications applied exactly once — deriving every expectation from the artefact or that re-resolution, never a typed constant. 38/38 pass on `afldb_test`.
+
+### AFLDB-ISSUE-118 family F — siblings: `player_relationships` `sibling` rows from the tracked football-families export, `has_brother`, Gridley `brother` mapped
+
+- **Sibling relationships are canonical.** `tools/migration/family_siblings.py normalize` resolves the 485 `sibling` rows of the operator's export of Wikipedia's "List of Australian rules football families" (revision 1365040810; raw under `data/players/families/`, untracked) to AFL Tables profile paths — name, listed-club lineage, the article title's birth year against the canonical date of birth, never a name alone — and writes the tracked artefact `data/players/sibling-relationships.csv` (498 pairs: 484 export pairs after one duplicated family is merged, plus 14 evidenced supplements), its provenance, 8 evidence-dated identity adjudications and `data/players/sibling-supplements.csv` (pairs the export lacks — Gary Ablett Jr ↔ Nathan Ablett and 13 others — each admitted only on a quoted sentence from the people's own articles). Absence of an export row is unknown coverage, never "no brother". The canonical label states what is evidenced (`brothers`, `twin brothers`, `sisters`, else the export's label); pairs are ordered deterministically, self-pairs and duplicate canonical pairs refuse.
+- **Loader.** `family_siblings.py load` (`--validate-only`, `--dry-run`, idempotent: a second run changes nothing) links only through `external_identities`; 498 rows, 389 with both people linked, 658 players with a linked brother on `afldb_test`. No migration.
+- **Rebuild.** New `siblings` data stage after `father-son` (tracked-file and `--validate-only` preflight; seven artefact-derived gates incl. self-pairs 0 and duplicate pairs 0). Stages 19 → 20, final checks 72 → 79. Clean unattended rebuild proven 2026-09-05 (22 min, FINAL VALIDATION 79/79).
+- **Grid Solver.** Biography gains `has_brother` (a player with an explicit canonical brothers row to another VFL/AFL player who played a match). `GRID_BUILDERS` 157.
+- **Player pages.** `getPlayerFamily` returns `relationship_label` and the family card renders Brother / Twin brother / Sister / Sibling from it instead of assuming every sibling row is a brother.
+- **Gridley corpus regression.** `brother` maps (data-absent criteria 9 → 8, occurrences 83 → 30; `unsupported` cells 249 → 90; cells solved 9,686 → 9,842; `incorrect known answer` 0); a new `source coverage gap` category names a brother cell the canonical sources cannot yet evidence (21 cells, one player) instead of calling AFLDB wrong or right.
+
+### AFLDB-ISSUE-118 family F — father–son rule selections: `father_son_selections` + `player_relationships` populated, `father_son_father` / `father_son_selection` - 5 September 2026
+
+- **The father–son rule is canonical.** The two migration-006 tables are populated for the first time from a tracked, normalised copy of Wikipedia's "List of father–son selections" (article *Father–son rule*, revision 1370239415): `data/players/father-son-selections.csv` — 127 selections 1988–2025, the seven source columns verbatim plus each person's AFL Tables profile path and link status — and `data/players/father-son-selections.source.json`. `tools/migration/father_son.py normalize` resolved every son and father once, deterministically (name + debut window/lead + the drafting club's lineage; `Sr.`/`Jr.` only on a unique debut season; the list's own 0-games / state-league annotations are the only zero-candidate non-links) and refuses any ambiguity; seven evidence-dated adjudications (`data/players/father-son-adjudications.csv`: two name variants, four state-league-qualified fathers tied by their Wikipedia articles, one explicit non-link) must each be needed and apply exactly once. Result: 99 sons and 123 fathers (107 distinct) linked, 28 sons who never played and 4 fathers with no VFL/AFL career left unlinked. `normalize --check` proves the tracked artefact is byte-identical to a regeneration.
+- **Loader and schema.** `father_son.py load` (`--validate-only`, `--dry-run`, idempotent) resolves profile paths only through `external_identities`, refuses an unresolvable path or a status that disagrees with it, and writes `father_son_selections` plus one `parent_child` row per selection in `player_relationships` (names verbatim, links where proven) in one batch. Migration `088_father_son_link_checks.sql`: draft_persons-style CHECKs on both link columns, pair uniqueness, column comments; both tables were already in the read/write registries.
+- **Rebuild.** New `father-son` data stage in `db:test:rebuild` after `coaches` (tracked-file and `--validate-only` preflight before the destructive reset; six final gates read from the artefact itself — 127 / 99 / 123 / 107 / 0 outside a trusted status / 127 relationships). Stage order 18 → 19, FINAL VALIDATION 66 → 72 checks; the six gates evaluated 6/6 against the hand-loaded `afldb_test` (the unattended rebuild is the next checkpoint's proof).
+- **Grid Solver.** Draft & recruitment gains `father_son_father` (a player whose son was selected under the rule) and `father_son_selection` (a player selected under it), linked rows only. `GRID_BUILDERS` 154 → 156.
+- **Gridley corpus regression.** `fathersonfather` maps (data-absent criteria 10 → 9, occurrences 86 → 83); its 9 cells (107 eligible fathers) produce no finding of any category; corpus `unsupported` 258 → 249 cells, cells solved 9,677 → 9,686, `incorrect known answer` 0, timeouts 0; strict run fails only on `unsupported` 249 + `dataset gap` 354. `brother` (53 occurrences) stays data-absent: the only sibling source AFLDB holds is the legacy Wikipedia-families SQLite on the DEV host (485 sibling pairs), whose export is recorded as the operator step (runbook §23.29 F.12).
+
+### AFLDB-ISSUE-118 Stage E2 — coaches: AFL Tables coach pages, `coaches` + `match_coaches`, `coached_by` / `premiership_coach` - 5 September 2026
+
+- **Coaching is canonical.** Migration `087_coaches.sql`: `coaches` (one row per person who coached a VFL/AFL match, keyed by the AFL Tables coach page; `player_id` nullable, linked to the existing `players` row ONLY through the page's Player Stats profile path and `external_identities` — never by name; coach-only people such as Chris Fagan, John Todd and Neil Craig have no player row and none is fabricated) and `match_coaches` (`match, club, coach` — the assignment at match grain, so caretakers and mid-season changes need no season ranges). Games, W/D/L, finals, Grand Finals and premierships are derived from `match_coaches ⋈ matches`, never stored. Both tables registered for `afldb_app` read and `afldb_import` write.
+- **Source and loader.** `tools/rebuild/afltables/acquire_coaches.py` captures the coaches index and its 386 pages under the contract's HTTP policy (parsed CSVs tracked, raw HTML hash-bound, tracked manifest `docs/rebuild-manifests/afltables_coaches/coaches-20260905.json`, pinned in `afltables-contract.json` `coaches.accepted_snapshot`). `tools/migration/import_match_coaches.py` folds the accepted fitzRoy baseline's per-match `Coach` column (one string per match and club, refusing anything else) to those pages by exact string, resolves matches by `match_key` and clubs by historical identity, links players only through profile paths (four page hrefs AFL Tables does not serve as printed are corrected by dated, evidence-recorded contract rules), and upserts both tables in one batch — `--validate-only`, `--dry-run`, idempotent. On `afldb_test`: 386 coaches (368 linked, 18 coach-only), 32,034 assignments, matches with both / one / no coach 15,817 / 400 / 621 (the source's own gaps before 1923 and eleven in 1940).
+- **Rebuild.** New `coaches` data stage in `db:test:rebuild` after `birth-dates` (pin read fail-closed, `--validate-only` preflight before the destructive reset, eight final gates from the pin's `measured` block). Stage order 17 → 18, FINAL VALIDATION 58 → 66 checks; clean unattended rebuild of `afldb_test` proven 2026-09-05 (22 min, 66/66).
+- **Grid Solver.** New Coaching group: `coached_by` (played a match for a club while that coach was assigned to it for that exact match) and `premiership_coach` (a coach with a proven player identity who coached a Grand Final winner). New `coach` parameter kind with a picker (`getCoachOptions`). `GRID_BUILDERS` 152 → 154.
+- **Gridley corpus regression.** `premcoach` and the seven `coachedBy*` criteria map (data-absent criteria 18 → 10, occurrences 102 → 86); corpus `unsupported` 306 → 258 cells, cells solved 9,629 → 9,677, `incorrect known answer` 0; Gridley's list-grain "played on a team coached by" (Heppell and Daniher under Goodwin's one 2013 caretaker match, which neither played in) is classified under the documented `list membership` difference; strict run fails only on `unsupported` 258 + `dataset gap` 354.
+
+### AFLDB-ISSUE-118 Stage E1 — height source conflicts adjudicated on evidence - 5 September 2026
+
+- **No canonical height changed.** The three players the §23.19 precedence decision left as open `source conflict` (Paddy McCartin, Jamarra Ugle-Hagan, Nathan Brown; 102 Gridley cells) were adjudicated against every source AFLDB holds (runbook §23.26). Nathan Brown's Wikipedia article is now tied to the Bulldogs/Richmond player through the Stage D1 date of birth (1978-02-10) and joins the tracked corroboration set `data/players/height-evidence-wikipedia.csv` (83 → 84 rows; the `players_with_wikipedia_height_evidence` rebuild gate derives from the row count); at 183 cm it sits on AFLDB's side of the bound, so his cells are `external source disagreement` under the unchanged rule. McCartin (register 194; AFL listing and uncited Wikipedia 195) and Ugle-Hagan (194; 197) keep the AFL Tables value under §23.19 rule 1.
+- **Tracked operator adjudications.** New `data/players/height-adjudications.csv` (profile-keyed, decision, reason, date, reference) read by `tests/height-adjudications.ts`, fail-closed on shape; a record applies only while the canonical height and the exact competing evidence are those it was decided on (`adjudicationStaleness`), otherwise the cell returns to `source conflict`. `.gitignore` now opts `/data/players/` in explicitly for both curated files.
+- **Gridley corpus regression** (`tests/integration/gridley-corpus.test.ts`): new informational category `adjudicated source conflict` (62 cells / 2 players, reported, never failed); `source conflict` 102 → 0, `external source disagreement` 202 → 242, `incorrect known answer` 0; strict acceptance now fails only on `unsupported` 306 + `dataset gap` 354 (failing cells 762 → 660). `tests/height-reconciliation.test.ts` gains the artefact contract and staleness cases (10/10).
+
+### AFLDB-ISSUE-118 Stages H3/H4 — height source precedence, heights in the rebuild, seven named medals, six captaincy lineages - 5 September 2026
+
+- **Height evidence, three sources.** New `tools/rebuild/afl_api/acquire_rosters.R` (AFL API season rosters 2012–2026, contract block `roster`, tracked manifest `docs/rebuild-manifests/afl_api/rosters-20260905.json`), `tools/migration/enrich_heights_afl_api.py` (fail-closed identity by name + club + season, then surname + club + season + guernsey; 1,824 players on `afldb_test`) and `tools/migration/enrich_heights_wikipedia.py` with the tracked `data/players/height-evidence-wikipedia.csv` (83-player adjudication set). Both write `player_height_evidence` rows only; the AFL Tables register remains the canonical authority for `players.height_cm` and no canonical height changed (runbook §23.19).
+- **Gridley corpus regression** (`tests/integration/gridley-corpus.test.ts`) classifies height cells from the evidence rows: `external source disagreement` (informational) and `source conflict` (still fails); `incorrect known answer` 299 → 0 on `afldb_test`.
+- **`db:test:rebuild`** gains `heights`, `heights-afl-api` and `heights-wikipedia` stages after `fitzroy`, pinned in `tools/rebuild/fitzroy/fitzroy-contract.json` (`height_enrichment`, in-season supplement bound by manifest SHA-256) and `tools/rebuild/afl_api/afl-api-contract.json` (`roster.accepted_snapshot`); offline `--validate-only` preflights; five new final-validation gates (12,487 / 0 / 0 / 1,824 / 83).
+- **Named medals:** Anzac, Showdown, Glendinning–Allan, Brett Kirk, Marcus Ashcroft, Goal of the Year, Mark of the Year — 7 definitions and 328 Wikipedia-cited winner rows in `data/awards/named-medals*.csv`; `import_awards.py` keeps row-level provenance (`draftguru` / `wikipedia`); `gridley-compat.ts` maps the seven Gridley ids to `award_winner`.
+- **Captaincies:** 399 rows for Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears and University in `data/awards/captaincies.csv` (1,774 total, all linked on `afldb_test`); the Gridley captain criteria are no longer partial.
+- Identity census `data/awards/player-identity.csv` 1,745 → 1,863 rows (12 without a rebuild-stable identity, was 18).
+- **Rebuild gate proven (§23.23):** a clean unattended `db:test:rebuild` of the full 16-stage graph (heights, AFL API and Wikipedia evidence, medals, captaincies) completed in 22 minutes with FINAL VALIDATION 53/53. **Premiership captains:** Gridley's key names one premiership captain per flag; AFLDB's `premiership_captain` keeps its documented semantics (every appointed captain who played in and won the Grand Final) — the corpus regression now classifies a co-captain cell from AFLDB's own captaincy evidence as `external source disagreement`; `incorrect known answer` 5 → 0 on `afldb_test`, no solver or data change.
+- **Dates of birth (Stage D1, §23.24):** new AFL Tables acquisition `tools/rebuild/afltables/acquire_club_lists.R` (contract `afltables-contract.json`, the 21 all-time club pages fitzRoy reads but strips of DOB and profile links; manifest-pinned `club-lists-20260905`, 16,731 rows) and loader `tools/migration/enrich_birth_dates_afltables.py` (identity by profile path only, evidence rows in `player_birth_evidence`, fills NULL `players.dob` only): 12,400 dates filled on `afldb_test` (855 → 13,255 players). **Stage D1 completed (§23.25):** `db:test:rebuild` gains a `birth-dates` stage after `heights-wikipedia`, its snapshot pinned fail-closed in `afltables-contract.json` (`club_player_lists.accepted_snapshot`, LF manifest hash + `measured` block), `--validate-only` in the preflight, and five final-validation gates (`players_with_dob_after_birth_dates` 13,255, `dob_without_evidence` 0, `players_with_club_list_birth_evidence` 13,255, `club_list_birth_conflict_players` 0, `dob_disagreeing_with_club_list` 2). The loader's writes are batched (two `COPY`s into `ON COMMIT DROP` temp tables, one keyed upsert, one join `UPDATE`, an in-transaction evidence-link check): 1.2 s instead of 1,658 s over the tunnel, still idempotent (a rerun fills 0). **Grid Solver:** new `Biography` builder `age_on_debut_min` ("Aged X or older on debut": completed years on debut day from `players.dob` and `player_career_stats.debut_date`; an unknown date never qualifies); Gridley's `22+ YEARS OLD / ON DEBUT` maps to it (data-absent criteria 19 → 18, occurrences 103 → 102).
+
+
+### AFLDB-ISSUE-118 Stage H2 — player heights from the AFL Tables register - 5 September 2026
+
+- **`players.height_cm` is populated** (12,487 players on `afldb_test`, 11,740 on `afldb_dev`;
+  production with the next deploy) from the already-acquired AFL Tables `player_details` register
+  in the tracked fitzRoy snapshot `full-history-20260902`, supplemented by the tracked in-season
+  `issue129-t7-20260903` rows for current players. The Grid Solver's *Height X cm or taller /
+  shorter* builders and Gridley's `195cm OR TALLER` / `180cm OR SHORTER` now answer from real data;
+  a player the register does not cover stays NULL and never qualifies.
+- **Migration `086_player_height_evidence.sql`**: `player_height_evidence` (every asserted height
+  with its source, external id, occurrences and batch; unique per player/source/height) and
+  `players.height_evidence_id`, on the birth-evidence pattern; registered for `afldb_app` read and
+  `afldb_import` write.
+- **`tools/migration/enrich_heights.py`**: manifest-verified, fail-closed reconciliation of the
+  register (no stable id) to canonical players through the snapshot's own per-match profile URLs
+  — club + games + goals + exact season set + the source's spelling of the name → the AFL Tables
+  identity `external_identities` already holds. Nothing is matched against AFLDB by name; zero,
+  several or differently-spelled candidates are rejected with the source row; two heights for one
+  player fill nothing and open a `data_issue`; existing values are never overwritten; re-runs are
+  idempotent and record their counters on the import batch.
+- **Gridley height oracle** (`tests/integration/gridley-height-oracle.test.ts`, opt-in) and the
+  shared oracle scaffold `tests/integration/gridley-oracle-bridge.ts` (extracted from the
+  All-Australian oracle, output unchanged): coverage before/after apply and a false-positive /
+  false-negative answer-key comparison. Result: every bridgeable Gridley height-key player has a
+  height; 83 players differ from Gridley's own height figure (a source difference, recorded in the
+  runbook, left red in the corpus regression rather than reclassified).
+- `tests/db-promotion-check.test.ts` now pins `player_height_evidence` and the three
+  `external_grid_*` tables from migration 080 that had never been classified.
+
+### AFLDB-ISSUE-118 Stage AA3 — the 1983–1988 VFL Teams of the Year join the All-Australian source - 5 September 2026
+
+- **`data/awards/all-australian.csv`: 1,158 → 1,244 rows.** The VFL Team of the Year for **1983,
+  1986, 1987 and 1988** (20 / 22 / 22 / 22 selections) is now held alongside the State of Origin
+  carnival team of the same season, as the honour's definition (VFL Team of the Year 1982–90 plus
+  the carnivals 1953–88) requires; the bootstrap had only the carnival team in those four years.
+  Source: Wikipedia *All-Australian team* § "VFL/AFL Team of the Year: 1982–1990" (`wikipedia`
+  provenance, `aah:` keys, names verbatim). Every new row links to a player; seven players were
+  added to `data/awards/player-identity.csv` (1,738 → 1,745).
+- **`tools/migration/all_australian.py`:** declared counts bumped (wikipedia 252 → 338, linked
+  1,078 → 1,164); the natural identity is `(source, season, player, club)` because a player named in
+  both teams of one season is two selections in two teams, not a duplicate. Award semantics and
+  the Grid Solver builders are unchanged: "X+ times" still counts distinct seasons, which the
+  Gridley corpus now confirms (a player in both 1988 teams and no other season is not a "2x").
+- **Effect on the Grid Solver:** 13 of the 14 players the Gridley answer keys listed as
+  All-Australians that AFLDB lacked (Brereton, Krakouer, Rhys-Jones, Kappler, Stretch, Brian Taylor,
+  Barry Mitchell, Hawkins, Royal, Quinlan, Malarkey, Wallace, Pert) now answer correctly; the
+  oracle's source-missing count fell from 315 answer entries to 11, all one Gridley-side claim
+  (Greg Anderson as a 2x) that no source supports. Loaded on `afldb_dev` and `afldb_test`;
+  production receives it with the next deploy and `import_awards.py --groups all_australian`.
+### AFLDB-ISSUE-118 (reopened) — All-Australian final team, height builders, strict Gridley regression - 5 September 2026
+
+- **Reopened:** the 5 September closeout counted 28 valid Gridley criteria as acceptable because
+  they were classified data-absent; the acceptance is now zero unsupported valid criteria
+  (`issues/closed/AFLDB-ISSUE-118.md` §23). The earlier entry below is retained as history.
+- **Grid Solver catalogue: 137 → 151** (`src/search/grid-solver-spec.ts`,
+  `src/db/queries/grid-solver.ts`): the **All-Australian final team** as its own question —
+  `all_australian_team`, `all_australian_team_min_times` (counts distinct seasons, so the 1984
+  club+state double listing is one selection), `all_australian_team_between_seasons` — kept
+  distinct from the **40-man squad** (`all_australian_squad_member`, and
+  `all_australian_squad_in_season` relabelled "40-man squad member, in season"); position
+  builders relabelled "final-team … (1991 onwards)". New `Biography` group with `height_min` /
+  `height_max` ("Height X cm or taller / shorter"); an unknown height never qualifies.
+- **Gridley mapping** (`src/search/gridley-compat.ts`): the 12 All-Australian criteria map to the
+  final-team builders instead of the generic award dropdown; `height195` / `height180` map to the
+  height builders. Data-absent debt 28 → 26 criteria (267 → 125 occurrences), pinned in
+  `tests/gridley-compat.test.ts`.
+- **`tests/integration/gridley-corpus.test.ts` fails by default** on any unsupported, dataset-gap
+  or partial-data finding (`AFLDB_GRIDLEY_DIAGNOSTIC=1` restores counted-and-named for
+  development); a `heights` probe names the empty height column.
+- No data was loaded: the height source decision (AFL Tables `player_details`, already acquired,
+  needs a cross-source reconciliation) is recorded for a High session.
+
 ### AFLDB-ISSUE-118 — Gridley compatibility corpus and Grid Solver completeness - 4 September 2026
 
 - **Grid Solver catalogue: 108 → 137 builders** (`src/search/grid-solver-spec.ts`,

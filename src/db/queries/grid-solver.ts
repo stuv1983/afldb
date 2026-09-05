@@ -929,6 +929,26 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE pms2.player_id = ${otherId})`;
     }
 
+    // -- Coaching (ISSUE-118 §23.27) -- match_coaches (match, club, coach) is
+    // the coaching grain; a coaching relationship exists per match played,
+    // so a caretaker's one game counts and a season range is never assumed.
+    case 'coached_by': {
+      const coachId = requireInt(axis, 'coach', 'Coach');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+                           WHERE mc.coach_id = ${coachId})`;
+    }
+    case 'premiership_coach':
+      // The winning club's coach in a Grand Final, as a PLAYER: only a coach
+      // whose page proves a player identity ('unique' link) can be on a
+      // player grid at all. A drawn Grand Final has no winner and counts
+      // for nobody; the replay decides it.
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                            JOIN matches m ON m.id = mc.match_id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+                             AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)`;
+
     // -- Captaincy -- no CHECK constraint ties captaincies.player_id to
     // its link_status_value, so both are checked explicitly. -----------
     case 'club_captain': {
@@ -983,6 +1003,17 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE achievement_type = 'first_kick_goal'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND consecutive_goal_kicks >= ${requireInt(axis, 'kicks', 'Kicks')})`;
+    // AFLDB-ISSUE-118 §23.35. after_siren_kicks (migration 089) is the same
+    // discipline: a curated match event with a nullable player link. Only a
+    // premiership-season kick that scored (goal or behind) and won the match,
+    // after the final siren or the end-of-extra-time siren, for a canonically
+    // linked kicker. Misses, draws and other competitions never qualify.
+    case 'after_siren_winner':
+      return sql`p.id IN (SELECT player_id FROM after_siren_kicks
+                            WHERE premiership_season
+                              AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
+                              AND siren IN ('final', 'end_of_extra_time')
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
     case 'first_kick_goal_for_club': {
       // By lineage, like every other club-scoped builder, so a Western
       // Bulldogs filter includes the Footscray era.
@@ -1144,6 +1175,42 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE a.slug IN ('all-australian-squad', 'all-australian') AND w.season = ${seasonYear}
                              AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
     }
+    // The final team (slug all-australian) versus the squad (slug
+    // all-australian-squad) are distinct awards and stay distinct here.
+    case 'all_australian_team':
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    case 'all_australian_team_min_times': {
+      // DISTINCT seasons, not rows: the 1984 team carries club and state
+      // rows for the same player, and both are one selection.
+      const n = requireInt(axis, 'times', 'Times');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian'
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                           GROUP BY w.player_id HAVING count(DISTINCT w.season) >= ${n})`;
+    }
+    case 'all_australian_team_between_seasons': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE a.slug = 'all-australian' AND w.season BETWEEN ${lo} AND ${hi}
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+    }
+    case 'all_australian_squad_member':
+      // A squad row, or a final-team row in a season that had a squad
+      // (the squad award's first recorded season, 2007), since the team is
+      // drawn from the squad.
+      return sql`p.id IN (SELECT w.player_id FROM award_winners w
+                            JOIN awards a ON a.id = w.award_id
+                           WHERE (a.slug = 'all-australian-squad'
+                                  OR (a.slug = 'all-australian'
+                                      AND w.season >= (SELECT min(w2.season) FROM award_winners w2
+                                                         JOIN awards a2 ON a2.id = w2.award_id
+                                                        WHERE a2.slug = 'all-australian-squad')))
+                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'best_and_fairest_in_premiership_season':
       // The club the player represented that season (player_club_season_stats)
       // won the flag (club_seasons.is_premier) in the season of the B&F.
@@ -1206,6 +1273,31 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = 'trade'
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
+    // AFLDB-ISSUE-118 §23.29. father_son_selections carries two independent
+    // person links; the CHECK constraints (migration 088) tie each status to
+    // its id, and the trusted statuses are still named here explicitly.
+    case 'father_son_selection':
+      return sql`p.id IN (SELECT drafted_player_id FROM father_son_selections
+                           WHERE drafted_player_id IS NOT NULL
+                             AND drafted_link_status IN ('unique', 'resolved'))`;
+    case 'father_son_father':
+      return sql`p.id IN (SELECT father_player_id FROM father_son_selections
+                           WHERE father_player_id IS NOT NULL
+                             AND father_link_status IN ('unique', 'resolved'))`;
+    // AFLDB-ISSUE-118 §23.31. An explicit canonical `sibling` row whose label
+    // establishes brothers, both sides linked to canonical players, and the
+    // brother having played a VFL/AFL match (player_career_stats.games > 0).
+    // Never a surname, a family key or a shared parent.
+    case 'has_brother':
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                            JOIN player_career_stats bc ON bc.player_id = r.person_b_player_id
+                           WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_a_player_id IS NOT NULL AND bc.games > 0
+                           UNION
+                          SELECT r.person_b_player_id FROM player_relationships r
+                            JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
+                           WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_b_player_id IS NOT NULL AND ac.games > 0)`;
     case 'national_draft_pick_between': {
       const [lo, hi] = orderedRange(axis, 'from', 'From pick', 'to', 'To pick');
       return sql`p.id IN (SELECT player_id FROM draft_picks
@@ -1229,6 +1321,27 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // value is the integer's canonical decimal form.
       const number = requireInt(axis, 'number', 'Number');
       return sql`p.id IN (SELECT player_id FROM player_match_stats WHERE jumper_number = ${String(number)})`;
+    }
+
+    // -- Biography ------------------------------------------------------------
+    // NULL height is unknown, not zero: the explicit IS NOT NULL keeps the
+    // intent visible even though a NULL comparison is already never true.
+    case 'height_min': {
+      const cm = requireInt(axis, 'cm', 'Centimetres');
+      return sql`p.height_cm IS NOT NULL AND p.height_cm >= ${cm}`;
+    }
+    case 'height_max': {
+      const cm = requireInt(axis, 'cm', 'Centimetres');
+      return sql`p.height_cm IS NOT NULL AND p.height_cm <= ${cm}`;
+    }
+    // Completed years on debut day: the player's Nth birthday fell on or
+    // before the debut match. Ordinary date arithmetic, so a 29 February
+    // birthday lands on 28 February in a common year exactly as a person
+    // counts it. NULL on either side is unknown and never qualifies.
+    case 'age_on_debut_min': {
+      const years = requireInt(axis, 'years', 'Years');
+      return sql`p.dob IS NOT NULL AND c.debut_date IS NOT NULL
+        AND c.debut_date >= p.dob + make_interval(years => ${years})`;
     }
 
     default:

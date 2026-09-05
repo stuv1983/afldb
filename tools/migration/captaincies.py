@@ -62,7 +62,11 @@ EXPECTED_HEADER = (
 # (AFLDB-ISSUE-112 §14.4 / §19). A row count or season span outside this is
 # a source contract change, not a formatting slip — bump these when a later
 # season's captaincies are curated in.
-EXPECTED_TOTAL = 1375
+# AFLDB-ISSUE-118 §23.21 (Family B): +400 rows for the six clubs the bootstrap
+# lacked (Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears, University),
+# transcribed from the Wikipedia captain lists (Hawthorn 1952, Peter O'Donohue, has no
+# AFL Tables identity and is recorded in the runbook, not here).
+EXPECTED_TOTAL = 1774
 MIN_SEASON = 1897
 MAX_SEASON = 2026
 EXPECTED_DISTINCT_SEASONS = 130
@@ -74,12 +78,13 @@ EXPECTED_DISTINCT_SEASONS = 130
 # three era-identity pairs; the loader's season-aware resolver picks the
 # right one. Adding a club here is a deliberate change, not a parser fix.
 KNOWN_CLUBS = {
-    "Adelaide", "Brisbane Lions", "Carlton", "Collingwood", "Essendon",
-    "Footscray", "Fremantle", "Gold Coast", "Greater Western Sydney",
-    "Kangaroos", "Melbourne", "North Melbourne", "Port Adelaide", "Richmond",
-    "South Melbourne", "St Kilda", "Sydney", "Western Bulldogs",
+    "Adelaide", "Brisbane Bears", "Brisbane Lions", "Carlton", "Collingwood",
+    "Essendon", "Fitzroy", "Footscray", "Fremantle", "Geelong", "Gold Coast",
+    "Greater Western Sydney", "Hawthorn", "Kangaroos", "Melbourne",
+    "North Melbourne", "Port Adelaide", "Richmond", "South Melbourne",
+    "St Kilda", "Sydney", "University", "West Coast", "Western Bulldogs",
 }
-EXPECTED_DISTINCT_CLUBS = 18
+EXPECTED_DISTINCT_CLUBS = 24
 
 # role vocabulary as measured — a single value. "Vice-captain" or a
 # co-captain role would be a new vocabulary entry, i.e. a deliberate change.

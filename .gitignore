@@ -57,14 +57,46 @@ next-env.d.ts
 !/data/awards/award-definitions.csv
 !/data/awards/rising-star-winners.csv
 !/data/awards/player-identity.csv
+# AFLDB-ISSUE-118 §23.19/§23.26: curated, tracked player height evidence (the Wikipedia
+# infobox corroboration set) and the operator adjudications of height source conflicts.
+!/data/players/
+/data/players/*
+!/data/players/height-evidence-wikipedia.csv
+!/data/players/height-adjudications.csv
+!/data/players/father-son-selections.csv
+!/data/players/father-son-selections.source.json
+!/data/players/father-son-adjudications.csv
+# AFLDB-ISSUE-118 §23.31: the normalised sibling pairs, their provenance and the adjudications;
+# the raw operator export under data/players/families/ stays untracked.
+!/data/players/sibling-relationships.csv
+!/data/players/sibling-relationships.source.json
+!/data/players/sibling-adjudications.csv
+!/data/players/sibling-supplements.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
+# AFLDB-ISSUE-118 §23.33: the normalised after-siren artefact, provenance and adjudications are tracked;
+# the raw table exports under data/records/after-siren/ stay untracked.
+!/data/records/after-siren-events.csv
+!/data/records/after-siren-events.source.json
+!/data/records/after-siren-adjudications.csv
 # ISSUE-093 Phase-1 canonical reference datasets: curated, reviewable, tracked.
 # Only JSON opts in; raw/large data under data/ (incl. data/sources/) stays ignored.
 !/data/reference/
 /data/reference/*
 !/data/reference/*.json
+# AFLDB-ISSUE-118 §23.27 Stage E2: the parsed AFL Tables coaches snapshot (index + coach
+# pages, two small CSVs per capture) is the rebuild's tracked input; the raw HTML beside
+# it stays local and is hash-bound by the tracked manifest under docs/rebuild-manifests/.
+!/data/sources/
+/data/sources/*
+!/data/sources/afltables/
+/data/sources/afltables/*
+!/data/sources/afltables/coaches/
+/data/sources/afltables/coaches/*
+!/data/sources/afltables/coaches/*/
+/data/sources/afltables/coaches/*/*
+!/data/sources/afltables/coaches/*/parsed/
 *.db
 *.db-journal
 *.db-wal

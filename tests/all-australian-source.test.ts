@@ -145,20 +145,20 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
     expect(result.stderr).toBe('');
     expect(result.payload).toMatchObject({
       ok: true,
-      row_count: 1158,
-      linked_count: 1078,
+      row_count: 1244,
+      linked_count: 1164,
       unlinked_count: 80,
       season_min: 1953,
       season_max: 2025,
       distinct_seasons: 53,
-      by_source: { draftguru: 906, wikipedia: 252 },
+      by_source: { draftguru: 906, wikipedia: 338 },
       position_present: 760,
       note_present: 906,
       captains: 34,
       vice_captains: 21,
       null_club: 50,
       link_status: {
-        ambiguous: 4, implausible: 9, resolved: 918, unique: 160, unmatched: 67,
+        ambiguous: 4, implausible: 9, resolved: 1004, unique: 160, unmatched: 67,
       },
     });
   });
@@ -208,24 +208,37 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
     );
   });
 
-  it('has exactly ten legitimately-duplicated (season, player) pairs, all distinguished by club', () => {
+  it('has exactly 38 legitimately-duplicated (season, player) pairs, all distinguished by (source, club)', () => {
     const rows = canonicalLines.slice(1).map(parseCsvLine);
     const byPair = new Map<string, string[]>();
     for (const cells of rows) {
       const pair = `${cells[COL.season]}|${cells[COL.player]}`;
       const clubs = byPair.get(pair) ?? [];
-      clubs.push(cells[COL.club]);
+      clubs.push(`${cells[COL.source]}|${cells[COL.club]}`);
       byPair.set(pair, clubs);
     }
     const dupPairs = [...byPair.entries()].filter(([, clubs]) => clubs.length > 1);
-    expect(dupPairs).toHaveLength(10);
-    // Nine are 1984, one is 2016 (Josh Kennedy).
-    expect(dupPairs.filter(([pair]) => pair.startsWith('1984|'))).toHaveLength(9);
-    expect(dupPairs.filter(([pair]) => pair.startsWith('2016|'))).toHaveLength(1);
-    // Every duplicated pair is fully separated by club.
+    expect(dupPairs).toHaveLength(38);
+    // Nine are 1984 (club + state rows of one team), one is 2016 (Josh
+    // Kennedy), and 28 are players named in BOTH teams of a dual-team season
+    // (State of Origin carnival team = draftguru, VFL Team of the Year =
+    // wikipedia; AFLDB-ISSUE-118 §23.14): 1983 7, 1986 6, 1987 9, 1988 6.
+    const bySeason = (season: string) => dupPairs.filter(([pair]) => pair.startsWith(`${season}|`));
+    expect(bySeason('1983')).toHaveLength(7);
+    expect(bySeason('1984')).toHaveLength(9);
+    expect(bySeason('1986')).toHaveLength(6);
+    expect(bySeason('1987')).toHaveLength(9);
+    expect(bySeason('1988')).toHaveLength(6);
+    expect(bySeason('2016')).toHaveLength(1);
+    // Every duplicated pair is separated by (source, club); the 1984 and 2016
+    // pairs are separated by club alone, the dual-team pairs by source (23 of
+    // them share the club string across the two teams).
+    const clubOnly = (clubs: string[]) => new Set(clubs.map((c) => c.split('|')[1])).size === clubs.length;
     for (const [, clubs] of dupPairs) {
       expect(new Set(clubs).size).toBe(clubs.length);
     }
+    expect(bySeason('1984').every(([, clubs]) => clubOnly(clubs))).toBe(true);
+    expect(bySeason('2016').every(([, clubs]) => clubOnly(clubs))).toBe(true);
   });
 
   it('per row: source_citation equals source, and only draftguru/wikipedia appear', () => {
@@ -239,8 +252,8 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
   it('carries the source_record_id verbatim as source_key — prefixed per source, strictly ascending, unique', () => {
     const rows = canonicalLines.slice(1).map(parseCsvLine);
     const keys = rows.map((cells) => cells[COL.sourceKey]);
-    expect(keys).toHaveLength(1158);
-    expect(new Set(keys).size).toBe(1158);
+    expect(keys).toHaveLength(1244);
+    expect(new Set(keys).size).toBe(1244);
     expect(keys).toEqual([...keys].sort());
     for (const cells of rows) {
       const key = cells[COL.sourceKey];
@@ -314,11 +327,11 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
     expectRejected([HEADER, DG_ROW, dup], /duplicate source_key 'aa:2000:1'/);
   });
 
-  it('rejects a duplicate (season, player, club) natural identity', () => {
+  it('rejects a duplicate (source, season, player, club) natural identity', () => {
     const twin = replaceCell(DG_ROW_2, COL.player, 'Test Player');
     // Same season + player + club as DG_ROW, different source_key.
     const collide = replaceCell(twin, COL.club, 'Carlton');
-    expectRejected([HEADER, DG_ROW, collide], /duplicate natural identity \(season, player, club\)/);
+    expectRejected([HEADER, DG_ROW, collide], /duplicate natural identity \(source, season, player, club\)/);
   });
 
   it('does NOT reject a (season, player) pair that differs by club', () => {
@@ -329,7 +342,7 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
     const kennedyB = replaceCell(DG_ROW_2, COL.player, 'Test Player'); // aa:2000:2 Essendon Test Player
     const result = runChecker(writeVariant([HEADER, kennedyA, kennedyB]));
     expect(result.payload.ok).toBe(false);
-    expect(result.payload.error).toEqual(expect.stringMatching(/expected 1158 All-Australian rows/));
+    expect(result.payload.error).toEqual(expect.stringMatching(/expected 1244 All-Australian rows/));
     expect(result.payload.error).not.toEqual(expect.stringMatching(/duplicate natural identity/));
   });
 
@@ -404,7 +417,7 @@ describe('canonical All-Australian source (AFLDB-ISSUE-112 phase 5)', () => {
   });
 
   it('rejects a truncated file (row count short of 1,158)', () => {
-    expectRejected([HEADER, DG_ROW, DG_ROW_2, WIKI_ROW], /expected 1158 All-Australian rows, got 3/);
+    expectRejected([HEADER, DG_ROW, DG_ROW_2, WIKI_ROW], /expected 1244 All-Australian rows, got 3/);
   });
 
   it('rejects a file whose source split is wrong', () => {

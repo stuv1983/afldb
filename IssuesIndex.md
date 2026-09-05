@@ -7,7 +7,13 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-05
-**Open issues:** 2 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`.
+**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`.
+
+<!-- UPDATE 2026-09-05 (ISSUE-118 REOPENED, later the same day): the closeout below stands as
+     history, but its acceptance definition was too weak — 28 valid Gridley criteria were counted
+     as acceptable because they were classified data_absent. Reopened with a corrected contract
+     (zero unsupported valid criteria); row restored below; 2 -> 3. Runbook moved back to
+     `issues/open/AFLDB-ISSUE-118.md` (§23). -->
 
 <!-- UPDATE 2026-09-05 (ISSUE-118 closeout): `AFLDB-ISSUE-118` is **Resolved**. Merged to `main`
      (`4efdf70`), deployed to DEV (`tmEQ-3b-HBNZtkAw90Aag`) and PROD (`pEc4154P6P0QK8Hjoo5Uj`);
@@ -496,9 +502,20 @@ closure boundary, and the unrelated query-builder timing regression remains with
      merged. Authoritative records: the `AFLDB-ISSUE-136` entry in `issues.md` (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-136.md` §13. Follow-up: `AFLDB-ISSUE-137`. -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | **NOT STARTED — allocated 2026-09-04 at the ISSUE-136 closeout; no production mutation authorised.** Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixes at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack Williams: a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url, the duplicate carrying the 2025 match rows, the awards-census rows and every 2026 settle row). The fixed importer HALTs (`external-identity split`) against such a database by design. Key files: `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 (verification SQL), `tools/migration/import_fitzroy_core.py`, `AFLDB-ISSUE-125` (promotion path). | Operator chooses (a) canonical rebuild-and-promote under `AFLDB-ISSUE-125`, or (b) a supervised, reviewed per-player identity reconciliation on production (re-point the renumbered identity, match rows, award rows and settle rows to the career player, recompute derived tables, retire the duplicate) after a production backup; first step of either is a read-only measurement of the production split. |
-<!-- RETIRED 2026-09-05 — `AFLDB-ISSUE-118` is **Resolved** and is NO LONGER an open issue.
-     Merged, deployed to DEV and PROD, accepted on both; see `issues.md` (Resolution,
-     2026-09-05) and `issues/closed/AFLDB-ISSUE-118.md` §22.12. -->
+| `AFLDB-ISSUE-138` | Low | Testing / Database privileges | **OPEN — found 2026-09-05 during ISSUE-118 §23.28.** `tests/integration/privileges.test.ts` ("afldb_import writes exactly the tables the registry allows") reports `external_grids` / `external_grid_axes` as writable-but-unregistered on every database since migration `080`, whose narrow `afldb_import` grants (SELECT + INSERT, UPDATE on `is_current`) are deliberate and outside the registry; reproduced hand-migrated and after a clean 18-stage rebuild, 34/35 pass. No privilege is wrong. | Extend the suite's exclusion list with the two tables and assert the 080 narrow shape (no DELETE/TRUNCATE), mirroring the `data_overrides` column-scoped case; no privilege change. |
+<!-- RESOLVED 2026-09-06 (§23.38) — `AFLDB-ISSUE-118` is **Resolved** and is NO LONGER an open issue.
+     After-siren integrated into the deterministic rebuild (data stage + `after-siren-reconcile`); FK
+     index migration `090` added the one ISSUE-118 migration 086 left off. Full `afldb_test` rebuild:
+     22 stages, FINAL VALIDATION 85 checks, after-siren reconcile 38/38. Final Gridley corpus
+     (diagnostic) 1,164/1,164: 9,854 cells solved, `incorrect known answer` 0, ISSUE-118 timeouts 0,
+     residual unsupported = exactly the seven §23.36 accepted deferrals. 638 ISSUE-118-domain tests
+     pass; `tsc` clean. Authoritative records: `issues.md` (Resolution, 2026-09-06) and
+     `issues/closed/AFLDB-ISSUE-118.md` §23.38. Branch `claude/issue-118` pushed, not merged.
+     Follow-up (not blocking): DEV load, production deploy (ISSUE-137), International Rules scope,
+     `AFLDB-ISSUE-138` (`external_grid_*` privilege-registry drift). -->
+<!-- 2026-09-05 (superseded by the REOPEN the same day; kept as history) — `AFLDB-ISSUE-118` was
+     marked **Resolved**: merged, deployed to DEV and PROD, accepted on both; see `issues.md`
+     (Resolution, 2026-09-05) and runbook §22.12. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match
      instead of updating it) is **Resolved** and is NO LONGER an open issue. The fail-closed
      rekey-in-place fix is merged (`657a875`) and deployed; runbook §8's production acceptance is

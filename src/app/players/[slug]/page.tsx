@@ -3,16 +3,23 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { CollapsiblePanel } from '@/components/CollapsiblePanel';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
+import { hasFamilyContent, PlayerFamilyCard } from '@/components/PlayerFamilyCard';
+import { PlayerAfterSirenEvents } from '@/components/PlayerAfterSirenEvents';
+import { PlayerCoachingCareer } from '@/components/PlayerCoachingCareer';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
+import { getPlayerAfterSirenEvents } from '@/db/queries/after-siren';
 import { getPlayerHonours } from '@/db/queries/awards';
+import { getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
   getPlayer,
   getPlayerBrownlow,
   getPlayerClubs,
+  getPlayerFamily,
   getPlayerMatches,
   getPlayerSeasons,
   listMostViewedPlayers,
@@ -154,17 +161,21 @@ export default async function PlayerPage({
     permanentRedirect(playerPath(player.slug, player.id));
   }
 
-  const [clubs, seasons, brownlow, matches, honours, draftHistory] = await Promise.all([
-    getPlayerClubs(player.id),
-    getPlayerSeasons(player.id),
-    getPlayerBrownlow(player.id),
-    // Most recent matches only. The full paged log lives at
-    // /players/[slug]/matches, which keeps this page free of
-    // searchParams and therefore cacheable.
-    getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
-    getPlayerHonours(player.id),
-    getPlayerDraftHistory(player.id),
-  ]);
+  const [clubs, seasons, brownlow, matches, honours, draftHistory, family, coachingCareer, afterSirenEvents] =
+    await Promise.all([
+      getPlayerClubs(player.id),
+      getPlayerSeasons(player.id),
+      getPlayerBrownlow(player.id),
+      // Most recent matches only. The full paged log lives at
+      // /players/[slug]/matches, which keeps this page free of
+      // searchParams and therefore cacheable.
+      getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
+      getPlayerHonours(player.id),
+      getPlayerDraftHistory(player.id),
+      getPlayerFamily(player.id),
+      getPlayerCoachingCareer(player.id),
+      getPlayerAfterSirenEvents(player.id),
+    ]);
 
   const risingStarNominations = honours.nominations;
   const risingStarWin = risingStarNominations.find((n) => n.isWinner);
@@ -203,6 +214,39 @@ export default async function PlayerPage({
         <div className="table-wrap">
           <table>
             <tbody>
+              {/* Identity facts first: who this person is, independent of
+                  their playing record. */}
+              <tr>
+                <th scope="row">Date of birth</th>
+                <td colSpan={3}>
+                  {player.dob
+                    ? <span>{formatDate(player.dob)}</span>
+                    : <span className="not-recorded">Not recorded</span>}
+                  {/* Sources disagree. The date shown is the one AFLDB
+                      already held; the conflict is recorded rather than
+                      resolved by picking a winner. Shown as visible text
+                      rather than a title attribute, which a keyboard or
+                      touch user can never reach. */}
+                  {player.dobDisputed && (
+                    <>
+                      {' '}
+                      <span className="badge badge-warn">Disputed</span>
+                      <div className="muted" style={{ fontSize: '0.85em', marginTop: '0.25rem' }}>
+                        Sources disagree on this date. The existing value is shown pending review.
+                      </div>
+                    </>
+                  )}
+                </td>
+              </tr>
+              {(player.heightCm || player.weightKg) && (
+                <tr>
+                  <th scope="row">Height</th>
+                  <td>{player.heightCm ? `${player.heightCm} cm` : <span className="not-recorded">Not recorded</span>}</td>
+                  <th scope="row">Weight</th>
+                  <td>{player.weightKg ? `${player.weightKg} kg` : <span className="not-recorded">Not recorded</span>}</td>
+                </tr>
+              )}
+              {/* Career record second. */}
               <tr>
                 <th scope="row">Debut</th>
                 <td>{formatDate(player.debutDate)}</td>
@@ -222,34 +266,9 @@ export default async function PlayerPage({
                 <td>{formatStat(player.bestGoalsGame)}</td>
               </tr>
               <tr>
-                <th scope="row">Date of birth</th>
-                <td>
-                  {player.dob
-                    ? <span>{formatDate(player.dob)}</span>
-                    : <span className="not-recorded">Not recorded</span>}
-                  {/* Sources disagree. The date shown is the one AFLDB
-                      already held; the conflict is recorded rather than
-                      resolved by picking a winner. */}
-                  {player.dobDisputed && (
-                    <span
-                      className="badge badge-warn"
-                      title="Sources disagree on this date. The existing value is shown pending review."
-                    >
-                      Disputed
-                    </span>
-                  )}
-                </td>
                 <th scope="row">Best game (disposals)</th>
-                <td>{formatStat(player.bestDisposalsGame)}</td>
+                <td colSpan={3}>{formatStat(player.bestDisposalsGame)}</td>
               </tr>
-              {(player.heightCm || player.weightKg) && (
-                <tr>
-                  <th scope="row">Height</th>
-                  <td>{player.heightCm ? `${player.heightCm} cm` : <span className="not-recorded">Not recorded</span>}</td>
-                  <th scope="row">Weight</th>
-                  <td>{player.weightKg ? `${player.weightKg} kg` : <span className="not-recorded">Not recorded</span>}</td>
-                </tr>
-              )}
               {player.notes && (
                 <tr>
                   <th scope="row">Notes</th>
@@ -327,7 +346,7 @@ export default async function PlayerPage({
       label: 'Honours',
       node: (
         <section className="section">
-          <h2>Honours</h2>
+          <CollapsiblePanel title="Honours">
           <ul className="ruled-list">
             {honours.hallOfFame && (
               <li>
@@ -446,6 +465,7 @@ export default async function PlayerPage({
               </li>
             ))}
           </ul>
+          </CollapsiblePanel>
         </section>
       ),
     });
@@ -688,6 +708,33 @@ export default async function PlayerPage({
       </section>
     ),
   });
+
+  // Family, coaching and after-the-siren are contextual to the player, not
+  // the primary playing record -- ordered after it rather than interrupting
+  // it, so a reader's own career stays the first thing they encounter.
+  if (hasFamilyContent(family)) {
+    sections.push({
+      id: 'family',
+      label: 'Family',
+      node: <PlayerFamilyCard playerId={player.id} family={family} />,
+    });
+  }
+
+  if (coachingCareer) {
+    sections.push({
+      id: 'coaching-career',
+      label: 'Coaching Career',
+      node: <PlayerCoachingCareer career={coachingCareer} />,
+    });
+  }
+
+  if (afterSirenEvents.length > 0) {
+    sections.push({
+      id: 'after-siren',
+      label: 'After-the-siren',
+      node: <PlayerAfterSirenEvents events={afterSirenEvents} />,
+    });
+  }
 
   return (
     <>

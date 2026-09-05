@@ -50,6 +50,111 @@ describe('every grid builder compiles and solves', () => {
   });
 });
 
+describe('All-Australian final team versus 40-man squad (ISSUE-118 reopened)', () => {
+  const team = (params: Record<string, string> = {}): GridAxisState => ({ builder: 'all_australian_team', params });
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('the final team is the all-australian award alone, never the squad rows', async () => {
+    const [truth] = await sql<{ team: number; squadOnly: number; squadMembers: number; squadFirst: number | null }[]>`
+      WITH linked AS (
+        SELECT w.player_id, w.season, a.slug FROM award_winners w JOIN awards a ON a.id = w.award_id
+         WHERE a.slug IN ('all-australian', 'all-australian-squad')
+           AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+      ), first_squad AS (SELECT min(season) AS season FROM linked WHERE slug = 'all-australian-squad')
+      SELECT (SELECT count(DISTINCT player_id) FROM linked WHERE slug = 'all-australian')::int AS team,
+             (SELECT count(DISTINCT player_id) FROM linked WHERE slug = 'all-australian-squad'
+               AND player_id NOT IN (SELECT player_id FROM linked WHERE slug = 'all-australian'))::int AS "squadOnly",
+             (SELECT count(DISTINCT player_id) FROM linked
+               WHERE slug = 'all-australian-squad'
+                  OR (slug = 'all-australian' AND season >= (SELECT season FROM first_squad)))::int AS "squadMembers",
+             (SELECT season FROM first_squad)::int AS "squadFirst"
+    `;
+    expect(truth.team).toBeGreaterThan(0);
+    expect(truth.squadOnly).toBeGreaterThan(0);
+    expect(truth.squadFirst).toBe(2007);
+    const teamSummary = await solveCellSummary(team(), anyPlayer, 'games_asc');
+    expect(teamSummary.eligible).toBe(truth.team);
+    const squad = await solveCellSummary({ builder: 'all_australian_squad_member', params: {} }, anyPlayer, 'games_asc');
+    expect(squad.eligible).toBe(truth.squadMembers);
+    // The two sets differ in both directions: pre-2007 final teams are not squad members, squad-only players are not final-team members.
+    expect(squad.eligible).not.toBe(teamSummary.eligible);
+  });
+
+  it('repeat selections count distinct seasons, so a two-row 1984 selection is one honour', async () => {
+    const doubles = await sql<{ playerId: number; rows: number; seasons: number }[]>`
+      SELECT w.player_id AS "playerId", count(*)::int AS rows, count(DISTINCT w.season)::int AS seasons
+        FROM award_winners w JOIN awards a ON a.id = w.award_id
+       WHERE a.slug = 'all-australian' AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+       GROUP BY w.player_id HAVING count(*) > count(DISTINCT w.season)
+    `;
+    // The 1984 team lists nine players under both club and state.
+    expect(doubles.length).toBeGreaterThan(0);
+    const [truth] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM (
+        SELECT w.player_id FROM award_winners w JOIN awards a ON a.id = w.award_id
+         WHERE a.slug = 'all-australian' AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+         GROUP BY w.player_id HAVING count(DISTINCT w.season) >= 2) t
+    `;
+    const twice: GridAxisState = { builder: 'all_australian_team_min_times', params: { times: '2' } };
+    expect((await solveCellSummary(twice, anyPlayer, 'games_asc')).eligible).toBe(truth.n);
+    // A player whose only repeat is the same season twice must not qualify.
+    const singleSeason = doubles.filter((r) => r.seasons === 1);
+    if (singleSeason.length > 0) {
+      const page = await solveCellRows(twice, anyPlayer, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+      const ids = new Set(page.rows.map((r) => r.id));
+      for (const r of singleSeason) expect(ids.has(r.playerId), String(r.playerId)).toBe(false);
+    }
+  });
+});
+
+describe('height builders (ISSUE-118 reopened)', () => {
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('an unknown height never qualifies on either side of the bound', async () => {
+    const [truth] = await sql<{ known: number; tall: number; short: number }[]>`
+      SELECT count(height_cm)::int AS known,
+             count(*) FILTER (WHERE height_cm >= 195)::int AS tall,
+             count(*) FILTER (WHERE height_cm <= 180)::int AS short
+        FROM players
+    `;
+    const tall = await solveCellSummary({ builder: 'height_min', params: { cm: '195' } }, anyPlayer, 'games_asc');
+    const short = await solveCellSummary({ builder: 'height_max', params: { cm: '180' } }, anyPlayer, 'games_asc');
+    expect(tall.eligible).toBe(truth.tall);
+    expect(short.eligible).toBe(truth.short);
+    // Every player with a recorded height is on exactly one side of a 180/181 split; nobody without one is on either.
+    const under181 = await solveCellSummary({ builder: 'height_max', params: { cm: '180' } }, anyPlayer, 'games_asc');
+    const over180 = await solveCellSummary({ builder: 'height_min', params: { cm: '181' } }, anyPlayer, 'games_asc');
+    expect(under181.eligible + over180.eligible).toBe(truth.known);
+  });
+});
+
+describe('age on debut (ISSUE-118 Stage D1)', () => {
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('counts completed years on debut day and never qualifies an unknown date', async () => {
+    const [truth] = await sql<{ known: number; atLeast22: number; under22: number; onBirthday: number }[]>`
+      SELECT count(*) FILTER (WHERE p.dob IS NOT NULL AND c.debut_date IS NOT NULL)::int AS known,
+             count(*) FILTER (WHERE c.debut_date >= p.dob + interval '22 years')::int AS "atLeast22",
+             count(*) FILTER (WHERE c.debut_date <  p.dob + interval '22 years')::int AS "under22",
+             count(*) FILTER (WHERE c.debut_date = p.dob + interval '22 years')::int AS "onBirthday"
+        FROM players p JOIN player_career_stats c ON c.player_id = p.id
+    `;
+    expect(truth.known).toBeGreaterThan(0);
+    const older = await solveCellSummary({ builder: 'age_on_debut_min', params: { years: '22' } }, anyPlayer, 'games_asc');
+    expect(older.eligible).toBe(truth.atLeast22);
+    // Every player with both dates known is on exactly one side of the 22nd birthday; nobody without them is on either.
+    expect(truth.atLeast22 + truth.under22).toBe(truth.known);
+    // The bound is inclusive: a debut ON the 22nd birthday counts as 22, and is the exact difference from "23 or older" minus the 22-year-olds.
+    const from23 = await solveCellSummary({ builder: 'age_on_debut_min', params: { years: '23' } }, anyPlayer, 'games_asc');
+    const [between] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE c.debut_date >= p.dob + interval '22 years' AND c.debut_date < p.dob + interval '23 years'`;
+    expect(older.eligible - from23.eligible).toBe(between.n);
+    // A debut on the birthday itself is inside "22 or older" (inclusive) and outside "23 or older".
+    expect(between.n).toBeGreaterThanOrEqual(truth.onBirthday);
+  });
+});
+
 describe('grid solver correctness', () => {
   it('solves the mapped ISSUE-076 won-final grid within the four-second safety margin', async () => {
     const [identity] = await sql<{
@@ -278,6 +383,272 @@ describe('grid solver correctness', () => {
     // teammates there too.
     const overlap = await getPlayerOverlapSummary(anchor.playerId, pairRow.other);
     expect(overlap.together).toBeGreaterThan(0);
+  });
+
+  it('coached_by is exactly the players who played a match for a club while that coach was assigned to it (ISSUE-118 Stage E2)', async () => {
+    // Simon Goodwin's page names one Essendon match in 2013 (the caretaker game)
+    // before Melbourne 2017-: the match grain must carry both, with no season range.
+    const [coach] = await sql<{ id: number; playerId: number | null }[]>`
+      SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Goodwin, Simon'
+    `;
+    expect(coach, 'the coaches stage has not loaded this database').toBeDefined();
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT pms.player_id AS id
+        FROM player_match_stats pms
+        JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+       WHERE mc.coach_id = ${coach.id}
+    `;
+    const clubsCoached = await sql<{ name: string; season: number }[]>`
+      SELECT DISTINCT c.name, m.season FROM match_coaches mc JOIN matches m ON m.id = mc.match_id JOIN clubs c ON c.id = mc.club_id
+       WHERE mc.coach_id = ${coach.id} ORDER BY m.season
+    `;
+    expect(clubsCoached[0]).toEqual({ name: 'Essendon', season: 2013 });
+    expect(clubsCoached.some((r) => r.name === 'Melbourne')).toBe(true);
+
+    const axis: GridAxisState = { builder: 'coached_by', params: { coach: String(coach.id) } };
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const summary = await solveCellSummary(axis, any, 'games_asc');
+    expect(summary.eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // An Essendon 2013 player coached in that one match is in the set.
+    const [essendon] = await sql<{ id: number }[]>`
+      SELECT pms.player_id AS id FROM player_match_stats pms
+        JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+        JOIN clubs c ON c.id = mc.club_id
+       WHERE mc.coach_id = ${coach.id} AND c.name = 'Essendon' LIMIT 1
+    `;
+    expect(truthIds.has(essendon.id)).toBe(true);
+  });
+
+  it('premiership_coach is the linked coaches of Grand Final winners, and coach-only people never appear as players', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT c.player_id AS id FROM coaches c
+        JOIN match_coaches mc ON mc.coach_id = c.id
+        JOIN matches m ON m.id = mc.match_id
+       WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+         AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id
+    `;
+    expect(truth.length).toBeGreaterThan(0);
+    const axis: GridAxisState = { builder: 'premiership_coach', params: {} };
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const summary = await solveCellSummary(axis, any, 'games_asc');
+    expect(summary.eligible).toBe(truth.length);
+    // Leigh Matthews: a player (Hawthorn) and a premiership coach (Collingwood 1990,
+    // Brisbane Lions 2001-03), linked through his AFL Tables profile.
+    const [matthews] = await sql<{ playerId: number | null; link: string }[]>`
+      SELECT player_id AS "playerId", link_status_value::text AS link FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews).toMatchObject({ link: 'unique' });
+    expect(truth.some((r) => r.id === matthews.playerId)).toBe(true);
+    // The operator-supplied coach-only list holds no player identity and no players row.
+    const coachOnly = await sql<{ nameKey: string; playerId: number | null; link: string; fabricated: number }[]>`
+      SELECT c.name_key AS "nameKey", c.player_id AS "playerId", c.link_status_value::text AS link,
+             (SELECT count(*) FROM players p WHERE p.display_name = c.display_name
+                AND NOT EXISTS (SELECT 1 FROM external_identities ei WHERE ei.player_id = p.id))::int AS fabricated
+        FROM coaches c
+       WHERE c.name_key IN ('Todd, John', 'Kinnear, Col', 'Cahill, John', 'Brittain, Wayne', 'Craig, Neil', 'McCartney, Brendan', 'Bolton, Brendon', 'Fagan, Chris')
+       ORDER BY c.name_key
+    `;
+    expect(coachOnly.map((r) => r.nameKey)).toEqual(['Bolton, Brendon', 'Brittain, Wayne', 'Cahill, John', 'Craig, Neil', 'Fagan, Chris', 'Kinnear, Col', 'McCartney, Brendan', 'Todd, John']);
+    for (const r of coachOnly) expect(r, r.nameKey).toMatchObject({ playerId: null, link: 'unmatched', fabricated: 0 });
+  });
+
+  // AFLDB-ISSUE-118 §23.29 family F: father_son_selections from the tracked
+  // normalised Wikipedia list; every person linked only through an AFL Tables
+  // profile path. The two builders are the two ends of the same row.
+  it('father_son_father and father_son_selection are the linked ends of father_son_selections, and the Abletts sit on the right ends', async () => {
+    const fathers = await sql<{ id: number }[]>`
+      SELECT DISTINCT father_player_id AS id FROM father_son_selections
+       WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')
+    `;
+    const sons = await sql<{ id: number }[]>`
+      SELECT DISTINCT drafted_player_id AS id FROM father_son_selections
+       WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+    `;
+    expect(fathers.length).toBeGreaterThan(100);
+    expect(sons.length).toBeGreaterThan(90);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const fatherAxis: GridAxisState = { builder: 'father_son_father', params: {} };
+    const sonAxis: GridAxisState = { builder: 'father_son_selection', params: {} };
+    expect((await solveCellSummary(fatherAxis, any, 'games_asc')).eligible).toBe(fathers.length);
+    expect((await solveCellSummary(sonAxis, any, 'games_asc')).eligible).toBe(sons.length);
+    const { rows } = await solveCellRows(fatherAxis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const fatherIds = new Set(fathers.map((r) => r.id));
+    for (const r of rows) expect(fatherIds.has(r.id), `player ${r.id}`).toBe(true);
+    // Gary Ablett Sr (Geelong 1984-1996) qualified Gary Jr (2001) and Nathan (2004);
+    // Gary Jr is a son, not a father. Identity is the AFL Tables profile, never the name.
+    const abletts = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/G/Gary_Ablett0.html', 'players/G/Gary_Ablett1.html')
+    `;
+    const byProfile = Object.fromEntries(abletts.map((r) => [r.profile, r.playerId]));
+    const senior = byProfile['players/G/Gary_Ablett0.html'];
+    const junior = byProfile['players/G/Gary_Ablett1.html'];
+    expect(senior).toBeDefined();
+    expect(junior).toBeDefined();
+    const seniorRows = await sql<{ son: string; year: number }[]>`
+      SELECT drafted_player_name AS son, draft_year AS year FROM father_son_selections WHERE father_player_id = ${senior} ORDER BY draft_year
+    `;
+    expect(seniorRows).toEqual([{ son: 'Gary Ablett, Jr.', year: 2001 }, { son: 'Nathan Ablett', year: 2004 }]);
+    expect(fatherIds.has(senior)).toBe(true);
+    expect(fatherIds.has(junior)).toBe(false);
+    expect(new Set(sons.map((r) => r.id)).has(junior)).toBe(true);
+    // A son who never played (Brayden Shaw, 2003) is a row with no player, never a fabricated one;
+    // a father with no VFL/AFL career (Jim Michalanney, 2022) likewise.
+    const unlinked = await sql<{ son: string; sonId: number | null; sonLink: string; father: string; fatherId: number | null; fatherLink: string }[]>`
+      SELECT drafted_player_name AS son, drafted_player_id AS "sonId", drafted_link_status::text AS "sonLink",
+             father_name AS father, father_player_id AS "fatherId", father_link_status::text AS "fatherLink"
+        FROM father_son_selections WHERE drafted_player_name = 'Brayden Shaw' OR father_name = 'Jim Michalanney' ORDER BY draft_year
+    `;
+    expect(unlinked).toEqual([
+      { son: 'Brayden Shaw', sonId: null, sonLink: 'unmatched', father: 'Tony Shaw', fatherId: expect.any(Number), fatherLink: 'unique' },
+      { son: 'Max Michalanney^', sonId: expect.any(Number), sonLink: 'unique', father: 'Jim Michalanney', fatherId: null, fatherLink: 'unmatched' },
+    ]);
+    // One parent_child relationship per selection, carrying the same links.
+    const [rel] = await sql<{ n: number; linkedFathers: number; linkedSons: number }[]>`
+      SELECT count(*)::int AS n, count(person_a_player_id)::int AS "linkedFathers", count(person_b_player_id)::int AS "linkedSons"
+        FROM player_relationships WHERE relationship = 'parent_child'
+    `;
+    const [sel] = await sql<{ n: number; linkedFathers: number; linkedSons: number }[]>`
+      SELECT count(*)::int AS n, count(father_player_id)::int AS "linkedFathers", count(drafted_player_id)::int AS "linkedSons" FROM father_son_selections
+    `;
+    expect(rel).toEqual(sel);
+  });
+
+  // AFLDB-ISSUE-118 §23.31 family F (siblings): player_relationships `sibling`
+  // rows from the tracked normalised football-families export. has_brother is
+  // an explicit brothers-labelled row with both people linked and the brother
+  // having played; never a surname, a family key or a shared parent.
+  it('has_brother is exactly the linked ends of brothers-labelled sibling rows, and the Abletts sit on the right ends', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT pid AS id FROM (
+        SELECT r.person_a_player_id AS pid FROM player_relationships r
+          JOIN player_career_stats bc ON bc.player_id = r.person_b_player_id
+         WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers') AND r.person_a_player_id IS NOT NULL AND bc.games > 0
+        UNION
+        SELECT r.person_b_player_id FROM player_relationships r
+          JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
+         WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers') AND r.person_b_player_id IS NOT NULL AND ac.games > 0
+      ) x
+    `;
+    expect(truth.length).toBeGreaterThan(500);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const axis: GridAxisState = { builder: 'has_brother', params: {} };
+    expect((await solveCellSummary(axis, any, 'games_asc')).eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // Gary Ablett Sr is the brother of Geoff and Kevin (the export's rows). Gary Jr and
+    // Nathan are brothers too: the export has no row for them (its family sentence names
+    // them only as their father's sons), which is a COVERAGE GAP, never "no brother" —
+    // the pair is carried by the tracked supplement on the two articles' own words.
+    // Absence of a row is unknown; only presence is asserted here.
+    const abletts = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/G/Gary_Ablett0.html', 'players/G/Geoff_Ablett.html', 'players/K/Kevin_Ablett.html', 'players/G/Gary_Ablett1.html', 'players/N/Nathan_Ablett.html')
+    `;
+    const byProfile = Object.fromEntries(abletts.map((r) => [r.profile, r.playerId]));
+    for (const p of ['players/G/Gary_Ablett0.html', 'players/G/Geoff_Ablett.html', 'players/K/Kevin_Ablett.html', 'players/G/Gary_Ablett1.html', 'players/N/Nathan_Ablett.html']) {
+      expect(byProfile[p], p).toBeDefined();
+      expect(truthIds.has(byProfile[p]), p).toBe(true);
+    }
+    const juniorRows = await sql<{ other: string; label: string; record: string }[]>`
+      SELECT CASE WHEN person_a_player_id = ${byProfile['players/G/Gary_Ablett1.html']} THEN person_b_name ELSE person_a_name END AS other,
+             relationship_label AS label, source_record_id AS record
+        FROM player_relationships WHERE relationship = 'sibling'
+         AND ${byProfile['players/G/Gary_Ablett1.html']} IN (person_a_player_id, person_b_player_id)
+    `;
+    expect(juniorRows).toEqual([{ other: 'Nathan Ablett', label: 'brothers', record: 'siblings:afldb-sibling-supplement:001' }]);
+    const seniorRows = await sql<{ other: string; label: string }[]>`
+      SELECT CASE WHEN person_a_player_id = ${byProfile['players/G/Gary_Ablett0.html']} THEN person_b_name ELSE person_a_name END AS other,
+             relationship_label AS label
+        FROM player_relationships WHERE relationship = 'sibling'
+         AND ${byProfile['players/G/Gary_Ablett0.html']} IN (person_a_player_id, person_b_player_id) ORDER BY 1
+    `;
+    expect(seniorRows).toEqual([{ other: 'Geoff Ablett', label: 'brothers' }, { other: 'Kevin Ablett', label: 'brothers' }]);
+    // A sibling row whose other side is unlinked (a relative who never played VFL/AFL)
+    // qualifies nobody, and a sisters row links nobody: no fabricated player anywhere.
+    const [shape] = await sql<{ selfPairs: number; dupPairs: number; sistersLinked: number; oneSided: number }[]>`
+      SELECT (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id = person_b_player_id)::int AS "selfPairs",
+             (SELECT count(*) FROM (SELECT 1 FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL
+                GROUP BY least(person_a_player_id, person_b_player_id), greatest(person_a_player_id, person_b_player_id) HAVING count(*) > 1) d)::int AS "dupPairs",
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND relationship_label = 'sisters' AND (person_a_player_id IS NOT NULL OR person_b_player_id IS NOT NULL))::int AS "sistersLinked",
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND (person_a_player_id IS NULL) <> (person_b_player_id IS NULL))::int AS "oneSided"
+    `;
+    expect(shape).toMatchObject({ selfPairs: 0, dupPairs: 0, sistersLinked: 0 });
+    expect(shape.oneSided).toBeGreaterThan(0);
+    // The builder reads canonical evidence only: a player whose sole sibling rows are
+    // one-sided (the relative resolved to no VFL/AFL player) is not qualified BY THEM.
+    // That is a statement about what the data proves, not that he has no brother.
+    const onlyOneSided = await sql<{ id: number }[]>`
+      SELECT DISTINCT COALESCE(person_a_player_id, person_b_player_id) AS id FROM player_relationships r
+       WHERE r.relationship = 'sibling' AND (r.person_a_player_id IS NULL) <> (r.person_b_player_id IS NULL)
+         AND NOT EXISTS (SELECT 1 FROM player_relationships o WHERE o.relationship = 'sibling'
+                            AND o.person_a_player_id IS NOT NULL AND o.person_b_player_id IS NOT NULL
+                            AND COALESCE(r.person_a_player_id, r.person_b_player_id) IN (o.person_a_player_id, o.person_b_player_id))
+    `;
+    expect(onlyOneSided.length).toBeGreaterThan(0);
+    for (const r of onlyOneSided) expect(truthIds.has(r.id), `player ${r.id}`).toBe(false);
+  });
+  // AFLDB-ISSUE-118 §23.35 after-the-siren. after_siren_winner is exactly the
+  // linked kickers of premiership-season rows that scored (goal or behind) and
+  // WON the match after the final / end-of-extra-time siren: never a miss, a
+  // draw, another competition, or an unlinked kicker (migration 089).
+  it('after_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT player_id AS id FROM after_siren_kicks
+       WHERE premiership_season AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
+         AND siren IN ('final', 'end_of_extra_time')
+         AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+    `;
+    // §23.34 U.4: 64 qualifying rows over 62 kickers on the canonical load, of which
+    // one (Cameron Zurhaar, 2026, uncited and unresolved) is unlinked: 63 rows / 61 players.
+    expect(truth.length).toBeGreaterThanOrEqual(60);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const axis: GridAxisState = { builder: 'after_siren_winner', params: {} };
+    expect((await solveCellSummary(axis, any, 'games_asc')).eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    expect(rows).toHaveLength(truth.length);
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // The excluded shapes each exist in the data and qualify nobody by themselves:
+    // a draw, a miss, an other-competition winner, and an unlinked kicker.
+    const excluded = await sql<{ kind: string; ids: number[] }[]>`
+      SELECT 'drew' AS kind, array_agg(DISTINCT player_id) AS ids FROM after_siren_kicks WHERE kick_effect = 'drew' AND player_id IS NOT NULL
+      UNION ALL
+      SELECT 'miss', array_agg(DISTINCT player_id) FROM after_siren_kicks WHERE kick_effect = 'none' AND player_id IS NOT NULL
+      UNION ALL
+      SELECT 'other competition', array_agg(DISTINCT player_id) FROM after_siren_kicks WHERE NOT premiership_season AND kick_effect = 'won' AND player_id IS NOT NULL
+    `;
+    for (const e of excluded) {
+      expect(e.ids?.length ?? 0, e.kind).toBeGreaterThan(0);
+      const only = await sql<{ id: number }[]>`
+        SELECT DISTINCT player_id AS id FROM after_siren_kicks WHERE player_id = ANY(${e.ids})
+        EXCEPT SELECT player_id FROM after_siren_kicks WHERE premiership_season AND kick_scored <> 'none' AND kick_effect = 'won' AND player_id IS NOT NULL
+      `;
+      for (const r of only) expect(truthIds.has(r.id), `${e.kind}: player ${r.id}`).toBe(false);
+    }
+    const [unlinked] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM after_siren_kicks WHERE player_id IS NULL AND premiership_season AND kick_effect = 'won'`;
+    expect(unlinked.n).toBeGreaterThan(0);
+    // Luke Shuey's 2017 elimination-final goal after the end-of-extra-time siren
+    // (§23.33 adjudication asr-adj-001) qualifies; David King's 1994 miss before
+    // extra time (asr-adj-002, siren = end_of_regulation) does not.
+    const named = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/L/Luke_Shuey.html', 'players/D/David_King0.html')
+    `;
+    const byProfile = Object.fromEntries(named.map((r) => [r.profile, r.playerId]));
+    expect(byProfile['players/L/Luke_Shuey.html']).toBeDefined();
+    expect(truthIds.has(byProfile['players/L/Luke_Shuey.html'])).toBe(true);
+    const [king] = await sql<{ siren: string; effect: string }[]>`
+      SELECT siren::text, kick_effect::text AS effect FROM after_siren_kicks WHERE season = 1994 AND player_name_clean = 'David King'
+    `;
+    expect(king).toEqual({ siren: 'end_of_regulation', effect: 'none' });
   });
 
   it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {

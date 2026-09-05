@@ -12,16 +12,18 @@
  * the table does not know is reported as unrecognised, and each rule pins
  * the title it was written against so a redefinition upstream fails loudly
  * instead of silently mapping to the old meaning. Where AFLDB holds no data
- * for a question (coaches, birthplace, height, siblings, a medal AFLDB does
- * not record) the rule says so explicitly with the reason, so the corpus
- * denominator never loses a row.
+ * for a question (coaches, birthplace, siblings, a medal AFLDB does not
+ * record) the rule says so explicitly with the reason, so the corpus
+ * denominator never loses a row. That status is a diagnostic, not a pass:
+ * the issue's acceptance is zero unsupported valid criteria, and the corpus
+ * regression fails on any of them unless run in diagnostic mode.
  *
  * Every id of AFLDB's own (club organizations, venues, awards, players) is
  * resolved through injected lookups, so this file stays pure and the
  * integration suite decides where the ids come from.
  *
  * Semantics were settled against Gridley's descriptions and its per-cell
- * answer keys; the decisions are recorded in issues/open/AFLDB-ISSUE-118.md.
+ * answer keys; the decisions are recorded in issues/closed/AFLDB-ISSUE-118.md.
  */
 
 import { GRID_BUILDERS, isAxisComplete, type GridAxisState } from '@/search/grid-solver-spec';
@@ -47,6 +49,12 @@ export type GridleyPlayerRef = {
   champId: number | null;
 };
 
+export type GridleyCoachRef = {
+  criterionId: string;
+  /** The coach's name as Gridley titles the criterion (upper case, e.g. "JOHN WORSFOLD"). */
+  name: string;
+};
+
 export type GridleyLookups = {
   /** club_organizations.slug -> id */
   clubs: Record<string, number>;
@@ -56,6 +64,8 @@ export type GridleyLookups = {
   awards: Record<string, number>;
   /** AFLDB players.id for a player-valued criterion, or null when unresolvable. */
   resolvePlayer: (ref: GridleyPlayerRef) => number | null;
+  /** AFLDB coaches.id for a coach-valued criterion (exactly one coach of that name), or null. */
+  resolveCoach: (ref: GridleyCoachRef) => number | null;
 };
 
 export type GridleyUnsupportedCategory =
@@ -166,18 +176,11 @@ const WESTERN_DERBY: [string, string] = ['west-coast', 'fremantle'];
 const QCLASH: [string, string] = ['brisbane-lions', 'gold-coast'];
 const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 
-const NO_COACHES = 'AFLDB has no coaching data (no coaches table anywhere in the schema)';
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
-const NO_HEIGHT = 'players.height_cm is unpopulated for every player; draft_picks.height_cm covers only drafted players, so the population cannot be answered honestly';
-const NO_SIBLINGS = 'player_relationships (migration 006) has never been populated on any environment';
-const NO_FATHER_LINK = 'father_son_selections has never been populated; draft_picks.signing_kind names the son, not the father';
 const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin column';
 const NO_OTHER_CODE = 'other-code (NFL) careers and International Rules representation are not modelled';
-const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner cannot be derived';
 const NO_SPOILS = 'spoils are not a recorded AFLDB statistic (one_percenters is a different measure)';
-const NO_DOB = 'players.dob is populated for under 7% of players, so age on debut cannot be answered honestly';
 const NO_RECRUITER = 'recruiters and list managers are not modelled';
-const noAward = (name: string) => `AFLDB has no "${name}" award rows (awards table)`;
 
 /**
  * Every non-player Gridley criterion id seen in the corpus, keyed by id.
@@ -381,8 +384,8 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   premier4x: fixed('4x PREMIERSHIP', mapped('premierships_min', { times: '4' })),
   'premier1-2010s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2010', to: '2019' })),
   'premier1-2020s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2020', to: '2029' })),
-  premcaptain: fixed('PREMIERSHIP', mapped('premiership_captain', {}, 'captaincies has no Geelong, Hawthorn or West Coast rows')),
-  premcoach: fixed('PREMIERSHIP', absent(NO_COACHES)),
+  premcaptain: fixed('PREMIERSHIP', mapped('premiership_captain')),
+  premcoach: fixed('PREMIERSHIP', mapped('premiership_coach')),
   bestfairestpremyear: fixed('B&F + PREMIERSHIP', mapped('best_and_fairest_in_premiership_season')),
 
   // -- venues ---------------------------------------------------------------
@@ -410,34 +413,34 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   'showdown-won-1': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_won_min', { clubA, clubB, times: '1' }))),
   'showdown-goals-1': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'showdown-tackles-5': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
-  'showdown-medal': fixed('SHOWDOWN', absent(noAward('Showdown Medal'))),
+  'showdown-medal': rule('SHOWDOWN', withAward('showdown-medal', (award) => mapped('award_winner', { award }))),
   'derby-playedin-10': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '10' }))),
   'derby-goals-1': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'derby-tackles-5': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
   'derby-winning-record': rule('WINNING RECORD', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_winning_record', { clubA, clubB }))),
-  glendenning: fixed('GLENDINNING', absent(noAward('Glendinning-Allan Medal'))),
+  glendenning: rule('GLENDINNING', withAward('glendinning-allan-medal', (award) => mapped('award_winner', { award }))),
   'qclash-playedin-3': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '3' }))),
   'qclash-playedin-5': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '5' }))),
   'qclash-playedin-10': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '10' }))),
   'qclash-goals-1': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
-  'qclash-medal': fixed('MARCUS ASHCROFT', absent(noAward('Marcus Ashcroft Medal'))),
+  'qclash-medal': rule('MARCUS ASHCROFT', withAward('marcus-ashcroft-medal', (award) => mapped('award_winner', { award }))),
   'battleofthebridge-playedin-1': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '1' }))),
   'battleofthebridge-playedin-3': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '3' }))),
   'battleofthebridge-goals-1': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'battleofthebridge-tackles-5': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
-  'battleofthebridge-medal': fixed('BRETT KIRK', absent(noAward('Brett Kirk Medal'))),
+  'battleofthebridge-medal': rule('BRETT KIRK', withAward('brett-kirk-medal', (award) => mapped('award_winner', { award }))),
   'anzac-playedin-1': fixed('ANZAC DAY MATCH', mapped('match_event_played', { event: 'Anzac Day' })),
   'anzac-won-1': fixed('ANZAC DAY MATCH', mapped('match_event_won', { event: 'Anzac Day' })),
-  anzacmedal: fixed('ANZAC', absent(noAward('Anzac Medal'))),
+  anzacmedal: rule('ANZAC', withAward('anzac-medal', (award) => mapped('award_winner', { award }))),
   'dreamtime-playedin-1': fixed(["DREAMTIME AT THE 'G", 'DREAMTIME MATCH'], mapped('match_event_played', { event: "Dreamtime at the 'G" })),
   'bigfreeze-playedin-1': fixed('BIG FREEZE MATCH', mapped('match_event_played_between', { event: "King's Birthday", from: '2015', to: '2099' })),
   'gatherround-playedin-1': fixed('GATHER ROUND', mapped('gather_round_played')),
   'gatherround-goals-1': fixed('GATHER ROUND', mapped('gather_round_game_stat_min', { stat: 'goals', x: '1' })),
 
   // -- captaincy -------------------------------------------------------------
-  // captaincies covers 15 of the 18 clubs (no Geelong, Hawthorn or West Coast
-  // rows on any environment): answerable, but partially, and said so.
-  captain: fixed('CLUB CAPTAIN', mapped('club_captain_any', {}, 'captaincies has no Geelong, Hawthorn or West Coast rows')),
+  // captaincies covers every club lineage since AFLDB-ISSUE-118 §23.21 (the six
+  // the bootstrap lacked were transcribed from the Wikipedia captain lists).
+  captain: fixed('CLUB CAPTAIN', mapped('club_captain_any')),
 
   // -- Brownlow --------------------------------------------------------------
   brownlow: fixed('BROWNLOW', mapped('brownlow_medallist')),
@@ -450,13 +453,16 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   brownlowOver25: fixed('WON BROWNLOW', mapped('brownlow_winner_votes_min', { votes: '25' })),
 
   // -- awards and honours ----------------------------------------------------
-  allAus1953: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner', { award }))),
-  allAus2x: rule('2x ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_min_times', { award, times: '2' }))),
-  allAus3x: rule('3x ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_min_times', { award, times: '3' }))),
-  allAus1990s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '1990', to: '1999' }))),
-  allAus2000s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2000', to: '2009' }))),
-  allAus2010s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2010', to: '2019' }))),
-  allAus2020s: rule('ALL AUSTRALIAN', withAward('all-australian', (award) => mapped('award_winner_between_seasons', { award, from: '2020', to: '2029' }))),
+  // The FINAL team (AFLDB award all-australian: 1953-1988 carnival teams,
+  // 1982-1990 VFL Team of the Year, 1991+ selected teams), never the
+  // 40-man squad. Dedicated builders; repeats count distinct seasons.
+  allAus1953: fixed('ALL AUSTRALIAN', mapped('all_australian_team')),
+  allAus2x: fixed('2x ALL AUSTRALIAN', mapped('all_australian_team_min_times', { times: '2' })),
+  allAus3x: fixed('3x ALL AUSTRALIAN', mapped('all_australian_team_min_times', { times: '3' })),
+  allAus1990s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '1990', to: '1999' })),
+  allAus2000s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2000', to: '2009' })),
+  allAus2010s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2010', to: '2019' })),
+  allAus2020s: fixed('ALL AUSTRALIAN', mapped('all_australian_team_between_seasons', { from: '2020', to: '2029' })),
   allAusDef: fixed('ALL AUSTRALIAN', mapped('all_australian_defender')),
   allAusFwd: fixed('ALL AUSTRALIAN', mapped('all_australian_forward')),
   allAusMid: fixed('ALL AUSTRALIAN', mapped('all_australian_midfielder')),
@@ -471,8 +477,8 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   aflpamvp: rule('AFLPA MVP', withAward('aflpa-mvp', (award) => mapped('award_winner', { award }))),
   '22under22': fixed('22 UNDER 22', mapped('under_22_selection')),
   hof: fixed('HALL OF FAME', mapped('hall_of_fame_player')),
-  moty: fixed('MARK OF THE YEAR', absent(noAward('Mark of the Year'))),
-  goty: fixed('GOAL OF THE YEAR', absent(noAward('Goal of the Year'))),
+  moty: rule('MARK OF THE YEAR', withAward('mark-of-the-year', (award) => mapped('award_winner', { award }))),
+  goty: rule('GOAL OF THE YEAR', withAward('goal-of-the-year', (award) => mapped('award_winner', { award }))),
 
   // -- draft and recruitment -------------------------------------------------
   pick1: fixed('PICK 1', mapped('national_draft_pick_between', { from: '1', to: '1' })),
@@ -482,7 +488,15 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   traded1: fixed('TRADED', mapped('traded_min_times', { times: '1' })),
   freeagent1: fixed('FREE AGENT', mapped('draft_type_is', { draftType: 'Free Agency' })),
   fatherson: fixed('FATHER SON PICK', mapped('recruited_via', { signingKind: 'Father-Son' })),
-  fathersonfather: fixed('FATHER OF', absent(NO_FATHER_LINK)),
+  // "Player has had a son selected under the Father-Son rule in the national
+  // draft (since 1986)": the FATHER of a father_son_selections row (ISSUE-118
+  // §23.29). The tracked list includes pre-draft and rookie-draft selections
+  // under the same rule; Gridley's own answers decide whether that is wider.
+  fathersonfather: fixed('FATHER OF', mapped('father_son_father')),
+  // "Has at least one brother who has played in the VFL/AFL." — an explicit
+  // canonical sibling row labelled brothers with both people linked (ISSUE-118
+  // §23.31); the relationship at any time, nothing about playing together.
+  brother: fixed('BROTHER', mapped('has_brother')),
   recruitedByDodoro: fixed('ADRIAN DODORO', absent(NO_RECRUITER)),
 
   // -- names and numbers -------------------------------------------------------
@@ -494,17 +508,31 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   worn25: fixed('WORN #25', mapped('jumper_number_worn', { number: '25' })),
   worn35: fixed('WORN #35', mapped('jumper_number_worn', { number: '35' })),
 
+  // -- biography ---------------------------------------------------------------
+  // Exact bounds on players.height_cm; an unknown height never qualifies.
+  // The column is filled from the AFL Tables player register through
+  // player_height_evidence (ISSUE-118 Stage H2, tools/migration/
+  // enrich_heights.py); a player the register does not cover stays NULL
+  // and is reported by the corpus regression, never guessed.
+  height195: fixed('195cm', mapped('height_min', { cm: '195' })),
+  height180: fixed('180cm', mapped('height_max', { cm: '180' })),
+  // "22+ YEARS OLD / ON DEBUT": completed years on debut day, from players.dob
+  // (fitzRoy per-match dates plus the AFL Tables all-time club lists, ISSUE-118
+  // Stage D1, tools/migration/enrich_birth_dates_afltables.py) and the derived
+  // player_career_stats.debut_date. A player with no recorded date never
+  // qualifies and is reported by the corpus regression, never guessed.
+  debut22: fixed('22+ YEARS OLD', mapped('age_on_debut_min', { years: '22' })),
+
   // -- attributes AFLDB does not hold ------------------------------------------
-  height195: fixed('195cm', absent(NO_HEIGHT)),
-  height180: fixed('180cm', absent(NO_HEIGHT)),
-  brother: fixed('BROTHER', absent(NO_SIBLINGS)),
   irish: fixed('IRISH PLAYER', absent(NO_BIRTHPLACE)),
   tasmanian: fixed('TASMANIAN', absent(NO_BIRTHPLACE)),
   nfl: fixed('NFL 🏈', absent(NO_OTHER_CODE)),
   intrulesplayer: fixed("INT'L RULES", absent(NO_OTHER_CODE)),
-  debut22: fixed('22+ YEARS OLD', absent(NO_DOB)),
   season2024player: fixed('2024 LISTED PLAYER', absent(NO_LISTS)),
-  winaftersiren: fixed('GAME WINNING', absent(NO_TIMELINE)),
+  // "Kicked a Goal or Behind after the siren to win the game. Doesn't include
+  // missed shots, or shots to tie." — a canonical after_siren_kicks row that
+  // scored and won a premiership-season match (ISSUE-118 §23.35).
+  winaftersiren: fixed('GAME WINNING', mapped('after_siren_winner')),
 
   // -- the freebie ----------------------------------------------------------------
   'free-hit': fixed('FREE HIT', { status: 'freebie', reason: 'Gridley: "Select any player you like" -- every player qualifies' }),
@@ -532,7 +560,15 @@ function playerRef(item: GridleyItem, gridleyPlayerId: number | null): GridleyPl
  */
 function mapPlayerCriterion(ctx: RuleContext): GridleyMapping | null {
   const { item, lookups } = ctx;
-  if (COACHED_BY_RE.test(item.id)) return absent(NO_COACHES);
+  if (COACHED_BY_RE.test(item.id)) {
+    // "COACHED BY WORSFOLD", titled with the coach's full name. Resolved to a
+    // coaches row (the AFL Tables coach-page person), never to a player: the
+    // relationship is match_coaches, and the coach may never have played.
+    const id = lookups.resolveCoach({ criterionId: item.id, name: item.title.trim() });
+    return id === null
+      ? unresolved(`coach "${item.title}" (${item.id}) not resolved`)
+      : mapped('coached_by', { coach: String(id) });
+  }
 
   const gfOpp = GF_OPP_ID_RE.exec(item.id);
   if (gfOpp) {

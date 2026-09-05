@@ -356,9 +356,12 @@ ever published can be asked here. That corpus — 1,143 boards, 839
 distinct criteria, captured in `external_grids` and exported to
 `tests/fixtures/gridley/` — is mapped onto the catalogue by
 `src/search/gridley-compat.ts` and replayed through the production solver
-by `tests/integration/gridley-corpus.test.ts`; the criteria AFLDB cannot
-answer (player height, siblings, coaches, a handful of medals it does not
-record) are listed there with their reasons rather than approximated. Each compiles in
+by `tests/integration/gridley-corpus.test.ts`, which fails on any criterion
+AFLDB cannot answer (siblings, coaches, a handful of medals it does not
+record, and height until the column is populated) — those are listed with
+their reasons rather than approximated, and the issue stays open until the
+list is empty. The All-Australian final team and the 40-man squad are
+separate questions there, as they are separate awards. Each compiles in
 `src/db/queries/grid-solver.ts` to a fixed SQL shape with bound
 parameters; there is no request-selected column or operator at all here,
 so most of the catalogue needs no allowlist check beyond "is this a known

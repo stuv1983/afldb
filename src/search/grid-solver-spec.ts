@@ -33,7 +33,7 @@ import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
 
 export type GridParamKind =
   | 'integer' | 'decimal' | 'season' | 'club' | 'venue' | 'player' | 'stat'
-  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent' | 'text';
+  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent' | 'text' | 'coach';
 
 export type GridParamDef = {
   key: string;
@@ -142,6 +142,7 @@ export type GridBuilderDef = {
 const club = (label = 'Club'): GridParamDef => ({ key: 'club', label, kind: 'club' });
 const venue = (label = 'Venue'): GridParamDef => ({ key: 'venue', label, kind: 'venue' });
 const player = (label = 'Player'): GridParamDef => ({ key: 'player', label, kind: 'player' });
+const coach = (label = 'Coach'): GridParamDef => ({ key: 'coach', label, kind: 'coach' });
 const stat = (key = 'stat', label = 'Statistic'): GridParamDef => ({ key, label, kind: 'stat' });
 const int = (key: string, label: string): GridParamDef => ({ key, label, kind: 'integer' });
 const decimal = (key: string, label: string): GridParamDef => ({ key, label, kind: 'decimal' });
@@ -163,9 +164,11 @@ export const GRID_GROUP_ORDER = [
   'Rivalries & marquee matches',
   'Teammates',
   'Captaincy',
+  'Coaching',
   'Awards & honours',
   'Draft & recruitment',
   'Names & numbers',
+  'Biography',
 ] as const;
 
 // Phase A ships infrastructure only: the original 31 builders (unchanged
@@ -223,6 +226,11 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   games_with_stat_min_count: { key: 'games_with_stat_min_count', label: 'X+ games with Y+ of a stat', group: 'Single-game feats', params: [stat(), int('y', 'At least (per game)'), int('times', 'In this many games')] },
   // The feat achieved for X+ distinct clubs (organizations, by lineage).
   single_game_stat_multi_club_min: { key: 'single_game_stat_multi_club_min', label: 'X+ of a stat in one game, for Y+ clubs (mergers folded)', group: 'Single-game feats', params: [stat(), int('x', 'At least'), int('clubs', 'Clubs')] },
+  // AFLDB-ISSUE-118 §23.32–§23.35. A goal or behind kicked after the final
+  // siren (of the match, or of extra time) that WON a premiership-season
+  // match: a curated, cited after_siren_kicks row (migration 089) with the
+  // kicker canonically linked. Never a miss, a draw, or another competition.
+  after_siren_winner: { key: 'after_siren_winner', label: 'Won a game with a kick after the siren', group: 'Single-game feats', params: [] },
 
   // Season & era
   debuted_between: { key: 'debuted_between', label: 'Debuted between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },
@@ -324,6 +332,16 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   teammate_of: { key: 'teammate_of', label: 'Teammate of…', group: 'Teammates', params: [player()] },
   played_against: { key: 'played_against', label: 'Played against…', group: 'Teammates', params: [player()] },
 
+  // Coaching -- match_coaches is the coaching grain (ISSUE-118 §23.27): a
+  // player was coached by X when they played a match for a club while X was
+  // that club's coach for that exact match. Caretakers and mid-season
+  // changes need no special case; there are no season ranges to get wrong.
+  coached_by: { key: 'coached_by', label: 'Coached by…', group: 'Coaching', params: [coach()] },
+  // A player who, as a coach, coached the winning club in a Grand Final.
+  // Derived from the Grand Final result and that match's coaching
+  // assignment through the coach's proven player link; nothing stored.
+  premiership_coach: { key: 'premiership_coach', label: 'Premiership coach', group: 'Coaching', params: [] },
+
   // Captaincy -- club_captain/captain_between_seasons kept their original
   // keys and behaviour from V1 but are relabelled here: they were always
   // "captain of a specific club" and "captain of any club in a season
@@ -370,12 +388,26 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // Position groups over the 1991+ named All-Australian positions: the
   // back six, the forward six and the four on-ball positions. Ruck and
   // interchange belong to no group, matching the source's own wording.
-  all_australian_defender: { key: 'all_australian_defender', label: 'All-Australian defender', group: 'Awards & honours', params: [] },
-  all_australian_forward: { key: 'all_australian_forward', label: 'All-Australian forward', group: 'Awards & honours', params: [] },
-  all_australian_midfielder: { key: 'all_australian_midfielder', label: 'All-Australian midfielder', group: 'Awards & honours', params: [] },
-  // The 40/44-man squad: AFLDB's all-australian-squad rows are the members
-  // NOT selected in the final team, so the squad is those plus the team.
-  all_australian_squad_in_season: { key: 'all_australian_squad_in_season', label: 'All-Australian squad member in season', group: 'Awards & honours', params: [season('season', 'Season')] },
+  all_australian_defender: { key: 'all_australian_defender', label: 'All-Australian final-team defender (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_forward: { key: 'all_australian_forward', label: 'All-Australian final-team forward (1991 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_midfielder: { key: 'all_australian_midfielder', label: 'All-Australian final-team midfielder (1991 onwards)', group: 'Awards & honours', params: [] },
+  // The final All-Australian team itself (award slug all-australian): the
+  // selected side of 20-22 each season, 1953 onwards, with the 1953-1988
+  // carnival teams and the 1982-1990 VFL Team of the Year in the same
+  // award -- exactly Gridley's definition. NOT the 40/44-man squad, which
+  // is a separate award below. Dedicated builders so the page never
+  // relies on finding "All-Australian Team" inside the generic award
+  // dropdown (it sits under the honour_team group there, not award).
+  // Repeat selections count DISTINCT seasons: the 1984 team lists nine
+  // players under both their club and their state (two rows, one honour).
+  all_australian_team: { key: 'all_australian_team', label: 'All-Australian final team (1953 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_team_min_times: { key: 'all_australian_team_min_times', label: 'All-Australian final team, X+ times', group: 'Awards & honours', params: [int('times', 'Times')] },
+  all_australian_team_between_seasons: { key: 'all_australian_team_between_seasons', label: 'All-Australian final team, between seasons', group: 'Awards & honours', params: [season('from', 'From season'), season('to', 'To season')] },
+  // The 40/44-man squad (award slug all-australian-squad, 2007 onwards):
+  // AFLDB's squad rows are the members NOT selected in the final team, so
+  // a squad member is a squad row OR a final-team row in a squad-era season.
+  all_australian_squad_member: { key: 'all_australian_squad_member', label: 'All-Australian 40-man squad member (2007 onwards)', group: 'Awards & honours', params: [] },
+  all_australian_squad_in_season: { key: 'all_australian_squad_in_season', label: 'All-Australian 40-man squad member, in season', group: 'Awards & honours', params: [season('season', 'Season')] },
   best_and_fairest_in_premiership_season: { key: 'best_and_fairest_in_premiership_season', label: 'Club best and fairest in a premiership season', group: 'Awards & honours', params: [] },
 
   // Draft & recruitment -- linked rows only (link_status_value IN
@@ -387,6 +419,14 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   drafted_by_club_never_played: { key: 'drafted_by_club_never_played', label: 'Drafted by club, never played there', group: 'Draft & recruitment', params: [club()] },
   recruited_via: { key: 'recruited_via', label: 'Recruited from…', group: 'Draft & recruitment', params: [signingKind()] },
   traded_min_times: { key: 'traded_min_times', label: 'Traded X+ times', group: 'Draft & recruitment', params: [int('times', 'Times')] },
+  // AFLDB-ISSUE-118 §23.29. The AFL father–son rule, from father_son_selections
+  // (the tracked, normalised Wikipedia list; every person linked only through
+  // an AFL Tables profile path). father_son_selection is the SON — a player
+  // selected under the rule (national or rookie draft, or a pre-draft
+  // selection); father_son_father is the FATHER — a player whose son was so
+  // selected. Linked rows only, the draft and Hall of Fame rule.
+  father_son_selection: { key: 'father_son_selection', label: 'Father–son selection', group: 'Draft & recruitment', params: [] },
+  father_son_father: { key: 'father_son_father', label: 'Father of a father–son selection', group: 'Draft & recruitment', params: [] },
   // National draft only (draft_kind = 'national'), unlike draft_pick_between
   // which spans every draft kind -- "pick 1 in the National Draft".
   national_draft_pick_between: { key: 'national_draft_pick_between', label: 'National Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },
@@ -395,6 +435,20 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   given_name_in: { key: 'given_name_in', label: 'First name is one of…', group: 'Names & numbers', params: [text('names', 'Names (comma-separated)')] },
   surname_hyphenated: { key: 'surname_hyphenated', label: 'Hyphenated surname', group: 'Names & numbers', params: [] },
   jumper_number_worn: { key: 'jumper_number_worn', label: 'Wore guernsey number', group: 'Names & numbers', params: [int('number', 'Number')] },
+
+  // Biography -- players.height_cm. NULL means unknown and never qualifies
+  // on either side of the bound; an unknown height is not a short one.
+  height_min: { key: 'height_min', label: 'Height X cm or taller', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  height_max: { key: 'height_max', label: 'Height X cm or shorter', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  // Age on debut in completed years, from players.dob and the derived
+  // player_career_stats.debut_date (AFLDB-ISSUE-118 §23.24/§23.25). Either
+  // unknown and the player never qualifies: an unknown age is not a young one.
+  age_on_debut_min: { key: 'age_on_debut_min', label: 'Aged X or older on debut', group: 'Biography', params: [int('years', 'Years')] },
+  // AFLDB-ISSUE-118 §23.31. A player with at least one brother who played VFL/AFL:
+  // an explicit canonical `sibling` row in player_relationships (the tracked,
+  // normalised Wikipedia football-families export) labelled brothers, both sides
+  // linked through an AFL Tables profile path, the brother with a match played.
+  has_brother: { key: 'has_brother', label: 'Brother played VFL/AFL', group: 'Biography', params: [] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

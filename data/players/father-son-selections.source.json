@@ -1,0 +1,18 @@
+{
+  "wikipedia_title": "Father–son rule",
+  "wikipedia_pageid": 4274230,
+  "revision_id": 1370239415,
+  "revision_timestamp": "2026-08-19T23:51:53Z",
+  "section": "List of father–son selections (VFL/AFL)",
+  "raw_rows": 127,
+  "raw_file": "data/players/father-son/vfl-afl.csv",
+  "games_last_updated_note": "Games Played last updated 12/10/2025 (the list's own trailer row)",
+  "normalised_on": "2026-09-05",
+  "measures": {
+    "selections": 127,
+    "sons_linked": 99,
+    "fathers_linked": 123,
+    "distinct_fathers_linked": 107,
+    "distinct_sons_linked": 99
+  }
+}

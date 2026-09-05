@@ -1875,7 +1875,7 @@ describe.skipIf(!canRunAllAustralianImporter)(
         .map((line) => splitCsv(line)[5])
         .filter((cell) => cell !== '')
         .map(Number);
-      expect(manifestPlayerIds).toHaveLength(1078);
+      expect(manifestPlayerIds).toHaveLength(1164);
       // AFLDB-ISSUE-112 §24.5: a link survives only where the bootstrap id
       // RESOLVES to this database's player through the tracked identity
       // census — not merely where some row happens to hold that integer.
@@ -1925,7 +1925,7 @@ describe.skipIf(!canRunAllAustralianImporter)(
       return { ...row, dupPairs: dup };
     }
 
-    it('reloads the full 1,158-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
+    it('reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset', async () => {
       const [before] = await sql<{ id: string }[]>`
         SELECT coalesce(max(id), 0)::text AS id FROM import_batches
       `;
@@ -1950,19 +1950,19 @@ describe.skipIf(!canRunAllAustralianImporter)(
       `;
       expect(batch, 'the all_australian batch must be recorded').toBeDefined();
       expect(batch.status).toBe('completed');
-      // 1,158 selections + the 1 award definition (§24).
-      expect(Number(batch.recordsRead)).toBe(1159);
+      // 1,244 selections + the 1 award definition (§24; ISSUE-118 §23.14 added 86).
+      expect(Number(batch.recordsRead)).toBe(1245);
       expect(Number(batch.recordsRejected)).toBe(0);
 
       const counts = await scopedCount();
       expect(counts).toMatchObject({
-        total: 1158, draftguru: 906, wikipedia: 252, seasons: 53,
-        captains: 34, vices: 21, rows1984: 48, dupPairs: 10,
+        total: 1244, draftguru: 906, wikipedia: 338, seasons: 53,
+        captains: 34, vices: 21, rows1984: 48, dupPairs: 38,
       });
       // Every selection whose player_id this DB can resolve is linked, and
       // only the unresolvable ones are not.
       expect(counts.linked).toBe(expectedLinked);
-      expect(counts.unlinked).toBe(1158 - expectedLinked);
+      expect(counts.unlinked).toBe(1244 - expectedLinked);
     }, 120_000);
 
     it('re-resolves each era identity from the source club string, season-aware', async () => {
@@ -2131,7 +2131,7 @@ describe.skipIf(!canRunAllAustralianImporter)(
            AND source_id IN (${draftguruId}, ${wikipediaId})
            AND player_id IS NULL
       `;
-      expect(unlinked).toHaveLength(1158 - expectedLinked);
+      expect(unlinked).toHaveLength(1244 - expectedLinked);
       for (const row of unlinked) {
         expect(['unmatched', 'implausible', 'ambiguous']).toContain(row.status);
       }

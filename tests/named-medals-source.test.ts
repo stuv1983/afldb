@@ -151,19 +151,19 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     expect(result.stderr).toBe('');
     expect(result.payload).toMatchObject({
       ok: true,
-      winner_count: 979,
-      definition_count: 17,
-      linked_count: 863,
+      winner_count: 1307,
+      definition_count: 24,
+      linked_count: 1191,
       unlinked_count: 116,
       votes_present: 53,
-      note_present: 865,
+      note_present: 1109,
       null_club: 299,
-      season_min: 1976,
+      season_min: 1970,
       season_max: 2025,
-      distinct_seasons: 50,
-      distinct_awards: 17,
+      distinct_seasons: 56,
+      distinct_awards: 24,
       link_status: {
-        implausible: 10, resolved: 812, unique: 51, unmatched: 106,
+        implausible: 10, resolved: 812, unique: 379, unmatched: 106,
       },
     });
   });
@@ -217,8 +217,8 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
   it('carries the source_record_id verbatim as source_key — namespaced per award, strictly ascending, unique', () => {
     const rows = winnerLines.slice(1).map(parseCsvLine);
     const keys = rows.map((cells) => cells[W.sourceKey]);
-    expect(keys).toHaveLength(979);
-    expect(new Set(keys).size).toBe(979);
+    expect(keys).toHaveLength(1307);
+    expect(new Set(keys).size).toBe(1307);
     expect(keys).toEqual([...keys].sort());
     for (const cells of rows) {
       const key = cells[W.sourceKey];
@@ -232,7 +232,7 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
   it('records a votes tally only on Brownlow rows, and those carry no note', () => {
     for (const line of winnerLines.slice(1)) {
       const cells = parseCsvLine(line);
-      expect(cells[W.sourceCitation]).toBe('draftguru');
+      expect(['draftguru', 'wikipedia']).toContain(cells[W.sourceCitation]);
       if (cells[W.awardSlug] === 'brownlow-medal') {
         expect(cells[W.votes]).toMatch(/^\d+\.\d{2}$/);
         expect(cells[W.note]).toBe('');
@@ -255,7 +255,7 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
       const [low, high] = spans.get(cells[W.awardSlug]) ?? [season, season];
       spans.set(cells[W.awardSlug], [Math.min(low, season), Math.max(high, season)]);
     }
-    expect(spans.size).toBe(17);
+    expect(spans.size).toBe(24);
     for (const [slug, [first, last]] of spans) {
       const def = defBySlug.get(slug);
       expect(def, `${slug} must have a definition`).toBeDefined();
@@ -326,7 +326,7 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     const result = runChecker({ csv: writeVariant([WINNERS_HEADER, W1, W2]) });
     expect(result.payload.ok).toBe(false);
     expect(result.payload.error).toEqual(
-      expect.stringMatching(/expected 979 named-medal winner rows, got 2/),
+      expect.stringMatching(/expected 1307 named-medal winner rows, got 2/),
     );
     expect(result.payload.error).not.toEqual(
       expect.stringMatching(/duplicate natural identity/),
@@ -339,18 +339,18 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     const result = runChecker({ csv: writeVariant([WINNERS_HEADER, kennedyA, kennedyB]) });
     expect(result.payload.ok).toBe(false);
     expect(result.payload.error).toEqual(
-      expect.stringMatching(/expected 979 named-medal winner rows, got 2/),
+      expect.stringMatching(/expected 1307 named-medal winner rows, got 2/),
     );
     expect(result.payload.error).not.toEqual(
       expect.stringMatching(/duplicate natural identity/),
     );
   });
 
-  it('rejects a season outside the declared 1976-2025 range', () => {
+  it('rejects a season outside the declared 1970-2025 range', () => {
     const row = replaceCell(
-      replaceCell(W1, W.season, '1975'), W.sourceKey, 'magarey-medal:1975:1',
+      replaceCell(W1, W.season, '1969'), W.sourceKey, 'magarey-medal:1969:1',
     );
-    expectWinnersRejected([WINNERS_HEADER, row], /season 1975 is outside the declared range 1976-2025/);
+    expectWinnersRejected([WINNERS_HEADER, row], /season 1969 is outside the declared range 1970-2025/);
   });
 
   it('rejects an unknown club', () => {
@@ -364,7 +364,7 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     const result = runChecker({ csv: writeVariant([WINNERS_HEADER, linkless]) });
     expect(result.payload.ok).toBe(false);
     expect(result.payload.error).toEqual(
-      expect.stringMatching(/expected 979 named-medal winner rows, got 1/),
+      expect.stringMatching(/expected 1307 named-medal winner rows, got 1/),
     );
     expect(result.payload.error).not.toEqual(expect.stringMatching(/club/));
   });
@@ -409,9 +409,9 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     expectWinnersRejected([WINNERS_HEADER, row], /votes '25' is not of the measured form 'NN.NN'/);
   });
 
-  it('rejects a source_citation other than draftguru', () => {
-    const row = replaceCell(W1, W.sourceCitation, 'wikipedia');
-    expectWinnersRejected([WINNERS_HEADER, row], /source_citation 'wikipedia' must be 'draftguru'/);
+  it('rejects a source_citation outside the declared vocabulary', () => {
+    const row = replaceCell(W1, W.sourceCitation, 'footywire');
+    expectWinnersRejected([WINNERS_HEADER, row], /source_citation 'footywire' must be one of/);
   });
 
   it('rejects a note with a leading space', () => {
@@ -419,13 +419,13 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     expectWinnersRejected([WINNERS_HEADER, row], /note has leading or trailing whitespace/);
   });
 
-  it('rejects a truncated winners file (row count short of 979)', () => {
-    expectWinnersRejected([WINNERS_HEADER, W1, W2], /expected 979 named-medal winner rows, got 2/);
+  it('rejects a truncated winners file (row count short of 1307)', () => {
+    expectWinnersRejected([WINNERS_HEADER, W1, W2], /expected 1307 named-medal winner rows, got 2/);
   });
 
   it('rejects a winners file missing an award entirely', () => {
     const lines = winnerLines.filter((line) => !line.startsWith('gary-ayres-award:'));
-    expectWinnersRejected(lines, /expected 979 named-medal winner rows, got 969/);
+    expectWinnersRejected(lines, /expected 1307 named-medal winner rows, got 1297/);
   });
 
   // ---- definitions file ----
@@ -459,7 +459,7 @@ describe('canonical named-medals source (AFLDB-ISSUE-112 phase 7)', () => {
     );
   });
 
-  it('rejects a definitions file missing one of the 17 named-medal awards', () => {
+  it('rejects a definitions file missing one of the 24 named-medal awards', () => {
     const lines = definitionLines.filter((line) => !line.startsWith('gary-ayres-award,'));
     expectDefinitionsRejected(lines, /missing \['gary-ayres-award'\]/);
   });
@@ -509,7 +509,7 @@ describe('named_medals group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 7)', (
     );
   });
 
-  it('reloads the 17 definitions on slug (scoped to those slugs) and the winners on (source_id, source_record_id)', () => {
+  it('reloads the 24 definitions on slug (scoped to those slugs) and the winners on (source_id, source_record_id)', () => {
     const body = source.slice(
       source.indexOf('def import_named_medals('),
       source.indexOf('# Group: AFLPA 22 Under 22'),
@@ -518,7 +518,7 @@ describe('named_medals group is legacy-SQLite-free (AFLDB-ISSUE-112 phase 7)', (
     expect(body).toContain('scope_column="slug", scope_values=[d.slug for d in definitions]');
     expect(body).toContain('pg, "award_winners", ["source_id", "source_record_id"]');
     expect(body).toContain('scope_column="award_id", scope_values=named_medal_award_ids');
-    expect(body).toContain('scopes=[("source_id", [source_id], False)]');
+    expect(body).toContain('scopes=[("source_id", sorted(source_ids.values()), False)]');
     expect(body).toContain('target_table="award_winners"');
   });
 

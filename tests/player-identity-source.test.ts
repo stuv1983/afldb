@@ -129,18 +129,20 @@ describe('awards player-identity census (AFLDB-ISSUE-112 §24.5)', () => {
     expect(result.status).toBe(0);
     expect(result.stderr).toBe('');
     expect(result.payload.ok).toBe(true);
-    expect(result.payload.player_count).toBe(1738);
-    expect(result.payload.with_identity).toBe(1720);
-    expect(result.payload.without_identity).toBe(18);
+    expect(result.payload.player_count).toBe(1863);
+    expect(result.payload.with_identity).toBe(1851);
+    expect(result.payload.without_identity).toBe(12);
   });
 
   it('enumerates the players with no rebuild-stable identity rather than hiding them', () => {
-    // 18 players / 33 manifest rows. Their rows load UNLINKED and are reported
+    // 12 players (18 before AFLDB-ISSUE-118 §23.21 censused six Fitzroy captains).
+    // Their rows load UNLINKED and are reported
     // by the loader; re-linking them is a curator decision, not a parser rule.
     const listed = runChecker().payload.without_identity_players as
       Array<{ player_id: number; display_name: string }>;
-    expect(listed).toHaveLength(18);
-    expect(listed.map((p) => p.player_id)).toContain(2018);
+    expect(listed).toHaveLength(12);
+    expect(listed.map((p) => p.player_id)).toContain(124);
+    expect(listed.map((p) => p.player_id)).not.toContain(2018); // Kevin Murray, censused with a profile in §23.21
     expect(listed.every((p) => p.display_name.length > 0)).toBe(true);
   });
 
@@ -210,7 +212,7 @@ describe('awards player-identity census (AFLDB-ISSUE-112 §24.5)', () => {
   });
 
   it('refuses a truncated census rather than resolving half the family', () => {
-    expectRejected(canonicalLines.slice(0, -1), /expected 1738 censused players/);
+    expectRejected(canonicalLines.slice(0, -1), /expected 1863 censused players/);
   });
 
   it('refuses a census whose unlinkable population has changed', () => {
@@ -219,7 +221,7 @@ describe('awards player-identity census (AFLDB-ISSUE-112 §24.5)', () => {
     expect(withoutUrl).toBeGreaterThanOrEqual(0);
     expectRejected(withCell(withoutUrl, 'afltables_profile_url',
                             'players/Z/Invented_Person.html'),
-                   /expected 18 censused players with no rebuild-stable identity/);
+                   /expected 12 censused players with no rebuild-stable identity/);
   });
 });
 

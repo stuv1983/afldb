@@ -148,15 +148,15 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
     expect(result.stderr).toBe('');
     expect(result.payload).toMatchObject({
       ok: true,
-      row_count: 1375,
-      linked_count: 1375,
+      row_count: 1774,
+      linked_count: 1774,
       unlinked_count: 0,
       season_min: 1897,
       season_max: 2026,
       distinct_seasons: 130,
-      distinct_clubs: 18,
-      notes_present: 178,
-      roles: { Captain: 1375 },
+      distinct_clubs: 24,
+      notes_present: 179,
+      roles: { Captain: 1774 },
     });
   });
 
@@ -188,9 +188,9 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
 
   it('carries the source_record_id verbatim as source_key — 24 hex chars, strictly ascending', () => {
     const keys = canonicalLines.slice(1).map((line) => parseCsvLine(line)[COL.sourceKey]);
-    expect(keys).toHaveLength(1375);
+    expect(keys).toHaveLength(1774);
     for (const key of keys) expect(key).toMatch(/^[0-9a-f]{24}$/);
-    expect(new Set(keys).size).toBe(1375);
+    expect(new Set(keys).size).toBe(1774);
     const ascending = [...keys].sort();
     expect(keys).toEqual(ascending);
   });
@@ -231,8 +231,8 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
   });
 
   it('rejects an unknown club', () => {
-    const row = replaceCell(VALID_ROW, COL.club, 'Fitzroy');
-    expectRejected([HEADER, row], /unknown club 'Fitzroy'/);
+    const row = replaceCell(VALID_ROW, COL.club, 'Barcelona');
+    expectRejected([HEADER, row], /unknown club 'Barcelona'/);
   });
 
   it('rejects a role outside the declared vocabulary', () => {
@@ -270,11 +270,11 @@ describe('canonical captaincies source (AFLDB-ISSUE-112 phase 3)', () => {
     expectRejected([HEADER, row], /player has leading or trailing whitespace/);
   });
 
-  it('rejects a total row count short of the declared 1375', () => {
+  it('rejects a total row count short of the declared 1774', () => {
     // Dropping only the final row keeps every remaining row's ordering
     // valid, so this reaches the completeness check rather than an earlier
     // per-row rule.
-    expectRejected(canonicalLines.slice(0, -1), /expected 1375 captaincy rows, got 1374/);
+    expectRejected(canonicalLines.slice(0, -1), /expected 1774 captaincy rows, got 1773/);
   });
 });
 

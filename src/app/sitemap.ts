@@ -4,7 +4,7 @@ import { sql } from '@/db/client';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
-import { honourTeamSlug } from '@/lib/slugs';
+import { coachSlug, honourTeamSlug } from '@/lib/slugs';
 
 const baseUrl = siteUrl();
 
@@ -64,10 +64,16 @@ export default async function sitemap({
 
   // Segment 0: static routes plus the small reference collections.
   if (id === 0) {
-    const [clubs, seasons, venues] = await Promise.all([
+    const [clubs, seasons, venues, coaches] = await Promise.all([
       sql<{ slug: string }[]>`SELECT slug FROM clubs ORDER BY slug`,
       sql<{ year: number }[]>`SELECT year FROM seasons ORDER BY year`,
       sql<{ slug: string }[]>`SELECT slug FROM venues ORDER BY slug`,
+      // Coach-only people only: a coach who also played is reached through
+      // their player page, which /coaches/[slug] redirects to rather than
+      // duplicating -- see AFLDB-ISSUE-118 §W.4.
+      sql<{ id: number; displayName: string }[]>`
+        SELECT id, display_name AS "displayName" FROM coaches WHERE player_id IS NULL
+      `,
     ]);
 
     return [
@@ -80,6 +86,7 @@ export default async function sitemap({
       { url: `${baseUrl}/awards`, changeFrequency: 'weekly', priority: 0.8 },
       { url: `${baseUrl}/draft`, changeFrequency: 'weekly', priority: 0.7 },
       { url: `${baseUrl}/venues`, changeFrequency: 'monthly', priority: 0.7 },
+      { url: `${baseUrl}/coaches`, changeFrequency: 'monthly', priority: 0.6 },
       { url: `${baseUrl}/match-search`, changeFrequency: 'monthly', priority: 0.8 },
       { url: `${baseUrl}/players/compare`, changeFrequency: 'monthly', priority: 0.5 },
       { url: `${baseUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
@@ -97,6 +104,11 @@ export default async function sitemap({
         url: `${baseUrl}/venues/${v.slug}`,
         changeFrequency: 'monthly' as const,
         priority: 0.5,
+      })),
+      ...coaches.map((c) => ({
+        url: `${baseUrl}/coaches/${coachSlug(c.displayName)}-${c.id}`,
+        changeFrequency: 'monthly' as const,
+        priority: 0.4,
       })),
     ];
   }

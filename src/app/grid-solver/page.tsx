@@ -8,6 +8,7 @@ import { Pagination } from '@/components/Pagination';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { getClubOrganizationOptions, getVenueOptions } from '@/db/queries/advanced-search';
 import { getAwardOptions } from '@/db/queries/awards';
+import { getCoachOptions } from '@/db/queries/coaches';
 import { createAxisSetCache, guardCellTimeout, solveCellRows, solveCellSummary, type GridCellOutcome, type GridCellSummary } from '@/db/queries/grid-solver';
 import { getPlayerNames } from '@/db/queries/players';
 import { getSiteSettings } from '@/db/queries/site-settings';
@@ -63,15 +64,17 @@ export default async function GridSolverPage({
     .map((a) => Number(a.params.player))
     .filter((id) => Number.isSafeInteger(id) && id > 0);
 
-  const [clubOptions, venueOptions, awardOptions, playerNames] = await Promise.all([
+  const [clubOptions, venueOptions, awardOptions, coachOptions, playerNames] = await Promise.all([
     getClubOrganizationOptions(),
     getVenueOptions(),
     getAwardOptions(),
+    getCoachOptions(),
     getPlayerNames(axisPlayerIds),
   ]);
   const clubNames = new Map(clubOptions.map((c) => [c.id, c.name]));
   const venueNames = new Map(venueOptions.map((v) => [v.id, v.name]));
   const awardNames = new Map(awardOptions.map((a) => [a.id, a.name]));
+  const coachNames = new Map(coachOptions.map((c) => [c.id, c.name]));
 
   // Solve every cell whose row and column are both fully specified --
   // an incomplete axis just says "define both axes", the same first-load
@@ -124,7 +127,7 @@ export default async function GridSolverPage({
     : null;
   const drillDown = drillDownOutcome?.status === 'solved' ? drillDownOutcome.value : null;
 
-  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames };
+  const lookups = { clubs: clubNames, venues: venueNames, players: playerNames, awards: awardNames, coaches: coachNames };
   const defined = cells.flat().filter((cell) => cell?.status === 'solved').length;
 
   // The board and its controls reorder and collapse like any other stack of
@@ -143,6 +146,7 @@ export default async function GridSolverPage({
                 clubs={clubOptions}
                 venues={venueOptions}
                 awards={awardOptions}
+                coaches={coachOptions}
                 playerNames={Object.fromEntries(playerNames)}
               />
             </div>
@@ -300,7 +304,7 @@ function describeAxis(
   axis: GridAxisState,
   lookups: {
     clubs: Map<number, string>; venues: Map<number, string>;
-    players: Map<number, string>; awards: Map<number, string>;
+    players: Map<number, string>; awards: Map<number, string>; coaches: Map<number, string>;
   },
 ): string {
   const def = GRID_BUILDERS[axis.builder];
@@ -315,6 +319,7 @@ function describeAxis(
       case 'venue': return lookups.venues.get(Number(raw)) ?? `Venue #${raw}`;
       case 'player': return lookups.players.get(Number(raw)) ?? `Player #${raw}`;
       case 'award': return lookups.awards.get(Number(raw)) ?? `Award #${raw}`;
+      case 'coach': return lookups.coaches.get(Number(raw)) ?? `Coach #${raw}`;
       case 'stat': return Object.hasOwn(GRID_STATS, raw) ? GRID_STATS[raw as keyof typeof GRID_STATS].label : raw;
       case 'aaPosition': return GRID_AA_POSITIONS.find((o) => o.value === raw)?.label ?? raw;
       default: return raw;
