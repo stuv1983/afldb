@@ -686,6 +686,92 @@ export async function getPlayerBrownlow(playerId: number) {
   `;
 }
 
+export type PlayerFamilyRelationship = {
+  relationshipType: string;
+  direction: 'from' | 'to';
+  relatedPlayerId: number | null;
+  relatedPlayerSlug: string | null;
+  relatedName: string;
+};
+
+export type PlayerFamilyFatherSonAsSon = {
+  fatherPlayerId: number | null;
+  fatherPlayerSlug: string | null;
+  fatherName: string;
+  clubName: string | null;
+  draftYear: number;
+  selection: string | null;
+};
+
+export type PlayerFamilyFatherSonAsFather = {
+  sonPlayerId: number | null;
+  sonPlayerSlug: string | null;
+  sonName: string;
+  clubName: string | null;
+  draftYear: number;
+  selection: string | null;
+};
+
+export type PlayerFamilyResult = {
+  relationships: PlayerFamilyRelationship[];
+  fatherSonAsSon: PlayerFamilyFatherSonAsSon[];
+  fatherSonAsFather: PlayerFamilyFatherSonAsFather[];
+};
+
+/**
+ * Family facts for a player from the canonical relationship tables
+ * (AFLDB-ISSUE-118 §23.29). `player_relationships` is the general model
+ * (parent/child today, siblings once §23.29's blocker clears — nothing
+ * here assumes father-son is the only relationship type); the loader also
+ * writes one `parent_child` row per father-son selection there
+ * (`source_record_id` prefixed `father-son:`), so those rows are excluded
+ * here to avoid presenting the same fact twice alongside the dedicated
+ * `fatherSonAsSon` / `fatherSonAsFather` lists, which carry the selection
+ * detail (club, draft year) the generic table does not.
+ */
+export async function getPlayerFamily(playerId: number): Promise<PlayerFamilyResult> {
+  const [relationships, fatherSonAsSon, fatherSonAsFather] = await Promise.all([
+    sql<PlayerFamilyRelationship[]>`
+      SELECT r.relationship AS "relationshipType",
+             CASE WHEN r.person_a_player_id = ${playerId} THEN 'from' ELSE 'to' END AS direction,
+             CASE WHEN r.person_a_player_id = ${playerId} THEN r.person_b_player_id
+                  ELSE r.person_a_player_id END AS "relatedPlayerId",
+             CASE WHEN r.person_a_player_id = ${playerId} THEN pb.slug ELSE pa.slug END AS "relatedPlayerSlug",
+             CASE WHEN r.person_a_player_id = ${playerId} THEN r.person_b_name
+                  ELSE r.person_a_name END AS "relatedName"
+        FROM player_relationships r
+        LEFT JOIN players pa ON pa.id = r.person_a_player_id
+        LEFT JOIN players pb ON pb.id = r.person_b_player_id
+       WHERE (r.person_a_player_id = ${playerId} OR r.person_b_player_id = ${playerId})
+         AND r.source_record_id NOT LIKE 'father-son:%'
+       ORDER BY r.relationship, "relatedName"
+    `,
+    sql<PlayerFamilyFatherSonAsSon[]>`
+      SELECT fs.father_player_id AS "fatherPlayerId", pf.slug AS "fatherPlayerSlug",
+             fs.father_name AS "fatherName",
+             COALESCE(cl.name, fs.club_name_raw) AS "clubName",
+             fs.draft_year AS "draftYear", fs.competition AS selection
+        FROM father_son_selections fs
+        LEFT JOIN players pf ON pf.id = fs.father_player_id
+        LEFT JOIN clubs cl ON cl.id = fs.club_id
+       WHERE fs.drafted_player_id = ${playerId}
+       ORDER BY fs.draft_year
+    `,
+    sql<PlayerFamilyFatherSonAsFather[]>`
+      SELECT fs.drafted_player_id AS "sonPlayerId", ps.slug AS "sonPlayerSlug",
+             fs.drafted_player_name AS "sonName",
+             COALESCE(cl.name, fs.club_name_raw) AS "clubName",
+             fs.draft_year AS "draftYear", fs.competition AS selection
+        FROM father_son_selections fs
+        LEFT JOIN players ps ON ps.id = fs.drafted_player_id
+        LEFT JOIN clubs cl ON cl.id = fs.club_id
+       WHERE fs.father_player_id = ${playerId}
+       ORDER BY fs.draft_year
+    `,
+  ]);
+  return { relationships, fatherSonAsSon, fatherSonAsFather };
+}
+
 /** Resolve a legacy or stale slug to the canonical one for redirects. */
 export async function getPlayerSlug(id: number): Promise<string | null> {
   const [row] = await sql<{ slug: string }[]>`
