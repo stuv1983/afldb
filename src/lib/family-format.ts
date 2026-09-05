@@ -41,16 +41,21 @@ export function formatSelectionDetail(row: {
 
 /**
  * Label for a generic `player_relationships` row, from this player's
- * perspective. AFLDB's men's competitions are the whole of this table today
- * (AFLW identity is a separate layer), so a `sibling` row is a brother. The
- * asymmetric types follow the convention the existing father-son loader
- * already writes (father as person A, son as person B -- §23.29 F.8), which
- * the query's `direction` already reflects.
+ * perspective. A `sibling` row says what the source evidenced through the
+ * loader's `relationship_label` (§23.31: `brothers` / `twin brothers`,
+ * `sisters`, else sex not evidenced) -- a linked player's unlinked sister
+ * must not be shown as a brother. The asymmetric types follow the convention
+ * the existing father-son loader already writes (father as person A, son as
+ * person B -- §23.29 F.8), which the query's `direction` already reflects.
  */
-export function relationshipLabel(relationshipType: string, direction: 'from' | 'to'): string {
+export function relationshipLabel(relationshipType: string, direction: 'from' | 'to', label = ''): string {
   switch (relationshipType) {
     case 'sibling':
-      return 'Brother';
+      if (label === 'brothers') return 'Brother';
+      if (label === 'twin brothers') return 'Twin brother';
+      if (label === 'sisters') return 'Sister';
+      if (label === 'twins') return 'Twin';
+      return 'Sibling';
     case 'parent_child':
       return direction === 'from' ? 'Parent' : 'Child';
     case 'grandparent_grandchild':

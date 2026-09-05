@@ -75,7 +75,7 @@ export function PlayerFamilyCard({
 
         {family.relationships.map((r, i) => (
           <li key={`rel-${i}-${r.relationshipType}-${r.relatedPlayerId ?? r.relatedName}`}>
-            <strong>{relationshipLabel(r.relationshipType, r.direction)}</strong>
+            <strong>{relationshipLabel(r.relationshipType, r.direction, r.relationshipLabel)}</strong>
             {' — '}
             <RelatedPersonName name={r.relatedName} slug={r.relatedPlayerSlug} id={r.relatedPlayerId} />
             <CompareLink playerId={playerId} relatedId={r.relatedPlayerId} />

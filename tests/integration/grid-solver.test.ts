@@ -518,6 +518,83 @@ describe('grid solver correctness', () => {
     expect(rel).toEqual(sel);
   });
 
+  // AFLDB-ISSUE-118 §23.31 family F (siblings): player_relationships `sibling`
+  // rows from the tracked normalised football-families export. has_brother is
+  // an explicit brothers-labelled row with both people linked and the brother
+  // having played; never a surname, a family key or a shared parent.
+  it('has_brother is exactly the linked ends of brothers-labelled sibling rows, and the Abletts sit on the right ends', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT pid AS id FROM (
+        SELECT r.person_a_player_id AS pid FROM player_relationships r
+          JOIN player_career_stats bc ON bc.player_id = r.person_b_player_id
+         WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers') AND r.person_a_player_id IS NOT NULL AND bc.games > 0
+        UNION
+        SELECT r.person_b_player_id FROM player_relationships r
+          JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
+         WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers') AND r.person_b_player_id IS NOT NULL AND ac.games > 0
+      ) x
+    `;
+    expect(truth.length).toBeGreaterThan(500);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const axis: GridAxisState = { builder: 'has_brother', params: {} };
+    expect((await solveCellSummary(axis, any, 'games_asc')).eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // Gary Ablett Sr is the brother of Geoff and Kevin (the export's rows). Gary Jr and
+    // Nathan are brothers too: the export has no row for them (its family sentence names
+    // them only as their father's sons), which is a COVERAGE GAP, never "no brother" —
+    // the pair is carried by the tracked supplement on the two articles' own words.
+    // Absence of a row is unknown; only presence is asserted here.
+    const abletts = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/G/Gary_Ablett0.html', 'players/G/Geoff_Ablett.html', 'players/K/Kevin_Ablett.html', 'players/G/Gary_Ablett1.html', 'players/N/Nathan_Ablett.html')
+    `;
+    const byProfile = Object.fromEntries(abletts.map((r) => [r.profile, r.playerId]));
+    for (const p of ['players/G/Gary_Ablett0.html', 'players/G/Geoff_Ablett.html', 'players/K/Kevin_Ablett.html', 'players/G/Gary_Ablett1.html', 'players/N/Nathan_Ablett.html']) {
+      expect(byProfile[p], p).toBeDefined();
+      expect(truthIds.has(byProfile[p]), p).toBe(true);
+    }
+    const juniorRows = await sql<{ other: string; label: string; record: string }[]>`
+      SELECT CASE WHEN person_a_player_id = ${byProfile['players/G/Gary_Ablett1.html']} THEN person_b_name ELSE person_a_name END AS other,
+             relationship_label AS label, source_record_id AS record
+        FROM player_relationships WHERE relationship = 'sibling'
+         AND ${byProfile['players/G/Gary_Ablett1.html']} IN (person_a_player_id, person_b_player_id)
+    `;
+    expect(juniorRows).toEqual([{ other: 'Nathan Ablett', label: 'brothers', record: 'siblings:afldb-sibling-supplement:001' }]);
+    const seniorRows = await sql<{ other: string; label: string }[]>`
+      SELECT CASE WHEN person_a_player_id = ${byProfile['players/G/Gary_Ablett0.html']} THEN person_b_name ELSE person_a_name END AS other,
+             relationship_label AS label
+        FROM player_relationships WHERE relationship = 'sibling'
+         AND ${byProfile['players/G/Gary_Ablett0.html']} IN (person_a_player_id, person_b_player_id) ORDER BY 1
+    `;
+    expect(seniorRows).toEqual([{ other: 'Geoff Ablett', label: 'brothers' }, { other: 'Kevin Ablett', label: 'brothers' }]);
+    // A sibling row whose other side is unlinked (a relative who never played VFL/AFL)
+    // qualifies nobody, and a sisters row links nobody: no fabricated player anywhere.
+    const [shape] = await sql<{ selfPairs: number; dupPairs: number; sistersLinked: number; oneSided: number }[]>`
+      SELECT (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id = person_b_player_id)::int AS "selfPairs",
+             (SELECT count(*) FROM (SELECT 1 FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL
+                GROUP BY least(person_a_player_id, person_b_player_id), greatest(person_a_player_id, person_b_player_id) HAVING count(*) > 1) d)::int AS "dupPairs",
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND relationship_label = 'sisters' AND (person_a_player_id IS NOT NULL OR person_b_player_id IS NOT NULL))::int AS "sistersLinked",
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND (person_a_player_id IS NULL) <> (person_b_player_id IS NULL))::int AS "oneSided"
+    `;
+    expect(shape).toMatchObject({ selfPairs: 0, dupPairs: 0, sistersLinked: 0 });
+    expect(shape.oneSided).toBeGreaterThan(0);
+    // The builder reads canonical evidence only: a player whose sole sibling rows are
+    // one-sided (the relative resolved to no VFL/AFL player) is not qualified BY THEM.
+    // That is a statement about what the data proves, not that he has no brother.
+    const onlyOneSided = await sql<{ id: number }[]>`
+      SELECT DISTINCT COALESCE(person_a_player_id, person_b_player_id) AS id FROM player_relationships r
+       WHERE r.relationship = 'sibling' AND (r.person_a_player_id IS NULL) <> (r.person_b_player_id IS NULL)
+         AND NOT EXISTS (SELECT 1 FROM player_relationships o WHERE o.relationship = 'sibling'
+                            AND o.person_a_player_id IS NOT NULL AND o.person_b_player_id IS NOT NULL
+                            AND COALESCE(r.person_a_player_id, r.person_b_player_id) IN (o.person_a_player_id, o.person_b_player_id))
+    `;
+    expect(onlyOneSided.length).toBeGreaterThan(0);
+    for (const r of onlyOneSided) expect(truthIds.has(r.id), `player ${r.id}`).toBe(false);
+  });
+
   it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {
     const row: GridAxisState = { builder: 'brownlow_medallist', params: {} };
     const col: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };

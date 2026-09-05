@@ -1273,6 +1273,20 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT father_player_id FROM father_son_selections
                            WHERE father_player_id IS NOT NULL
                              AND father_link_status IN ('unique', 'resolved'))`;
+    // AFLDB-ISSUE-118 §23.31. An explicit canonical `sibling` row whose label
+    // establishes brothers, both sides linked to canonical players, and the
+    // brother having played a VFL/AFL match (player_career_stats.games > 0).
+    // Never a surname, a family key or a shared parent.
+    case 'has_brother':
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                            JOIN player_career_stats bc ON bc.player_id = r.person_b_player_id
+                           WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_a_player_id IS NOT NULL AND bc.games > 0
+                           UNION
+                          SELECT r.person_b_player_id FROM player_relationships r
+                            JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
+                           WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_b_player_id IS NOT NULL AND ac.games > 0)`;
     case 'national_draft_pick_between': {
       const [lo, hi] = orderedRange(axis, 'from', 'From pick', 'to', 'To pick');
       return sql`p.id IN (SELECT player_id FROM draft_picks

@@ -42,6 +42,15 @@ import {
   fatherSonChecks,
   fatherSonMeasures,
   fatherSonValidateArgv,
+  SIBLINGS_ADJUDICATIONS,
+  SIBLINGS_CSV,
+  SIBLINGS_LOADER,
+  SIBLINGS_PROVENANCE,
+  SIBLINGS_SUPPLEMENTS,
+  siblingChecks,
+  siblingMeasures,
+  siblingsArgv,
+  siblingsValidateArgv,
   parseCsvRows,
   birthDateChecks,
   birthDatesArgv,
@@ -768,7 +777,7 @@ describe('stage graph', () => {
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
-      'coaches', 'father-son', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'coaches', 'father-son', 'siblings', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
       'ladder-witness', 'fingerprints',
     ]);
   });
@@ -788,7 +797,7 @@ describe('stage graph', () => {
     // enrichment' below).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
-                'birth-dates', 'coaches', 'father-son', 'draftguru', 'awards-honours', 'brownlow-season',
+                'birth-dates', 'coaches', 'father-son', 'siblings', 'draftguru', 'awards-honours', 'brownlow-season',
                 'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
@@ -1150,6 +1159,103 @@ describe('stage graph', () => {
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the coach gates, in stage order.
       expect(all.indexOf('father_son_selections')).toBeGreaterThan(all.indexOf('matches_without_coach'));
+    });
+  });
+
+  describe('sibling pairs (AFLDB-ISSUE-118 §23.31 family F)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'siblings')!;
+    const HEADER = 'source_key,family_key,family_name,person_a_name,person_a_role,person_a_wikipedia,person_a_clubs,person_a_legacy,'
+      + 'person_a_profile,person_a_link,person_a_note,person_b_name,person_b_role,person_b_wikipedia,person_b_clubs,person_b_legacy,'
+      + 'person_b_profile,person_b_link,person_b_note,relationship_label,source_label,evidence,extraction_method,source_revision_id,also_source_keys\n';
+    const row = (key: string, a: string, aLink: string, b: string, bLink: string, label = 'brothers') =>
+      `${key},ablett-0004,Ablett,"Ablett, A",brother,u,"Geelong, Hawthorn",unique:1,${a},${aLink},"n, with a comma",B Ablett,sibling,u,,unmatched,${b},${bLink},note,${label},siblings/brothers,"A and B were brothers.",prose_rule,1,\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), SIBLINGS_LOADER, 'load', '--csv', SIBLINGS_CSV, '--provenance', SIBLINGS_PROVENANCE]);
+      expect(siblingsArgv()).toEqual(stage.argv);
+      expect(siblingsValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${siblingMeasures().pairs} pairs`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize|families\//i);
+      for (const path of [SIBLINGS_CSV, SIBLINGS_ADJUDICATIONS, SIBLINGS_SUPPLEMENTS, SIBLINGS_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('follows father-son (the same identities) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('siblings'));
+      expect(ids.indexOf('father-son')).toBeLessThan(ids.indexOf('siblings'));
+      expect(ids.indexOf('siblings')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing, headerless or self-contradicting one', () => {
+      const m = siblingMeasures();
+      expect(m.pairs).toBeGreaterThan(400);
+      expect(m.pairsBothLinked).toBeLessThanOrEqual(m.pairs);
+      expect(m.brotherPairsLinked).toBeLessThanOrEqual(m.pairsBothLinked);
+      expect(m.playersWithBrother).toBeLessThanOrEqual(2 * m.brotherPairsLinked);
+      expect(m.unlinkedSides).toBeGreaterThanOrEqual(m.pairs - m.pairsBothLinked);
+      expect(m.unlinkedSides).toBeLessThanOrEqual(2 * (m.pairs - m.pairsBothLinked));
+      expect(() => siblingMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => siblingMeasures(() => 'source_key,family_key\n')).toThrow(/no data rows or an unexpected header/);
+      expect(() => siblingMeasures(() => HEADER)).toThrow(/no data rows/);
+      const ok = HEADER
+        + row('000000000000000000000001', 'players/G/Gary_Ablett0.html', 'unique', 'players/G/Geoff_Ablett.html', 'unique')
+        + row('000000000000000000000002', 'players/G/Gary_Ablett0.html', 'unique', 'players/K/Kevin_Ablett.html', 'resolved')
+        + row('000000000000000000000003', 'players/G/Geoff_Ablett.html', 'unique', '', 'unmatched', 'siblings')
+        + row('000000000000000000000004', '', 'ambiguous', '', 'unmatched', 'siblings')
+        + row('000000000000000000000005', 'players/A/A.html', 'unique', 'players/B/B.html', 'unique', 'twins');
+      expect(siblingMeasures(() => ok)).toEqual({ pairs: 5, pairsBothLinked: 3, brotherPairsLinked: 2, playersWithBrother: 3, unlinkedSides: 3 });
+      // A trusted status with no profile, a profile under an untrusted status, or a self-pair is refused.
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', '', 'unique', 'players/G/Geoff_Ablett.html', 'unique'))).toThrow(/disagrees with its profile/);
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', 'players/X/X.html', 'ambiguous', '', 'unmatched'))).toThrow(/disagrees with its profile/);
+      expect(() => siblingMeasures(() => HEADER + row('000000000000000000000001', 'players/X/X.html', 'unique', 'players/X/X.html', 'unique'))).toThrow(/links one player to himself/);
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'ERROR: columns differ' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(SIBLINGS_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(SIBLINGS_LOADER), OPTS, fitzroy()))
+        .toThrow(/Siblings preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== SIBLINGS_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/Siblings preflight: required tracked input is missing[\s\S]*sibling-adjudications/);
+      const noSupplement: Deps = { ...ok, fileExists: (path: string) => path !== SIBLINGS_SUPPLEMENTS && ok.fileExists(path) };
+      expect(() => runPreflight(noSupplement, OPTS, fitzroy())).toThrow(/Siblings preflight: required tracked input is missing[\s\S]*sibling-supplements/);
+    });
+
+    it('gates the rebuilt pairs on the artefact: rows, proven links only, brothers, no self or duplicate pair', () => {
+      const checks = siblingChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'player_relationships_sibling', 'sibling_pairs_both_linked', 'sibling_unlinked_sides', 'sibling_brother_pairs_linked',
+        'sibling_players_with_brother', 'sibling_self_pairs', 'sibling_duplicate_pairs',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = siblingMeasures();
+      expect(byKey.player_relationships_sibling.expected).toBe(m.pairs);
+      expect(byKey.sibling_pairs_both_linked.expected).toBe(m.pairsBothLinked);
+      expect(byKey.sibling_unlinked_sides.expected).toBe(m.unlinkedSides);
+      expect(byKey.sibling_brother_pairs_linked.expected).toBe(m.brotherPairsLinked);
+      expect(byKey.sibling_players_with_brother.expected).toBe(m.playersWithBrother);
+      expect(byKey.sibling_self_pairs.expected).toBe(0);
+      expect(byKey.sibling_duplicate_pairs.expected).toBe(0);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|person_a_name|person_b_name|family_key/); // never a name or a family
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the father–son gates, in stage order.
+      expect(all.indexOf('player_relationships_sibling')).toBeGreaterThan(all.indexOf('player_relationships_parent_child'));
     });
   });
 

@@ -1,0 +1,43 @@
+{
+  "wikipedia_title": "List of Australian rules football families",
+  "revision_id": "1365040810",
+  "source_url": "https://en.wikipedia.org/wiki/List_of_Australian_rules_football_families",
+  "raw_files": [
+    "data/players/families/family_members.csv",
+    "data/players/families/family_relationships.csv"
+  ],
+  "raw_members": 2290,
+  "raw_relationships": 1046,
+  "raw_relationship_types": {
+    "aunt_uncle_niece_nephew": 3,
+    "cousin": 3,
+    "grandparent_grandchild": 15,
+    "in_law": 1,
+    "parent_child": 537,
+    "sibling": 485,
+    "spouse": 2
+  },
+  "raw_sibling_rows": 485,
+  "supplement_pairs": 14,
+  "normalised_on": "2026-09-05",
+  "measures": {
+    "pairs": 498,
+    "pairs_both_linked": 389,
+    "pairs_one_linked": 64,
+    "pairs_unlinked": 45,
+    "brother_pairs_linked": 389,
+    "players_with_brother": 658,
+    "unlinked_sides": 154,
+    "ambiguous_sides": 0,
+    "adjudicated_sides": 9,
+    "merged_duplicate_rows": 1,
+    "supplement_pairs": 14
+  },
+  "labels": {
+    "brothers": 467,
+    "siblings": 13,
+    "sisters": 8,
+    "twin brothers": 7,
+    "twins": 3
+  }
+}

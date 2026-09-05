@@ -66,6 +66,12 @@ next-env.d.ts
 !/data/players/father-son-selections.csv
 !/data/players/father-son-selections.source.json
 !/data/players/father-son-adjudications.csv
+# AFLDB-ISSUE-118 §23.31: the normalised sibling pairs, their provenance and the adjudications;
+# the raw operator export under data/players/families/ stays untracked.
+!/data/players/sibling-relationships.csv
+!/data/players/sibling-relationships.source.json
+!/data/players/sibling-adjudications.csv
+!/data/players/sibling-supplements.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv

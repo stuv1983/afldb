@@ -120,7 +120,7 @@ describe('GRID_BUILDERS catalogue', () => {
     // Stage D1 (dates of birth): age on debut; then 2 with Stage E2 (coaches):
     // coached_by and premiership_coach; then 2 with family F (father–son):
     // father_son_selection and father_son_father.
-    expect(Object.keys(GRID_BUILDERS)).toHaveLength(156);
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(157);
     expect(GRID_BUILDERS.under_22_selection).toEqual({
       key: 'under_22_selection',
       label: 'Selected in AFLPA 22Under22 team',

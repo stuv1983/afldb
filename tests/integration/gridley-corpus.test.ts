@@ -105,7 +105,8 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean };
+type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean; siblings: boolean };
+const SIBLING_BUILDERS = new Set(['has_brother']);
 const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
 const DOB_BUILDERS = new Set(['age_on_debut_min']);
 const COACH_BUILDERS = new Set(['coached_by', 'premiership_coach']);
@@ -188,7 +189,7 @@ type CellFinding = {
   cell: string;
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
     | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
-    | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict';
+    | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict' | 'source coverage gap';
   row: string;
   col: string;
   rowAxis: string;
@@ -202,7 +203,7 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true };
+let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
@@ -241,6 +242,8 @@ const INFORMATIONAL: Record<string, string> = {
   'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23). AFLDB's answer is source-backed; the definitions differ",
   'adjudicated source conflict': "a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on",
 };
+/** ISSUE-118 §23.31: the cited brothers rows behind each has_brother player (player id -> evidence), for the reverse direction. */
+const brotherEvidence = new Map<number, string>();
 /**
  * Data AFLDB (or this database) does not hold. These FAIL the run: the
  * acceptance target is zero. In diagnostic mode they are counted and named
@@ -251,6 +254,7 @@ const DATA_GAPS: Record<string, string> = {
   'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches)',
   'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
+  'source coverage gap': "a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player. The absence of a row is UNKNOWN coverage, never 'no brother': the cell stays open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv",
 };
 const cellStats: { board: number; cell: string; gridley: number; afldb: number; ms: number }[] = [];
 
@@ -297,7 +301,7 @@ beforeAll(async () => {
         FROM caps a JOIN caps b ON b.season = a.season AND b.club_id = a.club_id AND b.player_id <> a.player_id
         JOIN clubs c ON c.id = a.club_id
        GROUP BY a.player_id, a.season, c.name`,
-    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string }[]>`
+    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string; siblings: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
              (SELECT count(*) FROM draft_picks WHERE link_status_value IN ('unique', 'resolved')) AS "draftLinked",
@@ -305,7 +309,8 @@ beforeAll(async () => {
              (SELECT count(*) FROM players WHERE height_cm IS NOT NULL) AS "heights",
              (SELECT count(*) FROM players) AS "players",
              (SELECT count(*) FROM players WHERE dob IS NOT NULL) AS "dobs",
-             (SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL) AS "fatherSon"`,
+             (SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL) AS "fatherSon",
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) AS "siblings"`,
   ]);
   // A dataset counts as present when at least half of it is usable: afldb_dev
   // links 5,103 of 6,810 draft picks; a rebuilt afldb_test links 5.
@@ -321,6 +326,8 @@ beforeAll(async () => {
     coaches: coaches.length > 0,
     // ISSUE-118 §23.29: the father-son rebuild stage loads the tracked list (123 linked fathers).
     fatherSon: Number(probe.fatherSon) > 0,
+    // ISSUE-118 §23.31: the siblings rebuild stage loads the tracked football-families export.
+    siblings: Number(probe.siblings) > 0,
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
@@ -335,6 +342,16 @@ beforeAll(async () => {
   }
   for (const r of coCaptains) {
     coCaptaincy.set(r.playerId, `${coCaptaincy.get(r.playerId) ? `${coCaptaincy.get(r.playerId)}; ` : ''}co-captain of ${r.club} ${r.season} with ${r.others} (all played and won the Grand Final)`);
+  }
+  const brothers = await sql<{ playerId: number; other: string; record: string; evidence: string }[]>`
+    SELECT x.player_id AS "playerId", x.other, r.source_record_id AS record, r.evidence
+      FROM player_relationships r
+      JOIN LATERAL (VALUES (r.person_a_player_id, r.person_b_name), (r.person_b_player_id, r.person_a_name)) AS x(player_id, other) ON TRUE
+     WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
+       AND r.person_a_player_id IS NOT NULL AND r.person_b_player_id IS NOT NULL
+  `;
+  for (const r of brothers) {
+    brotherEvidence.set(r.playerId, `${brotherEvidence.get(r.playerId) ? `${brotherEvidence.get(r.playerId)}; ` : ''}${r.other} (${r.record}: ${r.evidence})`);
   }
   const lookups: GridleyLookups = {
     clubs: Object.fromEntries(clubs.map((c) => [c.slug, c.id])),
@@ -359,7 +376,8 @@ beforeAll(async () => {
           || (!gaps.heights && HEIGHT_BUILDERS.has(mapping.axis.builder))
           || (!gaps.dobs && DOB_BUILDERS.has(mapping.axis.builder))
           || (!gaps.coaches && COACH_BUILDERS.has(mapping.axis.builder))
-          || (!gaps.fatherSon && FATHER_SON_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
+          || (!gaps.fatherSon && FATHER_SON_BUILDERS.has(mapping.axis.builder))
+          || (!gaps.siblings && SIBLING_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
       } else if (mapping.status === 'unresolved' && gapLog.some((g) => g.startsWith(`${item.id}:`))) {
         gappedCriteria.add(item.id);
       }
@@ -393,7 +411,7 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
   it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {
@@ -550,6 +568,20 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         else if (category === 'incorrect known answer' && axisBuilders.includes('premiership_captain')
                  && inAfldb && !inGridley && coCaptaincy.has(afldbId)) {
           findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; ${coCaptaincy.get(afldbId)}` });
+          continue;
+        }
+        // ISSUE-118 §23.31. A brother cell. Gridley lists a player AFLDB omits: the canonical
+        // sibling sources carry no brothers row for him -- a SOURCE COVERAGE GAP (unknown,
+        // never "no brother"), counted and named, open until an evidenced pair is admitted.
+        // AFLDB lists a player Gridley omits: AFLDB's answer rests on a cited brothers row,
+        // named here -- a disagreement with the external key, reported, not failed.
+        else if (category === 'incorrect known answer' && axisBuilders.includes('has_brother')
+                 && ((!inAfldb && lackingIdx.includes(axisBuilders.indexOf('has_brother'))) || (inAfldb && !inGridley && brotherEvidence.has(afldbId)))) {
+          if (!inAfldb) {
+            findings.push({ ...base, category: 'source coverage gap', detail: `${detail}; no canonical brothers row links him to a VFL/AFL player` });
+          } else {
+            findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; canonical brothers row: ${brotherEvidence.get(afldbId)}` });
+          }
           continue;
         }
         // ISSUE-118 §23.19. A height cell: Gridley's height source differs from the AFL

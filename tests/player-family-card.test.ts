@@ -61,9 +61,14 @@ describe('formatSelectionDetail', () => {
 });
 
 describe('relationshipLabel', () => {
-  it('labels a sibling row as Brother', () => {
-    expect(relationshipLabel('sibling', 'from')).toBe('Brother');
-    expect(relationshipLabel('sibling', 'to')).toBe('Brother');
+  it('labels a sibling row by what the loader evidenced, never assuming a brother', () => {
+    expect(relationshipLabel('sibling', 'from', 'brothers')).toBe('Brother');
+    expect(relationshipLabel('sibling', 'to', 'brothers')).toBe('Brother');
+    expect(relationshipLabel('sibling', 'from', 'twin brothers')).toBe('Twin brother');
+    expect(relationshipLabel('sibling', 'to', 'sisters')).toBe('Sister');
+    expect(relationshipLabel('sibling', 'to', 'twins')).toBe('Twin');
+    expect(relationshipLabel('sibling', 'to', 'siblings')).toBe('Sibling');
+    expect(relationshipLabel('sibling', 'to')).toBe('Sibling');
   });
 
   it('labels an asymmetric relationship by direction', () => {
@@ -82,6 +87,7 @@ describe('hasFamilyContent', () => {
       ...emptyFamily(),
       relationships: [{
         relationshipType: 'sibling',
+        relationshipLabel: 'brothers',
         direction: 'from',
         relatedPlayerId: null,
         relatedPlayerSlug: null,
@@ -175,6 +181,7 @@ describe('PlayerFamilyCard rendering', () => {
       ...emptyFamily(),
       relationships: [{
         relationshipType: 'sibling',
+        relationshipLabel: 'brothers',
         direction: 'from',
         relatedPlayerId: 400,
         relatedPlayerSlug: 'jack-example',
@@ -194,6 +201,7 @@ describe('PlayerFamilyCard rendering', () => {
       relationships: [
         {
           relationshipType: 'sibling',
+          relationshipLabel: 'brothers',
           direction: 'from',
           relatedPlayerId: 401,
           relatedPlayerSlug: 'jack-example',
@@ -201,6 +209,7 @@ describe('PlayerFamilyCard rendering', () => {
         },
         {
           relationshipType: 'sibling',
+          relationshipLabel: 'brothers',
           direction: 'from',
           relatedPlayerId: null,
           relatedPlayerSlug: null,

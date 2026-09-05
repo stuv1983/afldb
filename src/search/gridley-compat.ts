@@ -177,7 +177,6 @@ const QCLASH: [string, string] = ['brisbane-lions', 'gold-coast'];
 const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
-const NO_SIBLINGS = 'player_relationships carries no sibling rows: the only football-family source AFLDB holds (the legacy Wikipedia families, 485 sibling pairs) is not yet exported to a tracked artefact (ISSUE-118 §23.29)';
 const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin column';
 const NO_OTHER_CODE = 'other-code (NFL) careers and International Rules representation are not modelled';
 const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner cannot be derived';
@@ -495,6 +494,10 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   // §23.29). The tracked list includes pre-draft and rookie-draft selections
   // under the same rule; Gridley's own answers decide whether that is wider.
   fathersonfather: fixed('FATHER OF', mapped('father_son_father')),
+  // "Has at least one brother who has played in the VFL/AFL." — an explicit
+  // canonical sibling row labelled brothers with both people linked (ISSUE-118
+  // §23.31); the relationship at any time, nothing about playing together.
+  brother: fixed('BROTHER', mapped('has_brother')),
   recruitedByDodoro: fixed('ADRIAN DODORO', absent(NO_RECRUITER)),
 
   // -- names and numbers -------------------------------------------------------
@@ -522,7 +525,6 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   debut22: fixed('22+ YEARS OLD', mapped('age_on_debut_min', { years: '22' })),
 
   // -- attributes AFLDB does not hold ------------------------------------------
-  brother: fixed('BROTHER', absent(NO_SIBLINGS)),
   irish: fixed('IRISH PLAYER', absent(NO_BIRTHPLACE)),
   tasmanian: fixed('TASMANIAN', absent(NO_BIRTHPLACE)),
   nfl: fixed('NFL 🏈', absent(NO_OTHER_CODE)),

@@ -439,6 +439,11 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // player_career_stats.debut_date (AFLDB-ISSUE-118 §23.24/§23.25). Either
   // unknown and the player never qualifies: an unknown age is not a young one.
   age_on_debut_min: { key: 'age_on_debut_min', label: 'Aged X or older on debut', group: 'Biography', params: [int('years', 'Years')] },
+  // AFLDB-ISSUE-118 §23.31. A player with at least one brother who played VFL/AFL:
+  // an explicit canonical `sibling` row in player_relationships (the tracked,
+  // normalised Wikipedia football-families export) labelled brothers, both sides
+  // linked through an AFL Tables profile path, the brother with a match played.
+  has_brother: { key: 'has_brother', label: 'Brother played VFL/AFL', group: 'Biography', params: [] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

@@ -167,6 +167,16 @@ export const FATHER_SON_LOADER = 'tools/migration/father_son.py';
 export const FATHER_SON_CSV = join('data', 'players', 'father-son-selections.csv');
 export const FATHER_SON_ADJUDICATIONS = join('data', 'players', 'father-son-adjudications.csv');
 export const FATHER_SON_PROVENANCE = join('data', 'players', 'father-son-selections.source.json');
+/**
+ * AFLDB-ISSUE-118 §23.31 family F (siblings): sibling pairs from the tracked, normalised
+ * export of the Wikipedia football-families list (profile paths resolved once by
+ * `family_siblings.py normalize`, never a name at load time), plus adjudications and provenance.
+ */
+export const SIBLINGS_LOADER = 'tools/migration/family_siblings.py';
+export const SIBLINGS_CSV = join('data', 'players', 'sibling-relationships.csv');
+export const SIBLINGS_ADJUDICATIONS = join('data', 'players', 'sibling-adjudications.csv');
+export const SIBLINGS_PROVENANCE = join('data', 'players', 'sibling-relationships.source.json');
+export const SIBLINGS_SUPPLEMENTS = join('data', 'players', 'sibling-supplements.csv');
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
@@ -569,6 +579,18 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       kind: 'data',
       run: 'command',
       argv: fatherSonArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.31 family F (siblings). One `sibling` row per pair of the
+      // Wikipedia football-families export in player_relationships, from the TRACKED
+      // normalised artefact; every person resolved ONLY through the AFL Tables profile path
+      // it carries. Needs players and identities: after fitzroy; nothing later reads it.
+      id: 'siblings',
+      name: `SIBLINGS — tracked Wikipedia families export, ${siblingMeasures().pairs} pairs`,
+      kind: 'data',
+      run: 'command',
+      argv: siblingsArgv(python),
       envOverlay: dataEnv,
     },
     {
@@ -1146,6 +1168,9 @@ export function finalValidationChecks(
   // reason. The expected values are read from the tracked artefact itself.
   for (const check of fatherSonChecks()) checks.push(check);
 
+  // AFLDB-ISSUE-118 §23.31. Added together with the SIBLINGS stage, for the same reason.
+  for (const check of siblingChecks()) checks.push(check);
+
   return checks;
 }
 
@@ -1675,6 +1700,22 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + `artefact ${FATHER_SON_CSV} is malformed. Nothing has been destroyed.\n`
       + `${fatherSon.stdout}${fatherSon.stderr}`);
   }
+  // AFLDB-ISSUE-118 §23.31. The siblings stage likewise reads four TRACKED files (the
+  // supplements are explicitly evidenced pairs the export lacks).
+  for (const path of [SIBLINGS_CSV, SIBLINGS_ADJUDICATIONS, SIBLINGS_SUPPLEMENTS, SIBLINGS_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `Siblings preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const siblings = deps.runCommand(siblingsValidateArgv(), {});
+  if (siblings.status !== 0) {
+    throw new RebuildRefused(
+      `Siblings preflight failed (${SIBLINGS_LOADER} load --validate-only): the tracked `
+      + `artefact ${SIBLINGS_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${siblings.stdout}${siblings.stderr}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2177,6 +2218,97 @@ export function fatherSonChecks(): FinalCheck[] {
     { key: 'player_relationships_parent_child',
       sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'parent_child'",
       expected: m.selections },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.31 — sibling pairs, gated on the tracked artefact
+// ---------------------------------------------------------------------------
+
+export function siblingsArgv(python: string = resolvePython()): string[] {
+  return [python, SIBLINGS_LOADER, 'load', '--csv', SIBLINGS_CSV, '--provenance', SIBLINGS_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function siblingsValidateArgv(python: string = resolvePython()): string[] {
+  return [...siblingsArgv(python), '--validate-only'];
+}
+
+export type SiblingMeasures = {
+  pairs: number; pairsBothLinked: number; brotherPairsLinked: number; playersWithBrother: number; unlinkedSides: number;
+};
+
+/** The labels under which a linked pair is two brothers (family_siblings.py BROTHER_LABELS). */
+export const BROTHER_LABELS = ['brothers', 'twin brothers'];
+
+/**
+ * The artefact's own counts. The loader refuses to write unless every non-empty profile
+ * resolves to a canonical identity and every link status agrees with its profile, so the
+ * rows, linked sides and brother pairs after a rebuild are exactly these.
+ */
+export function siblingMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, SIBLINGS_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): SiblingMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${SIBLINGS_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [a, aLink, b, bLink, label] = ['person_a_profile', 'person_a_link', 'person_b_profile', 'person_b_link', 'relationship_label'].map(col);
+  if (rows.length < 2 || header[0] !== 'source_key' || [a, aLink, b, bLink, label].some((i) => i < 0)) {
+    throw new RebuildRefused(`${SIBLINGS_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  const linked = (status: string) => status === 'unique' || status === 'resolved';
+  for (const r of data) {
+    if (linked(r[aLink]) !== (r[a] !== '') || linked(r[bLink]) !== (r[b] !== '')) {
+      throw new RebuildRefused(`${SIBLINGS_CSV}: a link status disagrees with its profile (${r[0]}).`);
+    }
+    if (r[a] !== '' && r[a] === r[b]) throw new RebuildRefused(`${SIBLINGS_CSV}: a pair links one player to himself (${r[0]}).`);
+  }
+  const both = data.filter((r) => r[a] !== '' && r[b] !== '');
+  const brothers = both.filter((r) => BROTHER_LABELS.includes(r[label]));
+  return {
+    pairs: data.length,
+    pairsBothLinked: both.length,
+    brotherPairsLinked: brothers.length,
+    playersWithBrother: new Set(brothers.flatMap((r) => [r[a], r[b]])).size,
+    unlinkedSides: data.reduce((n, r) => n + (r[a] === '' ? 1 : 0) + (r[b] === '' ? 1 : 0), 0),
+  };
+}
+
+/**
+ * The siblings stage must survive a rebuild from scratch: every pair, the links exactly
+ * those the artefact proves, no self-pair, no canonical pair twice, and the brother
+ * population the Grid Solver's has_brother builder reads. A rebuild that drops the stage
+ * or links by name fails here.
+ */
+export function siblingChecks(): FinalCheck[] {
+  const m = siblingMeasures();
+  const labels = BROTHER_LABELS.map((l) => `'${l}'`).join(', ');
+  return [
+    { key: 'player_relationships_sibling', sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling'", expected: m.pairs },
+    { key: 'sibling_pairs_both_linked',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL",
+      expected: m.pairsBothLinked },
+    { key: 'sibling_unlinked_sides',
+      sql: "SELECT count(*) FILTER (WHERE person_a_player_id IS NULL) + count(*) FILTER (WHERE person_b_player_id IS NULL) FROM player_relationships WHERE relationship = 'sibling'",
+      expected: m.unlinkedSides },
+    { key: 'sibling_brother_pairs_linked',
+      sql: `SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL`,
+      expected: m.brotherPairsLinked },
+    { key: 'sibling_players_with_brother',
+      sql: `SELECT count(DISTINCT pid) FROM (SELECT person_a_player_id AS pid FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL UNION SELECT person_b_player_id FROM player_relationships WHERE relationship = 'sibling' AND relationship_label IN (${labels}) AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) x`,
+      expected: m.playersWithBrother },
+    { key: 'sibling_self_pairs',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id = person_b_player_id",
+      expected: 0 },
+    { key: 'sibling_duplicate_pairs',
+      sql: "SELECT count(*) FROM (SELECT 1 FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL GROUP BY least(person_a_player_id, person_b_player_id), greatest(person_a_player_id, person_b_player_id) HAVING count(*) > 1) d",
+      expected: 0 },
   ];
 }
 

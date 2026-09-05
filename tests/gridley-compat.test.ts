@@ -141,17 +141,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6774,
-      mappedDistinct: 829,
+      mappedOccurrences: 6827,
+      mappedDistinct: 830,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 83,
-      dataAbsentDistinct: 9,
+      dataAbsentOccurrences: 30,
+      dataAbsentDistinct: 8,
     });
     // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
     // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
     // is pinned so it only ever moves deliberately, and the integration
     // corpus run fails while it is above zero.
-    expect(distinct(absentList)).toBeLessThanOrEqual(9);
+    expect(distinct(absentList)).toBeLessThanOrEqual(8);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -167,7 +167,7 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     // The complete list, largest first. Every entry is a fact about AFLDB's
     // data, not about the solver: see issues/open/AFLDB-ISSUE-118.md §Stage 2.
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
-      'brother [53]', 'season2024player [14]',
+      'season2024player [14]',
       'intrulesplayer [5]',
       'winaftersiren [4]',
       'irish [2]', 'recruitedByDodoro [2]',

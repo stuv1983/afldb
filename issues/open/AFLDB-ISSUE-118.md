@@ -4312,3 +4312,264 @@ Nothing new was surfaced; no regression on this branch.
 **Exact next action (fresh session):** Begin sibling-family canonical ingestion after operator export is
 available (F.12: export the legacy family tables to CSV under `data/players/families/`, then siblings →
 `player_relationships` `sibling` + `has_brother` + `brother`). Not started this session.
+
+### 23.31 Family F (siblings) — canonical sibling pairs IMPLEMENTED, `has_brother`, Gridley `brother` mapped (5 September 2026, twelfth session, Fable medium)
+
+The §23.30 next action. The operator export of the legacy football-families tables was present; this
+session normalised its sibling rows through the father–son identity discipline into `player_relationships`,
+mapped the largest remaining Gridley family, and — after a mid-session correction from the operator —
+made the absence of a source row mean *unknown*, never *no brother*.
+
+**F.13 The operator export and its schema.** `data/players/families/` (raw, untracked, as `father-son/`):
+`family-schema.sql` (the legacy SQLite DDL), `family_members.csv` (2,290 rows: `source_member_id` — a
+stable 24-hex key — `family_key`, `family_name`, `member_name`, `member_wikipedia_url` (2,115 non-empty),
+`clubs_raw` (704 non-empty), `parent_source_member_id`, `explicit_relation_label`, the legacy name-match
+columns `player_id` / `match_status` / `candidate_count` / `candidate_player_ids` / `match_notes`),
+`family_relationships.csv` (1,046 rows keyed `source_relationship_id`, two member keys with roles,
+`relationship_type`, `relationship_label`, `evidence` — the article sentence — `extraction_method`,
+`confidence`, `source_url`, `source_revision_id`) and `family_draft.csv` (142). All rows are the Wikipedia
+article **List of Australian rules football families**, revision **1365040810**, scraped
+2026-08-02T08:44:41Z, legacy-imported 2026-08-12. `family_draft` is 127 AFL father–son + 15 AFLW
+father–daughter rows: the AFL half is the domain §23.29 already made canonical from the article the rule
+itself has, and it carried no identity the sibling normalisation needed, so it is **unused** (decision
+recorded; nothing from it was imported or compared).
+
+**F.14 Source relationship inventory (measured, not assumed).** `relationship_type`: `parent_child` 537,
+`sibling` **485**, `grandparent_grandchild` 15, `cousin` 3, `aunt_uncle_niece_nephew` 3, `spouse` 2,
+`in_law` 1. The 485 sibling rows: `relationship_label` `siblings/brothers` 454 (every one of whose
+sentences says "brother(s)"), `siblings` 22, `twins` 9; roles `sibling`/`brother`/`twin`/`sister` (two
+`sister` rows); `extraction_method` `prose_rule` for all 485; `confidence` `high` for all; **one row per
+unordered pair** (485 distinct pairs; 239 written A<B, 246 B<A — the export's ordering is arbitrary);
+**0 self-references; 0 duplicate source ids**. The 31 rows not labelled brothers: 9 `twins` (Atkins, Cook,
+Febey, Fleming, Gowans, Lower, Williams, Selwood — whose sentence says brothers — and the AFLW Moody twins)
+and 22 `siblings` (the Davies, Hamilton, Scholz, Svarc, Button/Martin and Dowrick sisters — AFLW; the
+mixed Houghton, Laurie, O'Driscoll, Walker and Western pairs; the James and Strom families). The
+estimate "~485 pairs" was exact for rows; the canonical pair count differs (F.16).
+
+**F.15 Identity — `tools/migration/family_siblings.py normalize` (run once against the §23.30 `afldb_test`,
+output tracked).** The legacy `player_id` cannot be used: the canonical rebuild seeds no
+`legacy_player_id` (0 of 13,273 on `afldb_test`), so it maps to nothing and is carried only as an audit
+column (`person_x_legacy`, e.g. `unique:9130`). AFLDB holds no Wikipedia identity source, so the URL is
+evidence, not a key. Each of the **798** people named in a sibling row is resolved **once** to an AFL Tables
+profile path: normalised name (the father–son normaliser's rules, including `Sr`/`Jr`) → the same-name
+players with an AFL Tables identity, one per player (a player with two identities — Charlie Cameron 2604 —
+is one candidate) → the listed clubs, when any is a VFL/AFL organisation, must include one the candidate
+played for (lineage: Footscray/Bulldogs, South Melbourne/Sydney, Bears+Fitzroy/Lions; `&`, `/`, `,` and
+`and` all separate clubs — the legacy parser had mis-scoped Rendell, the Knotts and Lewis Jetta as
+`out_of_scope` on `&`/`and`) — listed clubs that are ALL outside the VFL/AFL (state-league lists, "Carlton
+coach", "Port Adelaide rookie") mean the source says the person did not play VFL/AFL: unlinked whatever
+the name matches → when more than one candidate remains and the article title carries a birth-year
+disambiguator (`…(footballer, born 1940)`), the candidate whose canonical birth year (Stage D1) equals it,
+**only if every candidate has a birth year** so the rule never decides by elimination → one candidate is
+`unique`, none `unmatched`, several `ambiguous` and **unlinked** with the candidates recorded, unless a
+tracked adjudication decides. Measured before adjudication: **672 unique, 118 unmatched, 8 ambiguous**;
+the birth-year rule resolved 24 of the legacy's 32 ambiguities on its own. Agreement with the legacy match:
+635 legacy-unique → unique, 9 legacy-resolved → unique, 4 legacy-`out_of_scope` → unique (the separator
+bug above), 2 legacy-unique → unmatched (Zeke Uwland, Cody Curtin: 2025 debutants absent from the
+`full-history-20260902` snapshot; they will link on the next baseline), 86 legacy-unmatched → unmatched.
+**No name-only, surname, fuzzy or family-key link exists** (the reconciliation test proves every `unique`
+note is exactly the rule chain).
+
+**F.16 Adjudications — `data/players/sibling-adjudications.csv` (8 rows, keyed by `source_member_id`,
+each evidence-dated 2026-09-05, each required to be needed and applied once or the run refuses).** All
+eight are the leftover same-name ambiguities, each decided from the person's own Wikipedia article read
+this session (birth date + club + debut season, matched to one AFL Tables profile): Alwyn Davey →
+`Alwyn_Davey0` (b. 1984, Essendon 2007; `Alwyn_Davey1` is his 2004-born son), Ron Evans → `Ron_Evans1`
+(b. 1939, Essendon 1958, Coleman 1959–60), John Gill → `John_Gill1` (b. 1941, Carlton 1962), Andrew L.
+Krakouer → `Andrew_Krakouer0` (b. 1971, North Melbourne 1989; `Andrew_Krakouer1` is Jim's son), Bert
+Lucas → `Bert_Lucas0` (b. 1922, Carlton 1944 / South Melbourne — both candidates had played for a listed
+club), Jack Malone → `Jack_Malone1` (b. 1919, Footscray 1941; both candidates share the birth year so the
+title rule could not decide), Frank Murphy → `Frank_Murphy0` (b. 1905, Collingwood 1925), Ian Nankervis →
+`Ian_Nankervis0` (b. 1948, Geelong 1967). No explicit non-link was needed; **`ambiguous_sides` = 0**.
+
+**F.17 Pairs, labels and the coverage rule.** Every export sibling row becomes one canonical `sibling`
+row with the pair ordered deterministically (by profile path, else by `name:<normalised>`; roles travel
+with their person), so a reversed source ordering can never produce a second canonical pair; the artefact
+reader refuses an unordered, repeated or self pair. The Gardner family is listed twice in the article
+(`gardner-0324`, `gardner-0327`, both Corrie ↔ Eric): the two rows resolve to the same two identities and
+are **merged** into one canonical pair with the other key kept in `also_source_keys` (allowed only when
+both people are linked; two unlinked namesake pairs refuse). The canonical `relationship_label` states
+what the source evidences about sex: `brothers` (the export's own `siblings/brothers` label, or any
+sentence saying brother(s)), `twin brothers`, `sisters` (a sentence saying sister(s)), or — because
+`players` is the men's VFL/AFL and two players who are siblings are brothers — `brothers` / `twin
+brothers` for a `siblings` / `twins` row whose two people both resolve to canonical players; otherwise
+the export's label. **Operator correction, applied mid-session:** a pair the export does not carry is
+*unknown coverage*, never a negative — the article's prose rule saw "Gary is … father of Gary Jr. and
+Nathan" and produced only parent–child rows, and it produced no sibling row for the Mooneys or the Wakelin
+twins although the family notes say "Jason is Cameron's elder brother" and "Darryl and Shane are
+identical twin brothers". Such a pair is admitted only with explicit independent evidence through
+**`data/players/sibling-supplements.csv`** (14 rows, each naming both profile paths, the label, the quoted
+sentence — a brothers supplement must quote "brother(s)", never a shared parent or surname — and the
+date; a supplement must be needed, i.e. absent from the export, and both profiles must be canonical
+identities, or the run refuses). The 14: Gary Ablett Jr ↔ Nathan Ablett (the correction's own case,
+"the younger brother of Gary Ablett Jr"), Angus ↔ Andrew and Angus ↔ Hamish Brayshaw, Brad ↔ Luke
+Ottens, Cameron ↔ Jason Mooney, Darryl ↔ Shane Wakelin (twin brothers), Joe ↔ Darcy Daniher (6 Essendon
+games), Kane ↔ Chad Cornes, Luke ↔ Matthew Ball (17 Hawthorn games), Peter ↔ Shaun Burgoyne, Sam Reid
+(`Sam_Reid2`, b. 1991) ↔ Ben Reid, Travis ↔ Jason and Travis ↔ Cameron Cloke, Jake ↔ Will Kelly — every
+one a pair the export's family sentence named only as a father's sons, found by the corpus run below and
+then evidenced from the people's own articles (Jarryd Lyons's brother Corey was listed by Brisbane
+2017–2020 and never played an AFL match, so no pair: F.21). **Tests never assert a negative from a missing
+row**: the integration test asserts only presences, and the "does not qualify by one-sided rows" check is
+a statement about what the canonical data proves, labelled as such.
+
+**F.18 The tracked artefacts.** `data/players/sibling-relationships.csv` — **498 pairs** = 485 export rows
+− 1 merged duplicate + 14 supplements (25 columns: source key, family, both people's name/role/URL/listed
+clubs/legacy status/profile/link/note, canonical and source labels, the sentence, extraction method,
+revision, merged keys); `sibling-relationships.source.json` (article, revision, raw file names and counts,
+the type inventory, measures, label counts); the adjudications and supplements above. Measures (from the
+artefact, never typed): pairs 498; **both linked 389, one linked 64, unlinked 45**; brother pairs linked
+389; **players with a linked brother 658**; unlinked sides 154; ambiguous 0; adjudicated sides 9 (Andrew
+Krakouer sits in two rows); merged 1; supplements 14; labels `brothers` 466, `twin brothers` 7, `sisters`
+8, `siblings` 13, `twins` 3. `normalize --check` regenerates from the raw export + adjudications +
+supplements against the database and refuses any byte difference — **proven identical** after every
+regeneration this session. `.gitignore` opts the four files in; `.gitattributes` forces LF on
+`data/players/sibling-*`.
+
+**F.19 Loader and canonical rows.** `family_siblings.py load` (`--validate-only` offline, `--dry-run`)
+reads only the artefact, resolves every profile through `external_identities` (afltables,
+`afltables_profile_url`, unique/resolved) and refuses a missing identity or a status disagreeing with
+its profile; writes one `player_relationships` row per pair — `relationship` `sibling`, `family_key` /
+`family_name`, both names verbatim and roles, `relationship_label` as above, `confidence` `source`,
+`evidence` = the sentence + article/family/revision (supplements: the quoted evidence + the supplement
+key), `extraction_method` from the export (`adjudication` for supplements), `source_id` wikipedia,
+`source_record_id` `siblings:<key>` — upserted on `(source_id, source_record_id)` with a `WHERE … IS
+DISTINCT FROM` guard so an unchanged row is not rewritten, stale `siblings:%` rows of the source removed,
+one `import_batches` transaction. No migration: the 006/044 schema represents the semantics; pair
+uniqueness is enforced by the normaliser and gated (below), not by a new constraint. On `afldb_test` by
+hand: batch 24 wrote 484 rows; batch 25 **0 inserted or changed, 0 stale** (idempotent); batches 26/28/30
+added the supplements as they were evidenced (1, 12, 1 changed); batch 31 **0 changed**. Verified by SQL:
+498 sibling rows (389 both linked), 127 parent_child rows untouched, **0 self-pairs, 0 duplicate
+canonical pairs**, 658 distinct players with a linked brother, label counts as the artefact.
+
+**F.20 Player-family compatibility — one real gap fixed.** `getPlayerFamily` already returns generic
+rows (its filter excludes only `father-son:%`), and Gary Ablett Jr's page query now returns his Nathan
+row. But `relationshipLabel()` rendered every `sibling` row as "Brother", which would have shown Joel
+Western's unlinked sister Mikayla as a brother. Smallest fix: the query returns `relationship_label`,
+`relationshipLabel(type, direction, label)` renders Brother / Twin brother / Sister / Twin / Sibling from
+it, and `PlayerFamilyCard` passes it through (`tests/player-family-card.test.ts` updated). No other UI
+change.
+
+**F.21 Grid Solver and Gridley.** Builder **`has_brother`** (Biography, no parameters): a player with an
+explicit canonical `sibling` row labelled `brothers` / `twin brothers`, both sides linked, whose other
+side has `player_career_stats.games > 0` (AFLDB's "played" semantics; two 0-game players exist) — never a
+surname, family key or shared parent. `GRID_BUILDERS` 156 → **157**. `gridley-compat.ts`: `brother`
+(stored wording "Has at least one brother who has played in the VFL/AFL.", 53 occurrences, one wording)
+→ `has_brother`; `NO_SIBLINGS` gone. Denominators: mapped 6,774 → **6,827** occurrences / 829 → **830**
+criteria; **data-absent 83 → 30 occurrences, 9 → 8 criteria** (season2024player 14, intrulesplayer 5,
+winaftersiren 4, irish 2, recruitedByDodoro 2, nfl 1, spoils5season 1, tasmanian 1). The corpus test
+probes sibling rows as a dataset (`siblings` gap) and gains a **`source coverage gap`** category (a
+DATA_GAP: fails strict, counted in diagnostic): a `has_brother` cell where Gridley lists a player and the
+canonical sibling sources carry no brothers row for him — unknown coverage, open until an evidenced pair
+is admitted; the reverse direction (AFLDB lists on a cited brothers row, Gridley omits) reports as
+`external source disagreement` naming the row. `tests/integration/grid-solver.test.ts`: solver count =
+SQL truth (658), every row in the truth set, Gary Sr ↔ Geoff/Kevin from the export and Gary Jr ↔ Nathan
+from the supplement (`siblings:afldb-sibling-supplement:001`), 0 self / duplicate pairs, no sisters row
+links anyone — **200/200**.
+
+**F.22 Corpus evidence, before → after, the same `afldb_test` (hand-loaded, diagnostic mode, 1,164/1,164).**
+
+| Measure | Before (§23.30 state) | After (first run: export only) | After (final: + classification + 14 supplements) |
+|---|---:|---:|---:|
+| `unsupported` cells / data-absent criteria | 249 / 9 | 90 / 8 | **90 / 8** |
+| unsupported occurrences (compat) | 83 | 30 | **30** |
+| cells solved | 9,686 / 10,287 | 9,842 | **9,842 / 10,287** |
+| `dataset gap` | 354 | 357 | 357 |
+| `incorrect known answer` | 0 | 484 (12 players, all "Gridley lists, AFLDB omits") | **0** |
+| `source coverage gap` (new) | — | — | **21 cells / 1 player** (Jarryd Lyons) |
+| `external source disagreement` | 242 | 243 | 243 |
+| `adjudicated source conflict` | 62 | 65 | 65 |
+| `list membership` | 844 | 855 | 852 |
+| timeouts / cells over 1 s | 0 / 16 | 0 / 18 | **0 / 16 (max 1.9 s)** |
+| `brother` criterion | data-absent | 634 players, 29 ms | **658 players, 29 ms** |
+| strict failing cells (derived) | 603 | — | 468 = `unsupported` 90 + `dataset gap` 357 + `source coverage gap` 21 |
+
+The first run's 484 "incorrect" findings were 12 players Gridley credits with a brother and the export
+did not pair: 11 were evidenced from the players' own articles and admitted as supplements (F.17), which
+is admitting canonical evidence, not tuning to the oracle; the twelfth (Lyons: a listed-only brother) is
+exactly the coverage category. `incorrect known answer` stayed 0 on every non-brother axis; the three
+brother × `height195` cells classify under the height rules (1 disagreement, 3 adjudicated) as before.
+No canonical row was changed to make a cell green.
+
+**F.23 Rebuild integration.** Data stage **`siblings`** after `father-son`, before `draftguru` (argv
+`family_siblings.py load --csv … --provenance …`); the preflight proves the four tracked files exist and
+runs `--validate-only` before the destructive reset; **seven artefact-derived gates**:
+`player_relationships_sibling` 498, `sibling_pairs_both_linked` 389, `sibling_unlinked_sides` 154,
+`sibling_brother_pairs_linked` 389, `sibling_players_with_brother` 658, `sibling_self_pairs` 0,
+`sibling_duplicate_pairs` 0 (`least/greatest` grouping) — none reads a name or a family key. Stages 19 →
+**20** (data 13 → 14), checks 72 → **79**. `tests/db-test-rebuild.test.ts` 261 → **266/266**.
+
+**Full unattended rebuild — PASSED.** Launched detached from this worktree (uncommitted working tree at
+HEAD `dfdd37e` + this session's changes) with the documented command, `AFLDB_PYTHON` = the workstation
+Python 3.12, psql on PATH, tunnel on 55432. Started 21:36:17, `Rebuild complete.` 21:58:33, exit 0 —
+**22 min 16 s**. All **20 stages** executed in the declared order: PRECHECK (both family preflights
+before destruction), …, FATHER–SON (batch 12: 127 selections / 127 relationships), **SIBLINGS** (batch 13:
+498 pairs, shape verified, provenance revision 1365040810, both linked 389, players with a linked brother
+658, 498 inserted, 0 stale, 0.7 s — identical to the hand load), DRAFTGURU, … FINGERPRINTS. **FINAL
+VALIDATION PASSED: 79 checks**, the seven sibling gates among them: `player_relationships_sibling` 498,
+`sibling_pairs_both_linked` 389, `sibling_unlinked_sides` 154, `sibling_brother_pairs_linked` 389,
+`sibling_players_with_brother` 658, `sibling_self_pairs` 0, `sibling_duplicate_pairs` 0;
+`player_relationships_parent_child` 127 unchanged. Warnings: only the pre-existing OWNER notice and the
+awards/honours unlinked-identity notes (§23.30). After the rebuild the 14 supplements were re-cited with
+the families-page entry (F.17a: evidence text only, no count changed): `normalize --check` byte-identical,
+hand reload batch 25 **14 changed** (the evidence column), batch 26 **0 changed** — the rebuilt
+`afldb_test` therefore carries the committed artefact exactly. Strict corpus run on the rebuilt database:
+1,162/1,164 — failing only on the two acceptance assertions, failing cells = `unsupported` 90 +
+`dataset gap` 357 + `source coverage gap` 21 (no `incorrect known answer`, no timeout, 17 cells over 1 s).
+
+**F.17a Upstream-page reconciliation (operator clarification, applied).** The operator directed that the
+article itself — https://en.wikipedia.org/wiki/List_of_Australian_rules_football_families — is the
+primary relationship source and the export only its parsed snapshot, and that every remaining brother
+coverage gap be checked against the page, not the export. The page is too large for a single fetch, so
+each relevant family entry was read by section through the MediaWiki parse API this session (Ablett §5,
+Ball §47, Brayshaw §108, Burgoyne §140, Cloke §196, Cornes §216, Daniher §239, Kelly (3) §485, Lyons
+§547; Mooney/Wakelin/Ottens/Reid from the export's `family_notes`, which is that page's entry text at
+revision 1365040810). Result: the page is **explicit** for Mooney ("Jason is Cameron's elder brother")
+and Wakelin ("Darryl and Shane are identical twin brothers") — both supplements now cite the page as the
+primary evidence; for Ablett, Ball, Brayshaw, Burgoyne, Cloke, Cornes, Daniher, Kelly, Ottens and Reid
+the page says only that the men are one father's sons, which is not brother evidence under the rule, so
+those supplements rest on the players' own articles (each quoted) with the page entry cited as context.
+**Lyons**: the page reads "Marty is the father of Jarryd and Corey" — no explicit brother statement — and
+Corey Lyons (listed by Brisbane 2017–2020, no AFL match) has no canonical identity, so the pair cannot be
+recorded and Jarryd's 21 cells remain a **genuine `source coverage gap`**. **Jake Kelly** was never
+unresolved: he is `players/J/Jake_Kelly.html` (b. 21 January 1995, Adelaide/Essendon) on the roster and
+in supplement 014 from the first; the earlier fetch failures were only wrong article slugs, and his
+correct article (`Jake_Kelly_(Australian_footballer)`: pick 40, 2014 Rookie Draft, son of Craig Kelly;
+it names no brother) is now cited as identity corroboration beside Will Kelly's article, which states the
+relationship. Every supplement's `evidence` carries the page URL, revision, the quoted entry, and the
+quoted article sentence, so each addition is auditable.
+
+**F.24 Validation executed this session.** `family_siblings.py normalize` / `--check` (byte-identical, four
+times); `load --validate-only`; load ×2 idempotent (batch 31: 0 changed); `tests/sibling-reconciliation.test.ts`
+(new, 12/12: club parsing, title birth year, labels, suffix/club/year narrowing, outside-VFL/AFL lists,
+adjudication needed/stale/unlinked, supplement needed/stale/non-identity, self-pair, duplicate-family
+merge, artefact refusals, and the tracked artefact's counts derived from itself against the provenance);
+`father-son-reconciliation` 11/11; `db-test-rebuild` 266/266; full unattended rebuild 20 stages / 79 checks (above); strict corpus 1,162/1,164 (acceptance assertions only); `grid-solver-spec` (157); `gridley-compat`
+(new denominators, `brother` gone from the data-absent list); `player-family-card`; integration
+`grid-solver` 200/200; corpus diagnostic 1,164/1,164 (296 s); `npx tsc --noEmit -p .` clean; eslint on
+every touched file clean apart from the pre-existing `no-explicit-any` / unused-variable findings outside
+the edited ranges.
+
+**Deviations and follow-up.** (a) The export's coverage is incomplete for brothers the article names
+only as a father's sons or in family notes its prose rule skipped — the 14 supplements are the ones the
+corpus surfaced, not a census; a fresh extraction directly from the article (the operator noted its full
+list; the export is that article at revision 1365040810) is the right next sibling step, kept out of this
+milestone. (b) Jarryd Lyons's brother Corey never played (listed only): the 21 cells stay `source
+coverage gap` by the corpus's own rule, and no pair is recorded because supplements require two canonical
+players. (c) The AFLW-only sisters (8 rows) and mixed pairs are loaded unlinked; the AFLW identity layer is
+separate. (d) `family_draft.csv` unused. (e) DEV carries none of this; DEV is not semantic evidence.
+
+**Files:** `tools/migration/family_siblings.py` (new), `data/players/sibling-relationships.csv`,
+`data/players/sibling-relationships.source.json`, `data/players/sibling-adjudications.csv`,
+`data/players/sibling-supplements.csv` (new, tracked), `.gitignore`, `.gitattributes`,
+`tools/db/rebuild-test.ts`, `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
+`src/search/gridley-compat.ts`, `src/db/queries/players.ts`, `src/lib/family-format.ts`,
+`src/components/PlayerFamilyCard.tsx`, `tests/sibling-reconciliation.test.ts` (new),
+`tests/db-test-rebuild.test.ts`, `tests/grid-solver-spec.test.ts`, `tests/gridley-compat.test.ts`,
+`tests/player-family-card.test.ts`, `tests/integration/grid-solver.test.ts`,
+`tests/integration/gridley-corpus.test.ts`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md`, this runbook.
+
+**Exact next action (fresh session):** begin the after-the-siren canonical data milestone
+(`data/records/after-siren/`, establish `winaftersiren`'s exact meaning first). Then International Rules,
+`season2024player`, the Tony Buhagiar adjudication; a fresh sibling extraction from the families article
+when a sibling follow-up is scheduled. DEV load of birth dates, coaches, father–son and siblings;
+production with the next deploy (ISSUE-137 sequencing).

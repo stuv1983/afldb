@@ -688,6 +688,8 @@ export async function getPlayerBrownlow(playerId: number) {
 
 export type PlayerFamilyRelationship = {
   relationshipType: string;
+  /** The loader's label for what the source evidences (e.g. `brothers`, `sisters`, `siblings`). */
+  relationshipLabel: string;
   direction: 'from' | 'to';
   relatedPlayerId: number | null;
   relatedPlayerSlug: string | null;
@@ -739,6 +741,7 @@ export async function getPlayerFamily(playerId: number): Promise<PlayerFamilyRes
   const [relationships, fatherSonAsSon, fatherSonAsFather] = await Promise.all([
     sql<PlayerFamilyRelationship[]>`
       SELECT r.relationship AS "relationshipType",
+             r.relationship_label AS "relationshipLabel",
              CASE WHEN r.person_a_player_id = ${playerId} THEN 'from' ELSE 'to' END AS direction,
              CASE WHEN r.person_a_player_id = ${playerId} THEN r.person_b_player_id
                   ELSE r.person_a_player_id END AS "relatedPlayerId",
