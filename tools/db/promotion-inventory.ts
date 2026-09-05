@@ -73,7 +73,19 @@ export type TableTreatment = {
    * rebuild changes an identity (AFLDB-ISSUE-136 merged players, batches are new), so
    * the checker probes them before reinstatement.
    */
-  footballRefs?: { column: string; references: string; nullable: boolean }[];
+  footballRefs?: {
+    column: string;
+    references: string;
+    nullable: boolean;
+    /**
+     * What an operator does when the probe finds this reference dangling. Printed by the
+     * dangling-reference gate beside the finding. Omitted where the generic path applies:
+     * a nullable reference gets the drop-FK / restore / NULL / re-add sequence the gate
+     * already generates, and a NOT NULL reference with nothing written here is a refusal
+     * with no path — which is what "the contract must decide this table" meant.
+     */
+    remediation?: string;
+  }[];
   note: string;
 };
 
@@ -247,6 +259,66 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'describes the rebuilt rows; production\'s settle ledger describes rows that no '
       + 'longer exist and is retained only in the pre-cutover dump (a recorded gap).',
   },
+  // --- Captured external grid corpus (migration 080) ----------------------------------
+  // AFLDB-ISSUE-141. Deliberately NOT in afldb_meta.import_writable_tables — see the foot
+  // of 080_external_grids.sql: grant_import_write() hands out UPDATE, DELETE and TRUNCATE
+  // and privileges.sql would restore them at every reconcile, which would end the corpus's
+  // immutability. Deliberately not import-writable is NOT the same as decided, and until
+  // this issue the three tables were in neither set: the classification gate refused every
+  // database carrying 080, and — the substantive defect — a generated plan named them in
+  // neither the truncate list nor the reinstate list, so a swap would have replaced an
+  // explicitly immutable captured corpus with the candidate's empty tables, unnoticed.
+  //
+  // There is no Gridley rebuild stage (tools/db/rebuild-test.ts planStages()), so a rebuilt
+  // candidate carries these tables EMPTY apart from 080's own external_grid_sources seed.
+  // The corpus therefore behaves exactly like staging_aflw: not produced by the rebuild,
+  // reinstated from the pre-cutover dump, and lost if it is not.
+  {
+    schema: 'public', name: 'external_grid_sources', subsystem: 'Grid Solver corpus', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    footballRefs: [{
+      column: 'ingest_source_id', references: 'sources', nullable: false,
+      remediation: "sources is import-writable, so the candidate's sources.id for key "
+        + "'gridley' need not equal the dumped one. Resolve BEFORE the reinstate: read the "
+        + "candidate id (SELECT id FROM sources WHERE key = 'gridley') and restore this "
+        + 'table with ingest_source_id set to it, or reinstate and then UPDATE the column. '
+        + 'Never insert a sources row for this: migration 080 seeds it, so the candidate '
+        + 'already has one.',
+    }],
+    note: 'The grid platforms boards are captured from — one row, gridley, seeded by '
+      + 'migration 080 itself. Reinstated FIRST of the three: the truncate removes the '
+      + "candidate's seed so the dump's row keeps its id and external_grids.source_id "
+      + 'lands on the same id. Immutable captured evidence with no rebuild stage.',
+  },
+  {
+    schema: 'public', name: 'external_grids', subsystem: 'Grid Solver corpus', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    footballRefs: [{
+      column: 'import_batch_id', references: 'import_batches', nullable: false,
+      remediation: 'import_batches is import-writable, so the rebuilt candidate holds the '
+        + "rebuild's batches and NOT the batch that captured the corpus. This reference "
+        + 'will dangle on any real promotion and the column is NOT NULL, so the nullable '
+        + 'exception path of docs/production-promotion.md §7.4 does not apply. Decide it '
+        + 'explicitly and record the choice: either reinstate the referenced import_batches '
+        + 'row(s) from the pre-cutover dump BEFORE this table (their ids must not collide '
+        + "with the candidate's own, and the identity sequence must be re-synced), or open "
+        + 'ONE batch in the candidate for the reinstatement and set import_batch_id to it, '
+        + "which rewrites the corpus's ingest provenance and must be stated in the "
+        + 'promotion record. Never drop the rows: the captured payload is the evidence. '
+        + 'See docs/production-promotion.md §7.4b.',
+    }],
+    note: 'One row per captured REVISION of one external grid board, with the raw payload '
+      + 'that is the evidence a parse was made from. Immutable by design (ISSUE-118 §10.4) '
+      + 'and irreplaceable: the rescued legacy archive cannot be re-fetched. After '
+      + 'external_grid_sources, before external_grid_axes.',
+  },
+  {
+    schema: 'public', name: 'external_grid_axes', subsystem: 'Grid Solver corpus', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 40,
+    note: 'The six captured criteria of one board revision. ON DELETE CASCADE from '
+      + 'external_grids, so it is reinstated LAST of the three; its own rows carry the '
+      + "source's stable criterion keys and raw text, which no later parse can recover.",
+  },
   // --- Acquisition schemas (migrations 001, 014, 025, 074, 076, 077) -----------------
   {
     schema: 'staging', name: '*', subsystem: 'import pipeline / source observation spine', category: 'staging',
@@ -408,11 +480,73 @@ export const TEST_FIXTURE_EMAIL_SQL = `(
 // Database-name contract
 // ---------------------------------------------------------------------------
 
-export const PRODUCTION_DATABASE = 'afldb_prod';
-export const SOURCE_DATABASE = 'afldb_test';
-export const CANDIDATE_PREFIX = 'afldb_prod_candidate_';
-/** Matches the read-only convention `tools/db/rebuild-test.ts` already enforces. */
-export const PRE_REBUILD_PREFIX = 'afldb_prod_pre_rebuild_';
+/**
+ * AFLDB-ISSUE-141. Which live database this promotion is for. It is ALWAYS explicit: the
+ * checker takes `--environment prod|dev`, defaults to `prod`, and never infers it from a
+ * database name — inferring it would mean a typo could select the relaxations below.
+ *
+ * `dev` exists because `AFLDB-ISSUE-139` must converge `afldb_dev` through the same
+ * supported path, not through hand-written per-table dump/restore, which is the
+ * improvisation this procedure exists to prevent. It is one MORE accepted name shape per
+ * phase, not a name-free phase: the fail-closed matrix is identical, and a `prod` name
+ * under `dev` (or the reverse) is still refused.
+ *
+ * DEV IS NOT PRODUCTION AUTHORITY. A dev promotion has no real administrator identity to
+ * protect, so two gates differ — and only when asked for, in writing, on the command line.
+ * See `docs/production-promotion.md` §13.
+ */
+export type Environment = 'prod' | 'dev';
+
+export const ENVIRONMENTS: readonly Environment[] = ['prod', 'dev'];
+
+/** The default is `prod`: an operator who states nothing gets the production contract. */
+export const DEFAULT_ENVIRONMENT: Environment = 'prod';
+
+export type EnvironmentNames = {
+  environment: Environment;
+  /** The live database the candidate is eventually renamed to. */
+  live: string;
+  /** `<prefix><stamp>` — the restored candidate, never the live name. */
+  candidatePrefix: string;
+  /** `<prefix><stamp>` — the live database renamed aside by the swap, and kept. */
+  preRebuildPrefix: string;
+  /** The rebuilt source. `afldb_test` for both: `db:test:rebuild` accepts no other name. */
+  source: string;
+  /** The host label the generated plan prints. */
+  host: string;
+};
+
+const ENVIRONMENT_NAMES: Readonly<Record<Environment, EnvironmentNames>> = {
+  prod: {
+    environment: 'prod',
+    live: 'afldb_prod',
+    candidatePrefix: 'afldb_prod_candidate_',
+    // Matches the read-only convention `tools/db/rebuild-test.ts` already enforces.
+    preRebuildPrefix: 'afldb_prod_pre_rebuild_',
+    source: 'afldb_test',
+    host: 'PROD (afldb-prod)',
+  },
+  dev: {
+    environment: 'dev',
+    live: 'afldb_dev',
+    candidatePrefix: 'afldb_dev_candidate_',
+    preRebuildPrefix: 'afldb_dev_pre_rebuild_',
+    source: 'afldb_test',
+    host: 'DEV (streamanator)',
+  },
+};
+
+export function environmentNames(environment: Environment = DEFAULT_ENVIRONMENT): EnvironmentNames {
+  const names = ENVIRONMENT_NAMES[environment];
+  if (!names) throw new PromotionRefused(`Unknown environment '${environment}'.`);
+  return names;
+}
+
+/** The production names, kept as named constants because the procedure and its docs cite them. */
+export const PRODUCTION_DATABASE = ENVIRONMENT_NAMES.prod.live;
+export const SOURCE_DATABASE = ENVIRONMENT_NAMES.prod.source;
+export const CANDIDATE_PREFIX = ENVIRONMENT_NAMES.prod.candidatePrefix;
+export const PRE_REBUILD_PREFIX = ENVIRONMENT_NAMES.prod.preRebuildPrefix;
 
 export type Phase = 'source' | 'pre-cutover' | 'restored' | 'candidate' | 'production';
 
@@ -420,43 +554,55 @@ export const PHASES: readonly Phase[] = ['source', 'pre-cutover', 'restored', 'c
 
 export class PromotionRefused extends Error {}
 
-/** The database each phase may be pointed at. Anything else is refused by name. */
-export function assertDatabaseForPhase(phase: Phase, database: string): void {
+/**
+ * The database each phase may be pointed at, within one explicitly named environment.
+ * Anything else is refused by name. The environment is a parameter, never a deduction from
+ * the name offered: `--environment dev` with `afldb_prod` is refused, and so is
+ * `--environment prod` (the default) with `afldb_dev_candidate_<stamp>`.
+ */
+export function assertDatabaseForPhase(
+  phase: Phase, database: string, environment: Environment = DEFAULT_ENVIRONMENT,
+): void {
+  const names = environmentNames(environment);
   const nameOk = /^[a-z_][a-z0-9_-]*$/i.test(database);
   if (!nameOk) throw new PromotionRefused(`'${database}' is not a plausible database name.`);
   switch (phase) {
     case 'source':
-      if (database !== SOURCE_DATABASE) {
+      if (database !== names.source) {
         throw new PromotionRefused(
-          `Phase 'source' inspects the rebuilt '${SOURCE_DATABASE}' only, not '${database}'.`);
+          `Phase 'source' inspects the rebuilt '${names.source}' only, not '${database}'.`);
       }
       return;
     case 'pre-cutover':
     case 'production':
-      if (database !== PRODUCTION_DATABASE) {
+      if (database !== names.live) {
         throw new PromotionRefused(
-          `Phase '${phase}' inspects '${PRODUCTION_DATABASE}' only, not '${database}'.`);
+          `Phase '${phase}' inspects '${names.live}' only (--environment ${environment}), not '${database}'.`);
       }
       return;
     case 'restored':
     case 'candidate':
-      if (!database.startsWith(CANDIDATE_PREFIX) || database.length === CANDIDATE_PREFIX.length) {
+      if (!database.startsWith(names.candidatePrefix) || database.length === names.candidatePrefix.length) {
         throw new PromotionRefused(
-          `Phase '${phase}' inspects a candidate database named '${CANDIDATE_PREFIX}<stamp>', `
-          + `not '${database}'. The name is the safety: the live '${PRODUCTION_DATABASE}' is `
-          + 'never a candidate.');
+          `Phase '${phase}' inspects a candidate database named '${names.candidatePrefix}<stamp>' `
+          + `(--environment ${environment}), not '${database}'. The name is the safety: the live `
+          + `'${names.live}' is never a candidate.`);
       }
       return;
   }
 }
 
-/** The old production database the `restored` probe reads. */
-export function assertOldDatabaseName(database: string): void {
-  if (database === PRODUCTION_DATABASE) return;
-  if (database.startsWith(PRE_REBUILD_PREFIX) && database.length > PRE_REBUILD_PREFIX.length) return;
+/** The old live database the `restored` probe reads, within the named environment. */
+export function assertOldDatabaseName(
+  database: string, environment: Environment = DEFAULT_ENVIRONMENT,
+): void {
+  const names = environmentNames(environment);
+  if (database === names.live) return;
+  if (database.startsWith(names.preRebuildPrefix) && database.length > names.preRebuildPrefix.length) return;
   throw new PromotionRefused(
-    `--old-database must be '${PRODUCTION_DATABASE}' (before the swap) or `
-    + `'${PRE_REBUILD_PREFIX}<stamp>' (after it), not '${database}'.`);
+    `--old-database must be '${names.live}' (before the swap) or `
+    + `'${names.preRebuildPrefix}<stamp>' (after it), not '${database}' `
+    + `(--environment ${environment}).`);
 }
 
 /**
@@ -551,6 +697,8 @@ export type PlanInput = {
   oldDatabase: string;
   preCutoverDump: string;
   rebuiltDump: string;
+  /** Defaults to `prod`, so every existing caller and every existing plan is unchanged. */
+  environment?: Environment;
 };
 
 function sqlArray(names: readonly string[]): string {
@@ -611,12 +759,14 @@ END $$;
 /** The explicit cutover marker. Written AFTER reinstatement, BEFORE acceptance. */
 export function auditMarkerSql(input: PlanInput): string {
   const j = (s: string) => `'${s.replace(/'/g, "''")}'`;
+  const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
+  const label = names.environment === 'prod' ? 'production promotion' : 'dev promotion';
   return `-- AFLDB-ISSUE-125: the audit trail records the promotion itself. An operator, not a
 -- user, so actor_user_id is NULL and actor_label names the procedure.
 INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail)
 VALUES (
   NULL,
-  'operator: production promotion (AFLDB-ISSUE-125)',
+  'operator: ${label} (AFLDB-ISSUE-125)',
   'database.promoted',
   jsonb_build_object(
     'issue', 'AFLDB-ISSUE-125',
@@ -624,14 +774,16 @@ VALUES (
     'replaced', ${j(input.oldDatabase)},
     'rebuilt_dump', ${j(input.rebuiltDump)},
     'pre_cutover_dump', ${j(input.preCutoverDump)},
+    'environment', ${j(input.environment ?? DEFAULT_ENVIRONMENT)},
     'reinstated', to_jsonb(${sqlArray(tablesWithTreatment('reinstate'))}),
     'reset', to_jsonb(${sqlArray(tablesWithTreatment('reset'))}),
     'regenerated', to_jsonb(${sqlArray(tablesWithTreatment('regenerate'))}),
     'taken_from_rebuild', to_jsonb(${sqlArray(tablesWithTreatment('rebuilt'))}),
     'recorded_gaps', to_jsonb(ARRAY[
       'promotion_decisions: reset, retained only in the pre-cutover dump',
-      'canonical_applications and staging.*: production settle history replaced by the rebuild',
-      'auth_sessions: reset, every administrator signs in again'
+      'canonical_applications and staging.*: settle history replaced by the rebuild',
+      'auth_sessions: reset, every administrator signs in again',
+      'external_grids.import_batch_id: the capturing batch is not in the rebuilt candidate; see the promotion record'
     ])
   )
 );
@@ -644,9 +796,11 @@ VALUES (
  * earlier ones committed and the failing one untouched.
  */
 export function reinstatePlan(input: PlanInput): string {
+  const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
+  const envFlag = names.environment === 'prod' ? '' : ` --environment ${names.environment}`;
   const lines: string[] = [];
-  lines.push(`# AFLDB-ISSUE-125 reinstatement plan — candidate '${input.candidate}'`);
-  lines.push('# Run on PROD (afldb-prod) as the owner role. CANDIDATE_DSN is the owner DSN with the');
+  lines.push(`# AFLDB-ISSUE-125 reinstatement plan — candidate '${input.candidate}' (${names.environment})`);
+  lines.push(`# Run on ${names.host} as the owner role. CANDIDATE_DSN is the owner DSN with the`);
   lines.push('# database name replaced; never paste a DSN into a tracked file or a transcript.');
   lines.push('');
   lines.push('# 1. Empty every production-owned/operational table the rebuilt dump carried.');
@@ -673,8 +827,10 @@ export function reinstatePlan(input: PlanInput): string {
   lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f tools/maintenance/privileges.sql`);
   lines.push('');
   lines.push('# 6. Acceptance, before the swap:');
-  lines.push(`npm run db:promotion:check -- --phase candidate --database ${input.candidate} \\`);
-  lines.push('    --compare <snapshot.json> --expect-super-admin <real production super admin email>');
+  lines.push(`npm run db:promotion:check -- --phase candidate --database ${input.candidate}${envFlag} \\`);
+  lines.push(names.environment === 'prod'
+    ? '    --compare <snapshot.json> --expect-super-admin <real production super admin email>'
+    : '    --compare <snapshot.json> [--expect-super-admin <email>]   # optional on DEV, enforced when given');
   return `${lines.join('\n')}\n`;
 }
 
@@ -691,6 +847,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Rebuilt dump restored into a NEW candidate database (afldb_prod_candidate_<stamp>) — never over afldb_prod.',
   '`--phase restored` passed: candidate name, migration parity, dangling-reference probe against the old database resolved.',
   'Every production-owned/operational table truncated in the candidate, then reinstated per the printed plan, in order, each under --single-transaction.',
+  'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE its restore lines: external_grid_sources.ingest_source_id onto the candidate\'s gridley sources row, and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. Rows are never dropped to make the FK pass.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',
   'Service stopped; afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod; service started.',

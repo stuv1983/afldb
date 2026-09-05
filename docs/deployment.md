@@ -207,22 +207,45 @@ name the database in `--acknowledge-destroy`.
 `import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057
 persons and 6,810 picks. A missing input fails while the database is still intact.
 
-Stage order (fixed):
+Stage order (fixed). `planStages()` in `tools/db/rebuild-test.ts` is the authority; the
+stage `id` is what `--plan` prints and what a failure names.
 
-| # | Stage | Credential |
-|---|---|---|
-| 1 | preflight | none — no database contact |
-| 2 | database reset | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 3 | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
-| 4 | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
-| 5 | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 6 | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 7 | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 8 | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 9 | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 10 | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 11 | ladder witness cross-check | `AFLDB_TEST_IMPORT_DATABASE_URL` |
-| 12 | fingerprints / row counts | `AFLDB_TEST_DATABASE_URL` |
+| # | `id` | Stage | Credential |
+|---|---|---|---|
+| 1 | `precheck` | every required input, before anything is destroyed | none — no database contact |
+| 2 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
+| 3 | `migrations` | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | `privileges` | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 5 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 6 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 7 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 8 | `heights-afl-api` | heights — AFL API season rosters (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 9 | `heights-wikipedia` | heights — tracked adjudication set (evidence only) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 10 | `birth-dates` | birth dates — AFL Tables club player lists | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 11 | `coaches` | coaches + match coaches — AFL Tables coach pages | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 12 | `father-son` | father–son selections — tracked Wikipedia list | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 13 | `siblings` | sibling relationships — tracked families export | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 14 | `after-siren` | after-the-siren kicks — tracked exports | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 15 | `after-siren-reconcile` | **validation** — loaded rows vs a fresh re-resolution | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 16 | `draftguru` | **DraftGuru** | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 17 | `awards-honours` | **awards & honours** (tracked manifests) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 18 | `brownlow-season` | Brownlow season totals — tracked artefact | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 19 | `derived` | derived summaries | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 20 | `coleman` | Coleman (derived) | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 21 | `ladder-witness` | **validation** — cross-check `club_seasons` | `AFLDB_TEST_IMPORT_DATABASE_URL` |
+| 22 | `fingerprints` | **validation** — per-domain row counts vs the contracts | `AFLDB_TEST_DATABASE_URL` |
+
+Stages 7–15 are the AFLDB-ISSUE-118 additions (§23.19, §23.24, §23.27, §23.29, §23.31,
+§23.33–§23.35). Every one reads a tracked, manifest-pinned artefact, contacts no network, and
+resolves people **only** through the AFL Tables profile-url identities `fitzroy` registers —
+which is why they all follow it and why nothing later reads them. `after-siren-reconcile` and
+`ladder-witness` are validation stages: they open one connection and write nothing.
+
+**There is no Gridley stage.** The captured external grid corpus (migration 080,
+`external_grid_sources` / `external_grids` / `external_grid_axes`) is not produced by a
+rebuild, so a rebuilt database carries those tables empty apart from 080's own seed row. It is
+preserved across a promotion by the contract instead — `docs/production-promotion.md` §1 and
+§7.4b (AFLDB-ISSUE-141).
 
 The awards & honours stage (AFLDB-ISSUE-112) runs the eight manifest-backed
 groups and carries **no** `AFLDB_LEGACY_SQLITE` in its environment; the legacy

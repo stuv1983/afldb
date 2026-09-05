@@ -16,6 +16,19 @@
  *         --plan-dir <dir>                                  (no database contact)
  *     npm run db:promotion:check -- --checklist             (no database contact)
  *
+ * Every form above is the PRODUCTION contract, which is the default. AFLDB-ISSUE-141 adds an
+ * explicit `--environment prod|dev`, so the same supported path can converge `afldb_dev`
+ * (AFLDB-ISSUE-139) instead of hand-written per-table dump/restore:
+ *
+ *     npm run db:promotion:check -- --environment dev --phase pre-cutover --database afldb_dev \
+ *         --snapshot ~/backups/afldb/promotion-dev-<stamp>.json
+ *     npm run db:promotion:check -- --environment dev --phase candidate \
+ *         --database afldb_dev_candidate_<stamp> --compare <snapshot> [--allow-fixture-identities]
+ *
+ * The environment is never inferred from a database name — a typo must not select a
+ * relaxation. It selects one more accepted name shape per phase, not a name-free phase, and
+ * `--allow-fixture-identities` is refused outright under `prod`.
+ *
  * What it is: the executable half of docs/production-promotion.md. It reads the contract in
  * tools/db/promotion-inventory.ts and proves, against a live database, the facts an operator
  * would otherwise have to eyeball: that the database is the one the phase expects, that every
@@ -47,9 +60,10 @@ import { collectSections, fingerprintOf, type Row } from './catalog-fingerprint'
 import { computeChecksumRepresentations, matchesStoredChecksum } from './migration-checksum';
 import {
   ACCEPTANCE_CHECKLIST,
-  CANDIDATE_PREFIX,
+  DEFAULT_ENVIRONMENT,
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
+  ENVIRONMENTS,
   PHASES,
   PROMOTION_CONTRACT,
   PromotionRefused,
@@ -60,6 +74,7 @@ import {
   classifyPublicTables,
   compareCounts,
   databaseOf,
+  environmentNames,
   publicContractTables,
   reinstatePlan,
   reinstatedSchemas,
@@ -67,6 +82,7 @@ import {
   truncateSql,
   withDatabase,
   type CompareRule,
+  type Environment,
   type Phase,
   type Snapshot,
 } from './promotion-inventory';
@@ -84,6 +100,8 @@ export const DEFAULT_DSN_ENV = 'AFLDB_OWNER_DATABASE_URL';
 // ---------------------------------------------------------------------------
 
 export type Options = {
+  /** AFLDB-ISSUE-141. Always explicit, always defaulted to `prod`, never inferred. */
+  environment: Environment;
   phase?: Phase;
   database?: string;
   oldDatabase?: string;
@@ -97,10 +115,19 @@ export type Options = {
   preCutoverDump?: string;
   rebuiltDump?: string;
   checklist: boolean;
+  /**
+   * DEV-only conscious acceptance of test-fixture identities. It does not skip the scan and
+   * it does not hide a row: the gate still runs, still lists EVERY offending address (the
+   * ten-row sample cap is lifted), and reports WARN instead of FAIL. Refused under `prod`.
+   */
+  allowFixtureIdentities: boolean;
 };
 
 export function parseArgs(argv: readonly string[]): Options {
-  const out: Options = { dsnEnv: DEFAULT_DSN_ENV, plan: false, checklist: false };
+  const out: Options = {
+    environment: DEFAULT_ENVIRONMENT, dsnEnv: DEFAULT_DSN_ENV,
+    plan: false, checklist: false, allowFixtureIdentities: false,
+  };
   const need = (i: number, flag: string): string => {
     const value = argv[i + 1];
     if (!value || value.startsWith('--')) throw new PromotionRefused(`${flag} needs a value.`);
@@ -109,6 +136,15 @@ export function parseArgs(argv: readonly string[]): Options {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
+      case '--environment': {
+        const value = need(i, arg);
+        if (!ENVIRONMENTS.includes(value as Environment)) {
+          throw new PromotionRefused(
+            `Unknown environment '${value}'. Valid environments: ${ENVIRONMENTS.join(', ')} (default ${DEFAULT_ENVIRONMENT}).`);
+        }
+        out.environment = value as Environment; i += 1; break;
+      }
+      case '--allow-fixture-identities': out.allowFixtureIdentities = true; break;
       case '--phase': {
         const value = need(i, arg);
         if (!PHASES.includes(value as Phase)) {
@@ -147,16 +183,26 @@ export function parseArgs(argv: readonly string[]): Options {
     }
   }
 
+  // Checked before every early return: the relaxation must never be silently ignored
+  // because it was combined with a mode that does not consult it.
+  if (out.allowFixtureIdentities && out.environment !== 'dev') {
+    throw new PromotionRefused(
+      '--allow-fixture-identities is a DEV-only conscious acceptance and needs --environment dev. '
+      + 'A reserved-domain identity can never be a production identity.');
+  }
+
   if (out.checklist) return out;
 
   if (!out.database) throw new PromotionRefused('--database is required: name the database explicitly.');
 
+  const names = environmentNames(out.environment);
+
   if (out.plan) {
-    if (!out.database.startsWith(CANDIDATE_PREFIX)) {
-      throw new PromotionRefused(`--plan needs --database ${CANDIDATE_PREFIX}<stamp>: the plan is only ever run on a candidate.`);
+    if (!out.database.startsWith(names.candidatePrefix) || out.database.length === names.candidatePrefix.length) {
+      throw new PromotionRefused(`--plan needs --database ${names.candidatePrefix}<stamp>: the plan is only ever run on a candidate.`);
     }
-    if (!out.oldDatabase) throw new PromotionRefused('--plan needs --old-database (the production database being replaced).');
-    assertOldDatabaseName(out.oldDatabase);
+    if (!out.oldDatabase) throw new PromotionRefused(`--plan needs --old-database (the ${names.live} database being replaced).`);
+    assertOldDatabaseName(out.oldDatabase, out.environment);
     if (!out.preCutoverDump) throw new PromotionRefused('--plan needs --pre-cutover-dump <file>.');
     if (!out.rebuiltDump) throw new PromotionRefused('--plan needs --rebuilt-dump <file>.');
     if (!out.planDir) throw new PromotionRefused('--plan needs --plan-dir <dir> to write the SQL files into.');
@@ -164,12 +210,12 @@ export function parseArgs(argv: readonly string[]): Options {
   }
 
   if (!out.phase) throw new PromotionRefused(`--phase is required. Valid phases: ${PHASES.join(', ')}.`);
-  assertDatabaseForPhase(out.phase, out.database);
+  assertDatabaseForPhase(out.phase, out.database, out.environment);
   if (out.phase === 'restored') {
     if (!out.oldDatabase) {
       throw new PromotionRefused("Phase 'restored' needs --old-database so dangling references can be probed.");
     }
-    assertOldDatabaseName(out.oldDatabase);
+    assertOldDatabaseName(out.oldDatabase, out.environment);
   } else if (out.oldDatabase) {
     throw new PromotionRefused("--old-database is only meaningful with --phase restored.");
   }
@@ -302,9 +348,13 @@ async function gateMigrationParity(q: Query, report: Report): Promise<void> {
 }
 
 async function gateFixtureIdentities(
-  q: Query, present: readonly string[], phase: Phase, report: Report,
+  q: Query, present: readonly string[], phase: Phase, environment: Environment,
+  allowAccepted: boolean, report: Report,
 ): Promise<number> {
   const mustBeAbsent = phase === 'pre-cutover' || phase === 'candidate' || phase === 'production';
+  // AFLDB-ISSUE-141. Conscious acceptance means SEEING what is accepted: with the override
+  // in play the sample cap is lifted, so every offending address is printed, not ten of them.
+  const sampleLimit = allowAccepted ? '' : ' LIMIT 10';
   let total = 0;
   const lines: string[] = [];
   for (const table of EMAIL_BEARING_TABLES) {
@@ -312,7 +362,7 @@ async function gateFixtureIdentities(
     const rows = await q(`
       SELECT count(*)::int AS n,
              (SELECT array_agg(email ORDER BY email)
-                FROM (SELECT email FROM public.${table} WHERE ${TEST_FIXTURE_EMAIL_SQL} ORDER BY email LIMIT 10) s) AS sample
+                FROM (SELECT email FROM public.${table} WHERE ${TEST_FIXTURE_EMAIL_SQL} ORDER BY email${sampleLimit}) s) AS sample
         FROM public.${table}
        WHERE ${TEST_FIXTURE_EMAIL_SQL}`);
     const n = asInt(rows[0]?.n);
@@ -322,8 +372,17 @@ async function gateFixtureIdentities(
   }
   if (total === 0) {
     report.add('Test-fixture identities (reserved domains: .test .example .invalid .localhost, example.com/net/org)', 'PASS', lines);
+  } else if (mustBeAbsent && allowAccepted) {
+    // environment === 'dev' is guaranteed here: parseArgs refuses the flag under prod.
+    lines.push(`${total} fixture identity row(s) CONSCIOUSLY ACCEPTED under --environment dev --allow-fixture-identities.`);
+    lines.push('Accepted, not cleared, and every offending address is listed above.');
+    lines.push('This database must never become production: the prod contract refuses these rows and has no such flag.');
+    report.add('Test-fixture identities (accepted, DEV only)', 'WARN', lines);
   } else if (mustBeAbsent) {
-    lines.push('A reserved-domain identity can never be a production identity. REFUSED.');
+    lines.push(environment === 'prod'
+      ? 'A reserved-domain identity can never be a production identity. REFUSED.'
+      : 'A reserved-domain identity is refused by default here too. Accept it deliberately with '
+        + '--allow-fixture-identities, or remove the rows. REFUSED.');
     report.add('Test-fixture identities', 'FAIL', lines);
   } else {
     lines.push(phase === 'source'
@@ -335,10 +394,12 @@ async function gateFixtureIdentities(
 }
 
 async function gateSuperAdmin(
-  q: Query, present: readonly string[], phase: Phase, expected: string | undefined, report: Report,
+  q: Query, present: readonly string[], phase: Phase, environment: Environment,
+  expected: string | undefined, report: Report,
 ): Promise<number> {
+  const gate = environment === 'prod' ? 'Production super admin' : 'DEV super admin';
   if (!present.includes('auth_users')) {
-    report.add('Production super admin', 'FAIL', ['auth_users is absent.']);
+    report.add(gate, 'FAIL', ['auth_users is absent.']);
     return 0;
   }
   const rows = await q(`
@@ -367,9 +428,28 @@ async function gateSuperAdmin(
     }
   }
   const required = phase === 'pre-cutover' || phase === 'candidate' || phase === 'production';
-  if (required && enabled === 0) { lines.push('no enabled, fully enrolled super_admin — nobody could administer this database'); ok = false; }
+  // AFLDB-ISSUE-141. On production the expectation is unconditional: a database nobody can
+  // administer must not be promoted. A DEV promotion protects no real human authority, so
+  // the expectation is OPTIONAL there rather than silently dropped — state it with
+  // --expect-super-admin and it is enforced exactly as on production; omit it and the gate
+  // says so and warns.
+  const enforced = required && (environment === 'prod' || expected !== undefined);
+  let warn = false;
+  if (required && enabled === 0) {
+    if (enforced) {
+      lines.push('no enabled, fully enrolled super_admin — nobody could administer this database');
+      ok = false;
+    } else {
+      lines.push('no enabled, fully enrolled super_admin — NOT enforced under --environment dev '
+        + 'without --expect-super-admin; pass it to enforce the production rule here too');
+      warn = true;
+    }
+  }
   if (!required && !expected) lines.push('(informational in this phase)');
-  report.add('Production super admin', required ? (ok ? 'PASS' : 'FAIL') : (ok ? 'INFO' : 'WARN'), lines);
+  const verdict: Verdict = enforced
+    ? (ok ? 'PASS' : 'FAIL')
+    : (ok ? (warn ? 'WARN' : 'INFO') : 'WARN');
+  report.add(gate, verdict, lines);
   return enabled;
 }
 
@@ -490,7 +570,13 @@ async function gateDanglingReferences(
         lines.push(`       ALTER TABLE public.${t.name} ADD CONSTRAINT ${String(conname ?? '<fk constraint>')} FOREIGN KEY (${ref.column}) REFERENCES public.${ref.references}(id);`);
       } else {
         fail = true;
-        lines.push(`FAIL ${label} — NOT NULL reference cannot be reinstated; the contract must decide this table`);
+        lines.push(`FAIL ${label} — NOT NULL reference cannot be reinstated as-is`);
+        // AFLDB-ISSUE-141: where the contract HAS decided this case, print its decision
+        // rather than asking for one. A NOT NULL reference with no remediation recorded is
+        // still an undecided table, which is what the original message meant.
+        for (const line of (ref.remediation ?? 'the contract must decide this table').split('\n')) {
+          lines.push(`       ${line}`);
+        }
       }
     }
   }
@@ -516,6 +602,7 @@ export function writePlan(opts: Options): string[] {
   const input = {
     candidate: opts.database!, oldDatabase: opts.oldDatabase!,
     preCutoverDump: opts.preCutoverDump!, rebuiltDump: opts.rebuiltDump!,
+    environment: opts.environment,
   };
   const dir = opts.planDir!;
   mkdirSync(dir, { recursive: true });
@@ -570,7 +657,8 @@ async function main(): Promise<number> {
   if (opts.checklist) { printChecklist(); return 0; }
   if (opts.plan) {
     const written = writePlan(opts);
-    console.log('AFLDB-ISSUE-125 promotion plan written (nothing executed, no database contacted):');
+    console.log(`AFLDB-ISSUE-125 promotion plan written for --environment ${opts.environment} `
+      + '(nothing executed, no database contacted):');
     for (const path of written) console.log(`  ${path}`);
     console.log('\nRead every file before running it. The .sh is a transcript to follow, not a script to pipe.');
     return 0;
@@ -582,7 +670,8 @@ async function main(): Promise<number> {
   const dsn = withDatabase(baseDsn, opts.database!);
   const phase = opts.phase!;
 
-  console.log(`AFLDB-ISSUE-125 production promotion check — phase '${phase}'`);
+  const names = environmentNames(opts.environment);
+  console.log(`AFLDB-ISSUE-125 promotion check — environment '${opts.environment}' (live ${names.live}), phase '${phase}'`);
   console.log(`  mode      : READ-ONLY (server-enforced), no DDL, no DML, no restore path`);
   console.log(`  target    : ${opts.database} via ${opts.dsnEnv} (database name replaced; DSN host/role unchanged: ${databaseOf(baseDsn)} -> ${opts.database})`);
 
@@ -594,8 +683,10 @@ async function main(): Promise<number> {
     const { present } = await gateClassification(conn.q, report);
     await gateMigrationParity(conn.q, report);
     if (opts.expectFingerprint) await gateFingerprint(conn.q, opts.expectFingerprint, report);
-    const fixtures = await gateFixtureIdentities(conn.q, present, phase, report);
-    const superAdmins = await gateSuperAdmin(conn.q, present, phase, opts.expectSuperAdmin, report);
+    const fixtures = await gateFixtureIdentities(
+      conn.q, present, phase, opts.environment, opts.allowFixtureIdentities, report);
+    const superAdmins = await gateSuperAdmin(
+      conn.q, present, phase, opts.environment, opts.expectSuperAdmin, report);
     const counts = await gateInventory(conn.q, present, report);
     await gatePrivileges(conn.q, present, phase === 'candidate' || phase === 'production', report);
 
@@ -624,10 +715,10 @@ async function main(): Promise<number> {
   const failed = report.results.filter((r) => r.verdict === 'FAIL').map((r) => r.gate);
   console.log(`\n${'='.repeat(78)}`);
   if (failed.length === 0) {
-    console.log(`PROMOTION CHECK (${phase}): PASS — ${report.results.length} gate(s) evaluated, none failed.`);
+    console.log(`PROMOTION CHECK (${opts.environment}/${phase}): PASS — ${report.results.length} gate(s) evaluated, none failed.`);
     return 0;
   }
-  console.log(`PROMOTION CHECK (${phase}): REFUSED — ${failed.length} gate(s) failed:`);
+  console.log(`PROMOTION CHECK (${opts.environment}/${phase}): REFUSED — ${failed.length} gate(s) failed:`);
   for (const gate of failed) console.log(`  - ${gate}`);
   console.log('Do not proceed past this phase until every failed gate passes.');
   return 1;

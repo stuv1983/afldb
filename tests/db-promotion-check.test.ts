@@ -14,8 +14,10 @@ import { describe, expect, it } from 'vitest';
 import {
   ACCEPTANCE_CHECKLIST,
   CANDIDATE_PREFIX,
+  DEFAULT_ENVIRONMENT,
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
+  ENVIRONMENTS,
   PRE_REBUILD_PREFIX,
   PROMOTION_CONTRACT,
   PromotionRefused,
@@ -29,6 +31,7 @@ import {
   compareCounts,
   contractByName,
   databaseOf,
+  environmentNames,
   isTestFixtureEmail,
   publicContractTables,
   reinstatePlan,
@@ -77,8 +80,7 @@ const PINNED_FOOTBALL_TABLES = [
   'clubs', 'data_issues', 'derived_rebuilds', 'draft_persons', 'draft_picks', 'external_identities',
   'father_son_selections', 'hall_of_fame', 'honour_team_members', 'import_batches', 'import_rejections',
   'match_coaches', 'match_period_scores', 'matches', 'player_achievements', 'player_birth_evidence',
-  'player_career_stats',
-  'external_grid_axes', 'external_grid_sources', 'external_grids', 'player_height_evidence',
+  'player_career_stats', 'player_height_evidence',
   'player_club_season_stats', 'player_clubs', 'player_match_period_stats', 'player_match_stats',
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',
@@ -112,6 +114,29 @@ describe('the contract covers every non-football table the migrations create', (
     // data_issues is import-owned (migration 001) and import-writable: the rebuild's.
     expect(contractByName('data_issues')).toBeUndefined();
     expect(PINNED_FOOTBALL_TABLES).toContain('data_issues');
+  });
+
+  // AFLDB-ISSUE-141. The three migration-080 tables are deliberately NOT import-writable
+  // (080_external_grids.sql: grant_import_write() would hand out UPDATE/DELETE/TRUNCATE and
+  // privileges.sql would restore them at every reconcile). Before this issue they were in
+  // neither set, so the classification gate refused every database carrying 080 AND — the
+  // substantive defect — a generated plan named them in neither the truncate list nor the
+  // reinstate list, which would have swapped an immutable captured corpus for empty tables.
+  it('classifies every migration-080 table, so a plan can never silently drop the corpus', () => {
+    const trio = ['external_grid_sources', 'external_grids', 'external_grid_axes'];
+    for (const name of trio) {
+      const t = contractByName(name);
+      expect(t, `${name} must have an explicit treatment`).toBeDefined();
+      expect(t!.treatment, name).toBe('reinstate');
+      expect(t!.compare, name).toBe('equal');
+      expect(truncatedPublicTables(), name).toContain(name);
+      expect(reinstatedPublicTables(), name).toContain(name);
+    }
+    // Never registered import-writable: that is what makes the corpus immutable.
+    const migration = readFileSync(join(MIGRATIONS, '080_external_grids.sql'), 'utf8');
+    for (const name of trio) expect(migration).not.toContain(`grant_import_write('${name}')`);
+    // And the migration really does create all three, so the contract is not naming ghosts.
+    for (const name of trio) expect(migrationPublicTables().has(name), name).toBe(true);
   });
 
   it('has no duplicate entries and a note on every row', () => {
@@ -168,14 +193,33 @@ describe('the production-only state contract', () => {
 
   it('declares every FK into rebuilt data that the migrations define on a contract table', () => {
     // From the migrations: 023 data_submissions.import_batch_id, 056 player_link_resolutions.player_id,
-    // 067 player_link_match_candidates.player_id, 074 promotion_decisions.candidate_id.
+    // 067 player_link_match_candidates.player_id, 074 promotion_decisions.candidate_id,
+    // 080 external_grid_sources.ingest_source_id and external_grids.import_batch_id.
     const refs = PROMOTION_CONTRACT.flatMap((t) => (t.footballRefs ?? []).map((r) => `${t.name}.${r.column}->${r.references}`)).sort();
     expect(refs).toEqual([
       'data_submissions.import_batch_id->import_batches',
+      'external_grid_sources.ingest_source_id->sources',
+      'external_grids.import_batch_id->import_batches',
       'player_link_match_candidates.player_id->players',
       'player_link_resolutions.player_id->players',
       'promotion_decisions.candidate_id->promotion_candidates',
     ]);
+  });
+
+  // AFLDB-ISSUE-141. Both migration-080 references are NOT NULL into import-writable
+  // (rebuilt) tables, so neither can take the nullable exception path of §7.4. The contract
+  // must therefore carry a decided remediation for each, or the checker's refusal has no
+  // path out of it and the corpus is stranded.
+  it('records an explicit remediation for every NOT NULL reference it reinstates', () => {
+    for (const t of PROMOTION_CONTRACT) {
+      for (const ref of t.footballRefs ?? []) {
+        if (t.treatment !== 'reinstate' || ref.nullable) continue;
+        expect(ref.remediation, `${t.name}.${ref.column}`).toBeTruthy();
+        expect(ref.remediation!.length, `${t.name}.${ref.column}`).toBeGreaterThan(40);
+      }
+    }
+    expect(contractByName('external_grids')!.footballRefs![0].remediation).toMatch(/import_batches/);
+    expect(contractByName('external_grid_sources')!.footballRefs![0].remediation).toMatch(/gridley/);
   });
 });
 
@@ -193,6 +237,25 @@ describe('reinstatement order and generated SQL', () => {
     expect(order).not.toContain('promotion_decisions');
     expect(order).not.toContain('player_link_match_candidates');
     expect(order).not.toContain('canonical_applications');
+  });
+
+  // AFLDB-ISSUE-141. external_grids.source_id -> external_grid_sources (NOT NULL) and
+  // external_grid_axes.grid_id -> external_grids (ON DELETE CASCADE): the reinstate order
+  // is the only thing that keeps a per-table pg_restore from tripping either FK, and the
+  // truncate must remove migration 080's own external_grid_sources seed before the dump's
+  // row is restored so external_grids.source_id lands on the same id.
+  it('reinstates the captured grid corpus in FK order, after emptying the migration seed', () => {
+    const order = reinstatedPublicTables();
+    const at = (n: string) => order.indexOf(n);
+    expect(at('external_grid_sources')).toBeGreaterThanOrEqual(0);
+    expect(at('external_grids')).toBeGreaterThan(at('external_grid_sources'));
+    expect(at('external_grid_axes')).toBeGreaterThan(at('external_grids'));
+    const truncate = truncateSql();
+    for (const n of ['external_grid_sources', 'external_grids', 'external_grid_axes']) {
+      expect(truncate, n).toContain(`public.${n}`);
+    }
+    // Truncated together in the one statement, so no CASCADE is needed for the cascade FK.
+    expect(truncate).not.toMatch(/CASCADE/);
   });
 
   it('truncates every non-rebuilt contract table in one statement, without CASCADE', () => {
@@ -239,6 +302,52 @@ describe('reinstatement order and generated SQL', () => {
     expect(plan).toContain('privileges.sql');
     expect(plan).toContain('--phase candidate');
     expect(plan).not.toMatch(/postgres(ql)?:\/\//);
+  });
+
+  it('the generated plan restores the migration-080 corpus, in order', () => {
+    const plan = reinstatePlan({
+      candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod',
+      preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump',
+    });
+    const tables = [...plan.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1]);
+    expect(tables).toContain('external_grid_sources');
+    expect(tables).toContain('external_grids');
+    expect(tables).toContain('external_grid_axes');
+    expect(tables.indexOf('external_grids')).toBeGreaterThan(tables.indexOf('external_grid_sources'));
+    expect(tables.indexOf('external_grid_axes')).toBeGreaterThan(tables.indexOf('external_grids'));
+  });
+
+  // AFLDB-ISSUE-141. The plan is environment-aware, and `prod` output is byte-identical to
+  // what it was before the environment existed.
+  it('generates the same production plan as before, and a DEV plan only when asked', () => {
+    const base = {
+      oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump',
+    };
+    const prod = reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x' });
+    expect(prod).toBe(reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x', environment: 'prod' }));
+    expect(prod).toContain('PROD (afldb-prod)');
+    expect(prod).not.toContain('--environment');
+
+    const dev = reinstatePlan({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev',
+      preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump', environment: 'dev',
+    });
+    expect(dev).toContain('DEV (streamanator)');
+    expect(dev).toContain('--environment dev');
+    expect(dev).not.toContain('afldb-prod');
+    // Same contract, same tables, same order: dev is a name shape, not a different plan.
+    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables());
+  });
+
+  it('names the environment in the audit marker, defaulting to production', () => {
+    const prod = auditMarkerSql({ candidate: 'c', oldDatabase: 'o', preCutoverDump: 'p', rebuiltDump: 'r' });
+    expect(prod).toContain("'operator: production promotion (AFLDB-ISSUE-125)'");
+    expect(prod).toContain("'environment', 'prod'");
+    const dev = auditMarkerSql({
+      candidate: 'c', oldDatabase: 'o', preCutoverDump: 'p', rebuiltDump: 'r', environment: 'dev',
+    });
+    expect(dev).toContain("'operator: dev promotion (AFLDB-ISSUE-125)'");
+    expect(dev).toContain("'environment', 'dev'");
   });
 });
 
@@ -334,6 +443,67 @@ describe('database-name contract', () => {
     expect(() => assertOldDatabaseName('afldb_dev')).toThrow(PromotionRefused);
   });
 
+  // AFLDB-ISSUE-141. The environment is an explicit descriptor, never a deduction from the
+  // name offered. The matrix below is the whole safety property: one more accepted shape per
+  // phase, and every refusal that existed before still refuses.
+  it('defaults to production, and production behaviour is unchanged without the flag', () => {
+    expect(DEFAULT_ENVIRONMENT).toBe('prod');
+    expect([...ENVIRONMENTS].sort()).toEqual(['dev', 'prod']);
+    const prod = environmentNames();
+    expect(prod).toMatchObject({
+      environment: 'prod', live: 'afldb_prod', source: 'afldb_test',
+      candidatePrefix: CANDIDATE_PREFIX, preRebuildPrefix: PRE_REBUILD_PREFIX,
+    });
+    expect(environmentNames('prod')).toEqual(prod);
+    // Every no-environment call site keeps the production contract.
+    expect(() => assertDatabaseForPhase('production', 'afldb_prod')).not.toThrow();
+    expect(() => assertDatabaseForPhase('production', 'afldb_dev')).toThrow(PromotionRefused);
+    expect(() => assertOldDatabaseName('afldb_prod')).not.toThrow();
+    expect(() => assertOldDatabaseName('afldb_dev')).toThrow(PromotionRefused);
+  });
+
+  it('accepts the dev shapes only under --environment dev, with the same fail-closed matrix', () => {
+    const dev = environmentNames('dev');
+    expect(dev).toMatchObject({
+      environment: 'dev', live: 'afldb_dev', source: 'afldb_test',
+      candidatePrefix: 'afldb_dev_candidate_', preRebuildPrefix: 'afldb_dev_pre_rebuild_',
+    });
+
+    // Source: the rebuild target is afldb_test in both environments — db:test:rebuild
+    // accepts no other name — so this phase is deliberately identical.
+    expect(() => assertDatabaseForPhase('source', 'afldb_test', 'dev')).not.toThrow();
+    expect(() => assertDatabaseForPhase('source', 'afldb_dev', 'dev')).toThrow(PromotionRefused);
+
+    // Live phases.
+    for (const phase of ['pre-cutover', 'production'] as const) {
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev', 'dev')).not.toThrow();
+      expect(() => assertDatabaseForPhase(phase, 'afldb_prod', 'dev')).toThrow(PromotionRefused);
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev', 'prod')).toThrow(PromotionRefused);
+    }
+
+    // Candidate phases: a dev candidate under dev, and nothing else.
+    for (const phase of ['restored', 'candidate'] as const) {
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev_candidate_20260906', 'dev')).not.toThrow();
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev', 'dev')).toThrow(/never a candidate/);
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev_candidate_', 'dev')).toThrow(PromotionRefused);
+      expect(() => assertDatabaseForPhase(phase, 'afldb_prod_candidate_20260906', 'dev')).toThrow(PromotionRefused);
+      expect(() => assertDatabaseForPhase(phase, 'afldb_dev_candidate_20260906', 'prod')).toThrow(PromotionRefused);
+    }
+
+    // Malformed names are refused before the environment is consulted at all.
+    expect(() => assertDatabaseForPhase('source', 'afldb_test; DROP', 'dev')).toThrow(/not a plausible/);
+    expect(() => assertDatabaseForPhase('candidate', 'afldb_dev_candidate_x; DROP', 'dev')).toThrow(/not a plausible/);
+
+    // Old-database names, both directions.
+    expect(() => assertOldDatabaseName('afldb_dev', 'dev')).not.toThrow();
+    expect(() => assertOldDatabaseName('afldb_dev_pre_rebuild_20260906', 'dev')).not.toThrow();
+    expect(() => assertOldDatabaseName('afldb_dev_pre_rebuild_', 'dev')).toThrow(PromotionRefused);
+    expect(() => assertOldDatabaseName('afldb_prod', 'dev')).toThrow(PromotionRefused);
+    expect(() => assertOldDatabaseName('afldb_prod_pre_rebuild_20260906', 'dev')).toThrow(PromotionRefused);
+    expect(() => assertOldDatabaseName('afldb_dev_pre_rebuild_20260906', 'prod')).toThrow(PromotionRefused);
+    expect(() => assertOldDatabaseName('afldb_test', 'dev')).toThrow(PromotionRefused);
+  });
+
   it('replaces the database name in a DSN and nothing else', () => {
     const dsn = 'postgresql://afldb_owner:s3cret@127.0.0.1:5432/afldb_dev?sslmode=disable';
     const out = withDatabase(dsn, 'afldb_prod_candidate_1');
@@ -409,6 +579,49 @@ describe('checker arguments', () => {
     expect(restored.oldDatabase).toBe('afldb_prod');
   });
 
+  // AFLDB-ISSUE-141.
+  it('defaults --environment to prod and refuses anything but prod|dev', () => {
+    expect(parseArgs(['--phase', 'source', '--database', 'afldb_test']).environment).toBe('prod');
+    expect(parseArgs(['--environment', 'prod', '--phase', 'production', '--database', 'afldb_prod']).environment).toBe('prod');
+    expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).environment).toBe('dev');
+    expect(() => parseArgs(['--environment', 'staging', '--phase', 'source', '--database', 'afldb_test']))
+      .toThrow(/Unknown environment/);
+    expect(() => parseArgs(['--environment', '--phase'])).toThrow(/needs a value/);
+  });
+
+  it('binds each phase to its own environment, in both directions', () => {
+    // dev names are refused under the default (prod) contract
+    expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_dev'])).toThrow(PromotionRefused);
+    expect(() => parseArgs(['--phase', 'candidate', '--database', 'afldb_dev_candidate_1'])).toThrow(PromotionRefused);
+    // prod names are refused once dev is stated
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_prod'])).toThrow(PromotionRefused);
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`])).toThrow(PromotionRefused);
+    expect(() => parseArgs(['--environment', 'dev', '--phase', 'restored', '--database', 'afldb_dev_candidate_1',
+      '--old-database', 'afldb_prod'])).toThrow(PromotionRefused);
+    // and the dev path works when everything is stated
+    const dev = parseArgs(['--environment', 'dev', '--phase', 'restored',
+      '--database', 'afldb_dev_candidate_1', '--old-database', 'afldb_dev']);
+    expect(dev).toMatchObject({ environment: 'dev', database: 'afldb_dev_candidate_1', oldDatabase: 'afldb_dev' });
+  });
+
+  it('offers the fixture-identity acceptance on DEV only, and never by default', () => {
+    expect(parseArgs(['--phase', 'production', '--database', 'afldb_prod']).allowFixtureIdentities).toBe(false);
+    expect(parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev']).allowFixtureIdentities)
+      .toBe(false);
+    const accepted = parseArgs(['--environment', 'dev', '--phase', 'production', '--database', 'afldb_dev',
+      '--allow-fixture-identities']);
+    expect(accepted.allowFixtureIdentities).toBe(true);
+    // Refused under prod — including the implicit prod of no --environment at all, and even
+    // in the modes that never consult it, so it can never be silently ignored.
+    for (const argv of [
+      ['--phase', 'production', '--database', 'afldb_prod', '--allow-fixture-identities'],
+      ['--environment', 'prod', '--phase', 'production', '--database', 'afldb_prod', '--allow-fixture-identities'],
+      ['--checklist', '--allow-fixture-identities'],
+    ]) {
+      expect(() => parseArgs(argv), argv.join(' ')).toThrow(/DEV-only/);
+    }
+  });
+
   it('the plan needs a candidate, the old database, both dumps and a directory; the checklist needs nothing', () => {
     expect(parseArgs(['--checklist']).checklist).toBe(true);
     expect(() => parseArgs(['--plan', '--database', 'afldb_prod'])).toThrow(/only ever run on a candidate/);
@@ -417,6 +630,25 @@ describe('checker arguments', () => {
     const plan = parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
       '--pre-cutover-dump', 'a.dump', '--rebuilt-dump', 'b.dump', '--plan-dir', 'out']);
     expect(plan).toMatchObject({ plan: true, planDir: 'out', preCutoverDump: 'a.dump', rebuiltDump: 'b.dump' });
+  });
+
+  // AFLDB-ISSUE-141. --plan is the only supported producer of a preservation plan, so its
+  // prefix check is the gate that decides whether DEV can be promoted by the procedure at all.
+  it('binds --plan to the stated environment candidate prefix', () => {
+    const devArgs = ['--plan', '--database', 'afldb_dev_candidate_1', '--old-database', 'afldb_dev',
+      '--pre-cutover-dump', 'a.dump', '--rebuilt-dump', 'b.dump', '--plan-dir', 'out'];
+    expect(() => parseArgs(devArgs)).toThrow(/only ever run on a candidate/);
+    expect(parseArgs(['--environment', 'dev', ...devArgs])).toMatchObject({
+      plan: true, environment: 'dev', database: 'afldb_dev_candidate_1', oldDatabase: 'afldb_dev',
+    });
+    // A bare prefix with no stamp is still not a candidate name.
+    expect(() => parseArgs(['--environment', 'dev', '--plan', '--database', 'afldb_dev_candidate_',
+      '--old-database', 'afldb_dev', '--pre-cutover-dump', 'a', '--rebuilt-dump', 'b', '--plan-dir', 'o']))
+      .toThrow(/only ever run on a candidate/);
+    // The production candidate prefix is refused once dev is stated, and vice versa.
+    expect(() => parseArgs(['--environment', 'dev', '--plan', '--database', `${CANDIDATE_PREFIX}1`,
+      '--old-database', 'afldb_dev', '--pre-cutover-dump', 'a', '--rebuilt-dump', 'b', '--plan-dir', 'o']))
+      .toThrow(/only ever run on a candidate/);
   });
 });
 
@@ -440,6 +672,52 @@ describe('the checker is read-only by construction', () => {
   it('never prints a DSN: the target line names the variable and the database only', () => {
     expect(source).toMatch(/via \$\{opts\.dsnEnv\}/);
     expect(source).not.toMatch(/console\.log\([^)]*\bdsn\b/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-141. The two gates that differ on DEV are database-bound, so their behaviour
+ * is pinned here from the source text — the same technique this file already uses to prove
+ * the checker carries no write path. What must hold: the refusal is still the default, the
+ * relaxation is reachable only from the explicit flag, and accepting fixtures makes the
+ * checker print MORE, never less.
+ */
+describe('the DEV relaxations are explicit, and never silent', () => {
+  const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+
+  it('keeps the fixture refusal as the default and only WARNs behind the flag', () => {
+    const gate = source.slice(source.indexOf('async function gateFixtureIdentities'),
+                              source.indexOf('async function gateSuperAdmin'));
+    // Still a refusal in the phases that require absence...
+    expect(gate).toMatch(/mustBeAbsent[\s\S]*'Test-fixture identities', 'FAIL'/);
+    // ...and the only way past it is the flag, checked together with mustBeAbsent.
+    expect(gate).toMatch(/mustBeAbsent && allowAccepted/);
+    expect(gate).toContain('CONSCIOUSLY ACCEPTED');
+    expect(gate).toContain("'WARN'");
+    // Accepting prints every row: the ten-row sample cap is lifted, never widened silently.
+    expect(gate).toMatch(/const sampleLimit = allowAccepted \? '' : ' LIMIT 10'/);
+    expect(gate).toContain('${sampleLimit}');
+    expect(gate).not.toMatch(/ORDER BY email LIMIT 10/);
+  });
+
+  it('makes the super-admin expectation optional on DEV only when it was not asked for', () => {
+    const gate = source.slice(source.indexOf('async function gateSuperAdmin'),
+                              source.indexOf('async function gateInventory'));
+    expect(gate).toMatch(/const enforced = required && \(environment === 'prod' \|\| expected !== undefined\)/);
+    // The unenforced path still says so out loud rather than dropping the check.
+    expect(gate).toContain('NOT enforced under --environment dev');
+    expect(gate).toContain("warn = true");
+  });
+
+  it('never infers the environment from a database name', () => {
+    // The only writers of Options.environment are the explicit flag and the default.
+    expect(source).toMatch(/case '--environment'/);
+    expect((source.match(/out\.environment = /g) ?? []).length).toBe(1);
+    expect(source).toContain('environment: DEFAULT_ENVIRONMENT');
+    expect(source).not.toMatch(/startsWith\('afldb_dev/);
+    expect(source).not.toMatch(/=== 'afldb_dev'/);
+    // And the DEV-only flag is refused before any early return.
+    expect(source).toMatch(/allowFixtureIdentities && out\.environment !== 'dev'/);
   });
 });
 

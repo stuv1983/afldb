@@ -6,8 +6,19 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-09-05
-**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`.
+**Last updated:** 2026-09-06
+**Open issues:** 5 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`.
+
+<!-- UPDATE 2026-09-06 (ISSUE-141 closeout): `AFLDB-ISSUE-141` is **Resolved**. The
+     promotion contract now classifies the migration-080 Gridley trio (reinstate, FK order
+     external_grid_sources 20 -> external_grids 30 -> external_grid_axes 40) so a generated
+     plan can no longer drop the captured corpus, and `db:promotion:check` takes an explicit
+     `--environment prod|dev` defaulting to `prod`. Verified DB-free: 52/52 in
+     `tests/db-promotion-check.test.ts`, repo-wide typecheck clean, lint clean on every
+     touched file, and both a prod and a dev plan generated and read back. **The work is
+     uncommitted in the `main` working tree** — `AFLDB-ISSUE-139` unblocks on the merge, not
+     on this status. Authoritative record: `issues.md` (Resolution, 2026-09-06). Next free
+     issue ID is `AFLDB-ISSUE-142`. -->
 
 <!-- UPDATE 2026-09-05 (ISSUE-118 REOPENED, later the same day): the closeout below stands as
      history, but its acceptance definition was too weak — 28 valid Gridley criteria were counted
@@ -501,8 +512,22 @@ closure boundary, and the unrelated query-builder timing regression remains with
      identity gap, split HALT exercised against the real database. Committed on `claude/issue-136`, not
      merged. Authoritative records: the `AFLDB-ISSUE-136` entry in `issues.md` (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-136.md` §13. Follow-up: `AFLDB-ISSUE-137`. -->
+<!-- UPDATE 2026-09-06 (ISSUE-118 DEV load attempted): the `AFLDB-ISSUE-118` follow-up "DEV load"
+     was executed on `streamanator` / `afldb_dev` at `c2a5a13`. **After-siren loaded** (batch 105:
+     126 events, 126 rows, 123 linked / 3 unresolved, 121 matches linked; `after_siren.py reconcile`
+     38/38 — the same contract the canonical rebuild's AFTER-SIREN RECONCILE stage runs). **Coaches,
+     father-son and siblings could NOT be loaded**: all three resolve people only through the AFL
+     Tables profile-url identity and `afldb_dev` registers 12,472 of the accepted baseline's 13,271,
+     so they fail closed on 2 / 40 / 29 missing profiles respectively. That gap is now
+     `AFLDB-ISSUE-139`; the 17 duplicate stat-less 2026 matches found while explaining one unresolved
+     after-siren kicker are `AFLDB-ISSUE-140`. No code changed, no name-based identity written,
+     `import_fitzroy_core.py` was NOT run against `afldb_dev`, and production was untouched.
+     **Next free issue ID is `AFLDB-ISSUE-142`.** -->
+
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | **NOT STARTED — allocated 2026-09-04 at the ISSUE-136 closeout; no production mutation authorised.** Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixes at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack Williams: a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url, the duplicate carrying the 2025 match rows, the awards-census rows and every 2026 settle row). The fixed importer HALTs (`external-identity split`) against such a database by design. Key files: `issues/closed/AFLDB-ISSUE-136.md` §10.3/§13.4 (verification SQL), `tools/migration/import_fitzroy_core.py`, `AFLDB-ISSUE-125` (promotion path). | Operator chooses (a) canonical rebuild-and-promote under `AFLDB-ISSUE-125`, or (b) a supervised, reviewed per-player identity reconciliation on production (re-point the renumbered identity, match rows, award rows and settle rows to the career player, recompute derived tables, retire the duplicate) after a production backup; first step of either is a read-only measurement of the production split. |
 | `AFLDB-ISSUE-138` | Low | Testing / Database privileges | **OPEN — found 2026-09-05 during ISSUE-118 §23.28.** `tests/integration/privileges.test.ts` ("afldb_import writes exactly the tables the registry allows") reports `external_grids` / `external_grid_axes` as writable-but-unregistered on every database since migration `080`, whose narrow `afldb_import` grants (SELECT + INSERT, UPDATE on `is_current`) are deliberate and outside the registry; reproduced hand-migrated and after a clean 18-stage rebuild, 34/35 pass. No privilege is wrong. | Extend the suite's exclusion list with the two tables and assert the 080 narrow shape (no DELETE/TRUNCATE), mirroring the `data_overrides` column-scoped case; no privilege change. |
+| `AFLDB-ISSUE-139` | High | Data integrity / Import architecture / Database (dev) | **OPEN — Phases 1-3 done 2026-09-06 (read-only; no DB write). Was BLOCKED on `AFLDB-ISSUE-141`, now Resolved 2026-09-06 but UNCOMMITTED — resume once it is merged.** `afldb_dev` is the pre-rebuild bootstrap database: 12,472 `afltables_profile_url` identities against the accepted baseline's 13,271 players, leaving 891 `players` rows with no identity, so `father_son.py` (2 profiles), `family_siblings.py` (40) and `import_match_coaches.py` (29 of 368) fail closed on DEV; `after_siren.py` resolves by match participation and loaded fine (126 rows, reconcile 38/38). **Path (a), canonical rebuild-and-promote, is chosen.** Phase 1 established the supported contract (rebuild `afldb_test` -> restore into a candidate -> truncate + reinstate the non-rebuilt tables from a mandatory pre-cutover dump -> `privileges.sql` -> checker -> `ALTER DATABASE … RENAME` swap; current season re-acquired and `data_overrides` replayed afterwards). Phase 2's DEV-only state is classified in `issues.md` (preserve / reacquire / reproducible / discardable / uncertain). **Phase 3 gate DOES NOT PASS:** the preservation plan cannot be generated or accepted for a DEV database, and the migration-080 Gridley corpus has no treatment at all, so a plan generated today would silently drop it — `AFLDB-ISSUE-141`. Key files: `tools/migration/{father_son,family_siblings,import_match_coaches,import_fitzroy_core}.py`, `tools/db/rebuild-test.ts`, `tools/db/promotion-*.ts`. | **Nothing here runs until the `AFLDB-ISSUE-141` work is committed and merged** — no rebuild, no candidate, no swap. Then resume at Phase 4 (every checker phase under `--environment dev`, and settle `external_grids.import_batch_id` per `docs/production-promotion.md` §7.4b before the corpus reinstate): drive the rebuild from a workstation checkout holding the acquired snapshot bytes (`D:/dev/afldb-issue-118` has `full-history-20260902`, `club-lists-20260905`, `coaches-20260905`, `rosters-20260905`, DraftGuru symlinks) against `afldb_test` on `streamanator` over the 55432 tunnel — DEV holds none of those bytes — then candidate, plan, swap, replay `data_overrides`, regenerate `player_link_match_candidates`, re-acquire 2026 through the supervised ladder, then Phase 6 validation and the `AFLDB-ISSUE-140` re-measurement. Never match by name; never point `import_fitzroy_core.py` at `afldb_dev`. |
+| `AFLDB-ISSUE-140` | Medium | Data integrity / Import (current season) | **OPEN — found 2026-09-06 during the ISSUE-118 DEV load. Not started; nothing deleted.** `afldb_dev` holds 17 duplicate 2026 fixtures (34 rows, rounds 23-25): one copy carries the stats, the other is empty and sits one `round_number` lower — AFL Tables' numbering, which omits Opening Round, against AFLDB's which counts it. All 17 stat-less rows are under round 23 (9) and 24 (8) with no `match_period_scores`. `match_key` embeds the round, so the two conventions key one fixture twice and no upsert collapses them. Observed effect: the after-siren loader matched `2026-vfl-afl-23-hawthorn-dylan-moore` to the empty round-23 row (17046) and left the kicker unresolved. Production not measured. Key files: the settle path (`AFLDB-ISSUE-099`), `tools/migration/import_fitzroy_core.py` match identity, `AFLDB-ISSUE-131` (rekey-in-place precedent). | Read-only: identify which writer produced the stat-less copies and its round-number convention from `import_batches` / provenance, then measure production read-only. Do not delete rows first — the next settle would recreate them. |
 <!-- RESOLVED 2026-09-06 (§23.38) — `AFLDB-ISSUE-118` is **Resolved** and is NO LONGER an open issue.
      After-siren integrated into the deterministic rebuild (data stage + `after-siren-reconcile`); FK
      index migration `090` added the one ISSUE-118 migration 086 left off. Full `afldb_test` rebuild:

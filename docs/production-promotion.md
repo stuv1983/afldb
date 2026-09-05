@@ -1,4 +1,4 @@
-# AFLDB — Promoting a rebuilt database to production
+# AFLDB — Promoting a rebuilt database to a live database
 
 **Scope.** Replacing production's canonical football data with a clean rebuilt database
 (`afldb_test`, from `npm run db:test:rebuild`) while every table that only ever existed on
@@ -7,6 +7,14 @@ authority, audit and telemetry — survives intact, and nothing from the test da
 production state. The procedure exists because the 2026-09-02 cutover (`AFLDB-ISSUE-122` §S8)
 restored the rebuilt dump *over* `afldb_prod` and promoted a test fixture super admin into
 production; recovery worked only because a dump had been taken first. `AFLDB-ISSUE-125`.
+
+**Two environments, and production is the default.** Everything below is the **production**
+contract. `AFLDB-ISSUE-141` added an explicit `--environment prod|dev` so the *same* supported
+path can also converge `afldb_dev` (`AFLDB-ISSUE-139`) instead of hand-written per-table
+dump/restore, which is the improvisation this procedure exists to prevent. The environment is
+always stated on the command line and is **never inferred from a database name**. Read §13
+before promoting a DEV database: DEV is not production authority, the two environments do not
+have the same operational standing, and only two gates differ.
 
 **Two hosts, named on every command.**
 
@@ -71,6 +79,9 @@ promoted by accident.
 | `app_health_events` | health telemetry | yes | reinstate | Conscious retention; FK is `ON DELETE SET NULL`. |
 | `promotion_decisions` | observation spine | yes | **reset — recorded gap** | Decisions on `promotion_candidates`, which the rebuild replaces. Retained only in the pre-cutover dump and the kept database; named in the audit marker. |
 | `canonical_applications` | settle ledger | no | rebuilt | Machine ledger of the rebuilt rows. Production's settle ledger is a recorded gap. |
+| `external_grid_sources` | Grid Solver corpus | yes | reinstate (first of three) | Seeded by migration 080 itself: the truncate removes the candidate's seed so the dump's row keeps its id. `ingest_source_id` → rebuilt `sources` → probed (§7.4b). |
+| `external_grids` | Grid Solver corpus | yes | reinstate | Captured Gridley boards with their raw payloads. **Immutable evidence, no rebuild stage** — a rebuilt candidate has this empty and the rescued legacy archive cannot be re-fetched. `import_batch_id` is NOT NULL into rebuilt `import_batches` → §7.4b. |
+| `external_grid_axes` | Grid Solver corpus | yes | reinstate (last of three) | The six captured criteria per board revision. `ON DELETE CASCADE` from `external_grids`. |
 | `staging.*` | import / spine | no | rebuilt | Keyed to rebuilt `import_batches`. The current season is re-acquired (§9). |
 | `staging_aflw.*` | AFLW | yes | reinstate (schema) | **Not produced by the rebuild**; a rebuilt database has it empty. |
 | `afldb_meta.schema_migrations` | migrations | — | rebuilt, **parity-gated** | Must equal this checkout (§3, §6). |
@@ -78,8 +89,18 @@ promoted by accident.
 | everything in `import_writable_tables` | football | no | rebuilt | Canonical + derived (`player_clubs`, `player_club_season_stats`, `player_season_stats`, `player_career_stats`, `club_seasons`). |
 
 Reinstatement order is foreign-key order and is generated, not typed: `auth_users`, then
-every table that references it, then `data_submission_rows`, `nl_search_review`,
-`nl_search_feedback`, `app_health_events`.
+every table that references it and `external_grid_sources`, then `data_submission_rows`,
+`nl_search_review`, `nl_search_feedback`, `app_health_events` and `external_grids`, then
+`external_grid_axes` last.
+
+**Why the migration-080 tables are here.** They are deliberately **not** in
+`afldb_meta.import_writable_tables` (`080_external_grids.sql`: `grant_import_write()` hands out
+UPDATE, DELETE and TRUNCATE, and `privileges.sql` would restore them at every reconcile, which
+would end the corpus's immutability). Until `AFLDB-ISSUE-141` they were in neither set, so the
+classification gate refused every database carrying migration 080 — and, more seriously, a
+generated plan named them in neither the truncate list nor the reinstate list. Because there is
+no Gridley rebuild stage (`docs/deployment.md` §6a), the swap would have replaced an explicitly
+immutable captured corpus with the candidate's empty tables, and no gate would have noticed.
 
 ## 2. The checker
 
@@ -95,13 +116,20 @@ database name in it, so the same `.env` reaches `afldb_test`, `afldb_prod` or a 
 without a DSN ever appearing on a command line. Each phase is bound to one database shape
 and refuses any other by name:
 
-| Phase | Database | Gates |
-|---|---|---|
-| `source` | `afldb_test` | identity, classification, migration parity, fixtures (info), optional `--expect-fingerprint` |
-| `pre-cutover` | `afldb_prod` | + fixtures must be absent, super admin present, `--snapshot <file>` of row counts |
-| `restored` | `afldb_prod_candidate_<stamp>` | + `--old-database` dangling-reference probe |
-| `candidate` | `afldb_prod_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
-| `production` | `afldb_prod` | same as `candidate`, on the live name |
+| Phase | Database (`--environment prod`, the default) | Database (`--environment dev`) | Gates |
+|---|---|---|---|
+| `source` | `afldb_test` | `afldb_test` | identity, classification, migration parity, fixtures (info), optional `--expect-fingerprint` |
+| `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, `--snapshot <file>` of row counts |
+| `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe |
+| `candidate` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
+| `production` | `afldb_prod` | `afldb_dev` | same as `candidate`, on the live name |
+
+`--old-database` is `afldb_prod` / `afldb_prod_pre_rebuild_<stamp>` under `prod` and
+`afldb_dev` / `afldb_dev_pre_rebuild_<stamp>` under `dev`. `source` is `afldb_test` in both,
+because `db:test:rebuild` refuses any other target by name. The matrix is fail-closed in **both
+directions**: a `prod` name under `--environment dev` is refused, and a `dev` name under the
+default is refused. `--environment` adds one accepted shape per phase; it never makes a phase
+name-free, and it is never inferred from the name offered.
 
 Exit 0 is PASS; anything else is REFUSED with the failing gates named. A refusal at any
 phase stops the procedure at that phase.
@@ -259,6 +287,33 @@ for rows whose target is absent, re-add the FK with its original name. Record th
 row count in the promotion record. No other table gets this treatment; `player_link_match_candidates`
 is regenerated instead (§8) and `promotion_decisions` is a recorded gap (§1).
 
+### 7.4b The captured grid corpus's NOT NULL references (`AFLDB-ISSUE-141`)
+
+Two of the migration-080 references are **NOT NULL** into import-writable (rebuilt) tables, so
+neither can take the §7.4 nullable path. The checker prints the contract's decision beside the
+finding; both must be settled **before** the corpus's `pg_restore` line, and what was done
+recorded in the promotion record.
+
+* `external_grid_sources.ingest_source_id` → `sources`. `sources` is import-writable, so the
+  candidate's id for key `gridley` need not equal the dumped one. Migration 080 seeds that
+  `sources` row, so the candidate already has one: read it
+  (`SELECT id FROM sources WHERE key = 'gridley'`) and restore the table with
+  `ingest_source_id` set to it, or reinstate and then `UPDATE` the column. **Never insert a
+  `sources` row for this.**
+* `external_grids.import_batch_id` → `import_batches`. The rebuilt candidate holds the
+  *rebuild's* batches, not the batch that captured the corpus, so this reference dangles on any
+  real promotion. Two supportable answers, and the choice is the operator's:
+  1. reinstate the referenced `import_batches` row(s) from the pre-cutover dump **before** this
+     table — the ids must not collide with the candidate's own and the identity sequence must
+     be re-synced; or
+  2. open **one** batch in the candidate for the reinstatement and set `import_batch_id` to it.
+     This rewrites the corpus's ingest provenance, so it must be stated in the promotion record
+     and in the `database.promoted` marker's recorded gaps.
+
+  **Never drop the rows to make the FK pass.** The captured payload is the evidence, the
+  rescued legacy archive cannot be re-fetched, and there is no rebuild stage that would
+  recreate it.
+
 ### 7.5 Accept the candidate
 
 ```bash
@@ -387,3 +442,64 @@ candidate model is the existing backup/restore machinery plus a list, a probe an
   issue is this procedure.
 - `docs/backup-restore.md` — backup, proof and full disaster recovery.
 - `docs/deployment.md` §6a (clean rebuild), §7b (settle), §11 (code rollback).
+- `AFLDB-ISSUE-139` — converging `afldb_dev` through this procedure; the reason §13 exists.
+- `AFLDB-ISSUE-141` — the migration-080 treatments and the `--environment` descriptor.
+
+---
+
+## 13. Promoting a DEV database (`--environment dev`)
+
+**DEV is not production authority.** `afldb_dev` is the development database on
+`streamanator`; nothing on it is a production record, no reader depends on it, and a bad
+promotion there costs a rebuild rather than an incident. That is exactly why the relaxations
+below exist *only* here, and why nothing in this section may be carried back to `prod`.
+
+Everything else is identical, deliberately: the same contract, the same five phases, the same
+truncate/reinstate plan, the same FK order, the same fail-closed classification. `dev` is one
+more accepted **name shape** per phase, not a different procedure. §§0–12 apply as written,
+with `afldb_dev` for `afldb_prod`, `afldb_dev_candidate_<stamp>` for the candidate,
+`afldb_dev_pre_rebuild_<stamp>` for the database renamed aside, and `DEV: streamanator` on
+every command line where §§3–10 say `PROD: afldb-prod`.
+
+**What differs — and only these two things.**
+
+| Gate | `--environment prod` | `--environment dev` |
+|---|---|---|
+| Test-fixture identities | Refusal in `pre-cutover`, `candidate`, `production`. No override exists. | **Still a refusal by default.** `--allow-fixture-identities` accepts them consciously: the scan still runs, the verdict becomes WARN instead of FAIL, and the ten-row sample cap is **lifted** so every offending address is printed. Never silent, never partial. |
+| `--expect-super-admin` | Required in those phases: a database nobody can administer is not promoted. | Enforced exactly as on production **when the flag is given**. Omitted, the gate WARNs and says it is not enforced — optional, never silently dropped. |
+
+`--allow-fixture-identities` is refused outright under `--environment prod`, including the
+implicit `prod` of no `--environment` at all, and including modes that never consult it. A
+reserved-domain address can never be a production identity, and no flag changes that.
+
+**What is still real on DEV, and must not be lost.** A DEV promotion has no production human
+authority to protect, but it is not stateless:
+
+* the **captured Gridley corpus** (migration 080) — immutable evidence with no rebuild stage
+  and no re-fetch, and the reason `AFLDB-ISSUE-141` exists (§1, §7.4b);
+* admin and beta access state, `site_settings`, uploads, `data_edits`/`data_overrides` — real
+  operator choices, reinstated by the same contract;
+* the current season, which is **re-acquired** by a settle run (§9), not copied.
+
+**Before the first DEV promotion**, take the same mandatory backup (§4) and the same
+pre-cutover snapshot (§5). The relaxations above concern identity gates, not evidence: a DEV
+database is still restored into a *new* candidate and swapped by rename, never restored over.
+
+```bash
+# DEV: streamanator — the same five phases, with the environment stated every time
+npm run db:promotion:check -- --environment dev --phase source      --database afldb_test
+npm run db:promotion:check -- --environment dev --phase pre-cutover --database afldb_dev \
+    --snapshot ~/backups/afldb/promotion-dev-$STAMP.json
+npm run db:promotion:check -- --environment dev --plan --database "$CAND" \
+    --old-database afldb_dev --pre-cutover-dump <file> --rebuilt-dump <file> --plan-dir <dir>
+npm run db:promotion:check -- --environment dev --phase restored    --database "$CAND" \
+    --old-database afldb_dev
+npm run db:promotion:check -- --environment dev --phase candidate   --database "$CAND" \
+    --compare ~/backups/afldb/promotion-dev-$STAMP.json
+npm run db:promotion:check -- --environment dev --phase production  --database afldb_dev \
+    --compare ~/backups/afldb/promotion-dev-$STAMP.json
+```
+
+The generated plan names `DEV (streamanator)` as the host, carries `--environment dev` into its
+own acceptance command, and writes `'environment', 'dev'` into the `database.promoted` audit
+marker — so the audit trail records which environment was promoted, not merely that one was.
