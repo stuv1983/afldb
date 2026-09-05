@@ -105,8 +105,9 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean; siblings: boolean };
+type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean; fatherSon: boolean; siblings: boolean; afterSiren: boolean };
 const SIBLING_BUILDERS = new Set(['has_brother']);
+const AFTER_SIREN_BUILDERS = new Set(['after_siren_winner']);
 const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
 const DOB_BUILDERS = new Set(['age_on_debut_min']);
 const COACH_BUILDERS = new Set(['coached_by', 'premiership_coach']);
@@ -203,7 +204,7 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true };
+let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
@@ -251,7 +252,7 @@ const brotherEvidence = new Map<number, string>();
  */
 const DATA_GAPS: Record<string, string> = {
   unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required',
-  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches)',
+  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches, after-the-siren events)',
   'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
   'source coverage gap': "a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player. The absence of a row is UNKNOWN coverage, never 'no brother': the cell stays open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv",
@@ -301,7 +302,7 @@ beforeAll(async () => {
         FROM caps a JOIN caps b ON b.season = a.season AND b.club_id = a.club_id AND b.player_id <> a.player_id
         JOIN clubs c ON c.id = a.club_id
        GROUP BY a.player_id, a.season, c.name`,
-    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string; siblings: string }[]>`
+    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string; siblings: string; afterSiren: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
              (SELECT count(*) FROM draft_picks WHERE link_status_value IN ('unique', 'resolved')) AS "draftLinked",
@@ -310,7 +311,8 @@ beforeAll(async () => {
              (SELECT count(*) FROM players) AS "players",
              (SELECT count(*) FROM players WHERE dob IS NOT NULL) AS "dobs",
              (SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL) AS "fatherSon",
-             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) AS "siblings"`,
+             (SELECT count(*) FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL) AS "siblings",
+             (SELECT count(*) FROM after_siren_kicks WHERE player_id IS NOT NULL) AS "afterSiren"`,
   ]);
   // A dataset counts as present when at least half of it is usable: afldb_dev
   // links 5,103 of 6,810 draft picks; a rebuilt afldb_test links 5.
@@ -328,6 +330,8 @@ beforeAll(async () => {
     fatherSon: Number(probe.fatherSon) > 0,
     // ISSUE-118 §23.31: the siblings rebuild stage loads the tracked football-families export.
     siblings: Number(probe.siblings) > 0,
+    // ISSUE-118 §23.35: the after-siren load carries the tracked Wikipedia after-the-siren artefact.
+    afterSiren: Number(probe.afterSiren) > 0,
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
@@ -377,7 +381,8 @@ beforeAll(async () => {
           || (!gaps.dobs && DOB_BUILDERS.has(mapping.axis.builder))
           || (!gaps.coaches && COACH_BUILDERS.has(mapping.axis.builder))
           || (!gaps.fatherSon && FATHER_SON_BUILDERS.has(mapping.axis.builder))
-          || (!gaps.siblings && SIBLING_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
+          || (!gaps.siblings && SIBLING_BUILDERS.has(mapping.axis.builder))
+          || (!gaps.afterSiren && AFTER_SIREN_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
       } else if (mapping.status === 'unresolved' && gapLog.some((g) => g.startsWith(`${item.id}:`))) {
         gappedCriteria.add(item.id);
       }
@@ -411,7 +416,7 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.afterSiren && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
   it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {

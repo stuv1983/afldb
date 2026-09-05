@@ -226,6 +226,11 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   games_with_stat_min_count: { key: 'games_with_stat_min_count', label: 'X+ games with Y+ of a stat', group: 'Single-game feats', params: [stat(), int('y', 'At least (per game)'), int('times', 'In this many games')] },
   // The feat achieved for X+ distinct clubs (organizations, by lineage).
   single_game_stat_multi_club_min: { key: 'single_game_stat_multi_club_min', label: 'X+ of a stat in one game, for Y+ clubs (mergers folded)', group: 'Single-game feats', params: [stat(), int('x', 'At least'), int('clubs', 'Clubs')] },
+  // AFLDB-ISSUE-118 §23.32–§23.35. A goal or behind kicked after the final
+  // siren (of the match, or of extra time) that WON a premiership-season
+  // match: a curated, cited after_siren_kicks row (migration 089) with the
+  // kicker canonically linked. Never a miss, a draw, or another competition.
+  after_siren_winner: { key: 'after_siren_winner', label: 'Won a game with a kick after the siren', group: 'Single-game feats', params: [] },
 
   // Season & era
   debuted_between: { key: 'debuted_between', label: 'Debuted between seasons', group: 'Season & era', params: [season('from', 'From season'), season('to', 'To season')] },

@@ -1003,6 +1003,17 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE achievement_type = 'first_kick_goal'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND consecutive_goal_kicks >= ${requireInt(axis, 'kicks', 'Kicks')})`;
+    // AFLDB-ISSUE-118 §23.35. after_siren_kicks (migration 089) is the same
+    // discipline: a curated match event with a nullable player link. Only a
+    // premiership-season kick that scored (goal or behind) and won the match,
+    // after the final siren or the end-of-extra-time siren, for a canonically
+    // linked kicker. Misses, draws and other competitions never qualify.
+    case 'after_siren_winner':
+      return sql`p.id IN (SELECT player_id FROM after_siren_kicks
+                            WHERE premiership_season
+                              AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
+                              AND siren IN ('final', 'end_of_extra_time')
+                              AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
     case 'first_kick_goal_for_club': {
       // By lineage, like every other club-scoped builder, so a Western
       // Bulldogs filter includes the Footscray era.

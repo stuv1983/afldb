@@ -594,6 +594,62 @@ describe('grid solver correctness', () => {
     expect(onlyOneSided.length).toBeGreaterThan(0);
     for (const r of onlyOneSided) expect(truthIds.has(r.id), `player ${r.id}`).toBe(false);
   });
+  // AFLDB-ISSUE-118 §23.35 after-the-siren. after_siren_winner is exactly the
+  // linked kickers of premiership-season rows that scored (goal or behind) and
+  // WON the match after the final / end-of-extra-time siren: never a miss, a
+  // draw, another competition, or an unlinked kicker (migration 089).
+  it('after_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT player_id AS id FROM after_siren_kicks
+       WHERE premiership_season AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
+         AND siren IN ('final', 'end_of_extra_time')
+         AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+    `;
+    // §23.34 U.4: 64 qualifying rows over 62 kickers on the canonical load, of which
+    // one (Cameron Zurhaar, 2026, uncited and unresolved) is unlinked: 63 rows / 61 players.
+    expect(truth.length).toBeGreaterThanOrEqual(60);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const axis: GridAxisState = { builder: 'after_siren_winner', params: {} };
+    expect((await solveCellSummary(axis, any, 'games_asc')).eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    expect(rows).toHaveLength(truth.length);
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // The excluded shapes each exist in the data and qualify nobody by themselves:
+    // a draw, a miss, an other-competition winner, and an unlinked kicker.
+    const excluded = await sql<{ kind: string; ids: number[] }[]>`
+      SELECT 'drew' AS kind, array_agg(DISTINCT player_id) AS ids FROM after_siren_kicks WHERE kick_effect = 'drew' AND player_id IS NOT NULL
+      UNION ALL
+      SELECT 'miss', array_agg(DISTINCT player_id) FROM after_siren_kicks WHERE kick_effect = 'none' AND player_id IS NOT NULL
+      UNION ALL
+      SELECT 'other competition', array_agg(DISTINCT player_id) FROM after_siren_kicks WHERE NOT premiership_season AND kick_effect = 'won' AND player_id IS NOT NULL
+    `;
+    for (const e of excluded) {
+      expect(e.ids?.length ?? 0, e.kind).toBeGreaterThan(0);
+      const only = await sql<{ id: number }[]>`
+        SELECT DISTINCT player_id AS id FROM after_siren_kicks WHERE player_id = ANY(${e.ids})
+        EXCEPT SELECT player_id FROM after_siren_kicks WHERE premiership_season AND kick_scored <> 'none' AND kick_effect = 'won' AND player_id IS NOT NULL
+      `;
+      for (const r of only) expect(truthIds.has(r.id), `${e.kind}: player ${r.id}`).toBe(false);
+    }
+    const [unlinked] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM after_siren_kicks WHERE player_id IS NULL AND premiership_season AND kick_effect = 'won'`;
+    expect(unlinked.n).toBeGreaterThan(0);
+    // Luke Shuey's 2017 elimination-final goal after the end-of-extra-time siren
+    // (§23.33 adjudication asr-adj-001) qualifies; David King's 1994 miss before
+    // extra time (asr-adj-002, siren = end_of_regulation) does not.
+    const named = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/L/Luke_Shuey.html', 'players/D/David_King0.html')
+    `;
+    const byProfile = Object.fromEntries(named.map((r) => [r.profile, r.playerId]));
+    expect(byProfile['players/L/Luke_Shuey.html']).toBeDefined();
+    expect(truthIds.has(byProfile['players/L/Luke_Shuey.html'])).toBe(true);
+    const [king] = await sql<{ siren: string; effect: string }[]>`
+      SELECT siren::text, kick_effect::text AS effect FROM after_siren_kicks WHERE season = 1994 AND player_name_clean = 'David King'
+    `;
+    expect(king).toEqual({ siren: 'end_of_regulation', effect: 'none' });
+  });
 
   it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {
     const row: GridAxisState = { builder: 'brownlow_medallist', params: {} };

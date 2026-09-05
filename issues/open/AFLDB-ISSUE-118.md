@@ -4950,3 +4950,75 @@ validation — the `after_siren_winner` builder over `premiership_season AND kic
 kick_effect = 'won'`, the Gridley mapping, then the corpus rerun. The `after-siren` rebuild stage
 after `siblings` with artefact-derived gates (126 rows, 64/62 qualifying, 120 linked) and the DEV
 load remain open alongside it.
+
+### 23.35 After-the-siren — Grid Solver `after_siren_winner` builder and Gridley `winaftersiren` mapping, corpus rerun (5 September 2026, sixteenth session, Fable low)
+
+Scope: the smallest generic builder and mapping over the §23.33 model as loaded in §23.34. No change
+to the canonical model, migration 089, the loader, the normalised artefact, or any adjudication; no
+other solver semantics touched; no rebuild run.
+
+**V.1 Builder.** `after_siren_winner` (`src/search/grid-solver-spec.ts`, group *Single-game feats*,
+no params; `GRID_BUILDERS` 157 → **158**). `compileAxis` (`src/db/queries/grid-solver.ts`) reads
+`after_siren_kicks` with the exact qualifying predicate:
+
+```sql
+premiership_season
+AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
+AND siren IN ('final', 'end_of_extra_time')
+AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+```
+
+That is Gridley's definition ("Kicked a Goal or Behind after the siren to win the game. Doesn't
+include missed shots, or shots to tie") stated on the canonical columns: misses (`kick_scored =
+'none'` / `kick_effect = 'none'`), draws (`'drew'`), other competitions (`premiership_season = false`)
+and unlinked kickers never qualify. The `siren` clause is explicit even though the migration's CHECK
+already forbids a `won` effect after the end-of-regulation siren. **Mapping.**
+`winaftersiren: fixed('GAME WINNING', mapped('after_siren_winner'))` in `src/search/gridley-compat.ts`;
+the `NO_TIMELINE` data-absent reason is retired.
+
+**V.2 Eligible players on `afldb_test`.** The predicate selects **63 rows / 61 distinct players**.
+§23.34's 64 / 62 counted every scoring, winning, premiership-season row; exactly one of them (Cameron
+Zurhaar, 2026 R11, `cited = false`, `unmatched`) has no canonical player and is correctly excluded.
+`siren = 'end_of_regulation'` occurs on 0 of the 64 (as the CHECK requires). Every eligible player
+has `player_career_stats.games > 0`. Luke Shuey's 2017 EF goal after the end-of-extra-time siren
+(asr-adj-001) qualifies; David King's 1994 QF miss before extra time (asr-adj-002) does not.
+
+**V.3 Corpus, before → after** (`AFLDB_GRIDLEY_DIAGNOSTIC=1 AFLDB_GRIDLEY_REPORT=… npx vitest run
+tests/integration/gridley-corpus.test.ts`, both runs on the same `afldb_test`, both 1,164 / 1,164):
+
+| Measure | Before (7c94381) | After |
+|---|---|---|
+| unsupported valid criteria | 8 | **7** (`winaftersiren` left the set) |
+| `unsupported` cells | 90 | **78** |
+| cells solved | 9,842 | **9,854** (+12: boards 24, 156, 393, 744 — every cell on a `winaftersiren` axis) |
+| `incorrect known answer` | 0 | **0** |
+| `dataset gap` | 357 | 357 |
+| `external source disagreement` | 243 | 243 |
+| `adjudicated source conflict` | 65 | 65 |
+| `source coverage gap` | 21 | 21 |
+| `time of board` | 15,361 | 15,366 |
+| `list membership` | 852 | 852 |
+| cells over 1 s | 17 | 18 (max 1,850 → 1,877 ms; the moved cells are unrelated axes at the 1.8 s noise level, none after-siren; 0 over the 4 s guard) |
+| timeouts / errors | 0 | 0 |
+| strict run | fails on `unsupported` 90 + `dataset gap` 357 | fails on `unsupported` 78 + `dataset gap` 357 |
+
+`winaftersiren`: 4 occurrences, `mapped`, 61 players, 47 ms. Its 12 cells produced **5 findings, all
+`time of board`**: 4 are Nasiah Wanganeen-Milera (afldb 9761, Gridley 5420), whose St Kilda R20 2025
+winner post-dates the boards' answer keys; 1 is on the partner `clubs1` axis (afldb 3191), not the
+after-siren axis. **No disagreement with Gridley on any kicker the board already knew about**, no new
+dataset gap, no source coverage gap, and no adjudication needed. Corpus test: `after_siren_kicks`
+added to the `DatasetGaps` probe (`afterSiren`), so a database without the load reports a named
+`dataset gap` for the builder instead of a solver failure.
+
+**V.4 Tests / typecheck / lint.** `tests/grid-solver-spec.test.ts` (158) and
+`tests/gridley-compat.test.ts` (denominator: mapped 6,827 → 6,831 occurrences / 830 → 831 criteria,
+data-absent 30 → 26 occurrences / 8 → 7 criteria; `winaftersiren [4]` removed from the named list)
+**31/31**. New `tests/integration/grid-solver.test.ts` case: the builder's eligible set and rows equal
+the predicate exactly; the drawn, missed and other-competition shapes each exist and qualify nobody
+by themselves; at least one unlinked winning row exists and is excluded; Shuey in, King's row
+`end_of_regulation / none` — **pass** (`-t after_siren_winner`). `npx tsc --noEmit -p .` clean;
+`npx eslint` on the seven touched files clean.
+
+**Exact next action (fresh session):** perform the ISSUE-118 remaining-scope review. Still open
+alongside it: the `after-siren` rebuild stage after `siblings` with artefact-derived gates (126 rows,
+64 / 62 qualifying, 120 linked), the DEV load, International Rules, `season2024player`, Buhagiar.

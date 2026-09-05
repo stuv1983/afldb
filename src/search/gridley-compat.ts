@@ -179,7 +179,6 @@ const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
 const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin column';
 const NO_OTHER_CODE = 'other-code (NFL) careers and International Rules representation are not modelled';
-const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner cannot be derived';
 const NO_SPOILS = 'spoils are not a recorded AFLDB statistic (one_percenters is a different measure)';
 const NO_RECRUITER = 'recruiters and list managers are not modelled';
 
@@ -530,7 +529,10 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   nfl: fixed('NFL 🏈', absent(NO_OTHER_CODE)),
   intrulesplayer: fixed("INT'L RULES", absent(NO_OTHER_CODE)),
   season2024player: fixed('2024 LISTED PLAYER', absent(NO_LISTS)),
-  winaftersiren: fixed('GAME WINNING', absent(NO_TIMELINE)),
+  // "Kicked a Goal or Behind after the siren to win the game. Doesn't include
+  // missed shots, or shots to tie." — a canonical after_siren_kicks row that
+  // scored and won a premiership-season match (ISSUE-118 §23.35).
+  winaftersiren: fixed('GAME WINNING', mapped('after_siren_winner')),
 
   // -- the freebie ----------------------------------------------------------------
   'free-hit': fixed('FREE HIT', { status: 'freebie', reason: 'Gridley: "Select any player you like" -- every player qualifies' }),

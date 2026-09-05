@@ -141,17 +141,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6827,
-      mappedDistinct: 830,
+      mappedOccurrences: 6831,
+      mappedDistinct: 831,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 30,
-      dataAbsentDistinct: 8,
+      dataAbsentOccurrences: 26,
+      dataAbsentDistinct: 7,
     });
     // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
     // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
     // is pinned so it only ever moves deliberately, and the integration
     // corpus run fails while it is above zero.
-    expect(distinct(absentList)).toBeLessThanOrEqual(8);
+    expect(distinct(absentList)).toBeLessThanOrEqual(7);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -169,7 +169,6 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
       'season2024player [14]',
       'intrulesplayer [5]',
-      'winaftersiren [4]',
       'irish [2]', 'recruitedByDodoro [2]',
       'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
     ]);

@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 after-the-siren — Grid Solver `after_siren_winner`, Gridley `winaftersiren` mapped - 5 September 2026
+
+- **Grid Solver.** New builder `after_siren_winner` (*Single-game feats*; `GRID_BUILDERS` 158): a canonically linked kicker of a goal or behind after the final (or end-of-extra-time) siren that won a premiership-season match, read from `after_siren_kicks` (migration 089). Misses, draws, other competitions and unlinked kickers never qualify. 63 rows / 61 players on `afldb_test`.
+- **Gridley corpus.** `winaftersiren` mapped (data-absent criteria 8 → 7); `unsupported` 90 → 78 cells, cells solved 9,842 → 9,854, `incorrect known answer` 0, the only after-siren findings `time of board`; `after_siren_kicks` added to the corpus dataset-gap probe.
+
 ### AFLDB-ISSUE-118 after-the-siren — canonical `after_siren_kicks` model (migration 089) and the tracked normalised artefact - 5 September 2026
 
 - **Model.** New table `after_siren_kicks` (migration `089`), on the `player_achievements` (053) discipline but a dedicated match-event shape: kicker (nullable link, source spelling kept), opponent, competition + `premiership_season`, season, verbatim round, nullable match, what the kick scored (goal / behind / none), what it did to the result (won / drew / none), the kicker's result, which siren it followed (final / end of regulation / end of extra time), the source's verbatim final score and points, `cited`. CHECKs enforce the event semantics. Nothing in it is specific to a Grid Solver criterion. Applied to `afldb_test` (and to `afldb_dev`, schema only).
