@@ -414,6 +414,14 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   drafted_by_club_never_played: { key: 'drafted_by_club_never_played', label: 'Drafted by club, never played there', group: 'Draft & recruitment', params: [club()] },
   recruited_via: { key: 'recruited_via', label: 'Recruited from…', group: 'Draft & recruitment', params: [signingKind()] },
   traded_min_times: { key: 'traded_min_times', label: 'Traded X+ times', group: 'Draft & recruitment', params: [int('times', 'Times')] },
+  // AFLDB-ISSUE-118 §23.29. The AFL father–son rule, from father_son_selections
+  // (the tracked, normalised Wikipedia list; every person linked only through
+  // an AFL Tables profile path). father_son_selection is the SON — a player
+  // selected under the rule (national or rookie draft, or a pre-draft
+  // selection); father_son_father is the FATHER — a player whose son was so
+  // selected. Linked rows only, the draft and Hall of Fame rule.
+  father_son_selection: { key: 'father_son_selection', label: 'Father–son selection', group: 'Draft & recruitment', params: [] },
+  father_son_father: { key: 'father_son_father', label: 'Father of a father–son selection', group: 'Draft & recruitment', params: [] },
   // National draft only (draft_kind = 'national'), unlike draft_pick_between
   // which spans every draft kind -- "pick 1 in the National Draft".
   national_draft_pick_between: { key: 'national_draft_pick_between', label: 'National Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },

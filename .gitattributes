@@ -15,6 +15,9 @@ tools/rebuild/**/*.json          text eol=lf
 # bytes must be identical on every platform.
 data/brownlow/*.csv             text eol=lf
 data/brownlow/*.json            text eol=lf
+# AFLDB-ISSUE-118 §23.29: father_son.py normalize --check compares bytes with the regeneration
+data/players/father-son-*.csv   text eol=lf
+data/players/father-son-*.json  text eol=lf
 
 # AFLDB-ISSUE-118 Stage 2 — the captured Gridley payloads are exact response
 # bytes and tests/gridley-acquisition.test.ts pins their SHA-256. `-text`

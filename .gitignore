@@ -63,6 +63,9 @@ next-env.d.ts
 /data/players/*
 !/data/players/height-evidence-wikipedia.csv
 !/data/players/height-adjudications.csv
+!/data/players/father-son-selections.csv
+!/data/players/father-son-selections.source.json
+!/data/players/father-son-adjudications.csv
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv

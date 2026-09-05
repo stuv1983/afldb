@@ -177,8 +177,7 @@ const QCLASH: [string, string] = ['brisbane-lions', 'gold-coast'];
 const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
-const NO_SIBLINGS = 'player_relationships (migration 006) has never been populated on any environment';
-const NO_FATHER_LINK = 'father_son_selections has never been populated; draft_picks.signing_kind names the son, not the father';
+const NO_SIBLINGS = 'player_relationships carries no sibling rows: the only football-family source AFLDB holds (the legacy Wikipedia families, 485 sibling pairs) is not yet exported to a tracked artefact (ISSUE-118 §23.29)';
 const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin column';
 const NO_OTHER_CODE = 'other-code (NFL) careers and International Rules representation are not modelled';
 const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner cannot be derived';
@@ -491,7 +490,11 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   traded1: fixed('TRADED', mapped('traded_min_times', { times: '1' })),
   freeagent1: fixed('FREE AGENT', mapped('draft_type_is', { draftType: 'Free Agency' })),
   fatherson: fixed('FATHER SON PICK', mapped('recruited_via', { signingKind: 'Father-Son' })),
-  fathersonfather: fixed('FATHER OF', absent(NO_FATHER_LINK)),
+  // "Player has had a son selected under the Father-Son rule in the national
+  // draft (since 1986)": the FATHER of a father_son_selections row (ISSUE-118
+  // §23.29). The tracked list includes pre-draft and rookie-draft selections
+  // under the same rule; Gridley's own answers decide whether that is wider.
+  fathersonfather: fixed('FATHER OF', mapped('father_son_father')),
   recruitedByDodoro: fixed('ADRIAN DODORO', absent(NO_RECRUITER)),
 
   // -- names and numbers -------------------------------------------------------

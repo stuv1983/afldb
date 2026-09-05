@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
 import {
@@ -34,6 +34,15 @@ import {
   coachChecks,
   coachesImportArgv,
   coachesValidateArgv,
+  FATHER_SON_ADJUDICATIONS,
+  FATHER_SON_CSV,
+  FATHER_SON_LOADER,
+  FATHER_SON_PROVENANCE,
+  fatherSonArgv,
+  fatherSonChecks,
+  fatherSonMeasures,
+  fatherSonValidateArgv,
+  parseCsvRows,
   birthDateChecks,
   birthDatesArgv,
   birthDatesValidateArgv,
@@ -759,8 +768,8 @@ describe('stage graph', () => {
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
-      'coaches', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness',
-      'fingerprints',
+      'coaches', 'father-son', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'ladder-witness', 'fingerprints',
     ]);
   });
 
@@ -779,8 +788,8 @@ describe('stage graph', () => {
     // enrichment' below).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
-                'birth-dates', 'coaches', 'draftguru', 'awards-honours', 'brownlow-season', 'derived',
-                'coleman']);
+                'birth-dates', 'coaches', 'father-son', 'draftguru', 'awards-honours', 'brownlow-season',
+                'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
@@ -1051,6 +1060,96 @@ describe('stage graph', () => {
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the birth-date gates, in stage order.
       expect(all.indexOf('coaches')).toBeGreaterThan(all.indexOf('dob_disagreeing_with_club_list'));
+    });
+  });
+
+  describe('father–son selections (AFLDB-ISSUE-118 §23.29 family F)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'father-son')!;
+    const HEADER = 'source_key,draft_year,competition,selection_pick,selection_raw,club,drafted_player,drafted_games_reported,'
+      + 'drafted_profile,drafted_link,drafted_note,father,father_games_reported,father_profile,father_link,father_note\n';
+    const row = (key: string, son: string, sonLink: string, father: string, fatherLink: string) =>
+      `${key},${key.split(':')[1]},national,1,1,Geelong,"Son, Jr.",10,${son},${sonLink},"n, with a comma",Dad,100,${father},${fatherLink},note\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), FATHER_SON_LOADER, 'load', '--csv', FATHER_SON_CSV, '--provenance', FATHER_SON_PROVENANCE]);
+      expect(fatherSonArgv()).toEqual(stage.argv);
+      expect(fatherSonValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${fatherSonMeasures().selections} selections`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize/i);
+      for (const path of [FATHER_SON_CSV, FATHER_SON_ADJUDICATIONS, FATHER_SON_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('follows coaches (players and the afltables identities are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('father-son'));
+      expect(ids.indexOf('coaches')).toBeLessThan(ids.indexOf('father-son'));
+      expect(ids.indexOf('father-son')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing, headerless or self-contradicting one', () => {
+      const m = fatherSonMeasures();
+      expect(m.selections).toBeGreaterThan(100);
+      expect(m.sonsLinked).toBeLessThanOrEqual(m.selections);
+      expect(m.fathersLinked).toBeLessThanOrEqual(m.selections);
+      expect(m.distinctFathersLinked).toBeLessThanOrEqual(m.fathersLinked);
+      expect(() => fatherSonMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => fatherSonMeasures(() => 'source_key,draft_year\n')).toThrow(/no data rows or an unexpected header/);
+      expect(() => fatherSonMeasures(() => HEADER)).toThrow(/no data rows/);
+      const ok = HEADER
+        + row('wikipedia-father-son-rule:2001:01', 'players/G/Gary_Ablett1.html', 'unique', 'players/G/Gary_Ablett0.html', 'unique')
+        + row('wikipedia-father-son-rule:2004:01', '', 'unmatched', 'players/G/Gary_Ablett0.html', 'unique')
+        + row('wikipedia-father-son-rule:2004:02', 'players/X/X.html', 'resolved', '', 'unmatched');
+      expect(fatherSonMeasures(() => ok)).toEqual({ selections: 3, sonsLinked: 2, fathersLinked: 2, distinctFathersLinked: 1 });
+      // A trusted status with no profile, or a profile under 'unmatched', is a contradiction the gate refuses to count.
+      expect(() => fatherSonMeasures(() => HEADER + row('wikipedia-father-son-rule:2001:01', '', 'unique', 'players/G/Gary_Ablett0.html', 'unique'))).toThrow(/disagrees with its profile/);
+      expect(() => fatherSonMeasures(() => HEADER + row('wikipedia-father-son-rule:2001:01', 'players/X/X.html', 'unique', 'players/G/G.html', 'unmatched'))).toThrow(/disagrees with its profile/);
+      // The reader honours quoted commas and CRLF.
+      expect(parseCsvRows('a,"b, c","d ""q"""\r\n1,2,3\r\n')).toEqual([['a', 'b, c', 'd "q"'], ['1', '2', '3']]);
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'ERROR: columns differ' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(FATHER_SON_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(FATHER_SON_LOADER), OPTS, fitzroy()))
+        .toThrow(/Father–son preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== FATHER_SON_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/Father–son preflight: required tracked input is missing[\s\S]*father-son-adjudications/);
+    });
+
+    it('gates the rebuilt selections on the artefact: rows, proven links only, one relationship per selection', () => {
+      const checks = fatherSonChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'father_son_selections', 'father_son_sons_linked', 'father_son_fathers_linked', 'father_son_distinct_fathers',
+        'father_son_links_outside_trusted_status', 'player_relationships_parent_child',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = fatherSonMeasures();
+      expect(byKey.father_son_selections.expected).toBe(m.selections);
+      expect(byKey.father_son_sons_linked.expected).toBe(m.sonsLinked);
+      expect(byKey.father_son_fathers_linked.expected).toBe(m.fathersLinked);
+      expect(byKey.father_son_distinct_fathers.expected).toBe(m.distinctFathersLinked);
+      expect(byKey.father_son_links_outside_trusted_status.expected).toBe(0);
+      expect(byKey.player_relationships_parent_child.expected).toBe(m.selections);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|_name_raw|drafted_player_name|father_name/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the coach gates, in stage order.
+      expect(all.indexOf('father_son_selections')).toBeGreaterThan(all.indexOf('matches_without_coach'));
     });
   });
 

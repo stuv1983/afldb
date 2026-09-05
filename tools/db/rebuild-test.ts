@@ -158,6 +158,15 @@ const AFL_API_CONTRACT = join('tools', 'rebuild', 'afl_api', 'afl-api-contract.j
 export const BIRTH_DATE_LOADER = 'tools/migration/enrich_birth_dates_afltables.py';
 /** AFLDB-ISSUE-118 §23.27 Stage E2: coaches + match_coaches from the pinned coach pages and the baseline's Coach column. */
 export const COACH_LOADER = 'tools/migration/import_match_coaches.py';
+/**
+ * AFLDB-ISSUE-118 §23.29 family F: father–son rule selections from the tracked, normalised
+ * Wikipedia list (profile paths resolved once by `father_son.py normalize`, never a name at
+ * load time), plus the adjudication set and the source provenance the loader carries.
+ */
+export const FATHER_SON_LOADER = 'tools/migration/father_son.py';
+export const FATHER_SON_CSV = join('data', 'players', 'father-son-selections.csv');
+export const FATHER_SON_ADJUDICATIONS = join('data', 'players', 'father-son-adjudications.csv');
+export const FATHER_SON_PROVENANCE = join('data', 'players', 'father-son-selections.source.json');
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
@@ -546,6 +555,20 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       kind: 'data',
       run: 'command',
       argv: coachesImportArgv(fitzroy.label, python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.29 family F. father_son_selections (one row per selection under
+      // the AFL father–son rule: son, father, club, year, pick) and one parent_child row per
+      // pair in player_relationships, from the TRACKED normalised Wikipedia list. Every
+      // person is resolved ONLY through the AFL Tables profile path the artefact carries
+      // and the identities fitzroy registered; the artefact's own row counts are the gates.
+      // Needs players and identities: after fitzroy; nothing later reads it. No network.
+      id: 'father-son',
+      name: `FATHER–SON — tracked Wikipedia list, ${fatherSonMeasures().selections} selections`,
+      kind: 'data',
+      run: 'command',
+      argv: fatherSonArgv(python),
       envOverlay: dataEnv,
     },
     {
@@ -1119,6 +1142,10 @@ export function finalValidationChecks(
   // reason. The expected values are read from the AFL Tables contract's coaches pin.
   for (const check of coachChecks()) checks.push(check);
 
+  // AFLDB-ISSUE-118 §23.29. Added together with the FATHER–SON stage, for the same §H15.5
+  // reason. The expected values are read from the tracked artefact itself.
+  for (const check of fatherSonChecks()) checks.push(check);
+
   return checks;
 }
 
@@ -1631,6 +1658,23 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
         + `${coaches.stdout}${coaches.stderr}`);
     }
   }
+  // AFLDB-ISSUE-118 §23.29. The father–son stage reads three TRACKED files (the normalised
+  // list, its adjudications and its provenance): prove they are in the checkout and that
+  // the loader accepts the artefact's shape offline, before destruction.
+  for (const path of [FATHER_SON_CSV, FATHER_SON_ADJUDICATIONS, FATHER_SON_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `Father–son preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const fatherSon = deps.runCommand(fatherSonValidateArgv(), {});
+  if (fatherSon.status !== 0) {
+    throw new RebuildRefused(
+      `Father–son preflight failed (${FATHER_SON_LOADER} load --validate-only): the tracked `
+      + `artefact ${FATHER_SON_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${fatherSon.stdout}${fatherSon.stderr}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2032,6 +2076,107 @@ export function coachChecks(): FinalCheck[] {
       sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 1`, expected: pin.measured.matchesWithOneCoach },
     { key: 'matches_without_coach',
       sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 0`, expected: pin.measured.matchesWithoutCoach },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.29 — father–son rule selections, gated on the tracked artefact
+// ---------------------------------------------------------------------------
+
+export function fatherSonArgv(python: string = resolvePython()): string[] {
+  return [python, FATHER_SON_LOADER, 'load', '--csv', FATHER_SON_CSV, '--provenance', FATHER_SON_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function fatherSonValidateArgv(python: string = resolvePython()): string[] {
+  return [...fatherSonArgv(python), '--validate-only'];
+}
+
+/** A minimal RFC 4180 reader: quoted fields may hold commas, quotes and newlines. */
+export function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 1; } else quoted = false;
+      } else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i += 1;
+      row.push(field); field = '';
+      if (row.some((f) => f !== '')) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); if (row.some((f) => f !== '')) rows.push(row); }
+  return rows;
+}
+
+export type FatherSonMeasures = { selections: number; sonsLinked: number; fathersLinked: number; distinctFathersLinked: number };
+
+/**
+ * The artefact's own counts. The loader refuses to write unless every non-empty profile
+ * resolves to a canonical identity and every link status agrees with its profile, so the
+ * rows, linked sons and linked fathers after a rebuild are exactly these.
+ */
+export function fatherSonMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, FATHER_SON_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): FatherSonMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${FATHER_SON_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [profile, link, father, fatherLink] = ['drafted_profile', 'drafted_link', 'father_profile', 'father_link'].map(col);
+  if (rows.length < 2 || header[0] !== 'source_key' || [profile, link, father, fatherLink].some((i) => i < 0)) {
+    throw new RebuildRefused(`${FATHER_SON_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  for (const r of data) {
+    if ((r[link] === 'unmatched') !== (r[profile] === '') || (r[fatherLink] === 'unmatched') !== (r[father] === '')) {
+      throw new RebuildRefused(`${FATHER_SON_CSV}: a link status disagrees with its profile (${r[0]}).`);
+    }
+  }
+  return {
+    selections: data.length,
+    sonsLinked: data.filter((r) => r[profile] !== '').length,
+    fathersLinked: data.filter((r) => r[father] !== '').length,
+    distinctFathersLinked: new Set(data.filter((r) => r[father] !== '').map((r) => r[father])).size,
+  };
+}
+
+/**
+ * The father–son stage must survive a rebuild from scratch: every selection, the links
+ * exactly those the artefact proves (none outside a trusted status), and one parent_child
+ * relationship per selection. A rebuild that drops the stage or links by name fails here.
+ */
+export function fatherSonChecks(): FinalCheck[] {
+  const m = fatherSonMeasures();
+  return [
+    { key: 'father_son_selections', sql: 'SELECT count(*) FROM father_son_selections', expected: m.selections },
+    { key: 'father_son_sons_linked',
+      sql: "SELECT count(*) FROM father_son_selections WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')",
+      expected: m.sonsLinked },
+    { key: 'father_son_fathers_linked',
+      sql: "SELECT count(*) FROM father_son_selections WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')",
+      expected: m.fathersLinked },
+    { key: 'father_son_distinct_fathers',
+      sql: 'SELECT count(DISTINCT father_player_id) FROM father_son_selections WHERE father_player_id IS NOT NULL',
+      expected: m.distinctFathersLinked },
+    { key: 'father_son_links_outside_trusted_status',
+      sql: "SELECT count(*) FROM father_son_selections WHERE (drafted_player_id IS NOT NULL) <> (drafted_link_status IN ('unique', 'resolved')) OR (father_player_id IS NOT NULL) <> (father_link_status IN ('unique', 'resolved'))",
+      expected: 0 },
+    { key: 'player_relationships_parent_child',
+      sql: "SELECT count(*) FROM player_relationships WHERE relationship = 'parent_child'",
+      expected: m.selections },
   ];
 }
 

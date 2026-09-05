@@ -1262,6 +1262,17 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             WHERE link_status_value IN ('unique', 'resolved') AND draft_kind = 'trade'
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
+    // AFLDB-ISSUE-118 §23.29. father_son_selections carries two independent
+    // person links; the CHECK constraints (migration 088) tie each status to
+    // its id, and the trusted statuses are still named here explicitly.
+    case 'father_son_selection':
+      return sql`p.id IN (SELECT drafted_player_id FROM father_son_selections
+                           WHERE drafted_player_id IS NOT NULL
+                             AND drafted_link_status IN ('unique', 'resolved'))`;
+    case 'father_son_father':
+      return sql`p.id IN (SELECT father_player_id FROM father_son_selections
+                           WHERE father_player_id IS NOT NULL
+                             AND father_link_status IN ('unique', 'resolved'))`;
     case 'national_draft_pick_between': {
       const [lo, hi] = orderedRange(axis, 'from', 'From pick', 'to', 'To pick');
       return sql`p.id IN (SELECT player_id FROM draft_picks

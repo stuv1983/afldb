@@ -4072,3 +4072,200 @@ inventory the scrape programmatically), `season2024player`, the Tony Buhagiar Al
 `spoils5season` and `recruitedByDodoro` stay deferred, `irish` / `tasmanian` / `nfl` presumptively deferred
 pending their exact semantics. DEV load of the birth dates and coaches; production with the next deploy
 (ISSUE-137 sequencing).
+
+### 23.29 Family F (father–son / siblings) — father–son rule selections IMPLEMENTED; siblings blocked on a source export (5 September 2026, tenth session, Fable medium)
+
+The §23.28 next action, item (1). Exact Gridley semantics were established from the stored wording first,
+the existing schema was reused rather than redesigned, every identity is a profile path resolved once with
+the evidence recorded, and the sibling half stops at a documented blocker rather than a bespoke data hunt.
+
+**F.1 Exact criterion semantics (stored Gridley wording, `tests/fixtures/gridley/corpus.json`).**
+`fathersonfather` — title FATHER OF, subtitle A FATHER-SON PICK — "Player has had a son selected under
+the Father-Son rule in the national draft (since 1986)": 3 occurrences, one wording. The axis is the
+**father** (a VFL/AFL player) of a son selected under the rule; the son's own AFL career is irrelevant.
+`brother` — title BROTHER, subtitle PLAYED — "Has at least one brother who has played in the VFL/AFL.":
+53 occurrences, one wording. The relationship at any time; nothing about playing with or against him.
+
+**F.2 What AFLDB already had.** Migration 006 created `player_relationships` (the general family model:
+`relationship_type` enum `parent_child | sibling | grandparent_grandchild | aunt_uncle_niece_nephew |
+cousin | spouse | in_law | other`, both sides nullable with the raw names as the durable record) and
+`father_son_selections` (one row per selection: drafted son, father, club, year, pick, rule, competition,
+two independent `link_status` columns); migration 044 gave both the `(source_id, source_record_id)`
+natural key; both are in the 039/045 read and write registries. **Neither has ever held a row.**
+`draft_picks` carries 118 `signing_kind = 'Father-Son'` rows (1988–2025) with the father only as free text
+in `signing` ("Father-Son (David Cloke)", two "(?????)"), and on the rebuilt `afldb_test` the draft link
+layer is 5 resolved / 6,805 unmatched, so it can key neither person. DraftGuru's flag is also broader than
+the rule (Josh Dunkley 2015, Darryl McDowell-White 2022, Charlie Banfield 2025 carry it; the 1997–1998
+third-round selections do not). The legacy Sports Data Lab SQLite (`docs/data-dictionary.md` §4.4) holds
+Wikipedia-derived families — `family_members` 2,290, `family_relationships` 1,046 (`sibling` 485,
+`parent_child` 537), `family_draft` 142 — PLANNED for `player_relationships` and never migrated.
+
+**F.3 The source and its normalisation.** `data/players/father-son/vfl-afl.csv` (raw, untracked) is the
+"List of father–son selections" table of the Wikipedia article **Father–son rule** (pageid 4274230,
+revision 1370239415, 2026-08-19T23:51:53Z, read from the MediaWiki API this session): 131 lines = header +
+**127 selections (1988–2025)** + 3 trailer rows (sources; "Games Played last updated 12/10/2025"; the
+selection-number note: none before 1997, third round 1997–2006, bidding since 2007). Seven columns; the
+year is the selection year (the draft, or the pre-draft listing, of that year); `Selection` is blank
+(22 rows, → `pre-draft`), a pick (96, → `national`) or "N (rookie)" (9, → `rookie`). The games columns are
+**club-grain**: the son's games for the drafting club and the father's for the qualifying club (David
+Cloke 114 of 333 at Collingwood; Gary Ablett Sr 242 of 248 at Geelong; state-league qualifications are
+annotated — "146 (Claremont)", "391 (Port Adelaide in SANFL)", "N/A (Administrator)"). They are therefore
+corroboration, reported per row, never a selector. Duplicate structure: none (a son appears once; fathers
+repeat — David Cloke three sons, fifteen fathers two). The AFLW file (18 rows) was not used: it is out of
+ISSUE-118's VFL/AFL scope and the AFLW identity layer is separate.
+
+**F.4 Identity rules (`tools/migration/father_son.py normalize`, run once against `afldb_test`, output
+tracked).** Nothing downstream matches a name; the normaliser resolves each person to an AFL Tables
+profile path with deterministic rules and **refuses the run on anything it cannot decide from the row's
+own evidence**: names normalised (diacritics, punctuation, the `^` listed marker, middle initials,
+`Jr./Sr./Snr.`); a **son** is the unique same-name player who debuted in `[year, year+7]` and played for
+the drafting club's organisation; a **father** the unique same-name player who debuted at least 15
+seasons before the selection and played for that organisation's lineage (an organisation's own
+identities — Footscray, South Melbourne, Kangaroos — plus Fitzroy and the Bears for the Lions, whose
+eligibility recognises them); `Sr.`/`Jr.` keep the earliest/latest debut only when that season is unique
+among the candidates (a shared season stays ambiguous — the unit test caught the first draft deciding
+such a tie); zero candidates is a non-player only when the list itself says so (son 0 games; father with a
+state-league/administrator annotation); every other zero, every name-and-era-only father (state-league
+qualification) and every ambiguity needs a tracked adjudication. Measured: **127 rows, 0 ambiguous; sons
+99 linked / 28 never played (list 0 games, no candidate); fathers 123 linked (107 distinct) / 4 with no
+VFL/AFL career (Garry Fletcher — administrator; Noel Morton — Claremont; Jim Michalanney — Norwood; Peter
+Morrison — see below)**; games corroborated on 210 of the 222 linked people, the 12 differences all the
+list's own club-grain or stale figures (Michael Bowden 57 vs 59 on his second row, Robert Walls 215 vs
+Carlton 218, David Clarke 207 vs Geelong 202, Andrew Bews 164 vs Geelong 207, and eight sons' club-grain
+totals).
+
+**F.5 Adjudications — `data/players/father-son-adjudications.csv` (7 rows, each evidence-dated
+2026-09-05; every one must be needed and apply exactly once or the normaliser refuses).** Two name
+variants: **Brad Campbell** (Melbourne 1992) → `players/B/Bradley_Campbell.html` (AFL Tables and
+DraftGuru give the full name; Melbourne, 1 game in 1994 = the list's 1); **Billy Brownless** (Geelong
+2018) → `players/B/Bill_Brownless.html` (Geelong 1986–1997, 198 games = the list's 198; Wikipedia
+"Bill Brownless", Anthony William, uses Billy throughout; DraftGuru "Father-Son (Bill Brownless)"). Four
+state-league-qualified fathers whose lineage rule cannot fire, each tied by a Wikipedia article read this
+session: **John McIntosh** (Ashley McIntosh's article: "played football for Claremont and St Kilda"; the
+only John McIntosh on AFL Tables is St Kilda 1970–1972), **Bryan Cousins** (his article: Geelong debut
+1975, 67 games to 1979, then Perth; father of Ben), **Russell Ebert** (his article: "his son Brett was
+selected under the league's Father-son rule" 2002; 25 games for North Melbourne 1979), **Brian Peake**
+(Brett Peake's article: "His father, Brian Peake, played … East Fremantle, Geelong, Perth"; Geelong
+1981–1984). One explicit **non-link**: **Peter Morrison** (Brisbane Lions 1999) — the list records
+"Unknown (W.G., Mayne)", a QAFL qualification; no source ties the Footscray/South Melbourne Peter Morrison
+(1974–1981, b. 1956) to Shane Morrison, and a shared name is not identity, so the row loads with the
+father `unmatched` by decision, not by omission.
+
+**F.6 The tracked artefacts.** `data/players/father-son-selections.csv` (127 rows; the seven raw columns
+verbatim plus `source_key` = `wikipedia-father-son-rule:<year>:<seq>`, `competition`, `selection_pick`,
+each person's profile path, link status `unique | resolved | unmatched` and resolution note) and
+`data/players/father-son-selections.source.json` (article, pageid, revision, raw row count, measures).
+`father_son.py normalize --check` regenerates from the raw list and the adjudications against a database
+and refuses on any byte difference (proven identical after the suffix-rule fix). `.gitignore` opts the
+three files in explicitly; `.gitattributes` forces LF on `data/players/father-son-*` because the check
+compares bytes.
+
+**F.7 Canonical schema — migration `088_father_son_link_checks.sql`.** No new table: the two migration-006
+tables are the model. 088 adds the draft_persons-style CHECKs (a trusted status carries a player, an
+untrusted one does not — one per person column), a pair uniqueness constraint, and column comments for
+`competition` and `selection_note`. No grant call: both tables were already registered. Applied to
+`afldb_test` (150 ms).
+
+**F.8 Loader — `father_son.py load` (the rebuild stage; `--validate-only` offline, `--dry-run`).** Reads
+only the artefact; resolves every non-empty profile through `external_identities` (afltables,
+`afltables_profile_url`, unique/resolved) and refuses any that does not resolve or any status that
+disagrees with its path; upserts `father_son_selections` on `(source wikipedia, source_key)` with
+`club_id` = the organisation's identity contesting the following season, and one `parent_child` row per
+selection in `player_relationships` (father as person A, son as person B, names verbatim, links where
+proven, label "father and son (AFL father–son rule selection)", `source_record_id`
+`father-son:<source_key>`), removing stale rows of this source, in one `import_batches` transaction. On
+`afldb_test`: **batch 23 — 127 selections (99 sons, 123 fathers, 107 distinct), 127 relationships, 0.9 s;
+batch 24 identical, 0 stale removed — idempotent.** `draft_picks` was not touched: the 118 DraftGuru flags
+remain the draft source's own evidence, not the canonical selection record.
+
+**F.9 Rebuild integration (`tools/db/rebuild-test.ts`).** Data stage **`father-son`** after `coaches` and
+before `draftguru` (argv `father_son.py load --csv … --provenance …`; it joins only players and the
+identities `fitzroy` registered); the preflight proves the three tracked files exist and runs
+`--validate-only` before the destructive reset; **six final gates read from the artefact itself**
+(`father_son_selections` 127, `father_son_sons_linked` 99, `father_son_fathers_linked` 123,
+`father_son_distinct_fathers` 107, `father_son_links_outside_trusted_status` 0,
+`player_relationships_parent_child` 127) — none typed, none reading a name; a small RFC 4180 reader
+(`parseCsvRows`) because the notes carry commas. Stages 18 → **19** (data 12 → 13), gates 66 → **72**.
+Evaluated against the hand-loaded `afldb_test`: **6/6 PASS.** `tests/db-test-rebuild.test.ts` 256 →
+**261/261** (stage order, argv/preflight derivation, artefact-reader refusals, preflight refusals, gate
+shape and registration).
+
+**F.10 Grid Solver and Gridley.** Two builders in Draft & recruitment, no parameters, linked rows only:
+**`father_son_father`** (a player whose son was selected under the rule) and **`father_son_selection`**
+(a player selected under it). `GRID_BUILDERS` 154 → **156**. `gridley-compat.ts`: `fathersonfather` →
+`father_son_father`; `NO_FATHER_LINK` gone; `brother` stays data-absent with its reason rewritten to the
+actual state (F.12). Denominators: mapped 6,771 → 6,774 occurrences / 828 → 829 criteria; **data-absent
+86 → 83 occurrences, 10 → 9 criteria** (brother 53, season2024player 14, intrulesplayer 5, winaftersiren
+4, irish 2, recruitedByDodoro 2, nfl 1, spoils5season 1, tasmanian 1). The corpus test probes
+`father_son_selections` as a dataset (`fatherSon` gap) so an empty table reports a gap, never a guess.
+`tests/integration/grid-solver.test.ts`: solver counts equal SQL truth for both builders; Gary Ablett Sr
+(`Gary_Ablett0`) is the father of the 2001 and 2004 rows and Gary Jr (`Gary_Ablett1`) a son, not a father;
+Brayden Shaw (never played) and Jim Michalanney (no VFL/AFL career) are rows with no player and no
+fabricated one; the relationship counts equal the selection counts — **198/198**.
+
+**F.11 Evidence, before → after, same `afldb_test` (migration 088 + batch 23/24 by hand).**
+
+| Measure | Before (§23.28) | After |
+|---|---:|---:|
+| `unsupported` cells / valid criteria | 258 / 10 | **249 / 9** |
+| unsupported occurrences (compat) | 86 | **83** |
+| cells solved | 9,677 / 10,287 | **9,686 / 10,287** |
+| `dataset gap` | 354 | 354 |
+| `source conflict` / `adjudicated source conflict` | 0 / 62 | 0 / 62 |
+| `external source disagreement` | 242 | 242 |
+| `list membership` | 844 | 844 |
+| `incorrect known answer` | 0 | **0** |
+| timeouts / cells over 1 s | 0 / 15–18 | 0 / 18 diagnostic, 16 strict (max 1.9 s) |
+| strict failing cells | 612 | **603** = `unsupported` 249 + `dataset gap` 354 |
+| `GRID_BUILDERS` | 154 | 156 |
+| rebuild stages / data stages / final gates | 18 / 12 / 66 | 19 / 13 / 72 |
+
+The 9 `fathersonfather` cells (3 boards, 107 eligible fathers, 9 ms) produced **no finding of any
+category** — every bridged Gridley answer agrees with AFLDB in both directions. Diagnostic 1,164/1,164
+(294 s); strict 1,162/1,164, failing only on the two acceptance assertions. `father-son-reconciliation`
+(new) 11/11; `grid-solver-spec` + `gridley-compat` green with the new denominators; `tsc --noEmit` clean;
+eslint on every touched file clean apart from the two pre-existing warnings outside the edited ranges.
+
+**F.12 Siblings — investigated, BLOCKED on a source export, not started.** The repository holds no
+sibling evidence: the raw father–son list has none, `player_relationships` has none, and nothing tracked
+does. The only accepted-lineage source is the legacy SQLite `family_relationships` (485 `sibling` pairs,
+Wikipedia-derived, with `family_members` for identity) at
+`/home/arm/projects/sports_data_lab/data/afl/afl.db` on the DEV host — not on this workstation. Two
+read-only SSH attempts to inspect its schema (an inline script, then the recorded scp-and-run-by-path
+transport) were **denied by the session's permission classifier**, so the tables' shape and their
+identity columns are unknown to this session and no sibling model was designed on guesses. A Wikipedia
+"football families" scrape would be a disproportionate bespoke acquisition while a curated export already
+exists, so per the brief this stops here. **Exact operator step:** on the DEV host,
+`sqlite3 ~/projects/sports_data_lab/data/afl/afl.db ".schema family_members" ".schema family_relationships" ".schema family_draft"`
+and export the three tables to CSV under `data/players/families/` (untracked raw, like `father-son/`);
+the next session then normalises `sibling` pairs through the same profile-path discipline (the
+`family_members` identity columns decide whether that is deterministic) into `player_relationships`
+`sibling` rows, adds a `has_brother` builder over the same table, and maps `brother` (53 occurrences,
+159 cells — the largest remaining family). `family_draft` (142) should also be compared with the 127
+tracked selections as a second source.
+
+**Not done / deviations.** (a) No unattended full rebuild this session: the stage, preflight and gates
+are proven by the runner's unit tests and by evaluating the six gates against the hand-loaded database;
+the next unattended `db:test:rebuild` will prove them end to end (expect 19 stages, FINAL VALIDATION
+72/72). (b) The AFLW list is untouched. (c) `draft_picks` father-son flags and the canonical selections are
+not reconciled programmatically (four DraftGuru-only, eleven Wikipedia-only rows noted in F.2); a data-QA
+comparison is a possible follow-up, not a defect. (d) DEV carries none of migrations 087/088 nor the
+data; DEV is not semantic evidence.
+
+**Files:** `tools/migration/father_son.py` (new), `data/players/father-son-selections.csv`,
+`data/players/father-son-selections.source.json`, `data/players/father-son-adjudications.csv` (new,
+tracked), `.gitignore`, `.gitattributes`, `src/db/migrations/088_father_son_link_checks.sql` (new),
+`tools/db/rebuild-test.ts`, `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
+`src/search/gridley-compat.ts`, `tests/father-son-reconciliation.test.ts` (new),
+`tests/db-test-rebuild.test.ts`, `tests/grid-solver-spec.test.ts`, `tests/gridley-compat.test.ts`,
+`tests/integration/grid-solver.test.ts`, `tests/integration/gridley-corpus.test.ts`, `CHANGELOG.md`,
+`IssuesIndex.md`, `issues.md`, this runbook.
+
+**Exact next action (fresh session):** (1) operator exports the legacy family tables (F.12), then
+siblings → `player_relationships` `sibling` + `has_brother` + `brother`; (2) after-the-siren
+(`data/records/after-siren/`, establish `winaftersiren`'s exact meaning first); (3) International Rules
+(`data/reference/international-rules/`, establish `intrulesplayer`, inventory the scrape
+programmatically); (4) `season2024player`; (5) the Tony Buhagiar All-Australian adjudication;
+`spoils5season` / `recruitedByDodoro` deferred, `irish` / `tasmanian` / `nfl` presumptively deferred. Run
+the unattended 19-stage rebuild at the next checkpoint (expect FINAL VALIDATION 72/72). DEV load of birth
+dates, coaches and father–son; production with the next deploy (ISSUE-137 sequencing).

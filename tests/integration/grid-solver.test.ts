@@ -455,6 +455,69 @@ describe('grid solver correctness', () => {
     for (const r of coachOnly) expect(r, r.nameKey).toMatchObject({ playerId: null, link: 'unmatched', fabricated: 0 });
   });
 
+  // AFLDB-ISSUE-118 §23.29 family F: father_son_selections from the tracked
+  // normalised Wikipedia list; every person linked only through an AFL Tables
+  // profile path. The two builders are the two ends of the same row.
+  it('father_son_father and father_son_selection are the linked ends of father_son_selections, and the Abletts sit on the right ends', async () => {
+    const fathers = await sql<{ id: number }[]>`
+      SELECT DISTINCT father_player_id AS id FROM father_son_selections
+       WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')
+    `;
+    const sons = await sql<{ id: number }[]>`
+      SELECT DISTINCT drafted_player_id AS id FROM father_son_selections
+       WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+    `;
+    expect(fathers.length).toBeGreaterThan(100);
+    expect(sons.length).toBeGreaterThan(90);
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const fatherAxis: GridAxisState = { builder: 'father_son_father', params: {} };
+    const sonAxis: GridAxisState = { builder: 'father_son_selection', params: {} };
+    expect((await solveCellSummary(fatherAxis, any, 'games_asc')).eligible).toBe(fathers.length);
+    expect((await solveCellSummary(sonAxis, any, 'games_asc')).eligible).toBe(sons.length);
+    const { rows } = await solveCellRows(fatherAxis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const fatherIds = new Set(fathers.map((r) => r.id));
+    for (const r of rows) expect(fatherIds.has(r.id), `player ${r.id}`).toBe(true);
+    // Gary Ablett Sr (Geelong 1984-1996) qualified Gary Jr (2001) and Nathan (2004);
+    // Gary Jr is a son, not a father. Identity is the AFL Tables profile, never the name.
+    const abletts = await sql<{ profile: string; playerId: number }[]>`
+      SELECT ei.external_id AS profile, ei.player_id AS "playerId" FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables' AND ei.external_id IN ('players/G/Gary_Ablett0.html', 'players/G/Gary_Ablett1.html')
+    `;
+    const byProfile = Object.fromEntries(abletts.map((r) => [r.profile, r.playerId]));
+    const senior = byProfile['players/G/Gary_Ablett0.html'];
+    const junior = byProfile['players/G/Gary_Ablett1.html'];
+    expect(senior).toBeDefined();
+    expect(junior).toBeDefined();
+    const seniorRows = await sql<{ son: string; year: number }[]>`
+      SELECT drafted_player_name AS son, draft_year AS year FROM father_son_selections WHERE father_player_id = ${senior} ORDER BY draft_year
+    `;
+    expect(seniorRows).toEqual([{ son: 'Gary Ablett, Jr.', year: 2001 }, { son: 'Nathan Ablett', year: 2004 }]);
+    expect(fatherIds.has(senior)).toBe(true);
+    expect(fatherIds.has(junior)).toBe(false);
+    expect(new Set(sons.map((r) => r.id)).has(junior)).toBe(true);
+    // A son who never played (Brayden Shaw, 2003) is a row with no player, never a fabricated one;
+    // a father with no VFL/AFL career (Jim Michalanney, 2022) likewise.
+    const unlinked = await sql<{ son: string; sonId: number | null; sonLink: string; father: string; fatherId: number | null; fatherLink: string }[]>`
+      SELECT drafted_player_name AS son, drafted_player_id AS "sonId", drafted_link_status::text AS "sonLink",
+             father_name AS father, father_player_id AS "fatherId", father_link_status::text AS "fatherLink"
+        FROM father_son_selections WHERE drafted_player_name = 'Brayden Shaw' OR father_name = 'Jim Michalanney' ORDER BY draft_year
+    `;
+    expect(unlinked).toEqual([
+      { son: 'Brayden Shaw', sonId: null, sonLink: 'unmatched', father: 'Tony Shaw', fatherId: expect.any(Number), fatherLink: 'unique' },
+      { son: 'Max Michalanney^', sonId: expect.any(Number), sonLink: 'unique', father: 'Jim Michalanney', fatherId: null, fatherLink: 'unmatched' },
+    ]);
+    // One parent_child relationship per selection, carrying the same links.
+    const [rel] = await sql<{ n: number; linkedFathers: number; linkedSons: number }[]>`
+      SELECT count(*)::int AS n, count(person_a_player_id)::int AS "linkedFathers", count(person_b_player_id)::int AS "linkedSons"
+        FROM player_relationships WHERE relationship = 'parent_child'
+    `;
+    const [sel] = await sql<{ n: number; linkedFathers: number; linkedSons: number }[]>`
+      SELECT count(*)::int AS n, count(father_player_id)::int AS "linkedFathers", count(drafted_player_id)::int AS "linkedSons" FROM father_son_selections
+    `;
+    expect(rel).toEqual(sel);
+  });
+
   it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {
     const row: GridAxisState = { builder: 'brownlow_medallist', params: {} };
     const col: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
