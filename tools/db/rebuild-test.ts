@@ -46,6 +46,7 @@
  * can reach any stage below — it is a different entry point with no stage graph at all.
  */
 
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 
@@ -142,6 +143,14 @@ const COLEMAN_CONTRACT = join('data', 'reference', 'coleman-derivation.json');
  */
 const BROWNLOW_SEASON_MANIFEST = join('data', 'brownlow', 'season-votes.manifest.json');
 export const BROWNLOW_SEASON_LOADER = 'tools/migration/import_brownlow_season.py';
+
+/** AFLDB-ISSUE-118 §23.19. The height stages' loaders and the AFL API source contract. */
+export const HEIGHT_LOADER = 'tools/migration/enrich_heights.py';
+export const AFL_API_HEIGHT_LOADER = 'tools/migration/enrich_heights_afl_api.py';
+export const WIKIPEDIA_HEIGHT_LOADER = 'tools/migration/enrich_heights_wikipedia.py';
+/** The tracked Wikipedia height adjudication set (ISSUE-118 §23.19), keyed by AFL Tables profile. */
+export const WIKIPEDIA_HEIGHT_CSV = join('data', 'players', 'height-evidence-wikipedia.csv');
+const AFL_API_CONTRACT = join('tools', 'rebuild', 'afl_api', 'afl-api-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
   'data/brownlow/season-votes.manifest.json',
@@ -462,6 +471,45 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       envOverlay: dataEnv,
     },
     {
+      // AFLDB-ISSUE-118 §23.19. players.height_cm from the accepted baseline's own AFL
+      // Tables player_details register, reconciled to the snapshot's per-match rows and
+      // joined to players ONLY through the afltables profile-url identities `fitzroy`
+      // registered — so it must follow fitzroy and needs nothing later. The in-season
+      // supplement it reads beside the baseline is pinned in the fitzRoy contract
+      // (datasets.player_details.height_enrichment), never chosen here. No network.
+      id: 'heights',
+      name: `HEIGHTS — AFL Tables register (${fitzroy.label} + ${heightEnrichmentPins().supplements.map((s) => s.label).join(', ')})`,
+      kind: 'data',
+      run: 'command',
+      argv: heightsImportArgv(fitzroy.label, python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.19. The SECOND height evidence source: the AFL API season
+      // rosters (tracked manifest pinned in tools/rebuild/afl_api/afl-api-contract.json,
+      // roster.accepted_snapshot). Corroborating evidence rows only — it never writes
+      // players.height_cm — reconciled through canonical club/season/guernsey facts
+      // `fitzroy` loaded. No network.
+      id: 'heights-afl-api',
+      name: `HEIGHTS (AFL API) — corroborating evidence, ${aflApiRosterPin().label}`,
+      kind: 'data',
+      run: 'command',
+      argv: aflApiHeightsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.19. The THIRD height evidence source: the tracked Wikipedia
+      // infobox transcription for the Gridley height adjudication set (83 players),
+      // keyed by the AFL Tables profile identities `fitzroy` registered. Evidence rows
+      // only; never writes players.height_cm. Tracked artefact, no network.
+      id: 'heights-wikipedia',
+      name: 'HEIGHTS (Wikipedia) — tracked adjudication set, corroborating evidence',
+      kind: 'data',
+      run: 'command',
+      argv: wikipediaHeightsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
       // Must follow fitzroy: three tracked explicit decisions target canonical AFL Tables
       // identities and the importer HALTs rather than invent a replacement player.
       id: 'draftguru',
@@ -595,15 +643,17 @@ export const AWARDS_HONOURS_GROUPS = [
 export const AWARDS_HONOURS_EXPECTED = {
   honourTeamMembers: 113,
   hallOfFame: 343,
-  captaincies: 1375,
+  /** 1,375 bootstrap rows + 399 AFLDB-ISSUE-118 §23.21 rows for the six missing clubs. */
+  captaincies: 1774,
   risingStarNominations: 766,
   risingStarWinners: 33,
   allAustralian: 1244,
   clubBestAndFairest: 752,
-  namedMedals: 979,
+  /** 979 legacy-extracted rows + 328 AFLDB-ISSUE-118 §23.20 medal transcriptions. */
+  namedMedals: 1307,
   under22: 330,
-  /** bf-* (19) + named medals (17) + all-australian + rising-star + 22-under-22. */
-  awardDefinitions: 39,
+  /** bf-* (19) + named medals (24) + all-australian + rising-star + 22-under-22. */
+  awardDefinitions: 46,
 };
 
 /**
@@ -1016,6 +1066,10 @@ export function finalValidationChecks(
   for (const check of brownlowSeasonChecks(Number(measured.seasons_last))) {
     checks.push(check);
   }
+
+  // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
+  // §H15.5 reason. The expected values are read from the contracts' pin blocks.
+  for (const check of heightChecks()) checks.push(check);
 
   return checks;
 }
@@ -1463,6 +1517,237 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + 'the artefact, its manifest and the identity adjudication file do not agree. '
       + `Nothing has been destroyed.\n${brownlow.stdout}${brownlow.stderr}`);
   }
+
+  // AFLDB-ISSUE-118 §23.19. The height stages read two acquired snapshots beside the
+  // baseline — the pinned in-season supplement and the pinned AFL API roster set —
+  // whose raw bytes are gitignored. Prove the manifest bindings (done inside the pin
+  // readers, which refuse on a missing or mismatched manifest) and every artefact hash
+  // offline, before destruction, exactly as the ladder witness is proven.
+  if (source) {
+    const heights = deps.runCommand(heightsValidateArgv(source.label), {});
+    if (heights.status !== 0) {
+      throw new RebuildRefused(
+        `Height preflight failed (${HEIGHT_LOADER} --validate-only). The fitzRoy contract `
+        + 'pins the in-season supplement(s) '
+        + `${heightEnrichmentPins().supplements.map((s) => `'${s.label}'`).join(', ')}, `
+        + 'but the register or a supplement is missing, incomplete or does not match its '
+        + 'manifest. Nothing has been destroyed.\n'
+        + `${heights.stdout}${heights.stderr}`);
+    }
+  }
+  if (!deps.fileExists(WIKIPEDIA_HEIGHT_CSV)) {
+    throw new RebuildRefused(
+      `Wikipedia height preflight: required tracked input is missing: ${WIKIPEDIA_HEIGHT_CSV}. `
+      + 'Nothing has been destroyed.');
+  }
+  const wikipedia = deps.runCommand(wikipediaHeightsValidateArgv(), {});
+  if (wikipedia.status !== 0) {
+    throw new RebuildRefused(
+      `Wikipedia height preflight failed (${WIKIPEDIA_HEIGHT_LOADER} --validate-only): the `
+      + `tracked artefact ${WIKIPEDIA_HEIGHT_CSV} is malformed. Nothing has been destroyed.\n`
+      + `${wikipedia.stdout}${wikipedia.stderr}`);
+  }
+  const roster = deps.runCommand(aflApiHeightsValidateArgv(), {});
+  if (roster.status !== 0) {
+    throw new RebuildRefused(
+      `AFL API roster preflight failed (${AFL_API_HEIGHT_LOADER} --validate-only). The `
+      + `contract pins '${aflApiRosterPin().label}', but its acquired bytes are missing, `
+      + 'incomplete or do not match the manifest. Re-acquire it with '
+      + 'acquire_rosters.R --from 2012 --to <season>. Nothing has been destroyed.\n'
+      + `${roster.stdout}${roster.stderr}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.19 — the height stages' pinned inputs
+// ---------------------------------------------------------------------------
+
+/** SHA-256 of a tracked manifest's CANONICAL LF bytes (the AFLDB-ISSUE-114 lesson). */
+function manifestSha256(path: string): string | null {
+  if (!existsSync(path)) return null;
+  const bytes = readFileSync(path).toString('utf8').replace(/\r\n/g, '\n');
+  return createHash('sha256').update(bytes, 'utf8').digest('hex');
+}
+
+export type PinnedManifest = { label: string; manifest: string; sha256: string };
+
+/** Refuses unless the pinned manifest exists and hashes to its binding. */
+function provePin(pin: PinnedManifest, what: string): void {
+  const actual = manifestSha256(join(REPO_ROOT, pin.manifest));
+  if (actual === null) {
+    throw new RebuildRefused(
+      `${what} pins '${pin.label}' at ${pin.manifest}, but that manifest is not in this `
+      + 'checkout. The rebuild will not guess an input.');
+  }
+  if (actual !== pin.sha256) {
+    throw new RebuildRefused(
+      `${what} pins '${pin.label}' with manifest_sha256 ${pin.sha256.slice(0, 12)}…, but `
+      + `${pin.manifest} hashes to ${actual.slice(0, 12)}…. A changed manifest is a `
+      + 'successor decision, not something the rebuild resolves.');
+  }
+}
+
+export type HeightEnrichmentPins = {
+  supplements: PinnedManifest[];
+  measured: { playersWithHeight: number; heightWithoutEvidence: number; heightConflictsOpen: number };
+};
+
+/**
+ * The in-season supplement(s) and measured outcome the HEIGHTS stage is bound to, read
+ * from the fitzRoy contract (datasets.player_details.height_enrichment). Never a
+ * default: no pin, no stage. Each supplement's manifest binding is proven on read.
+ */
+export function heightEnrichmentPins(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, FITZROY_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): HeightEnrichmentPins {
+  const contract = readContract();
+  const datasets = contract?.datasets as Record<string, Record<string, unknown>> | undefined;
+  const block = datasets?.player_details?.height_enrichment as Record<string, unknown> | undefined;
+  const supplements = block?.supplements as Array<Record<string, unknown>> | undefined;
+  const measured = block?.measured as Record<string, unknown> | undefined;
+  if (!block || !Array.isArray(supplements) || supplements.length === 0 || !measured) {
+    throw new RebuildRefused(
+      `${FITZROY_CONTRACT} records no height enrichment binding `
+      + '(datasets.player_details.height_enrichment with supplements and measured). '
+      + 'AFLDB-ISSUE-118 §23.19 binds the in-season supplement explicitly; the rebuild '
+      + 'will not pick one.');
+  }
+  const pins: PinnedManifest[] = supplements.map((s) => ({
+    label: String(s.snapshot_label), manifest: String(s.manifest), sha256: String(s.manifest_sha256),
+  }));
+  for (const pin of pins) provePin(pin, 'The fitzRoy contract height_enrichment block');
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(`height_enrichment.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    supplements: pins,
+    measured: {
+      playersWithHeight: int('players_with_height'),
+      heightWithoutEvidence: int('height_without_evidence'),
+      heightConflictsOpen: int('height_conflicts_open'),
+    },
+  };
+}
+
+export type AflApiRosterPin = PinnedManifest & { measured: { playersWithAflApiEvidence: number } };
+
+/** The accepted AFL API roster snapshot, from roster.accepted_snapshot; binding proven. */
+export function aflApiRosterPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFL_API_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflApiRosterPin {
+  const contract = readContract();
+  const roster = contract?.roster as Record<string, unknown> | undefined;
+  const accepted = roster?.accepted_snapshot as
+    { snapshot_label?: unknown; manifest?: unknown; manifest_sha256?: unknown;
+      measured?: { players_with_afl_api_evidence?: unknown } } | undefined;
+  const n = accepted?.measured?.players_with_afl_api_evidence;
+  if (!accepted?.snapshot_label || !accepted.manifest || !accepted.manifest_sha256
+      || typeof n !== 'number' || !Number.isInteger(n)) {
+    throw new RebuildRefused(
+      `${AFL_API_CONTRACT} records no accepted roster snapshot `
+      + '(roster.accepted_snapshot with snapshot_label, manifest, manifest_sha256 and '
+      + 'measured.players_with_afl_api_evidence). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.snapshot_label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256),
+  };
+  provePin(pin, 'The AFL API contract roster.accepted_snapshot block');
+  return { ...pin, measured: { playersWithAflApiEvidence: n } };
+}
+
+/** The HEIGHTS data stage: the baseline register plus every pinned supplement. */
+export function heightsImportArgv(fitzroyLabel: string,
+                                  python: string = resolvePython()): string[] {
+  const argv = [python, HEIGHT_LOADER, '--label', fitzroyLabel];
+  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  return argv;
+}
+
+/** The same argv plus --validate-only: manifests and artefact hashes, no database. */
+export function heightsValidateArgv(fitzroyLabel: string,
+                                    python: string = resolvePython()): string[] {
+  return [...heightsImportArgv(fitzroyLabel, python), '--validate-only'];
+}
+
+export function aflApiHeightsArgv(python: string = resolvePython()): string[] {
+  return [python, AFL_API_HEIGHT_LOADER, '--label', aflApiRosterPin().label];
+}
+
+export function aflApiHeightsValidateArgv(python: string = resolvePython()): string[] {
+  return [...aflApiHeightsArgv(python), '--validate-only'];
+}
+
+export function wikipediaHeightsArgv(python: string = resolvePython()): string[] {
+  return [python, WIKIPEDIA_HEIGHT_LOADER, '--csv', WIKIPEDIA_HEIGHT_CSV];
+}
+
+export function wikipediaHeightsValidateArgv(python: string = resolvePython()): string[] {
+  return [...wikipediaHeightsArgv(python), '--validate-only'];
+}
+
+/**
+ * The adjudication set's size, read from the tracked artefact itself: the loader
+ * refuses to write unless EVERY row resolves to a canonical player, so the number of
+ * players carrying Wikipedia height evidence after a rebuild is exactly its row count.
+ */
+export function wikipediaHeightRows(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, WIKIPEDIA_HEIGHT_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): number {
+  const text = readCsv();
+  if (text === null) {
+    throw new RebuildRefused(`${WIKIPEDIA_HEIGHT_CSV} is not in this checkout.`);
+  }
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (lines.length < 2 || !lines[0].startsWith('afltables_profile,')) {
+    throw new RebuildRefused(`${WIKIPEDIA_HEIGHT_CSV} has no data rows or an unexpected header.`);
+  }
+  return lines.length - 1;
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.19. Heights must survive a rebuild from scratch: the fill count,
+ * the evidence-link invariant and the conflict count are pinned beside the inputs that
+ * produced them, so a rebuild that silently drops the stage (or reproduces fewer
+ * identities) fails here rather than being noticed by a Gridley cell weeks later.
+ */
+export function heightChecks(): FinalCheck[] {
+  const pins = heightEnrichmentPins();
+  const roster = aflApiRosterPin();
+  return [
+    { key: 'players_with_height',
+      sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL',
+      expected: pins.measured.playersWithHeight },
+    { key: 'height_without_evidence',
+      sql: 'SELECT count(*) FROM players WHERE height_cm IS NOT NULL AND height_evidence_id IS NULL',
+      expected: pins.measured.heightWithoutEvidence },
+    { key: 'height_conflicts_open',
+      sql: "SELECT count(*) FROM data_issues WHERE issue_type = 'height_conflict' AND resolved_at IS NULL",
+      expected: pins.measured.heightConflictsOpen },
+    { key: 'players_with_afl_api_height_evidence',
+      sql: "SELECT count(DISTINCT e.player_id) FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key = 'afl_api'",
+      expected: roster.measured.playersWithAflApiEvidence },
+    { key: 'players_with_wikipedia_height_evidence',
+      sql: "SELECT count(DISTINCT e.player_id) FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key = 'wikipedia'",
+      expected: wikipediaHeightRows() },
+  ];
 }
 
 /** Offline witness validation — no --compare, so no database is contacted. */

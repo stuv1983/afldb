@@ -83,6 +83,7 @@ from honour_teams import HonourTeamMember, load_honour_teams  # noqa: E402
 from player_identity import load_player_identities  # noqa: E402
 from named_medals import (  # noqa: E402
     AWARD_SLUGS as NAMED_MEDAL_SLUGS,
+    SOURCE_CITATIONS as NAMED_MEDAL_SOURCE_CITATIONS,
     load_named_medals,
     load_named_medals_definitions,
     validate_family as validate_named_medals_family,
@@ -1000,8 +1001,11 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
     definitions = load_named_medals_definitions()
     winners = load_named_medals()
     validate_named_medals_family(winners, definitions)
-
-    source_id = require_source(sources, "draftguru")
+    # AFLDB-ISSUE-118 §23.20: rows carry their own provenance (draftguru for
+    # the legacy extract, wikipedia for the seven transcribed medals), so each
+    # is written under its own source_id and the reload scope covers both.
+    source_ids = {key: require_source(sources, key)
+                  for key in sorted(NAMED_MEDAL_SOURCE_CITATIONS)}
 
     with pg.cursor() as cur:
         cur.execute("SELECT year FROM seasons")
@@ -1070,7 +1074,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
                 club_id, club_raw, w.votes,
                 None, False, False,
                 w.note,
-                source_id, w.source_key, batch.id,
+                source_ids[w.source_citation], w.source_key, batch.id,
             )
 
     stats = reload_keyed(
@@ -1082,7 +1086,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
         build_winners(), batch,
         target_table="award_winners",
         scope_column="award_id", scope_values=named_medal_award_ids,
-        scopes=[("source_id", [source_id], False)],
+        scopes=[("source_id", sorted(source_ids.values()), False)],
         allow_link_loss=allow_link_loss,
     )
     pg.commit()

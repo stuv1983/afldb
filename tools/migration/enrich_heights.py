@@ -315,6 +315,9 @@ def main() -> int:
                              "extend the full-history rows (repeatable).")
     parser.add_argument("--snapshot-dir", action="append", default=[], metavar="LABEL=PATH",
                         help=f"Directory override for a label (default {SNAPSHOT_ROOT}/<label>).")
+    parser.add_argument("--validate-only", action="store_true",
+                        help="Verify the manifests and every artefact's sha256 offline; "
+                             "touch no database (the rebuild precheck).")
     parser.add_argument("--dry-run", action="store_true",
                         help="Reconcile and report against the database; write nothing.")
     parser.add_argument("--report", type=Path, default=None,
@@ -356,6 +359,9 @@ def main() -> int:
              f"{sum(1 for r in register if parse_height(r.get('HT')) is not None):,} with a height")
     rep.step("player_stats files verified: "
              + ", ".join(f"{k} ({v})" for k, v in stats_files.items()))
+    if args.validate_only:
+        print(f"  done (validate only) in {time.time() - started:.1f}s")
+        return 0
 
     aggregates = aggregate_stats(iter_csvs(stats_paths), register_teams)
     results = reconcile(register, aggregates)

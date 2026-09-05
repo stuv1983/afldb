@@ -156,7 +156,8 @@ type CellFinding = {
   board: number;
   cell: string;
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
-    | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership';
+    | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
+    | 'external source disagreement' | 'source conflict';
   row: string;
   col: string;
   rowAxis: string;
@@ -181,10 +182,18 @@ const bridge = new Map<number, number>();
 const finalSeasons = new Map<number, number | null>();
 /** AFLDB player id -> Hall of Fame induction year: an honour a retired player can still gain after a board's date. */
 const hallOfFameYears = new Map<number, number>();
+/**
+ * AFLDB player id -> every height an INDEPENDENT source asserts (player_height_evidence
+ * rows from any source but AFL Tables: the AFL API season rosters, the tracked Wikipedia
+ * adjudication set). ISSUE-118 §23.19: a height cell Gridley disagrees on is classified
+ * from this evidence, never from Gridley's own answer.
+ */
+const heightEvidence = new Map<number, { source: string; height: number }[]>();
 /** Documented semantic differences between Gridley and AFLDB: reported and counted, never failed. */
 const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players); AFLDB models games played",
+  'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's; AFLDB's answer is corroborated and Gridley's is not (ISSUE-118 §23.19)",
 };
 /**
  * Data AFLDB (or this database) does not hold. These FAIL the run: the
@@ -194,7 +203,8 @@ const INFORMATIONAL: Record<string, string> = {
 const DATA_GAPS: Record<string, string> = {
   unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required',
   'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights)',
-  'partial dataset': 'captaincies has no Geelong, Hawthorn or West Coast rows on any environment',
+  'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
+  'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
 };
 const cellStats: { board: number; cell: string; gridley: number; afldb: number; ms: number }[] = [];
 
@@ -213,7 +223,7 @@ async function eligibleSet(axis: GridAxisState): Promise<Set<number>> {
 }
 
 beforeAll(async () => {
-  const [clubs, venues, awards, players, hof, [probe]] = await Promise.all([
+  const [clubs, venues, awards, players, hof, evidence, [probe]] = await Promise.all([
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM club_organizations`,
     sql<{ name: string; id: number }[]>`SELECT canonical_name AS name, id FROM venues`,
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM awards`,
@@ -221,6 +231,8 @@ beforeAll(async () => {
                             c.debut_season AS "debutSeason", c.final_season AS "finalSeason"
                        FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id`,
     sql<{ playerId: number; inductedYear: number | null }[]>`SELECT player_id AS "playerId", inducted_year AS "inductedYear" FROM hall_of_fame WHERE player_id IS NOT NULL`,
+    sql<{ playerId: number; source: string; height: number }[]>`SELECT e.player_id AS "playerId", s.key AS source, e.height_cm AS height
+                                                                  FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key <> 'afltables'`,
     sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
@@ -238,6 +250,9 @@ beforeAll(async () => {
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
+  for (const e of evidence) {
+    const l = heightEvidence.get(e.playerId) ?? []; l.push({ source: e.source, height: e.height }); heightEvidence.set(e.playerId, l);
+  }
   const lookups: GridleyLookups = {
     clubs: Object.fromEntries(clubs.map((c) => [c.slug, c.id])),
     venues: Object.fromEntries(venues.map((v) => [v.name, v.id])),
@@ -434,6 +449,30 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         // A club-count criterion in either direction: Gridley's own text counts a
         // trade-period move to a club the player never played for.
         else if (axisBuilders.some((b) => /^(one_club_player|multi_club_player|clubs_played_min)/.test(b))) category = 'list membership';
+        // ISSUE-118 §23.19. A height cell: Gridley's height source differs from the AFL
+        // Tables register. Classify from the independent evidence AFLDB holds for the
+        // player, never from Gridley's answer: corroborated on AFLDB's side of the bound
+        // and unsupported on Gridley's -> external source disagreement (reported);
+        // otherwise a source conflict that stays open.
+        else if (category === 'incorrect known answer') {
+          const hi = axisBuilders.findIndex((b) => b.startsWith('height_'));
+          const heightIsTheDifference = hi >= 0 && (inAfldb || lackingIdx.includes(hi));
+          if (heightIsTheDifference) {
+            const m = [rowRec, colRec][hi].mapping;
+            const cm = m.status === 'mapped' ? Number(m.axis.params.cm) : NaN;
+            const satisfies = (h: number) => (axisBuilders[hi] === 'height_min' ? h >= cm : h <= cm);
+            const independent = heightEvidence.get(afldbId) ?? [];
+            const onAfldbSide = independent.filter((e) => satisfies(e.height) === inAfldb);
+            const onGridleySide = independent.filter((e) => satisfies(e.height) === inGridley);
+            const list = (l: { source: string; height: number }[]) => l.map((e) => `${e.source} ${e.height}`).join(', ');
+            if (independent.length > 0 && onGridleySide.length === 0) {
+              findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; independent sources on AFLDB's side: ${list(onAfldbSide)}` });
+            } else {
+              findings.push({ ...base, category: 'source conflict', detail: `${detail}; ${independent.length === 0 ? 'no independent height source' : `independent sources on Gridley's side: ${list(onGridleySide)}${onAfldbSide.length ? `; on AFLDB's side: ${list(onAfldbSide)}` : ''}`}` });
+            }
+            continue;
+          }
+        }
         findings.push({ ...base, category, detail });
       }
     })));

@@ -55,5 +55,49 @@
     ],
     "promotion_policy": "never",
     "verdict_authority": "The acquirer does not adjudicate. It records what it measured and writes completeness 'unvalidated'; the source-family column contract and the bundle emitter decide what is projectable."
+  },
+  "roster": {
+    "$comment": "AFLDB-ISSUE-118 Stage H3 — what one bounded roster (season squad list) acquisition is: every AFL men's club's list for each season of an explicit --from/--to range, one artefact per season. It exists as the SECOND, independent height evidence source (heightInCm keyed by the stable providerId) beside the AFL Tables player_details register that Stage H2 loads; it corroborates, and never replaces, that register. The source-family shape is data/reference/source-families.json, source afl_api family roster (P4, 2026-08-28).",
+    "contract_roster_version": 1,
+    "family": "roster",
+    "adapter": "tools/rebuild/afl_api/acquire_rosters.R",
+    "endpoint": "fitzRoy::fetch_player_details_afl(season = S, team = NULL, current = TRUE, comp = 'AFLM'), once per season",
+    "competition": "AFL men's senior competition",
+    "acquisition_kind": "season_roster_snapshot",
+    "first_available_season": 2012,
+    "first_available_season_rule": "The AFL API holds squad lists from 2012 (the CD_ provider-id era) only: season 2010 returned nothing on 2026-09-05. --from earlier than 2012 is refused rather than written as an absence.",
+    "explicit_scope_only": true,
+    "scope_rule": "--from and --to are both REQUIRED. There is no implicit current season and no 'latest' default. A season that returns no rows is a TERMINAL failure: it is never written as empty and the manifest is not written at all.",
+    "scope_key_grammar": "from=<integer>;to=<integer>",
+    "fetch_mechanics": {
+      "measured_on": "2026-09-05, fitzRoy 1.8.0",
+      "current_true": "`current = TRUE, season = S` resolves the compSeason id for S and returns S's squad (probed 2012, 2015, 2019: the season column is S and the players are S's list, non-debuted list members included). This is the ONLY call shape the adapter uses.",
+      "current_false": "`current = FALSE` expands season to 2012:S and then fails inside dplyr::mutate for every S > 2012 ('`season` must be size 45 or 1, not 4'). Unusable in the pinned version; never called.",
+      "team_labels": "team = NULL enumerates every club the API lists for the compSeason (18 in every measured season). The labels are the API's own ('Adelaide Crows', 'GWS GIANTS', 'Sydney Swans', ...) and are recorded verbatim; mapping them to AFLDB club identity is the consumer's job."
+    },
+    "required_columns": ["providerId", "firstName", "surname", "season", "team", "heightInCm"],
+    "required_columns_rule": "The identity fields, the season and the one fact this family is acquired for. Every other P4 column is recorded as observed and is not a refusal condition.",
+    "external_key": ["providerId", "season", "team"],
+    "zero_is_missing_columns": ["heightInCm", "weightInKg"],
+    "zero_is_missing_rule": "P4 measured weightInKg = 0 on every row; the 2026-09-05 probe measured heightInCm = 0 on 1 of 841 rows in 2012. Both are zero-as-missing and map to NULL, never 0.",
+    "identity": "providerId is stable across seasons and shared with the lineup family (P4). It is NOT an AFLDB player identity: no external_identities row is written by this family, and a consumer that needs players.id must reconcile through canonical facts (club, season, name as the source spells it) and fail closed on ambiguity, exactly as the H2 register reconciliation does.",
+    "never_admissible_for": [
+      "overwriting an existing players.height_cm",
+      "filling players.height_cm where the AFL Tables register carries a value",
+      "any canonical fact other than height evidence without its own family decision"
+    ],
+    "accepted_snapshot": {
+      "$comment": "AFLDB-ISSUE-118 Stage H4 durability binding for the rebuild's HEIGHTS-AFL-API stage (tools/migration/enrich_heights_afl_api.py): which roster acquisition the rebuild loads as corroborating height evidence, its tracked manifest bound by the SHA-256 of the manifest's canonical LF bytes. The raw JSON artefacts are gitignored; the rebuild proves the binding and every artefact hash offline before destruction (enrich_heights_afl_api.py --validate-only) and refuses otherwise. A later acquisition is a successor decision recorded here, never a default.",
+      "snapshot_label": "rosters-20260905",
+      "manifest": "docs/rebuild-manifests/afl_api/rosters-20260905.json",
+      "manifest_sha256": "61aff99a8b14e08823821b23e68817c30604dabf33399b437ad3bf7fbe6369a7",
+      "seasons": { "from": 2012, "to": 2026 },
+      "measured": {
+        "$comment": "Measured on afldb_test (dry run, 2026-09-05) over the accepted fitzRoy baseline's players and match facts: providerIds reconciled to a canonical player (1,751 by name + shared club-season, 73 by surname + shared club-season + guernsey; 0 ambiguous), which is the number of players that receive AFL API height evidence rows. A rebuild from the same inputs must reproduce it exactly.",
+        "players_with_afl_api_evidence": 1824
+      }
+    },
+    "promotion_policy": "corroborating_evidence_only",
+    "verdict_authority": "The acquirer does not adjudicate. tools/migration/enrich_heights_afl_api.py verifies every artefact against the tracked manifest, reconciles identity fail-closed and writes player_height_evidence rows; the precedence decision is recorded in AFLDB-ISSUE-118 §23.19."
   }
 }

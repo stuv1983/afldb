@@ -289,6 +289,29 @@
       ]
     },
     "player_details": {
+      "height_enrichment": {
+        "$comment": "AFLDB-ISSUE-118 Stage H4 durability binding for the rebuild's HEIGHTS stage (tools/migration/enrich_heights.py). The register is the accepted canonical baseline's own player_details.csv and is never pinned separately: the rebuild resolves the baseline from data/reference/fitzroy-accepted-baselines.json and the register travels with it. What must be pinned is the in-season SUPPLEMENT: the register was captured on 2026-09-02 and counts its current players' 2026 games, which the baseline (seasons to 2025) cannot supply, so without the supplement 675 current players fail closed as unmatched (§23.16). Each supplement is a tracked in_season_partial manifest bound here by the SHA-256 of its CANONICAL LF BYTES (the AFLDB-ISSUE-114 lesson: .gitattributes renders docs/rebuild-manifests/** as eol=lf, and a CRLF working copy must hash the same). The raw CSVs are gitignored like every other acquired snapshot; tools/db/rebuild-test.ts proves the manifest binding and runs enrich_heights.py --validate-only (every artefact sha256) offline BEFORE destruction, and refuses when a manifest is missing, mismatched or its bytes are absent. Accepting a different supplement (a later in-season capture, or a new register whose capture date needs a different season) is an operator decision recorded by editing this block, never a default.",
+        "stage": "heights",
+        "loader": "tools/migration/enrich_heights.py",
+        "register_source": "the accepted baseline's player_details.csv (data/reference/fitzroy-accepted-baselines.json, exactly_one_accepted)",
+        "register_captured_on": "2026-09-02",
+        "supplements": [
+          {
+            "snapshot_label": "issue129-t7-20260903",
+            "manifest": "docs/rebuild-manifests/afltables_fitzroy_core/issue129-t7-20260903.json",
+            "manifest_sha256": "9dfb2efa74a8cf62cbc6719c91cf0655301d50f43b65505891170cfbfd7c3984",
+            "acquisition_kind": "in_season_partial",
+            "season": 2026,
+            "reason": "the register counts 2026 games (captured 2026-09-02, after round 25); the accepted baseline ends at 2025. Measured without it: 14,400 mapped + 675 current players unmatched; with it: 16,713 mapped."
+          }
+        ],
+        "measured": {
+          "$comment": "Measured on afldb_test (batch 165, 2026-09-05) from exactly these inputs over the accepted baseline's identities; a rebuild from the same inputs must reproduce them exactly. players_with_height is the fill count (12,487 of 13,273); height_without_evidence is the link invariant (every filled height points at the evidence row that justified it); height_conflicts_open is the two-heights-for-one-player count.",
+          "players_with_height": 12487,
+          "height_without_evidence": 0,
+          "height_conflicts_open": 0
+        }
+      },
       "fitzroy_function": "fetch_player_details_afltables",
       "grain": "player",
       "fields": [

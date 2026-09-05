@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 Stages H3/H4 — height source precedence, heights in the rebuild, seven named medals, six captaincy lineages - 5 September 2026
+
+- **Height evidence, three sources.** New `tools/rebuild/afl_api/acquire_rosters.R` (AFL API season rosters 2012–2026, contract block `roster`, tracked manifest `docs/rebuild-manifests/afl_api/rosters-20260905.json`), `tools/migration/enrich_heights_afl_api.py` (fail-closed identity by name + club + season, then surname + club + season + guernsey; 1,824 players on `afldb_test`) and `tools/migration/enrich_heights_wikipedia.py` with the tracked `data/players/height-evidence-wikipedia.csv` (83-player adjudication set). Both write `player_height_evidence` rows only; the AFL Tables register remains the canonical authority for `players.height_cm` and no canonical height changed (runbook §23.19).
+- **Gridley corpus regression** (`tests/integration/gridley-corpus.test.ts`) classifies height cells from the evidence rows: `external source disagreement` (informational) and `source conflict` (still fails); `incorrect known answer` 299 → 0 on `afldb_test`.
+- **`db:test:rebuild`** gains `heights`, `heights-afl-api` and `heights-wikipedia` stages after `fitzroy`, pinned in `tools/rebuild/fitzroy/fitzroy-contract.json` (`height_enrichment`, in-season supplement bound by manifest SHA-256) and `tools/rebuild/afl_api/afl-api-contract.json` (`roster.accepted_snapshot`); offline `--validate-only` preflights; five new final-validation gates (12,487 / 0 / 0 / 1,824 / 83).
+- **Named medals:** Anzac, Showdown, Glendinning–Allan, Brett Kirk, Marcus Ashcroft, Goal of the Year, Mark of the Year — 7 definitions and 328 Wikipedia-cited winner rows in `data/awards/named-medals*.csv`; `import_awards.py` keeps row-level provenance (`draftguru` / `wikipedia`); `gridley-compat.ts` maps the seven Gridley ids to `award_winner`.
+- **Captaincies:** 399 rows for Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears and University in `data/awards/captaincies.csv` (1,774 total, all linked on `afldb_test`); the Gridley captain criteria are no longer partial.
+- Identity census `data/awards/player-identity.csv` 1,745 → 1,863 rows (12 without a rebuild-stable identity, was 18).
+
+
 ### AFLDB-ISSUE-118 Stage H2 — player heights from the AFL Tables register - 5 September 2026
 
 - **`players.height_cm` is populated** (12,487 players on `afldb_test`, 11,740 on `afldb_dev`;

@@ -104,14 +104,20 @@ DEFINITIONS_HEADER = (
 # (AFLDB-ISSUE-112 §14.4 / §23). A row count, season span or per-family
 # distribution outside this is a source contract change, not a formatting
 # slip — bump these when a later season's winners are curated in.
-EXPECTED_WINNERS = 979
-EXPECTED_DEFINITIONS = 17
-MIN_SEASON = 1976
+# AFLDB-ISSUE-118 §23.20 (Family A): seven Gridley-facing medals joined the
+# family from the Wikipedia winner lists (328 rows, all linked; source_citation
+# 'wikipedia'): Anzac, Showdown, Glendinning–Allan, Brett Kirk and Marcus
+# Ashcroft medals, Goal of the Year and Mark of the Year (the latter two with
+# the Channel Seven / ABC awards of 1970–2000, as Gridley counts them).
+EXPECTED_WINNERS = 1307
+EXPECTED_DEFINITIONS = 24
+MIN_SEASON = 1970
 MAX_SEASON = 2025
-# 1976, then 1979/1980 onward — not contiguous, so a distinct-count check.
-EXPECTED_DISTINCT_SEASONS = 50
-EXPECTED_LINKED = 863
-EXPECTED_NOTE_PRESENT = 865
+# 1970-1976 (Mark / Goal of the Year), then 1979/1980 onward — not
+# contiguous, so a distinct-count check.
+EXPECTED_DISTINCT_SEASONS = 56
+EXPECTED_LINKED = 1191
+EXPECTED_NOTE_PRESENT = 1109
 EXPECTED_VOTES_PRESENT = 53
 
 # The 17 named-medal award slugs, exactly as import_awards.award_slug()
@@ -120,6 +126,13 @@ EXPECTED_VOTES_PRESENT = 53
 # once each. This same set is imported by import_awards.import_awards() to
 # exclude these awards' winners from the legacy reload's scope.
 AWARD_SLUGS = frozenset({
+    "anzac-medal",
+    "showdown-medal",
+    "glendinning-allan-medal",
+    "brett-kirk-medal",
+    "marcus-ashcroft-medal",
+    "goal-of-the-year",
+    "mark-of-the-year",
     "aflca-best-young-player",
     "aflca-champion",
     "aflpa-best-first-year-player",
@@ -147,6 +160,19 @@ DEFINITION_CATEGORIES = {"award", "draft_pick"}
 
 # Source-granularity provenance for the whole family (§13 operator policy).
 SOURCE_CITATION = "draftguru"
+# Row-level provenance vocabulary: the legacy-extracted rows cite draftguru,
+# the AFLDB-ISSUE-118 medal transcriptions cite wikipedia. Each value must be
+# a sources.key; import_awards routes every row to its own source_id.
+SOURCE_CITATIONS = frozenset({"draftguru", "wikipedia"})
+#: Medals whose season can legitimately carry two rows for one player: the
+#: per-match derby medals (two derbies a season) and Mark / Goal of the Year
+#: in 1970-2000, when Channel Seven and the ABC each made an award. The
+#: occasion in `note` distinguishes the rows.
+PER_MATCH_MEDALS = frozenset({
+    "anzac-medal", "showdown-medal", "glendinning-allan-medal",
+    "brett-kirk-medal", "marcus-ashcroft-medal",
+    "mark-of-the-year", "goal-of-the-year",
+})
 
 # The link_status enum (migration 005) and the subset that requires a
 # player_id (the migration 019/053 invariant, enforced here rather than
@@ -300,7 +326,7 @@ def load_named_medals(
                 if award_slug not in AWARD_SLUGS:
                     raise NamedMedalsSourceError(
                         f"line {line}: unknown award_slug {award_slug!r} "
-                        f"(not one of the 17 measured named-medal awards)"
+                        f"(not one of the {len(AWARD_SLUGS)} named-medal awards)"
                     )
 
                 match = _SOURCE_KEY_RE.fullmatch(source_key)
@@ -351,10 +377,10 @@ def load_named_medals(
                         f"player_id"
                     )
 
-                if source_citation != SOURCE_CITATION:
+                if source_citation not in SOURCE_CITATIONS:
                     raise NamedMedalsSourceError(
                         f"line {line}: source_citation {source_citation!r} must be "
-                        f"{SOURCE_CITATION!r} (source-granularity provenance)"
+                        f"one of {sorted(SOURCE_CITATIONS)} (source-granularity provenance)"
                     )
 
                 # votes is the Brownlow medallist's winning tally and is a
@@ -406,7 +432,11 @@ def load_named_medals(
                 # 2013 40-Man Squad has two different "Josh Kennedy"s.
                 # (award_slug, season, player, club) distinguishes every
                 # measured row.
-                natural_key = (award_slug, season, player, club or "")
+                # A per-match medal (two derbies a season) can be won twice in
+                # one season by one player (Luke Parker, Brett Kirk Medal 2022),
+                # so those rows are distinguished by the occasion in `note`.
+                natural_key = (award_slug, season, player, club or "",
+                               note if award_slug in PER_MATCH_MEDALS else "")
                 if natural_key in natural_keys:
                     raise NamedMedalsSourceError(
                         f"line {line}: duplicate natural identity "
@@ -464,15 +494,15 @@ def _validate_winners_complete(rows: Sequence[NamedMedalWinner]) -> None:
         missing = sorted(set(AWARD_SLUGS) - slugs)
         extra = sorted(slugs - set(AWARD_SLUGS))
         raise NamedMedalsSourceError(
-            f"winners cover {len(slugs)} of the 17 named-medal awards "
+            f"winners cover {len(slugs)} of the {len(AWARD_SLUGS)} named-medal awards "
             f"(missing {missing}, unexpected {extra})"
         )
 
     citations = {row.source_citation for row in rows}
-    if citations != {SOURCE_CITATION}:
+    if citations != SOURCE_CITATIONS:
         raise NamedMedalsSourceError(
             f"source_citation vocabulary {sorted(citations)} does not match the "
-            f"declared [{SOURCE_CITATION!r}]"
+            f"declared {sorted(SOURCE_CITATIONS)}"
         )
 
     linked = sum(1 for row in rows if row.player_id is not None)
@@ -537,7 +567,7 @@ def load_named_medals_definitions(
                 if slug not in AWARD_SLUGS:
                     raise NamedMedalsSourceError(
                         f"line {line}: unknown slug {slug!r} "
-                        f"(not one of the 17 measured named-medal awards)"
+                        f"(not one of the {len(AWARD_SLUGS)} named-medal awards)"
                     )
                 if category not in DEFINITION_CATEGORIES:
                     raise NamedMedalsSourceError(

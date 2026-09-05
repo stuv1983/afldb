@@ -26,6 +26,17 @@ import {
   AWARDS_HONOURS_EXPECTED,
   AWARDS_HONOURS_GROUPS,
   awardsHonoursChecks,
+  AFL_API_HEIGHT_LOADER,
+  HEIGHT_LOADER,
+  WIKIPEDIA_HEIGHT_CSV,
+  WIKIPEDIA_HEIGHT_LOADER,
+  wikipediaHeightRows,
+  wikipediaHeightsValidateArgv,
+  aflApiHeightsValidateArgv,
+  aflApiRosterPin,
+  heightChecks,
+  heightEnrichmentPins,
+  heightsValidateArgv,
   BROWNLOW_SEASON_LOADER,
   BROWNLOW_SEASON_PREFLIGHT_FILES,
   brownlowSeasonChecks,
@@ -731,10 +742,14 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-095 added 'ladder-witness' between derived and fingerprints. It is a
     // VALIDATION stage, not a data stage — the nine-stage DATA topology is unchanged and
     // nothing new imports. See 'ladder witness cross-check' below.
+    // AFLDB-ISSUE-118 §23.19 added 'heights' and 'heights-afl-api' directly after
+    // fitzroy: both read tracked-manifest snapshots already on disk (the baseline's own
+    // register plus a pinned in-season supplement; the pinned AFL API roster set) and
+    // join through the identities and match facts fitzroy just loaded. Neither acquires.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'draftguru', 'awards-honours', 'brownlow-season',
-      'derived', 'coleman', 'ladder-witness', 'fingerprints',
+      'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'draftguru',
+      'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness', 'fingerprints',
     ]);
   });
 
@@ -748,13 +763,110 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-113. 'brownlow-season' is the seventh, for the same reason: it reads
     // the tracked artefact under data/brownlow/ — a re-keyed read-only export of the
     // preserved authoritative table — and never the legacy SQLite or the network.
+    // AFLDB-ISSUE-118 §23.19. 'heights' and 'heights-afl-api' are the eighth and ninth:
+    // manifest-pinned snapshots on disk, no legacy SQLite, no network (see 'height
+    // enrichment' below).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
-      .toEqual(['reference', 'fitzroy', 'draftguru', 'awards-honours', 'brownlow-season',
-                'derived', 'coleman']);
+      .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
+                'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
     ]);
+  });
+
+  describe('height enrichment (AFLDB-ISSUE-118 §23.19)', () => {
+    const ids = idsOf(stages);
+    const heights = stages.find((s) => s.id === 'heights')!;
+    const aflApi = stages.find((s) => s.id === 'heights-afl-api')!;
+
+    it('binds the register to the accepted baseline and every supplement to the contract pin', () => {
+      const pins = heightEnrichmentPins();
+      expect(pins.supplements.length).toBeGreaterThan(0);
+      expect(heights.argv).toEqual([
+        resolvePython(), HEIGHT_LOADER, '--label', fitzroy().label,
+        ...pins.supplements.flatMap((p) => ['--supplement-label', p.label]),
+      ]);
+      expect(heights.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule), so the
+      // snapshot proven and the snapshot imported cannot differ.
+      expect(heightsValidateArgv(fitzroy().label)).toEqual([...heights.argv!, '--validate-only']);
+    });
+
+    it('loads the AFL API roster the contract accepts, as evidence only', () => {
+      const pin = aflApiRosterPin();
+      expect(aflApi.argv).toEqual([resolvePython(), AFL_API_HEIGHT_LOADER, '--label', pin.label]);
+      expect(aflApiHeightsValidateArgv()).toEqual([...aflApi.argv!, '--validate-only']);
+    });
+
+    it('follows fitzroy (identities and match facts) and precedes everything that reads players', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('heights'));
+      expect(ids.indexOf('heights')).toBeLessThan(ids.indexOf('heights-afl-api'));
+      expect(ids.indexOf('heights-afl-api')).toBeLessThan(ids.indexOf('heights-wikipedia'));
+      expect(ids.indexOf('heights-wikipedia')).toBeLessThan(ids.indexOf('draftguru'));
+      const wikipedia = stages.find((s) => s.id === 'heights-wikipedia')!;
+      expect(wikipedia.argv).toEqual([resolvePython(), WIKIPEDIA_HEIGHT_LOADER, '--csv', WIKIPEDIA_HEIGHT_CSV]);
+      expect(wikipediaHeightsValidateArgv()).toEqual([...wikipedia.argv!, '--validate-only']);
+      expect(wikipediaHeightRows()).toBeGreaterThan(0);
+      expect(() => wikipediaHeightRows(() => 'afltables_profile,player\n')).toThrow(/no data rows/);
+      for (const stage of [heights, aflApi, wikipedia]) {
+        expect(stage.kind).toBe('data');
+        expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+      }
+    });
+
+    it('refuses a contract with no height pin, and a pin whose manifest does not hash to its binding', () => {
+      expect(() => heightEnrichmentPins(() => ({ datasets: { player_details: {} } })))
+        .toThrow(/records no height enrichment binding/);
+      const real = JSON.parse(readFileSync(
+        join(root, 'tools', 'rebuild', 'fitzroy', 'fitzroy-contract.json'), 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.datasets.player_details.height_enrichment.supplements[0].manifest_sha256 = '0'.repeat(64);
+      expect(() => heightEnrichmentPins(() => tampered)).toThrow(/hashes to/);
+      expect(() => aflApiRosterPin(() => ({ roster: {} }))).toThrow(/no accepted roster snapshot/);
+    });
+
+    it('preflights both snapshots offline before the destructive stage and refuses on failure', () => {
+      const draftguruOk = 'snapshot : x (42 year pages, sha256 verified)\n'
+        + 'persons    : 5057\npicks      : 6810\n';
+      const brownlowOk = '{"ok": true}';
+      const withFailing = (failing?: string) => {
+        const commands: string[][] = [];
+        const deps: Deps = {
+          ...fakeDeps().deps,
+          runCommand: (a: string[]) => {
+            commands.push(a);
+            if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+            if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: brownlowOk, stderr: '' };
+            return { status: 0, stdout: draftguruOk, stderr: '' };
+          },
+        };
+        return { deps, commands };
+      };
+      const { deps, commands } = withFailing();
+      runPreflight(deps, OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(HEIGHT_LOADER))).toBe(true);
+      expect(validate.some((a) => a.includes(AFL_API_HEIGHT_LOADER))).toBe(true);
+      expect(validate.some((a) => a.includes(WIKIPEDIA_HEIGHT_LOADER))).toBe(true);
+      expect(() => runPreflight(withFailing(WIKIPEDIA_HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/Wikipedia height preflight failed[\s\S]*Nothing has been destroyed/);
+      expect(() => runPreflight(withFailing(HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/Height preflight failed[\s\S]*Nothing has been destroyed/);
+      expect(() => runPreflight(withFailing(AFL_API_HEIGHT_LOADER).deps, OPTS, fitzroy()))
+        .toThrow(/AFL API roster preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt heights on the pinned measurements', () => {
+      const keys = heightChecks().map((c) => c.key);
+      expect(keys).toEqual(['players_with_height', 'height_without_evidence',
+                            'height_conflicts_open', 'players_with_afl_api_height_evidence',
+                            'players_with_wikipedia_height_evidence']);
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      expect(finalValidationChecks(register).map((c) => c.key)).toEqual(expect.arrayContaining(keys));
+      expect(heightChecks().find((c) => c.key === 'players_with_height')!.expected).toBeGreaterThan(12000);
+    });
   });
 
   describe('brownlow season (AFLDB-ISSUE-113 §8.6)', () => {

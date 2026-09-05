@@ -178,7 +178,6 @@ const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner 
 const NO_SPOILS = 'spoils are not a recorded AFLDB statistic (one_percenters is a different measure)';
 const NO_DOB = 'players.dob is populated for under 7% of players, so age on debut cannot be answered honestly';
 const NO_RECRUITER = 'recruiters and list managers are not modelled';
-const noAward = (name: string) => `AFLDB has no "${name}" award rows (awards table)`;
 
 /**
  * Every non-player Gridley criterion id seen in the corpus, keyed by id.
@@ -382,7 +381,7 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   premier4x: fixed('4x PREMIERSHIP', mapped('premierships_min', { times: '4' })),
   'premier1-2010s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2010', to: '2019' })),
   'premier1-2020s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2020', to: '2029' })),
-  premcaptain: fixed('PREMIERSHIP', mapped('premiership_captain', {}, 'captaincies has no Geelong, Hawthorn or West Coast rows')),
+  premcaptain: fixed('PREMIERSHIP', mapped('premiership_captain')),
   premcoach: fixed('PREMIERSHIP', absent(NO_COACHES)),
   bestfairestpremyear: fixed('B&F + PREMIERSHIP', mapped('best_and_fairest_in_premiership_season')),
 
@@ -411,34 +410,34 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   'showdown-won-1': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_won_min', { clubA, clubB, times: '1' }))),
   'showdown-goals-1': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'showdown-tackles-5': rule('SHOWDOWN', withClubs(...SHOWDOWN, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
-  'showdown-medal': fixed('SHOWDOWN', absent(noAward('Showdown Medal'))),
+  'showdown-medal': rule('SHOWDOWN', withAward('showdown-medal', (award) => mapped('award_winner', { award }))),
   'derby-playedin-10': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '10' }))),
   'derby-goals-1': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'derby-tackles-5': rule('WESTERN DERBY', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
   'derby-winning-record': rule('WINNING RECORD', withClubs(...WESTERN_DERBY, (clubA, clubB) => mapped('matchup_winning_record', { clubA, clubB }))),
-  glendenning: fixed('GLENDINNING', absent(noAward('Glendinning-Allan Medal'))),
+  glendenning: rule('GLENDINNING', withAward('glendinning-allan-medal', (award) => mapped('award_winner', { award }))),
   'qclash-playedin-3': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '3' }))),
   'qclash-playedin-5': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '5' }))),
   'qclash-playedin-10': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '10' }))),
   'qclash-goals-1': rule('QCLASH', withClubs(...QCLASH, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
-  'qclash-medal': fixed('MARCUS ASHCROFT', absent(noAward('Marcus Ashcroft Medal'))),
+  'qclash-medal': rule('MARCUS ASHCROFT', withAward('marcus-ashcroft-medal', (award) => mapped('award_winner', { award }))),
   'battleofthebridge-playedin-1': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '1' }))),
   'battleofthebridge-playedin-3': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_played_min', { clubA, clubB, times: '3' }))),
   'battleofthebridge-goals-1': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'goals', x: '1' }))),
   'battleofthebridge-tackles-5': rule('SYDNEY DERBY', withClubs(...SYDNEY_DERBY, (clubA, clubB) => mapped('matchup_game_stat_min', { clubA, clubB, stat: 'tackles', x: '5' }))),
-  'battleofthebridge-medal': fixed('BRETT KIRK', absent(noAward('Brett Kirk Medal'))),
+  'battleofthebridge-medal': rule('BRETT KIRK', withAward('brett-kirk-medal', (award) => mapped('award_winner', { award }))),
   'anzac-playedin-1': fixed('ANZAC DAY MATCH', mapped('match_event_played', { event: 'Anzac Day' })),
   'anzac-won-1': fixed('ANZAC DAY MATCH', mapped('match_event_won', { event: 'Anzac Day' })),
-  anzacmedal: fixed('ANZAC', absent(noAward('Anzac Medal'))),
+  anzacmedal: rule('ANZAC', withAward('anzac-medal', (award) => mapped('award_winner', { award }))),
   'dreamtime-playedin-1': fixed(["DREAMTIME AT THE 'G", 'DREAMTIME MATCH'], mapped('match_event_played', { event: "Dreamtime at the 'G" })),
   'bigfreeze-playedin-1': fixed('BIG FREEZE MATCH', mapped('match_event_played_between', { event: "King's Birthday", from: '2015', to: '2099' })),
   'gatherround-playedin-1': fixed('GATHER ROUND', mapped('gather_round_played')),
   'gatherround-goals-1': fixed('GATHER ROUND', mapped('gather_round_game_stat_min', { stat: 'goals', x: '1' })),
 
   // -- captaincy -------------------------------------------------------------
-  // captaincies covers 15 of the 18 clubs (no Geelong, Hawthorn or West Coast
-  // rows on any environment): answerable, but partially, and said so.
-  captain: fixed('CLUB CAPTAIN', mapped('club_captain_any', {}, 'captaincies has no Geelong, Hawthorn or West Coast rows')),
+  // captaincies covers every club lineage since AFLDB-ISSUE-118 §23.21 (the six
+  // the bootstrap lacked were transcribed from the Wikipedia captain lists).
+  captain: fixed('CLUB CAPTAIN', mapped('club_captain_any')),
 
   // -- Brownlow --------------------------------------------------------------
   brownlow: fixed('BROWNLOW', mapped('brownlow_medallist')),
@@ -475,8 +474,8 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   aflpamvp: rule('AFLPA MVP', withAward('aflpa-mvp', (award) => mapped('award_winner', { award }))),
   '22under22': fixed('22 UNDER 22', mapped('under_22_selection')),
   hof: fixed('HALL OF FAME', mapped('hall_of_fame_player')),
-  moty: fixed('MARK OF THE YEAR', absent(noAward('Mark of the Year'))),
-  goty: fixed('GOAL OF THE YEAR', absent(noAward('Goal of the Year'))),
+  moty: rule('MARK OF THE YEAR', withAward('mark-of-the-year', (award) => mapped('award_winner', { award }))),
+  goty: rule('GOAL OF THE YEAR', withAward('goal-of-the-year', (award) => mapped('award_winner', { award }))),
 
   // -- draft and recruitment -------------------------------------------------
   pick1: fixed('PICK 1', mapped('national_draft_pick_between', { from: '1', to: '1' })),

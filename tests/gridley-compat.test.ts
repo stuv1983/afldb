@@ -48,7 +48,9 @@ export function loadAnswers(): Record<string, number[][][]> {
 const STUB_LOOKUPS: GridleyLookups = {
   clubs: Object.fromEntries([...new Set(Object.values(GRIDLEY_CLUB_CODES).map((c) => c.slug)), 'brisbane-bears'].map((slug, i) => [slug, 100 + i])),
   venues: Object.fromEntries(['Melbourne Cricket Ground', 'Docklands', 'Kardinia Park', 'Gabba', 'Sydney Cricket Ground', 'Adelaide Oval', 'Bellerive Oval', 'Jiangwan Stadium'].map((v, i) => [v, 200 + i])),
-  awards: Object.fromEntries(['all-australian', 'rising-star', 'norm-smith-medal', 'coleman', 'aflpa-mvp'].map((a, i) => [a, 300 + i])),
+  awards: Object.fromEntries(['all-australian', 'rising-star', 'norm-smith-medal', 'coleman', 'aflpa-mvp',
+    'anzac-medal', 'showdown-medal', 'glendinning-allan-medal', 'brett-kirk-medal', 'marcus-ashcroft-medal',
+    'goal-of-the-year', 'mark-of-the-year'].map((a, i) => [a, 300 + i])),
   resolvePlayer: (ref) => (ref.gridleyPlayerId ?? 9000 + ref.name.length),
 };
 
@@ -138,17 +140,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6732,
-      mappedDistinct: 812,
+      mappedOccurrences: 6754,
+      mappedDistinct: 819,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 125,
-      dataAbsentDistinct: 26,
+      dataAbsentOccurrences: 103,
+      dataAbsentDistinct: 19,
     });
     // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
     // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
     // is pinned so it only ever moves deliberately, and the integration
     // corpus run fails while it is above zero.
-    expect(distinct(absentList)).toBeLessThanOrEqual(26);
+    expect(distinct(absentList)).toBeLessThanOrEqual(19);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -165,12 +167,12 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     // data, not about the solver: see issues/open/AFLDB-ISSUE-118.md §Stage 2.
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
       'brother [53]', 'season2024player [14]',
-      'moty [7]', 'intrulesplayer [5]', 'showdown-medal [5]', 'premcoach [4]',
-      'winaftersiren [4]', 'anzacmedal [3]', 'coachedByWorsfold [3]', 'fathersonfather [3]',
-      'goty [3]', 'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
-      'glendenning [2]', 'irish [2]', 'recruitedByDodoro [2]',
-      'battleofthebridge-medal [1]', 'coachedByClarkson [1]', 'coachedByGoodwin [1]', 'coachedByMatthews [1]',
-      'debut22 [1]', 'nfl [1]', 'qclash-medal [1]', 'spoils5season [1]', 'tasmanian [1]',
+      'intrulesplayer [5]', 'premcoach [4]',
+      'winaftersiren [4]', 'coachedByWorsfold [3]', 'fathersonfather [3]',
+      'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
+      'irish [2]', 'recruitedByDodoro [2]',
+      'coachedByClarkson [1]', 'coachedByGoodwin [1]', 'coachedByMatthews [1]',
+      'debut22 [1]', 'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
     ]);
     for (const [, r] of rows) expect(r.reason.length).toBeGreaterThan(20);
   });
