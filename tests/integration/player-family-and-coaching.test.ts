@@ -1,17 +1,20 @@
 /**
  * getPlayerFamily (player_relationships + father_son_selections) and
- * getPlayerCoachingCareer (coaches + match_coaches + matches), added to
- * unblock the player-page UI (AFLDB-ISSUE-118 §23.28/§23.29). Identities
- * are discovered dynamically through external_identities/name_key, the
- * same pattern tests/integration/grid-solver.test.ts uses for the Abletts
- * and Leigh Matthews -- never a hardcoded player id.
+ * getCoachCareer / getPlayerCoachingCareer (coaches + match_coaches +
+ * matches), added to unblock the player-page UI (AFLDB-ISSUE-118
+ * §23.28/§23.29). getCoachCareer is the one derived aggregation, callable
+ * by coach id for coach-only people too; getPlayerCoachingCareer is a
+ * thin resolve-then-delegate wrapper. Identities are discovered
+ * dynamically through external_identities/name_key, the same pattern
+ * tests/integration/grid-solver.test.ts uses for the Abletts and Leigh
+ * Matthews -- never a hardcoded player id.
  */
 import './guard';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
-import { getPlayerCoachingCareer } from '@/db/queries/coaches';
+import { getCoachCareer, getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerFamily } from '@/db/queries/players';
 
 afterAll(async () => {
@@ -46,8 +49,23 @@ describe('getPlayerFamily', () => {
     const family = await getPlayerFamily(junior);
 
     expect(family.fatherSonAsSon).toHaveLength(1);
-    expect(family.fatherSonAsSon[0]).toMatchObject({ fatherName: 'Gary Ablett, Sr.' });
+    // 'selection' is renamed 'competition': the source pathway (national |
+    // rookie | pre-draft), never a formatted pick. Gary Jr (2001, pick 40)
+    // also has a canonical pick number, checked below alongside a second row.
+    expect(family.fatherSonAsSon[0]).toMatchObject({ fatherName: 'Gary Ablett, Sr.', competition: 'national', selectionPick: 40 });
     expect(family.fatherSonAsFather).toEqual([]);
+  });
+
+  it('a national-draft son with a recorded pick number carries it; competition is the pathway, not the pick', async () => {
+    const [row] = await sql<{ id: number; pick: number | null }[]>`
+      SELECT drafted_player_id AS id, selection_pick AS pick FROM father_son_selections
+       WHERE competition = 'national' AND selection_pick IS NOT NULL AND drafted_player_id IS NOT NULL
+       LIMIT 1
+    `;
+    expect(row, 'father-son stage has not loaded this database').toBeDefined();
+    const family = await getPlayerFamily(row.id);
+    const own = family.fatherSonAsSon.find((r) => r.selectionPick === row.pick);
+    expect(own).toMatchObject({ competition: 'national', selectionPick: row.pick });
   });
 
   it('an unlinked relative stays name-only with a null player link', async () => {
@@ -75,33 +93,46 @@ describe('getPlayerFamily', () => {
   });
 });
 
-describe('getPlayerCoachingCareer', () => {
-  it('Leigh Matthews: derived totals equal direct canonical SQL, across multiple clubs', async () => {
+/** Direct-SQL truth for a coach's derived aggregation, grouped by club. */
+async function coachTruth(coachId: number) {
+  return sql<{
+    clubId: number; games: number; wins: number; draws: number; losses: number;
+    finals: number; grandFinals: number; premierships: number;
+  }[]>`
+    SELECT mc.club_id AS "clubId",
+           count(*)::int AS games,
+           count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+           count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id)::int AS losses,
+           count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+           count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+           count(*) FILTER (WHERE m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)::int AS premierships
+      FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+     WHERE mc.coach_id = ${coachId}
+     GROUP BY mc.club_id
+  `;
+}
+
+function sumTruth(truth: Awaited<ReturnType<typeof coachTruth>>) {
+  return truth.reduce((acc, t) => ({
+    games: acc.games + t.games, wins: acc.wins + t.wins, draws: acc.draws + t.draws,
+    losses: acc.losses + t.losses, finals: acc.finals + t.finals,
+    grandFinals: acc.grandFinals + t.grandFinals, premierships: acc.premierships + t.premierships,
+  }), { games: 0, wins: 0, draws: 0, losses: 0, finals: 0, grandFinals: 0, premierships: 0 });
+}
+
+describe('getCoachCareer', () => {
+  it('Leigh Matthews (linked player/coach): derived totals equal direct canonical SQL, across multiple clubs', async () => {
     const [matthews] = await sql<{ id: number; playerId: number | null }[]>`
       SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Matthews, Leigh'
     `;
     expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
     expect(matthews.playerId).not.toBeNull();
 
-    const truth = await sql<{
-      clubId: number; games: number; wins: number; draws: number; losses: number;
-      finals: number; grandFinals: number; premierships: number;
-    }[]>`
-      SELECT mc.club_id AS "clubId",
-             count(*)::int AS games,
-             count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
-             count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
-             count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id)::int AS losses,
-             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
-             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
-             count(*) FILTER (WHERE m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)::int AS premierships
-        FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
-       WHERE mc.coach_id = ${matthews.id}
-       GROUP BY mc.club_id
-    `;
+    const truth = await coachTruth(matthews.id);
     expect(truth.length).toBeGreaterThan(1);
 
-    const career = await getPlayerCoachingCareer(matthews.playerId!);
+    const career = await getCoachCareer(matthews.id);
     expect(career).not.toBeNull();
     expect(career!.coachId).toBe(matthews.id);
     expect(career!.clubs).toHaveLength(truth.length);
@@ -115,16 +146,42 @@ describe('getPlayerCoachingCareer', () => {
         finals: t!.finals, grandFinals: t!.grandFinals, premierships: t!.premierships,
       });
     }
-
-    const totalsTruth = truth.reduce((acc, t) => ({
-      games: acc.games + t.games, wins: acc.wins + t.wins, draws: acc.draws + t.draws,
-      losses: acc.losses + t.losses, finals: acc.finals + t.finals,
-      grandFinals: acc.grandFinals + t.grandFinals, premierships: acc.premierships + t.premierships,
-    }), { games: 0, wins: 0, draws: 0, losses: 0, finals: 0, grandFinals: 0, premierships: 0 });
-    expect(career!.totals).toMatchObject(totalsTruth);
+    expect(career!.totals).toMatchObject(sumTruth(truth));
     expect(career!.totals.premierships).toBeGreaterThan(0);
+
+    // getPlayerCoachingCareer is a thin wrapper: same coach, same result.
+    const viaPlayer = await getPlayerCoachingCareer(matthews.playerId!);
+    expect(viaPlayer).toEqual(career);
   });
 
+  it('Chris Fagan (coach-only, player_id IS NULL): the aggregation still works by coach id', async () => {
+    const [fagan] = await sql<{ id: number; playerId: number | null }[]>`
+      SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Fagan, Chris'
+    `;
+    expect(fagan, 'the coaches stage has not loaded this database').toBeDefined();
+    expect(fagan.playerId).toBeNull();
+
+    const truth = await coachTruth(fagan.id);
+    expect(truth.length).toBeGreaterThan(0);
+
+    const career = await getCoachCareer(fagan.id);
+    expect(career).not.toBeNull();
+    expect(career!.coachId).toBe(fagan.id);
+    expect(career!.totals).toMatchObject(sumTruth(truth));
+
+    // No player link exists, so the player-scoped wrapper cannot reach him.
+    const [asPlayer] = await sql<{ id: number }[]>`
+      SELECT id FROM players WHERE display_name = 'Chris Fagan'
+    `;
+    if (asPlayer) expect(await getPlayerCoachingCareer(asPlayer.id)).toBeNull();
+  });
+
+  it('an invalid/nonexistent coach id returns null', async () => {
+    expect(await getCoachCareer(-1)).toBeNull();
+  });
+});
+
+describe('getPlayerCoachingCareer', () => {
   it('a player with no linked coaching row returns null', async () => {
     const [someone] = await sql<{ id: number }[]>`
       SELECT p.id FROM players p

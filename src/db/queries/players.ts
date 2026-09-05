@@ -700,7 +700,10 @@ export type PlayerFamilyFatherSonAsSon = {
   fatherName: string;
   clubName: string | null;
   draftYear: number;
-  selection: string | null;
+  /** How the selection was made: 'national' | 'rookie' | 'pre-draft' (source pathway, not a pick number). */
+  competition: string | null;
+  /** The national-draft pick number, when the source recorded one (competition = 'national'); null otherwise -- never manufactured. */
+  selectionPick: number | null;
 };
 
 export type PlayerFamilyFatherSonAsFather = {
@@ -709,7 +712,10 @@ export type PlayerFamilyFatherSonAsFather = {
   sonName: string;
   clubName: string | null;
   draftYear: number;
-  selection: string | null;
+  /** How the selection was made: 'national' | 'rookie' | 'pre-draft' (source pathway, not a pick number). */
+  competition: string | null;
+  /** The national-draft pick number, when the source recorded one (competition = 'national'); null otherwise -- never manufactured. */
+  selectionPick: number | null;
 };
 
 export type PlayerFamilyResult = {
@@ -750,7 +756,8 @@ export async function getPlayerFamily(playerId: number): Promise<PlayerFamilyRes
       SELECT fs.father_player_id AS "fatherPlayerId", pf.slug AS "fatherPlayerSlug",
              fs.father_name AS "fatherName",
              COALESCE(cl.name, fs.club_name_raw) AS "clubName",
-             fs.draft_year AS "draftYear", fs.competition AS selection
+             fs.draft_year AS "draftYear", fs.competition,
+             fs.selection_pick AS "selectionPick"
         FROM father_son_selections fs
         LEFT JOIN players pf ON pf.id = fs.father_player_id
         LEFT JOIN clubs cl ON cl.id = fs.club_id
@@ -761,7 +768,8 @@ export async function getPlayerFamily(playerId: number): Promise<PlayerFamilyRes
       SELECT fs.drafted_player_id AS "sonPlayerId", ps.slug AS "sonPlayerSlug",
              fs.drafted_player_name AS "sonName",
              COALESCE(cl.name, fs.club_name_raw) AS "clubName",
-             fs.draft_year AS "draftYear", fs.competition AS selection
+             fs.draft_year AS "draftYear", fs.competition,
+             fs.selection_pick AS "selectionPick"
         FROM father_son_selections fs
         LEFT JOIN players ps ON ps.id = fs.drafted_player_id
         LEFT JOIN clubs cl ON cl.id = fs.club_id

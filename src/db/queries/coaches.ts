@@ -22,7 +22,7 @@ export async function getCoachOptions() {
   `;
 }
 
-export type PlayerCoachingClubStint = {
+export type CoachingClubStint = {
   clubId: number;
   clubName: string;
   firstSeason: number;
@@ -37,10 +37,10 @@ export type PlayerCoachingClubStint = {
   winPct: number | null;
 };
 
-export type PlayerCoachingCareer = {
+export type CoachCareer = {
   coachId: number;
-  clubs: PlayerCoachingClubStint[];
-  totals: Omit<PlayerCoachingClubStint, 'clubId' | 'clubName' | 'firstSeason' | 'lastSeason'>;
+  clubs: CoachingClubStint[];
+  totals: Omit<CoachingClubStint, 'clubId' | 'clubName' | 'firstSeason' | 'lastSeason'>;
 };
 
 function winPct(wins: number, draws: number, games: number): number | null {
@@ -48,23 +48,25 @@ function winPct(wins: number, draws: number, games: number): number | null {
 }
 
 /**
- * A linked coach's career, derived from `coaches` + `match_coaches` +
- * `matches` (AFLDB-ISSUE-118 §23.28) rather than the AFL Tables coach
- * index's own stored totals: those are evidence only (`source_games_coached`,
- * never a total -- see migration 087), so games/W-D-L/finals/premierships
- * are always counted from the canonical per-match assignment.
+ * A coach's career, derived from `coaches` + `match_coaches` + `matches`
+ * (AFLDB-ISSUE-118 §23.28) rather than the AFL Tables coach index's own
+ * stored totals: those are evidence only (`source_games_coached`, never a
+ * total -- see migration 087), so games/W-D-L/finals/premierships are
+ * always counted from the canonical per-match assignment.
  *
- * Only a 'unique' player link counts as coaching this player, matching the
- * `premiership_coach` Grid Solver builder. No linked coach row returns
- * null, never a fabricated empty career.
+ * Works for any canonical `coaches` row, including a coach-only person
+ * whose `player_id IS NULL` -- the single aggregation both
+ * {@link getPlayerCoachingCareer} and future coach-only/coach-comparison
+ * read models delegate to. An unknown coach id returns null, never a
+ * fabricated empty career.
  */
-export async function getPlayerCoachingCareer(playerId: number): Promise<PlayerCoachingCareer | null> {
+export async function getCoachCareer(coachId: number): Promise<CoachCareer | null> {
   const [coach] = await sql<{ id: number }[]>`
-    SELECT id FROM coaches WHERE player_id = ${playerId} AND link_status_value = 'unique'
+    SELECT id FROM coaches WHERE id = ${coachId}
   `;
   if (!coach) return null;
 
-  const rows = await sql<Omit<PlayerCoachingClubStint, 'winPct'>[]>`
+  const rows = await sql<Omit<CoachingClubStint, 'winPct'>[]>`
     SELECT cl.id AS "clubId", cl.name AS "clubName",
            min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
            count(*)::int AS games,
@@ -101,4 +103,18 @@ export async function getPlayerCoachingCareer(playerId: number): Promise<PlayerC
     clubs,
     totals: { ...totals, winPct: winPct(totals.wins, totals.draws, totals.games) },
   };
+}
+
+/**
+ * Convenience wrapper for the player page: resolves the player's uniquely
+ * linked coach row (matching the `premiership_coach` Grid Solver builder's
+ * link requirement) and delegates to {@link getCoachCareer}. An unlinked
+ * player returns null, never a fabricated empty career.
+ */
+export async function getPlayerCoachingCareer(playerId: number): Promise<CoachCareer | null> {
+  const [coach] = await sql<{ id: number }[]>`
+    SELECT id FROM coaches WHERE player_id = ${playerId} AND link_status_value = 'unique'
+  `;
+  if (!coach) return null;
+  return getCoachCareer(coach.id);
 }
