@@ -825,14 +825,20 @@ def resolve_player(canon: Canon, row: dict[str, str], res: Resolution) -> None:
             candidates = cur.fetchall()
         method = "match_participation"
     else:
+        # player_match_stats + matches, NOT the derived player_club_season_stats:
+        # this loader runs as a rebuild stage BEFORE `derived`, so the summary
+        # table is empty at that point. The raw per-match rows are the same
+        # "played for this club that season" evidence and are populated by
+        # fitzroy, which every after-siren stage already follows.
         with canon.pg.cursor() as cur:
             cur.execute(
                 """SELECT DISTINCT p.id, NULL::smallint, NULL::smallint, p.debut_season
                      FROM players p
-                     JOIN player_club_season_stats s ON s.player_id = p.id
-                     JOIN clubs c ON c.id = s.club_id
+                     JOIN player_match_stats pms ON pms.player_id = p.id
+                     JOIN matches m ON m.id = pms.match_id
+                     JOIN clubs c ON c.id = pms.club_id
                     WHERE p.search_name = afldb_normalise_name(%s)
-                      AND s.season = %s AND c.organization_id = %s
+                      AND m.season = %s AND c.organization_id = %s
                     ORDER BY p.id""", (name, season, canon.organisation(row["club_raw"])))
             candidates = cur.fetchall()
         method = "club_season_participation"

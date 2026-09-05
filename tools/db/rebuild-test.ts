@@ -177,6 +177,18 @@ export const SIBLINGS_CSV = join('data', 'players', 'sibling-relationships.csv')
 export const SIBLINGS_ADJUDICATIONS = join('data', 'players', 'sibling-adjudications.csv');
 export const SIBLINGS_PROVENANCE = join('data', 'players', 'sibling-relationships.source.json');
 export const SIBLINGS_SUPPLEMENTS = join('data', 'players', 'sibling-supplements.csv');
+/**
+ * AFLDB-ISSUE-118 §23.33–§23.35 after-the-siren: canonical after_siren_kicks events
+ * (migration 089) from the tracked normalised artefact — a deterministic normalisation of
+ * the Wikipedia "kicks after the siren" table exports. The loader resolves match by
+ * (season, round, kicker's organisation, opponent) with the artefact's own points as the
+ * independent check, and the kicker by match participation, never by name. Adjudications
+ * and provenance are tracked beside it; the raw exports are gitignored and unread at load.
+ */
+export const AFTER_SIREN_LOADER = 'tools/migration/after_siren.py';
+export const AFTER_SIREN_CSV = join('data', 'records', 'after-siren-events.csv');
+export const AFTER_SIREN_ADJUDICATIONS = join('data', 'records', 'after-siren-adjudications.csv');
+export const AFTER_SIREN_PROVENANCE = join('data', 'records', 'after-siren-events.source.json');
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
@@ -591,6 +603,33 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       kind: 'data',
       run: 'command',
       argv: siblingsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.33–§23.35 after-the-siren. One after_siren_kicks row per event
+      // of the TRACKED normalised artefact (migration 089); the match is resolved by
+      // (season, round, both organisations) with the artefact's own final score as the
+      // independent check, the kicker by match participation for the kicker's club, never
+      // by name. Needs matches, clubs, player_match_stats and identities: after fitzroy;
+      // nothing later reads it. No network; the raw exports are not read.
+      id: 'after-siren',
+      name: `AFTER-SIREN — tracked Wikipedia siren-kick exports, ${afterSirenMeasures().events} events`,
+      kind: 'data',
+      run: 'command',
+      argv: afterSirenArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.34 U.6. The after-siren reconciliation: re-resolve the tracked
+      // artefact against the just-loaded database and check every canonical row against it.
+      // Every expectation is derived from the artefact or that re-resolution — never a
+      // typed constant — so it is independent of the season baseline. A VALIDATION stage:
+      // it opens one connection and writes nothing.
+      id: 'after-siren-reconcile',
+      name: 'AFTER-SIREN RECONCILE — loaded table against a fresh re-resolution',
+      kind: 'validation',
+      run: 'command',
+      argv: afterSirenReconcileArgv(python),
       envOverlay: dataEnv,
     },
     {
@@ -1171,6 +1210,11 @@ export function finalValidationChecks(
   // AFLDB-ISSUE-118 §23.31. Added together with the SIBLINGS stage, for the same reason.
   for (const check of siblingChecks()) checks.push(check);
 
+  // AFLDB-ISSUE-118 §23.33–§23.35. Added together with the AFTER-SIREN stage. The values
+  // are the tracked artefact's own link-independent counts; the linkage / canonical
+  // invariants are the AFTER-SIREN RECONCILE stage's own 38 checks.
+  for (const check of afterSirenChecks()) checks.push(check);
+
   return checks;
 }
 
@@ -1715,6 +1759,24 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       `Siblings preflight failed (${SIBLINGS_LOADER} load --validate-only): the tracked `
       + `artefact ${SIBLINGS_CSV} is malformed. Nothing has been destroyed.\n`
       + `${siblings.stdout}${siblings.stderr}`);
+  }
+  // AFLDB-ISSUE-118 §23.33–§23.35. The after-siren stage reads three TRACKED files (the
+  // artefact, its adjudications and its provenance); the raw exports are gitignored and
+  // never read at load. Prove they are in the checkout and that the loader accepts the
+  // artefact's shape offline, before destruction.
+  for (const path of [AFTER_SIREN_CSV, AFTER_SIREN_ADJUDICATIONS, AFTER_SIREN_PROVENANCE]) {
+    if (!deps.fileExists(path)) {
+      throw new RebuildRefused(
+        `After-siren preflight: required tracked input is missing: ${path}. `
+        + 'Nothing has been destroyed.');
+    }
+  }
+  const afterSiren = deps.runCommand(afterSirenValidateArgv(), {});
+  if (afterSiren.status !== 0) {
+    throw new RebuildRefused(
+      `After-siren preflight failed (${AFTER_SIREN_LOADER} load --validate-only): the tracked `
+      + `artefact ${AFTER_SIREN_CSV} is malformed or disagrees with its provenance. `
+      + `Nothing has been destroyed.\n${afterSiren.stdout}${afterSiren.stderr}`);
   }
 }
 
@@ -2308,6 +2370,97 @@ export function siblingChecks(): FinalCheck[] {
       expected: 0 },
     { key: 'sibling_duplicate_pairs',
       sql: "SELECT count(*) FROM (SELECT 1 FROM player_relationships WHERE relationship = 'sibling' AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL GROUP BY least(person_a_player_id, person_b_player_id), greatest(person_a_player_id, person_b_player_id) HAVING count(*) > 1) d",
+      expected: 0 },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// AFLDB-ISSUE-118 §23.33–§23.35 — the after-siren stage
+// ---------------------------------------------------------------------------
+
+/** `after_siren.py load` against the tracked artefact and its provenance. */
+export function afterSirenArgv(python: string = resolvePython()): string[] {
+  return [python, AFTER_SIREN_LOADER, 'load', '--csv', AFTER_SIREN_CSV,
+          '--provenance', AFTER_SIREN_PROVENANCE];
+}
+
+/** The same argv plus --validate-only: the artefact's shape, no database. */
+export function afterSirenValidateArgv(python: string = resolvePython()): string[] {
+  return [...afterSirenArgv(python), '--validate-only'];
+}
+
+/** `after_siren.py reconcile`: re-resolve the artefact and check the loaded table. */
+export function afterSirenReconcileArgv(python: string = resolvePython()): string[] {
+  return [python, AFTER_SIREN_LOADER, 'reconcile', '--csv', AFTER_SIREN_CSV];
+}
+
+export type AfterSirenMeasures = {
+  events: number; premiershipEvents: number; otherCompetitionEvents: number;
+  qualifyingEvents: number;
+};
+
+/**
+ * The artefact's own link-independent counts. `after_siren.py load` refuses unless the
+ * provenance's measures still equal a fresh read of the artefact, so a rebuild reproduces
+ * exactly these — and none of them depends on identity resolution or the season baseline
+ * (the qualifying predicate is a property of the stored columns, exactly what the
+ * downstream `after_siren_winner` builder / Gridley `winaftersiren` filter reads).
+ */
+export function afterSirenMeasures(
+  readCsv: () => string | null = () => {
+    const path = join(REPO_ROOT, AFTER_SIREN_CSV);
+    return existsSync(path) ? readFileSync(path, 'utf8') : null;
+  },
+): AfterSirenMeasures {
+  const text = readCsv();
+  if (text === null) throw new RebuildRefused(`${AFTER_SIREN_CSV} is not in this checkout.`);
+  const rows = parseCsvRows(text);
+  const header = rows[0] ?? [];
+  const col = (name: string) => header.indexOf(name);
+  const [prem, scored, effect] = ['premiership_season', 'kick_scored', 'kick_effect'].map(col);
+  if (rows.length < 2 || header[0] !== 'event_key' || [prem, scored, effect].some((i) => i < 0)) {
+    throw new RebuildRefused(`${AFTER_SIREN_CSV} has no data rows or an unexpected header.`);
+  }
+  const data = rows.slice(1);
+  const isPrem = (r: string[]) => r[prem] === 'true';
+  return {
+    events: data.length,
+    premiershipEvents: data.filter(isPrem).length,
+    otherCompetitionEvents: data.filter((r) => !isPrem(r)).length,
+    qualifyingEvents: data.filter((r) => isPrem(r)
+      && (r[scored] === 'goal' || r[scored] === 'behind') && r[effect] === 'won').length,
+  };
+}
+
+/**
+ * The after-siren stage must survive a rebuild from scratch: every event loaded, the
+ * premiership / other-competition split intact, the qualifying set the Grid Solver's
+ * `after_siren_winner` builder reads, no event twice, and every row carrying its
+ * provenance. A rebuild that drops the stage fails here; the deeper canonical / linkage
+ * invariants are the separate `after-siren-reconcile` stage's 38 checks.
+ */
+export function afterSirenChecks(): FinalCheck[] {
+  const m = afterSirenMeasures();
+  return [
+    { key: 'after_siren_kicks',
+      sql: 'SELECT count(*) FROM after_siren_kicks', expected: m.events },
+    { key: 'after_siren_premiership_rows',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE premiership_season',
+      expected: m.premiershipEvents },
+    { key: 'after_siren_other_competition_rows',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE NOT premiership_season',
+      expected: m.otherCompetitionEvents },
+    { key: 'after_siren_qualifying_rows',
+      sql: "SELECT count(*) FROM after_siren_kicks WHERE premiership_season "
+        + "AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'",
+      expected: m.qualifyingEvents },
+    { key: 'after_siren_duplicate_events',
+      sql: 'SELECT count(*) FROM (SELECT 1 FROM after_siren_kicks GROUP BY source_id, '
+        + 'source_record_id HAVING count(*) > 1) d',
+      expected: 0 },
+    { key: 'after_siren_rows_missing_provenance',
+      sql: 'SELECT count(*) FROM after_siren_kicks WHERE source_id IS NULL '
+        + 'OR source_record_id IS NULL OR import_batch_id IS NULL',
       expected: 0 },
   ];
 }

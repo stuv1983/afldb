@@ -23,7 +23,7 @@
  * integration suite decides where the ids come from.
  *
  * Semantics were settled against Gridley's descriptions and its per-cell
- * answer keys; the decisions are recorded in issues/open/AFLDB-ISSUE-118.md.
+ * answer keys; the decisions are recorded in issues/closed/AFLDB-ISSUE-118.md.
  */
 
 import { GRID_BUILDERS, isAxisComplete, type GridAxisState } from '@/search/grid-solver-spec';

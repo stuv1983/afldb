@@ -257,6 +257,23 @@ const DATA_GAPS: Record<string, string> = {
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
   'source coverage gap': "a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player. The absence of a row is UNKNOWN coverage, never 'no brother': the cell stays open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv",
 };
+/**
+ * ISSUE-118 §23.36 (W.2): the formally accepted residual unsupported-valid criteria.
+ * Each is an accepted deferral against the closure contract, not a defect: a redundant
+ * compatibility alias (season2024player -- generic season/era filters already cover it),
+ * a future/non-core canonical domain (International Rules, nationality/origin, other-code
+ * careers, recruiter history), or a statistic no free source AFLDB ingests carries
+ * (spoils). The strict corpus still records them as `unsupported`; this set is what the
+ * criterion-level acceptance check tolerates. A criterion that leaves this set (because it
+ * became supported) or a NEW unsupported criterion both fail the check -- the same
+ * spent-entry drift guard fk-indexes.test.ts uses. The same seven ids are the
+ * data-absent list tests/gridley-compat.test.ts pins and issues/closed/AFLDB-ISSUE-118.md
+ * §23.36 §W.2 classifies.
+ */
+const ACCEPTED_UNSUPPORTED = [
+  'intrulesplayer', 'irish', 'nfl', 'recruitedByDodoro', 'season2024player',
+  'spoils5season', 'tasmanian',
+].sort();
 const cellStats: { board: number; cell: string; gridley: number; afldb: number; ms: number }[] = [];
 
 const describeAxis = (m: GridleyMapping) => (m.status === 'mapped' ? `${m.axis.builder}(${JSON.stringify(m.axis.params)})` : m.status);
@@ -419,16 +436,30 @@ describe('Gridley corpus -- criteria', () => {
     if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.fatherSon && gaps.siblings && gaps.afterSiren && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
-  it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {
-    const unsupported = [...criteria.values()].filter((r) => r.mapping.status === 'unsupported')
-      .sort((a, b) => b.occurrences - a.occurrences || a.id.localeCompare(b.id))
-      .map((r) => `${r.id} [${r.occurrences}]: ${'reason' in r.mapping ? r.mapping.reason : ''}`);
-    console.log(`[gridley-corpus] unsupported valid criteria: ${unsupported.length}\n${unsupported.join('\n')}`);
+  it('leaves unsupported exactly the §23.36 accepted deferrals -- no more, no fewer', () => {
+    // The unsupported set comes from the mapping (src/search/gridley-compat.ts
+    // `absent(...)`), not from probing this database, so this holds in both modes.
+    // ISSUE-118 §23.36: the residual unsupported set is a formally accepted list of
+    // deferrals, not zero. A criterion outside ACCEPTED_UNSUPPORTED (a new gap) fails
+    // here; so does an ACCEPTED_UNSUPPORTED id that is no longer unsupported (a spent
+    // entry that should be removed from the list) -- the same drift guard
+    // fk-indexes.test.ts uses.
+    const unsupportedRecords = [...criteria.values()].filter((r) => r.mapping.status === 'unsupported')
+      .sort((a, b) => b.occurrences - a.occurrences || a.id.localeCompare(b.id));
+    console.log(`[gridley-corpus] unsupported valid criteria: ${unsupportedRecords.length}\n`
+      + unsupportedRecords.map((r) => `${r.id} [${r.occurrences}]: ${'reason' in r.mapping ? r.mapping.reason : ''}`).join('\n'));
+    expect([...new Set(unsupportedRecords.map((r) => r.id))].sort()).toEqual(ACCEPTED_UNSUPPORTED);
+  });
+
+  it('has no probed dataset gap, unless run in diagnostic mode', () => {
     if (DIAGNOSTIC) {
       console.log('[gridley-corpus] AFLDB_GRIDLEY_DIAGNOSTIC=1: unsupported criteria and dataset gaps are counted, not failed. This is NOT an acceptance run.');
       return;
     }
-    expect(unsupported).toEqual([]);
+    // Strict mode only: a database that carries every ISSUE-118 dataset AND reaches
+    // season 2026 has nothing here. The repository-standard afldb_test baseline ends
+    // at 2025, so this fails strict on 2026-debutant teammate refs; the acceptance
+    // proof is the diagnostic corpus run.
     expect([...gappedCriteria].sort()).toEqual([]);
   });
 

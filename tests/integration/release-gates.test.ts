@@ -736,24 +736,29 @@ describe('gate: absence is never zero', () => {
 // birth-date evidence
 // ---------------------------------------------------------------------
 // AFLDB-ISSUE-108: the 12,478-with-DOB / 883-without / two-conflict figures were
-// the retired legacy SQLite register plus its DOB-enrichment passes (which need
-// AFLDB_LEGACY_SQLITE and gitignored club-list CSVs and are not part of the
-// canonical rebuild — AFLDB-ISSUE-090 retired these as acceptance). The canonical
-// fitzRoy import writes exactly 855 dates, each with evidence, and zero conflicts.
-// The population pins below are re-pinned to the accepted baseline
-// full-history-20260827 (measured.players_with_dob = 855). The two
-// conflict-adjudication tests are skipped: there is no conflict data to exercise
-// them, and that is a missing-enrichment gap, not a regression.
+// the retired legacy SQLite register plus its DOB-enrichment passes.
+// AFLDB-ISSUE-118 §23.24-§23.25 (Stage D1): the canonical rebuild now has a
+// `birth-dates` stage that fills every NULL dob from the AFL Tables all-time club
+// lists (manifest-pinned club-lists-20260905), each with a player_birth_evidence
+// row and linked through dob_evidence_id, never overwriting a fitzRoy date. The
+// pins below are the deterministic-rebuild values, gated in tools/db/rebuild-test.ts
+// birthDateChecks from tools/rebuild/afltables/afltables-contract.json
+// club_player_lists.accepted_snapshot.measured: players_with_dob 13,255,
+// dob_without_evidence 0, dob_disagreeing_with_club_list 2 (Roan Steele, Jack
+// Hayes -- recorded as evidence, adjudication is separate, dob_disputed stays 0).
+// The two conflict-adjudication tests are still skipped: no conflict was
+// adjudicated into dob_disputed, so there is nothing to exercise.
 describe('gate: birth dates', () => {
-  it('populates 855 canonical dates with no conflicts', async () => {
+  it('populates 13,255 canonical dates with no conflicts', async () => {
     const [row] = await sql<{ withDob: number; disputed: number }[]>`
       SELECT count(*) FILTER (WHERE dob IS NOT NULL)::int AS "withDob",
              count(*) FILTER (WHERE dob_disputed)::int    AS disputed
         FROM players
     `;
-    // Accepted baseline full-history-20260827: 855 dates from fitzRoy
-    // player_details; DOB enrichment (12,478) is separate, tracked work.
-    expect(row.withDob).toBe(855);
+    // Deterministic rebuild (§23.25): 855 fitzRoy per-match dates + 12,400 filled
+    // from the club lists = 13,255. Proven by a full afldb_test rebuild 2026-09-06
+    // (FINAL VALIDATION players_with_dob_after_birth_dates = 13255).
+    expect(row.withDob).toBe(13_255);
     expect(row.disputed).toBe(0);
   });
 
@@ -778,16 +783,22 @@ describe('gate: birth dates', () => {
   });
 
   it('keeps the evidence behind every recovered date', async () => {
-    const [row] = await sql<{ evidence: number; linked: number }[]>`
+    const [row] = await sql<{ evidence: number; linked: number; unevidenced: number }[]>`
       SELECT (SELECT count(*)::int FROM player_birth_evidence)          AS evidence,
              (SELECT count(*)::int FROM players WHERE dob_evidence_id IS NOT NULL)
-                                                                        AS linked
+                                                                        AS linked,
+             (SELECT count(*)::int FROM players
+               WHERE dob IS NOT NULL AND dob_evidence_id IS NULL)       AS unevidenced
     `;
-    // AFLDB-ISSUE-108: canonical baseline — one evidence row per canonical date,
-    // every filled date linked to it (was legacy 12,472 / 11,533).
-    expect(row.evidence).toBe(855);
-    // Every filled date points back at the row that justified it.
-    expect(row.linked).toBe(855);
+    // AFLDB-ISSUE-118 §23.25 (Stage D1): a player can now carry more than one
+    // birth-evidence row (a fitzRoy per-match date plus one or more club-list
+    // dates), so the raw count exceeds the dated-player count. Rebuild-measured
+    // 2026-09-06: 14,110 evidence rows behind 13,255 dated players.
+    expect(row.evidence).toBe(14_110);
+    // Every filled date points back at the row that justified it -- the rebuild's
+    // dob_without_evidence gate is 0, so linked equals players_with_dob.
+    expect(row.linked).toBe(13_255);
+    expect(row.unevidenced).toBe(0);
   });
 
   it('matches players on the profile URL rather than the name', async () => {
@@ -841,12 +852,11 @@ describe('gate: birth dates', () => {
       SELECT count(*)::int AS n FROM players
        WHERE dob IS NULL AND dob_confidence = 'unknown'
     `;
-    // AFLDB-ISSUE-108: canonical baseline has no date for most players (was
-    // legacy 883 after enrichment). Not backfilled with a guess: shown as
-    // "Not recorded". AFLDB-ISSUE-136: 12,422 → 12,418 — the fold of the four
-    // renumbered-profile duplicates removed four undated 2025-only rows; the four
-    // continuing players carry a DOB. 855 dated + 12,418 undated = 13,273 players.
-    expect(row.n).toBe(12_418);
+    // AFLDB-ISSUE-118 §23.25 (Stage D1): the club-list birth-date stage filled all
+    // but 18 of the previously undated players. Those 18 are genuinely undated in
+    // every canonical source and are shown as "Not recorded", never a guess.
+    // Rebuild-measured 2026-09-06: 13,255 dated + 18 undated = 13,273 players.
+    expect(row.n).toBe(18);
   });
 });
 

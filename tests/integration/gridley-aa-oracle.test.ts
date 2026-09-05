@@ -3,7 +3,7 @@
  * database, using Gridley's stored per-cell answer keys as the external
  * oracle. Opt-in (set AFLDB_AA_REPORT=<file>): it computes every criterion
  * set, so it costs about a minute and is a diagnostic, not a gate. The
- * 2026-09-05 run and its conclusions are in issues/open/AFLDB-ISSUE-118.md.
+ * 2026-09-05 run and its conclusions are in issues/closed/AFLDB-ISSUE-118.md.
  *
  * The criterion sets, cells and the name + co-occurrence fingerprint bridge
  * from Gridley ids to AFLDB players come from ./gridley-oracle-bridge.ts,

@@ -51,6 +51,15 @@ import {
   siblingMeasures,
   siblingsArgv,
   siblingsValidateArgv,
+  AFTER_SIREN_ADJUDICATIONS,
+  AFTER_SIREN_CSV,
+  AFTER_SIREN_LOADER,
+  AFTER_SIREN_PROVENANCE,
+  afterSirenArgv,
+  afterSirenChecks,
+  afterSirenMeasures,
+  afterSirenReconcileArgv,
+  afterSirenValidateArgv,
   parseCsvRows,
   birthDateChecks,
   birthDatesArgv,
@@ -774,15 +783,19 @@ describe('stage graph', () => {
     // fitzroy: both read tracked-manifest snapshots already on disk (the baseline's own
     // register plus a pinned in-season supplement; the pinned AFL API roster set) and
     // join through the identities and match facts fitzroy just loaded. Neither acquires.
+    // AFLDB-ISSUE-118 §23.33–§23.35 added 'after-siren' (data) and 'after-siren-reconcile'
+    // (validation) directly after 'siblings': the canonical after_siren_kicks events from
+    // the tracked normalised artefact, then a re-resolution check of the loaded table.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
-      'coaches', 'father-son', 'siblings', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
+      'coaches', 'father-son', 'siblings', 'after-siren', 'after-siren-reconcile',
+      'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman',
       'ladder-witness', 'fingerprints',
     ]);
   });
 
-  it('adds exactly three data stages beyond the four, none of which acquires', () => {
+  it('adds only non-acquiring data stages beyond the four', () => {
     // AFLDB-ISSUE-111. 'coleman' is the fifth DATA stage. It is admitted because it
     // acquires nothing: no legacy SQLite, no manifest, no network — it reads AFLDB's own
     // canonical match facts and writes the award they imply.
@@ -795,10 +808,14 @@ describe('stage graph', () => {
     // AFLDB-ISSUE-118 §23.19. 'heights' and 'heights-afl-api' are the eighth and ninth:
     // manifest-pinned snapshots on disk, no legacy SQLite, no network (see 'height
     // enrichment' below).
+    // AFLDB-ISSUE-118 §23.33–§23.35. 'after-siren' reads the tracked normalised artefact
+    // (migration 089) and joins through the matches / player_match_stats / identities
+    // fitzroy loaded — no legacy SQLite, no manifest, no network. Its re-resolution check
+    // 'after-siren-reconcile' is a VALIDATION stage and is not in this list.
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
-                'birth-dates', 'coaches', 'father-son', 'siblings', 'draftguru', 'awards-honours', 'brownlow-season',
-                'derived', 'coleman']);
+                'birth-dates', 'coaches', 'father-son', 'siblings', 'after-siren', 'draftguru',
+                'awards-honours', 'brownlow-season', 'derived', 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
@@ -1256,6 +1273,104 @@ describe('stage graph', () => {
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the father–son gates, in stage order.
       expect(all.indexOf('player_relationships_sibling')).toBeGreaterThan(all.indexOf('player_relationships_parent_child'));
+    });
+  });
+
+  describe('after-siren events (AFLDB-ISSUE-118 §23.33–§23.35)', () => {
+    const ids = idsOf(stages);
+    const stage = stages.find((s) => s.id === 'after-siren')!;
+    const reconcile = stages.find((s) => s.id === 'after-siren-reconcile')!;
+    const HEADER = 'event_key,season,competition,premiership_season,round_raw,round_code,round_kind,player_name_raw,'
+      + 'player_name,club_raw,opponent_raw,kick_scored,kick_effect,shot_detail,kicker_result,siren,kicker_score_raw,'
+      + 'opponent_score_raw,kicker_points,opponent_points,margin,supergoal_scoring,score_footnote_raw,outcome_raw,'
+      + 'ref_raw,cited,adjudication_keys,source_file,source_table,source_line,note\n';
+    const row = (key: string, prem: string, scored: string, effect: string) =>
+      `${key},2017,VFL/AFL,${prem},EF,EF,final,A B,A B,West Coast,Port Adelaide,${scored},${effect},,`
+      + `${effect === 'won' ? 'win' : effect === 'drew' ? 'draw' : 'loss'},final,10.10 (70),10.9 (69),70,69,1,false,,,[1],true,,f.csv,t,2,\n`;
+
+    it('loads the tracked artefact through the loader\'s load subcommand, and derives the preflight argv from it', () => {
+      expect(stage.argv).toEqual([resolvePython(), AFTER_SIREN_LOADER, 'load', '--csv', AFTER_SIREN_CSV, '--provenance', AFTER_SIREN_PROVENANCE]);
+      expect(afterSirenArgv()).toEqual(stage.argv);
+      expect(afterSirenValidateArgv()).toEqual([...stage.argv!, '--validate-only']);
+      expect(stage.kind).toBe('data');
+      expect(stage.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(stage.name).toContain(`${afterSirenMeasures().events} events`);
+      expect(stage.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire|normalize|after-siren\//i);
+      for (const path of [AFTER_SIREN_CSV, AFTER_SIREN_ADJUDICATIONS, AFTER_SIREN_PROVENANCE]) expect(existsSync(join(root, path))).toBe(true);
+    });
+
+    it('runs a re-resolution reconcile as a validation stage right after the load', () => {
+      expect(reconcile.kind).toBe('validation');
+      expect(reconcile.run).toBe('command');
+      expect(reconcile.argv).toEqual([resolvePython(), AFTER_SIREN_LOADER, 'reconcile', '--csv', AFTER_SIREN_CSV]);
+      expect(afterSirenReconcileArgv()).toEqual(reconcile.argv);
+      expect(reconcile.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      expect(ids.indexOf('after-siren-reconcile')).toBe(ids.indexOf('after-siren') + 1);
+    });
+
+    it('follows siblings (the same identities) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('after-siren'));
+      expect(ids.indexOf('siblings')).toBeLessThan(ids.indexOf('after-siren'));
+      expect(ids.indexOf('after-siren')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('reads its gate values from the artefact itself and refuses a missing or headerless one', () => {
+      const m = afterSirenMeasures();
+      expect(m.events).toBeGreaterThan(100);
+      expect(m.premiershipEvents + m.otherCompetitionEvents).toBe(m.events);
+      expect(m.qualifyingEvents).toBeLessThanOrEqual(m.premiershipEvents);
+      expect(() => afterSirenMeasures(() => null)).toThrow(/not in this checkout/);
+      expect(() => afterSirenMeasures(() => 'event_key,season\n')).toThrow(/no data rows or an unexpected header/);
+      const ok = HEADER
+        + row('e1', 'true', 'goal', 'won')
+        + row('e2', 'true', 'behind', 'won')
+        + row('e3', 'true', 'goal', 'drew')
+        + row('e4', 'true', 'none', 'none')
+        + row('e5', 'false', 'goal', 'won');
+      expect(afterSirenMeasures(() => ok)).toEqual({ events: 5, premiershipEvents: 4, otherCompetitionEvents: 1, qualifyingEvents: 2 });
+    });
+
+    it('preflights the tracked files and the loader\'s offline validation before the destructive stage', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing) && a.includes('--validate-only')) return { status: 1, stdout: '', stderr: 'ERROR: measures disagree' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      expect(commands.some((a) => a.includes(AFTER_SIREN_LOADER) && a.includes('load') && a.includes('--validate-only'))).toBe(true);
+      expect(() => runPreflight(withFailing(AFTER_SIREN_LOADER), OPTS, fitzroy()))
+        .toThrow(/After-siren preflight failed[\s\S]*Nothing has been destroyed/);
+      const ok = withFailing();
+      const missing: Deps = { ...ok, fileExists: (path: string) => path !== AFTER_SIREN_ADJUDICATIONS && ok.fileExists(path) };
+      expect(() => runPreflight(missing, OPTS, fitzroy())).toThrow(/After-siren preflight: required tracked input is missing[\s\S]*after-siren-adjudications/);
+    });
+
+    it('gates the rebuilt events on the artefact: total, prem split, qualifying set, no duplicate, provenance present', () => {
+      const checks = afterSirenChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'after_siren_kicks', 'after_siren_premiership_rows', 'after_siren_other_competition_rows',
+        'after_siren_qualifying_rows', 'after_siren_duplicate_events', 'after_siren_rows_missing_provenance',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const m = afterSirenMeasures();
+      expect(byKey.after_siren_kicks.expected).toBe(m.events);
+      expect(byKey.after_siren_premiership_rows.expected).toBe(m.premiershipEvents);
+      expect(byKey.after_siren_other_competition_rows.expected).toBe(m.otherCompetitionEvents);
+      expect(byKey.after_siren_qualifying_rows.expected).toBe(m.qualifyingEvents);
+      expect(byKey.after_siren_duplicate_events.expected).toBe(0);
+      expect(byKey.after_siren_rows_missing_provenance.expected).toBe(0);
+      for (const c of checks) expect(c.sql).not.toMatch(/player_name|club_name_raw|opponent_name_raw/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the sibling gates, in stage order.
+      expect(all.indexOf('after_siren_kicks')).toBeGreaterThan(all.indexOf('player_relationships_sibling'));
     });
   });
 

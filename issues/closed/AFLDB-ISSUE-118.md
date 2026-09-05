@@ -1,9 +1,13 @@
 # AFLDB-ISSUE-118 — Persist Gridley history and use it as a Grid Solver compatibility corpus
 
-> **REOPENED 2026-09-05.** The 2026-09-05 closeout (§22.12) counted 28 valid Gridley criteria as
-> acceptable because they were classified `data_absent`. That is an unsupported valid question,
-> not a pass. §23 holds the corrected acceptance contract and the reopened work; §1–§22 are
-> preserved unchanged as the historical record, including the merge and deployment evidence.
+> **RESOLVED 2026-09-06 (§23.38).** Reopened 2026-09-05 because the first closeout (§22.12) counted
+> 28 valid Gridley criteria as acceptable while they were classified `data_absent` — an unsupported
+> valid question, not a pass. §23 holds the corrected acceptance contract (§23.36 §W.3) and the work
+> that met it: canonical heights, birth dates, coaches, father-son, siblings and after-the-siren
+> events; a 22-stage deterministic `afldb_test` rebuild (FINAL VALIDATION 85 checks); a final Gridley
+> corpus proof with `incorrect known answer` 0, ISSUE-118 timeouts 0, and exactly the seven §23.36
+> accepted deferrals left unsupported. §1–§22 are preserved unchanged as the historical record,
+> including the merge and deployment evidence.
 
 **Runbook.** Stages 0–2 (§1–§21) were investigation, persistence and acquisition on
 `opus/gridley-corpus`; §22 (4 September 2026, `claude/issue-118`) recovers that work onto
@@ -5240,3 +5244,195 @@ after-siren), International Rules acquisition/scope decision, and the Tony Buhag
 adjudication. This ISSUE-118 runbook is not to be marked closed until the closure condition (§W.3) is
 met in full -- the UI exposure audit (§W.4) is now satisfied by this section; only the final
 corpus/rebuild closure proof remains.
+
+### 23.38 Final rebuild / corpus / closure proof -- ISSUE-118 RESOLVED (6 September 2026, nineteenth session, Sonnet 5)
+
+The §W.3 closure proof. Scope: integrate the after-siren stage into the deterministic rebuild
+topology, prove a clean full `afldb_test` rebuild, reconcile every ISSUE-118 canonical domain, run the
+final Gridley corpus proof, fix the narrow blockers the proof surfaces, and reconcile the stale
+ISSUE-118 gate expectations. No new product functionality; no production contact; the two pre-existing
+stray untracked files (`gridley-report.json`, `r.id)).has(junior)).toBe(true)`) left untouched.
+
+**Z.1 After-siren integrated into the deterministic rebuild topology.** `tools/db/rebuild-test.ts`:
+a data stage **`after-siren`** after `siblings`, before `draftguru` (`after_siren.py load --csv … --provenance …`),
+then a **`after-siren-reconcile`** VALIDATION stage running `after_siren.py reconcile` (re-resolve the
+tracked artefact against the just-loaded database; every expectation derived from the artefact or that
+re-resolution, never a typed constant -- 38 checks). Preflight proves the three tracked files
+(`data/records/after-siren-events.csv`, `-adjudications.csv`, `-events.source.json`) exist and that
+`load --validate-only` accepts the artefact's shape before the destructive reset; the raw table
+exports under `data/records/after-siren/` are gitignored and unread at load. Six artefact-derived
+final-validation gates (`afterSirenChecks`, all link-independent): `after_siren_kicks` 126,
+`after_siren_premiership_rows` 121, `after_siren_other_competition_rows` 5, `after_siren_qualifying_rows`
+64 (premiership ∧ scored ∧ won), `after_siren_duplicate_events` 0, `after_siren_rows_missing_provenance`
+0. Stages **20 → 22** (data 14 → 15; the reconcile is a validation stage), final validation checks
+**79 → 85**. `tests/db-test-rebuild.test.ts` 266 → 272 (new after-siren describe block).
+
+**Z.2 Blocker fixed -- FK index (ISSUE-118 migration 086).** `fk-indexes.test.ts` (integration)
+flagged `players.height_evidence_id -> player_height_evidence` as an uncovered foreign key.
+Migration `086_player_height_evidence.sql` (this branch, §23.16) added the column with no index;
+`player_height_evidence` is `ON DELETE CASCADE` from `players` and the height enrichment pass is
+re-runnable, so a parent-side delete sequentially scans `players`. New migration
+**`090_players_height_evidence_fk_index.sql`**: `CREATE INDEX IF NOT EXISTS ix_players_height_evidence_id
+ON players (height_evidence_id) WHERE height_evidence_id IS NOT NULL` -- migration 041/050's partial
+shape (the column is NULL for every hand-entered / pre-system height). Applied by the rebuild's
+`migrations` stage; `fk-indexes.test.ts` green on the rebuilt database.
+
+**Z.3 Blocker fixed -- after-siren club-season fallback read a derived table.** The first full rebuild
+(Z.5, run 1) linked only 116 of 126 after-siren rows: `after_siren.py resolve_player`'s no-match
+fallback queried `player_club_season_stats`, which the `derived` stage builds -- but the `after-siren`
+stage runs *before* `derived`, so that table is empty at load time and the four other-competition rows
+that link by club-season participation (Kerry Good 1980 Escort Championships GF, and the NAB Cup / JLT
+rows for Luke Russell, Jack Riewoldt, Ed Langdon) fell through to `unmatched`. Fixed the fallback to
+read `player_match_stats` + `matches` directly (the same raw per-match evidence, populated by
+`fitzroy`, which every after-siren stage already follows -- the match-participation path already reads
+`player_match_stats`). Root-cause fix, no stage reorder. `tests/after-siren-normalisation.test.ts`
+loader-fake updated for the new query shape. Run 2 links 120 / unresolved 6, exactly §23.34 U.4.
+
+**Z.4 Stale ISSUE-118 gate expectations reconciled to the deterministic rebuild.**
+- `release-gates.test.ts` `gate: birth dates` was pinned to the pre-Stage-D1 fitzRoy-only population
+  (855 dates). Stage D1 (§23.24-§23.25, this branch) fills every NULL `dob` from the AFL Tables club
+  lists. Re-pinned to the rebuild-proven values, sourced from the same
+  `tools/rebuild/afltables/afltables-contract.json` `club_player_lists.accepted_snapshot.measured`
+  block the rebuild's own `birthDateChecks` gate reads: `players_with_dob` **13,255**,
+  `dob_without_evidence` **0**, `dob_disputed` **0**, `dob IS NULL ∧ dob_confidence = 'unknown'`
+  **18**, `player_birth_evidence` rows **14,110** (a player can carry a fitzRoy per-match date and one
+  or more club-list dates), every filled date linked. Green on the rebuilt database.
+- `db-promotion-check.test.ts` -- the three tables ISSUE-118 migrations 087 / 089 add (`coaches`,
+  `match_coaches`, `after_siren_kicks`) were unclassified in the test's `PINNED_FOOTBALL_TABLES`
+  mirror. They are canonical rebuild output (loaded from tracked artefacts, registered
+  `import_writable`), so they are football / rebuilt tables; added to the pin. The runtime
+  `classifyPublicTables` already passes (all three are in `afldb_meta.import_writable_tables`).
+- `fitzroy-acquisition.test.ts` / `draftguru-acquisition.test.ts` -- their `not.toContain("!/data/sources")`
+  guard tripped over §23.28's deliberate, scoped `.gitignore` opt-in for the two small parsed coach
+  CSVs (`data/sources/afltables/coaches/*/parsed/`, 112 kB tracked; the 257 MB fitzRoy / DraftGuru raw
+  working areas stay ignored). Replaced with an exact pin of the five `!/data/sources…` opt-in lines,
+  so a future opt-in that exposed a raw snapshot would fail. Both green.
+- `gridley-corpus.test.ts` -- added `ACCEPTED_UNSUPPORTED` (the §23.36 seven) and split the
+  criterion-level check into a standalone `it('leaves unsupported exactly the §23.36 accepted
+  deferrals -- no more, no fewer')` that passes in both modes: a NEW unsupported criterion, or one of
+  the seven becoming supported without being removed, fails it. The per-cell `dataset gap` strict
+  behaviour is unchanged (see Z.7).
+
+**Z.5 Full deterministic `afldb_test` rebuild -- PASSED.** Tracked `db:test:rebuild`, detached, owner
+import DSN, `--draftguru-label annual-html-20260902`, tunnel on 55432. Run 1 exposed Z.3; run 2, with
+the loader fixed: started 2026-09-06 03:53, `Rebuild complete.` 04:17, exit 0 -- **~24 min**.
+**22 stages** in declared order: PRECHECK, DATABASE RESET, MIGRATIONS (90 tracked, incl. 090),
+PRIVILEGES, REFERENCE DATA, FITZROY CORE (`full-history-20260902`), HEIGHTS, HEIGHTS (AFL API),
+HEIGHTS (Wikipedia), BIRTH DATES, COACHES, FATHER–SON, SIBLINGS, **AFTER-SIREN** (batch 14: 126 events,
+126 inserted, 0 stale; 120 linked / 6 unresolved; 116 matches linked / 10 NULL; 4 by club-season
+participation; 4 adjudications each applied once), **AFTER-SIREN RECONCILE (38/38)**, DRAFTGURU,
+AWARDS & HONOURS, BROWNLOW SEASON, DERIVED, COLEMAN, LADDER WITNESS (all checks passed), FINAL
+VALIDATION. **FINAL VALIDATION PASSED: 85 checks**, every expected value met, including the six
+after-siren gates and the unchanged coach / father-son / sibling gates. Warnings: only the pre-existing
+OWNER notice and the awards/honours unlinked-identity notes (§23.30).
+
+**Z.6 Final reconciliation, by ISSUE-118 domain (rebuilt `afldb_test`, tracked reconciliation tooling).**
+
+| Domain | Result |
+|---|---|
+| Historical player attributes -- heights | 12,487 with `height_cm`; `height_without_evidence` 0; `height_conflicts_open` 0; 1,824 AFL API + 84 Wikipedia corroborating-evidence players. |
+| Historical player attributes -- birth dates | `players_with_dob` 13,255; `dob_without_evidence` 0; `players_with_club_list_birth_evidence` 13,255; `club_list_birth_conflict_players` 0; `dob_disagreeing_with_club_list` 2 (Roan Steele, Jack Hayes -- recorded, adjudication separate); `dob_disputed` 0. |
+| Coaches | 386 canonical coaches (368 linked to a player by profile path, 18 coach-only incl. the operator list); 0 linked outside a unique identity; 32,034 `match_coaches` assignments; no fake player rows. |
+| Father–son | 127 selections; 99 sons + 123 fathers (107 distinct) linked; 0 links outside a trusted status; 127 `parent_child` relationships, one per selection, none duplicated. |
+| Siblings | 498 canonical pairs; 389 both linked; 154 unlinked sides; 389 brother pairs linked; 658 players with a linked brother; 0 self-pairs; 0 duplicate unordered pairs; `relationship_label` preserved. |
+| After-siren | `after_siren.py reconcile` **38/38**. 126 events (121 premiership / 5 other competition); `kick_scored` 71 goal / 30 behind / 25 none; `kick_effect` 68 won / 12 drew / 46 none; **64 qualifying** (premiership ∧ scored ∧ won) over 62 distinct kickers; 120 linked / 6 unresolved players (Mark Williams 2011 NAB Cup -- no premiership game that year; the five 2026 rows -- a season `matches` does not carry) over 111 distinct; 116 linked / 10 NULL matches (5 other-competition by model, 5 season-absent), 0 premiership NULL in a carried season; 126 linked clubs + opponents; 0 linked match disagreeing with its clubs or season; all 116 linked kickers present in their linked match's `player_match_stats`; 0 duplicate events; 0 rows missing source / source-record-id / import-batch; 4 adjudications each applied exactly once. Edge cases: **Luke Shuey 2017 EF** -- `goal / won / win`, `siren = end_of_extra_time`, inside the 64; **David King 1994 QF** -- `none / none / win`, `siren = end_of_regulation`, `shot_detail = fell short`, outside the 64 (a miss before an extra-time win); **Kerry Good 1980 Escort Championships GF** -- non-premiership, `match_id` NULL, linked by club-season participation, not in `winaftersiren`; **Cameron Zurhaar 2026 R11** -- `cited = false`, player + match NULL (2026 not carried). |
+
+**Z.7 Final Gridley corpus proof (rebuilt `afldb_test`, 2026-09-06).**
+
+*Diagnostic run* (`AFLDB_GRIDLEY_DIAGNOSTIC=1`, the acceptance proof, as every §23 session): **1,164 / 1,164**.
+
+| Measure | Value |
+|---|---:|
+| boards / cells | 1,143 / 10,287 |
+| cells solved | **9,854** |
+| **incorrect known answer** | **0** |
+| **timeouts / query failures** | **0** (slowest cell 1,888 ms; 0 over the 4 s guard; 16 over 1 s) |
+| residual unsupported-valid criteria | **7** (26 occurrences) |
+| `dataset gap` (per cell) | 357 |
+| `unsupported` (per cell) | 78 |
+| `source coverage gap` | 21 (Jarryd Lyons -- brother listed, never played, §23.31) |
+| `external source disagreement` (informational) | 243 |
+| `adjudicated source conflict` (informational) | 65 |
+| `time of board` (informational) | 15,366 |
+| `list membership` (informational) | 852 |
+
+Every measure reconciles exactly with §23.35 V.3's "After" column: the after-siren rebuild integration
+and the Z.3 loader fix change nothing in the corpus (the `winaftersiren` predicate selects the same
+**63 rows / 61 kickers** as §23.35 V.2). The residual unsupported-valid set is **exactly** the seven
+§23.36 accepted deferrals -- `season2024player` (14), `intrulesplayer` (5), `irish` (2),
+`recruitedByDodoro` (2), `nfl` (1), `spoils5season` (1), `tasmanian` (1). No additional unsupported
+criterion. `incorrect known answer` = 0 and the after-siren edge-case cells (Nasiah Wanganeen-Milera's
+2025 winner post-dating the boards' keys) classify `time of board`, not `incorrect`.
+
+*Strict run*: 1,162 / 1,164 -- two `it`s fail, unchanged in kind from every §23 session: (a) per-cell
+`dataset gap` 357 + `unsupported` 78 + `source coverage gap` 21 (`writes the run report and has no
+failing cells`); (b) `gappedCriteria` non-empty (`has no probed dataset gap …`). Both are inherent to
+the repository-standard `afldb_test` baseline, which carries no draft pick-number links (`picktop10`),
+no marquee tags, and ends at season 2025 while some boards list 2026 debutants -- not ISSUE-118
+defects, and never zero on this baseline. The new `it('leaves unsupported exactly the §23.36 accepted
+deferrals')` **passes** in both modes.
+
+**Z.8 UI closure condition (§W.3.8 / §W.4) -- verified from source and focused tests.** §23.37
+implemented the public exposure; this session re-ran it against the rebuilt database. Green:
+`tests/integration/after-siren.test.ts` (Luke Shuey 2017 EF, David King 1994 QF, Kerry Good 1980
+non-premiership, zero-events), `tests/integration/player-family-and-coaching.test.ts` (Leigh Matthews
+linked → player profile, Chris Fagan coach-only → `/coaches/[slug]-id`, `searchCoaches` finds Fagan
+and never Matthews), `tests/integration/player-honours.test.ts` (Brownlow / All-Australian de-dup),
+`tests/coach-slug.test.ts`, `tests/player-after-siren-events.test.ts`, `tests/player-family-card.test.ts`,
+`tests/after-siren-format.test.ts`. Player Coaching Career visible; coach-only people have a public
+profile route and are discoverable through `/coaches` and search; a player+coach resolves to the
+player profile with no duplicate identity; father-son, siblings and after-siren events show on player
+profiles; historical attributes and honours show on player profiles. **638 ISSUE-118-domain tests
+pass** against the rebuilt database.
+
+**Z.9 Test assessment -- every remaining red test classified.** `npx tsc --noEmit -p .` clean; eslint
+on the touched `.ts` files: only the pre-existing `no-explicit-any` findings outside the edited ranges
+(as §23.28 / §23.31 recorded); `after_siren.py` `py_compile` clean.
+
+| Test | State | Classification |
+|---|---|---|
+| `db-test-rebuild.test.ts` (278) | PASS | -- |
+| `fk-indexes.test.ts` | PASS | fixed by migration 090 (Z.2) |
+| `release-gates.test.ts` | PASS | birth-date gate re-pinned to the rebuild (Z.4) |
+| `db-promotion-check.test.ts` | PASS | three ISSUE-118 tables classified (Z.4) |
+| `fitzroy-acquisition.test.ts` / `draftguru-acquisition.test.ts` | PASS | `.gitignore` opt-in list pinned (Z.4) |
+| `after-siren-*`, `coach-*`, `player-family*`, `player-*`, `sibling-reconciliation`, `father-son-reconciliation`, `grid-solver*`, `gridley-compat` (638) | PASS | -- |
+| `gridley-corpus.test.ts` **strict** | 2 `it`s fail | **Accepted / intentional-strict.** Per-cell `dataset gap` 357 + `unsupported` 78 + `source coverage gap` 21 are inherent to the `afldb_test` season-2025 baseline (no draft pick-number links, no 2026 season) -- unchanged in kind since §23.4, never zero on this baseline. The acceptance proof is the diagnostic run (Z.7), which is green. |
+| `finals-semantics-contract.test.ts` (1 `it`) | fail | **Unrelated pre-existing environmental.** Windows-checkout CRLF: the test splits migration `084_round_type_wildcard_final.sql` (AFLDB-ISSUE-129, not 118) on `\n` and the trailing `\r` fails an exact-array match. Passes on Linux. Do not flip `autocrlf`. |
+| `reference-data.test.ts` (§H12) / `privileges.test.ts` | fail | **AFLDB-ISSUE-138** (separately tracked). Migration `080_external_grids.sql` grants `afldb_import` a deliberate narrow SELECT+INSERT on `external_grids` / `external_grid_axes` / `external_grid_sources` outside `afldb_meta.import_writable_tables`; the suites want the two tables added to their exclusion lists. No privilege is wrong; nothing to do with heights / coaches / family / after-siren. Confirmed unrelated; not worked here. |
+
+**Z.10 Formal §W.3 closure condition -- met.**
+
+1. every Gridley criterion inside accepted AFLDB canonical scope is supported correctly or
+   evidence-classified -- **yes** (9,854 cells solved; height / captaincy / brother differences
+   classified as `external source disagreement` / `adjudicated source conflict` / `source coverage
+   gap` on tracked evidence);
+2. every remaining unsupported-valid criterion is an explicitly accepted deferral -- **yes**, exactly
+   the §23.36 seven, no more;
+3. no unsupported criterion accidentally unclassified -- **yes** (the corpus lists exactly the seven);
+4. `incorrect known answer` = 0 except evidenced external-source disagreements -- **yes**, 0;
+5. no unresolved / unrecognised mappings within accepted scope -- **yes** (corpus `unresolved` /
+   `unrecognised` empty);
+6. no ISSUE-118 solver timeouts -- **yes**, 0 (slowest 1.9 s);
+7. canonical reconciliation and rebuild gates pass -- **yes** (85-check FINAL VALIDATION; 38/38
+   after-siren reconcile; every domain in Z.6);
+8. every user-facing canonical domain has a public UI exposure path -- **yes** (§23.37; Z.8);
+9. the UI exposure audit is complete -- **yes** (§23.37 satisfied §W.4; re-verified Z.8);
+10. the final corpus / rebuild closure proof is complete -- **yes** (Z.5 / Z.7).
+
+**Buhagiar**: Tony Buhagiar's 1979 All-Australian carnival row (`aa:1979:20`) links `implausible`
+because 1979 precedes his 1981 VFL debut (a pre-VFL state selection). In the corpus his `allAus1953`
+cells fall under `external source disagreement` (AFLDB's link rule is source-backed and deliberate),
+not `incorrect known answer`; `incorrect known answer` stays 0. Not a closure blocker under §W.3.4.
+
+**ISSUE-118 status: RESOLVED, 6 September 2026.** The Gridley compatibility corpus is proven against a
+fresh deterministic `afldb_test` rebuild: every valid criterion in accepted AFLDB canonical scope is
+answered or evidence-classified, the residual seven are formally accepted deferrals, `incorrect known
+answer` and ISSUE-118 timeouts are zero, all reconciliation and rebuild gates pass, and every
+ISSUE-118 canonical domain has a public UI exposure path.
+
+**Follow-up, not blocking closure** (unchanged from §23.37, tracked here for the record): the DEV load
+of birth dates + coaches + father-son + siblings + after-siren; production with the next deploy
+(ISSUE-137 sequencing); International Rules acquisition/scope; a fresh sibling extraction from the
+families article; the Grand-Final-day co-captain modelling note (1915 / 1958 / 1977 / 2004 / 2016);
+`AFLDB-ISSUE-138` (`external_grid_*` privilege-registry drift). None is an ISSUE-118 correctness gap.

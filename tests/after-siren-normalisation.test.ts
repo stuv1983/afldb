@@ -273,13 +273,11 @@ describe('after_siren.py normalisation', () => {
  */
 type FakeMatch = { id: number; season: number; round_code: string; home_org: number; away_org: number; home_club: number; away_club: number; home_score: number; away_score: number };
 type FakePms = { match_id: number; player_id: number; club_org: number; name: string; goals: number | null; behinds: number | null; debut: number | null };
-type FakeSeasonRow = { player_id: number; name: string; season: number; club_org: number; debut: number | null };
 type Fixture = {
   orgs: Record<string, number[]>;
   clubOrgs: Record<string, number>;
   matches?: FakeMatch[];
   participants?: FakePms[];
-  clubSeasons?: FakeSeasonRow[];
   matchSeasons?: number[];
   openingRoundSeasons?: number[];
 };
@@ -303,16 +301,21 @@ class FakeCursor:
                            for m in self.fx.get('matches', [])
                            if m['season'] == season and m['round_code'].upper() == code
                            and {m['home_org'], m['away_org']} == {ko, oo}]
+        elif 'JOIN matches m ON m.id = pms.match_id' in sql:
+            # club-season participation fallback: player_match_stats + matches,
+            # NOT the derived player_club_season_stats (empty when this loader
+            # runs as a rebuild stage before the derived stage).
+            name, season, org = params
+            season_matches = {mm['id'] for mm in self.fx.get('matches', []) if mm['season'] == season}
+            self.result = sorted({(p['player_id'], None, None, p['debut'])
+                                  for p in self.fx.get('participants', [])
+                                  if p['match_id'] in season_matches and p['club_org'] == org and p['name'] == name})
         elif 'player_match_stats' in sql:
             club_id, match_id, name = params
             org = self.fx['clubOrgs'][str(club_id)]
             self.result = [(p['player_id'], p['goals'], p['behinds'], p['debut'])
                            for p in self.fx.get('participants', [])
                            if p['match_id'] == match_id and p['club_org'] == org and p['name'] == name]
-        elif 'player_club_season_stats' in sql:
-            name, season, org = params
-            self.result = [(r['player_id'], None, None, r['debut']) for r in self.fx.get('clubSeasons', [])
-                           if r['name'] == name and r['season'] == season and r['club_org'] == org]
         else:
             raise AssertionError('unexpected query: ' + sql)
     def fetchall(self): return self.result
@@ -439,7 +442,7 @@ describe('after_siren.py match resolution', () => {
   });
 
   it('leaves match_id NULL for a season this database does not carry, and says so', () => {
-    const r = ok(resolveOne(event({ season: '2026', event_key: 'e-2026' }), { ...CARLTON_ESSENDON, matchSeasons: [1990], clubSeasons: [] }));
+    const r = ok(resolveOne(event({ season: '2026', event_key: 'e-2026' }), { ...CARLTON_ESSENDON, matchSeasons: [1990] }));
     expect(r.match_id).toBeNull();
     expect(r.notes).toContain('2026 is not in this database');
     expect(r.club_id).not.toBeNull();       // the era rule still names the clubs
@@ -448,7 +451,13 @@ describe('after_siren.py match resolution', () => {
 
   it('leaves match_id NULL for another competition without ever looking for one', () => {
     const other = event({ competition: 'NAB Cup', premiership_season: 'false', season: '2013' });
-    const r = ok(resolveOne(other, { ...CARLTON_ESSENDON, matchSeasons: [2013], clubSeasons: [{ player_id: 55, name: 'jane doe', season: 2013, club_org: 1, debut: 2010 }] }));
+    // The kicker still links by club-season participation: a premiership-season
+    // player_match_stats row for that club in 2013 (the derived summary is not read).
+    const r = ok(resolveOne(other, {
+      ...CARLTON_ESSENDON, matchSeasons: [2013],
+      matches: [{ id: 2013001, season: 2013, round_code: '5', home_org: 1, away_org: 2, home_club: 101, away_club: 102, home_score: 80, away_score: 70 }],
+      participants: [{ match_id: 2013001, player_id: 55, club_org: 1, name: 'jane doe', goals: 2, behinds: 1, debut: 2010 }],
+    }));
     expect(r.match_id).toBeNull();
     expect(r.notes).toContain('not a premiership-season fixture (NAB Cup)');
     expect(r.player_id).toBe(55);

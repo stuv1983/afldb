@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 — after-the-siren in the deterministic rebuild; FK index; final closure proof (Resolved) - 6 September 2026
+
+- **After-the-siren canonical events are now rebuilt from tracked inputs.** `db:test:rebuild` gains a data stage `after-siren` (after `siblings`) that loads `after_siren_kicks` (migration 089) from the tracked normalised artefact, and a validation stage `after-siren-reconcile` that re-resolves the artefact against the just-loaded database (38 checks, every expectation derived, never a typed constant). Six artefact-derived final-validation gates (126 events, 121 premiership / 5 other competition, 64 qualifying, 0 duplicates, 0 missing provenance). Rebuild stages 20 → 22, final validation 79 → 85.
+- **`after_siren.py` no-match player fallback.** The club-season participation fallback now reads `player_match_stats` + `matches` directly instead of the derived `player_club_season_stats`, which is not yet built when the stage runs. Four other-competition rows (a 1980 Escort Championships GF and NAB Cup / JLT rows) that previously loaded unlinked in a full rebuild now link by club-season participation, matching the hand-load state.
+- **Migration `090`** — `ix_players_height_evidence_id` (partial, `WHERE height_evidence_id IS NOT NULL`) covers the foreign key migration `086` added to `players` without an index.
+- **Resolved.** The Gridley compatibility corpus is proven against a fresh 22-stage deterministic `afldb_test` rebuild: every valid criterion in accepted canonical scope is answered or evidence-classified, `incorrect known answer` and ISSUE-118 solver timeouts are zero, all reconciliation and rebuild gates pass, every canonical domain has a public UI exposure path, and exactly the seven §23.36 accepted deferrals (`season2024player`, `intrulesplayer`, `irish`, `recruitedByDodoro`, `nfl`, `spoils5season`, `tasmanian`) remain unsupported. Runbook `issues/closed/AFLDB-ISSUE-118.md` §23.38.
+
 ### AFLDB-ISSUE-118 public UI exposure — coach-only profiles, after-the-siren, disclosure consistency - 6 September 2026
 
 - **Coach-only public profiles.** New `/coaches/[slug]-id` route: a coaching-first profile (games, win %, record, finals, Grand Finals, premierships, club-by-club stints) for a `coaches.player_id IS NULL` person. A coach linked to a player permanently redirects to that player's canonical page instead of a second profile. New `/coaches` discovery index lists every coach, linked ones routing straight to their player page. New read models `getCoach` (thin identity) and `listCoaches`.
@@ -130,7 +137,7 @@ commit.
 
 - **Reopened:** the 5 September closeout counted 28 valid Gridley criteria as acceptable because
   they were classified data-absent; the acceptance is now zero unsupported valid criteria
-  (`issues/open/AFLDB-ISSUE-118.md` §23). The earlier entry below is retained as history.
+  (`issues/closed/AFLDB-ISSUE-118.md` §23). The earlier entry below is retained as history.
 - **Grid Solver catalogue: 137 → 151** (`src/search/grid-solver-spec.ts`,
   `src/db/queries/grid-solver.ts`): the **All-Australian final team** as its own question —
   `all_australian_team`, `all_australian_team_min_times` (counts distinct seasons, so the 1984
