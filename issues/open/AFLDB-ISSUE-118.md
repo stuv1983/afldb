@@ -4269,3 +4269,46 @@ programmatically); (4) `season2024player`; (5) the Tony Buhagiar All-Australian 
 `spoils5season` / `recruitedByDodoro` deferred, `irish` / `tasmanian` / `nfl` presumptively deferred. Run
 the unattended 19-stage rebuild at the next checkpoint (expect FINAL VALIDATION 72/72). DEV load of birth
 dates, coaches and father–son; production with the next deploy (ISSUE-137 sequencing).
+
+### 23.30 Rebuild gate passed unattended — 19 stages, FINAL VALIDATION 72/72 (5 September 2026, eleventh session, Fable medium)
+
+**Scope.** Validation only. Father–son (§23.29) was admitted to the rebuild after the last unattended
+proof (§23.28, 18 stages / 66 checks), so the complete graph had to be proven from scratch against
+`afldb_test` before the next canonical data family begins. No code, data or migration changed this session.
+
+**Pre-run inspection.** `tools/db/rebuild-test.ts` `planStages()` declares exactly 19 stage ids in order:
+precheck, recreate, migrations, privileges, reference, fitzroy, heights, heights-afl-api, heights-wikipedia,
+birth-dates, coaches, **father-son** (directly after coaches, before draftguru), draftguru, awards-honours,
+brownlow-season, derived, coleman, ladder-witness, fingerprints. `finalValidationChecks()` = the 66 checks of
+§23.28 + `fatherSonChecks()` (six gates) = 72.
+
+**Command (the documented one, unchanged):**
+
+```text
+npm run db:test:rebuild -- --acknowledge-destroy afldb_test --allow-owner-import-dsn --draftguru-label annual-html-20260902
+```
+
+with `AFLDB_PYTHON` = the workstation Python 3.12 (`…\Programs\Python\Python312\python.exe`, psycopg 3.3.5),
+`C:\Program Files\PostgreSQL\16\bin` prepended to PATH for `psql`, and the SSH tunnel on 55432. Launched
+detached from this worktree at HEAD `d6b6d57` via `Start-Process powershell` with output to a log file (the
+harness's foreground/background tool timeout is 10 min, shorter than the rebuild).
+
+**Result.** Started 19:22:37, `Rebuild complete.` 19:45:56, exit 0 — **23 min 19 s**. All 19 stages executed in
+the declared order, none failed. PRECHECK (offline preflight incl. `father_son.py` shape/provenance check)
+before destruction; migration `088_father_son_link_checks.sql` applied in 192 ms; FATHER–SON after COACHES:
+127 selections, shape verified, provenance revision 1370239415, sons linked 99, fathers linked 123, distinct
+fathers 107, `father_son_selections` 127, `player_relationships` 127, stale rows removed 0, batch 12 in 0.9 s.
+**FINAL VALIDATION PASSED: 72 checks**, each `= expected`, the six father–son gates among them:
+`father_son_selections` 127, `father_son_sons_linked` 99, `father_son_fathers_linked` 123,
+`father_son_distinct_fathers` 107, `father_son_links_outside_trusted_status` 0,
+`player_relationships_parent_child` 127.
+
+**Warnings (all harmless, all pre-existing).** The `--allow-owner-import-dsn` OWNER notice (ISSUE-083, by
+design on the workstation); the AWARDS & HONOURS unlinked-identity warnings (all_australian 5, rising_star
+1 + 15, club_bf 4 + 1, named_medals 3 + 3, hall_of_fame 2, honour_teams 1, and 33 non-AFLDB club names kept
+as `club_name_raw`) — identical in kind to §23.23/§23.25/§23.28 and already covered by the honours gates.
+Nothing new was surfaced; no regression on this branch.
+
+**Exact next action (fresh session):** Begin sibling-family canonical ingestion after operator export is
+available (F.12: export the legacy family tables to CSV under `data/players/families/`, then siblings →
+`player_relationships` `sibling` + `has_brother` + `brother`). Not started this session.
