@@ -5,14 +5,18 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
+import { hasFamilyContent, PlayerFamilyCard } from '@/components/PlayerFamilyCard';
+import { PlayerCoachingCareer } from '@/components/PlayerCoachingCareer';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
 import { getPlayerHonours } from '@/db/queries/awards';
+import { getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
   getPlayer,
   getPlayerBrownlow,
   getPlayerClubs,
+  getPlayerFamily,
   getPlayerMatches,
   getPlayerSeasons,
   listMostViewedPlayers,
@@ -154,17 +158,20 @@ export default async function PlayerPage({
     permanentRedirect(playerPath(player.slug, player.id));
   }
 
-  const [clubs, seasons, brownlow, matches, honours, draftHistory] = await Promise.all([
-    getPlayerClubs(player.id),
-    getPlayerSeasons(player.id),
-    getPlayerBrownlow(player.id),
-    // Most recent matches only. The full paged log lives at
-    // /players/[slug]/matches, which keeps this page free of
-    // searchParams and therefore cacheable.
-    getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
-    getPlayerHonours(player.id),
-    getPlayerDraftHistory(player.id),
-  ]);
+  const [clubs, seasons, brownlow, matches, honours, draftHistory, family, coachingCareer] =
+    await Promise.all([
+      getPlayerClubs(player.id),
+      getPlayerSeasons(player.id),
+      getPlayerBrownlow(player.id),
+      // Most recent matches only. The full paged log lives at
+      // /players/[slug]/matches, which keeps this page free of
+      // searchParams and therefore cacheable.
+      getPlayerMatches(player.id, { limit: MATCH_PAGE_SIZE, offset: 0 }),
+      getPlayerHonours(player.id),
+      getPlayerDraftHistory(player.id),
+      getPlayerFamily(player.id),
+      getPlayerCoachingCareer(player.id),
+    ]);
 
   const risingStarNominations = honours.nominations;
   const risingStarWin = risingStarNominations.find((n) => n.isWinner);
@@ -263,6 +270,14 @@ export default async function PlayerPage({
       </section>
     ),
   });
+
+  if (hasFamilyContent(family)) {
+    sections.push({
+      id: 'family',
+      label: 'Family',
+      node: <PlayerFamilyCard playerId={player.id} family={family} />,
+    });
+  }
 
   if (draftHistory.length > 0) {
     sections.push({
@@ -448,6 +463,14 @@ export default async function PlayerPage({
           </ul>
         </section>
       ),
+    });
+  }
+
+  if (coachingCareer) {
+    sections.push({
+      id: 'coaching-career',
+      label: 'Coaching Career',
+      node: <PlayerCoachingCareer career={coachingCareer} />,
     });
   }
 
