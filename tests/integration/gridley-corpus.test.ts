@@ -102,8 +102,9 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean };
+type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean };
 const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
+const DOB_BUILDERS = new Set(['age_on_debut_min']);
 const DRAFT_BUILDERS = new Set(['national_draft_pick_between', 'draft_pick_between', 'draft_year_between', 'draft_type_is', 'drafted_by_club', 'drafted_by_club_never_played', 'recruited_via', 'traded_min_times']);
 const MATCH_EVENT_BUILDERS = new Set(['match_event_played', 'match_event_min', 'match_event_won', 'match_event_played_between']);
 
@@ -171,7 +172,7 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true };
+let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
@@ -208,7 +209,7 @@ const INFORMATIONAL: Record<string, string> = {
  */
 const DATA_GAPS: Record<string, string> = {
   unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required',
-  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights)',
+  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth)',
   'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
 };
@@ -253,12 +254,14 @@ beforeAll(async () => {
         FROM caps a JOIN caps b ON b.season = a.season AND b.club_id = a.club_id AND b.player_id <> a.player_id
         JOIN clubs c ON c.id = a.club_id
        GROUP BY a.player_id, a.season, c.name`,
-    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string }[]>`
+    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
              (SELECT count(*) FROM draft_picks WHERE link_status_value IN ('unique', 'resolved')) AS "draftLinked",
              (SELECT count(*) FROM matches WHERE match_event IS NOT NULL) AS "matchEvents",
-             (SELECT count(*) FROM players WHERE height_cm IS NOT NULL) AS "heights"`,
+             (SELECT count(*) FROM players WHERE height_cm IS NOT NULL) AS "heights",
+             (SELECT count(*) FROM players) AS "players",
+             (SELECT count(*) FROM players WHERE dob IS NOT NULL) AS "dobs"`,
   ]);
   // A dataset counts as present when at least half of it is usable: afldb_dev
   // links 5,103 of 6,810 draft picks; a rebuilt afldb_test links 5.
@@ -267,6 +270,9 @@ beforeAll(async () => {
     draftLinks: Number(probe.draftLinked) * 2 >= Number(probe.draftTotal),
     matchEvents: Number(probe.matchEvents) > 0,
     heights: Number(probe.heights) > 0,
+    // ISSUE-118 Stage D1: fitzRoy alone dates ~6% of players (855); the birth-dates
+    // rebuild stage takes it to ~99.9%. Half is the same threshold as draft links.
+    dobs: Number(probe.dobs) * 2 >= Number(probe.players),
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
@@ -295,7 +301,8 @@ beforeAll(async () => {
       if (mapping.status === 'mapped') {
         if ((!gaps.draftLinks && DRAFT_BUILDERS.has(mapping.axis.builder))
           || (!gaps.matchEvents && MATCH_EVENT_BUILDERS.has(mapping.axis.builder))
-          || (!gaps.heights && HEIGHT_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
+          || (!gaps.heights && HEIGHT_BUILDERS.has(mapping.axis.builder))
+          || (!gaps.dobs && DOB_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
       } else if (mapping.status === 'unresolved' && gapLog.some((g) => g.startsWith(`${item.id}:`))) {
         gappedCriteria.add(item.id);
       }
@@ -329,7 +336,7 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
   it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {

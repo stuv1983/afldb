@@ -140,17 +140,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6754,
-      mappedDistinct: 819,
+      mappedOccurrences: 6755,
+      mappedDistinct: 820,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 103,
-      dataAbsentDistinct: 19,
+      dataAbsentOccurrences: 102,
+      dataAbsentDistinct: 18,
     });
     // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
     // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
     // is pinned so it only ever moves deliberately, and the integration
     // corpus run fails while it is above zero.
-    expect(distinct(absentList)).toBeLessThanOrEqual(19);
+    expect(distinct(absentList)).toBeLessThanOrEqual(18);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -172,7 +172,7 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
       'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
       'irish [2]', 'recruitedByDodoro [2]',
       'coachedByClarkson [1]', 'coachedByGoodwin [1]', 'coachedByMatthews [1]',
-      'debut22 [1]', 'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
+      'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
     ]);
     for (const [, r] of rows) expect(r.reason.length).toBeGreaterThan(20);
   });
@@ -248,6 +248,8 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
   it('maps height bounds exactly onto players.height_cm builders', () => {
     expect(map('height195', '195cm', 'OR TALLER')).toMatchObject({ axis: { builder: 'height_min', params: { cm: '195' } } });
     expect(map('height180', '180cm', 'OR SHORTER')).toMatchObject({ axis: { builder: 'height_max', params: { cm: '180' } } });
+    // ISSUE-118 Stage D1: age on debut is derived from canonical dob + debut_date, never from Gridley's key.
+    expect(map('debut22', '22+ YEARS OLD', 'ON DEBUT')).toMatchObject({ axis: { builder: 'age_on_debut_min', params: { years: '22' } } });
   });
 
   it('teammate criteria resolve through the id-embedded Gridley player id or the title', () => {

@@ -27,6 +27,11 @@ import {
   AWARDS_HONOURS_GROUPS,
   awardsHonoursChecks,
   AFL_API_HEIGHT_LOADER,
+  BIRTH_DATE_LOADER,
+  afltablesClubListPin,
+  birthDateChecks,
+  birthDatesArgv,
+  birthDatesValidateArgv,
   HEIGHT_LOADER,
   WIKIPEDIA_HEIGHT_CSV,
   WIKIPEDIA_HEIGHT_LOADER,
@@ -748,8 +753,9 @@ describe('stage graph', () => {
     // join through the identities and match facts fitzroy just loaded. Neither acquires.
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
-      'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'draftguru',
-      'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness', 'fingerprints',
+      'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
+      'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness',
+      'fingerprints',
     ]);
   });
 
@@ -768,7 +774,8 @@ describe('stage graph', () => {
     // enrichment' below).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
-                'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman']);
+                'birth-dates', 'draftguru', 'awards-honours', 'brownlow-season', 'derived',
+                'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
       resolvePython(), 'tools/migration/import_awards.py', '--groups', 'coleman',
@@ -866,6 +873,91 @@ describe('stage graph', () => {
         join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
       expect(finalValidationChecks(register).map((c) => c.key)).toEqual(expect.arrayContaining(keys));
       expect(heightChecks().find((c) => c.key === 'players_with_height')!.expected).toBeGreaterThan(12000);
+    });
+  });
+
+  describe('birth dates (AFLDB-ISSUE-118 §23.24 Stage D1)', () => {
+    const ids = idsOf(stages);
+    const birthDates = stages.find((s) => s.id === 'birth-dates')!;
+    const contractPath = join(root, 'tools', 'rebuild', 'afltables', 'afltables-contract.json');
+
+    it('loads the club-list snapshot the AFL Tables contract accepts, and only that one', () => {
+      const pin = afltablesClubListPin();
+      expect(pin.label).toMatch(/^club-lists-\d{8}$/);
+      expect(birthDates.argv).toEqual([resolvePython(), BIRTH_DATE_LOADER, '--label', pin.label]);
+      expect(birthDatesArgv()).toEqual(birthDates.argv);
+      expect(birthDates.name).toContain(pin.label);
+      expect(birthDates.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule).
+      expect(birthDatesValidateArgv()).toEqual([...birthDates.argv!, '--validate-only']);
+      expect(birthDates.kind).toBe('data');
+      expect(birthDates.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+    });
+
+    it('follows heights-wikipedia (the identities fitzroy registered are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('heights-wikipedia')).toBeLessThan(ids.indexOf('birth-dates'));
+      expect(ids.indexOf('birth-dates')).toBeLessThan(ids.indexOf('draftguru'));
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('birth-dates'));
+    });
+
+    it('refuses a contract with no pin, a tampered manifest hash, and a missing measured value', () => {
+      expect(() => afltablesClubListPin(() => null)).toThrow(/no accepted club-list snapshot/);
+      expect(() => afltablesClubListPin(() => ({ club_player_lists: {} })))
+        .toThrow(/no accepted club-list snapshot/);
+      const real = JSON.parse(readFileSync(contractPath, 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.club_player_lists.accepted_snapshot.manifest_sha256_lf = '0'.repeat(64);
+      expect(() => afltablesClubListPin(() => tampered)).toThrow(/hashes to/);
+      const moved = structuredClone(real);
+      moved.club_player_lists.accepted_snapshot.manifest = 'docs/rebuild-manifests/afltables_club_lists/nope.json';
+      expect(() => afltablesClubListPin(() => moved)).toThrow(/not in this checkout/);
+      const unmeasured = structuredClone(real);
+      delete unmeasured.club_player_lists.accepted_snapshot.measured.dob_without_evidence;
+      expect(() => afltablesClubListPin(() => unmeasured)).toThrow(/dob_without_evidence is not an integer/);
+      // The real pin proves: the tracked manifest hashes to its LF binding on any checkout.
+      expect(afltablesClubListPin().measured.playersWithDob).toBeGreaterThan(13000);
+    });
+
+    it('preflights the snapshot offline before the destructive stage and refuses on failure', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(BIRTH_DATE_LOADER) && a.includes(afltablesClubListPin().label))).toBe(true);
+      expect(() => runPreflight(withFailing(BIRTH_DATE_LOADER), OPTS, fitzroy()))
+        .toThrow(/Birth-date preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt dates on the contract pin: population, evidence link, coverage, conflicts, disagreements', () => {
+      const checks = birthDateChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'players_with_dob_after_birth_dates', 'dob_without_evidence', 'players_with_club_list_birth_evidence',
+        'club_list_birth_conflict_players', 'dob_disagreeing_with_club_list',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const pin = afltablesClubListPin();
+      expect(byKey.players_with_dob_after_birth_dates.expected).toBe(pin.measured.playersWithDob);
+      expect(byKey.dob_without_evidence.expected).toBe(0);
+      expect(byKey.club_list_birth_conflict_players.expected).toBe(0);
+      expect(byKey.players_with_club_list_birth_evidence.expected).toBeLessThanOrEqual(pin.measured.playersWithDob);
+      expect(byKey.dob_without_evidence.sql).toMatch(/dob_evidence_id IS NULL/);
+      expect(byKey.club_list_birth_conflict_players.sql).toMatch(/count\(DISTINCT e\.dob\) > 1/);
+      expect(byKey.dob_disagreeing_with_club_list.sql).toMatch(/p\.dob <> e\.dob/);
+      for (const c of checks) expect(c.sql).not.toMatch(/'afltables_club_list'.*'wikipedia'/);
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the height gates, in stage order.
+      expect(all.indexOf('players_with_dob_after_birth_dates')).toBeGreaterThan(all.indexOf('players_with_wikipedia_height_evidence'));
     });
   });
 

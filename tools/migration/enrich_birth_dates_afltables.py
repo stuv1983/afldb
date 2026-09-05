@@ -247,44 +247,76 @@ def main() -> int:
         return 0
 
     # ---- Write: evidence for everything seen, fill only NULL.
+    #
+    # Batched (ISSUE-118 §23.24): the rows go up in two COPYs into ON COMMIT DROP temp
+    # tables and land in two set statements, so the stage costs a handful of round trips
+    # rather than one per row (the per-row loop took ~28 minutes through the tunnel).
+    # Semantics are unchanged: the evidence upsert is keyed (player, source, dob) and a
+    # rerun rewrites the same rows; the fill joins each player to ITS OWN evidence row of
+    # the same date and touches only players whose dob is still NULL, so a rerun fills 0.
+    # Two paths reaching one player with the same date (continuity folding) collapse to
+    # one evidence row here — occurrences summed, external_id the first path — where the
+    # loop let the last path win; nothing else differs.
+    t_write = time.time()
     with import_batch(pg, SOURCE_KEY, TOOL, "players") as batch:
         with pg.cursor() as cur:
-            evidence_ids: dict[tuple[int, date], int] = {}
-            for pid, path, d, occ in evidence:
-                cur.execute(
-                    """INSERT INTO player_birth_evidence
-                         (player_id, source_id, external_id, dob, evidence_type, confidence, occurrences, batch_id, notes)
-                       VALUES (%s, %s, %s, %s, %s, 'sourced', %s, %s, %s)
-                       ON CONFLICT (player_id, source_id, dob) DO UPDATE
-                         SET occurrences = EXCLUDED.occurrences, batch_id = EXCLUDED.batch_id,
-                             external_id = EXCLUDED.external_id, notes = EXCLUDED.notes
-                       RETURNING id""",
-                    (pid, source_id, path, d, EVIDENCE_TYPE, occ, batch.id, f"snapshot {args.label}"),
-                )
-                evidence_ids[(pid, d)] = cur.fetchone()[0]
-            filled = 0
-            for pid, d, _path in fill:
-                cur.execute(
-                    """UPDATE players p
-                          SET dob = %s, dob_confidence = 'sourced',
-                              birth_year = EXTRACT(YEAR FROM %s::date)::smallint,
-                              birth_year_min = EXTRACT(YEAR FROM %s::date)::smallint,
-                              birth_year_max = EXTRACT(YEAR FROM %s::date)::smallint,
-                              birth_year_confidence = 'sourced',
-                              dob_evidence_id = %s
-                        WHERE p.id = %s AND p.dob IS NULL""",
-                    (d, d, d, d, evidence_ids[(pid, d)], pid),
-                )
-                filled += cur.rowcount
-            batch.rows_inserted = len(evidence)
+            cur.execute("""CREATE TEMP TABLE tmp_birth_evidence
+                             (player_id integer NOT NULL, external_id text NOT NULL,
+                              dob date NOT NULL, occurrences integer NOT NULL) ON COMMIT DROP""")
+            with cur.copy("COPY tmp_birth_evidence (player_id, external_id, dob, occurrences) FROM STDIN") as copy:
+                for pid, path, d, occ in evidence:
+                    copy.write_row((pid, path, d, occ))
+            cur.execute(
+                """INSERT INTO player_birth_evidence
+                     (player_id, source_id, external_id, dob, evidence_type, confidence, occurrences, batch_id, notes)
+                   SELECT t.player_id, %s, min(t.external_id), t.dob, %s, 'sourced', sum(t.occurrences)::integer, %s, %s
+                     FROM tmp_birth_evidence t
+                    GROUP BY t.player_id, t.dob
+                   ON CONFLICT (player_id, source_id, dob) DO UPDATE
+                     SET occurrences = EXCLUDED.occurrences, batch_id = EXCLUDED.batch_id,
+                         external_id = EXCLUDED.external_id, notes = EXCLUDED.notes""",
+                (source_id, EVIDENCE_TYPE, batch.id, f"snapshot {args.label}"),
+            )
+            evidence_written = cur.rowcount
+            expected_evidence = len({(pid, d) for pid, _p, d, _o in evidence})
+            if evidence_written != expected_evidence:
+                raise RuntimeError(f"evidence upsert wrote {evidence_written} rows, expected {expected_evidence}")
+
+            cur.execute("""CREATE TEMP TABLE tmp_birth_fill
+                             (player_id integer PRIMARY KEY, dob date NOT NULL) ON COMMIT DROP""")
+            with cur.copy("COPY tmp_birth_fill (player_id, dob) FROM STDIN") as copy:
+                for pid, d, _path in fill:
+                    copy.write_row((pid, d))
+            cur.execute(
+                """UPDATE players p
+                      SET dob = f.dob, dob_confidence = 'sourced',
+                          birth_year = EXTRACT(YEAR FROM f.dob)::smallint,
+                          birth_year_min = EXTRACT(YEAR FROM f.dob)::smallint,
+                          birth_year_max = EXTRACT(YEAR FROM f.dob)::smallint,
+                          birth_year_confidence = 'sourced',
+                          dob_evidence_id = e.id
+                     FROM tmp_birth_fill f
+                     JOIN player_birth_evidence e
+                       ON e.player_id = f.player_id AND e.source_id = %s AND e.dob = f.dob
+                    WHERE p.id = f.player_id AND p.dob IS NULL""",
+                (source_id,),
+            )
+            filled = cur.rowcount
+            # Fail closed on the invariant the gates assume: nothing filled may lack its link.
+            cur.execute("SELECT count(*) FROM players WHERE dob IS NOT NULL AND dob_evidence_id IS NULL")
+            without_evidence = cur.fetchone()[0]
+            if without_evidence:
+                raise RuntimeError(f"{without_evidence} players carry a dob with no dob_evidence_id; refusing to commit")
+            batch.rows_inserted = evidence_written
             batch.rows_updated = filled
         pg.commit()
+    write_seconds = time.time() - t_write
 
     with pg.cursor() as cur:
         cur.execute("SELECT count(*) FILTER (WHERE dob IS NOT NULL), count(*) FROM players")
         with_dob, total = cur.fetchone()
-    print(f"  batch {batch.id}: evidence rows {len(evidence):,}, filled {filled:,}; players with dob "
-          f"{with_dob:,} / {total:,}; done in {time.time() - t0:.1f}s")
+    print(f"  batch {batch.id}: evidence rows {evidence_written:,}, filled {filled:,} (write {write_seconds:.1f}s); "
+          f"players with dob {with_dob:,} / {total:,}; done in {time.time() - t0:.1f}s")
     return 0
 
 

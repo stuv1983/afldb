@@ -1278,6 +1278,15 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const cm = requireInt(axis, 'cm', 'Centimetres');
       return sql`p.height_cm IS NOT NULL AND p.height_cm <= ${cm}`;
     }
+    // Completed years on debut day: the player's Nth birthday fell on or
+    // before the debut match. Ordinary date arithmetic, so a 29 February
+    // birthday lands on 28 February in a common year exactly as a person
+    // counts it. NULL on either side is unknown and never qualifies.
+    case 'age_on_debut_min': {
+      const years = requireInt(axis, 'years', 'Years');
+      return sql`p.dob IS NOT NULL AND c.debut_date IS NOT NULL
+        AND c.debut_date >= p.dob + make_interval(years => ${years})`;
+    }
 
     default:
       throw new Error(`Builder "${axis.builder}" has no compiler.`);

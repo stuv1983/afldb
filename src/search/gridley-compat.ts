@@ -176,7 +176,6 @@ const NO_BIRTHPLACE = 'AFLDB has no birthplace, nationality or state-of-origin c
 const NO_OTHER_CODE = 'other-code (NFL) careers and International Rules representation are not modelled';
 const NO_TIMELINE = 'no scoring-event timeline: an after-the-siren match winner cannot be derived';
 const NO_SPOILS = 'spoils are not a recorded AFLDB statistic (one_percenters is a different measure)';
-const NO_DOB = 'players.dob is populated for under 7% of players, so age on debut cannot be answered honestly';
 const NO_RECRUITER = 'recruiters and list managers are not modelled';
 
 /**
@@ -505,6 +504,12 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   // and is reported by the corpus regression, never guessed.
   height195: fixed('195cm', mapped('height_min', { cm: '195' })),
   height180: fixed('180cm', mapped('height_max', { cm: '180' })),
+  // "22+ YEARS OLD / ON DEBUT": completed years on debut day, from players.dob
+  // (fitzRoy per-match dates plus the AFL Tables all-time club lists, ISSUE-118
+  // Stage D1, tools/migration/enrich_birth_dates_afltables.py) and the derived
+  // player_career_stats.debut_date. A player with no recorded date never
+  // qualifies and is reported by the corpus regression, never guessed.
+  debut22: fixed('22+ YEARS OLD', mapped('age_on_debut_min', { years: '22' })),
 
   // -- attributes AFLDB does not hold ------------------------------------------
   brother: fixed('BROTHER', absent(NO_SIBLINGS)),
@@ -512,7 +517,6 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   tasmanian: fixed('TASMANIAN', absent(NO_BIRTHPLACE)),
   nfl: fixed('NFL 🏈', absent(NO_OTHER_CODE)),
   intrulesplayer: fixed("INT'L RULES", absent(NO_OTHER_CODE)),
-  debut22: fixed('22+ YEARS OLD', absent(NO_DOB)),
   season2024player: fixed('2024 LISTED PLAYER', absent(NO_LISTS)),
   winaftersiren: fixed('GAME WINNING', absent(NO_TIMELINE)),
 

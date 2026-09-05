@@ -128,6 +128,33 @@ describe('height builders (ISSUE-118 reopened)', () => {
   });
 });
 
+describe('age on debut (ISSUE-118 Stage D1)', () => {
+  const anyPlayer: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+
+  it('counts completed years on debut day and never qualifies an unknown date', async () => {
+    const [truth] = await sql<{ known: number; atLeast22: number; under22: number; onBirthday: number }[]>`
+      SELECT count(*) FILTER (WHERE p.dob IS NOT NULL AND c.debut_date IS NOT NULL)::int AS known,
+             count(*) FILTER (WHERE c.debut_date >= p.dob + interval '22 years')::int AS "atLeast22",
+             count(*) FILTER (WHERE c.debut_date <  p.dob + interval '22 years')::int AS "under22",
+             count(*) FILTER (WHERE c.debut_date = p.dob + interval '22 years')::int AS "onBirthday"
+        FROM players p JOIN player_career_stats c ON c.player_id = p.id
+    `;
+    expect(truth.known).toBeGreaterThan(0);
+    const older = await solveCellSummary({ builder: 'age_on_debut_min', params: { years: '22' } }, anyPlayer, 'games_asc');
+    expect(older.eligible).toBe(truth.atLeast22);
+    // Every player with both dates known is on exactly one side of the 22nd birthday; nobody without them is on either.
+    expect(truth.atLeast22 + truth.under22).toBe(truth.known);
+    // The bound is inclusive: a debut ON the 22nd birthday counts as 22, and is the exact difference from "23 or older" minus the 22-year-olds.
+    const from23 = await solveCellSummary({ builder: 'age_on_debut_min', params: { years: '23' } }, anyPlayer, 'games_asc');
+    const [between] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM players p JOIN player_career_stats c ON c.player_id = p.id
+       WHERE c.debut_date >= p.dob + interval '22 years' AND c.debut_date < p.dob + interval '23 years'`;
+    expect(older.eligible - from23.eligible).toBe(between.n);
+    // A debut on the birthday itself is inside "22 or older" (inclusive) and outside "23 or older".
+    expect(between.n).toBeGreaterThanOrEqual(truth.onBirthday);
+  });
+});
+
 describe('grid solver correctness', () => {
   it('solves the mapped ISSUE-076 won-final grid within the four-second safety margin', async () => {
     const [identity] = await sql<{

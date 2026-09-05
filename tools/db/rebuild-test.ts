@@ -151,6 +151,12 @@ export const WIKIPEDIA_HEIGHT_LOADER = 'tools/migration/enrich_heights_wikipedia
 /** The tracked Wikipedia height adjudication set (ISSUE-118 §23.19), keyed by AFL Tables profile. */
 export const WIKIPEDIA_HEIGHT_CSV = join('data', 'players', 'height-evidence-wikipedia.csv');
 const AFL_API_CONTRACT = join('tools', 'rebuild', 'afl_api', 'afl-api-contract.json');
+/**
+ * AFLDB-ISSUE-118 §23.24 Stage D1. The birth-date loader and the direct AFL Tables
+ * acquisition contract that pins the accepted all-time club-list snapshot it reads.
+ */
+export const BIRTH_DATE_LOADER = 'tools/migration/enrich_birth_dates_afltables.py';
+const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
   'data/brownlow/season-votes.manifest.json',
@@ -507,6 +513,21 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       kind: 'data',
       run: 'command',
       argv: wikipediaHeightsArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.24 Stage D1. players.dob from the AFL Tables all-time club
+      // player lists — the very pages the accepted register came from, but keeping the
+      // DOB column and the profile hrefs fitzRoy 1.8.0 drops. Manifest-pinned snapshot
+      // (tools/rebuild/afltables/afltables-contract.json club_player_lists
+      // .accepted_snapshot), joined to players ONLY through the afltables profile-url
+      // identities `fitzroy` registered; fills dob only where NULL, records every date
+      // seen as evidence, never overwrites a fitzRoy date. No network.
+      id: 'birth-dates',
+      name: `BIRTH DATES — AFL Tables club lists, ${afltablesClubListPin().label}`,
+      kind: 'data',
+      run: 'command',
+      argv: birthDatesArgv(python),
       envOverlay: dataEnv,
     },
     {
@@ -990,7 +1011,8 @@ const MEASURED_SQL: Record<string, string> = {
 const MEASURED_NOT_DB_GATED: Record<string, string> = {
   players_with_dob:
     'birth dates arrive via player_birth_evidence and DOB enrichment (ISSUE-090), so a raw '
-    + 'count is not this baseline’s claim; gated offline by the importer and register.',
+    + 'count is not this baseline’s claim; gated offline by the importer and register. The '
+    + 'rebuilt total is gated by the birth-dates stage (players_with_dob_after_birth_dates).',
   players_with_dob_conflict: 'same evidence model as players_with_dob.',
 };
 
@@ -1070,6 +1092,10 @@ export function finalValidationChecks(
   // AFLDB-ISSUE-118 §23.19. Added together with the HEIGHTS stages, for the same
   // §H15.5 reason. The expected values are read from the contracts' pin blocks.
   for (const check of heightChecks()) checks.push(check);
+
+  // AFLDB-ISSUE-118 §23.24. Added together with the BIRTH DATES stage, for the same
+  // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
+  for (const check of birthDateChecks()) checks.push(check);
 
   return checks;
 }
@@ -1556,6 +1582,18 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + 'acquire_rosters.R --from 2012 --to <season>. Nothing has been destroyed.\n'
       + `${roster.stdout}${roster.stderr}`);
   }
+  // AFLDB-ISSUE-118 §23.24. The birth-date stage reads a third acquired snapshot whose
+  // raw bytes are gitignored: prove the pin binding (inside afltablesClubListPin) and
+  // every parsed and raw artefact hash offline, before destruction.
+  const birthDates = deps.runCommand(birthDatesValidateArgv(), {});
+  if (birthDates.status !== 0) {
+    throw new RebuildRefused(
+      `Birth-date preflight failed (${BIRTH_DATE_LOADER} --validate-only). The AFL Tables `
+      + `contract pins '${afltablesClubListPin().label}', but its acquired bytes are missing, `
+      + 'incomplete or do not match the manifest. Re-acquire it with '
+      + 'tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
+      + `${birthDates.stdout}${birthDates.stderr}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1747,6 +1785,109 @@ export function heightChecks(): FinalCheck[] {
     { key: 'players_with_wikipedia_height_evidence',
       sql: "SELECT count(DISTINCT e.player_id) FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key = 'wikipedia'",
       expected: wikipediaHeightRows() },
+  ];
+}
+
+export type AflTablesClubListPin = PinnedManifest & {
+  measured: {
+    playersWithDob: number;
+    dobWithoutEvidence: number;
+    playersWithClubListBirthEvidence: number;
+    clubListBirthConflictPlayers: number;
+    dobDisagreeingWithClubList: number;
+  };
+};
+
+/**
+ * AFLDB-ISSUE-118 §23.24. The accepted AFL Tables all-time club-list snapshot, from
+ * club_player_lists.accepted_snapshot; manifest binding proven on read (the contract
+ * records the LF hash, and manifestSha256 normalises line endings, so a CRLF checkout
+ * still proves). Never a default: no pin, no stage.
+ */
+export function afltablesClubListPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFLTABLES_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflTablesClubListPin {
+  const contract = readContract();
+  const lists = contract?.club_player_lists as Record<string, unknown> | undefined;
+  const accepted = lists?.accepted_snapshot as
+    { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
+      measured?: Record<string, unknown> } | undefined;
+  if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
+      || !accepted.measured) {
+    throw new RebuildRefused(
+      `${AFLTABLES_CONTRACT} records no accepted club-list snapshot `
+      + '(club_player_lists.accepted_snapshot with label, manifest, manifest_sha256_lf and '
+      + 'measured). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256_lf),
+  };
+  provePin(pin, 'The AFL Tables contract club_player_lists.accepted_snapshot block');
+  const measured = accepted.measured;
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(
+        `club_player_lists.accepted_snapshot.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    ...pin,
+    measured: {
+      playersWithDob: int('players_with_dob'),
+      dobWithoutEvidence: int('dob_without_evidence'),
+      playersWithClubListBirthEvidence: int('players_with_club_list_birth_evidence'),
+      clubListBirthConflictPlayers: int('club_list_birth_conflict_players'),
+      dobDisagreeingWithClubList: int('dob_disagreeing_with_club_list'),
+    },
+  };
+}
+
+export function birthDatesArgv(python: string = resolvePython()): string[] {
+  return [python, BIRTH_DATE_LOADER, '--label', afltablesClubListPin().label];
+}
+
+/** The same argv plus --validate-only: manifest and artefact hashes, no database. */
+export function birthDatesValidateArgv(python: string = resolvePython()): string[] {
+  return [...birthDatesArgv(python), '--validate-only'];
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.24. Dates of birth must survive a rebuild from scratch: the
+ * population with a date, the evidence-link invariant, the evidence coverage and the
+ * contract's documented conflict/disagreement state are pinned beside the snapshot that
+ * produced them. A rebuild that silently drops the stage, resolves fewer identities, or
+ * starts overwriting fitzRoy dates fails here.
+ */
+export function birthDateChecks(): FinalCheck[] {
+  const pin = afltablesClubListPin();
+  const clubListEvidence = "player_birth_evidence e JOIN sources s ON s.id = e.source_id "
+    + "WHERE s.key = 'afltables' AND e.evidence_type = 'afltables_club_list'";
+  return [
+    { key: 'players_with_dob_after_birth_dates',
+      sql: 'SELECT count(*) FROM players WHERE dob IS NOT NULL',
+      expected: pin.measured.playersWithDob },
+    { key: 'dob_without_evidence',
+      sql: 'SELECT count(*) FROM players WHERE dob IS NOT NULL AND dob_evidence_id IS NULL',
+      expected: pin.measured.dobWithoutEvidence },
+    { key: 'players_with_club_list_birth_evidence',
+      sql: `SELECT count(DISTINCT e.player_id) FROM ${clubListEvidence}`,
+      expected: pin.measured.playersWithClubListBirthEvidence },
+    { key: 'club_list_birth_conflict_players',
+      sql: `SELECT count(*) FROM (SELECT e.player_id FROM ${clubListEvidence} `
+        + 'GROUP BY e.player_id HAVING count(DISTINCT e.dob) > 1) c',
+      expected: pin.measured.clubListBirthConflictPlayers },
+    { key: 'dob_disagreeing_with_club_list',
+      sql: `SELECT count(DISTINCT e.player_id) FROM ${clubListEvidence} `
+        + 'AND EXISTS (SELECT 1 FROM players p WHERE p.id = e.player_id AND p.dob IS NOT NULL AND p.dob <> e.dob)',
+      expected: pin.measured.dobDisagreeingWithClubList },
   ];
 }
 

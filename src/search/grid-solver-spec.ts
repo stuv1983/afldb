@@ -415,6 +415,10 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // on either side of the bound; an unknown height is not a short one.
   height_min: { key: 'height_min', label: 'Height X cm or taller', group: 'Biography', params: [int('cm', 'Centimetres')] },
   height_max: { key: 'height_max', label: 'Height X cm or shorter', group: 'Biography', params: [int('cm', 'Centimetres')] },
+  // Age on debut in completed years, from players.dob and the derived
+  // player_career_stats.debut_date (AFLDB-ISSUE-118 §23.24/§23.25). Either
+  // unknown and the player never qualifies: an unknown age is not a young one.
+  age_on_debut_min: { key: 'age_on_debut_min', label: 'Aged X or older on debut', group: 'Biography', params: [int('years', 'Years')] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

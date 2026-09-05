@@ -52,7 +52,22 @@
     "artefact_rule": "One CSV per club under parsed/, values kept as the page prints them (no numeric coercion, blank stays blank); the raw HTML bytes kept under raw/ with their sha256. The manifest binds both.",
     "identity_rule": "profile_path is the profile href reduced exactly as tools/migration/import_fitzroy_core.py normalise_profile_url() reduces it ('../' removed, the https://afltables.com/afl/stats/ prefix stripped, no leading slash) and is the ONLY key a loader may join on. A rendered name is never identity. A profile_path that resolves to no canonical identity is reported and refused, never matched by name.",
     "duplicate_rule": "A profile_path may appear once per club page (a player has one row per club); the same profile_path across two club pages is the same person and must carry the same DOB — a disagreement is a loader finding, never silently resolved.",
-    "accepted_snapshot": { "label": "club-lists-20260905", "manifest": "docs/rebuild-manifests/afltables_club_lists/club-lists-20260905.json", "manifest_sha256_lf": "e6d5ae2632d6e066ff65cb951a13a335a6f876322a87a0cb501f5cde45503941", "accepted_on": "2026-09-05", "accepted_in": "AFLDB-ISSUE-118 §23.24", "evidence": "21 pages, 16,731 rows (the register's exact row count), 13,364 distinct profile paths, 0 cross-club date disagreements; on the rebuilt afldb_test 13,260 paths resolve to canonical identities, 104 do not (92 are 2026 debutants the 2025-terminal baseline lacks, 12 are profiles renumbered after 2026-09-02), 12,400 NULL dates fillable, 853 existing dates agree, 2 disagree (kept)" },
+    "accepted_snapshot": {
+      "label": "club-lists-20260905",
+      "manifest": "docs/rebuild-manifests/afltables_club_lists/club-lists-20260905.json",
+      "manifest_sha256_lf": "e6d5ae2632d6e066ff65cb951a13a335a6f876322a87a0cb501f5cde45503941",
+      "accepted_on": "2026-09-05",
+      "accepted_in": "AFLDB-ISSUE-118 §23.24",
+      "evidence": "21 pages, 16,731 rows (the register's exact row count), 13,364 distinct profile paths, 0 cross-club date disagreements; on the rebuilt afldb_test 13,260 paths resolve to canonical identities, 104 do not (92 are 2026 debutants the 2025-terminal baseline lacks, 12 are profiles renumbered after 2026-09-02), 12,400 NULL dates fillable, 853 existing dates agree, 2 disagree (kept)",
+      "measured": {
+        "$comment": "What the rebuild's `birth-dates` stage must reproduce on the accepted fitzRoy baseline + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts birthDateChecks) and never type them. players_with_dob = 855 fitzRoy per-match dates + 12,400 filled here; dob_without_evidence must be 0 (every date carries dob_evidence_id); players_with_club_list_birth_evidence = every canonical player a page row reached (13,255 = 13,260 resolved paths less the 5 blank cells); club_list_birth_conflict_players = players reached with two different page dates (never filled; 0 in this capture); dob_disagreeing_with_club_list = players whose retained fitzRoy date differs from the page's (Roan Steele afldb 11043, Jack Hayes afldb 6330 — recorded, adjudication is a separate decision).",
+        "players_with_dob": 13255,
+        "dob_without_evidence": 0,
+        "players_with_club_list_birth_evidence": 13255,
+        "club_list_birth_conflict_players": 0,
+        "dob_disagreeing_with_club_list": 2
+      }
+    },
     "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf} by the session that accepts a capture for the rebuild's birth-date stage; the rebuild refuses a missing or mismatched pin, exactly like afl-api-contract.json roster.accepted_snapshot."
   }
 }

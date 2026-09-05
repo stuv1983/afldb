@@ -3583,7 +3583,7 @@ the ISSUE-136 mechanism, out of the contract's four tracked rules, reported not 
 AFL Tables 2001-10-22; Jack Hayes afldb 6330: 1997-03-06 vs 1996-03-06 — kept as fitzRoy's, both evidence rows
 recorded, adjudication is a separate decision); page-conflict players 0. **Loaded (batch 21, 1,658 s single-statement over the tunnel): evidence rows 13,255, filled 12,400; players with `dob` 855 → 13,255 of 13,273, `dob_without_evidence` 0, 18 still NULL (13 pre-2026 profiles with no resolvable page row, 5 blank cells).** DEV not loaded (next session, after the stage exists).
 
-**Not yet done (the rest of the family, next session):** (a) the rebuild stage `birth-dates` after
+**Not yet done as of this section ((a) and (b) done in §23.25; (c) DEV load still open):** (a) the rebuild stage `birth-dates` after
 `heights-wikipedia` with the contract pin read fail-closed, `--validate-only` in the preflight, and gates
 (`players_with_dob`, `dob_without_evidence = 0`, `players_with_club_list_birth_evidence`) plus the
 `tests/db-test-rebuild.test.ts` order/argv pins — and **batch the writes** (`executemany`/COPY): the
@@ -3593,3 +3593,105 @@ single-statement loop took ~25 minutes through the 55432 tunnel, which is fine b
 denominators, a `grid-solver` test, then the corpus; (c) DEV load. AFL Tables dates remain evidence with
 fitzRoy's as the existing value where both exist; a precedence decision for the 2 disagreements is recorded, not
 taken.
+
+### 23.25 Stage D1 completed — `birth-dates` in the rebuild, batched writes, `age_on_debut_min` and `debut22` (5 September 2026, seventh session, Fable medium)
+
+**Rebuild stage — `tools/db/rebuild-test.ts`.** New data stage `birth-dates` directly after `heights-wikipedia`
+and before `draftguru` (it joins only through the afltables identities `fitzroy` registered; nothing later reads
+`dob`). Its argv is `enrich_birth_dates_afltables.py --label <pin>` where the pin is read fail-closed by
+`afltablesClubListPin()` from `tools/rebuild/afltables/afltables-contract.json`
+`club_player_lists.accepted_snapshot` (`label`, `manifest`, `manifest_sha256_lf`, `measured`): a missing block,
+a manifest absent from the checkout, a manifest that does not hash to its LF binding (`manifestSha256` normalises
+CRLF, so an autocrlf checkout still proves) or a non-integer measured value is a `RebuildRefused` before anything
+is destroyed. The preflight runs the derived `--validate-only` argv (every parsed and raw artefact hash, 0.1 s,
+no database) beside the three height preflights. Five final-validation gates read the contract's new `measured`
+block and are never typed into the runner: `players_with_dob_after_birth_dates` = 13,255 (the key is distinct
+from the fitzRoy register's `players_with_dob` = 855, which stays in `MEASURED_NOT_DB_GATED` — the register's
+claim is fitzRoy's own dates, the stage's claim is the rebuilt total), `dob_without_evidence` = 0,
+`players_with_club_list_birth_evidence` = 13,255, `club_list_birth_conflict_players` = 0 (players reached with
+two different page dates, never filled) and `dob_disagreeing_with_club_list` = 2 (the retained fitzRoy dates of
+Roan Steele 11043 and Jack Hayes 6330 — the documented unresolved state, pinned so a silent overwrite or a
+silent adjudication fails the rebuild). `tests/db-test-rebuild.test.ts`: order pins 16 → 17 stages / 10 → 11
+data stages, a `birth dates` block (argv derivation, ordering, refusal on no pin / tampered hash / missing
+manifest / missing measured value, preflight refusal with `Nothing has been destroyed`, gate keys and their
+place after the height gates): **251/251**.
+
+**Batched loader writes — `tools/migration/enrich_birth_dates_afltables.py`.** The per-row loop (13,255
+`INSERT … RETURNING` + 12,400 `UPDATE` round trips, 1,658 s over the 55432 tunnel in §23.24) is replaced by two
+`COPY`s into `ON COMMIT DROP` temp tables, one keyed upsert (`ON CONFLICT (player_id, source_id, dob)`, grouped
+by player and date so two paths reaching one player with the same date collapse to one evidence row with
+summed occurrences — the loop let the last path win; this capture has none) and one join `UPDATE … FROM` that
+sets `dob_evidence_id` from the player's own evidence row of the same date and touches only `dob IS NULL`.
+Fail-closed additions inside the transaction: the upsert's rowcount must equal the distinct (player, date)
+pairs, and `count(*) WHERE dob IS NOT NULL AND dob_evidence_id IS NULL` must be 0, or the batch rolls back and is
+recorded `failed`. Reconciliation, identity rules and the never-overwrite rule are unchanged. **Timings on
+`afldb_test`:** rerun on the already-loaded database (batch 22) — evidence rows 13,255 upserted, **filled 0**,
+write 1.2 s, 1.9 s end to end (idempotence proven); inside the rebuild (batch 10, clean database) — evidence rows
+13,255, **filled 12,400**, write 2.7 s, 3.4 s end to end. Same counts as the hand-run §23.24 load to the row.
+
+**Rebuild gate, unattended, 17 stages.** `npm run db:test:rebuild -- --acknowledge-destroy afldb_test
+--allow-owner-import-dsn --draftguru-label annual-html-20260902` with `AFLDB_PYTHON` = the workstation Python
+3.12, psql 16 on PATH, the tunnel on 55432 and the §23.19 snapshot junctions; launched 13:31:21, `Rebuild
+complete.` 13:54:40 — **23 min 19 s**. No loader, contract or artefact was edited while it ran (the debut22
+solver/test edits below touch nothing the rebuild reads). Stage output: identities 13,275, paths resolved 13,260,
+unresolved 104, fill 12,400, existing agree 853, disagree 2, page-conflict players 0. **FINAL VALIDATION PASSED:
+58 checks** (53 of §23.23 + the five above, each `= expected`). `players` is 13,271 at the stage (the two
+DraftGuru-only 2026 draftees arrive later), 13,273 at validation; 18 players remain without a date (13 pre-2026
+profiles with no resolvable page row, 5 blank cells) exactly as §23.24 predicted.
+
+**`age_on_debut_min` — the builder (`src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`).**
+Group `Biography`, label "Aged X or older on debut", one integer param `years`. Compiles to
+`p.dob IS NOT NULL AND c.debut_date IS NOT NULL AND c.debut_date >= p.dob + make_interval(years => N)`: completed
+years on debut day, inclusive of the birthday itself, ordinary date arithmetic (a 29 February birthday lands on
+28 February in a common year), and an unknown date on either side never qualifies. `c` is the
+`player_career_stats` relation every axis already joins; `debut_date` is `min(match_date)` from
+`rebuild_derived.py`. `GRID_BUILDERS` 151 → 152. **Gridley `debut22`** ("22+ YEARS OLD / ON DEBUT", 1
+occurrence, board 171 row 2) maps to `age_on_debut_min {years: 22}` in `gridley-compat.ts`; the `NO_DOB`
+data-absent reason is deleted. Nothing reads Gridley's answer key; the result is derived from canonical `dob` +
+`debut_date` only. Population on the rebuilt `afldb_test`: 13,255 players with both dates, **4,416 aged 22 or
+more on debut**, 8,839 under 22, 3 who debuted on their 22nd birthday (inside the bound), 16 with a debut and no
+date (never qualify).
+
+**Tests.** `tests/gridley-compat.test.ts` denominators re-pinned: mapped occurrences 6,754 → **6,755**, mapped
+distinct 819 → **820**, data-absent occurrences 103 → **102**, data-absent distinct 19 → **18**, `debut22 [1]`
+removed from the named list, a `map('debut22', '22+ YEARS OLD', 'ON DEBUT')` assertion added.
+`tests/grid-solver-spec.test.ts` builder count 152. `tests/integration/grid-solver.test.ts` new block `age on
+debut`: the solver's eligible count equals the SQL truth for ≥ 22, every player with both dates is on exactly one
+side of the 22nd birthday, and ≥22 minus ≥23 equals the SQL count of 22-year-old debutants (inclusive lower
+bound proven): **191/191** on the rebuilt database. `tests/integration/gridley-corpus.test.ts`: a `dobs` dataset
+gap (present when at least half of `players` carry `dob`, the draft-link threshold) so `age_on_debut_min` is
+reported as `dataset gap` rather than a wrong answer on a database without the stage (afldb_dev today). Unit
+suites 282/282; `tsc --noEmit` clean; eslint on the touched files reports only the pre-existing `no-explicit-any`
+findings (same counts at HEAD).
+
+**Corpus, before → after, on the same rebuilt `afldb_test`.** Diagnostic (1,164/1,164, 294.0 s): cells solved
+**9,626 → 9,629** of 10,287; `unsupported` **309 → 306** (the three `debut22` cells); `time of board` 14,429 →
+14,431 (two players AFLDB lists on `debut22 × grandfinals2` whose second Grand Final came after the board date —
+the documented board-time semantics, on the other axis); `list membership` 839, `external source disagreement`
+202, `source conflict` 102, `dataset gap` 354 unchanged; **`incorrect known answer` 0**, timeouts 0, cells over
+1 s 16 (max 2.09 s, under the 4 s gate); `debut22` itself solved in 25 ms and the three cells in 41–174 ms; the
+one exactly-comparable cell (`debut22 × 2-1`) is 362 / 362. Strict (1,162/1,164, 293.1 s): the two acceptance
+assertions fail as designed and nothing else — **unsupported valid criteria 19 → 18**, failing cells 765 → **762**
+= `unsupported` 306 + `dataset gap` 354 + `source conflict` 102. Acceptance is still not met; the remaining
+work is data.
+
+**Not done / deviations.** (a) DEV load of the birth dates (`afldb_dev` still has fitzRoy's 855): a hand run of
+the loader against DEV or the next DEV rebuild — DEV is not semantic evidence, so nothing here depended on it.
+(b) The 2 fitzRoy/AFL Tables disagreements stay as recorded (fitzRoy retained, both evidence rows present,
+gate pinned at 2); adjudication is a separate decision. (c) The 12 renumbered profiles / 92 2026 debutants are
+unresolved by design until the fitzRoy baseline advances. (d) `age_on_debut_max` is not added — no Gridley
+criterion needs it and the brief was `debut22` only.
+
+**Files:** `tools/db/rebuild-test.ts`, `tools/rebuild/afltables/afltables-contract.json` (`measured` block),
+`tools/migration/enrich_birth_dates_afltables.py`, `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
+`src/search/gridley-compat.ts`, `tests/db-test-rebuild.test.ts`, `tests/gridley-compat.test.ts`,
+`tests/grid-solver-spec.test.ts`, `tests/integration/grid-solver.test.ts`, `tests/integration/gridley-corpus.test.ts`,
+`CHANGELOG.md`, `IssuesIndex.md`, this runbook.
+
+**Exact next action:** items 3–5 of §23.22 stand, renumbered: (1) the height `source conflict` operator decision
+(3 players, 102 cells); (2) §23.17's remaining families — **coaches** from the snapshot's per-match coach column
+(`premcoach` 4, `coachedBy*` 12 occurrences), then **siblings / father–son** (`brother` 53, `fathersonfather` 3),
+then the model and curated-source decisions (`season2024player` 14, `irish`/`tasmanian`, `nfl`,
+`intrulesplayer`, `winaftersiren`, `spoils5season`, `recruitedByDodoro`); (3) DEV load of the birth dates;
+(4) production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian adjudication remains
+open.
