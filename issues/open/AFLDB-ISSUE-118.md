@@ -3436,7 +3436,7 @@ Owen Abrahams, Frank Curcio) given the profile they lacked (census "without iden
 
 **Corpus after Family B:** diagnostic run after the captaincy load (1,164/1,164): cells solved 9,626 of 10,287; `partial dataset` 506 → **0**; `unsupported` 309, `dataset gap` 354, `external source disagreement` 197, `source conflict` 102, `time of board` 14,429, `list membership` 839, timeouts 0 — and **`incorrect known answer` 5 cells / 1 player: Adam Goodes (afldb 35), `premiership_captain`**, previously hidden under `partial dataset` while the captain criteria carried the partial note. Those are bootstrap Sydney rows, not Family B rows: AFLDB records Goodes as a 2012 premiership co-captain (with Jarrad McVeigh) and Gridley's key omits him — a co-captaincy semantics question for the next session, recorded, not reclassified. The strict run fails on those 5 cells plus the 102 height source-conflict cells, the 309 unsupported and the 354 dataset-gap cells.
 
-### 23.22 Remaining unsupported criteria and the exact next action
+### 23.22 Remaining unsupported criteria and the exact next action (as recorded after §23.21 — items 1 and 2 done in §23.23)
 
 **Still unsupported (19 criteria, 103 occurrences; §23.17's other families, unchanged):** `brother` (53),
 `season2024player` (14), `intrulesplayer` (5), `premcoach` (4), `winaftersiren` (4), `coachedByWorsfold` (3),
@@ -3466,3 +3466,77 @@ link rule for Tony Buhagiar (§23.18 item 4, undecided).
    siblings/father–son, the model and curated-source decisions.
 5. Production receives migration 086 and the three height loaders, the seven medals and the six captaincy
    clubs with the next deploy (ISSUE-137 sequencing; measure DEV-style identity coverage with dry runs first).
+
+### 23.23 Rebuild gate passed unattended; premiership-captain co-captaincy decided (5 September 2026, sixth session, Fable medium)
+
+**Gate — the complete 16-stage graph, unattended, from this worktree.** `npm run db:test:rebuild --
+--acknowledge-destroy afldb_test --allow-owner-import-dsn --draftguru-label annual-html-20260902` with
+`AFLDB_PYTHON` = the workstation Python 3.12 (psycopg 3.3.5), psql 16 on PATH, the tunnel on 55432 and the
+snapshot junctions of §23.19 H4; launched detached 11:46:10, `Rebuild complete.` at 12:08 — **22 minutes**, the
+fitzRoy stage taking ~15 minutes (the 3 hours of the H4 attempt were the tunnel, not the stage). Offline
+preflight re-proved the register, the 130 player_stats files, the 15 roster artefacts and the Wikipedia CSV
+before the reset. No loader, contract or artefact was edited while it ran. Every stage ran in order:
+precheck, recreate, migrations, privileges, reference, fitzroy, **heights (batch 7: filled 12,487, evidence
+rows 12,487, rejections 110), heights-afl-api (batch 8: 1,824 rows over 1,824 players), heights-wikipedia
+(batch 9: 83 rows)**, draftguru, awards-honours (medals 1,307, captaincies 1,774, definitions 46),
+brownlow-season (16,120 rows, 79,113 votes), derived, coleman (46), ladder-witness ("All checks passed"),
+fingerprints. **FINAL VALIDATION PASSED: 53 checks**, including the five height gates and the medal and
+captaincy counts, exactly as §23.19 H4 predicted. Observation, not a defect: `players = 13,271` is the
+accepted fitzRoy baseline's distinct-player count; the table holds 13,273 because the `draftguru` stage
+creates two 2026 draftees with no senior game (Fred Rodriguez, Riley Onley, DraftGuru identities only).
+Item 1 of §23.22 is closed; the H4 caveat ("not yet proven by an unattended run") no longer applies.
+
+**Corpus on the clean rebuild, unchanged test (run 1, diagnostic, 1,163/1,164, 294.8 s):** cells solved 9,626
+of 10,287; `time of board` 14,429, `list membership` 839, `external source disagreement` 197, `source
+conflict` 102, `unsupported` 309, `dataset gap` 354, **`incorrect known answer` 5**, timeouts 0, cells over
+1 s 16 (max 2.07 s) — identical to §23.21's numbers, so the rebuild reproduces the hand-continued database.
+The 5 failing cells are all one player on one criterion: Adam Goodes (Gridley 25 = afldb 35),
+`premcaptain` × 2000s (#30, #284), × 1990s (#53), × 2010s (#183), × goals1avgseason (#183).
+
+**Co-captaincy — the determination (item 2 of §23.22), from the stored oracle, the tracked source and the
+rebuilt canonical facts; `afldb_dev` deliberately not used as evidence.**
+
+| Evidence | What it says |
+|---|---|
+| Gridley's stored description (`tests/fixtures/gridley/corpus.json`, `premcaptain`) | "Won a premiership while captaining the team." — the same words the solver's comment uses |
+| Gridley's answer key | Goodes absent from all 5 cells he would satisfy. Cell counts (Gridley / AFLDB on the rebuilt `afldb_test`): 2000s 17 / 18, 2010s 14 / 16, 1990s 13 / 15, 40+ disposals 8 / 10, 1+ goal season average 53 / 52, Collingwood 15 / 14, Essendon 12 / 11; WC 4 / 4, ME 10 / 10, RI 12 / 12, GE 9 / 9, HW 9 / 9, 3× premiership player 25 / 25. The differences fit one pattern: Gridley omits the Sydney co-captains (Goodes 2012; Kirk and Barry 2005 are unbridged, visible only in the counts) and includes the Grand-Final-day captain of flags whose appointed captain did not play (Collingwood 1958) and the 1897 Essendon premiership decided without a Grand Final |
+| Tracked source, `data/awards/captaincies.csv` (Wikipedia captain lists) | Sydney 2005–2007: Barry Hall, Brett Kirk, Leo Barry (plus Stuart Maxfield 2003–2005), note "Barry Hall 2005 premiership captain"; Sydney 2011–2012: Adam Goodes, Jarrad McVeigh, note "Jarrad McVeigh 2012 premiership captain"; Western Bulldogs: Robert Murphy 2015–2017 with "Easton Wood 2016 premiership captain" on Wood's own 2018 row. The source lists every appointed captain and designates one "premiership captain" per flag in free text. The role vocabulary is `{Captain}` (`captaincies.py`); AFLDB holds no premiership-captain designation as data |
+| Canonical facts on the rebuilt `afldb_test` | Premierships with more than one linked captain: 1917 Collingwood (McHale, Wilson — both played), 1968 Carlton (Nicholls played; Barassi did not), 2005 Sydney (Hall, Kirk, Barry played; Maxfield did not), 2012 Sydney (Goodes, McVeigh — both played), 2024 and 2025 Brisbane Lions (Andrews, Neale — both played). Premierships where **no** listed captain played the Grand Final: 1915 Carlton (Billy Dick), 1958 Collingwood (Frank Tuck), 1977 North Melbourne (Keith Greig), 2004 Port Adelaide (Matthew Primus), 2016 Western Bulldogs (Robert Murphy). 1897 and 1924 have only `semi_final` rows: no Grand Final was played |
+| AFLDB's premiership rule | `rebuild_derived.py`: a premiership is "a game in a grand final whose result the player's club won"; `premiership_player`, `premierships_min`, `premiership_between_seasons` and `premiership_captain` all apply it, so 1897/1924 are excluded everywhere consistently |
+
+**Decision.** Gridley's `premcaptain` means *the* premiership captain — one person per flag, the captain of
+record on Grand Final day. AFLDB's `premiership_captain` means *a captain of the club that season who played
+in and won the Grand Final*, derived from canonical captaincies and match facts. Goodes was an appointed 2012
+co-captain (source-backed) who played the winning Grand Final (canonical fact): AFLDB's answer is true under its
+own documented semantics, and narrowing it would require a designation AFLDB holds only as a note, or an
+invented tie-break. **AFLDB's data and semantics are not wrong; the solver is unchanged; nothing is
+special-cased for Gridley.** The disagreement is definitional and is classified as such in the corpus
+regression from AFLDB's own evidence: `tests/integration/gridley-corpus.test.ts` now loads, from
+`captaincies` ⋈ `matches` ⋈ `player_match_stats`, every player who shared a premiership club-season with
+another linked captain where all of them played and won the Grand Final, and a `premiership_captain` cell in
+which AFLDB lists such a player and Gridley omits him is `external source disagreement` (informational) with
+the co-captains named in the detail. The rule never reads Gridley's answer, and a co-captain Gridley *lists*
+while AFLDB omits would still fail. Cross-check with the counts: the rule reclassifies exactly the 5 Goodes
+cells and nothing else.
+
+**Corpus after the classification (run 2, diagnostic, 1,164/1,164, 301.0 s):** cells solved 9,626 of 10,287;
+`incorrect known answer` **5 → 0**; `external source disagreement` 197 → **202** (the 5 Goodes cells, each
+"co-captain of Sydney 2012 with Jarrad McVeigh (all played and won the Grand Final)"); every other category
+unchanged (`time of board` 14,429, `list membership` 839, `source conflict` 102, `unsupported` 309, `dataset
+gap` 354); timeouts 0; cells over 1 s 17 (max 2.07 s, under the 4 s gate). **Strict run (run 3, 295.4 s):** 1,162/1,164 — the two acceptance assertions fail as designed and nothing else: 19 unsupported valid criteria, and 765 failing cells = `unsupported` 309 + `dataset gap` 354 + `source conflict` 102; `incorrect known answer` 0, timeouts 0, no cell over 4 s. Acceptance is still not met; the remaining work is data (§23.17 families, the height operator decision, the test dataset lag), not solver correctness.
+
+**Recorded, not fixed (canonical follow-up, outside this family):** the Grand-Final-day captain of the five
+flags whose appointed captain did not play (1915, 1958, 1977, 2004, 2016) is not in AFLDB at all — the
+source carries it only as a note on a different row (Wood) or not at all (Weideman 1958, Tredrea 2004). A
+"matchday captain" fact would need its own curated source and a deliberate role-vocabulary change
+(`captaincies.py` says so); it produces no bridged mismatch today because none of those players is
+player-valued in the corpus. `afldb_dev` shows the same 2005/2012 structure (historical comparison only;
+its 1,690 linked captaincies against 1,774 on `afldb_test` is dataset lag, not evidence).
+
+**Files:** `tests/integration/gridley-corpus.test.ts` (co-captaincy evidence map, classification branch,
+`INFORMATIONAL` text). No solver, loader, data or schema change.
+
+**Exact next action:** items 3–5 of §23.22 stand: (3) the height `source conflict` operator decision (3
+players, 102 cells); (4) §23.17's families in order — DOB stage + `age_on_debut_min`, coaches from the
+snapshot's per-match coach column, siblings/father–son, then the model and curated-source decisions; (5)
+production with the next deploy (ISSUE-137 sequencing).

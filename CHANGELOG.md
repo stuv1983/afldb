@@ -23,6 +23,7 @@ commit.
 - **Named medals:** Anzac, Showdown, Glendinning–Allan, Brett Kirk, Marcus Ashcroft, Goal of the Year, Mark of the Year — 7 definitions and 328 Wikipedia-cited winner rows in `data/awards/named-medals*.csv`; `import_awards.py` keeps row-level provenance (`draftguru` / `wikipedia`); `gridley-compat.ts` maps the seven Gridley ids to `award_winner`.
 - **Captaincies:** 399 rows for Geelong, Hawthorn, West Coast, Fitzroy, Brisbane Bears and University in `data/awards/captaincies.csv` (1,774 total, all linked on `afldb_test`); the Gridley captain criteria are no longer partial.
 - Identity census `data/awards/player-identity.csv` 1,745 → 1,863 rows (12 without a rebuild-stable identity, was 18).
+- **Rebuild gate proven (§23.23):** a clean unattended `db:test:rebuild` of the full 16-stage graph (heights, AFL API and Wikipedia evidence, medals, captaincies) completed in 22 minutes with FINAL VALIDATION 53/53. **Premiership captains:** Gridley's key names one premiership captain per flag; AFLDB's `premiership_captain` keeps its documented semantics (every appointed captain who played in and won the Grand Final) — the corpus regression now classifies a co-captain cell from AFLDB's own captaincy evidence as `external source disagreement`; `incorrect known answer` 5 → 0 on `afldb_test`, no solver or data change.
 
 
 ### AFLDB-ISSUE-118 Stage H2 — player heights from the AFL Tables register - 5 September 2026

@@ -189,11 +189,17 @@ const hallOfFameYears = new Map<number, number>();
  * from this evidence, never from Gridley's own answer.
  */
 const heightEvidence = new Map<number, { source: string; height: number }[]>();
+/**
+ * ISSUE-118 §23.23. AFLDB player id -> the co-captaincy AFLDB's own canonical data records for a
+ * premiership: more than one linked captain of the premier club that season, each of whom played in
+ * and won the Grand Final. Built from captaincies + match facts, never from Gridley's answer.
+ */
+const coCaptaincy = new Map<number, string>();
 /** Documented semantic differences between Gridley and AFLDB: reported and counted, never failed. */
 const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players); AFLDB models games played",
-  'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's; AFLDB's answer is corroborated and Gridley's is not (ISSUE-118 §23.19)",
+  'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23). AFLDB's answer is source-backed; the definitions differ",
 };
 /**
  * Data AFLDB (or this database) does not hold. These FAIL the run: the
@@ -223,7 +229,7 @@ async function eligibleSet(axis: GridAxisState): Promise<Set<number>> {
 }
 
 beforeAll(async () => {
-  const [clubs, venues, awards, players, hof, evidence, [probe]] = await Promise.all([
+  const [clubs, venues, awards, players, hof, evidence, coCaptains, [probe]] = await Promise.all([
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM club_organizations`,
     sql<{ name: string; id: number }[]>`SELECT canonical_name AS name, id FROM venues`,
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM awards`,
@@ -233,6 +239,20 @@ beforeAll(async () => {
     sql<{ playerId: number; inductedYear: number | null }[]>`SELECT player_id AS "playerId", inducted_year AS "inductedYear" FROM hall_of_fame WHERE player_id IS NOT NULL`,
     sql<{ playerId: number; source: string; height: number }[]>`SELECT e.player_id AS "playerId", s.key AS source, e.height_cm AS height
                                                                   FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key <> 'afltables'`,
+    // Premiership club-seasons with more than one linked captain who played in and won the Grand Final.
+    sql<{ playerId: number; season: number; club: string; others: string }[]>`
+      WITH prem AS (SELECT m.season, m.winner_club_id AS club_id, m.id AS match_id FROM matches m
+                     WHERE m.round_type = 'grand_final' AND m.winner_club_id IS NOT NULL),
+           caps AS (SELECT cp.season, cp.club_id, cp.player_id, p.display_name
+                      FROM captaincies cp JOIN players p ON p.id = cp.player_id
+                      JOIN prem ON prem.season = cp.season AND prem.club_id = cp.club_id
+                      JOIN player_match_stats pms ON pms.match_id = prem.match_id AND pms.player_id = cp.player_id
+                     WHERE cp.link_status_value IN ('unique', 'resolved'))
+      SELECT a.player_id AS "playerId", a.season, c.name AS club,
+             string_agg(b.display_name, ', ' ORDER BY b.display_name) AS others
+        FROM caps a JOIN caps b ON b.season = a.season AND b.club_id = a.club_id AND b.player_id <> a.player_id
+        JOIN clubs c ON c.id = a.club_id
+       GROUP BY a.player_id, a.season, c.name`,
     sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string }[]>`
       SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
@@ -252,6 +272,9 @@ beforeAll(async () => {
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
   for (const e of evidence) {
     const l = heightEvidence.get(e.playerId) ?? []; l.push({ source: e.source, height: e.height }); heightEvidence.set(e.playerId, l);
+  }
+  for (const r of coCaptains) {
+    coCaptaincy.set(r.playerId, `${coCaptaincy.get(r.playerId) ? `${coCaptaincy.get(r.playerId)}; ` : ''}co-captain of ${r.club} ${r.season} with ${r.others} (all played and won the Grand Final)`);
   }
   const lookups: GridleyLookups = {
     clubs: Object.fromEntries(clubs.map((c) => [c.slug, c.id])),
@@ -449,6 +472,17 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         // A club-count criterion in either direction: Gridley's own text counts a
         // trade-period move to a club the player never played for.
         else if (axisBuilders.some((b) => /^(one_club_player|multi_club_player|clubs_played_min)/.test(b))) category = 'list membership';
+        // ISSUE-118 §23.23. A premiership-captain cell where AFLDB lists a co-captain Gridley
+        // omits. Gridley's key names one premiership captain per flag (the tracked captain
+        // lists carry the same single designation as a note); AFLDB's canonical captaincies
+        // record every appointed captain, and the compile requires the player to have played
+        // in and won the Grand Final. Classified from AFLDB's own co-captaincy evidence, never
+        // from Gridley's answer: a definitional disagreement, reported, not failed.
+        else if (category === 'incorrect known answer' && axisBuilders.includes('premiership_captain')
+                 && inAfldb && !inGridley && coCaptaincy.has(afldbId)) {
+          findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; ${coCaptaincy.get(afldbId)}` });
+          continue;
+        }
         // ISSUE-118 §23.19. A height cell: Gridley's height source differs from the AFL
         // Tables register. Classify from the independent evidence AFLDB holds for the
         // player, never from Gridley's answer: corroborated on AFLDB's side of the bound
