@@ -33,7 +33,7 @@ import { decodeUrlState, encodeUrlState } from '@/lib/urlState';
 
 export type GridParamKind =
   | 'integer' | 'decimal' | 'season' | 'club' | 'venue' | 'player' | 'stat'
-  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent' | 'text';
+  | 'award' | 'draftType' | 'signingKind' | 'aaPosition' | 'matchEvent' | 'text' | 'coach';
 
 export type GridParamDef = {
   key: string;
@@ -142,6 +142,7 @@ export type GridBuilderDef = {
 const club = (label = 'Club'): GridParamDef => ({ key: 'club', label, kind: 'club' });
 const venue = (label = 'Venue'): GridParamDef => ({ key: 'venue', label, kind: 'venue' });
 const player = (label = 'Player'): GridParamDef => ({ key: 'player', label, kind: 'player' });
+const coach = (label = 'Coach'): GridParamDef => ({ key: 'coach', label, kind: 'coach' });
 const stat = (key = 'stat', label = 'Statistic'): GridParamDef => ({ key, label, kind: 'stat' });
 const int = (key: string, label: string): GridParamDef => ({ key, label, kind: 'integer' });
 const decimal = (key: string, label: string): GridParamDef => ({ key, label, kind: 'decimal' });
@@ -163,6 +164,7 @@ export const GRID_GROUP_ORDER = [
   'Rivalries & marquee matches',
   'Teammates',
   'Captaincy',
+  'Coaching',
   'Awards & honours',
   'Draft & recruitment',
   'Names & numbers',
@@ -324,6 +326,16 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // getPlayerOverlapSummary in db/queries/player-compare.ts.
   teammate_of: { key: 'teammate_of', label: 'Teammate of…', group: 'Teammates', params: [player()] },
   played_against: { key: 'played_against', label: 'Played against…', group: 'Teammates', params: [player()] },
+
+  // Coaching -- match_coaches is the coaching grain (ISSUE-118 §23.27): a
+  // player was coached by X when they played a match for a club while X was
+  // that club's coach for that exact match. Caretakers and mid-season
+  // changes need no special case; there are no season ranges to get wrong.
+  coached_by: { key: 'coached_by', label: 'Coached by…', group: 'Coaching', params: [coach()] },
+  // A player who, as a coach, coached the winning club in a Grand Final.
+  // Derived from the Grand Final result and that match's coaching
+  // assignment through the coach's proven player link; nothing stored.
+  premiership_coach: { key: 'premiership_coach', label: 'Premiership coach', group: 'Coaching', params: [] },
 
   // Captaincy -- club_captain/captain_between_seasons kept their original
   // keys and behaviour from V1 but are relabelled here: they were always

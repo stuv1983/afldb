@@ -929,6 +929,26 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE pms2.player_id = ${otherId})`;
     }
 
+    // -- Coaching (ISSUE-118 §23.27) -- match_coaches (match, club, coach) is
+    // the coaching grain; a coaching relationship exists per match played,
+    // so a caretaker's one game counts and a season range is never assumed.
+    case 'coached_by': {
+      const coachId = requireInt(axis, 'coach', 'Coach');
+      return sql`p.id IN (SELECT pms.player_id FROM player_match_stats pms
+                            JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+                           WHERE mc.coach_id = ${coachId})`;
+    }
+    case 'premiership_coach':
+      // The winning club's coach in a Grand Final, as a PLAYER: only a coach
+      // whose page proves a player identity ('unique' link) can be on a
+      // player grid at all. A drawn Grand Final has no winner and counts
+      // for nobody; the replay decides it.
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                            JOIN matches m ON m.id = mc.match_id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+                             AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)`;
+
     // -- Captaincy -- no CHECK constraint ties captaincies.player_id to
     // its link_status_value, so both are checked explicitly. -----------
     case 'club_captain': {

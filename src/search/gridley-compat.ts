@@ -49,6 +49,12 @@ export type GridleyPlayerRef = {
   champId: number | null;
 };
 
+export type GridleyCoachRef = {
+  criterionId: string;
+  /** The coach's name as Gridley titles the criterion (upper case, e.g. "JOHN WORSFOLD"). */
+  name: string;
+};
+
 export type GridleyLookups = {
   /** club_organizations.slug -> id */
   clubs: Record<string, number>;
@@ -58,6 +64,8 @@ export type GridleyLookups = {
   awards: Record<string, number>;
   /** AFLDB players.id for a player-valued criterion, or null when unresolvable. */
   resolvePlayer: (ref: GridleyPlayerRef) => number | null;
+  /** AFLDB coaches.id for a coach-valued criterion (exactly one coach of that name), or null. */
+  resolveCoach: (ref: GridleyCoachRef) => number | null;
 };
 
 export type GridleyUnsupportedCategory =
@@ -168,7 +176,6 @@ const WESTERN_DERBY: [string, string] = ['west-coast', 'fremantle'];
 const QCLASH: [string, string] = ['brisbane-lions', 'gold-coast'];
 const SYDNEY_DERBY: [string, string] = ['sydney', 'greater-western-sydney'];
 
-const NO_COACHES = 'AFLDB has no coaching data (no coaches table anywhere in the schema)';
 const NO_LISTS = 'AFLDB models games played, not season lists: a listed player with no game is not represented';
 const NO_SIBLINGS = 'player_relationships (migration 006) has never been populated on any environment';
 const NO_FATHER_LINK = 'father_son_selections has never been populated; draft_picks.signing_kind names the son, not the father';
@@ -381,7 +388,7 @@ export const GRIDLEY_RULES: Record<string, Rule> = {
   'premier1-2010s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2010', to: '2019' })),
   'premier1-2020s': fixed('PREMIERSHIP PLAYER', mapped('premiership_between_seasons', { from: '2020', to: '2029' })),
   premcaptain: fixed('PREMIERSHIP', mapped('premiership_captain')),
-  premcoach: fixed('PREMIERSHIP', absent(NO_COACHES)),
+  premcoach: fixed('PREMIERSHIP', mapped('premiership_coach')),
   bestfairestpremyear: fixed('B&F + PREMIERSHIP', mapped('best_and_fairest_in_premiership_season')),
 
   // -- venues ---------------------------------------------------------------
@@ -546,7 +553,15 @@ function playerRef(item: GridleyItem, gridleyPlayerId: number | null): GridleyPl
  */
 function mapPlayerCriterion(ctx: RuleContext): GridleyMapping | null {
   const { item, lookups } = ctx;
-  if (COACHED_BY_RE.test(item.id)) return absent(NO_COACHES);
+  if (COACHED_BY_RE.test(item.id)) {
+    // "COACHED BY WORSFOLD", titled with the coach's full name. Resolved to a
+    // coaches row (the AFL Tables coach-page person), never to a player: the
+    // relationship is match_coaches, and the coach may never have played.
+    const id = lookups.resolveCoach({ criterionId: item.id, name: item.title.trim() });
+    return id === null
+      ? unresolved(`coach "${item.title}" (${item.id}) not resolved`)
+      : mapped('coached_by', { coach: String(id) });
+  }
 
   const gfOpp = GF_OPP_ID_RE.exec(item.id);
   if (gfOpp) {

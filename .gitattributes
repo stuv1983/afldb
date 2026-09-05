@@ -22,3 +22,7 @@ data/brownlow/*.json            text eol=lf
 # must not rewrite a line ending inside them under any platform's checkout
 # rules. Nothing else in the repository hashes a file the source wrote.
 tests/fixtures/gridley/*.json   -text
+
+# AFLDB-ISSUE-118 Stage E2 — the tracked parsed coaches snapshot is hash-bound by its
+# manifest (parsed[].sha256), so its bytes must be identical on every platform.
+data/sources/afltables/coaches/**/*.csv  text eol=lf

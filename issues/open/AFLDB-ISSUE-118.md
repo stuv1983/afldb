@@ -3900,3 +3900,175 @@ acquiring the coaches snapshot first (label `coaches-<date>`, 386 pages, polite 
 before/after in a §23.28. Then siblings / father–son, the model and curated-source decisions, DEV load of the
 birth dates, production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian
 adjudication remains open.
+
+### 23.28 Stage E2 (coaches) — IMPLEMENTED: coach pages acquired, `coaches` + `match_coaches` canonical, rebuild stage, `coached_by` / `premiership_coach` (5 September 2026, ninth session, Fable medium)
+
+Implements §23.27 E2.3 items 3 → 6 exactly as decided; nothing in the model was redesigned. Every join is
+fail-closed on the accepted contract and nothing is matched by name.
+
+**E2.1 Source acquisition — `coaches-20260905`.** New adapter `tools/rebuild/afltables/acquire_coaches.py`
+(standard library only; the contract's HTTP policy — fitzRoy User-Agent, 1.5 s pacing, 20 s timeout, 3 bounded
+retries, robots.txt recorded, any non-200 terminal with no manifest written) reads the coaches index and every
+page it links: **386 index rows, 386 pages, 386 distinct names**, extraction 2026-09-05T06:36:13Z, robots.txt
+404. Parsed artefacts `parsed/coaches_index.csv` (the index row as printed: name, page href/path, teams, seasons,
+the H&A / finals / total W-D-L-T-% and PR/GF cells) and `parsed/coach_pages.csv` (page path, `<h1>` display
+name, `Born:` as printed, the Player Stats href and its normalised profile path, the Games Coached row count,
+the raw sha256) — **tracked** (`.gitignore` opts in only `data/sources/afltables/coaches/*/parsed/`,
+`.gitattributes` forces LF because the manifest hashes them); raw HTML (387 files) gitignored but hash-bound.
+Manifest copied to the tracked `docs/rebuild-manifests/afltables_coaches/coaches-20260905.json`
+(LF sha256 `3e78f473…`) and pinned as `coaches.accepted_snapshot` in `afltables-contract.json` with the
+`measured` block below. 368 pages carry a Player Stats profile, **18 do not** — the coach-only people
+(Worrall, Fagan, Craig, Cahill, Bolton, Kinnear, McCartney, Brittain, Todd, …), matching §23.27's "18 match
+nobody". Two source quirks handled without guessing: the index omits `</tr>` on its header row (the parser
+closes a row on the next start tag) and one page file has a space in its name ("Allan_La Fontaine.html", kept
+verbatim as identity; only the request line is percent-encoded).
+
+**E2.2 Four coach-page hrefs AFL Tables does not serve as printed — tracked, evidence-dated corrections.**
+The loader's first dry run refused four pages whose Player Stats link resolved to no `afltables` identity.
+Each was checked against the live site and the identities on the same day and recorded as a
+`coaches.profile_link_corrections` rule (exact `(coach_path, page_profile_path)` match, each rule must apply
+exactly once or the loader refuses — the `source_row_corrections` discipline): **Allan La Fontaine** (page
+links `Allan_La Fontaine.html` → HTTP 404; `Allan_La_Fontaine.html` is HTTP 200 and is the fitzRoy url column
+form, player 486); **Alan Belcher** (AFL Tables serves *both* `Alan_Belcher.html` and `Allan_Belcher.html`,
+each Born 2-Dec-1884; the coach page links the former, fitzRoy's url column is the latter, player 451 — one
+person, two paths; the fitzRoy path is AFLDB's identity); **John ONeil** (`John_ONeil.html` 404; `John_ONeill.
+html` 200, both pages Born 30-Aug-1935, player 7673); **Jim Toohey** (`Jim_Toohey.html` 404; the served
+profiles are `Jim_Toohey0` Born 23-Jul-1886 and `Jim_Toohey1` Born 1-Jun-1915; the coach page, Fitzroy 1920,
+prints 23-Jul-1886 → player 7202 — the date, not the name, selects). The rules and their evidence sit in the
+contract; the unit test proves a rule applies by exact page and href, exactly once, and refuses once its page
+is fixed upstream.
+
+**E2.3 Canonical schema — migration `087_coaches.sql`.** `coaches` (one row per person: `afltables_coach_path`
+unique, `name_key` = the snapshot's exact "Surname, Given" string unique, `display_name`, `given_name`,
+`surname`, `dob`, **`player_id` nullable → `players`** with `link_status_value` and a CHECK that a player is
+carried only under `unique`, `afltables_profile_path`, `source_games_coached` (evidence only, commented as
+never a total), source/record/batch/notes; one coach row per player at most) and **`match_coaches`**
+(`(match_id, club_id)` PK, `coach_id`, source/record/batch; a trigger refuses a club that is not one of the
+match's two). Games, W/D/L, finals, Grand Finals and premierships are derived, never stored. Registered
+`grant_app_read` + `grant_import_write` for both tables. Applied to `afldb_test` by `db:migrate:test` (087, 252
+ms) and reconciled by `db:privileges:test` (afldb_import 43 registered tables writable). No other branch tip
+carries an 087.
+
+**E2.4 Loader — `tools/migration/import_match_coaches.py`.** Verifies the coaches manifest (parsed always; raw
+whenever `raw/` is present — refusing a mismatch either way), then the baseline's and every pinned supplement's
+`player_stats` files (the heights stage's `verified_files`), `--validate-only` stopping there offline (8.3 s).
+Folds the per-match rows through `iter_player_stats` (row corrections applied) with the canonical
+`ClubResolver` to one string per `(match_key, club)` — **695,085 rows → 34,094 team-match groups, 32,452 with a
+coach, 1,642 without, 0 disagreements, 385 distinct strings, every one exactly one index name**. Resolves the
+match by `matches.match_key` (a key absent from a season the database holds refuses; a season the database
+does not hold at all is reported and skipped — the 418 supplement groups of 2026 on the 2025-terminal
+`afldb_test`), the club through the match's own two clubs, the coach page through the exact string, and the
+player **only** through the page's profile path → `external_identities` (continuity rules folded, the four
+tracked corrections applied). Upserts `coaches` (every page — the index-only coach and the two supplement-only
+coaches exist as people now) then `match_coaches` (temp-table COPY, set-based upsert, stale rows of this source
+removed) in one `import_batches` transaction. **On `afldb_test`: 386 coaches (368 linked, 18 coach-only),
+32,034 assignments; matches with both coaches 15,817 / one 400 / none 621** — exactly §23.27's measurement;
+cross-check: 364 of 386 pages' own Games Coached equal the canonical assignment count (the rest are the
+source's ≤1922/1940 gaps and 2026). Batch 23 in 12.7 s (write 4.4 s); a second run (batch 24) wrote the same
+386 / 32,034 with 0 stale removed — idempotent.
+
+**E2.5 Rebuild integration.** `tools/db/rebuild-test.ts`: `afltablesCoachesPin()` reads
+`coaches.accepted_snapshot` fail-closed (label, tracked manifest, LF hash proven, seven integer `measured`
+values); data stage **`coaches`** after `birth-dates` and before `draftguru` (argv = loader + pinned label +
+the baseline label + every `height_enrichment` supplement — the same pins the heights stage reads, so the two
+cannot disagree); preflight runs `--validate-only` before the destructive reset; **eight final gates**
+(`coaches`, `coaches_linked_to_players`, `coaches_unlinked`, `coaches_linked_outside_unique` = 0,
+`match_coaches`, `matches_with_both_coaches`, `matches_with_one_coach`, `matches_without_coach`), all read from
+the pin, none typed, none reading a name. Evaluated against the hand-loaded `afldb_test`: 8/8 PASS.
+`tests/db-test-rebuild.test.ts`: stage order 17 → 18 (data 11 → 12) and a `coaches` block (argv derivation,
+order, four pin refusals, preflight refusal, gate shape and registration).
+
+**E2.6 Grid Solver.** New param kind `coach` and group **Coaching**: `coached_by {coach}` — "the player
+appeared in a canonical match for a club while the specified coach was assigned to that club for that exact
+match" (`player_match_stats ⋈ match_coaches` on `(match_id, club_id)`, the `teammate_of` semi-join shape) —
+and `premiership_coach` (a `coaches` row with a proven `unique` player link and a `match_coaches` row on a
+`round_type = 'grand_final'` match whose `winner_club_id` is that row's club; a drawn Grand Final counts for
+nobody). `GRID_BUILDERS` 152 → 154. UI: `getCoachOptions()` (`src/db/queries/coaches.ts`, every coach with
+the season span of their assignments) feeds a select in `GridSolverForm` and the axis description on the page.
+`tests/integration/grid-solver.test.ts`: solver counts equal SQL truth for `coached_by` Goodwin (his 2013
+Essendon caretaker match included, every returned player in the truth set) and for `premiership_coach` (Leigh
+Matthews linked and present; the operator's coach-only list — Todd, Kinnear, Cahill, Brittain, Craig,
+McCartney, Bolton, plus Fagan — all `player_id` NULL / `unmatched`, no players row created): **195/195**.
+
+**E2.7 Gridley compatibility.** `gridley-compat.ts`: `GridleyLookups.resolveCoach` (exactly one `coaches` row
+by normalised display name — the eight are unique on the index; ambiguity → `unresolved`, an empty coaches
+table → `dataset gap`); `premcoach` → `premiership_coach`; `coachedBy*` → `coached_by` with the resolved coach.
+The `NO_COACHES` reason is gone. `tests/gridley-compat.test.ts` denominators: mapped 6,755 → 6,771 occurrences
+/ 820 → 828 criteria; **data-absent 102 → 86 occurrences, 18 → 10 criteria** (brother 53, season2024player
+14, intrulesplayer 5, winaftersiren 4, fathersonfather 3, irish 2, recruitedByDodoro 2, nfl 1, spoils5season 1,
+tasmanian 1).
+
+**E2.8 One semantic finding — Gridley's `coachedByGoodwin` is list-grain.** Board #752's key lists Dyson
+Heppell (4011) and Joe Daniher (7315) as coached by Goodwin. Goodwin's only Essendon assignment is the 2013
+round 23 caretaker match (Essendon v Richmond, 22 Essendon players); neither played in it (Heppell 19 games in
+2013, Daniher 5, none that day). Gridley's text — "Has played on an AFL team coached by Simon Goodwin. Includes
+teams coached in a caretaker capacity" — counts a player listed by the club in a season the coach coached a
+match for it; AFLDB's `coached_by` is a match the player played under that coach, as the brief specifies. The
+five cells are therefore the corpus's existing documented `list membership` difference (the same rule that
+already covers club, decade and teammate criteria), and `coached_by` was added to that classification's builder
+set with the case recorded beside it. **No data, predicate or answer was changed.**
+
+**E2.9 Evidence, before → after, same `afldb_test` (migration 087 + batch 23/24 by hand; the unattended
+rebuild below reproduces it).**
+
+| Measure | Before (§23.26) | After |
+|---|---:|---:|
+| `unsupported` cells / valid criteria | 306 / 18 | **258 / 10** |
+| unsupported occurrences (compat) | 102 | **86** |
+| cells solved | 9,629 / 10,287 | **9,677 / 10,287** |
+| `dataset gap` | 354 | 354 |
+| `source conflict` / `adjudicated source conflict` | 0 / 62 | 0 / 62 |
+| `external source disagreement` | 242 | 242 |
+| `list membership` | 839 | 844 (+5, E2.8) |
+| `incorrect known answer` | 0 | **0** |
+| timeouts / cells over 1 s | 0 / 18 | 0 / 15 (strict run; 18 in the diagnostic run) |
+| strict failing cells | 660 | **612** = `unsupported` 258 + `dataset gap` 354 |
+| `GRID_BUILDERS` | 152 | 154 |
+| rebuild stages / data stages / final gates | 17 / 11 / 58 | 18 / 12 / 66 |
+
+Diagnostic 1,164/1,164 (292 s); strict 1,162/1,164, failing only on the two acceptance assertions
+(`unsupported` 258, `dataset gap` 354). §23.27 expected 306 → 290 cells: the eight criteria's 16 occurrences
+span 48 cells, so 258. `tests/db-test-rebuild.test.ts` 251 → **256/256**; `grid-solver-spec` + `gridley-compat`
+31/31; `coach-reconciliation` (new) 9/9; `integration/grid-solver` 195/195; `tsc --noEmit` clean; eslint clean
+on every touched file (the runner's and rebuild test's pre-existing `no-explicit-any` findings are outside the
+edited ranges).
+
+**E2.10 Rebuild gate, unattended, 18 stages.** `npm run db:test:rebuild -- --acknowledge-destroy afldb_test
+--allow-owner-import-dsn --draftguru-label annual-html-20260902` with `AFLDB_PYTHON` = the workstation Python
+3.12, psql 16 on PATH and the tunnel on 55432; launched detached 16:55:07, `Rebuild complete.` 17:17:14 —
+**22 min 7 s**. Offline preflight (the coaches `--validate-only` among them) before destruction; COACHES after
+BIRTH DATES: 386 index rows / 386 pages verified, raw bytes verified (387 files), 386 coaches (368 linked, 18
+coach-only), 32,034 assignments (15,817 / 400 / 621), cross-check 364 / 386, batch 11 in 11.9 s. **FINAL
+VALIDATION PASSED: 66 checks** (58 of §23.25 + the eight coach gates, each `= expected`). On the rebuilt
+database: the eight gates 8/8 by direct evaluation; the operator's coach-only list (Todd, Kinnear, Cahill,
+Brittain, Craig, McCartney, Bolton) and Fagan all `player_id` NULL / `unmatched`; Ron Barassi → player 11243,
+Leigh Matthews → 8474, Mark Williams → 9150, each `unique` through their page's profile path, never the name.
+
+**Not done / deviations.** (a) DEV (`afldb_dev`) carries neither migration 087 nor the coaches; DEV is not
+semantic evidence. (b) `tests/integration/privileges.test.ts` fails one assertion on `afldb_test` both hand-migrated and after the
+clean rebuild, unrelated to this stage: `external_grids` / `external_grid_axes` are writable but unregistered
+because migration 080 (§20–§21) grants `afldb_import` a narrow INSERT on them deliberately outside the registry
+and the suite's exclusion list was never extended — recorded as **`AFLDB-ISSUE-138`** (test-only; no privilege
+is wrong); `coaches` and `match_coaches` are registered and writable and the other 34 assertions pass. (c) The coach page's Games Coached count is stored as evidence only; the 22 pages whose count differs
+from the canonical assignments are the source's own ≤1922/1940 gaps and 2026, reported, not gated. (d) The
+index's per-coach totals are kept in the parsed artefact for provenance and read by nothing.
+
+**Files:** `tools/rebuild/afltables/acquire_coaches.py` (new), `tools/rebuild/afltables/afltables-contract.json`
+(`coaches` block: rules, corrections, pin), `docs/rebuild-manifests/afltables_coaches/coaches-20260905.json`
+(new), `data/sources/afltables/coaches/coaches-20260905/parsed/*.csv` (new, tracked), `.gitignore`,
+`.gitattributes`, `src/db/migrations/087_coaches.sql` (new), `tools/migration/import_match_coaches.py` (new),
+`tools/db/rebuild-test.ts`, `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`,
+`src/db/queries/coaches.ts` (new), `src/app/grid-solver/page.tsx`, `src/app/grid-solver/GridSolverForm.tsx`,
+`src/search/gridley-compat.ts`, `tests/coach-reconciliation.test.ts` (new), `tests/db-test-rebuild.test.ts`,
+`tests/grid-solver-spec.test.ts`, `tests/gridley-compat.test.ts`, `tests/integration/grid-solver.test.ts`,
+`tests/integration/gridley-corpus.test.ts`, `tests/integration/gridley-oracle-bridge.ts`, `CHANGELOG.md`,
+`IssuesIndex.md`, `issues.md`, this runbook.
+
+**Exact next action (fresh session):** siblings / father–son from `data/players/father-son/` (inspect the
+`fathersonfather` and `brother` Gridley wording first; a reusable family-relationship model, explicit identity,
+fail closed on ambiguity), then after-the-siren (`data/records/after-siren/`, establish `winaftersiren`'s exact
+meaning), International Rules (`data/reference/international-rules/`, establish `intrulesplayer`'s meaning and
+inventory the scrape programmatically), `season2024player`, the Tony Buhagiar All-Australian adjudication;
+`spoils5season` and `recruitedByDodoro` stay deferred, `irish` / `tasmanian` / `nfl` presumptively deferred
+pending their exact semantics. DEV load of the birth dates and coaches; production with the next deploy
+(ISSUE-137 sequencing).

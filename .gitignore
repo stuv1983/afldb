@@ -71,6 +71,18 @@ next-env.d.ts
 !/data/reference/
 /data/reference/*
 !/data/reference/*.json
+# AFLDB-ISSUE-118 §23.27 Stage E2: the parsed AFL Tables coaches snapshot (index + coach
+# pages, two small CSVs per capture) is the rebuild's tracked input; the raw HTML beside
+# it stays local and is hash-bound by the tracked manifest under docs/rebuild-manifests/.
+!/data/sources/
+/data/sources/*
+!/data/sources/afltables/
+/data/sources/afltables/*
+!/data/sources/afltables/coaches/
+/data/sources/afltables/coaches/*
+!/data/sources/afltables/coaches/*/
+/data/sources/afltables/coaches/*/*
+!/data/sources/afltables/coaches/*/parsed/
 *.db
 *.db-journal
 *.db-wal

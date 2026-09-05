@@ -52,6 +52,7 @@ const STUB_LOOKUPS: GridleyLookups = {
     'anzac-medal', 'showdown-medal', 'glendinning-allan-medal', 'brett-kirk-medal', 'marcus-ashcroft-medal',
     'goal-of-the-year', 'mark-of-the-year'].map((a, i) => [a, 300 + i])),
   resolvePlayer: (ref) => (ref.gridleyPlayerId ?? 9000 + ref.name.length),
+  resolveCoach: (ref) => 7000 + ref.name.length,
 };
 
 type Occurrence = { board: number; orientation: 'row' | 'col'; position: number; item: GridleyItem; mapping: GridleyMapping };
@@ -140,17 +141,17 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     }).toEqual({
       occurrences: 6858,
       distinctCriteria: 839,
-      mappedOccurrences: 6755,
-      mappedDistinct: 820,
+      mappedOccurrences: 6771,
+      mappedDistinct: 828,
       freebieOccurrences: 1,
-      dataAbsentOccurrences: 102,
-      dataAbsentDistinct: 18,
+      dataAbsentOccurrences: 86,
+      dataAbsentDistinct: 10,
     });
     // Tracked debt, not a pass: ISSUE-118's acceptance is zero data-absent
     // valid criteria (issues/open/AFLDB-ISSUE-118.md §23). The exact figure
     // is pinned so it only ever moves deliberately, and the integration
     // corpus run fails while it is above zero.
-    expect(distinct(absentList)).toBeLessThanOrEqual(18);
+    expect(distinct(absentList)).toBeLessThanOrEqual(10);
   });
 
   it('names every data-absent criterion with its reason', () => {
@@ -167,11 +168,9 @@ describe('Gridley compatibility mapping -- exhaustive classification', () => {
     // data, not about the solver: see issues/open/AFLDB-ISSUE-118.md §Stage 2.
     expect(rows.map(([id, r]) => `${id} [${r.occurrences}]`)).toEqual([
       'brother [53]', 'season2024player [14]',
-      'intrulesplayer [5]', 'premcoach [4]',
-      'winaftersiren [4]', 'coachedByWorsfold [3]', 'fathersonfather [3]',
-      'coachedByDaniher [2]', 'coachedByHardwick [2]', 'coachedBySimpson [2]',
+      'intrulesplayer [5]',
+      'winaftersiren [4]', 'fathersonfather [3]',
       'irish [2]', 'recruitedByDodoro [2]',
-      'coachedByClarkson [1]', 'coachedByGoodwin [1]', 'coachedByMatthews [1]',
       'nfl [1]', 'spoils5season [1]', 'tasmanian [1]',
     ]);
     for (const [, r] of rows) expect(r.reason.length).toBeGreaterThan(20);
@@ -259,8 +258,11 @@ describe('Gridley semantics that are decided by arithmetic or lineage, not by lo
       .toMatchObject({ axis: { builder: 'teammate_of' } });
     expect(map('dustin-martin-gf-opp-2259', 'DUSTIN MARTIN', 'DEFEATED BY DUSTY IN A GF', 'player'))
       .toMatchObject({ axis: { builder: 'lost_grand_final_against', params: { player: '2259' } } });
+    // ISSUE-118 Stage E2: coach criteria resolve to a coaches row (the AFL Tables
+    // coach-page person), never to a player, and map onto match_coaches.
     expect(map('coachedByWorsfold', 'JOHN WORSFOLD', 'COACHED BY WORSFOLD', 'player'))
-      .toMatchObject({ status: 'unsupported', category: 'data_absent' });
+      .toMatchObject({ axis: { builder: 'coached_by', params: { coach: String(7000 + 'JOHN WORSFOLD'.length) } } });
+    expect(map('premcoach', 'PREMIERSHIP', 'COACH')).toMatchObject({ axis: { builder: 'premiership_coach' } });
   });
 
   it('normalises names the way the resolver compares them', () => {

@@ -156,6 +156,8 @@ const AFL_API_CONTRACT = join('tools', 'rebuild', 'afl_api', 'afl-api-contract.j
  * acquisition contract that pins the accepted all-time club-list snapshot it reads.
  */
 export const BIRTH_DATE_LOADER = 'tools/migration/enrich_birth_dates_afltables.py';
+/** AFLDB-ISSUE-118 §23.27 Stage E2: coaches + match_coaches from the pinned coach pages and the baseline's Coach column. */
+export const COACH_LOADER = 'tools/migration/import_match_coaches.py';
 const AFLTABLES_CONTRACT = join('tools', 'rebuild', 'afltables', 'afltables-contract.json');
 export const BROWNLOW_SEASON_PREFLIGHT_FILES = [
   'data/brownlow/season-votes.csv',
@@ -528,6 +530,22 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       kind: 'data',
       run: 'command',
       argv: birthDatesArgv(python),
+      envOverlay: dataEnv,
+    },
+    {
+      // AFLDB-ISSUE-118 §23.27 Stage E2. coaches (one row per person, keyed by the AFL
+      // Tables coach page; linked to a players row ONLY through the page's profile path
+      // and the afltables identities `fitzroy` registered — never by name) and
+      // match_coaches (match, club, coach) from the baseline's own per-match Coach
+      // column, reconciled to the pages by exact string. Manifest-pinned snapshot
+      // (afltables-contract.json coaches.accepted_snapshot); the tracked parsed
+      // artefacts are the input bytes. Needs matches, clubs and identities: after
+      // fitzroy; nothing later reads it. No network.
+      id: 'coaches',
+      name: `COACHES — AFL Tables coach pages ${afltablesCoachesPin().label} + ${fitzroy.label} Coach column`,
+      kind: 'data',
+      run: 'command',
+      argv: coachesImportArgv(fitzroy.label, python),
       envOverlay: dataEnv,
     },
     {
@@ -1097,6 +1115,10 @@ export function finalValidationChecks(
   // §H15.5 reason. The expected values are read from the AFL Tables contract's pin block.
   for (const check of birthDateChecks()) checks.push(check);
 
+  // AFLDB-ISSUE-118 §23.27. Added together with the COACHES stage, for the same §H15.5
+  // reason. The expected values are read from the AFL Tables contract's coaches pin.
+  for (const check of coachChecks()) checks.push(check);
+
   return checks;
 }
 
@@ -1594,6 +1616,21 @@ export function runPreflight(deps: Deps, opts: Options, source?: FitzroySource):
       + 'tools/rebuild/afltables/acquire_club_lists.R. Nothing has been destroyed.\n'
       + `${birthDates.stdout}${birthDates.stderr}`);
   }
+  // AFLDB-ISSUE-118 §23.27. The coaches stage reads the pinned coach-page snapshot (its
+  // parsed artefacts tracked, raw bytes gitignored) and the baseline's own player_stats
+  // files: prove the pin binding (inside afltablesCoachesPin) and every hash offline.
+  if (source) {
+    const coaches = deps.runCommand(coachesValidateArgv(source.label), {});
+    if (coaches.status !== 0) {
+      throw new RebuildRefused(
+        `Coaches preflight failed (${COACH_LOADER} --validate-only). The AFL Tables contract `
+        + `pins '${afltablesCoachesPin().label}', but its tracked artefacts, the baseline's `
+        + 'player_stats files or a pinned supplement are missing, incomplete or do not match '
+        + 'their manifests. Re-acquire the coach pages with '
+        + 'tools/rebuild/afltables/acquire_coaches.py. Nothing has been destroyed.\n'
+        + `${coaches.stdout}${coaches.stderr}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1888,6 +1925,113 @@ export function birthDateChecks(): FinalCheck[] {
       sql: `SELECT count(DISTINCT e.player_id) FROM ${clubListEvidence} `
         + 'AND EXISTS (SELECT 1 FROM players p WHERE p.id = e.player_id AND p.dob IS NOT NULL AND p.dob <> e.dob)',
       expected: pin.measured.dobDisagreeingWithClubList },
+  ];
+}
+
+export type AflTablesCoachesPin = PinnedManifest & {
+  measured: {
+    coaches: number;
+    coachesLinkedToPlayers: number;
+    coachesUnlinked: number;
+    matchCoaches: number;
+    matchesWithBothCoaches: number;
+    matchesWithOneCoach: number;
+    matchesWithoutCoach: number;
+  };
+};
+
+/**
+ * AFLDB-ISSUE-118 §23.27. The accepted AFL Tables coach-page snapshot, from
+ * coaches.accepted_snapshot; manifest binding proven on read (LF hash, so a CRLF
+ * checkout still proves). Never a default: no pin, no stage.
+ */
+export function afltablesCoachesPin(
+  readContract: () => Record<string, unknown> | null = () => {
+    const path = join(REPO_ROOT, AFLTABLES_CONTRACT);
+    return existsSync(path)
+      ? JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
+      : null;
+  },
+): AflTablesCoachesPin {
+  const contract = readContract();
+  const block = contract?.coaches as Record<string, unknown> | undefined;
+  const accepted = block?.accepted_snapshot as
+    { label?: unknown; manifest?: unknown; manifest_sha256_lf?: unknown;
+      measured?: Record<string, unknown> } | undefined | null;
+  if (!accepted?.label || !accepted.manifest || !accepted.manifest_sha256_lf
+      || !accepted.measured) {
+    throw new RebuildRefused(
+      `${AFLTABLES_CONTRACT} records no accepted coaches snapshot `
+      + '(coaches.accepted_snapshot with label, manifest, manifest_sha256_lf and '
+      + 'measured). The rebuild will not guess one.');
+  }
+  const pin = {
+    label: String(accepted.label), manifest: String(accepted.manifest),
+    sha256: String(accepted.manifest_sha256_lf),
+  };
+  provePin(pin, 'The AFL Tables contract coaches.accepted_snapshot block');
+  const measured = accepted.measured;
+  const int = (key: string): number => {
+    const v = measured[key];
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
+      throw new RebuildRefused(`coaches.accepted_snapshot.measured.${key} is not an integer.`);
+    }
+    return v;
+  };
+  return {
+    ...pin,
+    measured: {
+      coaches: int('coaches'),
+      coachesLinkedToPlayers: int('coaches_linked_to_players'),
+      coachesUnlinked: int('coaches_unlinked'),
+      matchCoaches: int('match_coaches'),
+      matchesWithBothCoaches: int('matches_with_both_coaches'),
+      matchesWithOneCoach: int('matches_with_one_coach'),
+      matchesWithoutCoach: int('matches_without_coach'),
+    },
+  };
+}
+
+/** The COACHES data stage: the pinned coach pages, the baseline and every pinned supplement. */
+export function coachesImportArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+  const argv = [python, COACH_LOADER, '--label', afltablesCoachesPin().label, '--fitzroy-label', fitzroyLabel];
+  for (const s of heightEnrichmentPins().supplements) argv.push('--supplement-label', s.label);
+  return argv;
+}
+
+/** The same argv plus --validate-only: manifests and artefact hashes, no database. */
+export function coachesValidateArgv(fitzroyLabel: string, python: string = resolvePython()): string[] {
+  return [...coachesImportArgv(fitzroyLabel, python), '--validate-only'];
+}
+
+/**
+ * AFLDB-ISSUE-118 §23.27. Coaching must survive a rebuild from scratch: every coach page
+ * as a person, the player links exactly those the pages prove (and no link outside a
+ * 'unique' status), the assignment count and the source's own coverage shape. A rebuild
+ * that drops the stage, links by name, or loses assignments fails here.
+ */
+export function coachChecks(): FinalCheck[] {
+  const pin = afltablesCoachesPin();
+  const perMatch = 'SELECT m.id, count(mc.match_id) AS n FROM matches m '
+    + 'LEFT JOIN match_coaches mc ON mc.match_id = m.id GROUP BY m.id';
+  return [
+    { key: 'coaches', sql: 'SELECT count(*) FROM coaches', expected: pin.measured.coaches },
+    { key: 'coaches_linked_to_players',
+      sql: "SELECT count(*) FROM coaches WHERE player_id IS NOT NULL AND link_status_value = 'unique'",
+      expected: pin.measured.coachesLinkedToPlayers },
+    { key: 'coaches_unlinked',
+      sql: 'SELECT count(*) FROM coaches WHERE player_id IS NULL',
+      expected: pin.measured.coachesUnlinked },
+    { key: 'coaches_linked_outside_unique',
+      sql: "SELECT count(*) FROM coaches WHERE player_id IS NOT NULL AND link_status_value <> 'unique'",
+      expected: 0 },
+    { key: 'match_coaches', sql: 'SELECT count(*) FROM match_coaches', expected: pin.measured.matchCoaches },
+    { key: 'matches_with_both_coaches',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 2`, expected: pin.measured.matchesWithBothCoaches },
+    { key: 'matches_with_one_coach',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 1`, expected: pin.measured.matchesWithOneCoach },
+    { key: 'matches_without_coach',
+      sql: `SELECT count(*) FROM (${perMatch}) x WHERE n = 0`, expected: pin.measured.matchesWithoutCoach },
   ];
 }
 

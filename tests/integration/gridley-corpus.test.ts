@@ -105,13 +105,39 @@ const PLAYER_OVERRIDES: Record<string, { name: string; debutSeason: number }> = 
  * solver failure, and the list of such criteria is asserted so a gap cannot
  * widen silently. On a database with the data, the list must be empty.
  */
-type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean };
+type DatasetGaps = { maxSeason: number; draftLinks: boolean; matchEvents: boolean; heights: boolean; dobs: boolean; coaches: boolean };
 const HEIGHT_BUILDERS = new Set(['height_min', 'height_max']);
 const DOB_BUILDERS = new Set(['age_on_debut_min']);
+const COACH_BUILDERS = new Set(['coached_by', 'premiership_coach']);
 const DRAFT_BUILDERS = new Set(['national_draft_pick_between', 'draft_pick_between', 'draft_year_between', 'draft_type_is', 'drafted_by_club', 'drafted_by_club_never_played', 'recruited_via', 'traded_min_times']);
 const MATCH_EVENT_BUILDERS = new Set(['match_event_played', 'match_event_min', 'match_event_won', 'match_event_played_between']);
 
 type PlayerRow = { id: number; displayName: string; givenName: string | null; surname: string | null; debutSeason: number | null; finalSeason: number | null };
+type CoachRow = { id: number; displayName: string };
+
+/**
+ * Coach resolution: by normalised full name against coaches.display_name (the AFL
+ * Tables coach-page person). Exactly one hit resolves; the eight Gridley coaches are
+ * unique names on the index. On a database with no coaches loaded every coach
+ * criterion is a dataset gap, never a guess.
+ */
+function buildCoachResolver(coaches: CoachRow[], unresolvedLog: string[], gapLog: string[]): (ref: { criterionId: string; name: string }) => number | null {
+  const byName = new Map<string, CoachRow[]>();
+  for (const c of coaches) {
+    const k = normalisePlayerName(c.displayName);
+    byName.set(k, [...(byName.get(k) ?? []), c]);
+  }
+  return (ref) => {
+    if (coaches.length === 0) {
+      gapLog.push(`${ref.criterionId}: this database holds no coaches`);
+      return null;
+    }
+    const candidates = byName.get(normalisePlayerName(ref.name)) ?? [];
+    if (candidates.length === 1) return candidates[0].id;
+    unresolvedLog.push(`${ref.criterionId}: coach "${ref.name}" matched ${candidates.length} coaches`);
+    return null;
+  };
+}
 
 function buildResolver(players: PlayerRow[], unresolvedLog: string[], gapLog: string[], maxSeason: number): (ref: GridleyPlayerRef) => number | null {
   const byName = new Map<string, PlayerRow[]>();
@@ -175,7 +201,7 @@ const criteria = new Map<string, CriterionRecord>();
 const findings: CellFinding[] = [];
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
-let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true };
+let gaps: DatasetGaps = { maxSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true };
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /** Criteria whose builder reads a dataset this database does not carry. */
@@ -210,7 +236,7 @@ const coCaptaincy = new Map<number, string>();
 /** Documented semantic differences between Gridley and AFLDB: reported and counted, never failed. */
 const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
-  'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players); AFLDB models games played",
+  'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played",
   'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23). AFLDB's answer is source-backed; the definitions differ",
   'adjudicated source conflict': "a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on",
 };
@@ -221,7 +247,7 @@ const INFORMATIONAL: Record<string, string> = {
  */
 const DATA_GAPS: Record<string, string> = {
   unsupported: 'the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required',
-  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth)',
+  'dataset gap': 'this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches)',
   'partial dataset': 'a mapped criterion whose builder reads a dataset its mapping note declares partial (none since AFLDB-ISSUE-118 §23.21 completed captaincies)',
   'source conflict': "a height cell where an independent source supports Gridley's side of the bound, or no independent source exists; AFLDB keeps the AFL Tables value (ISSUE-118 §23.19) but its answer is not proven, so the cell stays open",
 };
@@ -242,13 +268,14 @@ async function eligibleSet(axis: GridAxisState): Promise<Set<number>> {
 }
 
 beforeAll(async () => {
-  const [clubs, venues, awards, players, hof, evidence, profiles, coCaptains, [probe]] = await Promise.all([
+  const [clubs, venues, awards, players, coaches, hof, evidence, profiles, coCaptains, [probe]] = await Promise.all([
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM club_organizations`,
     sql<{ name: string; id: number }[]>`SELECT canonical_name AS name, id FROM venues`,
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM awards`,
     sql<PlayerRow[]>`SELECT p.id, p.display_name AS "displayName", p.given_name AS "givenName", p.surname,
                             c.debut_season AS "debutSeason", c.final_season AS "finalSeason"
                        FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id`,
+    sql<CoachRow[]>`SELECT id, display_name AS "displayName" FROM coaches`,
     sql<{ playerId: number; inductedYear: number | null }[]>`SELECT player_id AS "playerId", inducted_year AS "inductedYear" FROM hall_of_fame WHERE player_id IS NOT NULL`,
     sql<{ playerId: number; source: string; height: number }[]>`SELECT e.player_id AS "playerId", s.key AS source, e.height_cm AS height
                                                                   FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key <> 'afltables'`,
@@ -288,6 +315,8 @@ beforeAll(async () => {
     // ISSUE-118 Stage D1: fitzRoy alone dates ~6% of players (855); the birth-dates
     // rebuild stage takes it to ~99.9%. Half is the same threshold as draft links.
     dobs: Number(probe.dobs) * 2 >= Number(probe.players),
+    // ISSUE-118 Stage E2: the coaches rebuild stage loads every AFL Tables coach page.
+    coaches: coaches.length > 0,
   };
   for (const p of players) finalSeasons.set(p.id, p.finalSeason);
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
@@ -308,6 +337,7 @@ beforeAll(async () => {
     venues: Object.fromEntries(venues.map((v) => [v.name, v.id])),
     awards: Object.fromEntries(awards.map((a) => [a.slug, a.id])),
     resolvePlayer: buildResolver(players, unresolvedLog, gapLog, probe.maxSeason),
+    resolveCoach: buildCoachResolver(coaches, unresolvedLog, gapLog),
   };
 
   for (const b of boards) {
@@ -323,7 +353,8 @@ beforeAll(async () => {
         if ((!gaps.draftLinks && DRAFT_BUILDERS.has(mapping.axis.builder))
           || (!gaps.matchEvents && MATCH_EVENT_BUILDERS.has(mapping.axis.builder))
           || (!gaps.heights && HEIGHT_BUILDERS.has(mapping.axis.builder))
-          || (!gaps.dobs && DOB_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
+          || (!gaps.dobs && DOB_BUILDERS.has(mapping.axis.builder))
+          || (!gaps.coaches && COACH_BUILDERS.has(mapping.axis.builder))) gappedCriteria.add(item.id);
       } else if (mapping.status === 'unresolved' && gapLog.some((g) => g.startsWith(`${item.id}:`))) {
         gappedCriteria.add(item.id);
       }
@@ -357,7 +388,7 @@ describe('Gridley corpus -- criteria', () => {
     const empty = [...criteria.values()].filter((r) => r.set !== null && r.set.size === 0 && !gappedCriteria.has(r.id));
     expect(empty.map((r) => `${r.id} [${r.occurrences}] -> ${describeAxis(r.mapping)}`)).toEqual([]);
     // And a probed gap must actually be a gap here: on a complete database the list is empty.
-    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
+    if (gaps.draftLinks && gaps.matchEvents && gaps.heights && gaps.dobs && gaps.coaches && gaps.maxSeason >= 2026) expect([...gappedCriteria]).toEqual([]);
   });
 
   it('has no valid criterion left unsupported, and no probed dataset gap, unless run in diagnostic mode', () => {
@@ -496,7 +527,12 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
         let category: CellFinding['category'] = 'incorrect known answer';
         if (partial) category = 'partial dataset';
         else if (finalSeason === null || finalSeason >= boardYear || boardYear > gaps.maxSeason || inductedAfterBoard) category = 'time of board';
-        else if (inGridley && lackingIdx.length > 0 && lackingIdx.every((i) => /^(played_(for_club|in_decade)|teammate_of|wooden_spoon_season|minor_premiership_season)$/.test(axisBuilders[i]))) category = 'list membership';
+        // ISSUE-118 Stage E2: coached_by is the same shape. Gridley's "has played on a
+        // team coached by X" counts a player listed by the club in a season X coached a
+        // match for it (Heppell and Daniher under Goodwin's one 2013 Essendon game, which
+        // neither played in); AFLDB's coached_by is a match the player played while X was
+        // that club's coach for that exact match.
+        else if (inGridley && lackingIdx.length > 0 && lackingIdx.every((i) => /^(played_(for_club|in_decade)|teammate_of|wooden_spoon_season|minor_premiership_season|coached_by)$/.test(axisBuilders[i]))) category = 'list membership';
         // A club-count criterion in either direction: Gridley's own text counts a
         // trade-period move to a club the player never played for.
         else if (axisBuilders.some((b) => /^(one_club_player|multi_club_player|clubs_played_min)/.test(b))) category = 'list membership';

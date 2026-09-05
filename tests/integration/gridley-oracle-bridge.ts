@@ -71,6 +71,8 @@ export async function buildGridleyOracle(tag: string): Promise<GridleyOracle> {
     clubs: Object.fromEntries(clubs.map((c) => [c.slug, c.id])),
     venues: Object.fromEntries(venues.map((v) => [v.name, v.id])),
     awards: Object.fromEntries(awards.map((a) => [a.slug, a.id])),
+    // The oracle bridge scores height cells only; coach criteria never reach it.
+    resolveCoach: () => null,
     resolvePlayer: (ref) => {
       const c = byName.get(normalisePlayerName(ref.name)) ?? [];
       if (c.length !== 1) return null;

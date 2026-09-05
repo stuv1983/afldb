@@ -69,5 +69,129 @@
       }
     },
     "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf} by the session that accepts a capture for the rebuild's birth-date stage; the rebuild refuses a missing or mismatched pin, exactly like afl-api-contract.json roster.accepted_snapshot."
+  },
+  "coaches": {
+    "$comment": "AFLDB-ISSUE-118 Stage E2 (runbook §23.27). The accepted fitzRoy baseline's per-match Coach column names one coach per (match, club) but does not KEY the person: 16 of its 383 strings name two or three canonical players (Ron Barassi, Mark Williams …) and 18 name nobody who ever played. The AFL Tables coaches index (one page per person who coached, 386 on 2026-09-05, every name distinct) keys the person, and each coach page's 'Player Stats' link is the exact players/<L>/<Name>.html profile path external_identities already holds, so a coach who played joins the existing player row through AFLDB's own identity key and a coach who never played (no link) is a coach-only person with no player row. This family captures the index and every coach page; the loader (tools/migration/import_match_coaches.py) reconciles the snapshot column to these pages by EXACT string and refuses anything else.",
+    "contract_coaches_version": 1,
+    "family": "coach_pages",
+    "adapter": "tools/rebuild/afltables/acquire_coaches.py",
+    "index_endpoint": "https://afltables.com/afl/stats/coaches/coaches_idx.html",
+    "page_endpoint": "https://afltables.com/afl/stats/coaches/<coach file>",
+    "acquisition_kind": "coach_index_and_pages_snapshot",
+    "explicit_scope_only": true,
+    "scope_rule": "The whole index, every run: every coach row of the index's first table and every page it links. There is no partial mode; the loader refuses a manifest whose page count differs from its index row count.",
+    "scope_key_grammar": "coaches=<count>",
+    "index_required_header": [
+      "Coach",
+      "Teams",
+      "Seas",
+      "W",
+      "D",
+      "L",
+      "T",
+      "%",
+      "W",
+      "D",
+      "L",
+      "T",
+      "%",
+      "W",
+      "D",
+      "L",
+      "T",
+      "%",
+      "PR",
+      "GF"
+    ],
+    "index_header_rule": "The index's first table's second header row must equal index_required_header exactly (the first header row is the Home & Away / Finals / Total group row). A changed layout is a terminal failure.",
+    "index_row_rule": "A data row is a row whose Coach cell carries an href to a page in the coaches directory; every data row must carry one. The rendered name is kept verbatim as name_raw ('Surname, Given' — the exact form the fitzRoy Coach column prints) and must be unique across the index.",
+    "page_rule": "Each coach page must carry an <h1> (display_name), and its 'Player Stats' link, when present, is reduced to a profile_path exactly as club_player_lists.identity_rule reduces one. 'Born:' is kept as printed (blank when absent). games_coached is the number of rows of the page's 'Games Coached' table — the source's own count, kept only as cross-check evidence against the snapshot column and never as a total.",
+    "index_columns": [
+      "name_raw",
+      "coach_href",
+      "coach_path",
+      "teams",
+      "seasons",
+      "hna_w",
+      "hna_d",
+      "hna_l",
+      "hna_t",
+      "hna_pct",
+      "fin_w",
+      "fin_d",
+      "fin_l",
+      "fin_t",
+      "fin_pct",
+      "tot_w",
+      "tot_d",
+      "tot_l",
+      "tot_t",
+      "tot_pct",
+      "pr",
+      "gf"
+    ],
+    "page_columns": [
+      "coach_path",
+      "display_name",
+      "born_raw",
+      "player_href",
+      "profile_path",
+      "games_coached",
+      "raw_sha256"
+    ],
+    "artefact_rule": "parsed/coaches_index.csv (one row per index row, index_columns) and parsed/coach_pages.csv (one row per page, page_columns), LF line endings, values as the page prints them; these two parsed artefacts are TRACKED (the rebuild's input bytes) and the raw HTML under raw/ is gitignored but hash-bound in the manifest. The loader always verifies the parsed artefacts against the tracked manifest and verifies the raw bytes whenever raw/ is present.",
+    "identity_rule": "coach_path (coaches/<file>) is the coach's identity and profile_path the ONLY key a loader may use to link a coach to a player. A snapshot Coach string that is not exactly one index name_raw is refused; a profile_path that resolves to no canonical afltables identity is refused, never matched by name; a page with no Player Stats link is a coach-only person (player_id NULL, link_status unmatched).",
+    "profile_link_corrections": {
+      "$comment": "A coach page's Player Stats href that AFL Tables itself does not serve. Each rule names ONE coach page and the exact href its page prints, and supplies the profile path that IS served and that the fitzRoy url column (external_identities) holds. Applied by exact (coach_path, page_profile_path) match, never by name; every rule must match exactly one page of the accepted snapshot or the loader refuses, so a fixed page cannot leave a rule silently applying to nothing. Evidence is recorded per rule.",
+      "rules": [
+        {
+          "id": "allan-la-fontaine-space",
+          "coach_path": "coaches/Allan_La Fontaine.html",
+          "page_profile_path": "players/A/Allan_La Fontaine.html",
+          "canonical_profile_path": "players/A/Allan_La_Fontaine.html",
+          "evidence": "2026-09-05: GET https://afltables.com/afl/stats/players/A/Allan_La%20Fontaine.html is HTTP 404; GET .../players/A/Allan_La_Fontaine.html is HTTP 200 with <h1>Allan La Fontaine</h1>; the fitzRoy url column for his 1934-1946 Melbourne rows is the underscore form, which external_identities holds as player 486 on afldb_test."
+        },
+        {
+          "id": "alan-belcher-spelling",
+          "coach_path": "coaches/Alan_Belcher.html",
+          "page_profile_path": "players/A/Alan_Belcher.html",
+          "canonical_profile_path": "players/A/Allan_Belcher.html",
+          "evidence": "2026-09-05: AFL Tables serves BOTH players/A/Alan_Belcher.html (<h1>Alan Belcher</h1>) and players/A/Allan_Belcher.html (<h1>Allan Belcher</h1>), each with Born 2-Dec-1884; the coach page (Essendon 1910, Born 2-Dec-1884) links the former, the fitzRoy url column for his Essendon rows is the latter, which external_identities holds (player 451 on afldb_test). One person, two profile paths on the source; the fitzRoy path is AFLDB's identity."
+        },
+        {
+          "id": "john-oneil-spelling",
+          "coach_path": "coaches/John_ONeil.html",
+          "page_profile_path": "players/J/John_ONeil.html",
+          "canonical_profile_path": "players/J/John_ONeill.html",
+          "evidence": "2026-09-05: GET .../players/J/John_ONeil.html is HTTP 404; GET .../players/J/John_ONeill.html is HTTP 200 with <h1>John ONeill</h1>, Born 30-Aug-1935; the coach page (Geelong 1968, one match) prints Born 30-Aug-1935. external_identities holds the ONeill path (player 7673 on afldb_test)."
+        },
+        {
+          "id": "jim-toohey-unnumbered",
+          "coach_path": "coaches/Jim_Toohey.html",
+          "page_profile_path": "players/J/Jim_Toohey.html",
+          "canonical_profile_path": "players/J/Jim_Toohey0.html",
+          "evidence": "2026-09-05: GET .../players/J/Jim_Toohey.html is HTTP 404; the served profiles are Jim_Toohey0.html (Born 23-Jul-1886) and Jim_Toohey1.html (Born 1-Jun-1915); the coach page (Fitzroy 1920, one match) prints Born 23-Jul-1886, which is Jim_Toohey0 and no other. external_identities holds both numbered paths (players 7202 / 7203 on afldb_test); the date, not the name, selects 7202."
+        }
+      ]
+    },
+    "accepted_snapshot": {
+      "label": "coaches-20260905",
+      "manifest": "docs/rebuild-manifests/afltables_coaches/coaches-20260905.json",
+      "manifest_sha256_lf": "3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094",
+      "accepted_on": "2026-09-05",
+      "accepted_in": "AFLDB-ISSUE-118 §23.28",
+      "evidence": "386 index rows, 386 pages (extraction 2026-09-05T06:36:13Z), 386 distinct names; 368 pages link a Player Stats profile, 18 do not (the coach-only people: Worrall, Fagan, Craig, Cahill, Bolton, Kinnear, McCartney, Brittain, Todd …); every one of the accepted baseline's 383 Coach strings and the supplement's 2 resolve to an index name by exact string; 4 page hrefs AFL Tables does not serve as printed are corrected by the tracked profile_link_corrections on dated evidence; on the rebuilt afldb_test the 32,452 (match, club) groups with a coach fold to 32,034 assignments on the 16,838 baseline matches (418 groups are 2026 supplement rows of a season the baseline does not hold), 364 of 386 coach pages' own Games Coached equal the canonical assignment count (the rest are the source's pre-1923/1940 gaps and 2026).",
+      "measured": {
+        "$comment": "What the rebuild's `coaches` stage must reproduce on the accepted fitzRoy baseline + pinned supplement + this snapshot; the final validation gates read these (tools/db/rebuild-test.ts coachChecks) and never type them. coaches = every index page (a person exists whether or not the column names them yet); coaches_linked_to_players = pages whose Player Stats profile resolves through external_identities (link_status unique), coaches_unlinked = pages with no profile link (player_id NULL, no players row ever created); match_coaches = (match, club) assignments on canonical matches; the three match counts are the source's own coverage shape (both coaches / one / neither — gaps only before 1923 plus eleven 1940 records) and sum to the 16,838 baseline matches.",
+        "coaches": 386,
+        "coaches_linked_to_players": 368,
+        "coaches_unlinked": 18,
+        "match_coaches": 32034,
+        "matches_with_both_coaches": 15817,
+        "matches_with_one_coach": 400,
+        "matches_without_coach": 621
+      }
+    },
+    "accepted_snapshot_rule": "Set to {label, manifest, manifest_sha256_lf, accepted_on, accepted_in, evidence, measured} by the session that accepts a capture for the rebuild's coaches stage; the rebuild refuses a missing or mismatched pin, exactly like club_player_lists.accepted_snapshot."
   }
 }

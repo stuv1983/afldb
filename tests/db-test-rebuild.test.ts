@@ -28,7 +28,12 @@ import {
   awardsHonoursChecks,
   AFL_API_HEIGHT_LOADER,
   BIRTH_DATE_LOADER,
+  COACH_LOADER,
   afltablesClubListPin,
+  afltablesCoachesPin,
+  coachChecks,
+  coachesImportArgv,
+  coachesValidateArgv,
   birthDateChecks,
   birthDatesArgv,
   birthDatesValidateArgv,
@@ -754,7 +759,7 @@ describe('stage graph', () => {
     expect(idsOf(stages)).toEqual([
       'precheck', 'recreate', 'migrations', 'privileges',
       'reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia', 'birth-dates',
-      'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness',
+      'coaches', 'draftguru', 'awards-honours', 'brownlow-season', 'derived', 'coleman', 'ladder-witness',
       'fingerprints',
     ]);
   });
@@ -774,7 +779,7 @@ describe('stage graph', () => {
     // enrichment' below).
     expect(idsOf(stages.filter((s) => s.kind === 'data')))
       .toEqual(['reference', 'fitzroy', 'heights', 'heights-afl-api', 'heights-wikipedia',
-                'birth-dates', 'draftguru', 'awards-honours', 'brownlow-season', 'derived',
+                'birth-dates', 'coaches', 'draftguru', 'awards-honours', 'brownlow-season', 'derived',
                 'coleman']);
     const coleman = stages.find((s) => s.id === 'coleman')!;
     expect(coleman.argv).toEqual([
@@ -958,6 +963,94 @@ describe('stage graph', () => {
       expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
       // Added after the height gates, in stage order.
       expect(all.indexOf('players_with_dob_after_birth_dates')).toBeGreaterThan(all.indexOf('players_with_wikipedia_height_evidence'));
+    });
+  });
+
+  describe('coaches (AFLDB-ISSUE-118 §23.27 Stage E2)', () => {
+    const ids = idsOf(stages);
+    const coaches = stages.find((s) => s.id === 'coaches')!;
+    const contractPath = join(root, 'tools', 'rebuild', 'afltables', 'afltables-contract.json');
+
+    it('loads the coach-page snapshot the AFL Tables contract accepts, beside the baseline and every pinned supplement', () => {
+      const pin = afltablesCoachesPin();
+      expect(pin.label).toMatch(/^coaches-\d{8}$/);
+      const expected = [resolvePython(), COACH_LOADER, '--label', pin.label, '--fitzroy-label', FULL_LABEL];
+      for (const s of heightEnrichmentPins().supplements) expected.push('--supplement-label', s.label);
+      expect(coaches.argv).toEqual(expected);
+      expect(coachesImportArgv(FULL_LABEL)).toEqual(coaches.argv);
+      expect(coaches.name).toContain(pin.label);
+      expect(coaches.name).toContain(FULL_LABEL);
+      expect(coaches.envOverlay).toEqual({ AFLDB_IMPORT_DATABASE_URL: target().importDsn });
+      // The preflight argv is DERIVED from the data argv (the §28.4 rule).
+      expect(coachesValidateArgv(FULL_LABEL)).toEqual([...coaches.argv!, '--validate-only']);
+      expect(coaches.kind).toBe('data');
+      expect(coaches.argv!.join(' ')).not.toMatch(/legacy|sqlite|acquire/i);
+    });
+
+    it('follows birth-dates (matches, clubs and the afltables identities are all it joins on) and precedes draftguru', () => {
+      expect(ids.indexOf('fitzroy')).toBeLessThan(ids.indexOf('coaches'));
+      expect(ids.indexOf('birth-dates')).toBeLessThan(ids.indexOf('coaches'));
+      expect(ids.indexOf('coaches')).toBeLessThan(ids.indexOf('draftguru'));
+    });
+
+    it('refuses a contract with no pin, a tampered manifest hash, a moved manifest and a missing measured value', () => {
+      expect(() => afltablesCoachesPin(() => null)).toThrow(/no accepted coaches snapshot/);
+      expect(() => afltablesCoachesPin(() => ({ coaches: {} }))).toThrow(/no accepted coaches snapshot/);
+      expect(() => afltablesCoachesPin(() => ({ coaches: { accepted_snapshot: null } }))).toThrow(/no accepted coaches snapshot/);
+      const real = JSON.parse(readFileSync(contractPath, 'utf8'));
+      const tampered = structuredClone(real);
+      tampered.coaches.accepted_snapshot.manifest_sha256_lf = '0'.repeat(64);
+      expect(() => afltablesCoachesPin(() => tampered)).toThrow(/hashes to/);
+      const moved = structuredClone(real);
+      moved.coaches.accepted_snapshot.manifest = 'docs/rebuild-manifests/afltables_coaches/nope.json';
+      expect(() => afltablesCoachesPin(() => moved)).toThrow(/not in this checkout/);
+      const unmeasured = structuredClone(real);
+      delete unmeasured.coaches.accepted_snapshot.measured.coaches_unlinked;
+      expect(() => afltablesCoachesPin(() => unmeasured)).toThrow(/coaches_unlinked is not an integer/);
+      // The real pin proves: the tracked manifest hashes to its LF binding on any checkout.
+      const pin = afltablesCoachesPin();
+      expect(pin.measured.coaches).toBe(pin.measured.coachesLinkedToPlayers + pin.measured.coachesUnlinked);
+      expect(pin.measured.matchCoaches).toBe(2 * pin.measured.matchesWithBothCoaches + pin.measured.matchesWithOneCoach);
+    });
+
+    it('preflights the snapshot offline before the destructive stage and refuses on failure', () => {
+      const commands: string[][] = [];
+      const withFailing = (failing?: string): Deps => ({
+        ...fakeDeps().deps,
+        runCommand: (a: string[]) => {
+          commands.push(a);
+          if (failing && a.includes(failing)) return { status: 1, stdout: '', stderr: 'sha256 mismatch' };
+          if (a.includes(BROWNLOW_SEASON_LOADER)) return { status: 0, stdout: '{"ok": true}', stderr: '' };
+          return { status: 0, stdout: 'snapshot : x (42 year pages, sha256 verified)\npersons    : 5057\npicks      : 6810\n', stderr: '' };
+        },
+      });
+      runPreflight(withFailing(), OPTS, fitzroy());
+      const validate = commands.filter((a) => a.includes('--validate-only'));
+      expect(validate.some((a) => a.includes(COACH_LOADER) && a.includes(afltablesCoachesPin().label) && a.includes(FULL_LABEL))).toBe(true);
+      expect(() => runPreflight(withFailing(COACH_LOADER), OPTS, fitzroy()))
+        .toThrow(/Coaches preflight failed[\s\S]*Nothing has been destroyed/);
+    });
+
+    it('gates the rebuilt coaching on the contract pin: people, proven links only, assignments, coverage shape', () => {
+      const checks = coachChecks();
+      expect(checks.map((c) => c.key)).toEqual([
+        'coaches', 'coaches_linked_to_players', 'coaches_unlinked', 'coaches_linked_outside_unique',
+        'match_coaches', 'matches_with_both_coaches', 'matches_with_one_coach', 'matches_without_coach',
+      ]);
+      const byKey = Object.fromEntries(checks.map((c) => [c.key, c]));
+      const pin = afltablesCoachesPin();
+      expect(byKey.coaches.expected).toBe(pin.measured.coaches);
+      expect(byKey.coaches_linked_outside_unique.expected).toBe(0);
+      expect(byKey.match_coaches.expected).toBe(pin.measured.matchCoaches);
+      expect(byKey.coaches_linked_to_players.sql).toMatch(/link_status_value = 'unique'/);
+      expect(byKey.matches_without_coach.sql).toMatch(/LEFT JOIN match_coaches/);
+      for (const c of checks) expect(c.sql).not.toMatch(/display_name|surname|name_key/); // never a name
+      const register = JSON.parse(readFileSync(
+        join(root, 'data', 'reference', 'fitzroy-accepted-baselines.json'), 'utf8'));
+      const all = finalValidationChecks(register).map((c) => c.key);
+      expect(all).toEqual(expect.arrayContaining(checks.map((c) => c.key)));
+      // Added after the birth-date gates, in stage order.
+      expect(all.indexOf('coaches')).toBeGreaterThan(all.indexOf('dob_disagreeing_with_club_list'));
     });
   });
 

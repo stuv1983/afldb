@@ -1,0 +1,387 @@
+name_raw,coach_href,coach_path,teams,seasons,hna_w,hna_d,hna_l,hna_t,hna_pct,fin_w,fin_d,fin_l,fin_t,fin_pct,tot_w,tot_d,tot_l,tot_t,tot_pct,pr,gf
+"Malthouse, Mick",Mick_Malthouse.html,coaches/Mick_Malthouse.html,FO WC CW CA,1984-2015,379,5,282,666,57.28,27,2,23,52,53.85,406,7,305,718,57.03,3,8*
+"McHale, Jock",Jock_McHale.html,coaches/Jock_McHale.html,CW,1912-1949,440,8,207,655,67.79,26,2,30,58,46.55,466,10,237,713,66.06,7,16
+"Sheedy, Kevin",Kevin_Sheedy.html,coaches/Kevin_Sheedy.html,ES GW,1981-2013,366,6,263,635,58.11,23,,20,43,53.49,389,6,283,678,57.82,4,7
+"Jeans, Allan",Allan_Jeans.html,coaches/Allan_Jeans.html,SK HW RI,1961-1992,335,2,198,535,62.80,22,,19,41,53.66,357,2,217,576,62.15,4,9
+"Hafey, Tom",Tom_Hafey.html,coaches/Tom_Hafey.html,RI CW GE SY,1966-1988,312,2,166,480,65.21,24,2,16,42,59.52,336,4,182,522,64.75,4,10*
+"Parkin, David",David_Parkin.html,coaches/David_Parkin.html,HW CA FI,1977-2000,287,2,193,482,59.75,19,,17,36,52.78,306,2,210,518,59.27,4,6
+"Barassi, Ron",Ron_Barassi0.html,coaches/Ron_Barassi0.html,ME CA NM SY,1964-1995,259,3,220,482,54.05,17,1,15,33,53.03,276,4,235,515,53.98,4,9*
+"Clarkson, Alastair",Alastair_Clarkson.html,coaches/Alastair_Clarkson.html,HW NM,2005-2026,232,5,209,446,52.58,16,,10,26,61.54,248,5,219,472,53.07,4,5
+"Matthews, Leigh",Leigh_Matthews.html,coaches/Leigh_Matthews.html,CW BL,1986-2008,250,7,177,434,58.41,17,1,9,27,64.81,267,8,186,461,58.79,4,5
+"Smith, Norm",Norm_Smith.html,coaches/Norm_Smith.html,FI ME SM,1949-1972,237,7,184,428,56.19,16,,8,24,66.67,253,7,192,452,56.75,6,8
+"Reynolds, Dick",Dick_Reynolds.html,coaches/Dick_Reynolds.html,ES,1939-1960,254,4,120,378,67.72,21,2,14,37,59.46,275,6,134,415,66.99,4,12*
+"Bentley, Perce",Perce_Bentley.html,coaches/Perce_Bentley.html,RI CA,1934-1955,243,5,147,395,62.15,10,,9,19,52.63,253,5,156,414,61.71,3,5
+"Kennedy, John",John_Kennedy0.html,coaches/John_Kennedy0.html,HW NM,1957-1989,225,5,164,394,57.74,11,,7,18,61.11,236,5,171,412,57.89,3,5
+"Lyon, Ross",Ross_Lyon.html,coaches/Ross_Lyon.html,SK FR,2007-2026,206,4,167,377,55.17,9,1,11,21,45.24,215,5,178,398,54.65,,4*
+"Worsfold, John",John_Worsfold.html,coaches/John_Worsfold.html,WC ES,2002-2020,187,3,179,369,51.08,7,,12,19,36.84,194,3,191,388,50.39,1,2
+"Scott, Chris",Chris_Scott.html,coaches/Chris_Scott.html,GE,2011-2026,244,3,103,350,70.14,16,,17,33,48.48,260,3,120,383,68.28,2,4
+"Hardwick, Damien",Damien_Hardwick.html,coaches/Damien_Hardwick.html,RI GC,2010-2026,195,6,159,360,55.00,11,,7,18,61.11,206,6,166,378,55.29,3,3
+"Hughes, Frank",Frank_Hughes1.html,coaches/Frank_Hughes1.html,RI ME,1927-1965,226,3,119,348,65.37,18,1,11,30,61.67,244,4,130,378,65.08,5,11*
+"Eade, Rodney",Rodney_Eade.html,coaches/Rodney_Eade.html,SY WB GC,1996-2017,178,5,175,358,50.42,7,,12,19,36.84,185,5,187,377,49.73,,1
+"Minogue, Dan",Dan_Minogue.html,coaches/Dan_Minogue.html,RI HW CA SK FI,1920-1942,193,2,148,343,56.56,9,,7,16,56.25,202,2,155,359,56.55,2,3
+"Walls, Robert",Robert_Walls.html,coaches/Robert_Walls.html,FI CA BB RI,1981-1997,156,2,175,333,47.15,6,,8,14,42.86,162,2,183,347,46.97,1,2
+"Pagan, Denis",Denis_Pagan.html,coaches/Denis_Pagan.html,KA CA,1993-2007,161,2,159,322,50.31,14,,8,22,63.64,175,2,167,344,51.16,2,3
+"Longmire, John",John_Longmire.html,coaches/John_Longmire.html,SY,2011-2024,194,3,108,305,64.10,14,,14,28,50.00,208,3,122,333,62.91,1,5
+"Northey, John",John_Northey.html,coaches/John_Northey.html,SY ME RI BB BL,1985-1998,146,4,145,295,50.17,11,,9,20,55.00,157,4,154,315,50.48,,1
+"Hickey, Reg",Reg_Hickey.html,coaches/Reg_Hickey.html,GE,1932-1959,175,3,108,286,61.71,9,,9,18,50.00,184,3,117,304,61.02,3,4
+"Hinkley, Ken",Ken_Hinkley.html,coaches/Ken_Hinkley.html,PA,2013-2025,168,,114,282,59.57,6,,9,15,40.00,174,,123,297,58.59,,
+"Scott, Brad",Brad_Scott.html,coaches/Brad_Scott.html,NM ES,2010-2026,131,1,151,283,46.47,4,,4,8,50.00,135,1,155,291,46.56,,
+"Thompson, Mark",Mark_Thompson.html,coaches/Mark_Thompson.html,GE ES,2000-2014,162,4,98,264,62.12,11,,8,19,57.89,173,4,106,283,61.84,2,3
+"Rose, Bob",Bob_Rose.html,coaches/Bob_Rose.html,CW FO,1964-1986,160,4,104,268,60.45,3,,11,14,21.43,163,4,115,282,58.51,,3
+"Worrall, John",John_Worrall.html,coaches/John_Worrall.html,CA ES,1902-1920,152,4,107,263,58.56,13,,3,16,81.25,165,4,110,279,59.86,5,6
+"Beveridge, Luke",Luke_Beveridge.html,coaches/Luke_Beveridge.html,WB,2015-2026,150,1,112,263,57.22,8,,6,14,57.14,158,1,118,277,57.22,1,2
+"Williams, Mark",Mark_Williams2.html,coaches/Mark_Williams2.html,PA,1999-2010,142,2,112,256,55.86,8,,9,17,47.06,150,2,121,273,55.31,1,2
+"Kyne, Phonse",Phonse_Kyne.html,coaches/Phonse_Kyne.html,CW,1950-1963,152,2,98,252,60.71,9,,11,20,45.00,161,2,109,272,59.56,2,6
+"Roos, Paul",Paul_Roos.html,coaches/Paul_Roos.html,SY ME,2002-2016,128,2,122,252,51.19,9,,7,16,56.25,137,2,129,268,51.49,1,2
+"Stephen, Bill",Bill_Stephen.html,coaches/Bill_Stephen.html,FI ES,1955-1980,83,2,171,256,32.81,1,,1,2,50.00,84,2,172,258,32.95,,
+"Blight, Malcolm",Malcolm_Blight.html,coaches/Malcolm_Blight.html,NM GE AD SK,1981-2001,124,,103,227,54.63,15,,8,23,65.22,139,,111,250,55.60,2,5
+"Wallace, Terry",Terry_Wallace.html,coaches/Terry_Wallace.html,WB RI,1996-2009,114,4,122,240,48.33,2,,5,7,28.57,116,4,127,247,47.77,,
+"Simpson, Adam",Adam_Simpson.html,coaches/Adam_Simpson.html,WC,2014-2024,115,1,114,230,50.22,7,,5,12,58.33,122,1,119,242,50.62,1,2
+"Fagan, Chris",Chris_Fagan.html,coaches/Chris_Fagan.html,BL,2017-2026,133,2,84,219,61.19,12,,8,20,60.00,145,2,92,239,61.09,2,3
+"Whitten, Ted",Ted_Whitten0.html,coaches/Ted_Whitten0.html,FO,1957-1971,89,,136,225,39.56,2,,1,3,66.67,91,,137,228,39.91,,1
+"Daniher, Neale",Neale_Daniher.html,coaches/Neale_Daniher.html,ME,1998-2007,102,1,108,211,48.58,6,,6,12,50.00,108,1,114,223,48.65,,1
+"Ayres, Gary",Gary_Ayres.html,coaches/Gary_Ayres.html,GE AD,1995-2004,116,1,94,211,55.21,4,,8,12,33.33,120,1,102,223,54.04,,1
+"Dyer, Jack",Jack_Dyer0.html,coaches/Jack_Dyer0.html,RI,1941-1952,130,2,80,212,61.79,4,,6,10,40.00,134,2,86,222,60.81,1,3
+"Carter, Wally",Wally_Carter0.html,coaches/Wally_Carter0.html,NM,1940-1962,96,1,115,212,45.52,2,,5,7,28.57,98,1,120,219,44.98,,1
+"Buckley, Nathan",Nathan_Buckley.html,coaches/Nathan_Buckley.html,CW,2012-2021,112,2,92,206,54.85,5,,7,12,41.67,117,2,99,218,54.13,,1
+"Clark, Norman",Norman_Clark.html,coaches/Norman_Clark.html,CA RI SK NM,1912-1931,117,6,70,193,62.18,11,,10,21,52.38,128,6,80,214,61.21,2,5
+"Voss, Michael",Michael_Voss.html,coaches/Michael_Voss.html,BL CA,2009-2026,89,2,115,206,43.69,3,,3,6,50.00,92,2,118,212,43.87,,
+"Goodwin, Simon",Simon_Goodwin.html,coaches/Simon_Goodwin.html,ES ME,2013-2025,106,1,86,193,55.18,5,,5,10,50.00,111,1,91,203,54.93,1,1
+"Ratten, Brett",Brett_Ratten.html,coaches/Brett_Ratten.html,CA SK NM,2007-2023,92,1,99,192,48.18,2,,4,6,33.33,94,1,103,198,47.73,,
+"Cameron, Leon",Leon_Cameron.html,coaches/Leon_Cameron.html,GW,2014-2022,94,4,82,180,53.33,7,,6,13,53.85,101,4,88,193,53.37,,1
+"Craig, Neil",Neil_Craig.html,coaches/Neil_Craig.html,AD ME,2004-2013,90,,78,168,53.57,3,,6,9,33.33,93,,84,177,52.54,,
+"Hale, Jack",Jack_Hale.html,coaches/Jack_Hale.html,SM HW,1948-1959,69,1,102,172,40.41,1,,1,2,50.00,70,1,103,174,40.52,,
+"Sutton, Charlie",Charlie_Sutton.html,coaches/Charlie_Sutton.html,FO,1951-1968,78,2,75,155,50.97,4,,3,7,57.14,82,2,78,162,51.23,1,1
+"Hall, Alex",Alex_Hall.html,coaches/Alex_Hall.html,SK ME RI HW,1906-1925,58,3,94,155,38.39,,,,,,58,3,94,155,38.39,,
+"Longmuir, Justin",Justin_Longmuir.html,coaches/Justin_Longmuir.html,FR,2020-2026,87,2,62,151,58.28,1,,2,3,33.33,88,2,64,154,57.79,,
+"Nicks, Matthew",Matthew_Nicks.html,coaches/Matthew_Nicks.html,AD,2020-2026,70,1,81,152,46.38,,,2,2,0.00,70,1,83,154,45.78,,
+"Jewell, Tony",Tony_Jewell.html,coaches/Tony_Jewell.html,RI SK,1979-1987,59,1,90,150,39.67,3,,,3,100.00,62,1,90,153,40.85,1,1
+"Joyce, Alan",Alan_Joyce.html,coaches/Alan_Joyce.html,HW FO,1988-1996,87,2,51,140,62.86,5,,5,10,50.00,92,2,56,150,62.00,2,2
+"Laidley, Dani",Dani_Laidley.html,coaches/Dani_Laidley.html,NM,2003-2009,71,2,71,144,50.00,1,,4,5,20.00,72,2,75,149,48.99,,
+"Belcher, Vic",Vic_Belcher.html,coaches/Vic_Belcher.html,SM FI,1914-1927,72,3,58,133,55.26,8,,5,13,61.54,80,3,63,146,55.82,1,3
+"Jesaulenko, Alex",Alex_Jesaulenko.html,coaches/Alex_Jesaulenko.html,CA SK,1978-1990,63,3,70,136,47.43,3,,1,4,75.00,66,3,71,140,48.21,1,1
+"McCaskill, Bob",Bob_McCaskill.html,coaches/Bob_McCaskill.html,NM HW,1941-1951,47,,90,137,34.31,,,1,1,0.00,47,,91,138,34.06,,
+"Judge, Ken",Ken_Judge.html,coaches/Ken_Judge.html,HW WC,1996-2001,49,3,80,132,38.26,,,1,1,0.00,49,3,81,133,37.97,,
+"Coleman, John",John_Coleman.html,coaches/John_Coleman.html,ES,1961-1967,84,3,38,125,68.40,6,,2,8,75.00,90,3,40,133,68.80,2,2
+"Kelly, Joe",Joe_Kelly1.html,coaches/Joe_Kelly1.html,FO SM,1937-1944,59,,70,129,45.74,1,,2,3,33.33,60,,72,132,45.45,,
+"Olliver, Arthur",Arthur_Olliver.html,coaches/Arthur_Olliver.html,FO,1943-1950,68,1,59,128,53.52,,,3,3,0.00,68,1,62,131,52.29,,
+"Connolly, Chris",Chris_Connolly.html,coaches/Chris_Connolly.html,HW FR,2001-2007,67,,59,126,53.17,1,,3,4,25.00,68,,62,130,52.31,,
+"Shaw, Robert",Robert_Shaw.html,coaches/Robert_Shaw.html,FI AD,1991-1996,45,,85,130,34.62,,,,,,45,,85,130,34.62,,
+"Richardson, Alan",Alan_Richardson1.html,coaches/Alan_Richardson1.html,PA SK,2013-2019,43,2,82,127,34.65,,,,,,43,2,82,127,34.65,,
+"Killigrew, Alan",Alan_Killigrew.html,coaches/Alan_Killigrew.html,SK NM,1956-1966,46,1,77,124,37.50,,,,,,46,1,77,124,37.50,,
+"Parratt, Percy",Percy_Parratt.html,coaches/Percy_Parratt.html,FI CA GE,1913-1935,70,5,42,117,61.97,3,,4,7,42.86,73,5,46,124,60.89,1,1
+"Skilton, Bob",Bob_Skilton.html,coaches/Bob_Skilton.html,SM ME,1965-1977,44,,79,123,35.77,,,,,,44,,79,123,35.77,,
+"McRae, Craig",Craig_McRae.html,coaches/Craig_McRae.html,CW,2022-2026,74,4,36,114,66.67,5,,4,9,55.56,79,4,40,123,65.85,1,1
+"Thomas, Grant",Grant_Thomas.html,coaches/Grant_Thomas.html,SK,2001-2006,61,1,55,117,52.56,2,,4,6,33.33,63,1,59,123,51.63,,
+"Dew, Stuart",Stuart_Dew.html,coaches/Stuart_Dew.html,GC,2018-2023,36,1,84,121,30.17,,,,,,36,1,84,121,30.17,,
+"Mitchell, Sam",Sam_Mitchell.html,coaches/Sam_Mitchell.html,HW,2022-2026,59,2,53,114,52.63,3,,2,5,60.00,62,2,55,119,52.94,,
+"Scanlan, Paddy",Paddy_Scanlan.html,coaches/Paddy_Scanlan.html,FO SM NM,1927-1937,41,,77,118,34.75,,,,,,41,,77,118,34.75,,
+"Goggin, Bill",Bill_Goggin.html,coaches/Bill_Goggin.html,FO GE,1976-1982,61,2,48,111,55.86,1,,5,6,16.67,62,2,53,117,53.85,,
+"Davis, Bob",Bob_Davis.html,coaches/Bob_Davis.html,GE,1956-1965,69,4,35,108,65.74,3,1,4,8,43.75,72,5,39,116,64.22,1,1
+"Ricketts, Charlie",Charlie_Ricketts.html,coaches/Charlie_Ricketts.html,SM RI SK,1909-1921,51,1,57,109,47.25,2,,4,6,33.33,53,1,61,115,46.52,1,2
+"Alves, Stan",Stan_Alves.html,coaches/Stan_Alves.html,SK,1994-1998,53,1,56,110,48.64,2,,3,5,40.00,55,1,59,115,48.26,,1
+"Hands, Ken",Ken_Hands.html,coaches/Ken_Hands.html,CA,1959-1964,58,2,48,108,54.63,2,1,3,6,41.67,60,3,51,114,53.95,,1
+"Stewart, Ian",Ian_Stewart.html,coaches/Ian_Stewart.html,SM CA,1976-1981,50,1,62,113,44.69,,,1,1,0.00,50,1,63,114,44.30,,
+"Frawley, Danny",Danny_Frawley.html,coaches/Danny_Frawley.html,RI,2000-2004,44,,66,110,40.00,1,,2,3,33.33,45,,68,113,39.82,,
+"Tuddenham, Des",Des_Tuddenham.html,coaches/Des_Tuddenham.html,ES SM,1972-1978,56,,54,110,50.91,,,2,2,0.00,56,,56,112,50.00,,
+"Schwab, Peter",Peter_Schwab.html,coaches/Peter_Schwab.html,HW,2000-2004,49,,55,104,47.12,3,,2,5,60.00,52,,57,109,47.71,,
+"Pannam, Charles",Charles_Pannam.html,coaches/Charles_Pannam.html,SM,1923-1928,52,,51,103,50.49,2,,3,5,40.00,54,,54,108,50.00,,
+"Smith, Len",Len_Smith0.html,coaches/Len_Smith0.html,FI RI,1958-1965,53,2,49,104,51.92,,,3,3,0.00,53,2,52,107,50.47,,
+"Pianto, Peter",Peter_Pianto.html,coaches/Peter_Pianto.html,GE,1966-1970,66,1,30,97,68.56,3,,4,7,42.86,69,1,34,104,66.83,,1
+"Knights, Peter",Peter_Knights.html,coaches/Peter_Knights.html,BB HW,1987-1995,36,,67,103,34.95,,,1,1,0.00,36,,68,104,34.62,,
+"Harvey, Mark",Mark_Harvey.html,coaches/Mark_Harvey.html,FR BL,2007-2013,40,,58,98,40.82,1,,1,2,50.00,41,,59,100,41.00,,
+"Barker, Syd",Syd_Barker0.html,coaches/Syd_Barker0.html,ES NM,1922-1927,55,1,33,89,62.36,5,,5,10,50.00,60,1,38,99,61.11,2,1
+"Kingsley, Adam",Adam_Kingsley.html,coaches/Adam_Kingsley.html,GW,2023-2026,54,,38,92,58.70,2,,4,6,33.33,56,,42,98,57.14,,
+"Balme, Neil",Neil_Balme.html,coaches/Neil_Balme.html,ME,1993-1997,39,,56,95,41.05,2,,1,3,66.67,41,,57,98,41.84,,
+"Hughson, Fred",Fred_Hughson.html,coaches/Fred_Hughson.html,FI,1943-1947,55,2,33,90,62.22,4,,2,6,66.67,59,2,35,96,62.50,1,1
+"Nicholls, John",John_Nicholls.html,coaches/John_Nicholls.html,CA,1972-1975,57,2,27,86,67.44,4,1,4,9,50.00,61,3,31,95,65.79,1,2
+"Pyke, Don",Don_Pyke.html,coaches/Don_Pyke.html,AD,2016-2019,53,1,34,88,60.80,3,,2,5,60.00,56,1,36,93,60.75,,1
+"Warne-Smith, Ivor",Ivor_Warne-Smith.html,coaches/Ivor_Warne-Smith.html,ME,1928-1932,48,1,41,90,53.89,,1,1,2,25.00,48,2,42,92,53.26,,
+"Maher, Frank",Frank_Maher.html,coaches/Frank_Maher.html,ES FI CA,1927-1936,46,3,41,90,52.78,,,2,2,0.00,46,3,43,92,51.63,,
+"Wheeler, Terry",Terry_Wheeler.html,coaches/Terry_Wheeler.html,FO,1990-1994,49,1,38,88,56.25,1,,2,3,33.33,50,1,40,91,55.49,,
+"Olsson, Rod",Rod_Olsson.html,coaches/Rod_Olsson.html,GE,1976-1979,44,,44,88,50.00,1,,2,3,33.33,45,,46,91,49.45,,
+"Cahill, John",John_Cahill.html,coaches/John_Cahill.html,CW PA,1983-1998,44,2,42,88,51.14,2,,1,3,66.67,46,2,43,91,51.65,,
+"Francis, Jim",Jim_Francis.html,coaches/Jim_Francis.html,CA SK,1956-1960,47,1,42,90,52.78,,,1,1,0.00,47,1,43,91,52.20,,
+"Matthews, Herbie",Herbie_Matthews0.html,coaches/Herbie_Matthews0.html,SM,1939-1957,27,1,62,90,30.56,,,,,,27,1,62,90,30.56,,
+"Sheldon, Ken",Ken_Sheldon.html,coaches/Ken_Sheldon.html,SK,1990-1993,47,1,38,86,55.23,1,,2,3,33.33,48,1,40,89,54.49,,
+"Cornes, Graham",Graham_Cornes.html,coaches/Graham_Cornes.html,AD,1991-1994,42,1,43,86,49.42,1,,2,3,33.33,43,1,45,89,48.88,,
+"Shaw, Tony",Tony_Shaw.html,coaches/Tony_Shaw.html,CW,1996-1999,30,,58,88,34.09,,,,,,30,,58,88,34.09,,
+"Bartlett, Kevin",Kevin_Bartlett.html,coaches/Kevin_Bartlett.html,RI,1988-1991,27,,61,88,30.68,,,,,,27,,61,88,30.68,,
+"McKenna, Guy",Guy_McKenna.html,coaches/Guy_McKenna.html,GC,2011-2014,24,,64,88,27.27,,,,,,24,,64,88,27.27,,
+"Rattray, Gordon",Gordon_Rattray.html,coaches/Gordon_Rattray.html,ME FI,1924-1939,29,1,58,88,33.52,,,,,,29,1,58,88,33.52,,
+"Neesham, Gerard",Gerard_Neesham.html,coaches/Gerard_Neesham.html,FR,1995-1998,32,,56,88,36.36,,,,,,32,,56,88,36.36,,
+"Brosnan, Gerald",Gerald_Brosnan.html,coaches/Gerald_Brosnan.html,UN ME,1910-1920,17,,71,88,19.32,,,,,,17,,71,88,19.32,,
+"Hird, James",James_Hird.html,coaches/James_Hird.html,ES,2011-2015,41,1,42,84,49.40,,,1,1,0.00,41,1,43,85,48.82,,
+"McKenzie, Keith",Keith_McKenzie.html,coaches/Keith_McKenzie.html,NM CA,1966-1975,25,2,57,84,30.95,,,,,,25,2,57,84,30.95,,
+"Donaldson, Graham",Graham_Donaldson.html,coaches/Graham_Donaldson.html,FI,1971-1974,34,1,49,84,41.07,,,,,,34,1,49,84,41.07,,
+"Bailey, Dean",Dean_Bailey.html,coaches/Dean_Bailey.html,ME,2008-2011,22,2,59,83,27.71,,,,,,22,2,59,83,27.71,,
+"Bolton, Brendon",Brendon_Bolton.html,coaches/Brendon_Bolton.html,HW CA,2014-2019,21,,61,82,25.61,,,,,,21,,61,82,25.61,,
+"Cazaly, Roy",Roy_Cazaly.html,coaches/Roy_Cazaly.html,SM HW,1922-1943,22,2,58,82,28.05,,,,,,22,2,58,82,28.05,,
+"Coghlan, Arthur",Arthur_Coghlan.html,coaches/Arthur_Coghlan.html,GE,1929-1934,45,1,27,73,62.33,3,,4,7,42.86,48,1,31,80,60.63,,1
+"Bisset, Jack",Jack_Bisset.html,coaches/Jack_Bisset.html,SM,1933-1936,57,,13,70,81.43,6,,4,10,60.00,63,,17,80,78.75,1,4
+"Hardy, Charlie",Charlie_Hardy.html,coaches/Charlie_Hardy.html,ES SK,1928-1932,39,1,39,79,50.00,,,,,,39,1,39,79,50.00,,
+"Cubbins, Bill",Bill_Cubbins.html,coaches/Bill_Cubbins.html,SK FO,1930-1934,42,,36,78,53.85,,,,,,42,,36,78,53.85,,
+"Baggott, Jack",Jack_Baggott.html,coaches/Jack_Baggott.html,ES SM,1936-1940,29,,49,78,37.18,,,,,,29,,49,78,37.18,,
+"Chadwick, Bert",Bert_Chadwick.html,coaches/Bert_Chadwick.html,ME HW,1925-1929,42,1,28,71,59.86,4,,1,5,80.00,46,1,29,76,61.18,1,1
+"Cable, Barry",Barry_Cable.html,coaches/Barry_Cable.html,NM,1981-1984,39,,33,72,54.17,1,,3,4,25.00,40,,36,76,52.63,,
+"McDonald, Alan",Alan_McDonald.html,coaches/Alan_McDonald.html,RI,1957-1960,22,2,48,72,31.94,,,,,,22,2,48,72,31.94,,
+"Mann, Neil",Neil_Mann.html,coaches/Neil_Mann.html,CW,1960-1974,48,1,17,66,73.48,1,,5,6,16.67,49,1,22,72,68.75,,
+"McAlpine, Ivan",Ivan_McAlpine.html,coaches/Ivan_McAlpine.html,HW,1935-1938,22,,50,72,30.56,,,,,,22,,50,72,30.56,,
+"Condon, Dick",Dick_Condon.html,coaches/Dick_Condon.html,CW RI,1905-1909,38,,30,68,55.88,,,3,3,0.00,38,,33,71,53.52,,1
+"Adams, Bill",Bill_Adams.html,coaches/Bill_Adams.html,SM,1945-1948,38,1,29,68,56.62,1,,1,2,50.00,39,1,30,70,56.43,,1
+"Yze, Adem",Adem_Yze.html,coaches/Adem_Yze.html,ME RI,2022-2026,11,,59,70,15.71,,,,,,11,,59,70,15.71,,
+"Sanderson, Brenton",Brenton_Sanderson.html,coaches/Brenton_Sanderson.html,AD,2012-2014,38,,28,66,57.58,1,,2,3,33.33,39,,30,69,56.52,,
+"Patterson, Michael",Michael_Patterson.html,coaches/Michael_Patterson.html,SK RI,1978-1984,24,1,43,68,36.03,,,,,,24,1,43,68,36.03,,
+"Knights, Matthew",Matthew_Knights.html,coaches/Matthew_Knights.html,ES WC,2008-2022,25,1,41,67,38.06,,,1,1,0.00,25,1,42,68,37.50,,
+"Davis, Barry",Barry_Davis.html,coaches/Barry_Davis.html,ES,1978-1980,30,1,35,66,46.21,,,1,1,0.00,30,1,36,67,45.52,,
+"Kinnear, Col",Col_Kinnear.html,coaches/Col_Kinnear.html,SY,1989-1991,23,1,42,66,35.61,,,,,,23,1,42,66,35.61,,
+"Leppitsch, Justin",Justin_Leppitsch.html,coaches/Justin_Leppitsch.html,BL,2014-2016,14,,52,66,21.21,,,,,,14,,52,66,21.21,,
+"McCartney, Brendan",Brendan_McCartney.html,coaches/Brendan_McCartney.html,WB,2012-2014,20,,46,66,30.30,,,,,,20,,46,66,30.30,,
+"Schimmelbusch, Wayne",Wayne_Schimmelbusch.html,coaches/Wayne_Schimmelbusch.html,NM,1990-1992,31,,35,66,46.97,,,,,,31,,35,66,46.97,,
+"Rose, Kevin",Kevin_Rose.html,coaches/Kevin_Rose.html,FI,1975-1977,22,,44,66,33.33,,,,,,22,,44,66,33.33,,
+"Devine, John",John_Devine.html,coaches/John_Devine.html,GE,1986-1988,28,1,37,66,43.18,,,,,,28,1,37,66,43.18,,
+"Ridley, Ian",Ian_Ridley.html,coaches/Ian_Ridley.html,ME,1971-1973,28,1,37,66,43.18,,,,,,28,1,37,66,43.18,,
+"Farmer, Graham",Graham_Farmer.html,coaches/Graham_Farmer.html,GE,1973-1975,24,,42,66,36.36,,,,,,24,,42,66,36.36,,
+"John, Graeme",Graeme_John.html,coaches/Graeme_John.html,SM,1973-1975,15,1,50,66,23.48,,,,,,15,1,50,66,23.48,,
+"Clarke, Jack",Jack_Clarke.html,coaches/Jack_Clarke.html,ES,1968-1970,32,2,28,62,53.23,1,,2,3,33.33,33,2,30,65,52.31,,1
+"Sparrow, George",George_Sparrow.html,coaches/George_Sparrow.html,SK,1913-1929,35,,24,59,59.32,2,,2,4,50.00,37,,26,63,58.73,,1
+"Baldock, Darrel",Darrel_Baldock.html,coaches/Darrel_Baldock.html,SK,1987-1989,18,,44,62,29.03,,,,,,18,,44,62,29.03,,
+"Beckwith, John",John_Beckwith.html,coaches/John_Beckwith.html,ME,1968-1970,17,,45,62,27.42,,,,,,17,,45,62,27.42,,
+"Angus, George",George_Angus.html,coaches/George_Angus.html,CW,1909-1911,37,2,15,54,70.37,4,,2,6,66.67,41,2,17,60,70.00,1,2
+"McQualter, Andrew",Andrew_McQualter.html,coaches/Andrew_McQualter.html,RI WC,2023-2026,12,,47,59,20.34,,,,,,12,,47,59,20.34,,
+"Diggins, Brighton",Brighton_Diggins.html,coaches/Brighton_Diggins.html,SM CA,1935-1940,38,,18,56,67.86,2,,,2,100.00,40,,18,58,68.97,1,1
+"Rankin, Cliff",Cliff_Rankin.html,coaches/Cliff_Rankin.html,GE,1925-1927,44,,9,53,83.02,1,,3,4,25.00,45,,12,57,78.95,1,1
+"Ruthven, Alan",Alan_Ruthven.html,coaches/Alan_Ruthven.html,FI,1952-1954,27,1,27,55,50.00,1,,1,2,50.00,28,1,28,57,50.00,,
+"Quinn, Tommy",Tommy_Quinn.html,coaches/Tommy_Quinn.html,GE,1946-1948,22,,35,57,38.60,,,,,,22,,35,57,38.60,,
+"Quade, Ricky",Ricky_Quade.html,coaches/Ricky_Quade.html,SY,1982-1984,25,,32,57,43.86,,,,,,25,,32,57,43.86,,
+"Albiston, Alec",Alec_Albiston.html,coaches/Alec_Albiston.html,HW,1947-1949,12,,45,57,21.05,,,,,,12,,45,57,21.05,,
+"La Fontaine, Allan",Allan_La Fontaine.html,coaches/Allan_La Fontaine.html,ME,1949-1951,25,,30,55,45.45,,,1,1,0.00,25,,31,56,44.64,,
+"Froude, Fred",Fred_Froude.html,coaches/Fred_Froude.html,SK,1948-1950,14,1,41,56,25.89,,,,,,14,1,41,56,25.89,,
+"Clarke, Ansell",Ansell_Clarke.html,coaches/Ansell_Clarke.html,SK,1938-1940,27,,26,53,50.94,1,,1,2,50.00,28,,27,55,50.91,,
+"Pannam, Albert",Albert_Pannam0.html,coaches/Albert_Pannam0.html,RI,1953-1955,22,1,31,54,41.67,,,,,,22,1,31,54,41.67,,
+"McMahen, Noel",Noel_McMahen.html,coaches/Noel_McMahen.html,SM,1962-1964,9,,45,54,16.67,,,,,,9,,45,54,16.67,,
+"Holden, George",George_Holden.html,coaches/George_Holden.html,FI,1916-1919,19,2,27,48,41.67,5,,1,6,83.33,24,2,28,54,46.30,1,2
+"Campbell, Garnet",Garnet_Campbell.html,coaches/Garnet_Campbell.html,ES,1931-1933,22,,32,54,40.74,,,,,,22,,32,54,40.74,,
+"Rowe, Des",Des_Rowe.html,coaches/Des_Rowe.html,RI,1961-1963,15,,39,54,27.78,,,,,,15,,39,54,27.78,,
+"Drum, Damian",Damian_Drum.html,coaches/Damian_Drum.html,FR,1999-2001,13,,40,53,24.53,,,,,,13,,40,53,24.53,,
+"Hart, Royce",Royce_Hart.html,coaches/Royce_Hart.html,FO,1980-1982,8,,45,53,15.09,,,,,,8,,45,53,15.09,,
+"Eicke, Wels",Wels_Eicke.html,coaches/Wels_Eicke.html,SK NM,1919-1926,16,,36,52,30.77,,,,,,16,,36,52,30.77,,
+"Lane, Gordon",Gordon_Lane.html,coaches/Gordon_Lane.html,SM,1950-1952,22,2,27,51,45.10,,,,,,22,2,27,51,45.10,,
+"Teague, David",David_Teague.html,coaches/David_Teague.html,CA,2019-2021,21,,29,50,42.00,,,,,,21,,29,50,42.00,,
+"McNamara, Dave",Dave_McNamara.html,coaches/Dave_McNamara.html,SK,1914-1923,21,2,26,49,44.90,,,,,,21,2,26,49,44.90,,
+"Smith, Jimmy",Jimmy_Smith0.html,coaches/Jimmy_Smith0.html,SK,1909-1918,16,,32,48,33.33,,,1,1,0.00,16,,33,49,32.65,,
+"Gieschen, Jeff",Jeff_Gieschen.html,coaches/Jeff_Gieschen.html,RI,1997-1999,25,,24,49,51.02,,,,,,25,,24,49,51.02,,
+"Wilson, Percy",Percy_Wilson.html,coaches/Percy_Wilson.html,ME,1921-1923,16,2,30,48,35.42,,,,,,16,2,30,48,35.42,,
+"Beames, Percy",Percy_Beames.html,coaches/Percy_Beames.html,ME,1942-1944,19,,29,48,39.58,,,,,,19,,29,48,39.58,,
+"Gellie, Graeme",Graeme_Gellie.html,coaches/Graeme_Gellie.html,SK,1984-1986,6,,42,48,12.50,,,,,,6,,42,48,12.50,,
+"Richardson, Barry",Barry_Richardson.html,coaches/Barry_Richardson.html,RI,1976-1978,24,2,19,45,55.56,1,,1,2,50.00,25,2,20,47,55.32,,
+"Primus, Matthew",Matthew_Primus.html,coaches/Matthew_Primus.html,PA,2010-2012,13,,34,47,27.66,,,,,,13,,34,47,27.66,,
+"Elliott, Fred",Fred_Elliott.html,coaches/Fred_Elliott.html,CA,1909-1911,32,2,7,41,80.49,2,,4,6,33.33,34,2,11,47,74.47,,2
+"Cox, Dean",Dean_Cox.html,coaches/Dean_Cox.html,SY,2025-2026,30,,16,46,65.22,,,,,,30,,16,46,65.22,,
+"Brittain, Wayne",Wayne_Brittain.html,coaches/Wayne_Brittain.html,CA,2001-2002,17,,27,44,38.64,1,,1,2,50.00,18,,28,46,39.13,,
+"Thorogood, Ian",Ian_Thorogood.html,coaches/Ian_Thorogood.html,CA,1976-1977,29,1,14,44,67.05,,,2,2,0.00,29,1,16,46,64.13,,
+"Bourke, Francis",Francis_Bourke.html,coaches/Francis_Bourke.html,RI,1982-1983,25,,19,44,56.82,1,,1,2,50.00,26,,20,46,56.52,,1
+"Rohde, Peter",Peter_Rohde.html,coaches/Peter_Rohde.html,WB,2002-2004,9,1,35,45,21.11,,,,,,9,1,35,45,21.11,,
+"Weideman, Murray",Murray_Weideman.html,coaches/Murray_Weideman.html,CW,1975-1976,19,,25,44,43.18,,,1,1,0.00,19,,26,45,42.22,,
+"Todd, John",John_Todd.html,coaches/John_Todd.html,WC,1988-1989,20,,24,44,45.45,,,1,1,0.00,20,,25,45,44.44,,
+"Clover, Horrie",Horrie_Clover.html,coaches/Horrie_Clover.html,CA,1922-1927,26,1,16,43,61.63,,,2,2,0.00,26,1,18,45,58.89,,
+"Dixon, Brian",Brian_Dixon.html,coaches/Brian_Dixon.html,NM,1971-1972,6,1,37,44,14.77,,,,,,6,1,37,44,14.77,,
+"McMaster, Bill",Bill_McMaster0.html,coaches/Bill_McMaster0.html,GE,1971-1972,12,,32,44,27.27,,,,,,12,,32,44,27.27,,
+"Rutten, Ben",Ben_Rutten.html,coaches/Ben_Rutten.html,ES,2021-2022,17,,26,43,39.53,,,1,1,0.00,17,,27,44,38.64,,
+"Watters, Scott",Scott_Watters.html,coaches/Scott_Watters.html,SK,2012-2013,17,,27,44,38.64,,,,,,17,,27,44,38.64,,
+"Watson, Tim",Tim_Watson.html,coaches/Tim_Watson.html,SK,1999-2000,12,1,31,44,28.41,,,,,,12,1,31,44,28.41,,
+"Austin, Rod",Rod_Austin.html,coaches/Rod_Austin.html,FI,1989-1990,19,,25,44,43.18,,,,,,19,,25,44,43.18,,
+"McKenzie, Don",Don_McKenzie1.html,coaches/Don_McKenzie1.html,FO,1978-1982,14,1,29,44,32.95,,,,,,14,1,29,44,32.95,,
+"Ditterich, Carl",Carl_Ditterich.html,coaches/Carl_Ditterich.html,ME,1979-1980,11,,32,43,25.58,,,,,,11,,32,43,25.58,,
+"Taylor, Dick",Dick_Taylor.html,coaches/Dick_Taylor.html,NM,1932-1934,13,1,28,42,32.14,,,,,,13,1,28,42,32.14,,
+"Clegg, Ron",Ron_Clegg.html,coaches/Ron_Clegg.html,SM,1951-1959,17,,23,40,42.50,,,,,,17,,23,40,42.50,,
+"Smith, Dave",Dave_Smith.html,coaches/Dave_Smith.html,ES,1908-1909,25,,11,36,69.44,1,,2,3,33.33,26,,13,39,66.67,,1
+"Thomas, Bill",Bill_Thomas1.html,coaches/Bill_Thomas1.html,SM,1910-1911,25,1,10,36,70.83,1,,2,3,33.33,26,1,12,39,67.95,,
+"Shea, Keith",Keith_Shea.html,coaches/Keith_Shea.html,HW,1945-1946,9,,30,39,23.08,,,,,,9,,30,39,23.08,,
+"Noble, David",David_Noble.html,coaches/David_Noble.html,NM,2021-2022,5,1,32,38,14.47,,,,,,5,1,32,38,14.47,,
+"Miller, Allan",Allan_Miller.html,coaches/Allan_Miller.html,SM,1967-1968,11,2,25,38,31.58,,,,,,11,2,25,38,31.58,,
+"Hird, Allan",Allan_Hird0.html,coaches/Allan_Hird0.html,SK,1946-1947,5,1,32,38,14.47,,,,,,5,1,32,38,14.47,,
+"Thomas, Hughie",Hughie_Thomas.html,coaches/Hughie_Thomas.html,SK,1944-1945,8,2,28,38,23.68,,,,,,8,2,28,38,23.68,,
+"Williamson, Col",Col_Williamson.html,coaches/Col_Williamson.html,SK,1952-1953,7,,30,37,18.92,,,,,,7,,30,37,18.92,,
+"Eason, Bill",Bill_Eason.html,coaches/Bill_Eason.html,GE,1912-1913,21,,15,36,58.33,,,1,1,0.00,21,,16,37,56.76,,
+"Brew, Ray",Ray_Brew.html,coaches/Ray_Brew.html,CA,1926-1928,22,,14,36,61.11,,,1,1,0.00,22,,15,37,59.46,,
+"McCorkell, Jock",Jock_McCorkell.html,coaches/Jock_McCorkell.html,NM,1954-1955,14,1,21,36,40.28,,,1,1,0.00,14,1,22,37,39.19,,
+"Hickinbotham, Dave",Dave_Hickinbotham.html,coaches/Dave_Hickinbotham.html,GE,1910-1911,18,2,16,36,52.78,,,,,,18,2,16,36,52.78,,
+"Niven, Colin",Colin_Niven.html,coaches/Colin_Niven.html,FI,1930-1931,11,,25,36,30.56,,,,,,11,,25,36,30.56,,
+"May, Charlie",Charlie_May.html,coaches/Charlie_May.html,ES,1934-1935,12,,24,36,33.33,,,,,,12,,24,36,33.33,,
+"Gaudion, Charlie",Charlie_Gaudion.html,coaches/Charlie_Gaudion.html,NM,1956-1957,11,,25,36,30.56,,,,,,11,,25,36,30.56,,
+"Faul, Bill",Bill_Faul.html,coaches/Bill_Faul.html,SM,1960-1961,12,,24,36,33.33,,,,,,12,,24,36,33.33,,
+"Mills, Bert",Bert_Mills.html,coaches/Bert_Mills.html,HW,1940-1941,10,,26,36,27.78,,,,,,10,,26,36,27.78,,
+"Coventry, Syd",Syd_Coventry0.html,coaches/Syd_Coventry0.html,FO,1935-1937,8,2,26,36,25.00,,,,,,8,2,26,36,25.00,,
+"Rowe, Percy",Percy_Rowe.html,coaches/Percy_Rowe.html,FI CA,1935-1937,19,1,16,36,54.17,,,,,,19,1,16,36,54.17,,
+"Foote, Les",Les_Foote.html,coaches/Les_Foote.html,SK,1954-1955,5,1,30,36,15.28,,,,,,5,1,30,36,15.28,,
+"Incigneri, Len",Len_Incigneri.html,coaches/Len_Incigneri.html,RI ME,1911-1914,9,,27,36,25.00,,,,,,9,,27,36,25.00,,
+"Harris, John",John_Harris.html,coaches/John_Harris.html,HW,1930-1931,9,,27,36,25.00,,,,,,9,,27,36,25.00,,
+"Arthur, Graham",Graham_Arthur.html,coaches/Graham_Arthur.html,HW,1964-1965,17,,19,36,47.22,,,,,,17,,19,36,47.22,,
+"Moriarty, Geoff",Geoff_Moriarty.html,coaches/Geoff_Moriarty.html,FI,1911-1912,20,,16,36,55.56,,,,,,20,,16,36,55.56,,
+"Drohan, Eddie",Eddie_Drohan.html,coaches/Eddie_Drohan.html,ME SK,1910-1911,6,,30,36,16.67,,,,,,6,,30,36,16.67,,
+"Fitzmaurice, Tom",Tom_Fitzmaurice.html,coaches/Tom_Fitzmaurice.html,GE NM,1928-1935,6,,28,34,17.65,,,,,,6,,28,34,17.65,,
+"Murray, Kevin",Kevin_Murray.html,coaches/Kevin_Murray.html,FI,1963-1964,,,34,34,0.00,,,,,,,,34,34,0.00,,
+"Forbes, Keith",Keith_Forbes.html,coaches/Keith_Forbes.html,NM,1938-1939,11,,23,34,32.35,,,,,,11,,23,34,32.35,,
+"Heinz, George",George_Heinz.html,coaches/George_Heinz.html,ME SK,1919-1927,8,,26,34,23.53,,,,,,8,,26,34,23.53,,
+"Eason, Alec",Alec_Eason.html,coaches/Alec_Eason.html,GE FO,1920-1929,11,1,22,34,33.82,,,,,,11,1,22,34,33.82,,
+"Neeld, Mark",Mark_Neeld.html,coaches/Mark_Neeld.html,ME,2012-2013,5,,28,33,15.15,,,,,,5,,28,33,15.15,,
+"Ware, Norm",Norm_Ware.html,coaches/Norm_Ware.html,FO,1941-1942,20,,12,32,62.50,,,1,1,0.00,20,,13,33,60.61,,
+"Hampshire, Ian",Ian_Hampshire.html,coaches/Ian_Hampshire.html,FO,1982-1983,12,,21,33,36.36,,,,,,12,,21,33,36.36,,
+"Howson, Bert",Bert_Howson.html,coaches/Bert_Howson.html,SM,1918-1919,25,,5,30,83.33,2,,1,3,66.67,27,,6,33,81.82,1,1
+"Twomey, Bill",Bill_Twomey1.html,coaches/Bill_Twomey1.html,HW,1933-1934,5,,27,32,15.63,,,,,,5,,27,32,15.63,,
+"King, Steven",Steven_King.html,coaches/Steven_King.html,GC ME,2023-2026,17,,13,30,56.67,,,1,1,0.00,17,,14,31,54.84,,
+"Shaw, Rhyce",Rhyce_Shaw.html,coaches/Rhyce_Shaw.html,NM,2019-2020,10,,19,29,34.48,,,,,,10,,19,29,34.48,,
+"Findlay, Bill",Bill_Findlay.html,coaches/Bill_Findlay.html,NM FO,1942-1966,9,1,17,27,35.19,,,,,,9,1,17,27,35.19,,
+"Campbell, Graham",Graham_Campbell.html,coaches/Graham_Campbell.html,FI,1973-1978,8,,18,26,30.77,,,,,,8,,18,26,30.77,,
+"Thomas, Len",Len_Thomas.html,coaches/Len_Thomas.html,HW NM,1939-1940,7,1,17,25,30.00,,,,,,7,1,17,25,30.00,,
+"Buckenara, Gary",Gary_Buckenara.html,coaches/Gary_Buckenara.html,SY,1992-1993,3,1,21,25,14.00,,,,,,3,1,21,25,14.00,,
+"Garvin, Reg",Reg_Garvin.html,coaches/Reg_Garvin.html,SK,1942-1943,7,1,16,24,31.25,,,,,,7,1,16,24,31.25,,
+"Jones, Peter",Peter_Jones.html,coaches/Peter_Jones.html,CA,1980,17,,5,22,77.27,,,2,2,0.00,17,,7,24,70.83,,
+"Leonard, Johnny",Johnny_Leonard.html,coaches/Johnny_Leonard.html,SM,1932-1943,17,,6,23,73.91,,,1,1,0.00,17,,7,24,70.83,,
+"Cameron, Charlie",Charlie_Cameron2.html,coaches/Charlie_Cameron2.html,NM FI,1932-1948,11,,12,23,47.83,,,,,,11,,12,23,47.83,,
+"Tyson, Charles",Charles_Tyson.html,coaches/Charles_Tyson.html,NM,1928-1929,5,,18,23,21.74,,,,,,5,,18,23,21.74,,
+"Carr, Josh",Josh_Carr.html,coaches/Josh_Carr.html,PA,2026,7,,16,23,30.43,,,,,,7,,16,23,30.43,,
+"Smith, Ross",Ross_Smith1.html,coaches/Ross_Smith1.html,SK,1977,3,2,17,22,18.18,,,,,,3,2,17,22,18.18,,
+"Alexander, Ron",Ron_Alexander.html,coaches/Ron_Alexander.html,WC,1987,11,,11,22,50.00,,,,,,11,,11,22,50.00,,
+"Sproule, Paul",Paul_Sproule.html,coaches/Paul_Sproule.html,RI,1985,9,,13,22,40.91,,,,,,9,,13,22,40.91,,
+"Dare, Norm",Norm_Dare.html,coaches/Norm_Dare.html,BB,1990,4,,18,22,18.18,,,,,,4,,18,22,18.18,,
+"Birt, John",John_Birt.html,coaches/John_Birt.html,ES,1971,4,1,17,22,20.45,,,,,,4,1,17,22,20.45,,
+"Jones, Dennis",Dennis_Jones.html,coaches/Dennis_Jones.html,ME,1978,5,,17,22,22.73,,,,,,5,,17,22,22.73,,
+"Clymo, Charlie",Charlie_Clymo.html,coaches/Charlie_Clymo.html,GE,1931,15,,3,18,83.33,2,,1,3,66.67,17,,4,21,80.95,1,1
+"Schmidt, Billy",Billy_Schmidt.html,coaches/Billy_Schmidt.html,RI,1933,15,,3,18,83.33,1,,2,3,33.33,16,,5,21,76.19,,1
+"Morris, Mel",Mel_Morris.html,coaches/Mel_Morris.html,RI,1925-1926,10,,11,21,47.62,,,,,,10,,11,21,47.62,,
+"Ogden, Percy",Percy_Ogden.html,coaches/Percy_Ogden.html,ES,1920-1921,3,2,15,20,20.00,,,,,,3,2,15,20,20.00,,
+"Williams, Jack",Jack_Williams0.html,coaches/Jack_Williams0.html,GE,1945,2,,18,20,10.00,,,,,,2,,18,20,10.00,,
+"Orchard, Billy",Billy_Orchard.html,coaches/Billy_Orchard.html,GE,1914,11,1,6,18,63.89,,,1,1,0.00,11,1,7,19,60.53,,
+"Quinlan, Bernie",Bernie_Quinlan.html,coaches/Bernie_Quinlan.html,FI,1995,2,,17,19,10.53,,,,,,2,,17,19,10.53,,
+"Lahiff, Tommy",Tommy_Lahiff.html,coaches/Tommy_Lahiff.html,HW SM,1944-1965,2,1,16,19,13.16,,,,,,2,1,16,19,13.16,,
+"Grace, Mick",Mick_Grace.html,coaches/Mick_Grace.html,SK,1908,10,,8,18,55.56,,,1,1,0.00,10,,9,19,52.63,,
+"Belcher, Alan",Alan_Belcher.html,coaches/Alan_Belcher.html,ES,1910,12,,6,18,66.67,,,1,1,0.00,12,,7,19,63.16,,
+"Crowe, Jim",Jim_Crowe.html,coaches/Jim_Crowe.html,FO,1947,8,1,10,19,44.74,,,,,,8,1,10,19,44.74,,
+"Hopkins, Allan",Allan_Hopkins.html,coaches/Allan_Hopkins.html,FO,1930-1934,4,,15,19,21.05,,,,,,4,,15,19,21.05,,
+"Caldwell, Jim",Jim_Caldwell.html,coaches/Jim_Caldwell.html,CA SM,1925-1929,6,,13,19,31.58,,,,,,6,,13,19,31.58,,
+"Kelly, Harvey",Harvey_Kelly.html,coaches/Harvey_Kelly.html,SM,1913,14,1,3,18,80.56,,,1,1,0.00,14,1,4,19,76.32,,
+"Watson, Colin",Colin_Watson.html,coaches/Colin_Watson.html,SK,1934,9,,9,18,50.00,,,,,,9,,9,18,50.00,,
+"Deane, Col",Col_Deane.html,coaches/Col_Deane.html,SK,1933,6,,12,18,33.33,,,,,,6,,12,18,33.33,,
+"Pannam, Charlie",Charlie_Pannam.html,coaches/Charlie_Pannam.html,RI,1912,3,,15,18,16.67,,,,,,3,,15,18,16.67,,
+"Sutton, Bert",Bert_Sutton.html,coaches/Bert_Sutton.html,HW,1928,,,18,18,0.00,,,,,,,,18,18,0.00,,
+"Brown, Vic",Vic_Brown.html,coaches/Vic_Brown.html,UN,1913,,,18,18,0.00,,,,,,,,18,18,0.00,,
+"Arklay, Tom",Tom_Arklay.html,coaches/Tom_Arklay.html,GE,1944,1,,17,18,5.56,,,,,,1,,17,18,5.56,,
+"ODonohue, Peter",Peter_ODonohue.html,coaches/Peter_ODonohue.html,HW,1966,5,,13,18,27.78,,,,,,5,,13,18,27.78,,
+"Oppy, Max",Max_Oppy.html,coaches/Max_Oppy.html,RI,1956,6,,12,18,33.33,,,,,,6,,12,18,33.33,,
+"Metherell, Len",Len_Metherell.html,coaches/Len_Metherell.html,GE,1941,3,,15,18,16.67,,,,,,3,,15,18,16.67,,
+"Nash, Laurie",Laurie_Nash.html,coaches/Laurie_Nash.html,SM,1953,9,,9,18,50.00,,,,,,9,,9,18,50.00,,
+"Lewis, John",John_Lewis0.html,coaches/John_Lewis0.html,NM,1930,1,,17,18,5.56,,,,,,1,,17,18,5.56,,
+"Jackson, Jim",Jim_Jackson.html,coaches/Jim_Jackson.html,HW,1932,3,,15,18,16.67,,,,,,3,,15,18,16.67,,
+"Wells, Jack",Jack_Wells.html,coaches/Jack_Wells.html,CA,1913,9,1,8,18,52.78,,,,,,9,1,8,18,52.78,,
+"Knight, Jack",Jack_Knight.html,coaches/Jack_Knight.html,SK,1941,3,,15,18,16.67,,,,,,3,,15,18,16.67,,
+"Bunton, Haydn",Haydn_Bunton.html,coaches/Haydn_Bunton.html,FI,1936,2,,16,18,11.11,,,,,,2,,16,18,11.11,,
+"Green, Fred",Fred_Green.html,coaches/Fred_Green.html,SK,1951,5,,13,18,27.78,,,,,,5,,13,18,27.78,,
+"Jenkins, Ern",Ern_Jenkins.html,coaches/Ern_Jenkins.html,RI,1913,6,,12,18,33.33,,,,,,6,,12,18,33.33,,
+"McCarthy, Con",Con_McCarthy.html,coaches/Con_McCarthy.html,FO,1925,4,,13,17,23.53,,,,,,4,,13,17,23.53,,
+"Lethbridge, Chris",Chris_Lethbridge.html,coaches/Chris_Lethbridge.html,FI,1925,12,,5,17,70.59,,,,,,12,,5,17,70.59,,
+"Taylor, Bert",Bert_Taylor0.html,coaches/Bert_Taylor0.html,GE,1923,9,,7,16,56.25,,,1,1,0.00,9,,8,17,52.94,,
+"Valentine, Viv",Viv_Valentine.html,coaches/Viv_Valentine.html,CA,1919,10,,6,16,62.50,,,1,1,0.00,10,,7,17,58.82,,
+"Titus, Jack",Jack_Titus.html,coaches/Jack_Titus.html,RI,1937-1965,11,,6,17,64.71,,,,,,11,,6,17,64.71,,
+"McKenzie, Jack",Jack_McKenzie0.html,coaches/Jack_McKenzie0.html,ME,1915,9,,7,16,56.25,,,1,1,0.00,9,,8,17,52.94,,
+"Wood, Artie",Artie_Wood.html,coaches/Artie_Wood.html,SM,1921,5,1,10,16,34.38,,,,,,5,1,10,16,34.38,,
+"Hiskins, Arthur",Arthur_Hiskins.html,coaches/Arthur_Hiskins.html,SM,1920,7,,9,16,43.75,,,,,,7,,9,16,43.75,,
+"Hagger, Lloyd",Lloyd_Hagger.html,coaches/Lloyd_Hagger.html,GE,1924,8,,8,16,50.00,,,,,,8,,8,16,50.00,,
+"Wigraft, Len",Len_Wigraft.html,coaches/Len_Wigraft.html,FI,1934,6,,10,16,37.50,,,,,,6,,10,16,37.50,,
+"Morrison, Alby",Alby_Morrison.html,coaches/Alby_Morrison.html,FO,1934-1935,4,,11,15,26.67,,,,,,4,,11,15,26.67,,
+"Crocker, Darren",Darren_Crocker.html,coaches/Darren_Crocker.html,NM,2009-2016,6,1,8,15,43.33,,,,,,6,1,8,15,43.33,,
+"Fraser, Josh",Josh_Fraser.html,coaches/Josh_Fraser.html,CA,2026,11,1,2,14,82.14,1,,,1,100.00,12,1,2,15,83.33,,
+"Solomon, Dean",Dean_Solomon.html,coaches/Dean_Solomon.html,GC ES,2017-2026,1,,14,15,6.67,,,,,,1,,14,15,6.67,,
+"Maybury, Percy",Percy_Maybury.html,coaches/Percy_Maybury.html,RI,1917,3,1,11,15,23.33,,,,,,3,1,11,15,23.33,,
+"Barker, John",John_Barker.html,coaches/John_Barker.html,CA,2015,3,,11,14,21.43,,,,,,3,,11,14,21.43,,
+"Nolan, Bernie",Bernie_Nolan.html,coaches/Bernie_Nolan.html,RI,1918,5,,9,14,35.71,,,,,,5,,9,14,35.71,,
+"Nunan, Michael",Michael_Nunan.html,coaches/Michael_Nunan.html,FI,1996,1,,13,14,7.14,,,,,,1,,13,14,7.14,,
+"Donnelly, Gerry",Gerry_Donnelly.html,coaches/Gerry_Donnelly.html,NM,1926,,1,13,14,3.57,,,,,,,1,13,14,3.57,,
+"Fleiter, Fred",Fred_Fleiter.html,coaches/Fred_Fleiter.html,SM,1929,6,,8,14,42.86,,,,,,6,,8,14,42.86,,
+"Strickland, Billy",Billy_Strickland.html,coaches/Billy_Strickland.html,CW,1904-1908,8,,3,11,72.73,,,2,2,0.00,8,,5,13,61.54,,
+"McVeigh, Mark",Mark_McVeigh.html,coaches/Mark_McVeigh.html,GW,2022,4,,9,13,30.77,,,,,,4,,9,13,30.77,,
+"Walsh, Phil",Phil_Walsh.html,coaches/Phil_Walsh.html,PA AD,2001-2015,8,,5,13,61.54,,,,,,8,,5,13,61.54,,
+"Allan, Ben",Ben_Allan.html,coaches/Ben_Allan.html,FR,2001,2,,11,13,15.38,,,,,,2,,11,13,15.38,,
+"Noonan, Paddy",Paddy_Noonan.html,coaches/Paddy_Noonan.html,NM,1929,1,,12,13,7.69,,,,,,1,,12,13,7.69,,
+"Hutchison, Greg",Greg_Hutchison.html,coaches/Greg_Hutchison.html,ME,1997,3,,10,13,23.08,,,,,,3,,10,13,23.08,,
+"Rowell, Ted",Ted_Rowell.html,coaches/Ted_Rowell.html,CW,1907-1908,6,,6,12,50.00,,,,,,6,,6,12,50.00,,
+"Gravenall, Sam",Sam_Gravenall.html,coaches/Sam_Gravenall.html,ES,1922,7,1,4,12,62.50,,,,,,7,1,4,12,62.50,,
+"Erwin, Mick",Mick_Erwin.html,coaches/Mick_Erwin.html,CW,1982,3,,9,12,25.00,,,,,,3,,9,12,25.00,,
+"Everett, Allan",Allan_Everett.html,coaches/Allan_Everett.html,GE,1940,7,,4,11,63.64,,,1,1,0.00,7,,5,12,58.33,,
+"McConnell, Alan",Alan_McConnell.html,coaches/Alan_McConnell.html,FI,1995-1996,,,11,11,0.00,,,,,,,,11,11,0.00,,
+"Camporeale, Scott",Scott_Camporeale.html,coaches/Scott_Camporeale.html,AD,2015,6,,3,9,66.67,1,,1,2,50.00,7,,4,11,63.64,,
+"King, Stuart",Stuart_King.html,coaches/Stuart_King.html,SK,1932,2,,9,11,18.18,,,,,,2,,9,11,18.18,,
+"Merrett, Roger",Roger_Merrett.html,coaches/Roger_Merrett.html,BL,1998,3,1,7,11,31.82,,,,,,3,1,7,11,31.82,,
+"Adamson, Jim",Jim_Adamson.html,coaches/Jim_Adamson.html,NM,1940,2,,9,11,18.18,,,,,,2,,9,11,18.18,,
+"Rawlings, Jade",Jade_Rawlings.html,coaches/Jade_Rawlings.html,RI,2009,3,1,7,11,31.82,,,,,,3,1,7,11,31.82,,
+"Saunders, Harry",Harry_Saunders.html,coaches/Harry_Saunders.html,FO,1926,3,,7,10,30.00,,,,,,3,,7,10,30.00,,
+"Ringrose, Doug",Doug_Ringrose.html,coaches/Doug_Ringrose.html,FI,1929,2,,8,10,20.00,,,,,,2,,8,10,20.00,,
+"Harris, Dick",Dick_Harris0.html,coaches/Dick_Harris0.html,RI,1944-1964,4,,6,10,40.00,,,,,,4,,6,10,40.00,,
+"Harvey, Robert",Robert_Harvey.html,coaches/Robert_Harvey.html,CW,2021,2,,7,9,22.22,,,,,,2,,7,9,22.22,,
+"Melling, Ted",Ted_Melling.html,coaches/Ted_Melling.html,FI,1919,4,1,4,9,50.00,,,,,,4,1,4,9,50.00,,
+"Riley, Mark",Mark_Riley.html,coaches/Mark_Riley.html,ME,2007,3,,6,9,33.33,,,,,,3,,6,9,33.33,,
+"Hammond, Bob",Bob_Hammond1.html,coaches/Bob_Hammond1.html,SY,1984,3,,5,8,37.50,,,,,,3,,5,8,37.50,,
+"Freake, Jimmy",Jimmy_Freake.html,coaches/Jimmy_Freake.html,FI,1929,1,,7,8,12.50,,,,,,1,,7,8,12.50,,
+"Cassidy, Jim",Jim_Cassidy.html,coaches/Jim_Cassidy.html,FO,1926,1,,7,8,12.50,,,,,,1,,7,8,12.50,,
+"Pemberton, Jack",Jack_Pemberton.html,coaches/Jack_Pemberton.html,NM,1931,,,8,8,0.00,,,,,,,,8,8,0.00,,
+"Dibbs, Charlie",Charlie_Dibbs.html,coaches/Charlie_Dibbs.html,GE,1936,3,,4,7,42.86,,,,,,3,,4,7,42.86,,
+"Schofield, Jarrad",Jarrad_Schofield.html,coaches/Jarrad_Schofield.html,WC,2024,2,,5,7,28.57,,,,,,2,,5,7,28.57,,
+"Feltham, Paul",Paul_Feltham.html,coaches/Paul_Feltham.html,BB,1989,5,,2,7,71.43,,,,,,5,,2,7,71.43,,
+"Plummer, Elton",Elton_Plummer.html,coaches/Elton_Plummer.html,ES,1944,3,1,3,7,50.00,,,,,,3,1,3,7,50.00,,
+"Adams, Leigh",Leigh_Adams.html,coaches/Leigh_Adams.html,NM,2022,1,,5,6,16.67,,,,,,1,,5,6,16.67,,
+"Bickley, Mark",Mark_Bickley.html,coaches/Mark_Bickley.html,AD,2011,3,,3,6,50.00,,,,,,3,,3,6,50.00,,
+"Viney, Todd",Todd_Viney.html,coaches/Todd_Viney.html,ME,2011,1,,4,5,20.00,,,,,,1,,4,5,20.00,,
+"Guy, Eric",Eric_Guy.html,coaches/Eric_Guy.html,SK,1972-1974,3,,2,5,60.00,,,,,,3,,2,5,60.00,,
+"McDonald, Donald",Donald_McDonald.html,coaches/Donald_McDonald.html,HW,2004,2,,3,5,40.00,,,,,,2,,3,5,40.00,,
+"Hocking, Garry",Garry_Hocking.html,coaches/Garry_Hocking.html,PA,2012,,1,3,4,12.50,,,,,,,1,3,4,12.50,,
+"Rademacher, Arthur",Arthur_Rademacher.html,coaches/Arthur_Rademacher.html,HW,1933,1,,3,4,25.00,,,,,,1,,3,4,25.00,,
+"Davis, Allan",Allan_Davis.html,coaches/Allan_Davis.html,SK,1987,2,,2,4,50.00,,,,,,2,,2,4,50.00,,
+"Chaplin, Troy",Troy_Chaplin.html,coaches/Troy_Chaplin.html,ME,2025,,,3,3,0.00,,,,,,,,3,3,0.00,,
+"Graham, Jaymie",Jaymie_Graham.html,coaches/Jaymie_Graham.html,WC FR,2018-2022,3,,,3,100.00,,,,,,3,,,3,100.00,,
+"Egan, Matthew",Matthew_Egan.html,coaches/Matthew_Egan.html,ES,2015,1,,2,3,33.33,,,,,,1,,2,3,33.33,,
+"Williams, Paul",Paul_Williams.html,coaches/Paul_Williams.html,WB,2011,2,,1,3,66.67,,,,,,2,,1,3,66.67,,
+"Donald, Wally",Wally_Donald.html,coaches/Wally_Donald.html,FO,1952-1953,1,,2,3,33.33,,,,,,1,,2,3,33.33,,
+"Silvagni, Sergio",Sergio_Silvagni.html,coaches/Sergio_Silvagni.html,CA,1978,,,3,3,0.00,,,,,,,,3,3,0.00,,
+"Ruddell, Cec",Cec_Ruddell.html,coaches/Cec_Ruddell.html,ES,1945-1946,,,2,2,0.00,,,,,,,,2,2,0.00,,
+"Scott, Brett",Brett_Scott.html,coaches/Brett_Scott.html,SY,1993,,,2,2,0.00,,,,,,,,2,2,0.00,,
+"Taylor, Charlie",Charlie_Taylor.html,coaches/Charlie_Taylor.html,RI,1909,,,2,2,0.00,,,,,,,,2,2,0.00,,
+"Cusack, Ted",Ted_Cusack.html,coaches/Ted_Cusack.html,NM,1939,1,,1,2,50.00,,,,,,1,,1,2,50.00,,
+"Richards, Ron",Ron_Richards1.html,coaches/Ron_Richards1.html,CW,1974,2,,,2,100.00,,,,,,2,,,2,100.00,,
+"OBrien, Paddy",Paddy_OBrien.html,coaches/Paddy_OBrien.html,CA,1925,,,2,2,0.00,,,,,,,,2,2,0.00,,
+"Laver, Les",Les_Laver.html,coaches/Les_Laver.html,GE,1940,1,,1,2,50.00,,,,,,1,,1,2,50.00,,
+"Ryan, Joe",Joe_Ryan.html,coaches/Joe_Ryan.html,FO,1959-1960,,,2,2,0.00,,,,,,,,2,2,0.00,,
+"Cashman, Jack",Jack_Cashman.html,coaches/Jack_Cashman.html,FI,1934,1,,1,2,50.00,,,,,,1,,1,2,50.00,,
+"Hunter, Harry",Harry_Hunter.html,coaches/Harry_Hunter.html,ES,1939,2,,,2,100.00,,,,,,2,,,2,100.00,,
+"Thaw, Alan",Alan_Thaw.html,coaches/Alan_Thaw.html,ES,1959,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Rush, Bob",Bob_Rush.html,coaches/Bob_Rush.html,CW,1930,,,,,,1,,,1,100.00,1,,,1,100.00,1,1
+"Patterson, Bill",Bill_Patterson1.html,coaches/Bill_Patterson1.html,SK,1938,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Bassett, Nathan",Nathan_Bassett.html,coaches/Nathan_Bassett.html,PA,2022,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Burns, Scott",Scott_Burns.html,coaches/Scott_Burns.html,AD,2022,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Lade, Brendon",Brendon_Lade.html,coaches/Brendon_Lade.html,SK,2022,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Caracella, Blake",Blake_Caracella.html,coaches/Blake_Caracella.html,ES,2022,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Hansen, Ashley",Ashley_Hansen.html,coaches/Ashley_Hansen.html,CA,2022,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"ONeil, John",John_ONeil.html,coaches/John_ONeil.html,GE,1968,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Toohey, Jim",Jim_Toohey.html,coaches/Jim_Toohey.html,FI,1920,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Hale, David",David_Hale.html,coaches/David_Hale.html,FR,2019,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Davis, Frank",Frank_Davis.html,coaches/Frank_Davis.html,ME,1979,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Hislop, Max",Max_Hislop.html,coaches/Max_Hislop.html,RI,1920,,,,,,,,1,1,0.00,,,1,1,0.00,,
+"ODonnell, Gary",Gary_ODonnell.html,coaches/Gary_ODonnell.html,ES,2006,,1,,1,50.00,,,,,,,1,,1,50.00,,
+"Clark, Wally",Wally_Clark.html,coaches/Wally_Clark.html,FI,1963,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Howell, Verdun",Verdun_Howell.html,coaches/Verdun_Howell.html,RI,1971,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Franklin, Tony",Tony_Franklin.html,coaches/Tony_Franklin.html,SY,1984,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Williams, Tommy",Tommy_Williams.html,coaches/Tommy_Williams.html,FI,1964,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Thomas, Stan",Stan_Thomas.html,coaches/Stan_Thomas.html,NM,1926,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Simmonds, Roy",Roy_Simmonds.html,coaches/Roy_Simmonds.html,HW,1973,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Slocum, Ray",Ray_Slocum.html,coaches/Ray_Slocum.html,FI,1968,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Jordon, Ray",Ray_Jordon.html,coaches/Ray_Jordon.html,NM,1976,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Hillard, Norm",Norm_Hillard.html,coaches/Norm_Hillard.html,FI,1945,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Edwards, Arthur",Arthur_Edwards0.html,coaches/Arthur_Edwards0.html,FI,1961,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Trezise, Neil",Neil_Trezise.html,coaches/Neil_Trezise.html,GE,1963,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Griggs, Les",Les_Griggs.html,coaches/Les_Griggs.html,ES,1941,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Dugdale, John",John_Dugdale.html,coaches/John_Dugdale.html,NM,1977,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Blakey, John",John_Blakey.html,coaches/John_Blakey.html,BL,2005,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Sewell, Greg",Greg_Sewell.html,coaches/Greg_Sewell.html,ES,1965,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"McLaren, George",George_McLaren.html,coaches/George_McLaren.html,FO,1951,1,,,1,100.00,,,,,,1,,,1,100.00,,
+"Goode, Frank",Frank_Goode.html,coaches/Frank_Goode.html,FO,1981,,,1,1,0.00,,,,,,,,1,1,0.00,,
+"Curcio, Frank",Frank_Curcio.html,coaches/Frank_Curcio.html,FI,1956,,,1,1,0.00,,,,,,,,1,1,0.00,,

@@ -38,12 +38,14 @@ export function GridSolverForm({
   clubs,
   venues,
   awards,
+  coaches,
   playerNames,
 }: {
   initialState: GridBoardState;
   clubs: Option[];
   venues: Option[];
   awards: AwardOption[];
+  coaches: Option[];
   /** id -> display name, for axes already carrying a Teammates-category player id. */
   playerNames: Record<string, string>;
 }) {
@@ -70,12 +72,12 @@ export function GridSolverForm({
     <div style={{ display: 'grid', gap: '1rem' }}>
       <AxisGroup
         title="Columns" side="cols" axes={state.cols}
-        clubs={clubs} venues={venues} awards={awards} playerNames={playerNames}
+        clubs={clubs} venues={venues} awards={awards} coaches={coaches} playerNames={playerNames}
         onChange={(i, next) => setAxis('cols', i, next)}
       />
       <AxisGroup
         title="Rows" side="rows" axes={state.rows}
-        clubs={clubs} venues={venues} awards={awards} playerNames={playerNames}
+        clubs={clubs} venues={venues} awards={awards} coaches={coaches} playerNames={playerNames}
         onChange={(i, next) => setAxis('rows', i, next)}
       />
 
@@ -100,7 +102,7 @@ export function GridSolverForm({
 }
 
 function AxisGroup({
-  title, side, axes, clubs, venues, awards, playerNames, onChange,
+  title, side, axes, clubs, venues, awards, coaches, playerNames, onChange,
 }: {
   title: string;
   side: 'rows' | 'cols';
@@ -108,6 +110,7 @@ function AxisGroup({
   clubs: Option[];
   venues: Option[];
   awards: AwardOption[];
+  coaches: Option[];
   playerNames: Record<string, string>;
   onChange: (index: number, next: GridAxisState) => void;
 }) {
@@ -125,6 +128,7 @@ function AxisGroup({
             clubs={clubs}
             venues={venues}
             awards={awards}
+            coaches={coaches}
             playerNames={playerNames}
           />
         ))}
@@ -134,7 +138,7 @@ function AxisGroup({
 }
 
 function AxisEditor({
-  axisLabel, axis, onChange, clubs, venues, awards, playerNames,
+  axisLabel, axis, onChange, clubs, venues, awards, coaches, playerNames,
 }: {
   axisLabel: string;
   axis: GridAxisState;
@@ -142,6 +146,7 @@ function AxisEditor({
   clubs: Option[];
   venues: Option[];
   awards: AwardOption[];
+  coaches: Option[];
   playerNames: Record<string, string>;
 }) {
   const def = GRID_BUILDERS[axis.builder];
@@ -191,6 +196,7 @@ function AxisEditor({
             clubs={clubs}
             venues={venues}
             awards={awards}
+            coaches={coaches}
             playerNames={playerNames}
           />
         ))}
@@ -200,7 +206,7 @@ function AxisEditor({
 }
 
 function ParamInput({
-  axisKey, param, value, onChange, clubs, venues, awards, playerNames,
+  axisKey, param, value, onChange, clubs, venues, awards, coaches, playerNames,
 }: {
   axisKey: string;
   param: GridParamDef;
@@ -209,6 +215,7 @@ function ParamInput({
   clubs: Option[];
   venues: Option[];
   awards: AwardOption[];
+  coaches: Option[];
   playerNames: Record<string, string>;
 }) {
   if (param.kind === 'club' || param.kind === 'venue') {
@@ -265,6 +272,18 @@ function ParamInput({
         <select value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">Choose…</option>
           {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </label>
+    );
+  }
+
+  if (param.kind === 'coach') {
+    return (
+      <label>
+        {param.label}
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Choose…</option>
+          {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
     );

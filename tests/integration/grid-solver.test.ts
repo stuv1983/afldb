@@ -385,6 +385,76 @@ describe('grid solver correctness', () => {
     expect(overlap.together).toBeGreaterThan(0);
   });
 
+  it('coached_by is exactly the players who played a match for a club while that coach was assigned to it (ISSUE-118 Stage E2)', async () => {
+    // Simon Goodwin's page names one Essendon match in 2013 (the caretaker game)
+    // before Melbourne 2017-: the match grain must carry both, with no season range.
+    const [coach] = await sql<{ id: number; playerId: number | null }[]>`
+      SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Goodwin, Simon'
+    `;
+    expect(coach, 'the coaches stage has not loaded this database').toBeDefined();
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT pms.player_id AS id
+        FROM player_match_stats pms
+        JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+       WHERE mc.coach_id = ${coach.id}
+    `;
+    const clubsCoached = await sql<{ name: string; season: number }[]>`
+      SELECT DISTINCT c.name, m.season FROM match_coaches mc JOIN matches m ON m.id = mc.match_id JOIN clubs c ON c.id = mc.club_id
+       WHERE mc.coach_id = ${coach.id} ORDER BY m.season
+    `;
+    expect(clubsCoached[0]).toEqual({ name: 'Essendon', season: 2013 });
+    expect(clubsCoached.some((r) => r.name === 'Melbourne')).toBe(true);
+
+    const axis: GridAxisState = { builder: 'coached_by', params: { coach: String(coach.id) } };
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const summary = await solveCellSummary(axis, any, 'games_asc');
+    expect(summary.eligible).toBe(truth.length);
+    const { rows } = await solveCellRows(axis, any, 'games_asc', { limit: GRID_LIMITS.maxRowsPerCell, offset: 0 });
+    const truthIds = new Set(truth.map((r) => r.id));
+    for (const r of rows) expect(truthIds.has(r.id), `player ${r.id}`).toBe(true);
+    // An Essendon 2013 player coached in that one match is in the set.
+    const [essendon] = await sql<{ id: number }[]>`
+      SELECT pms.player_id AS id FROM player_match_stats pms
+        JOIN match_coaches mc ON mc.match_id = pms.match_id AND mc.club_id = pms.club_id
+        JOIN clubs c ON c.id = mc.club_id
+       WHERE mc.coach_id = ${coach.id} AND c.name = 'Essendon' LIMIT 1
+    `;
+    expect(truthIds.has(essendon.id)).toBe(true);
+  });
+
+  it('premiership_coach is the linked coaches of Grand Final winners, and coach-only people never appear as players', async () => {
+    const truth = await sql<{ id: number }[]>`
+      SELECT DISTINCT c.player_id AS id FROM coaches c
+        JOIN match_coaches mc ON mc.coach_id = c.id
+        JOIN matches m ON m.id = mc.match_id
+       WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+         AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id
+    `;
+    expect(truth.length).toBeGreaterThan(0);
+    const axis: GridAxisState = { builder: 'premiership_coach', params: {} };
+    const any: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
+    const summary = await solveCellSummary(axis, any, 'games_asc');
+    expect(summary.eligible).toBe(truth.length);
+    // Leigh Matthews: a player (Hawthorn) and a premiership coach (Collingwood 1990,
+    // Brisbane Lions 2001-03), linked through his AFL Tables profile.
+    const [matthews] = await sql<{ playerId: number | null; link: string }[]>`
+      SELECT player_id AS "playerId", link_status_value::text AS link FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews).toMatchObject({ link: 'unique' });
+    expect(truth.some((r) => r.id === matthews.playerId)).toBe(true);
+    // The operator-supplied coach-only list holds no player identity and no players row.
+    const coachOnly = await sql<{ nameKey: string; playerId: number | null; link: string; fabricated: number }[]>`
+      SELECT c.name_key AS "nameKey", c.player_id AS "playerId", c.link_status_value::text AS link,
+             (SELECT count(*) FROM players p WHERE p.display_name = c.display_name
+                AND NOT EXISTS (SELECT 1 FROM external_identities ei WHERE ei.player_id = p.id))::int AS fabricated
+        FROM coaches c
+       WHERE c.name_key IN ('Todd, John', 'Kinnear, Col', 'Cahill, John', 'Brittain, Wayne', 'Craig, Neil', 'McCartney, Brendan', 'Bolton, Brendon', 'Fagan, Chris')
+       ORDER BY c.name_key
+    `;
+    expect(coachOnly.map((r) => r.nameKey)).toEqual(['Bolton, Brendon', 'Brittain, Wayne', 'Cahill, John', 'Craig, Neil', 'Fagan, Chris', 'Kinnear, Col', 'McCartney, Brendan', 'Todd, John']);
+    for (const r of coachOnly) expect(r, r.nameKey).toMatchObject({ playerId: null, link: 'unmatched', fabricated: 0 });
+  });
+
   it('solveCellRows returns exactly min(eligible, limit) rows for a real cell', async () => {
     const row: GridAxisState = { builder: 'brownlow_medallist', params: {} };
     const col: GridAxisState = { builder: 'career_games_min', params: { games: '0' } };
