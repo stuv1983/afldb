@@ -27,7 +27,9 @@
  * default. Set AFLDB_GRIDLEY_DIAGNOSTIC=1 to downgrade those three to
  * counted-and-named while the acquisitions are in progress; the two
  * documented semantic differences (`time of board`, `list membership`)
- * stay informational in both modes.
+ * stay informational in both modes, as do the two evidence-backed height
+ * categories (`external source disagreement`, §23.19; `adjudicated source
+ * conflict`, §23.26), while an open `source conflict` fails like a data gap.
  */
 import './guard';
 
@@ -49,6 +51,7 @@ import {
 } from '@/search/gridley-compat';
 import { type GridAxisState } from '@/search/grid-solver-spec';
 import { loadAnswers, loadCorpus, type CorpusBoard } from '../gridley-compat.test';
+import { adjudicationStaleness, loadHeightAdjudications, type HeightAdjudication } from '../height-adjudications';
 
 afterAll(async () => {
   await sql.end();
@@ -158,7 +161,7 @@ type CellFinding = {
   cell: string;
   category: 'parse' | 'unsupported' | 'dataset gap' | 'partial dataset' | 'query failure' | 'timeout' | 'empty answer'
     | 'incorrect known answer' | 'count mismatch' | 'time of board' | 'list membership'
-    | 'external source disagreement' | 'source conflict';
+    | 'external source disagreement' | 'source conflict' | 'adjudicated source conflict';
   row: string;
   col: string;
   rowAxis: string;
@@ -191,6 +194,14 @@ const hallOfFameYears = new Map<number, number>();
  */
 const heightEvidence = new Map<number, { source: string; height: number }[]>();
 /**
+ * ISSUE-118 §23.26. AFLDB player id -> the tracked operator adjudication of a height source
+ * conflict (data/players/height-adjudications.csv), keyed by the AFL Tables profile the player's
+ * afltables identity holds. An adjudication applies only while the canonical height and the
+ * competing evidence it was decided on are exactly what the database holds now: any change to
+ * either makes it stale and the cell returns to `source conflict`.
+ */
+const heightAdjudications = new Map<number, HeightAdjudication & { stale: string | null }>();
+/**
  * ISSUE-118 §23.23. AFLDB player id -> the co-captaincy AFLDB's own canonical data records for a
  * premiership: more than one linked captain of the premier club that season, each of whom played in
  * and won the Grand Final. Built from captaincies + match facts, never from Gridley's answer.
@@ -201,6 +212,7 @@ const INFORMATIONAL: Record<string, string> = {
   'time of board': "Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today",
   'list membership': "Gridley's club, decade, teammate, club-count, wooden-spoon and minor-premiership criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players); AFLDB models games played",
   'external source disagreement': "a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23). AFLDB's answer is source-backed; the definitions differ",
+  'adjudicated source conflict': "a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on",
 };
 /**
  * Data AFLDB (or this database) does not hold. These FAIL the run: the
@@ -230,7 +242,7 @@ async function eligibleSet(axis: GridAxisState): Promise<Set<number>> {
 }
 
 beforeAll(async () => {
-  const [clubs, venues, awards, players, hof, evidence, coCaptains, [probe]] = await Promise.all([
+  const [clubs, venues, awards, players, hof, evidence, profiles, coCaptains, [probe]] = await Promise.all([
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM club_organizations`,
     sql<{ name: string; id: number }[]>`SELECT canonical_name AS name, id FROM venues`,
     sql<{ slug: string; id: number }[]>`SELECT slug, id FROM awards`,
@@ -240,6 +252,9 @@ beforeAll(async () => {
     sql<{ playerId: number; inductedYear: number | null }[]>`SELECT player_id AS "playerId", inducted_year AS "inductedYear" FROM hall_of_fame WHERE player_id IS NOT NULL`,
     sql<{ playerId: number; source: string; height: number }[]>`SELECT e.player_id AS "playerId", s.key AS source, e.height_cm AS height
                                                                   FROM player_height_evidence e JOIN sources s ON s.id = e.source_id WHERE s.key <> 'afltables'`,
+    sql<{ playerId: number; profile: string; height: number | null }[]>`SELECT ei.player_id AS "playerId", ei.external_id AS profile, p.height_cm AS height
+                                                                          FROM external_identities ei JOIN sources s ON s.id = ei.source_id JOIN players p ON p.id = ei.player_id
+                                                                         WHERE s.key = 'afltables'`,
     // Premiership club-seasons with more than one linked captain who played in and won the Grand Final.
     sql<{ playerId: number; season: number; club: string; others: string }[]>`
       WITH prem AS (SELECT m.season, m.winner_club_id AS club_id, m.id AS match_id FROM matches m
@@ -278,6 +293,12 @@ beforeAll(async () => {
   for (const h of hof) if (h.inductedYear !== null) hallOfFameYears.set(h.playerId, h.inductedYear);
   for (const e of evidence) {
     const l = heightEvidence.get(e.playerId) ?? []; l.push({ source: e.source, height: e.height }); heightEvidence.set(e.playerId, l);
+  }
+  const byProfile = new Map(profiles.map((r) => [r.profile, r]));
+  for (const adj of loadHeightAdjudications()) {
+    const row = byProfile.get(adj.afltablesProfile);
+    if (!row) continue; // this database has no afltables identity for the profile: nothing to adjudicate
+    heightAdjudications.set(row.playerId, { ...adj, stale: adjudicationStaleness(adj, row.height, heightEvidence.get(row.playerId) ?? []) });
   }
   for (const r of coCaptains) {
     coCaptaincy.set(r.playerId, `${coCaptaincy.get(r.playerId) ? `${coCaptaincy.get(r.playerId)}; ` : ''}co-captain of ${r.club} ${r.season} with ${r.others} (all played and won the Grand Final)`);
@@ -506,8 +527,13 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
             const onAfldbSide = independent.filter((e) => satisfies(e.height) === inAfldb);
             const onGridleySide = independent.filter((e) => satisfies(e.height) === inGridley);
             const list = (l: { source: string; height: number }[]) => l.map((e) => `${e.source} ${e.height}`).join(', ');
+            const adj = heightAdjudications.get(afldbId);
             if (independent.length > 0 && onGridleySide.length === 0) {
               findings.push({ ...base, category: 'external source disagreement', detail: `${detail}; independent sources on AFLDB's side: ${list(onAfldbSide)}` });
+            } else if (adj && adj.stale === null) {
+              findings.push({ ...base, category: 'adjudicated source conflict', detail: `${detail}; ${adj.decision} (${adj.decidedOn}, ${adj.reference}): AFL Tables ${adj.afltablesCm} against ${adj.competingEvidence}` });
+            } else if (adj) {
+              findings.push({ ...base, category: 'source conflict', detail: `${detail}; adjudication of ${adj.decidedOn} is STALE: ${adj.stale}` });
             } else {
               findings.push({ ...base, category: 'source conflict', detail: `${detail}; ${independent.length === 0 ? 'no independent height source' : `independent sources on Gridley's side: ${list(onGridleySide)}${onAfldbSide.length ? `; on AFLDB's side: ${list(onAfldbSide)}` : ''}`}` });
             }

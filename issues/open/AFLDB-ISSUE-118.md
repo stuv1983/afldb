@@ -3695,3 +3695,99 @@ then the model and curated-source decisions (`season2024player` 14, `irish`/`tas
 `intrulesplayer`, `winaftersiren`, `spoils5season`, `recruitedByDodoro`); (3) DEV load of the birth dates;
 (4) production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian adjudication remains
 open.
+
+### 23.26 Stage E1 — the three height source conflicts adjudicated on evidence (5 September 2026, eighth session, Fable medium)
+
+**Scope.** The `source conflict` category §23.19 left open: 102 cells, 3 players (Paddy McCartin 10175 44 cells,
+Jamarra Ugle-Hagan 6700 18, Nathan Brown 9771 40). For each, every source AFLDB holds was inspected on the
+rebuilt `afldb_test` (register rows in `full-history-20260902/player_details.csv`, `player_height_evidence`,
+`external_identities`) and an explicit decision made. **No canonical height changed** (`players.height_cm`
+194 / 194 / 181 before and after; `height_evidence_id` unchanged).
+
+**E1.1 Identity first — Nathan Brown.** Gridley's Nathan Brown is id 5429 (criterion
+`nathan-brown-teammate-5429`); AFL Tables lists three Nathan Browns and the §23.19 Wikipedia pass could not key
+his article by name. The 50 `height180` cells whose key lists 5429 sit on Richmond (12), Western Bulldogs (3),
+`dreamtime-playedin-1`, `allAus1953`/`allAus2000s`, `clubLeadingGoalKicker2x` and `brownlow50votes` axes: the
+1997–2003 Bulldogs / 2004–2009 Richmond player, afldb 9771, exactly as `PLAYER_OVERRIDES` bridges him — not
+the Melbourne Nathan Brown 9770 whom the register lists at 180. The Stage D1 dates settle the article: afldb
+9771 `dob` 1978-02-10; Wikipedia "Nathan Brown (Australian footballer, born 1978)" infobox `birth_date`
+1978-02-10, `draftpick` 10th 1996 (Bulldogs), `years1` 1997–2003, `years2` 2004–2009, **`height` 183 cm**
+(revision 1343824433, 2026-03-16T16:40:56Z). Added as row 84 of the tracked
+`data/players/height-evidence-wikipedia.csv` with the tie recorded in its note; loaded on `afldb_test` by
+`enrich_heights_wikipedia.py` (batch 22: 84 profiles resolved, 0 unresolved, 60 agree / 24 differ, 0.7 s;
+`--validate-only` and `--dry-run` first). Decision: **AFL Tables 181 retained; the only independent source
+(183) sits on AFLDB's side of the ≤180 bound**, so under the unchanged §23.19 H3.6 rule the 40 cells are
+`external source disagreement` — evidence, not a rule change. The `players_with_wikipedia_height_evidence`
+gate derives from the artefact's row count (`wikipediaHeightRows()`), so the next rebuild expects 84 without
+an edit; `tests/db-test-rebuild.test.ts` 251/251 unchanged.
+
+**E1.2 Paddy McCartin — AFL Tables 194 retained.** Register: 194 on both club rows (St Kilda 2015–2018,
+Sydney 2022–2023). AFL API roster: 195, one constant across all seven listed seasons (2015–2019, 2022–2023;
+`CD_I298312`). Wikipedia infobox: 195 (revision 1371023312), **uncited** — it cannot be shown independent of
+the AFL listing. The 1 cm difference is the AFL listing's documented systematic skew (+1 on 274 of the 701
+differing shared players, H3.3). Neither source can be shown wrong from the other; §23.19 rule 1 keeps the
+column on one measurement convention. **Decision: retain; the cell answer at the ≥195 bound is not provable
+from AFLDB's sources.**
+
+**E1.3 Jamarra Ugle-Hagan — AFL Tables 194 retained.** Register: 194 on both club rows (Western Bulldogs
+2021–2024 and Gold Coast 2026 — the register captured 2026-09-02 includes his current club and still says 194).
+AFL API: 197, one constant 2021–2026 (`CD_I1009301`). Wikipedia: 197 (revision 1369185653), uncited. A 3 cm
+delta is beyond the ±2 skew but inside the listing's distribution (+3 on 45 shared players). Superseding for one
+player would put `height_cm` on two conventions (rule 1); a column-wide rule "listing supersedes the register
+when they differ by ≥3 cm and a third source agrees" would touch roughly 100 players and needs Wikipedia (or
+another source) for each — a separate policy decision, not made here. **Decision: retain; the cell answer at
+the ≥195 bound is not provable from AFLDB's sources.**
+
+**E1.4 The classification contract — an adjudication is a tracked, self-invalidating record.** New tracked
+artefact **`data/players/height-adjudications.csv`** (columns `afltables_profile, player, afltables_cm,
+competing_evidence, decision, reason, decided_on, reference`; two rows, `retain_afltables`; keyed by the AFL
+Tables profile path, never by name; `.gitignore` now opts `/data/players/` in explicitly for it and the
+Wikipedia set, which had been force-added). Reader `tests/height-adjudications.ts` (`loadHeightAdjudications`,
+fail-closed on header, field count, profile shape, duplicate profile, non-integer or implausible height,
+unsorted or malformed `source:cm` pairs, unknown decision, a reason under 40 characters, date, reference) and
+`adjudicationStaleness(adj, canonicalHeight, competing)`: a record applies **only while the canonical height
+and the exact set of non-AFL-Tables evidence pairs are those it was decided on**; a supersession, a new register
+value, a new source or a changed value returns it to `source conflict` with the reason in the cell detail.
+`tests/integration/gridley-corpus.test.ts`: new informational category **`adjudicated source conflict`**
+(reported, never failed) taken in the height branch after the §23.19 evidence test and before the open
+`source conflict` fallback; the rule for `external source disagreement` and `source conflict` is unchanged.
+Nothing reads Gridley's key. `tests/height-reconciliation.test.ts` gains a `height adjudications artefact`
+block (the tracked rows exactly as recorded, quoted/CRLF parsing, six refusals, five staleness cases):
+**10/10**; `tsc --noEmit` clean; eslint clean on the touched files.
+
+**E1.5 Evidence, before → after, same rebuilt `afldb_test` (plus batch 22).**
+
+| Measure | Before (§23.25) | After |
+|---|---:|---:|
+| `source conflict` cells / players | 102 / 3 | **0 / 0** |
+| `adjudicated source conflict` cells / players | — | **62 / 2** (McCartin 44, Ugle-Hagan 18) |
+| `external source disagreement` cells / players | 202 / 7 | **242 / 8** (+ Nathan Brown 40) |
+| `incorrect known answer` | 0 | 0 |
+| `unsupported` cells / valid criteria | 306 / 18 | 306 / 18 |
+| `dataset gap` | 354 | 354 |
+| cells solved | 9,629 / 10,287 | 9,629 / 10,287 |
+| timeouts / cells over 1 s (max) | 0 / 16 (2.09 s) | 0 / 18 (1.91 s) |
+| strict failing cells | 762 | **660** = `unsupported` 306 + `dataset gap` 354 |
+| Wikipedia evidence players (rebuild gate) | 83 | 84 |
+
+Diagnostic 1,164/1,164 (284 s); strict 1,162/1,164 (the two acceptance assertions, on `unsupported` 306 and
+`dataset gap` 354 only). Height oracle (`gridley-height-oracle`, `AFLDB_HEIGHT_REPORT`) 16/16, 420 height cells
+compared, bridged answer players with a height 950 / 950; its per-cell false-negative shape for the three
+players is unchanged because the oracle reads `players.height_cm`, which did not move. `grid-solver`
+integration untouched (no builder or SQL changed).
+
+**Not done / deviations.** (a) The height-adjudication model is a test-side classification contract; nothing
+in `src/` or the rebuild reads the artefact (it does not fill or change data, so no stage or gate is needed).
+(b) DEV (`afldb_dev`) does not carry batch 22; DEV is not semantic evidence. (c) The column-wide "≥3 cm with a
+third source" question (E1.3) is recorded, not decided.
+
+**Files:** `data/players/height-evidence-wikipedia.csv` (+1 row), `data/players/height-adjudications.csv`
+(new), `.gitignore`, `tests/height-adjudications.ts` (new), `tests/height-reconciliation.test.ts`,
+`tests/integration/gridley-corpus.test.ts`, `CHANGELOG.md`, `IssuesIndex.md`, `issues.md`, this runbook.
+
+**Exact next action:** §23.25's list less item (1): **coaches** from the snapshot's per-match coach column
+(`premcoach` 4, `coachedBy*` 12 occurrences) — inspect the accepted fitzRoy/AFL Tables source first, record the
+source/model decision, then a match-level (match, club, coach) responsibility model suitable for later
+person/profile integration; then siblings / father–son; then the model and curated-source decisions; DEV load of
+the birth dates; production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian
+adjudication remains open.

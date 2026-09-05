@@ -13,6 +13,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { HEIGHT_ADJUDICATION_COLUMNS, adjudicationStaleness, loadHeightAdjudications } from './height-adjudications';
+
 const repositoryRoot = join(__dirname, '..');
 const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
 
@@ -100,5 +102,58 @@ describe('enrich_heights reconciliation', () => {
     expect(silly).toMatchObject({ status: 'mapped', height: null });
     // The register lists a guernsey the match rows never recorded: informational only.
     expect(jumperless).toMatchObject({ status: 'mapped', height: 200, jumper: null });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-118 §23.26: the tracked operator adjudications of height source
+ * conflicts. The corpus test applies a row only while the canonical height and
+ * the competing evidence it names are exactly what the database holds, so the
+ * artefact itself must be well-formed and self-describing.
+ */
+describe('height adjudications artefact', () => {
+  const header = HEIGHT_ADJUDICATION_COLUMNS.join(',');
+  const row = (profile = 'players/P/Paddy_McCartin.html', cm = '194', competing = 'afl_api:195;wikipedia:195', decision = 'retain_afltables') =>
+    `${profile},Paddy McCartin,${cm},${competing},${decision},"AFL Tables register lists 194 on both club rows; the AFL listing and Wikipedia say 195.",2026-09-05,AFLDB-ISSUE-118 §23.26`;
+
+  it('loads the tracked artefact: unique profiles, integer heights, sorted competing evidence, a known decision', () => {
+    const rows = loadHeightAdjudications();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(new Set(rows.map((r) => r.afltablesProfile)).size).toBe(rows.length);
+    for (const r of rows) {
+      expect(r.decision).toBe('retain_afltables');
+      expect(r.competingEvidence.split(';').every((p) => /^[a-z_]+:\d{3}$/.test(p))).toBe(true);
+      expect(r.reference).toMatch(/^AFLDB-ISSUE-118/);
+    }
+    // The two §23.26 decisions, exactly as recorded.
+    expect(rows.find((r) => r.player === 'Paddy McCartin')).toMatchObject({ afltablesCm: 194, competingEvidence: 'afl_api:195;wikipedia:195' });
+    expect(rows.find((r) => r.player === 'Jamarra Ugle-Hagan')).toMatchObject({ afltablesCm: 194, competingEvidence: 'afl_api:197;wikipedia:197' });
+  });
+
+  it('parses quoted reasons with commas and CRLF rows', () => {
+    const [r] = loadHeightAdjudications(`${header}\r\n${row()}\r\n`);
+    expect(r).toMatchObject({ afltablesProfile: 'players/P/Paddy_McCartin.html', afltablesCm: 194, decidedOn: '2026-09-05' });
+    expect(r.reason).toContain('both club rows; the AFL listing');
+  });
+
+  it('refuses a malformed artefact rather than applying it', () => {
+    expect(() => loadHeightAdjudications(`profile,player\n${row()}\n`)).toThrow(/header/);
+    expect(() => loadHeightAdjudications(`${header}\n${row()}\n${row()}\n`)).toThrow(/duplicate profile/);
+    expect(() => loadHeightAdjudications(`${header}\n${row('Paddy McCartin')}\n`)).toThrow(/profile path/);
+    expect(() => loadHeightAdjudications(`${header}\n${row(undefined, '19x')}\n`)).toThrow(/afltables_cm/);
+    expect(() => loadHeightAdjudications(`${header}\n${row(undefined, undefined, 'wikipedia:195;afl_api:195')}\n`)).toThrow(/sorted/);
+    expect(() => loadHeightAdjudications(`${header}\n${row(undefined, undefined, undefined, 'prefer_gridley')}\n`)).toThrow(/decision/);
+  });
+
+  it('applies only while the canonical height and the competing evidence are exactly those decided on', () => {
+    const adj = { afltablesCm: 194, competingEvidence: 'afl_api:195;wikipedia:195' };
+    const evidence = [{ source: 'wikipedia', height: 195 }, { source: 'afl_api', height: 195 }];
+    expect(adjudicationStaleness(adj, 194, evidence)).toBeNull();
+    // The canonical value moved (a supersession or a new register): the decision no longer describes it.
+    expect(adjudicationStaleness(adj, 195, evidence)).toMatch(/canonical height is now 195/);
+    expect(adjudicationStaleness(adj, null, evidence)).toMatch(/now NULL/);
+    // A new or changed competing source: the evidence set the operator reviewed is not this one.
+    expect(adjudicationStaleness(adj, 194, [...evidence, { source: 'club_site', height: 196 }])).toMatch(/competing evidence is now \[afl_api:195;club_site:196;wikipedia:195\]/);
+    expect(adjudicationStaleness(adj, 194, [{ source: 'afl_api', height: 195 }])).toMatch(/adjudicated on \[afl_api:195;wikipedia:195\]/);
   });
 });
