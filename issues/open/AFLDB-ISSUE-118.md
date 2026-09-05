@@ -3791,3 +3791,112 @@ source/model decision, then a match-level (match, club, coach) responsibility mo
 person/profile integration; then siblings / father–son; then the model and curated-source decisions; DEV load of
 the birth dates; production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian
 adjudication remains open.
+
+### 23.27 Stage E2 (coaches) — source investigated, model decided, NOT implemented (5 September 2026, eighth session, Fable medium)
+
+Investigation only, as the brief required before any schema. Nothing in `src/`, the migrations, the rebuild or
+`afldb_test` changed for coaches in this session. Context reached the handoff ceiling after §23.26; the
+implementation is the exact next action below.
+
+**E2.1 What the accepted snapshot carries.** Every fitzRoy `player_stats_<season>.csv` in the accepted
+baseline `full-history-20260902` (129 files, 685,473 rows, 81 columns) carries a **`Coach`** column (column 79),
+"Surname, Given" form, one value per row; the in-season supplement `issue129-t7-20260903` carries the same
+column. Measured on the baseline:
+
+| Measure | Value |
+|---|---:|
+| team-match groups (season, date, round, home, away, playing-for) | 33,676 = 16,838 matches × 2 |
+| groups with a coach | 32,034; groups without 1,642 |
+| groups whose rows disagree on the coach | **0** — the column is exactly one coach per (match, club) |
+| matches with both coaches / one / neither | 15,817 / 400 / 621 |
+| seasons with any gap | 1897–1901 (every match), 1902–1910 shrinking (127/144 → 36/188), 1912 18, 1914 1, 1915–1922 15–17 each, **1940 11/224**; complete from 1941 |
+| distinct coach strings | 383 (+2 in the supplement only: Carr, Josh; Fraser, Josh) |
+| team-seasons with more than one coach | 162 of 1,530 — mid-season changes and caretakers are represented per match (2022: seven clubs; 2023 Gold Coast King/Dew, North Ratten/Clarkson, Richmond McQualter/Hardwick; 2024 West Coast Simpson/Schofield; 2025 Melbourne Chaplin/Goodwin) |
+| the eight Gridley coaches | Worsfold 388 team-matches (West Coast 2002–2013, Essendon 2016–2020); Daniher 223 (Melbourne 1998–2007); Hardwick 355 (Richmond 2010–2023 r10, Gold Coast 2024–2025); Simpson 242 (West Coast 2014–2024); Clarkson 449 (Hawthorn 2005–2021, North 2023–2025); Goodwin 203 (**Essendon 2013 ×1** — the caretaker match Gridley's text names — Melbourne 2017–2025); Matthews, Leigh 461 (Collingwood 1986–1995, Brisbane Lions 1999–2008; "Matthews, Herbie" is a distinct string) |
+
+Spelling is stable: one string per person across eras (McHale 1912–1949, Kennedy 1957–1989, Sheedy 1981–2013,
+Malthouse 1984–2015 each a single string). The column names the coach; it does not key the person.
+
+**E2.2 Identity — the AFL Tables coaches index and coach pages are the key.** `afltables.com/afl/stats/
+coaches/coaches_idx.html` (fetched once for this investigation, 227 KB, not stored) lists **386 coach pages
+with 386 distinct names — no name maps to two pages** — and **all 385 snapshot + supplement strings resolve
+to a page by exact string** (one index name never coaches in the snapshot). Each coach page
+(`coaches/<Given>_<Surname><n>.html`, the same `<n>` disambiguation as player profiles; e.g. `Ron_Barassi0.html`)
+carries a **"Player Stats" link to the exact player profile path** (`../players/R/Ron_Barassi0.html`), the
+coach's birth date, and every game coached with its game URL. That link is the person identity: it is the
+same `players/<L>/<Name>.html` path `external_identities` holds for every canonical player (source
+`afltables`), so a coach who played joins the existing player row through the key AFLDB is built on, and a
+coach who did not play (no "Player Stats" link) has no player row and none is fabricated. Name-only linking
+measured on `afldb_test` shows why the key matters: of 383 strings, 349 match exactly one player by
+normalised name with debut ≤ first season coached, **16 are ambiguous** (Ron Barassi — two Ron Barassis, Mark
+Williams — three, both **premiership coaches**; Alan Richardson, Len Smith, Charlie Cameron, Jack Williams …)
+and 18 match nobody (Worrall, Fagan, Craig, Cahill, Bolton, Kinnear, McCartney, Brittain, Todd … — coach-only
+in the VFL/AFL, correctly unlinkable; "ONeil, John" is an apostrophe difference).
+
+**E2.3 Model decision.**
+
+1. **`coaches`** — one row per person who coached: `id`, `afltables_coach_path` (unique; the coach page
+   path), `display_name`, `given_name`, `surname`, `name_key` (the snapshot's "Surname, Given" string, unique),
+   `dob` (from the coach page), **`player_id` nullable → `players`** with `link_status_value link_status`
+   (`unique` when the coach page's Player Stats profile resolves through `external_identities`; `unmatched`
+   when the page has no profile link; never inferred from the name), `source_id`, `source_record_id`,
+   `import_batch_id`, `notes`. This is the "person" seam: a player-turned-coach is one `players` row plus one
+   `coaches` row joined by `player_id`; later profile work renders both domains from that join.
+2. **`match_coaches`** — `(match_id, club_id)` primary key, `coach_id`, `source_id`, `source_record_id`
+   (`<match_key>@<club>`), `import_batch_id`. One row per (match, club) with a coach in the snapshot column;
+   caretakers and mid-season changes are simply the coach of that match. No season ranges anywhere. Coach
+   W/D/L, games, win %, finals, Grand Finals and premierships are **derived** from `match_coaches ⋈ matches`
+   when needed, never stored.
+3. **Acquisition (new tracked dataset, manifest-pinned):** `tools/rebuild/afltables/acquire_coaches.R` (or
+   `.py` beside `acquire_club_lists.R`) fetches the coaches index and the 386 coach pages, writes
+   `coaches_index.csv` (name, coach path) and `coach_pages.csv` (coach path, player profile path or blank,
+   born, games coached) plus raw HTML under gitignored `data/sources/afltables/coaches/<label>/`, with a tracked
+   manifest `docs/rebuild-manifests/afltables_coaches/<label>.json` and a pin block `coaches.accepted_snapshot`
+   in `tools/rebuild/afltables/afltables-contract.json` (label, manifest, `manifest_sha256_lf`, `measured`),
+   read fail-closed exactly like `club_player_lists`.
+4. **Loader** `tools/migration/import_match_coaches.py`: verifies the coaches snapshot and the fitzRoy baseline
+   + supplements (the same labels the `heights` stage reads from `height_enrichment`, reused through a shared
+   argv helper — the per-match rows are the same files), builds (match_key, club) → coach string from the
+   `Coach` column (refusing any group with two strings), resolves the match by `matches.match_key`
+   (16,838 / 16,838 populated) and the club through `import_fitzroy_core.ClubResolver` (historical identity),
+   resolves the string → coach page (exact, refusing an unmapped string) → profile → `player_id`, upserts
+   `coaches` then `match_coaches` in one transaction, `--validate-only` and `--dry-run` like the other loaders.
+   The coach page's own games-coached count is a per-coach cross-check against the column (report only,
+   gate the total).
+5. **Rebuild:** data stage `coaches` after `birth-dates` and before `draftguru` (needs matches, clubs and the
+   afltables identities `fitzroy` registered; nothing later reads it), preflight `--validate-only`, final gates
+   from the contract's `measured` block: `coaches` (385 with the supplement), `match_coaches` (32,034 baseline +
+   supplement rows), `matches_with_both_coaches`, `coaches_linked_to_players`, `coaches_unlinked` (coach-only),
+   `match_coaches_without_coach_page` = 0. `tests/db-test-rebuild.test.ts` order pins 17 → 18 stages / 11 → 12
+   data stages.
+6. **Grid Solver** (`grid-solver-spec.ts`, `grid-solver.ts`): `coached_by {coach}` (group Coaching, "Coached
+   by X": exists `player_match_stats pms ⋈ match_coaches mc ON (mc.match_id, mc.club_id) = (pms.match_id,
+   pms.club_id)` with `mc.coach_id = $coach` — the same set-then-rank semi-join shape as `teammate_of`) and
+   `premiership_coach` (no params: exists `coaches c` with `c.player_id = p.id` and a `match_coaches` row on a
+   `round_type = 'grand_final'` match whose `winner_club_id` is that row's club). `GRID_BUILDERS` 152 → 154.
+   `gridley-compat.ts`: `premcoach` → `premiership_coach`; `coachedBy*` → `coached_by` with the coach resolved
+   by a `resolveCoach` lookup (exact given + surname, the eight are unique); the eight data-absent reasons are
+   deleted (data-absent criteria 18 → 10, occurrences 102 → 86). Focused tests: loader reconciliation on
+   synthetic rows beside `tests/height-reconciliation.test.ts`, `grid-solver-spec` builder count,
+   `gridley-compat` denominators, an `integration/grid-solver` block (solver counts equal SQL truth for
+   `coached_by` Goodwin including the 2013 Essendon match, `premiership_coach` equals the distinct linked
+   premiership coaches), then diagnostic + strict corpus with before/after (`unsupported` 306 / 18 criteria
+   expected → 290 / 10, everything else unchanged).
+
+**Not decided / to verify during implementation.** (a) Whether the 621 no-coach matches and 400 one-sided
+matches (all ≤1922 plus 1940) should be reported as a `measured` absence only (recommended: they are the
+source's own gaps; no stage fills them). (b) The one index-only coach (never in the snapshot) is loaded as a
+`coaches` row with no `match_coaches` rows, or skipped — recommended: loaded, so the person exists once the
+next in-season snapshot names them. (c) The coach page's "Player Stats" link is the identity; if any page's
+profile path does not resolve in `external_identities`, the loader must refuse rather than fall back to the
+name.
+
+**Files:** `IssuesIndex.md`, `issues.md`, this runbook (no code).
+
+**Exact next action (fresh session, Fable medium):** implement E2.3 items 3 → 4 → 5 → 6 in that order,
+acquiring the coaches snapshot first (label `coaches-<date>`, 386 pages, polite rate), proving the loader on
+`afldb_test` by hand (`--validate-only`, `--dry-run`, load), then the unattended 18-stage `db:test:rebuild`
+(expect FINAL VALIDATION 58 + the new gates), then the solver/compat tests and both corpus modes, recording
+before/after in a §23.28. Then siblings / father–son, the model and curated-source decisions, DEV load of the
+birth dates, production with the next deploy (ISSUE-137 sequencing). Tony Buhagiar's All-Australian
+adjudication remains open.
