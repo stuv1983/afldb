@@ -5022,3 +5022,96 @@ by themselves; at least one unlinked winning row exists and is excluded; Shuey i
 **Exact next action (fresh session):** perform the ISSUE-118 remaining-scope review. Still open
 alongside it: the `after-siren` rebuild stage after `siblings` with artefact-derived gates (126 rows,
 64 / 62 qualifying, 120 linked), the DEV load, International Rules, `season2024player`, Buhagiar.
+
+### 23.36 Remaining-scope review — closure scope and accepted deferrals (5 September 2026, seventeenth session, Sonnet 5)
+
+Scope: documentation only, per this session's brief. No Grid Solver criteria, schema, canonical
+data, ingestion, loaders, rebuild stages, UI or solver semantics touched. No rebuild run.
+
+**W.1 Verification of the residual unsupported-valid set.** §23.35 V.3/V.4 already recorded
+`unsupported valid criteria` falling 8 → 7 and data-absent 30 → 26 occurrences when `winaftersiren`
+left the set (mapped to `after_siren_winner`). The last named 8-criterion list in this runbook
+(sixteenth-session predecessor, data-absent denominator before §23.35) was `season2024player` (14),
+`intrulesplayer` (5), `winaftersiren` (4), `irish` (2), `recruitedByDodoro` (2), `nfl` (1),
+`spoils5season` (1), `tasmanian` (1) — 8 criteria, 30 occurrences. Removing `winaftersiren` (now
+`mapped`) leaves exactly:
+
+| Criterion | Occurrences |
+|---|---:|
+| `season2024player` | 14 |
+| `intrulesplayer` | 5 |
+| `irish` | 2 |
+| `recruitedByDodoro` | 2 |
+| `nfl` | 1 |
+| `spoils5season` | 1 |
+| `tasmanian` | 1 |
+| **Total** | **26** |
+
+**7 criteria, 26 occurrences** — reconciling exactly with §23.35 V.4's `data-absent 8 → 7 criteria /
+30 → 26 occurrences`, and exactly the set this session was asked to confirm. No repository evidence
+contradicts it; this is the full and only residual unsupported-valid set as of `3fda0ce`.
+
+The untracked `gridley-report.json` in the working tree (one of the two pre-existing stray untracked
+files, left untouched) was deliberately **not** used as evidence: it is a stale corpus-diagnostic
+dump that predates the coaches / father-son / siblings / after-siren work in this runbook — it still
+carries `brother`, `fathersonfather`, `premcoach`, the seven `coachedBy*` ids and even
+`winaftersiren` as `unsupported`, all of which §23.27–§23.35 above show already `mapped`. The
+authoritative record for this verification is this file's own §23.27–§23.35 sequence and the
+denominators it carries forward session to session; no fresh corpus run was needed or run.
+
+**W.2 Classification of the residual set.**
+
+| Criterion | Occurrences | Deferral type | Reasoning |
+|---|---:|---|---|
+| `season2024player` | 14 | Redundant compatibility alias | AFLDB already exposes generic season/era player filters (decade played, played between seasons, X+ games in a named season, and other season-scoped criteria per §23.11/§3176). A 2024-specific list-membership builder would duplicate that generic capability for one Gridley-only alias; not a canonical data gap. No one-off 2024 builder will be added. |
+| `intrulesplayer` | 5 | Future / non-core canonical domain | International Rules is a hybrid-code representative competition AFLDB does not model (§3178: "small curated CSVs… into a `representative_selections` table"). Deferred as a possible future expansion, not built solely to satisfy this one Gridley criterion. |
+| `irish` | 2 | Future / non-core canonical domain | Nationality/origin is not a modelled domain (§3177: no birthplace/nationality column on `players`). |
+| `tasmanian` | 1 | Future / non-core canonical domain | Birthplace/state-of-origin is not a modelled domain (same §3177 gap as `irish`). |
+| `nfl` | 1 | Future / non-core canonical domain | Other-code (NFL) career history is outside the current core AFL model (§3178, grouped with International Rules as a representative/other-code career gap). |
+| `recruitedByDodoro` | 2 | Future / non-core canonical domain | Recruiter/list-manager tenure per player is not modelled and no structured source names a recruiter per player (§2656/§3180: "fundamentally unavailable… no structured source"). Not to be solved by hard-coding a Dodoro player list or building a whole recruiter domain for one criterion. |
+| `spoils5season` | 1 | Unavailable canonical statistic | Spoils is a Champion Data–only statistic (§2657/§3181), not present in any free source AFLDB ingests and not equivalent to any statistic AFLDB does carry (in particular not `one_percenters` — no repository evidence establishes semantic equivalence, so none is substituted). |
+
+Three deferral types, matching the brief exactly:
+- **redundant compatibility alias:** `season2024player`;
+- **future / non-core canonical domains:** `intrulesplayer`, `irish`, `tasmanian`, `nfl`, `recruitedByDodoro`;
+- **unavailable canonical statistic:** `spoils5season`.
+
+**W.3 Formal closure condition.** ISSUE-118 may close when:
+
+1. every Gridley criterion inside the accepted AFLDB canonical scope is supported correctly or explicitly evidence-classified;
+2. every remaining unsupported-valid criterion is an explicitly accepted deferral (§W.2 above is that classification for the current residual set);
+3. no unsupported criterion remains accidentally unclassified;
+4. incorrect known answer = 0, except independently evidenced external-source disagreements already classified as such;
+5. no unresolved / unrecognised mappings remain within accepted scope;
+6. no ISSUE-118 solver timeouts remain;
+7. canonical reconciliation and rebuild gates pass;
+8. all user-facing canonical domains introduced by ISSUE-118 have an appropriate public UI exposure path, or are explicitly documented as internal-only;
+9. the final UI exposure audit (§W.4) is complete;
+10. the final corpus / rebuild closure proof is complete.
+
+Gridley is treated throughout as an external compatibility/regression oracle — not the AFLDB product
+roadmap and not a canonical-truth source. Deferrals recorded above are accepted against that
+contract; they are not a claim that Gridley is wrong, and not a claim that AFLDB will never model
+these domains.
+
+**W.4 Required UI exposure audit (not performed in this session).** Before ISSUE-118 can close, the
+following domains this issue introduced or extended must be audited for public UI exposure:
+
+- coaches;
+- father-son;
+- siblings;
+- after-siren events;
+- historical player attributes and honours.
+
+That audit must establish: what is already publicly visible; what remains inaccessible; whether
+coach-only people (no player profile) have a public card/profile; whether after-siren events have an
+appropriate public presentation; whether historical canonical attributes/honours appear properly on
+player profiles; whether family relationships (father-son, siblings) appear correctly on both related
+profiles.
+
+**Exact next action:** perform the ISSUE-118 public UI exposure design audit in a fresh Claude Design
+session. Still open alongside it, unchanged from §23.35: the `after-siren` rebuild stage after
+`siblings`, the DEV load (birth dates + coaches + father-son + siblings + after-siren), International
+Rules acquisition/scope decision, and the Tony Buhagiar All-Australian adjudication. This ISSUE-118
+runbook is not to be marked closed until the closure condition (§W.3) is met in full, including the
+UI exposure audit and a final corpus/rebuild closure proof.
