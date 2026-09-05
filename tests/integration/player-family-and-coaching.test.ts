@@ -14,7 +14,8 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
-import { getCoachCareer, getPlayerCoachingCareer } from '@/db/queries/coaches';
+import { getCoach, getCoachCareer, getPlayerCoachingCareer, listCoaches } from '@/db/queries/coaches';
+import { searchCoaches } from '@/db/queries/search';
 import { getPlayerFamily } from '@/db/queries/players';
 
 afterAll(async () => {
@@ -190,5 +191,73 @@ describe('getPlayerCoachingCareer', () => {
     `;
     expect(someone).toBeDefined();
     expect(await getPlayerCoachingCareer(someone.id)).toBeNull();
+  });
+});
+
+/**
+ * The `/coaches/[slug]-id` public route's identity lookup and discovery
+ * index (AFLDB-ISSUE-118 §W.4). Leigh Matthews (linked) and Chris Fagan
+ * (coach-only) are the same tracked fixtures {@link getCoachCareer} above
+ * uses -- discovered dynamically, never a hardcoded id.
+ */
+describe('getCoach', () => {
+  it('Leigh Matthews: a linked coach carries the player id and slug a redirect needs', async () => {
+    const [matthews] = await sql<{ id: number; playerId: number | null }[]>`
+      SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
+    expect(matthews.playerId).not.toBeNull();
+
+    const identity = await getCoach(matthews.id);
+    expect(identity).not.toBeNull();
+    expect(identity!.playerId).toBe(matthews.playerId);
+    expect(identity!.playerSlug).not.toBeNull();
+  });
+
+  it('Chris Fagan: a coach-only identity carries no player id or slug', async () => {
+    const [fagan] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Fagan, Chris'
+    `;
+    expect(fagan, 'the coaches stage has not loaded this database').toBeDefined();
+
+    const identity = await getCoach(fagan.id);
+    expect(identity).not.toBeNull();
+    expect(identity!.playerId).toBeNull();
+    expect(identity!.playerSlug).toBeNull();
+  });
+
+  it('an invalid/nonexistent coach id returns null, never a fabricated identity', async () => {
+    expect(await getCoach(-1)).toBeNull();
+  });
+});
+
+describe('listCoaches', () => {
+  it('includes both a linked and a coach-only person, each with their own link fields', async () => {
+    const coaches = await listCoaches();
+    expect(coaches.length).toBeGreaterThan(0);
+
+    const matthews = coaches.find((c) => c.displayName.includes('Leigh Matthews'));
+    const fagan = coaches.find((c) => c.displayName.includes('Chris Fagan'));
+    expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
+    expect(fagan, 'the coaches stage has not loaded this database').toBeDefined();
+
+    expect(matthews!.playerId).not.toBeNull();
+    expect(matthews!.playerSlug).not.toBeNull();
+    expect(fagan!.playerId).toBeNull();
+    expect(fagan!.playerSlug).toBeNull();
+  });
+});
+
+describe('searchCoaches', () => {
+  it('finds a coach-only person by name', async () => {
+    const results = await searchCoaches('Chris Fagan');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].title).toContain('Chris Fagan');
+    expect(results[0].type).toBe('coach');
+  });
+
+  it('never returns a coach who also played -- that person is a Player search result, not a Coach one', async () => {
+    const results = await searchCoaches('Leigh Matthews');
+    expect(results.find((r) => r.title.includes('Leigh Matthews'))).toBeUndefined();
   });
 });

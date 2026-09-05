@@ -9,6 +9,7 @@ function stint(overrides: Partial<CoachingClubStint> = {}): CoachingClubStint {
   return {
     clubId: 1,
     clubName: 'Collingwood',
+    clubSlug: 'collingwood',
     firstSeason: 1990,
     lastSeason: 1999,
     games: 200,

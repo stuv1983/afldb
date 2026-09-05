@@ -9,10 +9,9 @@ import { formatNumber, formatPercentage, formatSpan } from '@/lib/format';
  * so the playing profile stays the visually dominant content -- a reader
  * who also wants the coaching record opens it deliberately.
  *
- * `CoachingClubStint` carries a club id and name but no slug, so the club
- * column is plain text rather than a guessed URL; the player's own Clubs
+ * The club column is plain text rather than a link: the player's own Clubs
  * section elsewhere on this page already links every club they are
- * associated with.
+ * associated with, so a second link here would be redundant.
  */
 export function PlayerCoachingCareer({ career }: { career: CoachCareer }) {
   const { totals } = career;

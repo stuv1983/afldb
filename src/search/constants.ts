@@ -25,7 +25,7 @@ export const MAX_PAGE_SIZE = Number.isSafeInteger(envMaxPageSize) && envMaxPageS
 export const DEFAULT_PAGE_SIZE = 50;
 
 export type SearchResultType =
-  | 'player' | 'club' | 'venue' | 'season' | 'round' | 'match' | 'award' | 'record'
+  | 'player' | 'coach' | 'club' | 'venue' | 'season' | 'round' | 'match' | 'award' | 'record'
   | 'aflw_player' | 'aflw_club';
 
 /**
@@ -44,6 +44,7 @@ export function searchResultHref(result: {
   if (result.slug.startsWith('/')) return result.slug;
   switch (result.type) {
     case 'player': return `/players/${result.slug}-${result.id}`;
+    case 'coach': return `/coaches/${result.slug}-${result.id}`;
     case 'club': return `/clubs/${result.slug}`;
     case 'venue': return `/venues/${result.slug}`;
     case 'season': return `/seasons/${result.slug}`;
@@ -63,6 +64,7 @@ export function searchResultHref(result: {
 /** Human labels for grouping mixed suggestions in the dropdown. */
 export const SEARCH_TYPE_LABELS: Record<SearchResultType, string> = {
   player: 'Player',
+  coach: 'Coach',
   club: 'Club',
   venue: 'Venue',
   season: 'Season',

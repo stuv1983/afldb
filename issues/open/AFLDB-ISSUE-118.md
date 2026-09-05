@@ -5109,9 +5109,134 @@ appropriate public presentation; whether historical canonical attributes/honours
 player profiles; whether family relationships (father-son, siblings) appear correctly on both related
 profiles.
 
-**Exact next action:** perform the ISSUE-118 public UI exposure design audit in a fresh Claude Design
-session. Still open alongside it, unchanged from §23.35: the `after-siren` rebuild stage after
-`siblings`, the DEV load (birth dates + coaches + father-son + siblings + after-siren), International
-Rules acquisition/scope decision, and the Tony Buhagiar All-Australian adjudication. This ISSUE-118
-runbook is not to be marked closed until the closure condition (§W.3) is met in full, including the
-UI exposure audit and a final corpus/rebuild closure proof.
+**Exact next action (superseded by §23.37):** perform the ISSUE-118 public UI exposure design audit in
+a fresh Claude Design session. Still open alongside it, unchanged from §23.35: the `after-siren`
+rebuild stage after `siblings`, the DEV load (birth dates + coaches + father-son + siblings +
+after-siren), International Rules acquisition/scope decision, and the Tony Buhagiar All-Australian
+adjudication. This ISSUE-118 runbook is not to be marked closed until the closure condition (§W.3) is
+met in full, including the UI exposure audit and a final corpus/rebuild closure proof.
+
+### 23.37 Public UI exposure — coach-only profiles, after-the-siren, disclosure consistency (6 September 2026, eighteenth session, Sonnet 5)
+
+Scope per this session's brief: public read/UI exposure + narrowly required read-query/search wiring
+only. No canonical schema, migrations, canonical loaders, ingestion, normalisation, rebuild stages,
+Grid Solver semantics, Gridley mappings, canonical identity-resolution rules, provenance semantics or
+ISSUE-118 deferred domains touched. `after_siren_kicks`, `coaches`, `match_coaches`, family data and
+honours data were read, never written. No rebuild run; no canonical data modified. This satisfies
+§W.4's required UI exposure audit for **coaches** and **after-siren events**; family and honours were
+already publicly visible and are addressed here only as disclosure-consistency polish (§W.4's audit
+questions on family/honours visibility are otherwise unchanged from what §23.29/§23.31 already
+established).
+
+**Coach-only public profiles (P0 closure blocker 1).** `coaches.player_id IS NULL` people previously
+had no public profile at all. Added:
+- `getCoach(id)` (`src/db/queries/coaches.ts`): thin identity lookup (id, displayName, dob, playerId,
+  playerSlug) -- never duplicates {@link getCoachCareer}'s aggregation.
+- `listCoaches()`: every coach (linked and coach-only) with span/games, for the discovery index.
+- `coachSlug()` (`src/lib/slugs.ts`): derives a URL slug from `display_name` at read time, the same
+  pattern `honourTeamSlug` already uses for a name-keyed entity with no stored slug column.
+- `/coaches/[slug]-id` (`src/app/coaches/[slug]/page.tsx`): renders a coaching-first profile (games,
+  win %, record, finals, Grand Finals, premierships, club-by-club stint table -- reusing
+  `PlayerCoachingCareer`'s table shape) for a genuinely coach-only person. A coach linked to a player
+  (`player_id IS NOT NULL`) permanently redirects to that player's canonical `/players/...` profile
+  instead of rendering a second profile; a stale coach slug redirects to the canonical one, same
+  pattern the player route already uses. `getCoachCareer` gained a `clubSlug` field (additive, does not
+  affect `PlayerCoachingCareer`, whose club column stays plain text on purpose -- the player's own
+  Clubs section already links every club) so the coach-only page can link clubs coached. Metadata: a
+  neutral `Person` JSON-LD (`coachSchema`, `src/lib/structured-data.ts`) with
+  `jobTitle: 'Australian rules football coach'` -- never `playerSchema`'s athlete claim, since a
+  coach-only person never played. Coach-only profiles are a small, bounded set: `generateStaticParams`
+  prerenders all of them, the same `clubs`/`venues` pattern uses for a small reference collection.
+- `/coaches` (`src/app/coaches/page.tsx`): a sortable index of every coach, reusing the
+  `CollapsibleTable` + `SortableTable` pattern `/venues` already establishes. A linked coach's row links
+  straight to their player profile rather than through the coach-only route's redirect, so the index
+  itself never presents a duplicate profile.
+
+**After-the-siren public exposure (P0 closure blocker 2).** Added `getPlayerAfterSirenEvents(playerId)`
+(`src/db/queries/after-siren.ts`), reading `after_siren_kicks` (migration 089) read-only -- no
+recomputation, no correction, internal provenance (`source_id`, `source_record_id`, `link_status`,
+`candidate_count`) never reaches the page. `afterSirenEventLabel()` (`src/lib/after-siren-format.ts`)
+maps the four `(kick_scored, kick_effect)` combinations plus the three `siren` states to the required
+reader-facing wording (`Goal/Behind after the siren to win/draw`, `Missed after the siren`, explicit
+`... in extra time` wording for `end_of_extra_time`, `Missed before extra time` for
+`end_of_regulation` -- which the migration's own CHECK constraints guarantee is always a miss, so no
+other combination is reachable at that siren value). `PlayerAfterSirenEvents`
+(`src/components/PlayerAfterSirenEvents.tsx`) renders a concise ruled list inside a `CollapsiblePanel`
+(collapsed by default, renders nothing for zero events so an empty section never appears in
+`ReorderableSections`), linking the match when `match_id` is present and each club when canonical
+routing resolved it, showing the competition only for a non-premiership-season row, and a visible
+"uncited" note (never a title-only tooltip) when `cited = false`. The player's own name is never
+printed -- the read model carries no player-name field to render.
+
+**Coach discovery/search (P0 closure blocker 3).** `coach` added to `SearchResultType`
+(`src/search/constants.ts`) with a `Coach` label and `/coaches/[slug]-id` route generation.
+`searchCoaches(query, limit)` (`src/db/queries/search.ts`) follows `searchClubs`'s
+normalise/rank-by-exact-then-prefix-then-trigram shape, scoped to `c.player_id IS NULL` so a
+player+coach is never returned twice as both a Player and a Coach result. Wired into `globalSearch`
+(a new "Coaches" section on `/search`, `src/app/search/page.tsx`, following the existing "Clubs"
+ruled-list pattern) and into `autocomplete`'s default (unscoped) fan-out -- `SearchBox`,
+`SEARCH_TYPE_LABELS` and `searchResultHref` are all generic over `SearchResultType`, so the existing
+debounce/keyboard/listbox behaviour needed no change.
+
+**Family and Honours disclosure consistency (P1).** `PlayerFamilyCard` wrapped in `CollapsiblePanel`
+(open by default, a `"N relatives"` note counting the actual rendered rows -- `fatherSonAsSon.length +
+fatherSonAsFather.length + relationships.length`); relationship semantics, directional labels, sibling
+labels, linked/unlinked handling, father-son draft context and Compare links are all byte-identical to
+before, just re-parented into the disclosure. The player page's Honours block gained the same
+`CollapsiblePanel` (open by default), replacing its bare `<h2>`.
+
+**Brownlow de-duplication (P1).** `getPlayerHonours`'s generic awards query (`src/db/queries/awards.ts`)
+excluded only `all-australian`; it also carried `brownlow-medal` (53 `award_winners` rows, the
+medallist record distinct from `brownlow_season_votes` -- see migration 087's
+`import_awards.py:load_named_medals`), which meant a medallist saw the fact three times: the stat-strip
+"N× medallist" note, a generic Honours row, and the dedicated Brownlow Medal section. Now excludes
+`brownlow-medal` alongside `all-australian`, on the same reasoning (each has its own dedicated,
+richer block elsewhere on the page). Read/presentation change only; no award semantics touched.
+
+**Career & Biography regrouping and DOB accessibility (P1).** The table now groups identity facts first
+(date of birth, height, weight) and career-record facts second (debut, last match, record, seasons,
+clubs, best game); no field removed, no new panel. The disputed-DOB explanation, previously a `title`
+attribute on the "Disputed" badge (invisible to keyboard/touch users), is now a visible `<div>`
+adjacent to the badge, always in the DOM regardless of hover/focus state.
+
+**Final section hierarchy.** Section pushes reordered to: Career & Biography (open), Draft &
+recruitment (open), Honours (open), Clubs (open), Season by season (open), Brownlow Medal (open),
+Match log (open), Family (open), Coaching Career (closed), After-the-siren (closed) -- Family/Coaching
+moved from immediately after Honours to after Match log; After-the-siren is new. `ReorderableSections`
+already handles an unrecognised/new/removed section id defensively (`known = new Set(defaultOrder)`,
+missing ids appended at the end of a restored order) -- new section keys and the reordering needed no
+change there.
+
+**Sitemap.** `/coaches` and every coach-only profile URL added to sitemap segment 0 (the small
+reference-collection segment `clubs`/`seasons`/`venues` already use) -- coach-only rows only, scoped
+`player_id IS NULL`, since a linked coach is reached through their player page.
+
+**Tests.** New: `tests/after-siren-format.test.ts` (all required wording cases, DB-free),
+`tests/player-after-siren-events.test.ts` (component render, DB-free), `tests/coach-slug.test.ts`
+(DB-free), `tests/integration/after-siren.test.ts` (Luke Shuey 2017 extra-time goal-to-win, David King
+1994 `end_of_regulation` miss, Kerry Good 1980 Escort Championships non-premiership row with no
+`match_id`, zero-events case), `tests/integration/player-honours.test.ts` (Brownlow exclusion,
+All-Australian exclusion unchanged, a genuinely different award not swept up). Extended:
+`tests/player-family-card.test.ts` (open-by-default, relative count singular/plural),
+`tests/player-coaching-career.test.ts` (fixture gains `clubSlug`),
+`tests/integration/player-family-and-coaching.test.ts` (`getCoach` for Leigh Matthews (linked) and
+Chris Fagan (coach-only), `listCoaches` carries both, `searchCoaches` finds Fagan and never returns
+Matthews). All ran against `afldb_test` (tunnel up this session): DB-free suite 96 files / 3,193 passed
+(5 pre-existing, unrelated failures -- `db-promotion-check`, two `.gitignore` snapshot-layout checks,
+`finals-semantics-contract` (tracked CRLF/worktree issue), `reference-data` (unrelated `external_grid_*`
+table drift); none touch a file this session changed); `npx tsc --noEmit -p .` clean; `eslint` on every
+touched file: 0 problems.
+
+**Deliberately not built this session** (Explicitly out of scope per the brief): coach-v-coach compare,
+a dedicated after-siren records index, a match-page after-siren callout, season-by-season coaching,
+a coach list on club pages, `hall_of_fame.coach_id`, a generic person model, and every domain §W.2
+already deferred (International Rules, `season2024player`, nationality/origin, Tasmanian/birthplace,
+NFL careers, recruiter history, spoils).
+
+**Exact next action:** perform the final ISSUE-118 rebuild/corpus/closure proof in a fresh chat (not
+begun this session, per the brief). Still open alongside it, unchanged from §23.35: the `after-siren`
+rebuild stage after `siblings`, the DEV load (birth dates + coaches + father-son + siblings +
+after-siren), International Rules acquisition/scope decision, and the Tony Buhagiar All-Australian
+adjudication. This ISSUE-118 runbook is not to be marked closed until the closure condition (§W.3) is
+met in full -- the UI exposure audit (§W.4) is now satisfied by this section; only the final
+corpus/rebuild closure proof remains.

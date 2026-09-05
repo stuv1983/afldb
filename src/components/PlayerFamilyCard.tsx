@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
+import { CollapsiblePanel } from '@/components/CollapsiblePanel';
 import type { PlayerFamilyResult } from '@/db/queries/players';
 import { formatSelectionDetail, hasFamilyContent, relationshipLabel } from '@/lib/family-format';
-import { playerPath } from '@/lib/format';
+import { playerPath, pluralise } from '@/lib/format';
 
 export { hasFamilyContent };
 
@@ -47,41 +48,44 @@ export function PlayerFamilyCard({
 }) {
   if (!hasFamilyContent(family)) return null;
 
+  const count = family.fatherSonAsSon.length + family.fatherSonAsFather.length + family.relationships.length;
+
   return (
     <section className="section">
-      <h2>Family</h2>
-      <ul className="ruled-list">
-        {family.fatherSonAsSon.map((row) => (
-          <li key={`son-${row.draftYear}-${row.fatherName}`}>
-            <strong>Father</strong>
-            {' — '}
-            <RelatedPersonName name={row.fatherName} slug={row.fatherPlayerSlug} id={row.fatherPlayerId} />
-            <CompareLink playerId={playerId} relatedId={row.fatherPlayerId} />
-            <br />
-            <span className="muted">Father-son selection — {formatSelectionDetail(row)}</span>
-          </li>
-        ))}
+      <CollapsiblePanel title="Family" note={`${count} ${pluralise(count, 'relative')}`}>
+        <ul className="ruled-list">
+          {family.fatherSonAsSon.map((row) => (
+            <li key={`son-${row.draftYear}-${row.fatherName}`}>
+              <strong>Father</strong>
+              {' — '}
+              <RelatedPersonName name={row.fatherName} slug={row.fatherPlayerSlug} id={row.fatherPlayerId} />
+              <CompareLink playerId={playerId} relatedId={row.fatherPlayerId} />
+              <br />
+              <span className="muted">Father-son selection — {formatSelectionDetail(row)}</span>
+            </li>
+          ))}
 
-        {family.fatherSonAsFather.map((row) => (
-          <li key={`father-${row.draftYear}-${row.sonName}`}>
-            <strong>Son</strong>
-            {' — '}
-            <RelatedPersonName name={row.sonName} slug={row.sonPlayerSlug} id={row.sonPlayerId} />
-            <CompareLink playerId={playerId} relatedId={row.sonPlayerId} />
-            <br />
-            <span className="muted">Father-son selection — {formatSelectionDetail(row)}</span>
-          </li>
-        ))}
+          {family.fatherSonAsFather.map((row) => (
+            <li key={`father-${row.draftYear}-${row.sonName}`}>
+              <strong>Son</strong>
+              {' — '}
+              <RelatedPersonName name={row.sonName} slug={row.sonPlayerSlug} id={row.sonPlayerId} />
+              <CompareLink playerId={playerId} relatedId={row.sonPlayerId} />
+              <br />
+              <span className="muted">Father-son selection — {formatSelectionDetail(row)}</span>
+            </li>
+          ))}
 
-        {family.relationships.map((r, i) => (
-          <li key={`rel-${i}-${r.relationshipType}-${r.relatedPlayerId ?? r.relatedName}`}>
-            <strong>{relationshipLabel(r.relationshipType, r.direction, r.relationshipLabel)}</strong>
-            {' — '}
-            <RelatedPersonName name={r.relatedName} slug={r.relatedPlayerSlug} id={r.relatedPlayerId} />
-            <CompareLink playerId={playerId} relatedId={r.relatedPlayerId} />
-          </li>
-        ))}
-      </ul>
+          {family.relationships.map((r, i) => (
+            <li key={`rel-${i}-${r.relationshipType}-${r.relatedPlayerId ?? r.relatedName}`}>
+              <strong>{relationshipLabel(r.relationshipType, r.direction, r.relationshipLabel)}</strong>
+              {' — '}
+              <RelatedPersonName name={r.relatedName} slug={r.relatedPlayerSlug} id={r.relatedPlayerId} />
+              <CompareLink playerId={playerId} relatedId={r.relatedPlayerId} />
+            </li>
+          ))}
+        </ul>
+      </CollapsiblePanel>
     </section>
   );
 }

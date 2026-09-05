@@ -441,7 +441,12 @@ export async function getPlayerHonours(playerId: number) {
         JOIN awards a ON a.id = w.award_id
        WHERE w.player_id = ${playerId}
          AND w.link_status_value IN ('unique','resolved')
-         AND a.slug <> 'all-australian'
+         -- All-Australian gets its own dedicated block below (with captaincy
+         -- and squad detail a generic award row can't carry); the Brownlow
+         -- Medal has its own dedicated section elsewhere on the page, sourced
+         -- from brownlow_season_votes rather than this table (AFLDB-ISSUE-118
+         -- §W.4) -- both would otherwise appear twice.
+         AND a.slug NOT IN ('all-australian', 'brownlow-medal')
        GROUP BY a.id, a.slug, a.name, a.category, a.competition
        ORDER BY min(w.season)
     `,

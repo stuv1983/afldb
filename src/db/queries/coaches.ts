@@ -25,6 +25,7 @@ export async function getCoachOptions() {
 export type CoachingClubStint = {
   clubId: number;
   clubName: string;
+  clubSlug: string;
   firstSeason: number;
   lastSeason: number;
   games: number;
@@ -40,7 +41,7 @@ export type CoachingClubStint = {
 export type CoachCareer = {
   coachId: number;
   clubs: CoachingClubStint[];
-  totals: Omit<CoachingClubStint, 'clubId' | 'clubName' | 'firstSeason' | 'lastSeason'>;
+  totals: Omit<CoachingClubStint, 'clubId' | 'clubName' | 'clubSlug' | 'firstSeason' | 'lastSeason'>;
 };
 
 function winPct(wins: number, draws: number, games: number): number | null {
@@ -67,7 +68,7 @@ export async function getCoachCareer(coachId: number): Promise<CoachCareer | nul
   if (!coach) return null;
 
   const rows = await sql<Omit<CoachingClubStint, 'winPct'>[]>`
-    SELECT cl.id AS "clubId", cl.name AS "clubName",
+    SELECT cl.id AS "clubId", cl.name AS "clubName", cl.slug AS "clubSlug",
            min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
            count(*)::int AS games,
            count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
@@ -80,7 +81,7 @@ export async function getCoachCareer(coachId: number): Promise<CoachCareer | nul
       JOIN matches m ON m.id = mc.match_id
       JOIN clubs cl ON cl.id = mc.club_id
      WHERE mc.coach_id = ${coach.id}
-     GROUP BY cl.id, cl.name
+     GROUP BY cl.id, cl.name, cl.slug
      ORDER BY min(m.season)
   `;
   const clubs = rows.map((r) => ({ ...r, winPct: winPct(r.wins, r.draws, r.games) }));
@@ -117,4 +118,63 @@ export async function getPlayerCoachingCareer(playerId: number): Promise<CoachCa
   `;
   if (!coach) return null;
   return getCoachCareer(coach.id);
+}
+
+export type CoachIdentity = {
+  id: number;
+  displayName: string;
+  dob: Date | null;
+  /** Non-null only for a 'unique' link (coaches_link_ck, migration 087). */
+  playerId: number | null;
+  playerSlug: string | null;
+};
+
+/**
+ * A coach's stable public identity, for the `/coaches/[slug]-id` route
+ * (AFLDB-ISSUE-118 §W.4): just enough to render a coach-only profile or
+ * redirect a linked coach to their player page, never the coaching
+ * aggregation itself -- that stays {@link getCoachCareer}'s job. An unknown
+ * id returns null, never a fabricated identity.
+ */
+export async function getCoach(id: number): Promise<CoachIdentity | null> {
+  const [row] = await sql<CoachIdentity[]>`
+    SELECT c.id, c.display_name AS "displayName", c.dob,
+           c.player_id AS "playerId", p.slug AS "playerSlug"
+      FROM coaches c
+      LEFT JOIN players p ON p.id = c.player_id
+     WHERE c.id = ${id}
+  `;
+  return row ?? null;
+}
+
+export type CoachIndexRow = {
+  id: number;
+  displayName: string;
+  firstSeason: number | null;
+  lastSeason: number | null;
+  games: number;
+  playerId: number | null;
+  playerSlug: string | null;
+};
+
+/**
+ * Every coach, for the `/coaches` discovery index (AFLDB-ISSUE-118 §W.4).
+ * Includes coaches who also played -- their row still needs to be findable
+ * from the index, it just resolves to their player profile rather than a
+ * coach-only one, same rule the linked-coach redirect on the profile route
+ * applies.
+ */
+export async function listCoaches(): Promise<CoachIndexRow[]> {
+  return sql<CoachIndexRow[]>`
+    SELECT c.id, c.display_name AS "displayName",
+           min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
+           count(mc.match_id)::int AS games,
+           c.player_id AS "playerId", p.slug AS "playerSlug"
+      FROM coaches c
+      LEFT JOIN players p ON p.id = c.player_id
+      LEFT JOIN match_coaches mc ON mc.coach_id = c.id
+      LEFT JOIN matches m ON m.id = mc.match_id
+     GROUP BY c.id, c.display_name, c.player_id, p.slug
+     ORDER BY c.surname, c.given_name, c.display_name
+  `;
 }

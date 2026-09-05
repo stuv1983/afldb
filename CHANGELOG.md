@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-118 public UI exposure — coach-only profiles, after-the-siren, disclosure consistency - 6 September 2026
+
+- **Coach-only public profiles.** New `/coaches/[slug]-id` route: a coaching-first profile (games, win %, record, finals, Grand Finals, premierships, club-by-club stints) for a `coaches.player_id IS NULL` person. A coach linked to a player permanently redirects to that player's canonical page instead of a second profile. New `/coaches` discovery index lists every coach, linked ones routing straight to their player page. New read models `getCoach` (thin identity) and `listCoaches`.
+- **After-the-siren on player profiles.** New `getPlayerAfterSirenEvents` read model over `after_siren_kicks` (migration 089), read-only. New `PlayerAfterSirenEvents` component: a collapsed-by-default ruled list with plain-language wording (`Goal/Behind after the siren to win/draw`, `Missed after the siren`, explicit extra-time wording, `Missed before extra time`), match and club links where canonical routing resolves them, and a visible "uncited" note for an uncited event. Renders nothing for a player with no events.
+- **Coach discovery/search.** New search result type `coach`; `searchCoaches` (scoped to `player_id IS NULL`, so a player who also coached is never listed twice) wired into global search and autocomplete.
+- **Player profile — disclosure and accessibility polish.** Family and Honours are now `CollapsiblePanel` sections (Family notes a relative count); the generic Honours list no longer independently repeats the Brownlow Medal (already covered by the stat strip and the dedicated Brownlow section); the disputed-date-of-birth explanation is now visible text rather than a `title` attribute; Career & Biography now groups identity facts (date of birth, height, weight) before career-record facts. Default section order updated: Family and Coaching Career now follow Match log, and a new After-the-siren section (collapsed by default) follows Coaching Career.
+- **Sitemap.** `/coaches` and coach-only profile URLs added.
+
 ### AFLDB-ISSUE-118 after-the-siren — Grid Solver `after_siren_winner`, Gridley `winaftersiren` mapped - 5 September 2026
 
 - **Grid Solver.** New builder `after_siren_winner` (*Single-game feats*; `GRID_BUILDERS` 158): a canonically linked kicker of a goal or behind after the final (or end-of-extra-time) siren that won a premiership-season match, read from `after_siren_kicks` (migration 089). Misses, draws, other competitions and unlinked kickers never qualify. 63 rows / 61 players on `afldb_test`.

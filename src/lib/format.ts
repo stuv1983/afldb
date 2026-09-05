@@ -208,6 +208,10 @@ export function awardPath(slug: string): string {
   return `/awards/${slug}`;
 }
 
+export function coachPath(slug: string, id: number): string {
+  return `/coaches/${slug}-${id}`;
+}
+
 export function awardSeasonPath(slug: string, season: number): string {
   return `/awards/${slug}/${season}`;
 }

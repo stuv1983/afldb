@@ -231,4 +231,73 @@ describe('PlayerFamilyCard rendering', () => {
     const node = PlayerFamilyCard({ playerId: 1, family: emptyFamily() });
     expect(node).toBeNull();
   });
+
+  it('is open by default, unlike the contextual Coaching Career panel', () => {
+    const family: PlayerFamilyResult = {
+      ...emptyFamily(),
+      relationships: [{
+        relationshipType: 'sibling',
+        relationshipLabel: 'brothers',
+        direction: 'from',
+        relatedPlayerId: null,
+        relatedPlayerSlug: null,
+        relatedName: 'Someone',
+      }],
+    };
+    const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 1, family }));
+    const detailsTag = html.match(/<details[^>]*>/)?.[0] ?? '';
+    expect(detailsTag).toMatch(/\bopen\b/);
+  });
+
+  it('shows a relative count matching the actual rendered rows', () => {
+    const family: PlayerFamilyResult = {
+      fatherSonAsSon: [{
+        fatherPlayerId: 100,
+        fatherPlayerSlug: 'gary-ablett-sr',
+        fatherName: 'Gary Ablett Sr',
+        clubName: 'Geelong',
+        draftYear: 2001,
+        competition: 'national',
+        selectionPick: 40,
+      }],
+      fatherSonAsFather: [],
+      relationships: [
+        {
+          relationshipType: 'sibling',
+          relationshipLabel: 'brothers',
+          direction: 'from',
+          relatedPlayerId: 401,
+          relatedPlayerSlug: 'jack-example',
+          relatedName: 'Jack Example',
+        },
+        {
+          relationshipType: 'sibling',
+          relationshipLabel: 'brothers',
+          direction: 'from',
+          relatedPlayerId: null,
+          relatedPlayerSlug: null,
+          relatedName: 'Unlinked Example',
+        },
+      ],
+    };
+    const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 200, family }));
+    expect(html).toContain('3 relatives');
+  });
+
+  it('uses the singular for exactly one relative', () => {
+    const family: PlayerFamilyResult = {
+      ...emptyFamily(),
+      fatherSonAsSon: [{
+        fatherPlayerId: 100,
+        fatherPlayerSlug: 'gary-ablett-sr',
+        fatherName: 'Gary Ablett Sr',
+        clubName: 'Geelong',
+        draftYear: 2001,
+        competition: 'national',
+        selectionPick: 40,
+      }],
+    };
+    const html = renderToStaticMarkup(PlayerFamilyCard({ playerId: 200, family }));
+    expect(html).toContain('1 relative<');
+  });
 });

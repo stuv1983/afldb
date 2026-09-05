@@ -7,6 +7,7 @@ import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { solveCellRows, type GridCellRow } from '@/db/queries/grid-solver';
 import { answerNlQuestion } from '@/db/queries/nl/answer';
 import { normalisedSearchTerm } from '@/lib/like';
+import { coachSlug } from '@/lib/slugs';
 import type { NlAnswer } from '@/search/nl/answer-types';
 import {
   EVERY_PLAYER_AXIS,
@@ -141,6 +142,46 @@ export async function searchPlayers(query: string, limit = 20): Promise<SearchRe
      ORDER BY rank DESC, COALESCE(c.games, 0) DESC, p.sort_name
      LIMIT ${limit}
   `;
+}
+
+/**
+ * Coach-only people, keyed by `display_name` (AFLDB-ISSUE-118 §W.4) --
+ * scoped to `player_id IS NULL` so a coach who also played is never
+ * returned here alongside their own `searchPlayers` row. `coaches` carries
+ * no stored slug, so the URL slug is derived at read time with the same
+ * {@link coachSlug} the route itself resolves by id.
+ */
+export async function searchCoaches(query: string, limit = 6): Promise<SearchResult[]> {
+  const rows = await sql<{ id: number; title: string; subtitle: string | null; rank: number }[]>`
+    WITH q AS (SELECT afldb_normalise_name(${likeSafe(query)}) AS term)
+    SELECT c.id,
+           c.display_name AS title,
+           CASE WHEN min(m.season) IS NULL THEN NULL
+                ELSE min(m.season) || '–' || max(m.season) || ' · ' || count(mc.match_id) || ' games'
+           END AS subtitle,
+           (CASE WHEN afldb_normalise_name(c.display_name) = q.term THEN 1000
+                 WHEN afldb_normalise_name(c.display_name) LIKE q.term || '%' THEN 500
+                 ELSE 200 END
+            + similarity(afldb_normalise_name(c.display_name), q.term) * 100)::float AS rank
+      FROM coaches c
+      LEFT JOIN match_coaches mc ON mc.coach_id = c.id
+      LEFT JOIN matches m ON m.id = mc.match_id
+     CROSS JOIN q
+     WHERE c.player_id IS NULL
+       AND (afldb_normalise_name(c.display_name) LIKE '%' || q.term || '%'
+            OR afldb_normalise_name(c.display_name) % q.term)
+     GROUP BY c.id, c.display_name, q.term
+     ORDER BY rank DESC, c.display_name
+     LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    type: 'coach' as const,
+    id: r.id,
+    slug: coachSlug(r.title),
+    title: r.title,
+    subtitle: r.subtitle,
+    rank: r.rank,
+  }));
 }
 
 /**
@@ -489,6 +530,7 @@ export type PlayerQuestionAnswer = {
 
 export type GlobalSearchResults = {
   players: SearchResult[];
+  coaches: SearchResult[];
   clubs: SearchResult[];
   venues: SearchResult[];
   seasons: SearchResult[];
@@ -652,7 +694,7 @@ async function answerPlayerQuestion(
 }
 
 const EMPTY_RESULTS: GlobalSearchResults = {
-  players: [], clubs: [], venues: [], seasons: [],
+  players: [], coaches: [], clubs: [], venues: [], seasons: [],
   rounds: [], matches: [], awards: [], records: [],
   aflwPlayers: [], aflwClubs: [], intent: null,
   playerQuestion: null, clubQuestion: null, nlAnswer: null, total: 0,
@@ -690,10 +732,11 @@ export async function globalSearch(
   const runTopicSearch = topicText.length >= MIN_QUERY_LENGTH && topicText !== trimmed;
 
   const [
-    players, clubs, venues, seasons, rounds, matches, awards, aflw, topicAwards,
+    players, coaches, clubs, venues, seasons, rounds, matches, awards, aflw, topicAwards,
     playerQuestionRaw, clubQuestionRaw, nlAnswer,
   ] = await Promise.all([
     searchPlayers(trimmed, playerLimit),
+    searchCoaches(trimmed),
     searchClubs(trimmed),
     searchVenues(trimmed),
     searchSeasons(trimmed),
@@ -728,7 +771,7 @@ export async function globalSearch(
   });
 
   return {
-    players, clubs, venues, seasons, rounds, matches, awards, records,
+    players, coaches, clubs, venues, seasons, rounds, matches, awards, records,
     aflwPlayers: aflw.players,
     aflwClubs: aflw.clubs,
     intent,
@@ -738,7 +781,7 @@ export async function globalSearch(
     // An answered question is a result: without this, a phrase that only
     // the question parser understands still renders the "no results"
     // empty state despite having an answer on screen.
-    total: players.length + clubs.length + venues.length + seasons.length
+    total: players.length + coaches.length + clubs.length + venues.length + seasons.length
       + rounds.length + matches.length + awards.length + records.length
       + aflw.players.length + aflw.clubs.length
       + (playerQuestion ? 1 : 0) + (clubQuestion ? 1 : 0) + (nlAnswer ? 1 : 0),
@@ -803,8 +846,9 @@ export async function autocomplete(
       .slice(0, capped);
   }
 
-  const [players, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
+  const [players, coaches, clubs, venues, seasons, rounds, awards, aflw] = await Promise.all([
     searchPlayers(trimmed, capped),
+    searchCoaches(trimmed, 2),
     searchClubs(trimmed, 2),
     searchVenues(trimmed, 2),
     searchSeasons(trimmed, 1),
@@ -815,7 +859,7 @@ export async function autocomplete(
   const records = searchRecords(trimmed, 2);
 
   const others = [
-    ...rounds, ...seasons, ...awards, ...records, ...clubs, ...venues,
+    ...rounds, ...seasons, ...awards, ...records, ...coaches, ...clubs, ...venues,
     ...aflw.clubs, ...aflw.players,
   ]
     .sort((a, b) => b.rank - a.rank)

@@ -149,6 +149,46 @@ export function playerSchema(input: PlayerSchemaInput): Json {
   });
 }
 
+export type CoachSchemaInput = {
+  name: string;
+  path: string;
+  description: string;
+  dob: Date | string | null;
+  clubs: { name: string; slug: string }[];
+};
+
+/**
+ * A coach as `Person`, coaching-only.
+ *
+ * Deliberately does not reuse `playerSchema`'s `jobTitle` -- a coach-only
+ * person (`coaches.player_id IS NULL`) never played, so asserting
+ * "Australian rules footballer" of them would be an athlete claim the data
+ * does not support. `memberOf` names the clubs the coaching record links,
+ * same shape as `playerSchema`, but describing a coaching relationship
+ * rather than a playing one.
+ */
+export function coachSchema(input: CoachSchemaInput): Json {
+  const birthDate = input.dob
+    ? new Date(input.dob).toISOString().slice(0, 10)
+    : undefined;
+
+  return compact({
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': `${absoluteUrl(input.path)}#coach`,
+    name: input.name,
+    url: absoluteUrl(input.path),
+    description: input.description,
+    birthDate,
+    jobTitle: 'Australian rules football coach',
+    memberOf: input.clubs.map((club) => ({
+      '@type': 'SportsTeam',
+      name: club.name,
+      url: absoluteUrl(`/clubs/${club.slug}`),
+    })),
+  });
+}
+
 export type ClubSchemaInput = {
   name: string;
   path: string;
