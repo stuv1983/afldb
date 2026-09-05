@@ -3540,3 +3540,56 @@ its 1,690 linked captaincies against 1,774 on `afldb_test` is dataset lag, not e
 players, 102 cells); (4) §23.17's families in order — DOB stage + `age_on_debut_min`, coaches from the
 snapshot's per-match coach column, siblings/father–son, then the model and curated-source decisions; (5)
 production with the next deploy (ISSUE-137 sequencing).
+
+### 23.24 Stage D1 — dates of birth from the AFL Tables all-time club lists (5 September 2026, sixth session)
+
+**Why this family first (§23.17 item 2).** The rebuilt canonical database carries `players.dob` for **855 of
+13,273** players, all from fitzRoy per-match rows. The accepted register cannot supply the rest: fitzRoy 1.8.0's
+`get_player_details_afltables()` reads the 21 all-time club pages and then `select(-"DOB")`s the column away and
+keeps no hrefs (`html_table()`), so `player_details.csv` has neither dates nor profile links. The legacy
+`enrich_birth_dates.py` path read the legacy SQLite's `raw_row_json`; it is not a rebuild stage and never can be.
+`debut22` ("22+ years old on debut", 1 occurrence) needs population-wide dates, and so does any honest
+age-on-debut answer.
+
+**Acquisition — `tools/rebuild/afltables/acquire_club_lists.R`** (new; contract
+`tools/rebuild/afltables/afltables-contract.json`, block `club_player_lists`, new file). Reads the same 21 pages
+(`https://afltables.com/afl/stats/alltime/<slug>.html`, fitzRoy's own slug map, `bullldogs` included) under
+fitzRoy's User-Agent, concurrency 1, 1.5 s pacing, 20 s timeout, 3 retries at 2/4/8 s on transient failures;
+robots.txt fetched and recorded (404: none published). Terminal on a non-200 page, a header that is not the
+contract's, a linked-row without an href, a duplicate profile path on one page, or an empty club: no manifest.
+Keeps the raw HTML bytes (`raw/`, sha256) and one CSV per club (`parsed/`, values as printed, plus
+`profile_href` and `profile_path` = `normalise_profile_url()` of the href — the identity key). Snapshot
+**`club-lists-20260905`**: 21 pages in ~40 s, **16,731 rows — the register's exact row count** — every row
+with a DOB cell, 5 blank (`&nbsp;`: Kelly Robinson, Morrie Davidson, Dick Casey, Jim Schellnack, Bill
+Hennington, all pre-1930), **13,364 distinct profile paths, 0 cross-club date disagreements**. Tracked manifest
+`docs/rebuild-manifests/afltables_club_lists/club-lists-20260905.json` (LF; sha256
+`e6d5ae26…3941`), pinned as `club_player_lists.accepted_snapshot` in the contract. Raw artefacts gitignored
+under `data/sources/afltables/club_lists/` like every snapshot.
+
+**Loader — `tools/migration/enrich_birth_dates_afltables.py`** (new). `--validate-only` re-proves every parsed
+and raw artefact hash offline (0.1 s); otherwise joins each path to a canonical player **only through
+`external_identities` (source `afltables`)**, folding the fitzRoy contract's `profile_url_continuity` rules
+(none needed for this pair of captures); writes every date seen to `player_birth_evidence` (source `afltables`,
+`evidence_type` `afltables_club_list`, `external_id` = profile path, batch-tracked); **fills `players.dob` only
+where NULL** (`dob_confidence` sourced, `dob_evidence_id` set); never overwrites; reports disagreements and
+refuses to fill any player reached with two different dates. Names are never used.
+
+**Reconciliation on the rebuilt `afldb_test` (dry run, then load):** identities 13,275; **paths resolved 13,260**,
+unresolved **104** — 92 are 2026 debutants (`Seasons` = 2026) the 2025-terminal baseline cannot hold, 12 are
+profiles AFL Tables renumbered after the 2026-09-02 register capture (e.g. `Archie_Roberts0.html` beside the
+baseline's `Archie_Roberts.html`; the 15 baseline identities absent from every page are their counterparts —
+the ISSUE-136 mechanism, out of the contract's four tracked rules, reported not folded); players reached
+13,260; **fillable 12,400; existing dates agree 853; disagree 2** (Roan Steele afldb 11043: fitzRoy 2002-09-19 vs
+AFL Tables 2001-10-22; Jack Hayes afldb 6330: 1997-03-06 vs 1996-03-06 — kept as fitzRoy's, both evidence rows
+recorded, adjudication is a separate decision); page-conflict players 0. **Loaded (batch 21, 1,658 s single-statement over the tunnel): evidence rows 13,255, filled 12,400; players with `dob` 855 → 13,255 of 13,273, `dob_without_evidence` 0, 18 still NULL (13 pre-2026 profiles with no resolvable page row, 5 blank cells).** DEV not loaded (next session, after the stage exists).
+
+**Not yet done (the rest of the family, next session):** (a) the rebuild stage `birth-dates` after
+`heights-wikipedia` with the contract pin read fail-closed, `--validate-only` in the preflight, and gates
+(`players_with_dob`, `dob_without_evidence = 0`, `players_with_club_list_birth_evidence`) plus the
+`tests/db-test-rebuild.test.ts` order/argv pins — and **batch the writes** (`executemany`/COPY): the
+single-statement loop took ~25 minutes through the 55432 tunnel, which is fine by hand and wrong for a stage;
+(b) the `age_on_debut_min` builder over `dob` and `player_career_stats.debut_date`, `debut22` mapped in
+`gridley-compat.ts` (data-absent 19 → 18 criteria, 103 → 102 occurrences), `tests/gridley-compat.test.ts`
+denominators, a `grid-solver` test, then the corpus; (c) DEV load. AFL Tables dates remain evidence with
+fitzRoy's as the existing value where both exist; a precedence decision for the 2 disagreements is recorded, not
+taken.
