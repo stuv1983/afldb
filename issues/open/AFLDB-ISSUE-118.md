@@ -4573,3 +4573,127 @@ separate. (d) `family_draft.csv` unused. (e) DEV carries none of this; DEV is no
 `season2024player`, the Tony Buhagiar adjudication; a fresh sibling extraction from the families article
 when a sibling follow-up is scheduled. DEV load of birth dates, coaches, father–son and siblings;
 production with the next deploy (ISSUE-137 sequencing).
+
+### 23.32 After-the-siren — `winaftersiren` semantics defined, source inventoried, NOT implemented (5 September 2026, thirteenth session, Fable low)
+
+Planning/semantics only. No schema, loader, solver, rebuild-stage or canonical change was made in this
+session; the operator export under `data/records/after-siren/` is untracked (`.gitignore` `/data/records/*`,
+only `first-kick-goal-ids.csv` opted in) and was read, not modified.
+
+**S.1 Exact Gridley wording.** The corpus carries `winaftersiren` four times (boards 24 / 2023-08-09,
+156 / 2023-12-19, 393 / 2024-08-12, 744 / 2025-07-29), title `GAME WINNING`, subtitle `KICK AFTER
+SIREN`, `type: null`, in two description variants:
+
+- boards 24, 156, 393: *"Kicked a Goal or Behind after the siren to win the game. Doesn't include missed
+  shots, or shots to tie."*
+- board 744: *"Kicked a Goal or Behind after the siren to win the game. Doesn't include shots to tie."*
+
+The two agree on every qualification rule: (1) the kick was after the final siren; (2) it scored — a goal
+**or a behind**; (3) it **won** the match. Excluded by the wording itself: shots to tie (draws, whichever
+score type) and missed shots (the 2025 variant only stops restating this; a miss cannot "win the game").
+The wording never says "goal", so the behind-win category qualifies; it never says "draw", so no draw
+qualifies. There is no ambiguity about goal/behind or win/draw; two residual ambiguities are in S.7. The
+semantic target is therefore: **a player who kicked a goal or a behind after the final siren whose score
+turned a losing or level position into a win.**
+
+**S.2 Source inventory** (`data/records/after-siren/`, eight CSVs, 126 data rows in total, derived by
+parsing the files, not from the earlier rough counts; every file is a Wikipedia table export with a
+`Ref.` footnote column; the source article/revision is not recorded anywhere in the directory):
+
+| File | Columns | Rows | Category |
+|---|---|---|---|
+| `…kicked_a_goal_to_win…final_siren.csv` | Player, Club, Opponent, Rd., Year, Final score, Ref. | 59 | goal, win, VFL/AFL premiership season (1913–2026) |
+| `…kicked_a_goal_to_win…final_siren_1.csv` | + `Competition` | 3 | goal, win, non-premiership (Escort Championships 1980 GF, NAB Cup 2013, JLT Community Series 2017) |
+| `…kicked_a_behind_to_win…final_siren.csv` | as goal-win | 5 | behind, win, VFL/AFL (1944–2019) |
+| `…kicked_a_behind_to_win…final_siren_1.csv` | + `Competition` | 1 | behind, win, NAB Cup 2013 |
+| `…kicked_a_goal_to_draw…final_siren.csv` | as goal-win | 8 | goal, draw, VFL/AFL (1935–2026) |
+| `…kicked_a_goal_to_draw…final_siren_1.csv` | + `Competition` | 1 | goal, draw, NAB Cup 2011 |
+| `…kicked_a_behind_to_draw…final_siren.csv` | as goal-win | 3 | behind, draw, VFL/AFL (1926–2017) |
+| `…missed_an_opportunity_to_win_or_draw…final_siren.csv` | Player, **Team**, Opponent, Rd., Year, Final score, **Outcome**, Ref. | 46 | missed shot, VFL/AFL (1915–2026); `Outcome` ∈ Behind 19, Behind (hit the goal post) 2, No score (fell short) 20, No score (out on the full) 5 |
+
+The `_1` files are **not duplicates**: they are the article's separate "other competitions" tables
+(pre-season / night-series matches, flagged `[c]` for supergoal scoring such as `0.4.6 (30)`), carry an
+extra `Competition` column, and share no (player, club, opponent, round, year) with any other file. Zero
+exact-event overlaps exist between any two files. Ten players appear in more than one row, all as
+genuinely distinct events (Tom Hawkins goal-win 2012 + behind-draw 2017; Mitch McGovern, Dylan Moore,
+Malcolm Blight, Stephen Kernahan, David Mundy and Jack Riewoldt each with one scoring row and one missed
+row; Brad Johnson two misses; Barry Hall and Gary Rohan two goal-wins each, the second written
+`Barry Hall (2)` / `Gary Rohan (2)` — the `(2)` is the article's repeat marker inside the name cell and
+must be stripped, never treated as a different person). Cameron Zurhaar 2026 R11 has an empty `Ref.`;
+every other row is cited.
+
+**S.3 Qualifying vs non-qualifying categories.** Qualifying for `winaftersiren`: goal-win (59) and
+behind-win (5) in VFL/AFL premiership-season matches = **64 events, 62 distinct players** (Hall and Rohan
+twice). Non-qualifying but related, worth retaining as canonical events under their own type: goal-draw
+(8), behind-draw (3), missed (46). The five non-premiership `_1` events are excluded from `winaftersiren`
+on the narrow reading: Gridley's other criteria are all premiership-season facts, and AFLDB's `matches`
+holds only premiership-season rounds (`round_type` is home-and-away plus finals; no pre-season type
+exists), so they could not resolve to a `match_id` anyway. They should be kept in the normalised
+artefact flagged by competition, not silently dropped. Corpus plausibility check on the 64/62 reading:
+the four boards' Gridley answer counts for `winaftersiren` cells (Port Adelaide 4, Fremantle 6, St Kilda
+6, Geelong 12, Sydney 8, 150+ games 40, one club 40 on two boards, played 2010s 22, 2020s 18, Marvel 33,
+25+ disposals 41) are consistent with a ~62-player set counted by every club a player ever played for,
+and not with a goal-only set or with draws included. Exact reconciliation belongs to the implementation
+session.
+
+**S.4 Available source fields.** Player name (article spelling, with `Sr.`, `(2)` and hyphenated
+names); kicker's club (the `Club`/`Team` column is always the kicker's side and its score is always
+written first: all 68 win rows have margins of 1–6 points with the kicker's side ahead, all 12 draw rows
+are level, the missed rows read "lost to" 39 / "drew" 6 / one "d."); opponent; `Rd.` as a number or a
+finals code (EF, QF, SF, PF, GF, WF); `Year`; `Final score` as `G.B (pts) d./drew/lost to G.B (pts)` with
+optional footnote markers `[a]` (Luke Shuey 2017 EF, extra time), `[b]` (David King 1994 QF, listed under
+"missed" although North Melbourne won by 23), `[c]` (supergoal notation); `Competition` only in the `_1`
+files; `Outcome` only in the missed file; `Ref.` footnote number. **Not available:** match date, venue,
+time remaining, the footnote texts themselves, any player/club identifier, and the article title and
+revision id.
+
+**S.5 Resolvability without inventing identity.** Match: (season, round code, kicker's club, opponent)
+locates exactly one `matches` row (`season`, `round_code`, `home_club_id` / `away_club_id` via the club
+lineage the captaincy and coaches loaders already use), and the source's final score is an independent
+check against `home_score` / `away_score`. This is the same season + round resolution
+`tools/records/import-first-kick-goal.ts` uses, including its Opening Round offset (three qualifying
+events fall in 2024–2026). No date is needed. Player: name + kicker's club narrows to that club's
+`player_match_stats` rows for the resolved match, so the player must have **played that match for that
+club**; for the 68 scoring rows the row's `goals` / `behinds` must be ≥ 1 of the stated type, which
+confirms the link without a name-only guess. Two same-named players in one club-match is essentially
+impossible and must fail closed, as `father_son.py` / `family_siblings.py` do. `Sr.`, `(2)`, `Kangaroos`
+(2002 North Melbourne alias), `Brisbane Bears` and `Footscray` need the ordinary alias handling. The
+missed rows link the same way but without the scoring confirmation (a miss leaves no statistic); their
+match still resolves by club + score.
+
+**S.6 Canonical-model reconnaissance.** `player_achievements` (migration 053, comments corrected in
+054) is the existing home for exactly this kind of fact. Its own header says it exists for "curated,
+source-only facts … no play-by-play or event-sequence data anywhere in AFLDB"; it is modelled on
+`hall_of_fame` / `captaincies` (nullable `player_id`, raw name retained, `link_status_value` +
+`candidate_count`, `club_id`, `season`, `round_raw`, `match_id`, `source_annotation`, `notes`, provenance
+columns, `(source_id, source_record_id)` uniqueness); it is registered for app read / import write; and
+`achievement_type` is an enum designed to be extended one `ALTER TYPE … ADD VALUE` per migration. **It is
+reusable.** What it lacks for after-the-siren: the opponent club, the score type (goal/behind), the result
+(win/draw/miss), the missed-shot outcome, the competition of the `_1` rows, and the source's final score.
+Its `first_kick_goal`-specific columns (`consecutive_goal_kicks`, `no_further_career_*`,
+`kickless_matches_before_first_kick`) are NOT NULL with defaults, so a second type leaves them inert but
+harmless. Two candidate shapes for the next session to decide: (a) new enum values (`after_siren_win`,
+`after_siren_draw`, `after_siren_miss`) plus a small typed extension (score type, outcome, opponent,
+competition, source score) in a migration; or (b) a dedicated `after_siren_kicks` table following the 053
+pattern. Nothing else fits: `records.ts` is computed leaderboards, `honour_team_members` is season-honour
+grain, `staging.source_records` (074) is the observation spine, not a canonical model. The
+tracked-artefact precedent is `first-kick-goal-ids.csv` (stable `fkg-NNN` ids + `Status`) with a
+`.gitignore` opt-in, and the normalise/load split of `father_son.py` / `family_siblings.py`.
+
+**S.7 Open questions / blockers.** (1) Extra time (Shuey 2017 EF `[a]`): the kick came after the siren
+that ended extra time, i.e. the final siren of the match — recommended **include**, recorded as an
+evidence-dated adjudication rather than a silent rule. (2) David King 1994 QF `[b]`: a "missed" row in a
+23-point win; the footnote text is not in the export and must be read from the article before the row is
+typed (non-qualifying either way). (3) The article title and revision id are not recorded: the
+implementation session must capture them into a `.source.json` as the sibling artefact did, and obtain the
+footnote texts for `[a]` / `[b]`. (4) Zurhaar 2026 R11 has no citation; keep it with a `source_annotation`
+saying so. (5) The `_1` (non-premiership) rows can have no `match_id`; recommended: keep in the tracked
+artefact, load with `match_id` NULL and the competition set, exclude from the builder. (6) `winaftersiren`
+needs only the union of goal-win and behind-win, so one builder; the score type is still stored.
+
+**Exact next action (fresh session):** design and implement the canonical after-siren normalised
+model/artifact in a fresh chat — tracked normalised CSV + `.source.json` from the eight exports (S.2), the
+model decision from S.6 as a migration, a normalise/load tool resolving match and player as in S.5 with
+fail-closed ambiguity, a rebuild stage after `siblings` with gates derived from the artefact (64 qualifying
+events / 62 players, 68 scoring rows confirmed by `player_match_stats`), an `after_siren_winner` builder and
+the `winaftersiren` mapping, then the corpus rerun.
