@@ -4818,3 +4818,135 @@ player by name + club within that match's `player_match_stats` with the goal/beh
 the 68 scoring rows, fail-closed on ambiguity, `match_id` NULL for the 5 other-competition rows; then
 the rebuild stage after `siblings` with artefact-derived gates (126 rows, 64/62 qualifying). The
 `after_siren_winner` builder, the `winaftersiren` mapping and the corpus rerun follow that.
+
+### 23.34 After-the-siren — migration 089 applied to `afldb_test`, canonical loader written, 126 events reconciled and the load proven idempotent (5 September 2026, fifteenth session, Opus 5 high)
+
+Scope of this session: apply the §23.33 model, load the tracked artefact, and prove reconciliation
+and idempotence. No Grid Solver change, no `winaftersiren` builder or mapping, no rebuild stage, no
+corpus run.
+
+**U.1 Migration applied.** `npm run db:migrate:test` applied `089_after_siren_kicks.sql` to
+`afldb_test` (88 already applied, 1 pending, 242 ms): four enums, `after_siren_kicks`, its five
+CHECKs, the provenance quartet, the `(source_id, source_record_id)` uniqueness constraint, five
+indexes, the `wikipedia_after_siren_kicks` source row and the app-read / import-write registration.
+**Deviation, recorded honestly:** a `tools/db/migrate.ts --help` probe is not a recognised flag, so
+that invocation fell through to the runner's default target and applied `087_coaches.sql`,
+`088_father_son_link_checks.sql` and `089_after_siren_kicks.sql` to `afldb_dev` before the intended
+test-target run. All three are additive DDL, no loader was run and no row was written on `afldb_dev`;
+a DEV schema catch-up for the coaches / father–son / siblings work was already on this issue's next
+actions, so the migrations were left applied rather than reversed with an unapproved `DROP`. Nothing
+in this session read `afldb_dev` as evidence.
+
+**U.2 Loader** — `tools/migration/after_siren.py load` (`--validate-only` / `--dry-run` /
+`--dsn-env`, default `AFLDB_IMPORT_DATABASE_URL`) and a companion `reconcile`. Both are additive:
+the §23.33 normaliser is untouched and `normalize --check` still reports the artefact and provenance
+"exactly the regeneration". `--validate-only` is offline and checks the artefact's header against
+`ARTEFACT_COLUMNS`, its event-key uniqueness, every boolean and enum, that a premiership row carries
+the premiership competition, and that the provenance's `measures` still equal the artefact's.
+
+**U.3 Resolution — canonical, deterministic, fail-closed; no fuzzy matching and no name-only link.**
+
+* *Club* — `club_raw` / `opponent_raw` resolve through `clubs` and `club_aliases` to exactly one club
+  ORGANISATION, so "Kangaroos", "Footscray" and "South Melbourne" reach their own lineage; anything
+  but exactly one organisation refuses the run. The era club actually stored comes from the resolved
+  MATCH wherever there is one, so the one genuinely overlapping era pair on this data (Kangaroos 14
+  and North Melbourne 16 both cover 2002) can never be decided by a tie-break on a linked row. Only
+  a row with no match falls back to the season-window rule `src/lib/ingest/datasets.ts` uses.
+* *Match* — the key is (season, round, kicker's organisation, opponent's organisation) and the
+  artefact's own points are the independent check that selects one candidate. That check is what
+  separates the drawn 1972 semi-final (Carlton 61 – Richmond 61, match 7549) from its replay
+  (69 – 110, match 7551); the key alone returns both. A numeric round that finds nothing is retried
+  one round higher when the season has an Opening-Round-shaped first round — the rule
+  `tools/records/import-first-kick-goal.ts` established — which fired for 5 rows, all in 2024/2025,
+  each still confirmed by the source's exact scores. A season absent from `matches` leaves `match_id`
+  NULL and is reported; a season the database DOES carry that cannot resolve refuses, as does a
+  candidate whose scores disagree with the source's.
+* *Player* — inside a resolved match the kicker is the one player of that name in that match for the
+  kicker's club, read from `player_match_stats`: match participation, not a name lookup. A row with
+  no match falls back to participation for that club in that season. Both apply `father_son.py`'s
+  generational-suffix rule when it is needed to separate same-name players (it was not needed on this
+  data: "Gary Ablett Sr." and "Ron Barassi Sr." are each the only player of that name in their own
+  match, so the suffix narrows nothing and both link `unique`). Nothing resolved leaves `player_id`
+  NULL with the source's spelling kept and `link_status_value` saying why, exactly as 053 does.
+* *Score confirmation* — for a linked kicker of a scoring kick in a resolved match, the player's own
+  goals (or behinds) in that match must not be zero: 87 confirmed, 5 "not recorded", 0 contradicted.
+  The 5 are pre-1950 behind-to-score rows whose matches record no behinds for anyone; NULL is "not
+  recorded", never zero, so it confirms nothing and refuses nothing. A recorded zero refuses.
+
+**U.4 Canonical row counts on `afldb_test`** (batch 27; every figure below is computed, none typed):
+
+| | Premiership season | Other competition | Total |
+|---|---|---|---|
+| rows loaded | 121 | 5 | **126** |
+| linked player | 116 | 4 | **120** |
+| unresolved player | 5 | 1 | **6** |
+| linked match | 116 | 0 | **116** |
+| NULL match | 5 | 5 | **10** |
+
+111 distinct players; 116 linked by match participation and 4 by club-season participation; club and
+opponent club resolved on all 126. `winaftersiren`'s later filter (`premiership_season AND
+kick_scored <> 'none' AND kick_effect = 'won'`) selects **64 rows / 62 distinct kickers** on the
+database, matching §23.32 S.3 and §23.33 T.3 exactly.
+
+The 6 unresolved kickers are honest gaps, not failures: the 5 **2026** rows (Talor Byrne, Dylan Moore
+×2, Cameron Zurhaar, Tim Membrey) sit in a season this canonical rebuild does not carry at all —
+`matches` ends at 2025 and no player has a 2026 season — so their matches are NULL too; and **Mark
+Williams** (2011 NAB Cup, Essendon) is one of four players of that name, was on Essendon's list in
+2011 but played no premiership game that year, so no participation evidence separates him. All six
+keep the source's spelling and `link_status_value = 'unmatched'`. 0 rows are `ambiguous`.
+
+**U.5 §23.33 adjudications, as loaded.** Each is applied to exactly one row and the row states it:
+
+| Key | Row on `afldb_test` |
+|---|---|
+| asr-adj-001 | Luke Shuey 2017 EF — player 8954, match 15194, `goal / won / win`, `siren = end_of_extra_time`, **inside the 64 qualifying rows**. |
+| asr-adj-002 | David King 1994 QF — player 3528, match 10795, `none / none / win`, `siren = end_of_regulation`, `shot_detail = fell short`: a miss before an extra-time win, **not** a scoring win event and outside the 64. |
+| asr-adj-003 | Cameron Zurhaar 2026 R11 — `cited = false`, kept as an evidence-gap row; its player and match are NULL for the separate 2026 reason above, not because it is uncited. |
+| asr-adj-004 | Harry Hickey 1944 R18 — `kicker_score_raw` stored verbatim as `12.7 (89)` with `kicker_points = 89`; nothing corrected. AFLDB's own match 4264 independently carries Footscray 12.17 (89) d. Carlton 13.10 (88), so the source's POINTS are corroborated and the defect is its behinds figure. Recorded, not silently repaired. |
+
+No new adjudication was created: no loader blocker needed one.
+
+**U.6 Reconciliation** — `after_siren.py reconcile` re-resolves the artefact against the same
+database and checks the loaded table against it, deriving every expectation from the artefact or
+that re-resolution and never from a typed constant. **38/38 PASS**: 126 source events considered and
+126 canonical rows (and 126 rows in the table); 121 premiership / 5 other competition; `kick_scored`
+71 goal / 30 behind / 25 none; `kick_effect` 68 won / 12 drew / 46 none; `kicker_result` 69 win / 18
+draw / 39 loss; 64 qualifying rows over 62 distinct kickers; 120 linked and 6 unresolved players over
+111 distinct; 0 ambiguous; 116 linked and 10 NULL matches, of which the 5 other-competition rows are
+NULL by model and **0 premiership rows are NULL in a season this database carries**; 126 linked clubs
+and opponents; 0 linked matches disagreeing with their own clubs or season; all 116 linked kickers
+present in `player_match_stats` for their linked match; 0 duplicate canonical events, 0 duplicate
+`(source_id, source_record_id)`, 0 rows missing a source, source record id or import batch; and the
+four adjudications each applied exactly once.
+
+**U.7 Idempotence.** The upsert is keyed on `(source, event_key)` — the artefact's own stable key —
+and rewrites a row only where a written column actually differs, so an unchanged event keeps the
+batch that first wrote it. Run 1 (batch 27): **126 inserted or changed, 0 stale removed**. Run 2
+(batch 28), identical input: **0 inserted or changed, 0 stale removed**. Run 3 after the source edit
+in U.8 (batch 29): **0 / 0** again. All 126 rows still carry `import_batch_id = 27`, so the second
+and third runs touched nothing at all — the churn is zero by row, not merely by count. Each run
+records its counters in `import_batches.validation_result`.
+
+**U.8 Tests.** `tests/after-siren-normalisation.test.ts` grew 23 loader cases beside the 8
+normalisation ones (**31/31 pass**). `resolve_match` / `resolve_player` read a `Canon`, so they are
+driven against a fake one built from fixture rows: the real rule code runs with no database. Covered:
+the match key and that the clubs come from the match; the kicker read first from either side of the
+fixture; the drawn-final/replay separation on points; the Opening-Round retry firing only in a season
+of that shape and refusing otherwise; NULL match with the era clubs still named for an uncarried
+season and for another competition; refusals for an unfindable fixture in a carried season, a score
+disagreement, and a club name that is not exactly one organisation; the kicker never taken from the
+opponent; unmatched and ambiguous both left unlinked with the source spelling; the suffix rule
+producing `resolved` with its reason recorded; score confirmation confirmed / not-recorded /
+not-applicable and the recorded-zero refusal; the artefact contract's four refusals; `load
+--validate-only` on the tracked artefact; and a guard that every column the loader writes is one
+migration 089 declares. `npx tsc --noEmit -p .` clean; `npx eslint
+tests/after-siren-normalisation.test.ts` clean; `normalize --check --quiet` still byte-identical, so
+the §23.33 normalisation regression is intact; `tests/sibling-reconciliation.test.ts` and
+`tests/father-son-reconciliation.test.ts` still pass (54/54 across the three), which matters because
+`after_siren.py` now imports `common` and `father_son` at module level.
+
+**Exact next action (fresh session):** add Grid Solver `winaftersiren` support and run corpus
+validation — the `after_siren_winner` builder over `premiership_season AND kick_scored <> 'none' AND
+kick_effect = 'won'`, the Gridley mapping, then the corpus rerun. The `after-siren` rebuild stage
+after `siblings` with artefact-derived gates (126 rows, 64/62 qualifying, 120 linked) and the DEV
+load remain open alongside it.

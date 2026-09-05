@@ -73,8 +73,17 @@ import io
 import json
 import re
 import sys
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from common import (  # noqa: E402
+    Reporter, connect_pg, import_batch, load_env, require_env, safe_dsn,
+)
+from father_son import normalise_name  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAW_DIR = REPO_ROOT / "data" / "records" / "after-siren"
@@ -532,6 +541,693 @@ def render_provenance(raw_dir: Path, sources: list[SourceRow], adjudications: li
 # Commands
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Loading — the tracked artefact into after_siren_kicks (migration 089)
+# ---------------------------------------------------------------------------
+#
+# Identity is canonical and fail-closed; nothing here matches fuzzily or on a
+# name alone.
+#
+# * Club — ``club_raw`` / ``opponent_raw`` resolve to exactly one club
+#   ORGANISATION through ``clubs`` and ``club_aliases``, so "Kangaroos",
+#   "Footscray" and "South Melbourne" are the same lineage as their modern
+#   identity. More than one organisation, or none, refuses the run. The era
+#   club actually stored is taken from the resolved MATCH wherever there is
+#   one, so no era-window tie-break can put the wrong identity on a linked
+#   row; only a row with no match falls back to the season-window rule
+#   ``src/lib/ingest/datasets.ts`` uses (the era whose own first season is
+#   latest among those covering the season).
+#
+# * Match — the key is (season, round, kicker's organisation, opponent's
+#   organisation) and the artefact's own points are the INDEPENDENT check that
+#   picks one candidate, which is what separates a drawn final from its replay
+#   (1972 SF Carlton–Richmond). A numeric round that finds nothing is retried
+#   one higher when the season has an Opening-Round-shaped first round, the
+#   rule ``tools/records/import-first-kick-goal.ts`` established. A season this
+#   database does not carry at all leaves ``match_id`` NULL and is reported; a
+#   season it DOES carry that still cannot resolve refuses, as does a candidate
+#   whose scores disagree with the source's.
+#
+# * Player — within a resolved match the kicker is the one player of that name
+#   in that match for the kicker's club, read from ``player_match_stats``:
+#   match participation, not a name lookup. A row with no match (the other
+#   competitions, and any season absent here) falls back to participation for
+#   that club in that season. Both apply ``father_son.normalise_name``'s
+#   generational-suffix rule when it is needed to separate same-name players.
+#   Nothing resolved leaves ``player_id`` NULL with the source's own spelling
+#   kept and ``link_status_value`` recording why, exactly as 053 does.
+#
+# * Score confirmation — for a linked kicker of a scoring kick in a resolved
+#   match, the player's goals (or behinds) in that match must not be zero. A
+#   NULL is "not recorded" in the pre-1965 sense, never zero, so it confirms
+#   nothing and refuses nothing; a recorded zero contradicts the source and
+#   refuses the run.
+#
+# The upsert is keyed on (source, event key) — the artefact's own stable key —
+# and rewrites a row only when a column actually differs, so a second identical
+# load inserts nothing, changes nothing and removes nothing.
+
+SOURCE_KEY = "wikipedia_after_siren_kicks"
+LOAD_TOOL = "after_siren.py"
+TARGET_TABLE = "after_siren_kicks"
+
+WRITTEN_COLUMNS = (
+    "player_id", "player_name_raw", "player_name_clean", "link_status_value", "candidate_count",
+    "club_id", "club_name_raw", "opponent_club_id", "opponent_name_raw",
+    "competition", "premiership_season", "season", "round_raw", "match_id",
+    "kick_scored", "kick_effect", "shot_detail", "kicker_result", "siren",
+    "kicker_score_raw", "opponent_score_raw", "kicker_points", "opponent_points", "supergoal_scoring",
+    "cited", "source_annotation", "notes",
+)
+# A re-load compares everything it writes except the provenance quartet, so an
+# unchanged event is left alone and keeps the batch id that first wrote it.
+COMPARED_COLUMNS = WRITTEN_COLUMNS
+
+
+@dataclass
+class Resolution:
+    """One artefact row resolved against one database."""
+
+    row: dict[str, str]
+    club_id: int | None = None
+    opponent_club_id: int | None = None
+    match_id: int | None = None
+    match_method: str | None = None
+    player_id: int | None = None
+    link_status: str = "unmatched"
+    candidate_count: int = 0
+    player_method: str | None = None
+    score_check: str = "not_applicable"
+    note_parts: list[str] = field(default_factory=list)
+
+
+def read_artefact(path: Path) -> list[dict[str, str]]:
+    """The tracked artefact, shape-checked offline."""
+    if not path.is_file():
+        raise AfterSirenSourceError(f"{path} is not in this checkout")
+    with path.open(encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        if reader.fieldnames != ARTEFACT_COLUMNS:
+            raise AfterSirenSourceError(
+                f"{path.name}: unexpected header\n  expected: {','.join(ARTEFACT_COLUMNS)}\n"
+                f"  actual:   {','.join(reader.fieldnames or [])}")
+        rows = [dict(r) for r in reader]
+    if not rows:
+        raise AfterSirenSourceError(f"{path.name} has no rows")
+    seen: set[str] = set()
+    for r in rows:
+        key = r["event_key"]
+        if key in seen:
+            raise AfterSirenSourceError(f"{path.name}: duplicate event key {key}")
+        seen.add(key)
+        for flag in ("premiership_season", "cited", "supergoal_scoring"):
+            if r[flag] not in ("true", "false"):
+                raise AfterSirenSourceError(f"{path.name}: {key} has a non-boolean {flag}")
+        if (r["kick_scored"] not in ("goal", "behind", "none")
+                or r["kick_effect"] not in ("won", "drew", "none")
+                or r["kicker_result"] not in ("win", "draw", "loss")
+                or r["siren"] not in SIRENS):
+            raise AfterSirenSourceError(f"{path.name}: {key} has an unknown enum value")
+        if r["premiership_season"] == "true" and r["competition"] != PREMIERSHIP_COMPETITION:
+            raise AfterSirenSourceError(
+                f"{path.name}: {key} is a premiership row of competition {r['competition']!r}")
+        for col in ("season", "kicker_points", "opponent_points"):
+            if not r[col].isdigit():
+                raise AfterSirenSourceError(f"{path.name}: {key} has a non-numeric {col}")
+    return rows
+
+
+def read_provenance(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for key in ("wikipedia_title", "page_id", "raw_rows", "measures"):
+        if key not in data:
+            raise AfterSirenSourceError(f"{path.name} lacks {key}")
+    if data["raw_rows"] != data["measures"]["events"]:
+        raise AfterSirenSourceError(f"{path.name}: raw_rows disagrees with measures.events")
+    return data
+
+
+def truthy(value: str) -> bool:
+    return value == "true"
+
+
+def fetch_source_id(pg: Any) -> int:
+    with pg.cursor() as cur:
+        cur.execute("SELECT id FROM sources WHERE key = %s", (SOURCE_KEY,))
+        row = cur.fetchone()
+    if row is None:
+        raise AfterSirenSourceError(f"sources has no {SOURCE_KEY!r} row; apply migration 089 first")
+    return row[0]
+
+
+class Canon:
+    """The canonical facts this load resolves against, fetched once."""
+
+    def __init__(self, pg: Any) -> None:
+        self.pg = pg
+        with pg.cursor() as cur:
+            cur.execute("SELECT year FROM seasons")
+            self.seasons = {r[0] for r in cur.fetchall()}
+            cur.execute("SELECT DISTINCT season FROM matches")
+            self.match_seasons = {r[0] for r in cur.fetchall()}
+            # A season with an Opening Round has a first round markedly shorter
+            # than its second (import-first-kick-goal.ts); computed once.
+            cur.execute(
+                """SELECT season FROM matches WHERE NOT is_final GROUP BY season
+                    HAVING count(*) FILTER (WHERE round_code = '1') > 0
+                       AND count(*) FILTER (WHERE round_code = '1')
+                         < count(*) FILTER (WHERE round_code = '2')""")
+            self.opening_round_seasons = {r[0] for r in cur.fetchall()}
+        self._orgs: dict[str, int] = {}
+
+    def organisation(self, club_raw: str) -> int:
+        """Exactly one club organisation, by club name or alias; anything else refuses."""
+        if club_raw in self._orgs:
+            return self._orgs[club_raw]
+        with self.pg.cursor() as cur:
+            cur.execute(
+                """WITH candidate AS (
+                     SELECT c.organization_id FROM clubs c
+                      WHERE afldb_normalise_name(c.name) = afldb_normalise_name(%s)
+                     UNION
+                     SELECT c.organization_id FROM club_aliases a JOIN clubs c ON c.id = a.club_id
+                      WHERE afldb_normalise_name(a.alias) = afldb_normalise_name(%s))
+                   SELECT DISTINCT organization_id FROM candidate""", (club_raw, club_raw))
+            found = [r[0] for r in cur.fetchall()]
+        if len(found) != 1:
+            raise AfterSirenSourceError(
+                f"club {club_raw!r} resolves to {len(found)} club organisations on this database; "
+                "the loader will not guess")
+        self._orgs[club_raw] = found[0]
+        return found[0]
+
+    def era_club(self, org: int, season: int) -> int | None:
+        """The club identity of that organisation active in that season.
+
+        The tie-break is the one ``src/lib/ingest/datasets.ts`` uses: the era
+        whose own first season is latest, so 2002 is the Kangaroos rather than
+        the North Melbourne identity that spans them. Only rows with no match
+        need it; a linked row takes its clubs from the match itself.
+        """
+        with self.pg.cursor() as cur:
+            cur.execute(
+                """SELECT id FROM clubs
+                    WHERE organization_id = %s AND first_season <= %s
+                      AND (last_season IS NULL OR last_season >= %s)
+                    ORDER BY first_season DESC NULLS LAST, id LIMIT 1""", (org, season, season))
+            row = cur.fetchone()
+        return row[0] if row else None
+
+
+def resolve_match(canon: Canon, row: dict[str, str], res: Resolution) -> None:
+    """(season, round, both organisations), with the source's points as the check."""
+    season = int(row["season"])
+    kicker_org = canon.organisation(row["club_raw"])
+    opponent_org = canon.organisation(row["opponent_raw"])
+    if not truthy(row["premiership_season"]):
+        res.note_parts.append(f"match: not a premiership-season fixture ({row['competition']})")
+        return
+    if season not in canon.match_seasons:
+        res.note_parts.append(f"match: {season} is not in this database's canonical matches")
+        return
+
+    codes = [(row["round_raw"].strip().upper(), "round_exact")]
+    if row["round_raw"].strip().isdigit() and season in canon.opening_round_seasons:
+        codes.append((str(int(row["round_raw"].strip()) + 1), "opening_round_offset"))
+    kicker_points, opponent_points = int(row["kicker_points"]), int(row["opponent_points"])
+
+    for code, method in codes:
+        with canon.pg.cursor() as cur:
+            cur.execute(
+                """SELECT m.id, hc.organization_id, m.home_club_id, m.away_club_id, m.home_score, m.away_score
+                     FROM matches m
+                     JOIN clubs hc ON hc.id = m.home_club_id
+                     JOIN clubs ac ON ac.id = m.away_club_id
+                    WHERE m.season = %s AND upper(btrim(m.round_code)) = %s
+                      AND ((hc.organization_id = %s AND ac.organization_id = %s)
+                        OR (hc.organization_id = %s AND ac.organization_id = %s))
+                    ORDER BY m.id""",
+                (season, code, kicker_org, opponent_org, opponent_org, kicker_org))
+            candidates = cur.fetchall()
+        if not candidates:
+            continue
+        agreeing = []
+        for match_id, home_org, home_club, away_club, home_score, away_score in candidates:
+            kicker_is_home = home_org == kicker_org
+            scores = (home_score, away_score) if kicker_is_home else (away_score, home_score)
+            if scores == (kicker_points, opponent_points):
+                agreeing.append((match_id,
+                                 home_club if kicker_is_home else away_club,
+                                 away_club if kicker_is_home else home_club))
+        if len(agreeing) != 1:
+            raise AfterSirenSourceError(
+                f"{row['event_key']}: {len(candidates)} match(es) at {season} round {code} between "
+                f"{row['club_raw']} and {row['opponent_raw']}, {len(agreeing)} agreeing with the source's "
+                f"{kicker_points}-{opponent_points}; the loader will not guess")
+        res.match_id, res.club_id, res.opponent_club_id = agreeing[0]
+        res.match_method = method
+        res.note_parts.append(
+            "match: resolved on the round the source states" if method == "round_exact"
+            else "match: resolved one round higher (the season has an Opening Round)")
+        return
+
+    raise AfterSirenSourceError(
+        f"{row['event_key']}: no {season} match between {row['club_raw']} and {row['opponent_raw']} at "
+        f"round {row['round_raw']} on a database that carries {season}")
+
+
+def suffix_rule(candidates: list[tuple], debut_index: int, suffix: str | None) -> list[tuple]:
+    """``Sr.`` keeps the earliest debut and ``Jr.`` the latest — only among two or more."""
+    if suffix and len(candidates) >= 2:
+        debuts = [c[debut_index] or 0 for c in candidates]
+        pick = min(debuts) if suffix == "sr" else max(debuts)
+        return [c for c in candidates if (c[debut_index] or 0) == pick]
+    return candidates
+
+
+def resolve_player(canon: Canon, row: dict[str, str], res: Resolution) -> None:
+    name, suffix = normalise_name(row["player_name"])
+    season = int(row["season"])
+    if res.match_id is not None:
+        with canon.pg.cursor() as cur:
+            cur.execute(
+                """SELECT pms.player_id, pms.goals, pms.behinds, p.debut_season
+                     FROM player_match_stats pms
+                     JOIN players p ON p.id = pms.player_id
+                     JOIN clubs c ON c.id = pms.club_id
+                     JOIN clubs kicker ON kicker.id = %s
+                    WHERE pms.match_id = %s
+                      AND c.organization_id = kicker.organization_id
+                      AND p.search_name = afldb_normalise_name(%s)
+                    ORDER BY pms.player_id""", (res.club_id, res.match_id, name))
+            candidates = cur.fetchall()
+        method = "match_participation"
+    else:
+        with canon.pg.cursor() as cur:
+            cur.execute(
+                """SELECT DISTINCT p.id, NULL::smallint, NULL::smallint, p.debut_season
+                     FROM players p
+                     JOIN player_club_season_stats s ON s.player_id = p.id
+                     JOIN clubs c ON c.id = s.club_id
+                    WHERE p.search_name = afldb_normalise_name(%s)
+                      AND s.season = %s AND c.organization_id = %s
+                    ORDER BY p.id""", (name, season, canon.organisation(row["club_raw"])))
+            candidates = cur.fetchall()
+        method = "club_season_participation"
+
+    res.candidate_count = len(candidates)
+    narrowed = suffix_rule(candidates, 3, suffix)
+    if len(narrowed) == 1:
+        res.player_id = narrowed[0][0]
+        res.link_status = "unique" if len(candidates) == 1 else "resolved"
+        res.player_method = method
+        res.note_parts.append(
+            "player: the one player of that name in the match for this club"
+            if method == "match_participation"
+            else "player: the one player of that name playing for this club that season")
+        if res.link_status == "resolved":
+            res.note_parts.append(
+                f"player: {len(candidates)} same-name candidates separated by the {suffix}. suffix")
+        confirm_score(row, narrowed[0], res)
+    elif not candidates:
+        res.link_status = "unmatched"
+        res.note_parts.append(
+            "player: no player of that name in that match for this club on this database"
+            if method == "match_participation"
+            else "player: no player of that name playing for this club that season on this database")
+    else:
+        res.link_status = "ambiguous"
+        res.note_parts.append(
+            f"player: {len(candidates)} candidates and no evidence here to separate them")
+
+
+def confirm_score(row: dict[str, str], candidate: tuple, res: Resolution) -> None:
+    """The kicker's own scoring line in the match, as a check on the link.
+
+    NULL is "not recorded", never zero — the earliest rows carry no behinds at
+    all — so it confirms nothing and refuses nothing. A recorded zero
+    contradicts the source and refuses the run.
+    """
+    if res.match_id is None or row["kick_scored"] == "none":
+        res.score_check = "not_applicable"
+        return
+    recorded = candidate[1] if row["kick_scored"] == "goal" else candidate[2]
+    if recorded is None:
+        res.score_check = "not_recorded"
+        res.note_parts.append(f"score check: this match records no {row['kick_scored']}s for anyone")
+    elif recorded >= 1:
+        res.score_check = "confirmed"
+    else:
+        raise AfterSirenSourceError(
+            f"{row['event_key']}: {row['player_name']} is recorded with 0 {row['kick_scored']}s in match "
+            f"{res.match_id}, contradicting a kick that scored a {row['kick_scored']}")
+
+
+def source_annotation(row: dict[str, str]) -> str | None:
+    """The source's own qualifying cells, verbatim; nothing AFLDB decided."""
+    parts = []
+    if row["outcome_raw"]:
+        parts.append(f"Outcome: {row['outcome_raw']}")
+    if row["score_footnote_raw"]:
+        parts.append(f"score footnote {row['score_footnote_raw']}")
+    return "; ".join(parts) or None
+
+
+def row_notes(res: Resolution) -> str | None:
+    """The artefact's own note (an adjudication, or the repeat marker) then how
+    this database resolved the row. Deterministic, so a re-load compares equal."""
+    parts = [res.row["note"]] if res.row["note"] else []
+    parts.extend(res.note_parts)
+    return "; ".join(parts) or None
+
+
+def resolve_rows(canon: Canon, rows: list[dict[str, str]]) -> list[Resolution]:
+    out = []
+    for row in rows:
+        res = Resolution(row=row)
+        resolve_match(canon, row, res)
+        if res.match_id is None:
+            season = int(row["season"])
+            res.club_id = canon.era_club(canon.organisation(row["club_raw"]), season)
+            res.opponent_club_id = canon.era_club(canon.organisation(row["opponent_raw"]), season)
+        resolve_player(canon, row, res)
+        out.append(res)
+    return out
+
+
+def resolution_measures(resolutions: list[Resolution]) -> dict[str, int]:
+    linked = [r for r in resolutions if r.link_status in ("unique", "resolved")]
+    return {
+        "events": len(resolutions),
+        "players_linked": len(linked),
+        "players_unresolved": len(resolutions) - len(linked),
+        "players_ambiguous": sum(1 for r in resolutions if r.link_status == "ambiguous"),
+        "players_distinct": len({r.player_id for r in linked}),
+        "players_by_match_participation": sum(1 for r in linked if r.player_method == "match_participation"),
+        "players_by_club_season_participation":
+            sum(1 for r in linked if r.player_method == "club_season_participation"),
+        "matches_linked": sum(1 for r in resolutions if r.match_id is not None),
+        "matches_null": sum(1 for r in resolutions if r.match_id is None),
+        "matches_null_other_competition":
+            sum(1 for r in resolutions if r.match_id is None and not truthy(r.row["premiership_season"])),
+        "matches_null_season_absent":
+            sum(1 for r in resolutions if r.match_id is None and truthy(r.row["premiership_season"])),
+        "matches_by_opening_round_offset": sum(1 for r in resolutions if r.match_method == "opening_round_offset"),
+        "clubs_linked": sum(1 for r in resolutions if r.club_id is not None),
+        "opponent_clubs_linked": sum(1 for r in resolutions if r.opponent_club_id is not None),
+        "score_confirmed": sum(1 for r in resolutions if r.score_check == "confirmed"),
+        "score_not_recorded": sum(1 for r in resolutions if r.score_check == "not_recorded"),
+    }
+
+
+def write_rows(pg: Any, resolutions: list[Resolution], source_id: int,
+               provenance: dict[str, Any] | None, rep: Reporter) -> dict[str, Any]:
+    assignments = ", ".join(f"{c} = EXCLUDED.{c}" for c in WRITTEN_COLUMNS)
+    compare_left = ", ".join(f"{TARGET_TABLE}.{c}" for c in COMPARED_COLUMNS)
+    compare_right = ", ".join(f"EXCLUDED.{c}" for c in COMPARED_COLUMNS)
+    placeholders = (
+        "%s,%s,%s,%s::link_status,%s,"
+        "%s,%s,%s,%s,"
+        "%s,%s,%s,%s,%s,"
+        "%s::after_siren_score,%s::after_siren_effect,%s,%s::after_siren_result,%s::after_siren_siren,"
+        "%s,%s,%s,%s,%s,"
+        "%s,%s,%s,"
+        "%s,%s,%s")
+    statement = f"""
+        INSERT INTO {TARGET_TABLE} ({', '.join(WRITTEN_COLUMNS)}, source_id, source_record_id, import_batch_id)
+        VALUES ({placeholders})
+        ON CONFLICT (source_id, source_record_id) DO UPDATE SET
+          {assignments}, import_batch_id = EXCLUDED.import_batch_id
+        WHERE ({compare_left}) IS DISTINCT FROM ({compare_right})"""
+
+    with import_batch(pg, SOURCE_KEY, LOAD_TOOL, TARGET_TABLE) as batch:
+        batch.records_read = len(resolutions)
+        with pg.cursor() as cur:
+            values = []
+            for res in resolutions:
+                row = res.row
+                values.append((
+                    res.player_id, row["player_name_raw"], row["player_name"], res.link_status,
+                    res.candidate_count,
+                    res.club_id, row["club_raw"], res.opponent_club_id, row["opponent_raw"],
+                    row["competition"], truthy(row["premiership_season"]), int(row["season"]),
+                    row["round_raw"], res.match_id,
+                    row["kick_scored"], row["kick_effect"], row["shot_detail"] or None,
+                    row["kicker_result"], row["siren"],
+                    row["kicker_score_raw"], row["opponent_score_raw"], int(row["kicker_points"]),
+                    int(row["opponent_points"]), truthy(row["supergoal_scoring"]),
+                    truthy(row["cited"]), source_annotation(row), row_notes(res),
+                    source_id, row["event_key"], batch.id))
+            cur.executemany(statement, values)
+            keys = [r.row["event_key"] for r in resolutions]
+            cur.execute(
+                f"DELETE FROM {TARGET_TABLE} WHERE source_id = %s AND NOT (source_record_id = ANY(%s))",
+                (source_id, keys))
+            stale = cur.rowcount
+            cur.execute(
+                f"""SELECT count(*) FILTER (WHERE import_batch_id = %s), count(*)
+                      FROM {TARGET_TABLE} WHERE source_id = %s""", (batch.id, source_id))
+            changed, total = cur.fetchone()
+        batch.records_inserted += changed
+    rep.result("after_siren_kicks rows", total)
+    rep.result("rows inserted or changed", changed)
+    rep.result("stale rows removed", stale)
+    summary = {
+        "events": len(resolutions), "rows": total, "changed": changed, "stale_removed": stale,
+        "artefact": measures([r.row for r in resolutions]),
+        "resolution": resolution_measures(resolutions),
+        "provenance": provenance,
+    }
+    with pg.cursor() as cur:
+        cur.execute("UPDATE import_batches SET validation_result = %s WHERE id = %s",
+                    (json.dumps(summary), batch.id))
+    pg.commit()
+    summary["batch_id"] = batch.id
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# Reconciliation — the loaded table against the artefact, on one database
+# ---------------------------------------------------------------------------
+
+
+def reconcile(pg: Any, rows: list[dict[str, str]], resolutions: list[Resolution],
+              source_id: int) -> list[tuple[str, bool, str]]:
+    """Every expectation is derived from the artefact, or from re-resolving it
+    against this same canonical database; none is a constant typed here."""
+    art = measures(rows)
+    res_m = resolution_measures(resolutions)
+    checks: list[tuple[str, bool, str]] = []
+
+    def check(label: str, actual: Any, expected: Any) -> None:
+        checks.append((label, actual == expected, f"{actual} (expected {expected})"))
+
+    with pg.cursor() as cur:
+        cur.execute(f"SELECT count(*) FROM {TARGET_TABLE} WHERE source_id = %s", (source_id,))
+        total = cur.fetchone()[0]
+        cur.execute(f"SELECT count(*) FROM {TARGET_TABLE}")
+        table_total = cur.fetchone()[0]
+        cur.execute(f"SELECT premiership_season, count(*) FROM {TARGET_TABLE} WHERE source_id = %s GROUP BY 1",
+                    (source_id,))
+        by_prem = dict(cur.fetchall())
+        cur.execute(f"SELECT kick_scored::text, count(*) FROM {TARGET_TABLE} WHERE source_id = %s GROUP BY 1",
+                    (source_id,))
+        by_scored = dict(cur.fetchall())
+        cur.execute(f"SELECT kick_effect::text, count(*) FROM {TARGET_TABLE} WHERE source_id = %s GROUP BY 1",
+                    (source_id,))
+        by_effect = dict(cur.fetchall())
+        cur.execute(f"SELECT kicker_result::text, count(*) FROM {TARGET_TABLE} WHERE source_id = %s GROUP BY 1",
+                    (source_id,))
+        by_result = dict(cur.fetchall())
+        cur.execute(
+            f"""SELECT count(*) FILTER (WHERE player_id IS NOT NULL),
+                       count(DISTINCT player_id),
+                       count(*) FILTER (WHERE player_id IS NULL),
+                       count(*) FILTER (WHERE link_status_value = 'ambiguous'),
+                       count(*) FILTER (WHERE match_id IS NOT NULL),
+                       count(*) FILTER (WHERE match_id IS NULL),
+                       count(*) FILTER (WHERE match_id IS NULL AND NOT premiership_season),
+                       count(*) FILTER (WHERE club_id IS NOT NULL),
+                       count(*) FILTER (WHERE opponent_club_id IS NOT NULL)
+                  FROM {TARGET_TABLE} WHERE source_id = %s""", (source_id,))
+        (linked, distinct_players, unlinked, ambiguous, matched, null_match,
+         null_match_other, clubs, opponent_clubs) = cur.fetchone()
+        cur.execute(
+            f"""SELECT count(*) FROM (
+                  SELECT season, competition, round_raw, club_name_raw, player_name_clean
+                    FROM {TARGET_TABLE} WHERE source_id = %s
+                   GROUP BY 1,2,3,4,5 HAVING count(*) > 1) d""", (source_id,))
+        duplicate_events = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT count(*) FROM (
+                  SELECT source_id, source_record_id FROM {TARGET_TABLE}
+                   GROUP BY 1,2 HAVING count(*) > 1) d""")
+        duplicate_keys = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT count(*) FILTER (WHERE source_record_id IS NULL),
+                       count(*) FILTER (WHERE source_id IS NULL),
+                       count(*) FILTER (WHERE import_batch_id IS NULL)
+                  FROM {TARGET_TABLE}""")
+        null_key, null_source, null_batch = cur.fetchone()
+        cur.execute(
+            f"""SELECT count(*) FROM {TARGET_TABLE} k
+                 WHERE k.source_id = %s AND k.premiership_season AND k.match_id IS NULL
+                   AND EXISTS (SELECT 1 FROM matches m WHERE m.season = k.season)""", (source_id,))
+        premiership_null_in_carried_season = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT count(*) FROM {TARGET_TABLE} k JOIN matches m ON m.id = k.match_id
+                 WHERE k.source_id = %s
+                   AND (m.season <> k.season
+                     OR NOT (k.club_id IN (m.home_club_id, m.away_club_id)
+                         AND k.opponent_club_id IN (m.home_club_id, m.away_club_id)))""", (source_id,))
+        match_disagreements = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT count(*) FROM {TARGET_TABLE} k
+                 WHERE k.source_id = %s AND k.match_id IS NOT NULL AND k.player_id IS NOT NULL
+                   AND EXISTS (SELECT 1 FROM player_match_stats pms
+                                WHERE pms.match_id = k.match_id AND pms.player_id = k.player_id)""",
+            (source_id,))
+        kickers_in_their_match = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT count(*), count(DISTINCT COALESCE(player_id::text, player_name_clean))
+                  FROM {TARGET_TABLE}
+                 WHERE source_id = %s AND premiership_season
+                   AND kick_scored <> 'none' AND kick_effect = 'won'""", (source_id,))
+        qualifying, qualifying_players = cur.fetchone()
+
+    check("source events considered", len(rows), art["events"])
+    check("canonical rows for this source", total, art["events"])
+    check("rows in after_siren_kicks", table_total, art["events"])
+    check("premiership-season rows", by_prem.get(True, 0), art["premiership_season_events"])
+    check("other-competition rows", by_prem.get(False, 0), art["other_competition_events"])
+    check("kick_scored goal", by_scored.get("goal", 0), art["goal_won"] + art["goal_drew"])
+    check("kick_scored behind", by_scored.get("behind", 0),
+          art["behind_won"] + art["behind_drew"] + art["missed_behind"])
+    check("kick_scored none", by_scored.get("none", 0), art["missed_no_score"])
+    check("kick_effect won", by_effect.get("won", 0), art["goal_won"] + art["behind_won"])
+    check("kick_effect drew", by_effect.get("drew", 0), art["goal_drew"] + art["behind_drew"])
+    check("kick_effect none", by_effect.get("none", 0), art["missed"])
+    check("kicker_result win", by_result.get("win", 0),
+          sum(1 for r in rows if r["kicker_result"] == "win"))
+    check("kicker_result draw", by_result.get("draw", 0),
+          sum(1 for r in rows if r["kicker_result"] == "draw"))
+    check("kicker_result loss", by_result.get("loss", 0),
+          sum(1 for r in rows if r["kicker_result"] == "loss"))
+    check("qualifying (premiership, scored, won)", qualifying, art["premiership_season_scored_and_won"])
+    check("qualifying distinct kickers", qualifying_players, art["premiership_season_scored_and_won_players"])
+    check("rows with a linked player", linked, res_m["players_linked"])
+    check("distinct linked players", distinct_players, res_m["players_distinct"])
+    check("rows with an unresolved player", unlinked, res_m["players_unresolved"])
+    check("rows with an ambiguous player", ambiguous, res_m["players_ambiguous"])
+    check("rows with a linked match", matched, res_m["matches_linked"])
+    check("rows with a NULL match", null_match, res_m["matches_null"])
+    check("NULL match, other competition", null_match_other, art["other_competition_events"])
+    check("premiership NULL match in a season this database carries", premiership_null_in_carried_season, 0)
+    check("rows with a linked club", clubs, res_m["clubs_linked"])
+    check("rows with a linked opponent club", opponent_clubs, res_m["opponent_clubs_linked"])
+    check("linked match disagreeing with its clubs or season", match_disagreements, 0)
+    check("linked kickers present in their linked match", kickers_in_their_match,
+          sum(1 for r in resolutions if r.match_id is not None and r.player_id is not None))
+    check("duplicate canonical events", duplicate_events, 0)
+    check("duplicate (source, source_record_id)", duplicate_keys, 0)
+    check("rows without a source record id", null_key, 0)
+    check("rows without a source", null_source, 0)
+    check("rows without an import batch", null_batch, 0)
+
+    # Each adjudication is applied to exactly one row, and that row states it.
+    adjudicated = [r for r in rows if r["adjudication_keys"]]
+    check("adjudicated artefact rows", len(adjudicated), art["adjudicated"])
+    with pg.cursor() as cur:
+        for row in adjudicated:
+            cur.execute(
+                f"""SELECT count(*) FROM {TARGET_TABLE}
+                     WHERE source_id = %s AND source_record_id = %s
+                       AND siren = %s::after_siren_siren
+                       AND kick_scored = %s::after_siren_score
+                       AND kick_effect = %s::after_siren_effect
+                       AND cited = %s AND kicker_score_raw = %s AND kicker_points = %s
+                       AND position(%s in notes) > 0""",
+                (source_id, row["event_key"], row["siren"], row["kick_scored"], row["kick_effect"],
+                 truthy(row["cited"]), row["kicker_score_raw"], int(row["kicker_points"]), row["note"]))
+            label = f"adjudication {row['adjudication_keys']} applied exactly once to {row['event_key']}"
+            checks.append((label, cur.fetchone()[0] == 1, row["event_key"]))
+    return checks
+
+
+def report_checks(checks: list[tuple[str, bool, str]], rep: Reporter) -> int:
+    failed = 0
+    for label, ok, detail in checks:
+        if not ok:
+            failed += 1
+        rep.step(f"{'PASS' if ok else 'FAIL'}  {label}: {detail}")
+    return failed
+
+
+def cmd_load(args: argparse.Namespace) -> int:
+    rep = Reporter(verbose=not args.quiet)
+    started = time.time()
+    print("AFLDB after-the-siren kicks (tracked, cited Wikipedia-derived artefact)")
+    rows = read_artefact(args.csv)
+    provenance = read_provenance(args.provenance)
+    art = measures(rows)
+    rep.step(f"{args.csv.name}: {art['events']} events, shape verified"
+             + (f"; page {provenance['page_id']}, inspected revision "
+                f"{provenance.get('inspected_revision_id')}" if provenance else ""))
+    if provenance and provenance["measures"] != art:
+        raise AfterSirenSourceError(f"{args.provenance.name} measures disagree with the artefact")
+    if args.validate_only:
+        for k, v in art.items():
+            rep.result(k, v)
+        print(f"  done (validate only) in {time.time() - started:.1f}s")
+        return 0
+
+    load_env()
+    dsn = require_env(args.dsn_env)
+    print(f"  target: {safe_dsn(dsn)}")
+    if args.dry_run:
+        print("  DRY RUN - nothing will be written")
+    pg = connect_pg(dsn)
+    source_id = fetch_source_id(pg)
+    canon = Canon(pg)
+    absent = sorted({int(r["season"]) for r in rows} - canon.seasons)
+    if absent:
+        raise AfterSirenSourceError(f"seasons absent from this database: {absent}")
+    resolutions = resolve_rows(canon, rows)
+    for k, v in resolution_measures(resolutions).items():
+        rep.result(k, v)
+    unresolved = [r.row["event_key"] for r in resolutions if r.link_status not in ("unique", "resolved")]
+    if unresolved:
+        rep.step("kickers left unresolved, the source spelling kept: " + ", ".join(unresolved))
+    if args.dry_run:
+        print(f"  done (dry run) in {time.time() - started:.1f}s")
+        return 0
+    summary = write_rows(pg, resolutions, source_id, provenance, rep)
+    print(f"  batch {summary['batch_id']}: {summary['rows']} events, {summary['changed']} inserted or changed, "
+          f"{summary['stale_removed']} stale removed; done in {time.time() - started:.1f}s")
+    return 0
+
+
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    rep = Reporter(verbose=not args.quiet)
+    started = time.time()
+    print("AFLDB after-the-siren kicks: reconcile the loaded table with the tracked artefact")
+    rows = read_artefact(args.csv)
+    load_env()
+    dsn = require_env(args.dsn_env)
+    print(f"  target: {safe_dsn(dsn)}")
+    pg = connect_pg(dsn)
+    source_id = fetch_source_id(pg)
+    resolutions = resolve_rows(Canon(pg), rows)
+    checks = reconcile(pg, rows, resolutions, source_id)
+    failed = report_checks(checks, rep)
+    print(f"  {len(checks) - failed}/{len(checks)} checks passed; done in {time.time() - started:.1f}s")
+    if failed:
+        sys.exit(f"ERROR: {failed} reconciliation check(s) failed")
+    return 0
+
+
 def cmd_normalize(args: argparse.Namespace) -> int:
     print(f"AFLDB after-the-siren kicks: normalise the Wikipedia table exports under {args.raw_dir}")
     sources = read_sources(args.raw_dir)
@@ -569,6 +1265,21 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--check", action="store_true", help="compare the tracked artefact with a fresh normalisation; write nothing")
     n.add_argument("--quiet", action="store_true")
     n.set_defaults(func=cmd_normalize)
+    l = sub.add_parser("load", help="Load the tracked artefact into after_siren_kicks (migration 089).")
+    l.add_argument("--csv", type=Path, default=DEFAULT_ARTEFACT)
+    l.add_argument("--provenance", type=Path, default=DEFAULT_PROVENANCE)
+    l.add_argument("--dsn-env", default="AFLDB_IMPORT_DATABASE_URL",
+                   help="environment variable holding the target DSN")
+    l.add_argument("--validate-only", action="store_true", help="Check the artefact's shape offline; touch no database.")
+    l.add_argument("--dry-run", action="store_true", help="Resolve against the database; write nothing.")
+    l.add_argument("--quiet", action="store_true")
+    l.set_defaults(func=cmd_load)
+    r = sub.add_parser("reconcile", help="Check the loaded table against the tracked artefact.")
+    r.add_argument("--csv", type=Path, default=DEFAULT_ARTEFACT)
+    r.add_argument("--dsn-env", default="AFLDB_IMPORT_DATABASE_URL",
+                   help="environment variable holding the target DSN")
+    r.add_argument("--quiet", action="store_true")
+    r.set_defaults(func=cmd_reconcile)
     args = parser.parse_args(argv)
     try:
         return args.func(args)

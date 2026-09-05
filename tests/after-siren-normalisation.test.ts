@@ -265,3 +265,349 @@ describe('after_siren.py normalisation', () => {
     }
   });
 });
+
+/**
+ * The loader's identity rules (AFLDB-ISSUE-118 §23.34). `resolve_match` and
+ * `resolve_player` read a `Canon`, so they are driven here against a fake one
+ * built from fixture rows: the real rule code runs, no database is touched.
+ */
+type FakeMatch = { id: number; season: number; round_code: string; home_org: number; away_org: number; home_club: number; away_club: number; home_score: number; away_score: number };
+type FakePms = { match_id: number; player_id: number; club_org: number; name: string; goals: number | null; behinds: number | null; debut: number | null };
+type FakeSeasonRow = { player_id: number; name: string; season: number; club_org: number; debut: number | null };
+type Fixture = {
+  orgs: Record<string, number[]>;
+  clubOrgs: Record<string, number>;
+  matches?: FakeMatch[];
+  participants?: FakePms[];
+  clubSeasons?: FakeSeasonRow[];
+  matchSeasons?: number[];
+  openingRoundSeasons?: number[];
+};
+type Resolved = {
+  match_id: number | null; match_method: string | null; club_id: number | null; opponent_club_id: number | null;
+  player_id: number | null; link_status: string; candidate_count: number; player_method: string | null;
+  score_check: string; notes: string | null;
+};
+type ResolveResult = { ok: true; resolved: Resolved } | { ok: false; error: string };
+
+const FAKE_CANON = `
+class FakeCursor:
+    def __init__(self, fx):
+        self.fx, self.result = fx, []
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def execute(self, sql, params=()):
+        if 'FROM matches m' in sql:
+            season, code, ko, oo, oo2, ko2 = params
+            self.result = [(m['id'], m['home_org'], m['home_club'], m['away_club'], m['home_score'], m['away_score'])
+                           for m in self.fx.get('matches', [])
+                           if m['season'] == season and m['round_code'].upper() == code
+                           and {m['home_org'], m['away_org']} == {ko, oo}]
+        elif 'player_match_stats' in sql:
+            club_id, match_id, name = params
+            org = self.fx['clubOrgs'][str(club_id)]
+            self.result = [(p['player_id'], p['goals'], p['behinds'], p['debut'])
+                           for p in self.fx.get('participants', [])
+                           if p['match_id'] == match_id and p['club_org'] == org and p['name'] == name]
+        elif 'player_club_season_stats' in sql:
+            name, season, org = params
+            self.result = [(r['player_id'], None, None, r['debut']) for r in self.fx.get('clubSeasons', [])
+                           if r['name'] == name and r['season'] == season and r['club_org'] == org]
+        else:
+            raise AssertionError('unexpected query: ' + sql)
+    def fetchall(self): return self.result
+    def fetchone(self): return self.result[0] if self.result else None
+
+class FakePg:
+    def __init__(self, fx): self.fx = fx
+    def cursor(self): return FakeCursor(self.fx)
+
+class FakeCanon:
+    def __init__(self, fx):
+        self.fx, self.pg = fx, FakePg(fx)
+        self.match_seasons = set(fx.get('matchSeasons') or [])
+        self.opening_round_seasons = set(fx.get('openingRoundSeasons') or [])
+    def organisation(self, club_raw):
+        found = self.fx['orgs'].get(club_raw, [])
+        if len(found) != 1:
+            raise m.AfterSirenSourceError(
+                "club %r resolves to %d club organisations on this database" % (club_raw, len(found)))
+        return found[0]
+    def era_club(self, org, season):
+        for cid, o in self.fx['clubOrgs'].items():
+            if o == org:
+                return int(cid)
+        return None
+`;
+
+function resolveOne(row: Row, fixture: Fixture): ResolveResult {
+  const script = `
+import json, sys
+sys.path.insert(0, 'tools/migration')
+import after_siren as m
+data = json.loads(sys.stdin.read())
+fx = data['fixture']
+${FAKE_CANON}
+try:
+    canon = FakeCanon(fx)
+    res = m.resolve_rows(canon, [data['row']])[0]
+    print(json.dumps({'ok': True, 'resolved': {
+        'match_id': res.match_id, 'match_method': res.match_method, 'club_id': res.club_id,
+        'opponent_club_id': res.opponent_club_id, 'player_id': res.player_id,
+        'link_status': res.link_status, 'candidate_count': res.candidate_count,
+        'player_method': res.player_method, 'score_check': res.score_check, 'notes': m.row_notes(res)}}))
+except m.AfterSirenSourceError as e:
+    print(json.dumps({'ok': False, 'error': str(e)}))
+`;
+  const proc = spawnSync(python, ['-c', script], { cwd: repositoryRoot, input: JSON.stringify({ row, fixture }), encoding: 'utf8' });
+  if (proc.status !== 0) throw new Error(`python exited ${proc.status}: ${proc.stderr}`);
+  return JSON.parse(proc.stdout) as ResolveResult;
+}
+
+function ok(r: ResolveResult): Resolved {
+  if (!r.ok) throw new Error(r.error);
+  return r.resolved;
+}
+
+/** An artefact row; only the fields a test varies need naming. */
+function event(over: Row = {}): Row {
+  const base: Row = {
+    event_key: '1990-vfl-afl-5-carlton-jane-doe', season: '1990', competition: 'VFL/AFL',
+    premiership_season: 'true', round_raw: '5', round_code: '5', round_kind: 'home_and_away',
+    player_name_raw: 'Jane Doe', player_name: 'Jane Doe', club_raw: 'Carlton', opponent_raw: 'Essendon',
+    kick_scored: 'goal', kick_effect: 'won', shot_detail: '', kicker_result: 'win', siren: 'final',
+    kicker_score_raw: '10.10 (70)', opponent_score_raw: '10.9 (69)', kicker_points: '70',
+    opponent_points: '69', margin: '1', supergoal_scoring: 'false', score_footnote_raw: '',
+    outcome_raw: '', ref_raw: '[1]', cited: 'true', adjudication_keys: '',
+    source_file: 'f.csv', source_table: 't', source_line: '2', note: '',
+  };
+  return { ...base, ...over };
+}
+
+/** Carlton (org 1, era club 101) beat Essendon (org 2, era club 102) by a point in round 5. */
+const CARLTON_ESSENDON: Fixture = {
+  orgs: { Carlton: [1], Essendon: [2] },
+  clubOrgs: { 101: 1, 102: 2 },
+  matchSeasons: [1990],
+  matches: [{ id: 900, season: 1990, round_code: '5', home_org: 1, away_org: 2, home_club: 101, away_club: 102, home_score: 70, away_score: 69 }],
+  participants: [{ match_id: 900, player_id: 55, club_org: 1, name: 'jane doe', goals: 3, behinds: 1, debut: 1988 }],
+};
+
+describe('after_siren.py match resolution', () => {
+  it('keys on season, round and both club organisations, and takes the clubs from the match', () => {
+    const r = ok(resolveOne(event(), CARLTON_ESSENDON));
+    expect(r.match_id).toBe(900);
+    expect(r.match_method).toBe('round_exact');
+    expect([r.club_id, r.opponent_club_id]).toEqual([101, 102]);
+    expect(r.notes).toContain('resolved on the round the source states');
+  });
+
+  it('reads the kicker first whichever side of the fixture the club was on', () => {
+    const away = { ...CARLTON_ESSENDON, matches: [{ ...CARLTON_ESSENDON.matches![0], home_org: 2, away_org: 1, home_club: 102, away_club: 101, home_score: 69, away_score: 70 }] };
+    const r = ok(resolveOne(event(), away));
+    expect(r.match_id).toBe(900);
+    expect([r.club_id, r.opponent_club_id]).toEqual([101, 102]);
+  });
+
+  it("separates a drawn final from its replay on the source's own points", () => {
+    const finals: Fixture = {
+      ...CARLTON_ESSENDON, matchSeasons: [1972],
+      matches: [
+        { id: 1, season: 1972, round_code: 'SF', home_org: 1, away_org: 2, home_club: 101, away_club: 102, home_score: 61, away_score: 61 },
+        { id: 2, season: 1972, round_code: 'SF', home_org: 1, away_org: 2, home_club: 101, away_club: 102, home_score: 69, away_score: 110 },
+      ],
+      participants: [{ match_id: 1, player_id: 55, club_org: 1, name: 'jane doe', goals: 2, behinds: 0, debut: 1968 }],
+    };
+    const drawn = event({ season: '1972', round_raw: 'SF', round_code: 'SF', round_kind: 'final', kick_effect: 'drew', kicker_result: 'draw', kicker_score_raw: '9.7 (61)', opponent_score_raw: '9.7 (61)', kicker_points: '61', opponent_points: '61', margin: '0' });
+    expect(ok(resolveOne(drawn, finals)).match_id).toBe(1);
+  });
+
+  it('retries one round higher only in a season shaped by an Opening Round', () => {
+    const opening: Fixture = {
+      ...CARLTON_ESSENDON, matchSeasons: [2024], openingRoundSeasons: [2024],
+      matches: [{ id: 7, season: 2024, round_code: '6', home_org: 1, away_org: 2, home_club: 101, away_club: 102, home_score: 70, away_score: 69 }],
+      participants: [{ match_id: 7, player_id: 55, club_org: 1, name: 'jane doe', goals: 1, behinds: 0, debut: 2020 }],
+    };
+    const row = event({ season: '2024' });
+    const r = ok(resolveOne(row, opening));
+    expect(r.match_id).toBe(7);
+    expect(r.match_method).toBe('opening_round_offset');
+    expect(r.notes).toContain('one round higher');
+    // The same fixture without the Opening-Round shape refuses rather than shifting.
+    const strict = { ...opening, openingRoundSeasons: [] };
+    expect(resolveOne(row, strict)).toMatchObject({ ok: false });
+  });
+
+  it('leaves match_id NULL for a season this database does not carry, and says so', () => {
+    const r = ok(resolveOne(event({ season: '2026', event_key: 'e-2026' }), { ...CARLTON_ESSENDON, matchSeasons: [1990], clubSeasons: [] }));
+    expect(r.match_id).toBeNull();
+    expect(r.notes).toContain('2026 is not in this database');
+    expect(r.club_id).not.toBeNull();       // the era rule still names the clubs
+    expect(r.link_status).toBe('unmatched'); // and nothing invents a kicker
+  });
+
+  it('leaves match_id NULL for another competition without ever looking for one', () => {
+    const other = event({ competition: 'NAB Cup', premiership_season: 'false', season: '2013' });
+    const r = ok(resolveOne(other, { ...CARLTON_ESSENDON, matchSeasons: [2013], clubSeasons: [{ player_id: 55, name: 'jane doe', season: 2013, club_org: 1, debut: 2010 }] }));
+    expect(r.match_id).toBeNull();
+    expect(r.notes).toContain('not a premiership-season fixture (NAB Cup)');
+    expect(r.player_id).toBe(55);
+    expect(r.player_method).toBe('club_season_participation');
+  });
+
+  it('refuses a season it carries whose fixture it cannot find', () => {
+    const r = resolveOne(event({ round_raw: '9', round_code: '9' }), CARLTON_ESSENDON);
+    expect(r).toMatchObject({ ok: false });
+    if (!r.ok) expect(r.error).toContain('no 1990 match between Carlton and Essendon');
+  });
+
+  it("refuses a fixture whose score disagrees with the source's", () => {
+    const wrong = { ...CARLTON_ESSENDON, matches: [{ ...CARLTON_ESSENDON.matches![0], home_score: 71 }] };
+    const r = resolveOne(event(), wrong);
+    expect(r).toMatchObject({ ok: false });
+    if (!r.ok) expect(r.error).toContain('0 agreeing with');
+  });
+
+  it('refuses a club name that is not exactly one organisation', () => {
+    const r = resolveOne(event(), { ...CARLTON_ESSENDON, orgs: { Carlton: [1, 3], Essendon: [2] } });
+    expect(r).toMatchObject({ ok: false });
+    if (!r.ok) expect(r.error).toContain('resolves to 2 club organisations');
+  });
+});
+
+describe('after_siren.py player resolution', () => {
+  it('links the one player of that name in the match for the kicker club', () => {
+    const r = ok(resolveOne(event(), CARLTON_ESSENDON));
+    expect(r.player_id).toBe(55);
+    expect(r.link_status).toBe('unique');
+    expect(r.candidate_count).toBe(1);
+    expect(r.player_method).toBe('match_participation');
+    expect(r.score_check).toBe('confirmed');
+  });
+
+  it('never reaches across to the opponent, and leaves the source spelling when nobody matches', () => {
+    const opponentOnly = { ...CARLTON_ESSENDON, participants: [{ match_id: 900, player_id: 55, club_org: 2, name: 'jane doe', goals: 3, behinds: 1, debut: 1988 }] };
+    const r = ok(resolveOne(event(), opponentOnly));
+    expect(r.player_id).toBeNull();
+    expect(r.link_status).toBe('unmatched');
+    expect(r.candidate_count).toBe(0);
+    expect(r.notes).toContain('no player of that name in that match');
+  });
+
+  it('leaves same-name team-mates ambiguous rather than picking one', () => {
+    const two = { ...CARLTON_ESSENDON, participants: [
+      { match_id: 900, player_id: 55, club_org: 1, name: 'jane doe', goals: 3, behinds: 1, debut: 1988 },
+      { match_id: 900, player_id: 56, club_org: 1, name: 'jane doe', goals: 0, behinds: 0, debut: 1989 },
+    ] };
+    const r = ok(resolveOne(event(), two));
+    expect(r.player_id).toBeNull();
+    expect(r.link_status).toBe('ambiguous');
+    expect(r.candidate_count).toBe(2);
+  });
+
+  it('separates same-name candidates by a generational suffix, and records that it did', () => {
+    const two = { ...CARLTON_ESSENDON, participants: [
+      { match_id: 900, player_id: 55, club_org: 1, name: 'jane doe', goals: 3, behinds: 1, debut: 1988 },
+      { match_id: 900, player_id: 56, club_org: 1, name: 'jane doe', goals: 1, behinds: 0, debut: 1962 },
+    ] };
+    const senior = ok(resolveOne(event({ player_name: 'Jane Doe Sr.', player_name_raw: 'Jane Doe Sr.' }), two));
+    expect(senior.player_id).toBe(56);
+    expect(senior.link_status).toBe('resolved');
+    expect(senior.candidate_count).toBe(2);
+    expect(senior.notes).toContain('separated by the sr. suffix');
+    expect(ok(resolveOne(event({ player_name: 'Jane Doe Jr.', player_name_raw: 'Jane Doe Jr.' }), two)).player_id).toBe(55);
+  });
+});
+
+describe('after_siren.py score confirmation', () => {
+  const withScores = (goals: number | null, behinds: number | null): Fixture => ({
+    ...CARLTON_ESSENDON,
+    participants: [{ match_id: 900, player_id: 55, club_org: 1, name: 'jane doe', goals, behinds, debut: 1988 }],
+  });
+
+  it('confirms a goal against the kicker\'s own scoring line', () => {
+    expect(ok(resolveOne(event(), withScores(2, 0))).score_check).toBe('confirmed');
+  });
+
+  it('treats an unrecorded statistic as unknown, never as zero', () => {
+    const behindToWin = event({ kick_scored: 'behind', kicker_score_raw: '10.10 (70)', opponent_points: '69' });
+    const r = ok(resolveOne(behindToWin, withScores(0, null)));
+    expect(r.score_check).toBe('not_recorded');
+    expect(r.player_id).toBe(55);
+    expect(r.notes).toContain('records no behinds for anyone');
+  });
+
+  it('refuses a recorded zero, which contradicts the source', () => {
+    const r = resolveOne(event(), withScores(0, 3));
+    expect(r).toMatchObject({ ok: false });
+    if (!r.ok) expect(r.error).toContain('recorded with 0 goals');
+  });
+
+  it('checks nothing for a kick that scored nothing', () => {
+    const missed = event({ kick_scored: 'none', kick_effect: 'none', kicker_result: 'loss', shot_detail: 'fell short', outcome_raw: 'No score (fell short)', kicker_points: '69', opponent_points: '70', kicker_score_raw: '10.9 (69)', opponent_score_raw: '10.10 (70)' });
+    const missedFixture = { ...withScores(0, 0), matches: [{ ...CARLTON_ESSENDON.matches![0], home_score: 69, away_score: 70 }] };
+    const r = ok(resolveOne(missed, missedFixture));
+    expect(r.score_check).toBe('not_applicable');
+    expect(r.player_id).toBe(55);
+  });
+});
+
+describe('after_siren.py artefact contract for the loader', () => {
+  function refuse(mutate: string): string {
+    const script = `
+import json, sys, tempfile
+from pathlib import Path
+sys.path.insert(0, 'tools/migration')
+import after_siren as m
+text = Path('data/records/after-siren-events.csv').read_text(encoding='utf-8').replace('\\r\\n', '\\n')
+lines = text.split('\\n')
+${mutate}
+with tempfile.TemporaryDirectory() as d:
+    p = Path(d) / 'a.csv'
+    p.write_text('\\n'.join(lines), encoding='utf-8', newline='\\n')
+    try:
+        m.read_artefact(p)
+        print('ACCEPTED')
+    except m.AfterSirenSourceError as e:
+        print(str(e))
+`;
+    const proc = spawnSync(python, ['-c', script], { cwd: repositoryRoot, encoding: 'utf8' });
+    if (proc.status !== 0) throw new Error(`python exited ${proc.status}: ${proc.stderr}`);
+    return proc.stdout.trim();
+  }
+
+  it('refuses a header that is not the tracked shape', () => {
+    expect(refuse("lines[0] = lines[0].replace('event_key', 'key')")).toContain('unexpected header');
+  });
+
+  it('refuses a duplicated event key', () => {
+    expect(refuse('lines.insert(2, lines[1])')).toContain('duplicate event key');
+  });
+
+  it('refuses an unknown enum value', () => {
+    expect(refuse("lines[1] = lines[1].replace(',goal,won,', ',punt,won,')")).toContain('unknown enum value');
+  });
+
+  it('refuses a premiership row of another competition', () => {
+    expect(refuse("lines[1] = lines[1].replace(',VFL/AFL,true,', ',NAB Cup,true,')")).toContain('premiership row of competition');
+  });
+
+  it('accepts the tracked artefact through load --validate-only, and its provenance agrees', () => {
+    const proc = spawnSync(python, ['tools/migration/after_siren.py', 'load', '--validate-only'], { cwd: repositoryRoot, encoding: 'utf8' });
+    expect(proc.status, proc.stderr).toBe(0);
+    expect(proc.stdout).toMatch(/126 events, shape verified/);
+    expect(proc.stdout).toMatch(/done \(validate only\)/);
+  });
+
+  it('writes only columns migration 089 declares', () => {
+    const sql = readFileSync(join(repositoryRoot, 'src', 'db', 'migrations', '089_after_siren_kicks.sql'), 'utf8');
+    const body = sql.slice(sql.indexOf('CREATE TABLE after_siren_kicks'));
+    const declared = new Set([...body.matchAll(/^\s{2}([a-z_]+)\s{2,}/gm)].map((m) => m[1]));
+    const script = "import sys; sys.path.insert(0, 'tools/migration'); import after_siren as m; print(' '.join(m.WRITTEN_COLUMNS))";
+    const proc = spawnSync(python, ['-c', script], { cwd: repositoryRoot, encoding: 'utf8' });
+    expect(proc.status, proc.stderr).toBe(0);
+    const written = proc.stdout.trim().split(' ');
+    expect(written.length).toBeGreaterThan(20);
+    expect(written.filter((c) => !declared.has(c))).toEqual([]);
+  });
+});
