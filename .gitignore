@@ -75,6 +75,11 @@ next-env.d.ts
 !/data/records/
 /data/records/*
 !/data/records/first-kick-goal-ids.csv
+# AFLDB-ISSUE-118 §23.33: the normalised after-siren artefact, provenance and adjudications are tracked;
+# the raw table exports under data/records/after-siren/ stay untracked.
+!/data/records/after-siren-events.csv
+!/data/records/after-siren-events.source.json
+!/data/records/after-siren-adjudications.csv
 # ISSUE-093 Phase-1 canonical reference datasets: curated, reviewable, tracked.
 # Only JSON opts in; raw/large data under data/ (incl. data/sources/) stays ignored.
 !/data/reference/

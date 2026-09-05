@@ -1,0 +1,74 @@
+{
+  "wikipedia_title": "List of kicks after the siren in the VFL/AFL",
+  "source_url": "https://en.wikipedia.org/wiki/List_of_kicks_after_the_siren_in_the_VFL/AFL",
+  "page_id": 11694586,
+  "export_revision_id": null,
+  "export_revision_note": "The operator export does not record the article revision it was taken from. The live article was inspected for the footnote texts and table headings; its Cameron Zurhaar 2026 row is cited there, so the export predates that citation.",
+  "inspected_revision_id": "1371785656",
+  "inspected_on": "2026-09-05",
+  "raw_dir": "data/records/after-siren",
+  "raw_files": [
+    {
+      "file": "Players_to_have_kicked_a_behind_to_draw_a_match_after_the_final_siren.csv",
+      "rows": 3,
+      "sha256": "920e2bf75e26bba9366a8f60af5c95b736934d5482becb6b9bf2db7928f81a24"
+    },
+    {
+      "file": "Players_to_have_kicked_a_behind_to_win_a_match_after_the_final_siren.csv",
+      "rows": 5,
+      "sha256": "67add997a57dc1502672ea0a108d34018326e185d0b5d82e0cedb084043d5087"
+    },
+    {
+      "file": "Players_to_have_kicked_a_behind_to_win_a_match_after_the_final_siren_1.csv",
+      "rows": 1,
+      "sha256": "9cc8f5116ecb2c20eb30a6cc519238c8d3cf507d3b50a773093e9a897f03cda0"
+    },
+    {
+      "file": "Players_to_have_kicked_a_goal_to_draw_a_match_after_the_final_siren.csv",
+      "rows": 8,
+      "sha256": "bf647ef616c6d36cfeaf7d0afad49bef4605c6ef8727a857172ef652114ecf9b"
+    },
+    {
+      "file": "Players_to_have_kicked_a_goal_to_draw_a_match_after_the_final_siren_1.csv",
+      "rows": 1,
+      "sha256": "7197cc7308c5462f3bfcad8f619334c798cbc754b431b5f5cdbeda794cd0895a"
+    },
+    {
+      "file": "Players_to_have_kicked_a_goal_to_win_a_match_after_the_final_siren.csv",
+      "rows": 59,
+      "sha256": "25aeecc66f9028bf3db9a9ef5b37d731eeeb5b01dfe7813aaa8a0036e1345168"
+    },
+    {
+      "file": "Players_to_have_kicked_a_goal_to_win_a_match_after_the_final_siren_1.csv",
+      "rows": 3,
+      "sha256": "87d4baa90ffbdb84d867c1ff20d2a7eddc3c5a1c6bfd4f8486603c28d12c936b"
+    },
+    {
+      "file": "Players_to_have_missed_an_opportunity_to_win_or_draw_a_match_after_the_final_siren.csv",
+      "rows": 46,
+      "sha256": "e17e9aba59c3fe25c65958914d60dae62c5cf82c27d8cec28c8f262e5c463cb9"
+    }
+  ],
+  "raw_rows": 126,
+  "adjudications": 4,
+  "measures": {
+    "events": 126,
+    "premiership_season_events": 121,
+    "other_competition_events": 5,
+    "goal_won": 62,
+    "behind_won": 6,
+    "goal_drew": 9,
+    "behind_drew": 3,
+    "missed": 46,
+    "missed_behind": 21,
+    "missed_no_score": 25,
+    "premiership_season_scored_and_won": 64,
+    "premiership_season_scored_and_won_players": 62,
+    "siren_end_of_extra_time": 1,
+    "siren_end_of_regulation": 1,
+    "uncited": 1,
+    "score_arithmetic_defects": 1,
+    "adjudicated": 4,
+    "repeat_markers_stripped": 2
+  }
+}

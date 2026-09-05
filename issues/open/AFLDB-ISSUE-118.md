@@ -4697,3 +4697,124 @@ model decision from S.6 as a migration, a normalise/load tool resolving match an
 fail-closed ambiguity, a rebuild stage after `siblings` with gates derived from the artefact (64 qualifying
 events / 62 players, 68 scoring rows confirmed by `player_match_stats`), an `after_siren_winner` builder and
 the `winaftersiren` mapping, then the corpus rerun.
+
+### 23.33 After-the-siren — canonical model chosen, `after_siren_kicks` (migration 089), deterministic normalised artefact; loader / solver / corpus NOT started (5 September 2026, fourteenth session, Fable medium)
+
+Scope of this session: the canonical model decision, its migration, the deterministic source
+normaliser, the tracked normalised artefact and its tests. No loader, no Grid Solver builder, no
+`winaftersiren` mapping, no rebuild stage, no corpus classification, no database change was made
+or run.
+
+**T.1 Model chosen: a small dedicated table, `after_siren_kicks`, not a `player_achievement_type`
+value.** `player_achievements` (053) was re-read against §23.32 S.6. It is the right *discipline*
+(nullable player link with the source spelling retained, `link_status_value` + `candidate_count`,
+club, season, verbatim round, nullable match, provenance, `(source_id, source_record_id)`
+uniqueness) and the new table copies it. It is the wrong *shape*: (1) its `match_id` comment says
+"resolved by career game position, never by season/round/club lookup", which is exactly the lookup
+an after-siren event needs; (2) the domain needs five event facts it lacks — opponent, what the kick
+scored, what it did to the result, which siren it followed, the competition — plus the source's own
+final score; adding them as nullable columns meaningful to one enum value, beside first-kick
+columns (`consecutive_goal_kicks`, `no_further_career_*`, `kickless_matches_before_first_kick`) that
+would sit inert on every after-siren row, overloads a single-player career fact with a match event.
+Migration `src/db/migrations/089_after_siren_kicks.sql` therefore creates `after_siren_kicks` with
+four enums (`after_siren_score` goal/behind/none, `after_siren_effect` won/drew/none,
+`after_siren_result` win/draw/loss, `after_siren_siren` final/end_of_regulation/end_of_extra_time),
+columns `player_*` / `link_status_value` / `candidate_count` (053 CHECK), `club_id` +
+`club_name_raw`, `opponent_club_id` + `opponent_name_raw`, `competition` + `premiership_season`,
+`season`, `round_raw`, `match_id` (CHECK: NULL unless premiership season), `kick_scored`,
+`kick_effect`, `shot_detail`, `kicker_result`, `siren`, the verbatim kicker/opponent scores and
+points, `supergoal_scoring`, `cited`, `source_annotation`, `notes`, provenance columns, the source
+uniqueness constraint, five indexes, the `wikipedia_after_siren_kicks` source row, and app-read /
+import-write registration. A CHECK enforces the event semantics (a kick that won is a 1–6 point win,
+1 for a behind; a kick that drew is level; a miss in a win is only possible after the regulation
+siren). Nothing in the schema names Gridley: `winaftersiren` will later be the filter
+`premiership_season AND kick_scored <> 'none' AND kick_effect = 'won'`. **Not yet applied to any
+database** (no migration run this session).
+
+**T.2 Normaliser** — `tools/migration/after_siren.py normalize [--check]`, offline (no database,
+no identity resolution; the loader session resolves player/club/match as S.5 describes). It reads
+the eight raw exports (still untracked under `data/records/after-siren/`), classifies each by file
+name (goal/behind × win/draw, missed; `_1` = the article's "other competitions" table), parses
+`Final score` kicker-first, requires each `G.B (pts)` (or `S.G.B (pts)` under `[c]`) to add up and
+the separator (`d.` / `drew` / `lost to`) to agree with the computed margin, then derives and
+cross-checks against the table: `kick_scored` (goal / behind / none — a missed-table `Behind` is a
+behind that changed nothing), `kick_effect` (won / drew / none), `kicker_result` (win / draw / loss),
+`shot_detail` (fell short / out on the full / hit the goal post), `siren`. Refusals: a goal-win over
+6 points, a behind-win over 1, a draw row that is not level, a miss in a win, a behind that left the
+scores level in the missed table, a supergoal score without `[c]` (or `[c]` without it), a footnote
+without an adjudication, an empty `Ref.` without one, a score that does not add up without one, an
+adjudication no row needs, the same event in two files. Event key
+`season-competition-round-club-player` (e.g. `2017-vfl-afl-EF-west-coast-luke-shuey`) is derived
+from source fields only, so it is stable across regenerations and independent of row order; the
+article's `(2)` repeat marker is stripped into `player_name` and kept in `player_name_raw`. Output
+is sorted (season, premiership first, competition, round order with finals after home-and-away, club,
+player). `--check` compares BOTH the artefact and the provenance file byte-for-byte with a fresh
+normalisation; the provenance carries no timestamp, only the constant inspection date, so it
+regenerates identically. `.gitattributes` forces LF on `data/records/after-siren-*.{csv,json}`.
+
+**T.3 Tracked artefact** — `data/records/after-siren-events.csv` (31 columns: `event_key, season,
+competition, premiership_season, round_raw, round_code, round_kind, player_name_raw, player_name,
+club_raw, opponent_raw, kick_scored, kick_effect, shot_detail, kicker_result, siren,
+kicker_score_raw, opponent_score_raw, kicker_points, opponent_points, margin, supergoal_scoring,
+score_footnote_raw, outcome_raw, ref_raw, cited, adjudication_keys, source_file, source_table,
+source_line, note`), `data/records/after-siren-events.source.json` (article title, page id 11694586,
+`export_revision_id: null` with the reason, inspected live revision 1371785656 on 2026-09-05, the
+eight raw files with row counts and SHA-256, measures) and `data/records/after-siren-adjudications.csv`
+(`.gitignore` opt-ins added; the raw exports stay ignored). **126 events**, every source row
+represented once, zero duplicates:
+
+| Category | Premiership season | Other competition | Total |
+|---|---|---|---|
+| goal, won | 59 | 3 (Escort Championships 1980 GF; NAB Cup 2013; JLT Community Series 2017) | 62 |
+| behind, won | 5 | 1 (NAB Cup 2013) | 6 |
+| goal, drew | 8 | 1 (NAB Cup 2011) | 9 |
+| behind, drew | 3 | 0 | 3 |
+| missed — behind | 21 | 0 | 21 |
+| missed — no score | 25 | 0 | 25 |
+| **total** | **121** | **5** | **126** |
+
+Qualifying for `winaftersiren` on the S.1 semantics (premiership season, scored, won): **64 events,
+62 distinct players** (Barry Hall 2001/2005, Gary Rohan 2017/2021), matching §23.32 S.3 exactly.
+Non-qualifying but canonical: 12 draws, 46 misses, 5 other-competition events. The counts are
+computed by the test from the artefact, not typed.
+
+**T.4 Adjudications (`data/records/after-siren-adjudications.csv`, four, each needed by exactly one
+row or the run refuses):**
+
+| Key | Event | Field | Decision |
+|---|---|---|---|
+| asr-adj-001 | Luke Shuey 2017 EF `[a]` | siren = `end_of_extra_time` | Footnote `[a]` reads "After extra time." The extra-time siren is the final siren of the match; the goal turned a level score into a 2-point win → `goal / won / win`, qualifying. |
+| asr-adj-002 | David King 1994 QF `[b]` | siren = `end_of_regulation` | Footnote `[b]` (quoted in full in the file): the shot came after the siren ending regulation time with scores level 91–91, registered no score, and North Melbourne won extra time 3.5 to nil. Classified `none / none / win`, `shot_detail` fell short: a genuine after-siren miss whose recorded win is the extra-time result. Without the adjudication the normaliser refuses a miss in a win. |
+| asr-adj-003 | Cameron Zurhaar 2026 R11 | citation = `uncited` | Empty `Ref.` in the export; the live article (rev 1371785656) now cites the row, so the citation post-dates the export. Kept as `cited = false`; no independent source consulted. Evidence gap for the loader. |
+| asr-adj-004 | Harry Hickey 1944 R18 (new finding) | score_arithmetic = `points_as_written` | The export's `12.7 (89)` is 79 points by its own goals/behinds; the opponent's `13.10 (88)` adds up. The points, the 1-point margin and the behind-to-win table agree, so the points are taken as written and both figures are stored verbatim, uncorrected and unverified. |
+
+Every other row adds up and needs nothing. The five `_1` rows carry their competition name,
+`premiership_season = false`, and (Riewoldt, Langdon, Russell, Williams) `supergoal_scoring = true`;
+they are never matched to a premiership-season match.
+
+**T.5 Determinism proof.** `python tools/migration/after_siren.py normalize` wrote the artefact and
+provenance; `normalize --check --quiet` immediately afterwards reported both "exactly the
+regeneration". The vitest block re-runs `--check` whenever the raw exports are present in the
+checkout (they are untracked, so a CI checkout skips that one line and still asserts the artefact's
+shape and counts).
+
+**T.6 Tests.** New `tests/after-siren-normalisation.test.ts` (no existing suite is a semantic home;
+it follows `tests/sibling-reconciliation.test.ts`, driving the module through the interpreter on
+synthetic exports, no database): file/table classification and per-table derivation; goal / behind
+/ miss and win / draw / loss distinctions including `shot_detail`; other-competition preservation
+with supergoal arithmetic; every refusal listed in T.2; Shuey (refused without, `end_of_extra_time`
+goal-to-win with, stale adjudication refused, a decisive kick cannot precede extra time); King
+(refused without, `none/none/win` with, still refused when adjudicated as `final`); uncited and
+score-arithmetic adjudications needed, applied, and refused when stale; repeat-marker stripping,
+cross-file duplicate refusal, deterministic ordering; the tracked artefact's counts, adjudication
+list and provenance, and byte-identical regeneration. 8/8 pass; `npx tsc --noEmit -p .` clean;
+`npx eslint tests/after-siren-normalisation.test.ts` clean.
+
+**Exact next action (fresh session):** load and reconcile canonical after-siren events — apply
+migration 089 on `afldb_test`, write `after_siren.py load` (`--validate-only` / `--dry-run` /
+idempotent) resolving match by (season, round, kicker's club, opponent) with the artefact's points
+as the independent check and the Opening Round offset from `tools/records/import-first-kick-goal.ts`,
+player by name + club within that match's `player_match_stats` with the goal/behind confirmation for
+the 68 scoring rows, fail-closed on ambiguity, `match_id` NULL for the 5 other-competition rows; then
+the rebuild stage after `siblings` with artefact-derived gates (126 rows, 64/62 qualifying). The
+`after_siren_winner` builder, the `winaftersiren` mapping and the corpus rerun follow that.

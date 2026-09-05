@@ -21,6 +21,9 @@ data/players/father-son-*.json  text eol=lf
 # AFLDB-ISSUE-118 §23.31: family_siblings.py normalize --check compares bytes likewise
 data/players/sibling-*.csv      text eol=lf
 data/players/sibling-*.json     text eol=lf
+# AFLDB-ISSUE-118 §23.33: after_siren.py normalize --check compares bytes likewise
+data/records/after-siren-*.csv  text eol=lf
+data/records/after-siren-*.json text eol=lf
 
 # AFLDB-ISSUE-118 Stage 2 — the captured Gridley payloads are exact response
 # bytes and tests/gridley-acquisition.test.ts pins their SHA-256. `-text`
