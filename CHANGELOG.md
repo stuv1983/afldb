@@ -15,6 +15,58 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-117 — Retired access keys can be permanently deleted from `/admin/access` - 6 September 2026
+
+- Beta access keys gain the last step of their lifecycle: **Active → Revoke → Delete**. Revoking
+  still only sets `beta_access_codes.revoked_at` and keeps the record, which is what makes it the
+  right way to stop a key immediately; a key can now also be removed once it is finished with,
+  instead of sitting in the admin list forever. Revoke's semantics and visibility are unchanged.
+- **A key is deletable once it is *retired* — revoked, or spent.** A spent key
+  (`use_count >= max_uses`) deletes directly: requiring an admin to revoke something the database
+  already refuses was ceremony, and because Revoke is only offered while a key is `live`, a spent
+  key previously could be neither revoked nor deleted and simply accumulated. A key that could
+  still admit somebody is still refused — a **partly used** key has admissions left, and an
+  **unlimited** key (`max_uses IS NULL`, migration 036) is never spent and must be revoked first.
+  The rule is a strict subset of the redeem query's own refusal conditions, so widening what may be
+  deleted did not put a single live key at risk. An **expired** key stays undeletable by design:
+  expiry passes on its own, with nobody deciding anything, and deletion is irreversible.
+- **The retired-only rule is in the statement, not the browser.** `deleteRetiredAccessCode`
+  (`src/db/queries/access-codes.ts`) carries
+  `WHERE id = … AND (revoked_at IS NOT NULL OR (max_uses IS NOT NULL AND use_count >= max_uses))`,
+  so a request naming a still-redeemable key's id matches no row and deletes nothing. Hiding the
+  button on an active key is presentation; this predicate is the rule. "Not retired", "never
+  existed" and "already deleted" return one message, so the endpoint cannot be used to discover
+  which ids exist.
+- **The deletion cannot outlive its audit.** `access.code_deleted` is written with
+  `auditInTransaction` (AFLDB-ISSUE-119) inside the same `authSql.begin` as the DELETE, so a failed
+  audit rolls the deletion back — the auth-pool counterpart of the guarantee `AFLDB-ISSUE-027` gave
+  the import role. The trail records the key's id, label, use count and **which rule** made it
+  disposable (`revoked` or `spent`), which is enough to say what was destroyed and why it was
+  allowed, and no secret: only the sha256 of the code was ever stored and it leaves with the row.
+- **Migration 091** grants `afldb_auth` `DELETE` on `beta_access_codes` — a privilege it did not
+  hold, so without this the feature fails closed on a permission error. `tools/maintenance/
+  privileges.sql` is updated in step, because its `afldb_auth` section is subtractive and would
+  otherwise revoke the grant at the next reconcile or restore, and
+  `tests/integration/privileges.test.ts` now asserts the grant so that regression fails in CI rather
+  than in the admin UI. **Deploy order is load-bearing: apply migration 091 and `privileges.sql`
+  before the code.**
+- Checked before introducing the DELETE: no foreign key references `beta_access_codes`, and while a
+  beta session's claim subject embeds `code:<id>`, `hasBetaAccess()` and the middleware verify the
+  signed claim alone and never look that id up. Deleting a key therefore ends no live session — and
+  neither does revoking one; the epoch and the TTL remain the only ways to cut a beta session short.
+  Ids are `GENERATED ALWAYS AS IDENTITY`, so a freed id is never reissued.
+- On a revoked **or spent** row the admin UI shows **Delete…**, which opens an in-row confirmation
+  naming the key and its state before anything is submitted, styled apart from Revoke with a new
+  `.btn-danger`.
+- **Numbering note.** This work was written on 2026-08-31 as migration `079_access_code_delete.sql`
+  on the unmerged branch `claude/issue-116` and applied to `afldb_dev` from there; `main`
+  subsequently took `079` for `079_nl_search_log_head_to_head_grain.sql`. The migration is therefore
+  renumbered **091** (confirmed free across every ref and every worktree). `afldb_dev` keeps an
+  applied ledger row for the old name that no checkout can reproduce; it is not edited or deleted,
+  applying `091` there is safe because `GRANT` is idempotent, and the resulting
+  `db:promotion:check --phase pre-cutover` parity refusal on `afldb_dev` remains truthful and
+  expected — see `AFLDB-ISSUE-142` Finding C.
+
 ### AFLDB-ISSUE-141 — the promotion contract classifies migration 080, and takes an explicit environment - 6 September 2026
 
 - **The captured Gridley corpus can no longer be silently dropped by a promotion.** `external_grid_sources`, `external_grids` and `external_grid_axes` (migration `080`) are deliberately not import-writable and were in neither classification set, so the fail-closed gate refused every database carrying `080` and — the substantive defect — a generated plan named them in neither the truncate list nor the reinstate list. Because there is no Gridley rebuild stage, the swap would have replaced an explicitly immutable captured corpus with the candidate's empty tables, unnoticed. All three now have an explicit `reinstate` / `compare: equal` treatment in FK order (`external_grid_sources` 20 → `external_grids` 30 → `external_grid_axes` 40), so the truncate removes migration 080's own seed row before the dump's row is restored onto the same id. None was added to `import_writable_tables`; migration 080's privileges are unchanged; no schema migration.
