@@ -224,8 +224,9 @@ test('a stale player slug redirects once, permanently', async ({ request }) => {
 /**
  * AFLDB-ISSUE-144 Stage 9 — the comparison surface a crawler is served.
  *
- * The pair is the document; the season, the match filter and the history
- * page are view state on it. Both orders of a pair therefore resolve to one
+ * The pair is the document; the match filter and the history page are view
+ * state on it (the comparison is all-time only since the Club Rivalry
+ * Explorer follow-up, FR-1). Both orders of a pair therefore resolve to one
  * alphabetically ordered canonical, and a state that resolves to no pair
  * canonicalises back to the bare surface.
  *
@@ -248,9 +249,10 @@ test('a club comparison canonicalises to its ordered pair alone', async ({ page 
   expect(forward.search).toBe('?club1=adelaide&club2=brisbane-lions');
   expect(reversed.href).toBe(forward.href);
 
-  // Season, match filter and page are dropped, not carried.
+  // Era, match filter and page are dropped, not carried (an unrecognised
+  // `season` param on the same URL is simply ignored, not read).
   const stateful = await canonicalOf(
-    '/clubs/compare?club1=brisbane-lions&club2=adelaide&season=2024&matchType=finals&page=2',
+    '/clubs/compare?club1=brisbane-lions&club2=adelaide&season=2024&era=1990&matchType=finals&page=2',
   );
   expect(stateful.href).toBe(forward.href);
 

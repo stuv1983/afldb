@@ -4,16 +4,39 @@ import { CollapsibleTable } from '@/components/CollapsibleTable';
 import type {
   ComparisonOrganization,
   H2HDecade,
+  H2HMeeting,
   H2HPeriodRecordKind,
   H2HPeriodRecords,
+  H2HRecordEntry,
+  H2HRecordKind,
+  H2HRecords,
+  H2HStreak,
+  H2HStreaks,
 } from '@/db/queries/club-comparison';
+import type { ComparisonEffectiveParams } from '@/app/clubs/compare/state';
 import {
   decadeLabel,
+  eraCaptionSuffix,
+  eraScopeSentence,
+  outcomeLabel,
   periodCoverageSentence,
   periodRecordLabel,
+  recordKindLabel,
+  recordKindUnit,
   turnaroundSegmentLabel,
 } from '@/lib/club-comparison-format';
 import { formatDate, formatNumber, formatPercentage, formatStat, matchPath } from '@/lib/format';
+
+const RECORD_ORDER: H2HRecordKind[] = [
+  'biggest-win-a',
+  'biggest-win-b',
+  'closest-game',
+  'highest-score-a',
+  'highest-score-b',
+  'lowest-score-a',
+  'lowest-score-b',
+  'highest-combined-score',
+];
 
 const PERIOD_ORDER: H2HPeriodRecordKind[] = [
   'biggest-quarter-time-lead-a',
@@ -33,28 +56,38 @@ const PERIOD_ORDER: H2HPeriodRecordKind[] = [
 ];
 
 /**
- * Rivalry by decade and period-score rivalry records
- * (AFLDB-ISSUE-144 Stage 8).
+ * Rivalry records for /clubs/compare (Club Rivalry Explorer follow-up,
+ * FR-3): the single-match records and streaks that were the old
+ * `ClubComparisonHeadToHead`'s "Rivalry records" section, plus the
+ * by-decade breakdown and period-score records that used to live in the
+ * separate `ClubComparisonTrends` component. The approved reorder names
+ * one "Rivalry records" section between the era explorer and Venues, so
+ * all four live under that one heading now, as subsections.
  *
- * Decade labels come from the rows: no decade, era or year boundary is
- * written down here.
+ * Always fully expanded — this is core rivalry-history content, not a
+ * long tail — except the period-records table, which keeps the nested
+ * disclosure it already had: that table is the one large enough to
+ * warrant its own collapse even inside an otherwise-expanded section.
  *
- * Every period record names the organisation whose record it is, and
- * carries both clubs' break scores plus the full-time score, because one
- * meeting routinely holds two opposite records — Adelaide's biggest
- * quarter-time lead over Brisbane Lions is the same match as Brisbane
- * Lions' biggest comeback from quarter time, and a bare margin would
- * misattribute one of them. The full-time score is the canonical match
- * score, never the fourth period's own points.
+ * Only the records table and (implicitly, via its own population) the
+ * by-decade table honour the era filter; streaks stay all-time because a
+ * decade boundary would truncate a run that crosses it, and the same is
+ * true of period records, which are read from the pair's whole history.
  */
-export function ClubComparisonTrends({
+export function ClubComparisonRivalryRecords({
   organizationA,
   organizationB,
+  params,
+  records,
+  streaks,
   decades,
   periodRecords,
 }: {
   organizationA: ComparisonOrganization;
   organizationB: ComparisonOrganization;
+  params: ComparisonEffectiveParams;
+  records: H2HRecords;
+  streaks: H2HStreaks;
   decades: H2HDecade[];
   periodRecords: H2HPeriodRecords;
 }) {
@@ -62,9 +95,93 @@ export function ClubComparisonTrends({
   const bName = organizationB.name;
 
   return (
-    <>
-      <section className="section" id="by-decade">
-        <h2>By decade</h2>
+    <section className="section" id="rivalry-records">
+      <h2>Rivalry records</h2>
+      <p className="section-note">
+        {eraScopeSentence(params.era)} Where a record is shared, every match that holds
+        it is listed.
+      </p>
+      <div className="table-wrap">
+        <table>
+          <caption>Rivalry records — {aName} and {bName}{eraCaptionSuffix(params.era)}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Record</th>
+              <th scope="col" className="num">Value</th>
+              <th scope="col">Measure</th>
+              <th scope="col">Match</th>
+              <th scope="col" className="num">Season</th>
+              <th scope="col">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {RECORD_ORDER.flatMap((kind) => {
+              const entries = records[kind] ?? [];
+              const label = recordKindLabel(kind, aName, bName);
+              if (entries.length === 0) {
+                return [(
+                  <tr key={kind}>
+                    <th scope="row">{label}</th>
+                    <td className="not-recorded" colSpan={5}>Not recorded</td>
+                  </tr>
+                )];
+              }
+              return entries.map((entry: H2HRecordEntry, index) => (
+                <tr key={`${kind}-${entry.matchId}`}>
+                  <th scope="row">
+                    {label}
+                    {entries.length > 1 && (
+                      <span className="badge">Tied {index + 1} of {entries.length}</span>
+                    )}
+                  </th>
+                  <td className="num">{formatNumber(entry.value)}</td>
+                  <td>{recordKindUnit(kind)}</td>
+                  <td className="wide"><MeetingLink meeting={entry} /></td>
+                  <td className="num">{entry.season}</td>
+                  <td className="nowrap">
+                    {formatStat(entry.aScore)}–{formatStat(entry.bScore)}
+                    <span className="meta"> ({aName} first)</span>
+                  </td>
+                </tr>
+              ));
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {params.era !== null && (
+        <p className="section-note">
+          Streaks are always all-time — an era filter narrows records above, not streaks,
+          because a decade boundary would truncate a run that crosses it.
+        </p>
+      )}
+      <div className="table-wrap">
+        <table>
+          <caption>Streaks</caption>
+          <thead>
+            <tr>
+              <th scope="col">Streak</th>
+              <th scope="col" className="num">Matches</th>
+              <th scope="col">From</th>
+              <th scope="col">To</th>
+            </tr>
+          </thead>
+          <tbody>
+            <StreakRow label={`Longest winning streak — ${aName}`} streak={streaks.longestA} />
+            <StreakRow label={`Longest winning streak — ${bName}`} streak={streaks.longestB} />
+            <StreakRow
+              label="Current streak"
+              streak={streaks.current}
+              outcomeName={streaks.current
+                ? outcomeLabel(streaks.current.outcome, aName, bName)
+                : undefined}
+            />
+          </tbody>
+        </table>
+      </div>
+
+      <div id="by-decade">
+        <h3>By decade</h3>
         {decades.length === 0 ? (
           <p className="empty">There is no meeting to break down by decade.</p>
         ) : (
@@ -115,22 +232,26 @@ export function ClubComparisonTrends({
         <p className="section-note">
           Points are summed over meetings with a recorded score only; “scored meetings” is
           the denominator behind them. {aName}’s points against are {bName}’s points for.
+          This breakdown is always all-time — it is the source of the era chips above, not
+          a view they narrow.
         </p>
-      </section>
+      </div>
 
-      <section className="section" id="period-records">
-        <h2>Period records</h2>
+      <div id="period-records">
+        <h3>Period records</h3>
         <p className="section-note">
           {periodCoverageSentence(
             periodRecords.coverage.usableMeetings,
             periodRecords.coverage.meetings,
           )}{' '}
-          Break scores are cumulative. Full-time is the canonical match score.
+          Break scores are cumulative. Full-time is the canonical match score. Always
+          all-time, regardless of the era filter above.
         </p>
         <CollapsibleTable
           id="period-records-table"
           title="Leads, comebacks and turnarounds"
           defaultOpen={false}
+          headingLevel={4}
         >
           {periodRecords.coverage.usableMeetings === 0 ? (
             <p className="empty">
@@ -207,7 +328,53 @@ export function ClubComparisonTrends({
             </p>
           )}
         </CollapsibleTable>
-      </section>
-    </>
+      </div>
+    </section>
+  );
+}
+
+function MeetingLink({ meeting }: { meeting: H2HMeeting }) {
+  return (
+    <Link href={matchPath(meeting.matchId)}>
+      {formatDate(meeting.matchDate)} — {meeting.homeClubName} v {meeting.awayClubName}
+    </Link>
+  );
+}
+
+function StreakRow({
+  label,
+  streak,
+  outcomeName,
+}: {
+  label: string;
+  streak: H2HStreak | null;
+  outcomeName?: string;
+}) {
+  if (!streak) {
+    return (
+      <tr>
+        <th scope="row">{label}</th>
+        <td className="not-recorded" colSpan={3}>None on record</td>
+      </tr>
+    );
+  }
+  return (
+    <tr>
+      <th scope="row">
+        {label}
+        {outcomeName && <span className="meta"> ({outcomeName})</span>}
+      </th>
+      <td className="num">{formatNumber(streak.length)}</td>
+      <td className="nowrap">
+        <Link href={matchPath(streak.fromMatchId)}>
+          {formatDate(streak.fromMatchDate)} ({streak.fromSeason})
+        </Link>
+      </td>
+      <td className="nowrap">
+        <Link href={matchPath(streak.toMatchId)}>
+          {formatDate(streak.toMatchDate)} ({streak.toSeason})
+        </Link>
+      </td>
+    </tr>
   );
 }

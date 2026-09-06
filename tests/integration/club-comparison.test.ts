@@ -247,6 +247,34 @@ describe('club comparison: head-to-head core', () => {
     expect(draw?.isFinalsSeries).toBe(false);
   });
 
+  it('filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history', async () => {
+    const [all, s1990s, s2000s, s2010s, s2020s] = await Promise.all([
+      getHeadToHeadMeetings(adelaide, lions),
+      getHeadToHeadMeetings(adelaide, lions, { era: 1990 }),
+      getHeadToHeadMeetings(adelaide, lions, { era: 2000 }),
+      getHeadToHeadMeetings(adelaide, lions, { era: 2010 }),
+      getHeadToHeadMeetings(adelaide, lions, { era: 2020 }),
+    ]);
+
+    // Runbook witness (V1.7 decade H2H): Adelaide vs Brisbane Lions.
+    expect(s1990s.totalMeetings).toBe(5);
+    expect(s2000s.totalMeetings).toBe(15);
+    expect(s2010s.totalMeetings).toBe(13);
+    expect(s2020s.totalMeetings).toBe(8);
+    expect(
+      s1990s.totalMeetings + s2000s.totalMeetings + s2010s.totalMeetings + s2020s.totalMeetings,
+    ).toBe(all.totalMeetings);
+
+    expect(s1990s.era).toBe(1990);
+    expect(s1990s.meetings.every((m) => m.season >= 1990 && m.season < 2000)).toBe(true);
+
+    // A decade this rivalry never met in returns zero meetings, not an error.
+    const noMeetings = await getHeadToHeadMeetings(adelaide, lions, { era: 1900 });
+    expect(noMeetings.totalMeetings).toBe(0);
+    expect(noMeetings.meetings).toEqual([]);
+    expect(noMeetings.era).toBe(1900);
+  });
+
   it('paginates the complete meetings list deterministically at 25 rows per page', async () => {
     expect(MEETINGS_PAGE_SIZE).toBe(25);
 
@@ -390,6 +418,24 @@ describe('club comparison: head-to-head core', () => {
     expect(records['closest-game'].some((r) => r.matchId === 16486)).toBe(false);
     expect(records['biggest-win-a'].some((r) => r.outcome === 'draw')).toBe(false);
     expect(records['biggest-win-b'].some((r) => r.outcome === 'draw')).toBe(false);
+  });
+
+  it('scopes records to one decade of the rivalry when an era is given (Club Rivalry Explorer follow-up, FR-2)', async () => {
+    const scoped = await getHeadToHeadRecords(adelaide, lions, { era: 1990 });
+
+    for (const kind of Object.keys(scoped) as (keyof typeof scoped)[]) {
+      for (const entry of scoped[kind]) {
+        expect(entry.season, `${kind} match ${entry.matchId}`).toBeGreaterThanOrEqual(1990);
+        expect(entry.season, `${kind} match ${entry.matchId}`).toBeLessThan(2000);
+      }
+    }
+
+    // A decade this rivalry never met in produces "not recorded" for every
+    // kind, never an error and never a record borrowed from another decade.
+    const noRecords = await getHeadToHeadRecords(adelaide, lions, { era: 1900 });
+    for (const kind of Object.keys(noRecords) as (keyof typeof noRecords)[]) {
+      expect(noRecords[kind]).toEqual([]);
+    }
   });
 
   it('reads streaks from chronological order, with a draw breaking a winning streak', async () => {

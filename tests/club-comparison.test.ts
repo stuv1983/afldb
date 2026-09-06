@@ -24,15 +24,24 @@ describe('AFLDB-ISSUE-144 Stage 7: shareable current-state URLs', () => {
       .toBe('/clubs/compare?club1=brisbane-lions&club2=adelaide');
   });
 
-  it('carries season, match filter and page', () => {
+  it('carries match filter and page', () => {
     expect(clubComparePath({
-      club1: 'carlton', club2: 'collingwood', season: 1970, matchType: 'finals', page: 3,
-    })).toBe('/clubs/compare?club1=carlton&club2=collingwood&season=1970&matchType=finals&page=3');
+      club1: 'carlton', club2: 'collingwood', matchType: 'finals', page: 3,
+    })).toBe('/clubs/compare?club1=carlton&club2=collingwood&matchType=finals&page=3');
+  });
+
+  it('carries the era (Club Rivalry Explorer follow-up, FR-2)', () => {
+    expect(clubComparePath({
+      club1: 'carlton', club2: 'collingwood', era: 1990,
+    })).toBe('/clubs/compare?club1=carlton&club2=collingwood&era=1990');
   });
 
   it('omits the defaults so the shared URL stays the short one', () => {
     expect(clubComparePath({
       club1: 'carlton', club2: 'collingwood', matchType: 'all', page: 1,
+    })).toBe('/clubs/compare?club1=carlton&club2=collingwood');
+    expect(clubComparePath({
+      club1: 'carlton', club2: 'collingwood', era: null,
     })).toBe('/clubs/compare?club1=carlton&club2=collingwood');
   });
 
@@ -43,12 +52,17 @@ describe('AFLDB-ISSUE-144 Stage 7: shareable current-state URLs', () => {
 
 describe('AFLDB-ISSUE-144 Stage 7: swap', () => {
   const state = {
-    club1: 'carlton', club2: 'collingwood', season: 1970, matchType: 'finals' as const, page: 3,
+    club1: 'carlton', club2: 'collingwood', matchType: 'finals' as const, page: 3,
   };
 
   it('reverses the clubs and nothing else', () => {
     expect(swapClubComparePath(state))
-      .toBe('/clubs/compare?club1=collingwood&club2=carlton&season=1970&matchType=finals&page=3');
+      .toBe('/clubs/compare?club1=collingwood&club2=carlton&matchType=finals&page=3');
+  });
+
+  it('preserves the era (Club Rivalry Explorer follow-up, FR-2)', () => {
+    expect(swapClubComparePath({ ...state, era: 1990 }))
+      .toBe('/clubs/compare?club1=collingwood&club2=carlton&matchType=finals&era=1990&page=3');
   });
 
   it('is its own inverse', () => {
@@ -64,10 +78,9 @@ describe('AFLDB-ISSUE-144 Stage 7: SEO canonical URL', () => {
     expect(canonicalClubComparePath('brisbane-lions', 'adelaide')).toBe(canonical);
   });
 
-  it('omits season, match filter and page', () => {
+  it('omits match filter and page', () => {
     const canonical = canonicalClubComparePath('carlton', 'collingwood');
     expect(canonical).toBe('/clubs/compare?club1=carlton&club2=collingwood');
-    expect(canonical).not.toContain('season');
     expect(canonical).not.toContain('matchType');
     expect(canonical).not.toContain('page');
   });
@@ -101,16 +114,29 @@ describe('AFLDB-ISSUE-144 Stage 7: match-type recognition', () => {
 describe('AFLDB-ISSUE-144 Stage 7: pagination base parameters', () => {
   it('carries the view state the pager must preserve, without the page', () => {
     expect(clubCompareBaseParams({
-      club1: 'carlton', club2: 'collingwood', season: 1970, matchType: 'finals', page: 4,
+      club1: 'carlton', club2: 'collingwood', matchType: 'finals', page: 4,
     })).toEqual({
-      club1: 'carlton', club2: 'collingwood', season: '1970', matchType: 'finals',
+      club1: 'carlton', club2: 'collingwood', matchType: 'finals',
     });
   });
 
   it('drops the default match filter', () => {
     expect(clubCompareBaseParams({ club1: 'carlton', club2: 'collingwood', matchType: 'all' }))
       .toEqual({
-        club1: 'carlton', club2: 'collingwood', season: undefined, matchType: undefined,
+        club1: 'carlton', club2: 'collingwood', matchType: undefined,
       });
+  });
+
+  it('carries the era so an era-filtered match history keeps its era across pages', () => {
+    expect(clubCompareBaseParams({
+      club1: 'carlton', club2: 'collingwood', matchType: 'finals', era: 1990, page: 4,
+    })).toEqual({
+      club1: 'carlton', club2: 'collingwood', matchType: 'finals', era: '1990',
+    });
+  });
+
+  it('drops an absent era', () => {
+    expect(clubCompareBaseParams({ club1: 'carlton', club2: 'collingwood' }))
+      .toEqual({ club1: 'carlton', club2: 'collingwood', matchType: undefined, era: undefined });
   });
 });

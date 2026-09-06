@@ -1,15 +1,17 @@
 import { ClubComparisonBrownlow } from '@/components/ClubComparisonBrownlow';
 import { ClubComparisonControls } from '@/components/ClubComparisonControls';
-import { ClubComparisonHeadToHead } from '@/components/ClubComparisonHeadToHead';
+import { ClubComparisonEraExplorer } from '@/components/ClubComparisonEraExplorer';
+import { ClubComparisonHero } from '@/components/ClubComparisonHero';
+import { ClubComparisonMatchHistory } from '@/components/ClubComparisonMatchHistory';
 import { ClubComparisonPlayers } from '@/components/ClubComparisonPlayers';
-import { ClubComparisonSeason } from '@/components/ClubComparisonSeason';
-import { ClubComparisonTrends } from '@/components/ClubComparisonTrends';
+import { ClubComparisonRivalryRecords } from '@/components/ClubComparisonRivalryRecords';
+import { ClubComparisonVenues } from '@/components/ClubComparisonVenues';
 import type { ClubComparisonRouteState, ComparisonNotice } from '@/app/clubs/compare/state';
-import { matchTypeLabel } from '@/lib/club-comparison-format';
-import { formatDate } from '@/lib/format';
 
 /**
- * The public presentation of /clubs/compare (AFLDB-ISSUE-144 Stage 8).
+ * The public presentation of /clubs/compare (AFLDB-ISSUE-144 Stage 8;
+ * section split and reordered by the Club Rivalry Explorer follow-up,
+ * FR-3).
  *
  * It renders the discriminated route state Stage 7 resolved and does
  * nothing else: no search parameter is re-parsed here, no query is run
@@ -19,13 +21,18 @@ import { formatDate } from '@/lib/format';
  * fourth carries data at all, which is what makes it impossible for this
  * component to render a comparison the route did not resolve.
  *
+ * A comparison's section order is the approved design contract: Header →
+ * Hero → Era explorer → Rivalry records → Venues → Players → Brownlow →
+ * Match history. Rivalry records is the one section left always expanded;
+ * Venues, Players, Brownlow and Match history are each one collapsed
+ * top-level disclosure (`CollapsiblePanel`/`CollapsibleTable` rendering
+ * its own `<h2>`, not a plain `<section>`).
+ *
  * The selectors are a plain GET form and every other control is a link,
  * so the whole surface stays server-rendered and every view a reader can
  * reach is a URL they can share.
  */
 export function ClubComparisonView({ state }: { state: ClubComparisonRouteState }) {
-  const seasonMeta = state.seasonMeta;
-
   return (
     <>
       <div className="page-header">
@@ -37,22 +44,12 @@ export function ClubComparisonView({ state }: { state: ClubComparisonRouteState 
         </h1>
         {state.kind === 'comparison' ? (
           <p className="subtitle">
-            {state.params.season !== null && <>Season {state.params.season} · </>}
-            {matchTypeLabel(state.params.matchType)}
-            {seasonMeta?.isProvisional && (
-              <>
-                {' '}<span className="badge badge-warn">Season in progress</span>
-                {seasonMeta.dataThroughDate && (
-                  <> Data through {formatDate(seasonMeta.dataThroughDate)}.</>
-                )}
-              </>
-            )}
+            All time
           </p>
         ) : (
           <p className="lede">
-            Compare any two VFL/AFL clubs: their record in a chosen season, their complete
-            head-to-head history, the rivalry’s records, and the players who have
-            represented both.
+            Compare any two VFL/AFL clubs: their complete all-time head-to-head history, the
+            rivalry’s records, and the players who have represented both.
           </p>
         )}
       </div>
@@ -100,23 +97,29 @@ export function ClubComparisonView({ state }: { state: ClubComparisonRouteState 
 
       {state.kind === 'comparison' && (
         <>
-          <ClubComparisonSeason
+          <ClubComparisonHero
             organizationA={state.organizationA}
             organizationB={state.organizationB}
-            season={state.params.season}
-            seasonA={state.data.seasonA}
-            seasonB={state.data.seasonB}
+            summary={state.data.summary}
           />
 
-          <ClubComparisonHeadToHead
+          <ClubComparisonEraExplorer decades={state.data.decades} params={state.params} />
+
+          <ClubComparisonRivalryRecords
             organizationA={state.organizationA}
             organizationB={state.organizationB}
             params={state.params}
-            summary={state.data.summary}
-            meetings={state.data.meetings}
             records={state.data.records}
             streaks={state.data.streaks}
+            decades={state.data.decades}
+            periodRecords={state.data.periodRecords}
+          />
+
+          <ClubComparisonVenues
+            organizationA={state.organizationA}
+            organizationB={state.organizationB}
             venues={state.data.venues}
+            era={state.params.era}
           />
 
           <ClubComparisonPlayers
@@ -131,19 +134,16 @@ export function ClubComparisonView({ state }: { state: ClubComparisonRouteState 
           <ClubComparisonBrownlow
             organizationA={state.organizationA}
             organizationB={state.organizationB}
-            season={state.params.season}
-            seasonA={state.data.seasonA}
-            seasonB={state.data.seasonB}
             brownlowA={state.data.brownlowA}
             brownlowB={state.data.brownlowB}
             h2hBrownlow={state.data.h2hBrownlow}
           />
 
-          <ClubComparisonTrends
+          <ClubComparisonMatchHistory
             organizationA={state.organizationA}
             organizationB={state.organizationB}
-            decades={state.data.decades}
-            periodRecords={state.data.periodRecords}
+            params={state.params}
+            meetings={state.data.meetings}
           />
         </>
       )}
