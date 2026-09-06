@@ -162,6 +162,23 @@ export function decadeLabel(decade: number): string {
   return `${decade}s`;
 }
 
+/**
+ * The scope sentence for an era-aware section (Club Rivalry Explorer
+ * follow-up, FR-2): all-time by default, or narrowed to one decade of the
+ * rivalry when the reader has chosen an era chip. `era` is always one of
+ * the pair's own decades by the time this is called -- the state layer
+ * has already rejected anything else.
+ */
+export function eraScopeSentence(era: number | null): string {
+  if (era === null) return 'All-time, over every meeting of the two clubs.';
+  return `The ${decadeLabel(era)} only, over meetings from that decade of the rivalry.`;
+}
+
+/** ` (2000s)`, or nothing for all time -- a caption suffix, not a sentence. */
+export function eraCaptionSuffix(era: number | null): string {
+  return era === null ? '' : ` (${decadeLabel(era)})`;
+}
+
 export function outcomeLabel(outcome: H2HOutcome, aName: string, bName: string): string {
   if (outcome === 'a-win') return aName;
   if (outcome === 'b-win') return bName;

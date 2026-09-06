@@ -1,11 +1,8 @@
 import Link from 'next/link';
 
 import { CollapsiblePanel } from '@/components/CollapsiblePanel';
-import { CollapsibleTable } from '@/components/CollapsibleTable';
 import type {
   ClubBrownlowHistory,
-  ClubSeasonBrownlowSummary,
-  ClubSeasonComparison,
   ComparisonOrganization,
   H2HBrownlow,
 } from '@/db/queries/club-comparison';
@@ -13,17 +10,20 @@ import {
   coverageLabel,
   h2hBrownlowCoverageSentence,
 } from '@/lib/club-comparison-format';
-import { formatNumber, formatStat, playerPath } from '@/lib/format';
+import { formatNumber, playerPath } from '@/lib/format';
 
 /**
- * Brownlow presentation for /clubs/compare (AFLDB-ISSUE-144 Stage 8).
+ * Brownlow presentation for /clubs/compare (AFLDB-ISSUE-144 Stage 8;
+ * selected-season block removed by the Club Rivalry Explorer follow-up,
+ * FR-1 — this page is all-time only). Collapsed behind one top-level
+ * disclosure by FR-3: the club history and H2H match votes used to be
+ * two independently-collapsible panels nested inside a plain `<section>`;
+ * now the whole "Brownlow" section is the one collapsed unit, so its two
+ * subsections are plain `<h3>` blocks rather than their own disclosures.
  *
- * Three separate things, kept separate because the query layer keeps
- * them separate:
+ * Two separate things, kept separate because the query layer keeps them
+ * separate:
  *
- *  - the SELECTED SEASON at the club grain, where a total is shown only
- *    when the season's coverage is authoritative and a pending season
- *    says "Pending" rather than nothing or zero;
  *  - the CLUB HISTORY, which counts complete seasons only and discloses
  *    the multi-club rows it could not honestly attribute;
  *  - the HEAD-TO-HEAD match votes, which are home-and-away only —
@@ -34,46 +34,25 @@ import { formatNumber, formatStat, playerPath } from '@/lib/format';
 export function ClubComparisonBrownlow({
   organizationA,
   organizationB,
-  season,
-  seasonA,
-  seasonB,
   brownlowA,
   brownlowB,
   h2hBrownlow,
 }: {
   organizationA: ComparisonOrganization;
   organizationB: ComparisonOrganization;
-  season: number | null;
-  seasonA: ClubSeasonComparison | null;
-  seasonB: ClubSeasonComparison | null;
   brownlowA: ClubBrownlowHistory;
   brownlowB: ClubBrownlowHistory;
   h2hBrownlow: H2HBrownlow;
 }) {
   const sides = [
-    { org: organizationA, season: seasonA, history: brownlowA },
-    { org: organizationB, season: seasonB, history: brownlowB },
+    { org: organizationA, history: brownlowA },
+    { org: organizationB, history: brownlowB },
   ];
 
   return (
-    <section className="section" id="brownlow">
-      <h2>Brownlow</h2>
-
-      <h3>Selected season{season === null ? '' : ` — ${season}`}</h3>
-      <div className="grid grid-panels grid-shrink">
-        {sides.map(({ org, season: data }) => (
-          <div className="card" key={org.id}>
-            <h4>{org.name}</h4>
-            {!data ? (
-              <p className="meta">No season is selected.</p>
-            ) : (
-              <SeasonBrownlow summary={data.brownlow} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      <CollapsiblePanel id="brownlow-history" title="Club Brownlow history" defaultOpen={false}>
+    <CollapsiblePanel id="brownlow" title="Brownlow" defaultOpen={false}>
+      <div id="brownlow-history">
+        <h3>Club Brownlow history</h3>
         <p className="section-note">
           Seasons whose published season totals are complete, attributed to the club the
           player is recorded with for that season. Votes that cannot honestly be
@@ -82,18 +61,15 @@ export function ClubComparisonBrownlow({
         <div className="grid grid-panels grid-shrink">
           {sides.map(({ org, history }) => (
             <div key={org.id}>
-              {/* h3, not h4: this panel's own title is the <h2> inside
-                  CollapsiblePanel's <summary>, so an h4 here skipped a
-                  level for anyone navigating by heading. AFLDB-ISSUE-144
-                  Stage 9. */}
-              <h3>{org.name}</h3>
+              <h4>{org.name}</h4>
               <ClubHistory history={history} />
             </div>
           ))}
         </div>
-      </CollapsiblePanel>
+      </div>
 
-      <CollapsibleTable id="h2h-brownlow" title="Brownlow votes in this rivalry" defaultOpen={false}>
+      <div id="h2h-brownlow">
+        <h3>Brownlow votes in this rivalry</h3>
         <p className="section-note">
           {h2hBrownlowCoverageSentence(h2hBrownlow.coveredMeetings, h2hBrownlow.eligibleMeetings)}{' '}
           Coverage is {h2hBrownlow.coverage}. Only home-and-away meetings are eligible:
@@ -141,89 +117,8 @@ export function ClubComparisonBrownlow({
             </table>
           </div>
         )}
-      </CollapsibleTable>
-    </section>
-  );
-}
-
-/**
- * A club's selected-season Brownlow. `isAuthoritative` is the only thing
- * that permits a total; a pending season says so in words, and no state
- * is ever rendered as zero.
- */
-function SeasonBrownlow({ summary }: { summary: ClubSeasonBrownlowSummary }) {
-  if (!summary.isAuthoritative) {
-    return (
-      <>
-        <p className="not-recorded">{coverageLabel(summary.coverage)}</p>
-        <p className="meta">
-          {summary.coverage === 'pending'
-            ? 'The season’s Brownlow count has not been published yet.'
-            : 'No authoritative season total is available for this season.'}
-        </p>
-      </>
-    );
-  }
-  return (
-    <>
-      <p>
-        <strong>{formatStat(summary.totalVotes)}</strong> votes from{' '}
-        {formatStat(summary.playersWithVotes)} players.
-      </p>
-      {summary.winners.length > 0 && (
-        <p>
-          Medal winner{summary.winners.length > 1 ? 's' : ''}:{' '}
-          {summary.winners.map((winner, index) => (
-            <span key={winner.playerId}>
-              {index > 0 && ', '}
-              <Link href={playerPath(winner.slug, winner.playerId)}>{winner.displayName}</Link>
-              {winner.isIneligible && <span className="badge badge-warn">Ineligible</span>}
-            </span>
-          ))}
-        </p>
-      )}
-      {summary.leaders.length === 0 ? (
-        <p className="muted">No player from this club polled a vote.</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <caption>Leading vote-getters</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="num">#</th>
-                <th scope="col">Player</th>
-                <th scope="col" className="num">Votes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.leaders.map((leader) => (
-                <tr key={`${leader.rank}-${leader.playerId}`}>
-                  <td className="num">{leader.rank}</td>
-                  <td className="wide">
-                    <Link href={playerPath(leader.slug, leader.playerId)}>
-                      {leader.displayName}
-                    </Link>
-                    {leader.isWinner && <span className="badge">Winner</span>}
-                    {leader.isIneligible && <span className="badge badge-warn">Ineligible</span>}
-                    {leader.attributionSource === 'unattributed' && (
-                      <span className="badge badge-warn">Club not attributed</span>
-                    )}
-                  </td>
-                  <td className="num">{formatNumber(leader.votes)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {summary.unattributedRows > 0 && (
-        <p className="notice">
-          {formatNumber(summary.unattributedRows)} vote{summary.unattributedRows === 1 ? '' : 's'}{' '}
-          row{summary.unattributedRows === 1 ? '' : 's'} ({formatNumber(summary.unattributedVotes)}{' '}
-          votes) could not be attributed to a single club this season and are not counted here.
-        </p>
-      )}
-    </>
+      </div>
+    </CollapsiblePanel>
   );
 }
 

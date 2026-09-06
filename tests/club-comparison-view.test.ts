@@ -10,11 +10,7 @@ import type {
 } from '@/app/clubs/compare/state';
 import type {
   ClubBrownlowHistory,
-  ClubSeasonBrownlowSummary,
-  ClubSeasonComparison,
-  ClubSeasonTeamMetric,
   ComparisonOrganization,
-  ComparisonSeason,
   CrossoverPlayer,
   H2HMeeting,
   H2HPeriodRecordEntry,
@@ -23,7 +19,6 @@ import type {
   H2HRecordKind,
   H2HRecords,
   MatchType,
-  MetricCoverage,
 } from '@/db/queries/club-comparison';
 import {
   canonicalClubComparePath,
@@ -43,8 +38,9 @@ import {
  * number, a zero, or silence.
  *
  * The fixtures are hand-built route states, so a test can assert a state
- * the test database does not currently happen to contain (a metric with
- * unequal coverage, a tied record, a club that did not compete).
+ * the test database does not currently happen to contain (unequal metric
+ * coverage, a tied record). The comparison is all-time only (Club Rivalry
+ * Explorer follow-up, FR-1) — there is no per-season club record here.
  */
 
 const ADELAIDE: ComparisonOrganization = {
@@ -60,25 +56,7 @@ const FITZROY: ComparisonOrganization = {
   firstSeason: 1897, lastSeason: 1996, isActive: false,
 };
 
-function season(year: number, provisional = false): ComparisonSeason {
-  return {
-    season: year,
-    competition: 'AFL',
-    league: 'AFL',
-    status: provisional ? 'in_progress' : 'complete',
-    isComplete: !provisional,
-    isProvisional: provisional,
-    dataThroughDate: provisional ? new Date(Date.UTC(2026, 6, 1)) : null,
-    completedAt: null,
-    firstMatchDate: null,
-    lastMatchDate: null,
-    matchCount: 207,
-    clubCount: 18,
-  };
-}
-
 const OPTIONS: ComparisonOptions = {
-  seasons: [season(2026, true), season(2025), season(1930)],
   organizations: [ADELAIDE, BRISBANE, FITZROY],
 };
 
@@ -86,8 +64,8 @@ function params(overrides: Partial<ComparisonEffectiveParams> = {}): ComparisonE
   return {
     club1: 'adelaide',
     club2: 'brisbane-lions',
-    season: 2025,
     matchType: 'all' as MatchType,
+    era: null,
     page: 1,
     ...overrides,
   };
@@ -118,140 +96,6 @@ function meeting(overrides: Partial<H2HMeeting> = {}): H2HMeeting {
     margin: 10,
     attendance: 41000,
     outcome: 'b-win',
-    ...overrides,
-  };
-}
-
-function metric(
-  key: string,
-  label: string,
-  coverage: MetricCoverage,
-  overrides: Partial<ClubSeasonTeamMetric> = {},
-): ClubSeasonTeamMetric {
-  const available = coverage === 'complete' || coverage === 'partial';
-  return {
-    key,
-    statKey: key,
-    label,
-    coverage,
-    isAvailable: available,
-    isPartial: coverage === 'partial',
-    isPending: coverage === 'pending',
-    isNotApplicable: coverage === 'not_applicable',
-    average: available ? 350.5 : null,
-    total: available ? 8412 : null,
-    eligibleMatches: available ? 24 : 0,
-    totalTeamMatches: 24,
-    hasDenominatorDiscrepancy: false,
-    ...overrides,
-  };
-}
-
-function brownlowSeason(
-  coverage: MetricCoverage,
-  overrides: Partial<ClubSeasonBrownlowSummary> = {},
-): ClubSeasonBrownlowSummary {
-  const authoritative = coverage === 'complete';
-  return {
-    organizationId: 1,
-    season: 2025,
-    coverage,
-    isAuthoritative: authoritative,
-    totalVotes: authoritative ? 62 : null,
-    playersWithVotes: authoritative ? 14 : null,
-    leaders: authoritative
-      ? [{
-          rank: 1, playerId: 501, displayName: 'Jordan Dawson', sortName: 'Dawson, Jordan',
-          slug: 'jordan-dawson', votes: 21, isWinner: false, isIneligible: false,
-          attributionSource: 'explicit',
-        }]
-      : [],
-    winners: [],
-    unattributedRows: 0,
-    unattributedVotes: 0,
-    ...overrides,
-  };
-}
-
-function clubSeason(
-  organization: ComparisonOrganization,
-  year: number,
-  overrides: Partial<ClubSeasonComparison> = {},
-): ClubSeasonComparison {
-  return {
-    season: year,
-    seasonMeta: season(year),
-    identity: {
-      organizationId: organization.id,
-      organizationName: organization.name,
-      organizationSlug: organization.slug,
-      season: year,
-      clubId: organization.id,
-      clubName: organization.name,
-      clubSlug: organization.slug,
-      participated: true,
-      matchesPlayed: 24,
-      ladderRows: 1,
-    },
-    participated: true,
-    record: {
-      organizationId: organization.id,
-      season: year,
-      clubId: organization.id,
-      clubName: organization.name,
-      clubSlug: organization.slug,
-      played: 23,
-      wins: 17,
-      draws: 1,
-      losses: 5,
-      premiershipPoints: 70,
-      pointsFor: 2100,
-      pointsAgainst: 1700,
-      percentage: 123.5,
-      ladderRank: 1,
-      finalsPlayed: 3,
-      isPremier: false,
-      woodenSpoon: false,
-      winPercentage: 76.1,
-      averagePointsFor: 91.3,
-      averagePointsAgainst: 73.9,
-    },
-    teamMetrics: {
-      organizationId: organization.id,
-      season: year,
-      participated: true,
-      totalTeamMatches: 24,
-      metrics: [
-        metric('disposals', 'Disposals', 'complete'),
-        metric('hitouts', 'Hit-outs', 'partial', {
-          average: 38.2, eligibleMatches: 23, hasDenominatorDiscrepancy: true,
-        }),
-        metric('score_involvements', 'Score involvements', 'not_collected'),
-        metric('goal_assists', 'Goal assists', 'pending'),
-      ],
-    },
-    leaders: {
-      organizationId: organization.id,
-      season: year,
-      participated: true,
-      games: [{
-        rank: 1, playerId: 501, displayName: 'Jordan Dawson', sortName: 'Dawson, Jordan',
-        slug: 'jordan-dawson', value: 24, recordedGames: null,
-      }],
-      goals: [{
-        rank: 1, playerId: 502, displayName: 'Taylor Walker', sortName: 'Walker, Taylor',
-        slug: 'taylor-walker', value: 51, recordedGames: null,
-      }],
-      disposals: [{
-        rank: 1, playerId: 501, displayName: 'Jordan Dawson', sortName: 'Dawson, Jordan',
-        slug: 'jordan-dawson', value: 690, recordedGames: 24,
-      }],
-      goalsCoverage: 'complete',
-      goalsAvailable: true,
-      disposalsCoverage: 'complete',
-      disposalsAvailable: true,
-    },
-    brownlow: brownlowSeason('complete', { organizationId: organization.id, season: year }),
     ...overrides,
   };
 }
@@ -338,8 +182,6 @@ function crossover(overrides: Partial<CrossoverPlayer> = {}): CrossoverPlayer {
 
 function comparisonData(overrides: Partial<ClubComparisonData> = {}): ClubComparisonData {
   return {
-    seasonA: clubSeason(ADELAIDE, 2025),
-    seasonB: clubSeason(BRISBANE, 2025),
     summary: {
       meetings: 60,
       aWins: 28,
@@ -355,6 +197,7 @@ function comparisonData(overrides: Partial<ClubComparisonData> = {}): ClubCompar
     meetings: {
       meetings: [meeting()],
       matchType: 'all',
+      era: null,
       page: 1,
       pageSize: 25,
       totalMeetings: 60,
@@ -442,7 +285,6 @@ function comparisonState(
     params?: Partial<ComparisonEffectiveParams>;
     data?: Partial<ClubComparisonData>;
     organizationB?: ComparisonOrganization;
-    seasonMeta?: ComparisonSeason | null;
     notices?: ClubComparisonRouteState['notices'];
   } = {},
 ): ClubComparisonRouteState {
@@ -453,9 +295,6 @@ function comparisonState(
     params: effective,
     notices: overrides.notices ?? [],
     options: OPTIONS,
-    seasonMeta: overrides.seasonMeta === undefined
-      ? season(effective.season ?? 2025)
-      : overrides.seasonMeta,
     canonicalPath: canonicalClubComparePath(ADELAIDE.slug, organizationB.slug),
     sharePath: clubComparePath(effective),
     noindex: false,
@@ -473,7 +312,6 @@ function landingState(): ClubComparisonRouteState {
     params: effective,
     notices: [],
     options: OPTIONS,
-    seasonMeta: season(2025),
     canonicalPath: '/clubs/compare',
     sharePath: clubComparePath(effective),
     noindex: false,
@@ -490,12 +328,13 @@ describe('landing state', () => {
   it('renders every selector, database-driven, with nothing chosen', () => {
     expect(html).toContain('name="club1"');
     expect(html).toContain('name="club2"');
-    expect(html).toContain('name="season"');
-    expect(html).toContain('name="matchType"');
     expect(html).toContain('Choose a club…');
     expect(html).toContain('Adelaide');
     expect(html).toContain('Fitzroy');
-    expect(html).toContain('2026 (in progress)');
+  });
+
+  it('has no match-type control until a comparison exists (FR-3: it is local to Match History)', () => {
+    expect(html).not.toContain('name="matchType"');
   });
 
   it('auto-selects no club', () => {
@@ -507,7 +346,7 @@ describe('landing state', () => {
 
   it('renders no comparison section', () => {
     for (const id of [
-      'selected-season', 'head-to-head', 'rivalry-records', 'match-history',
+      'head-to-head', 'rivalry-records', 'match-history',
       'player-leaders', 'connected-players', 'brownlow', 'by-decade', 'period-records',
       'player-averages',
     ]) {
@@ -528,7 +367,6 @@ describe('invalid and same-organisation states', () => {
     expect(html).toContain('That club could not be found');
     expect(html).toContain('footscray');
     expect(html).not.toContain('id="head-to-head"');
-    expect(html).not.toContain('id="selected-season"');
   });
 
   it('asks for two different clubs rather than an empty head-to-head', () => {
@@ -548,22 +386,28 @@ describe('invalid and same-organisation states', () => {
 describe('comparison state', () => {
   const html = render(comparisonState());
 
-  it('renders every major section', () => {
-    expect(html).toContain('Selected season');
+  it('renders every major section (FR-3: some are collapsed top-level disclosures, not plain sections)', () => {
+    // Always-expanded plain sections keep a bare <h2>.
     expect(html).toContain('<h2>Head-to-head</h2>');
     expect(html).toContain('<h2>Rivalry records</h2>');
-    expect(html).toContain('<h2>Match history</h2>');
-    expect(html).toContain('<h2>Player rivalry leaders</h2>');
-    expect(html).toContain('<h2>Connected players</h2>');
-    expect(html).toContain('<h2>Brownlow</h2>');
-    expect(html).toContain('<h2>By decade</h2>');
-    expect(html).toContain('<h2>Period records</h2>');
-    expect(html).toContain('<h2>Player averages in this rivalry</h2>');
+    // Collapsed top-level sections are a CollapsiblePanel/CollapsibleTable,
+    // whose own <h2> carries the "table-details-title" class.
+    expect(html).toContain('table-details-title">Venues</h2>');
+    expect(html).toContain('table-details-title">Players</h2>');
+    expect(html).toContain('table-details-title">Brownlow</h2>');
+    expect(html).toContain('table-details-title">Match history</h2>');
+    // Subsections that used to be their own <h2> are now <h3>, nested
+    // under the one collapsed or expanded section that contains them.
+    expect(html).toContain('<h3>Player rivalry leaders</h3>');
+    expect(html).toContain('<h3>Connected players</h3>');
+    expect(html).toContain('<h3>By decade</h3>');
+    expect(html).toContain('<h3>Period records</h3>');
+    expect(html).toContain('<h3>Player averages in this rivalry</h3>');
   });
 
   it('heads the page with both organisations and the current filter state', () => {
     expect(html).toContain('Adelaide v Brisbane Lions');
-    expect(html).toContain('Season 2025');
+    expect(html).toContain('All time');
     expect(html).toContain('All matches');
   });
 
@@ -595,52 +439,6 @@ describe('comparison state', () => {
 
 describe('coverage presentation', () => {
   const html = render(comparisonState());
-
-  it('renders an uncollected team metric as words, never as 0', () => {
-    const row = rowFor(html, 'Score involvements');
-    expect(row).toContain('Not recorded');
-    expect(row).not.toMatch(/>0(\.0)?</);
-  });
-
-  it('renders a pending team metric as Pending', () => {
-    expect(rowFor(html, 'Goal assists')).toContain('Pending');
-  });
-
-  it('shows the honest denominator for a partial metric', () => {
-    const row = rowFor(html, 'Hit-outs');
-    expect(row).toContain('23 of 24 matches');
-  });
-
-  it('marks a metric whose two clubs have different coverage as not comparable', () => {
-    const differing = render(comparisonState({
-      data: {
-        seasonB: clubSeason(BRISBANE, 2025, {
-          teamMetrics: {
-            organizationId: 2, season: 2025, participated: true, totalTeamMatches: 24,
-            metrics: [
-              metric('disposals', 'Disposals', 'complete', { eligibleMatches: 20 }),
-              metric('hitouts', 'Hit-outs', 'partial', {
-                average: 38.2, eligibleMatches: 23, hasDenominatorDiscrepancy: true,
-              }),
-              metric('score_involvements', 'Score involvements', 'not_collected'),
-              metric('goal_assists', 'Goal assists', 'pending'),
-            ],
-          },
-        }),
-      },
-    }));
-    expect(rowFor(differing, 'Disposals')).toContain('Different coverage');
-  });
-
-  it('renders a pending selected-season Brownlow as pending, not as no votes', () => {
-    const pending = render(comparisonState({
-      data: {
-        seasonA: clubSeason(ADELAIDE, 2026, { brownlow: brownlowSeason('pending') }),
-      },
-    }));
-    expect(pending).toContain('Pending');
-    expect(pending).toContain('has not been published yet');
-  });
 
   it('discloses head-to-head Brownlow coverage as X of Y eligible meetings', () => {
     expect(html).toContain('Recorded H2H Brownlow votes from 100 of 120 eligible meetings.');
@@ -698,44 +496,24 @@ describe('ties', () => {
   });
 });
 
-describe('did not compete', () => {
-  it('says so for the club that did not, and keeps the selected season', () => {
-    const html = render(comparisonState({
-      params: { club2: 'fitzroy', season: 1930 },
-      organizationB: FITZROY,
-      seasonMeta: season(1930),
-      data: {
-        seasonA: clubSeason(ADELAIDE, 1930, {
-          participated: false,
-          record: null,
-          identity: null,
-        }),
-        seasonB: clubSeason(FITZROY, 1930),
-      },
-    }));
-    expect(html).toContain('Did not compete in 1930');
-    expect(html).toContain('Selected season — 1930');
-    expect(html).not.toContain('Selected season — 2025');
-  });
-});
-
 describe('shareable controls', () => {
-  it('swaps the presentation order while preserving season, filter and page', () => {
+  it('swaps the presentation order while preserving the filter and page', () => {
     const html = render(comparisonState({ params: { matchType: 'finals', page: 3 } }));
     expect(html).toContain(
       'href="/clubs/compare?club1=brisbane-lions&amp;club2=adelaide'
-      + '&amp;season=2025&amp;matchType=finals&amp;page=3"',
+      + '&amp;matchType=finals&amp;page=3"',
     );
     expect(html).toContain('Swap the order of the two clubs');
   });
 
-  it('keeps the club, season and filter state on every pagination link', () => {
+  it('keeps the club and filter state on every pagination link', () => {
     const html = render(comparisonState({
       params: { matchType: 'finals', page: 2 },
       data: {
         meetings: {
           meetings: [meeting()],
           matchType: 'finals',
+          era: null,
           page: 2,
           pageSize: 25,
           totalMeetings: 60,
@@ -747,21 +525,60 @@ describe('shareable controls', () => {
     }));
     expect(html).toContain(
       'href="/clubs/compare?club1=adelaide&amp;club2=brisbane-lions'
-      + '&amp;season=2025&amp;matchType=finals&amp;page=3"',
+      + '&amp;matchType=finals&amp;page=3"',
     );
     expect(html).toContain(
       'href="/clubs/compare?club1=adelaide&amp;club2=brisbane-lions'
-      + '&amp;season=2025&amp;matchType=finals"',
+      + '&amp;matchType=finals"',
     );
+  });
+});
+
+describe('era explorer', () => {
+  it('renders a chip for every decade in the rivalry, plus all time, with the current era marked', () => {
+    const html = render(comparisonState({ params: { era: null } }));
+    expect(html).toContain('aria-label="Filter rivalry records and match history by era"');
+    expect(html).toContain('>All time</a>');
+    expect(html).toContain('aria-current="true"');
+    expect(html).toContain('1990s');
+  });
+
+  it('scopes rivalry records and match history to the chosen era, but leaves streaks and venues all-time', () => {
+    const html = render(comparisonState({
+      params: { era: 1990 },
+      data: {
+        meetings: {
+          meetings: [meeting()],
+          matchType: 'all',
+          era: 1990,
+          page: 1,
+          pageSize: 25,
+          totalMeetings: 20,
+          totalPages: 1,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+      },
+    }));
+    expect(html).toContain('Rivalry records — Adelaide and Brisbane Lions (1990s)');
+    expect(html).toContain('The 1990s only, over meetings from that decade of the rivalry.');
+    expect(html).toContain('Streaks are always all-time');
+    expect(html).toContain('Venue records are always all-time.');
+  });
+
+  it('does not claim streaks or venues are era-scoped when no era is chosen', () => {
+    const html = render(comparisonState({ params: { era: null } }));
+    expect(html).not.toContain('Streaks are always all-time');
+    expect(html).not.toContain('Venue records are always all-time.');
   });
 });
 
 describe('notices', () => {
   it('states a normalisation rather than silently applying it', () => {
     const html = render(comparisonState({
-      notices: [{ field: 'season', message: '1066 is not a season on record; showing 2025.' }],
+      notices: [{ field: 'matchType', message: 'That match filter is not one of all, home-and-away or finals; showing all matches.' }],
     }));
-    expect(html).toContain('1066 is not a season on record; showing 2025.');
+    expect(html).toContain('That match filter is not one of all, home-and-away or finals; showing all matches.');
   });
 });
 
@@ -780,14 +597,6 @@ describe('empty states', () => {
     expect(html).toContain('There is no meeting to break down by decade.');
   });
 });
-
-/** The `<tr>` whose row header is `label`, so a cell assertion cannot drift. */
-function rowFor(html: string, label: string): string {
-  const rows = html.split('<tr>');
-  const row = rows.find((candidate) => candidate.includes(`>${label}</th>`));
-  expect(row, `no row found for ${label}`).toBeTruthy();
-  return row as string;
-}
 
 /**
  * AFLDB-ISSUE-144 Stage 9 — accessibility semantics of the rendered view.
@@ -824,7 +633,9 @@ describe('Stage 9 accessibility semantics', () => {
 
     it(`labels every control on ${label}`, () => {
       const ids = [...html.matchAll(/<select id="([^"]+)"/g)].map((m) => m[1]);
-      expect(ids.length).toBe(4);
+      // Landing has only the two club selects; a comparison additionally
+      // has Match History's own local match-type select (FR-3).
+      expect(ids.length).toBe(label === 'landing' ? 2 : 3);
       for (const id of ids) expect(html).toContain(`<label for="${id}"`);
       expect(html).toContain('<legend>');
     });

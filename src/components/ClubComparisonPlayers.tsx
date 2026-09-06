@@ -19,7 +19,10 @@ import { clubPath, formatDate, formatNumber, formatStat, matchPath, playerPath }
 /**
  * The player-shaped rivalry sections of /clubs/compare
  * (AFLDB-ISSUE-144 Stage 8): H2H leaderboards, connected players and
- * H2H per-match averages.
+ * H2H per-match averages. Collapsed behind one top-level disclosure by
+ * the Club Rivalry Explorer follow-up, FR-3 — its three subsections use
+ * `<h3>` rather than `<h2>`, since the outer `CollapsiblePanel` supplies
+ * the section's own `<h2>` in its `<summary>`.
  *
  * Two contracts are load-bearing in the markup. A player who appeared
  * for both clubs in this rivalry is ONE leaderboard row with two
@@ -46,9 +49,9 @@ export function ClubComparisonPlayers({
   const bName = organizationB.name;
 
   return (
-    <>
-      <section className="section" id="player-leaders">
-        <h2>Player rivalry leaders</h2>
+    <CollapsiblePanel id="players" title="Players" defaultOpen={false}>
+      <section id="player-leaders">
+        <h3>Player rivalry leaders</h3>
         <p className="section-note">
           Across every meeting of the two clubs. A player who appeared for both clubs in
           this rivalry — and several have — is one row here, with the split shown.
@@ -87,8 +90,8 @@ export function ClubComparisonPlayers({
         />
       </section>
 
-      <section className="section" id="connected-players">
-        <h2>Connected players</h2>
+      <section id="connected-players">
+        <h3>Connected players</h3>
         <p className="section-note">
           Players who represented both clubs, counting every name each club has played
           under. “Order” is the club a player is first recorded for, and nothing more:
@@ -125,6 +128,7 @@ export function ClubComparisonPlayers({
               title="Every connected player"
               note={`${formatNumber(crossoverPlayers.length)} players`}
               defaultOpen={false}
+              headingLevel={4}
             >
               <div className="table-wrap">
                 <SortableTable
@@ -204,8 +208,8 @@ export function ClubComparisonPlayers({
         )}
       </section>
 
-      <section className="section" id="player-averages">
-        <h2>Player averages in this rivalry</h2>
+      <section id="player-averages">
+        <h3>Player averages in this rivalry</h3>
         <p className="section-note">
           Per-match averages over recorded rivalry matches only. A player needs at least{' '}
           {playerAverages.minimumRecordedGames} recorded rivalry games for the statistic in
@@ -217,13 +221,14 @@ export function ClubComparisonPlayers({
           title="Average leaderboards"
           note={`${formatNumber(playerAverages.boards.length)} statistics`}
           defaultOpen={false}
+          headingLevel={4}
         >
           {playerAverages.boards.map((board) => (
             <AverageBoard key={board.key} board={board} minimum={playerAverages.minimumRecordedGames} />
           ))}
         </CollapsiblePanel>
       </section>
-    </>
+    </CollapsiblePanel>
   );
 }
 

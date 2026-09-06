@@ -1,7 +1,6 @@
 import Link from 'next/link';
 
-import { CLUB_COMPARE_PATH, MATCH_TYPES } from '@/lib/club-comparison-url';
-import { MATCH_TYPE_LABELS } from '@/lib/club-comparison-format';
+import { CLUB_COMPARE_PATH } from '@/lib/club-comparison-url';
 import type { ComparisonEffectiveParams, ComparisonOptions } from '@/app/clubs/compare/state';
 
 /**
@@ -10,8 +9,8 @@ import type { ComparisonEffectiveParams, ComparisonOptions } from '@/app/clubs/c
  * A plain GET form, which is what keeps this a Server Component and
  * every view a shareable URL: there is no hidden client state on this
  * surface, so a reader can bookmark, share or reload anything they can
- * see. Submitting drops `page`, which is correct — changing the pair,
- * the season or the filter starts the history at its first page.
+ * see. Submitting drops `page`, which is correct — changing the pair or
+ * the filter starts the history at its first page.
  *
  * Both club lists offer every organisation. The second is deliberately
  * NOT filtered to exclude the first: silently removing or switching a
@@ -20,7 +19,12 @@ import type { ComparisonEffectiveParams, ComparisonOptions } from '@/app/clubs/c
  * would otherwise find their second choice gone.
  *
  * Options come from `state.options`, which the route reads from
- * canonical rows on every request. No club and no season is named here.
+ * canonical rows on every request. No club is named here. The
+ * comparison itself is all-time only (Club Rivalry Explorer follow-up,
+ * FR-1); there is no season field. The match-type field lived here
+ * temporarily after FR-1 and has been relocated into Match History's own
+ * local form (FR-3) — it only ever filters that section, so it now lives
+ * with the section it filters.
  */
 export function ClubComparisonControls({
   params,
@@ -66,32 +70,6 @@ export function ClubComparisonControls({
             <label htmlFor="club-compare-club2">Second club</label>
             <select id="club-compare-club2" name="club2" defaultValue={params.club2 ?? ''}>
               {clubOptions}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="club-compare-season">Season</label>
-            <select
-              id="club-compare-season"
-              name="season"
-              defaultValue={params.season === null ? '' : String(params.season)}
-            >
-              {options.seasons.map((s) => (
-                <option key={s.season} value={String(s.season)}>
-                  {s.season}{s.isProvisional ? ' (in progress)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="club-compare-match-type">Match type</label>
-            <select
-              id="club-compare-match-type"
-              name="matchType"
-              defaultValue={params.matchType}
-            >
-              {MATCH_TYPES.map((type) => (
-                <option key={type} value={type}>{MATCH_TYPE_LABELS[type]}</option>
-              ))}
             </select>
           </div>
         </div>

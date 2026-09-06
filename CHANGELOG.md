@@ -15,6 +15,32 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-144 — Club Rivalry Explorer redesign - 7 September 2026
+
+- `/clubs/compare` is now all-time-first rather than season-first: the season selector and every
+  per-season block (record/ladder/scoring/team-stats/player-leaders/Brownlow) are removed from this
+  surface. The underlying selected-season query layer is untouched and still fully covered by its own
+  integration suite; only this page stopped using it.
+- Added an era explorer: a chip for every decade the chosen pair has actually met in (discovered from
+  their own meeting history, never a fixed list), plus "All time". Choosing an era narrows Rivalry
+  records and Match history to that decade and resets pagination; a new era is a new population, the
+  same treatment changing the match-type filter already gets. Streaks, Venues, Players and Brownlow
+  stay all-time regardless — a decade boundary would truncate a cross-boundary streak, and the design
+  review kept the other sections as whole-of-rivalry context.
+- Split the former single head-to-head block into four sections and reordered the page: Header → Hero
+  (all-time summary) → Era explorer → Rivalry records (records, streaks, decade breakdown, period-score
+  leads/comebacks/turnarounds) → Venues → Players → Brownlow → Match history (its own local match-type
+  filter, moved out of the shared controls form). Venues, Players, Brownlow and Match history are each
+  one collapsed disclosure; Rivalry records stays always expanded.
+- The shareable URL carries `era` and `matchType` alongside `page`; the SEO canonical URL continues to
+  carry the ordered pair only, with era/matchType/page/season never reaching it.
+- Fixed a heading-hierarchy defect found during acceptance: three subsections nested inside an
+  already-top-level section ("Leads, comebacks and turnarounds" under Rivalry records; "Every connected
+  player" and "Average leaderboards" under Players) were rendering as a second `<h2>` instead of
+  continuing the section's own outline. `CollapsiblePanel`/`CollapsibleTable` gained an optional
+  heading-level option (defaulting to `<h2>`, unchanged everywhere else on the site) so a nested
+  disclosure can render at the level that actually continues its parent section.
+
 ### AFLDB-ISSUE-145 — Venues exposed in site navigation - 6 September 2026
 
 - The existing `/venues` index is now linked from the primary navigation (a `Venues` entry after

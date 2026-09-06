@@ -1,23 +1,21 @@
 /**
- * AFLDB-ISSUE-144 Stage 7 — route state for /clubs/compare.
+ * AFLDB-ISSUE-144 Stage 7 — route state for /clubs/compare (all-time only
+ * since the Club Rivalry Explorer follow-up, FR-1 — season removed).
  *
  * These exercise the route's own resolution against real `afldb_test`
  * data, because every rule this stage adds is a rule about canonical
- * rows: which seasons exist, which slugs are organisations, and which
- * two organisations are the same one under different names. Fixtures
- * could not prove any of it.
+ * rows: which slugs are organisations, and which two organisations are
+ * the same one under different names. Fixtures could not prove any of
+ * it.
  *
  * Nothing here re-proves Stage 1-6 query semantics; those live in
  * tests/integration/club-comparison.test.ts and are untouched. The one
  * statistical value asserted (Adelaide/Brisbane Lions 41 meetings) is
  * the runbook witness, used only to show the route loaded real data.
- *
- * No year is written down: the default season, the historical season and
- * the "did not compete" case are all discovered from `seasons`.
  */
 import './guard';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { generateMetadata } from '@/app/clubs/compare/page';
 import {
@@ -25,22 +23,10 @@ import {
   resolveClubComparisonState,
 } from '@/app/clubs/compare/state';
 import { sql } from '@/db/client';
-import { MEETINGS_PAGE_SIZE, getComparisonSeasons } from '@/db/queries/club-comparison';
+import { MEETINGS_PAGE_SIZE } from '@/db/queries/club-comparison';
 
 afterAll(async () => {
   await sql.end();
-});
-
-let latestSeason = 0;
-let historicalSeason = 0;
-
-beforeAll(async () => {
-  const seasons = await getComparisonSeasons();
-  expect(seasons.length).toBeGreaterThan(0);
-  latestSeason = seasons[0].season;
-  // A canonical season that is not the default, discovered rather than named.
-  historicalSeason = seasons[seasons.length - 1].season;
-  expect(historicalSeason).toBeLessThan(latestSeason);
 });
 
 describe('Stage 7 route state: unselected landing', () => {
@@ -57,10 +43,9 @@ describe('Stage 7 route state: unselected landing', () => {
     expect(state.notices).toEqual([]);
   });
 
-  it('offers canonical seasons and organisations to the selectors', async () => {
+  it('offers canonical organisations to the selectors', async () => {
     const state = await resolveClubComparisonState({});
 
-    expect(state.options.seasons[0].season).toBe(latestSeason);
     expect(state.options.organizations.length).toBeGreaterThan(0);
 
     const slugs = state.options.organizations.map((o) => o.slug);
@@ -97,7 +82,6 @@ describe('Stage 7 route state: valid pair', () => {
 
     expect(state.organizationA.slug).toBe('adelaide');
     expect(state.organizationB.slug).toBe('brisbane-lions');
-    expect(state.params.season).toBe(latestSeason);
     expect(state.params.matchType).toBe('all');
     expect(state.params.page).toBe(1);
     expect(state.notices).toEqual([]);
@@ -105,8 +89,6 @@ describe('Stage 7 route state: valid pair', () => {
     // Real data, not an empty shell.
     expect(state.data.summary.meetings).toBe(41);
     expect(state.data.meetings.pageSize).toBe(MEETINGS_PAGE_SIZE);
-    expect(state.data.seasonA?.season).toBe(latestSeason);
-    expect(state.data.seasonB?.season).toBe(latestSeason);
     expect(state.data.brownlowA).toBeTruthy();
     expect(state.data.decades.length).toBeGreaterThan(0);
     expect(state.data.periodRecords).toBeTruthy();
@@ -135,10 +117,8 @@ describe('Stage 7 route state: valid pair', () => {
     expect(forward.canonicalPath).toBe(canonical);
     expect(reversed.canonicalPath).toBe(canonical);
 
-    // The shareable URL is the current view, with the season it actually
-    // resolved to pinned so a shared link keeps showing what was shared.
-    expect(reversed.sharePath)
-      .toBe(`/clubs/compare?club1=brisbane-lions&club2=adelaide&season=${latestSeason}`);
+    // The shareable URL is the current view.
+    expect(reversed.sharePath).toBe('/clubs/compare?club1=brisbane-lions&club2=adelaide');
     expect(reversed.swapPath).toBe(forward.sharePath);
   });
 
@@ -152,63 +132,6 @@ describe('Stage 7 route state: valid pair', () => {
       const state = await resolveClubComparisonState({ club1, club2 });
       expect(state.kind, `${club1} vs ${club2}`).toBe('comparison');
     }
-  });
-});
-
-describe('Stage 7 route state: season handling', () => {
-  it('keeps a canonical historical season', async () => {
-    const state = await resolveClubComparisonState({
-      club1: 'carlton', club2: 'collingwood', season: String(historicalSeason),
-    });
-
-    expect(state.kind).toBe('comparison');
-    expect(state.params.season).toBe(historicalSeason);
-    expect(state.seasonMeta?.season).toBe(historicalSeason);
-    expect(state.notices).toEqual([]);
-    if (state.kind !== 'comparison') return;
-    expect(state.data.seasonA?.season).toBe(historicalSeason);
-  });
-
-  it('falls back to the maximum canonical season with a notice', async () => {
-    for (const bad of ['1066', 'not-a-season', '']) {
-      const state = await resolveClubComparisonState({
-        club1: 'carlton', club2: 'collingwood', season: bad,
-      });
-      expect(state.params.season, bad).toBe(latestSeason);
-      if (bad === '') {
-        // An empty value is an absent value, not a wrong one.
-        expect(state.notices).toEqual([]);
-      } else {
-        const notice = state.notices.find((n) => n.field === 'season');
-        expect(notice, bad).toBeTruthy();
-        expect(notice?.message).toContain(String(latestSeason));
-      }
-    }
-  });
-
-  it('preserves a season an organisation did not compete in', async () => {
-    // Discovered, not assumed: a canonical season with no participation.
-    const [row] = await sql<{ season: number }[]>`
-      SELECT s.year::int AS season
-        FROM seasons s
-       WHERE NOT EXISTS (
-               SELECT 1 FROM club_seasons cs
-                 JOIN clubs c ON c.id = cs.club_id
-                 JOIN club_organizations o ON o.id = c.organization_id
-                WHERE cs.season = s.year AND o.slug = 'adelaide')
-       ORDER BY s.year DESC
-       LIMIT 1
-    `;
-    if (!row) return; // Nothing to prove on a database where Adelaide played every season.
-
-    const state = await resolveClubComparisonState({
-      club1: 'adelaide', club2: 'brisbane-lions', season: String(row.season),
-    });
-    expect(state.params.season).toBe(row.season);
-    if (state.kind !== 'comparison') throw new Error('pair must still resolve');
-    expect(state.data.seasonA?.season).toBe(row.season);
-    expect(state.data.seasonA?.participated).toBe(false);
-    expect(state.data.seasonA?.record).toBeNull();
   });
 });
 
@@ -269,6 +192,56 @@ describe('Stage 7 route state: filter and page normalisation', () => {
   });
 });
 
+describe('Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up)', () => {
+  it('scopes rivalry records and match history to the chosen era, leaving everything else all-time', async () => {
+    const [allTime, scoped] = await Promise.all([
+      resolveClubComparisonState({ club1: 'adelaide', club2: 'brisbane-lions' }),
+      resolveClubComparisonState({ club1: 'adelaide', club2: 'brisbane-lions', era: '1990' }),
+    ]);
+    if (allTime.kind !== 'comparison' || scoped.kind !== 'comparison') {
+      throw new Error('pair must resolve');
+    }
+    expect(scoped.params.era).toBe(1990);
+    expect(scoped.notices).toEqual([]);
+    // Runbook witness (V1.7 decade H2H): Adelaide vs Brisbane Lions, 1990s = 5 meetings.
+    expect(scoped.data.meetings.totalMeetings).toBe(5);
+    expect(scoped.data.meetings.era).toBe(1990);
+    // Everything the approved design keeps all-time must be identical
+    // whether or not an era is chosen -- an era narrows records and
+    // meetings only.
+    expect(scoped.data.summary).toEqual(allTime.data.summary);
+    expect(scoped.data.streaks).toEqual(allTime.data.streaks);
+    expect(scoped.data.venues).toEqual(allTime.data.venues);
+    expect(scoped.data.decades).toEqual(allTime.data.decades);
+  });
+
+  it('falls back to all time on an era outside this rivalry’s recorded history, with a notice', async () => {
+    const state = await resolveClubComparisonState({
+      club1: 'adelaide', club2: 'brisbane-lions', era: '1900',
+    });
+    if (state.kind !== 'comparison') throw new Error('pair must resolve');
+    expect(state.params.era).toBeNull();
+    expect(state.notices.some((n) => n.field === 'era')).toBe(true);
+    expect(state.data.meetings.totalMeetings).toBe(41);
+  });
+
+  it('falls back to all time on an unparsable era, with a notice', async () => {
+    const state = await resolveClubComparisonState({
+      club1: 'adelaide', club2: 'brisbane-lions', era: 'nineties',
+    });
+    if (state.kind !== 'comparison') throw new Error('pair must resolve');
+    expect(state.params.era).toBeNull();
+    expect(state.notices.some((n) => n.field === 'era')).toBe(true);
+  });
+
+  it('is absent from the canonical URL', async () => {
+    const metadata = await resolveClubComparisonMetadata({
+      club1: 'adelaide', club2: 'brisbane-lions', era: '1990',
+    });
+    expect(metadata.canonicalPath).not.toContain('era');
+  });
+});
+
 describe('Stage 7 route state: rejected pairs', () => {
   it('rejects the same organisation before any comparison query', async () => {
     const state = await resolveClubComparisonState({
@@ -316,7 +289,7 @@ describe('Stage 7 canonical metadata', () => {
     const [forward, reversed] = await Promise.all([
       resolveClubComparisonMetadata({
         club1: 'brisbane-lions', club2: 'adelaide',
-        season: String(historicalSeason), matchType: 'finals', page: '4',
+        matchType: 'finals', page: '4',
       }),
       resolveClubComparisonMetadata({ club1: 'adelaide', club2: 'brisbane-lions' }),
     ]);
@@ -324,7 +297,6 @@ describe('Stage 7 canonical metadata', () => {
     const canonical = '/clubs/compare?club1=adelaide&club2=brisbane-lions';
     expect(forward.canonicalPath).toBe(canonical);
     expect(reversed.canonicalPath).toBe(canonical);
-    expect(forward.canonicalPath).not.toContain('season');
     expect(forward.canonicalPath).not.toContain('matchType');
     expect(forward.canonicalPath).not.toContain('page');
     expect(forward.noindex).toBe(false);
@@ -439,11 +411,10 @@ describe('Stage 9 rendered route metadata', () => {
       .toBe(canonical);
   });
 
-  it('keeps season, match filter and page out of the canonical', async () => {
+  it('keeps match filter and page out of the canonical', async () => {
     const result = await meta({
       club1: 'brisbane-lions',
       club2: 'adelaide',
-      season: String(historicalSeason),
       matchType: 'finals',
       page: '3',
     });

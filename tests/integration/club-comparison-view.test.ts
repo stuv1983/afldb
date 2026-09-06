@@ -12,7 +12,8 @@
  * file is for: resolve the route state exactly as a request does, render
  * it, and assert the page is a comparison rather than an exception.
  *
- * No year and no club record is written down; the season is discovered.
+ * No year and no club record is written down; the comparison is all-time
+ * only (Club Rivalry Explorer follow-up, FR-1).
  */
 import './guard';
 
@@ -36,7 +37,6 @@ describe('Stage 8 view over real route state', () => {
   it('renders the landing page with database-driven selectors and no comparison', async () => {
     const html = await renderState({});
     expect(html).toContain('name="club1"');
-    expect(html).toContain('name="season"');
     expect(html).toContain('<h2>Choose two clubs</h2>');
     expect(html).not.toContain('id="head-to-head"');
   });
@@ -44,7 +44,7 @@ describe('Stage 8 view over real route state', () => {
   it('renders every section of a real comparison', async () => {
     const html = await renderState({ club1: 'adelaide', club2: 'brisbane-lions' });
     for (const heading of [
-      'Selected season', 'Head-to-head', 'Rivalry records', 'Match history',
+      'Head-to-head', 'Rivalry records', 'Match history',
       'Player rivalry leaders', 'Connected players', 'Brownlow', 'By decade',
       'Period records', 'Player averages in this rivalry',
     ]) {
@@ -80,5 +80,24 @@ describe('Stage 8 view over real route state', () => {
     });
     expect(html).toContain('matchType=finals');
     expect(html).toContain('club1=carlton&amp;club2=collingwood');
+  });
+
+  it('renders the era explorer and scopes rivalry records to the chosen era (Club Rivalry Explorer follow-up, FR-2)', async () => {
+    const html = await renderState({
+      club1: 'adelaide', club2: 'brisbane-lions', era: '1990',
+    });
+    expect(html).toContain('aria-label="Filter rivalry records and match history by era"');
+    expect(html).toContain('1990s');
+    expect(html).toContain('Rivalry records — Adelaide and Brisbane Lions (1990s)');
+    expect(html).not.toContain('undefined');
+    expect(html).not.toContain('NaN');
+  });
+
+  it('surfaces an era outside the rivalry’s recorded history as a notice, not a crash', async () => {
+    const html = await renderState({
+      club1: 'adelaide', club2: 'brisbane-lions', era: '1900',
+    });
+    expect(html).toContain('is not part of this rivalry');
+    expect(html).toContain('Rivalry records — Adelaide and Brisbane Lions</caption>');
   });
 });

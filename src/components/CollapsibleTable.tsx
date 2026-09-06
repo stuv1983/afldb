@@ -26,6 +26,7 @@ export function CollapsibleTable({
   title,
   note,
   defaultOpen = true,
+  headingLevel,
   filters,
   children,
 }: {
@@ -33,11 +34,18 @@ export function CollapsibleTable({
   title: string;
   note?: string;
   defaultOpen?: boolean;
+  headingLevel?: 2 | 3 | 4;
   filters?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <CollapsiblePanel id={id} title={title} note={note} defaultOpen={defaultOpen}>
+    <CollapsiblePanel
+      id={id}
+      title={title}
+      note={note}
+      defaultOpen={defaultOpen}
+      headingLevel={headingLevel}
+    >
       {filters}
       {children}
     </CollapsiblePanel>

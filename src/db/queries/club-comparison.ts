@@ -105,8 +105,17 @@ function matchTypeFilter(matchType: MatchType) {
  * THE shared organisation-pair scoping fragment. Every Stage 1 query
  * builds its `meetings` CTE from this and nothing else, so all of them
  * see an identical match population and identical outcome semantics.
+ *
+ * `era` is a decade's first season (1990 for the 1990s), applied as
+ * `[era, era + 10)`. It narrows the SAME population `getHeadToHeadByDecade`
+ * already groups by decade -- it is never a second population definition,
+ * and callers pass it only where the Club Rivalry Explorer follow-up
+ * (FR-2) allows a chosen era to narrow the result: single-match records
+ * and the meetings list. The summary, streaks, venues, decade breakdown,
+ * player leaders/averages and Brownlow sections stay all-time regardless
+ * of any era in the URL.
  */
-function h2hScope(orgA: number, orgB: number, matchType: MatchType = 'all') {
+function h2hScope(orgA: number, orgB: number, matchType: MatchType = 'all', era?: number) {
   return sql`
     SELECT m.id,
            m.season,
@@ -135,6 +144,7 @@ function h2hScope(orgA: number, orgB: number, matchType: MatchType = 'all') {
      WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
          OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
        ${matchTypeFilter(matchType)}
+       ${era !== undefined ? sql`AND m.season >= ${era} AND m.season < ${era + 10}` : sql``}
   `;
 }
 
@@ -277,6 +287,7 @@ export async function getHeadToHeadSummary(orgA: number, orgB: number): Promise<
 export type MeetingsPage = {
   meetings: H2HMeeting[];
   matchType: MatchType;
+  era: number | null;
   page: number;
   pageSize: number;
   totalMeetings: number;
@@ -289,25 +300,31 @@ export type MeetingsPage = {
  * `page` is one-based. Out-of-range pages return no rows but honest
  * pagination metadata -- deciding whether that is a redirect is route
  * behaviour, not query behaviour.
+ *
+ * `era`, when supplied, is a decade's first season (Club Rivalry Explorer
+ * follow-up, FR-2) and narrows the population `h2hScope` already scopes;
+ * it is the caller's responsibility to have validated it against the
+ * pair's own decade population first.
  */
 export async function getHeadToHeadMeetings(
   orgA: number,
   orgB: number,
-  options: { matchType?: MatchType; page?: number } = {},
+  options: { matchType?: MatchType; page?: number; era?: number } = {},
 ): Promise<MeetingsPage> {
   assertDistinct(orgA, orgB);
   const matchType = options.matchType ?? 'all';
+  const era = options.era ?? null;
   const page = Math.max(1, Math.trunc(options.page ?? 1));
   const offset = (page - 1) * MEETINGS_PAGE_SIZE;
 
   const [countRow] = await sql<{ total: number }[]>`
-    WITH meetings AS (${h2hScope(orgA, orgB, matchType)})
+    WITH meetings AS (${h2hScope(orgA, orgB, matchType, era ?? undefined)})
     SELECT count(*)::int AS total FROM meetings
   `;
   const totalMeetings = countRow.total;
 
   const meetings = await sql<H2HMeeting[]>`
-    WITH meetings AS (${h2hScope(orgA, orgB, matchType)})
+    WITH meetings AS (${h2hScope(orgA, orgB, matchType, era ?? undefined)})
     SELECT ${MEETING_COLUMNS} FROM meetings m
      ORDER BY m.match_date DESC NULLS LAST, m.season DESC, m.id DESC
      LIMIT ${MEETINGS_PAGE_SIZE} OFFSET ${offset}
@@ -317,6 +334,7 @@ export async function getHeadToHeadMeetings(
   return {
     meetings: [...meetings],
     matchType,
+    era,
     page,
     pageSize: MEETINGS_PAGE_SIZE,
     totalMeetings,
@@ -398,11 +416,21 @@ const RECORD_KINDS: H2HRecordKind[] = [
  * recorded", never a nil-all record.
  *
  * Draws never enter closest-game: a nil margin is not the closest win.
+ *
+ * `era`, when supplied, is a decade's first season (Club Rivalry Explorer
+ * follow-up, FR-2): the eight records are then each held within that one
+ * decade of the rivalry rather than across its whole history. The caller
+ * is responsible for validating it against the pair's own decade
+ * population first -- this function only narrows `h2hScope`.
  */
-export async function getHeadToHeadRecords(orgA: number, orgB: number): Promise<H2HRecords> {
+export async function getHeadToHeadRecords(
+  orgA: number,
+  orgB: number,
+  options: { era?: number } = {},
+): Promise<H2HRecords> {
   assertDistinct(orgA, orgB);
   const rows = await sql<(H2HRecordEntry & { kind: H2HRecordKind })[]>`
-    WITH meetings AS (${h2hScope(orgA, orgB)}),
+    WITH meetings AS (${h2hScope(orgA, orgB, 'all', options.era)}),
     scored AS (SELECT * FROM meetings WHERE a_score IS NOT NULL AND b_score IS NOT NULL),
     picks AS (
       SELECT 'biggest-win-a'::text AS kind, id, (a_score - b_score)::int AS value
