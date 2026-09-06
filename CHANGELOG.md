@@ -15,6 +15,46 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-143 — The promotion contract can express an intentional historical-only disposition - 6 September 2026
+
+- `docs/production-promotion.md` §7.4c had named two supportable answers for a lineage-bound
+  ledger row that cannot be evidenced across an id-lineage change, and the tooling could execute
+  **neither**: `--phase restored` FAILed on any unresolved row, the generated plan reinstated every
+  `reinstate` table with no way to exclude one, and `--phase candidate --compare` would then have
+  refused the omission from the other side. A promotion that met a real lineage change — which on
+  `afldb_dev` is every promotion — could not pass, whichever answer the operator chose.
+- **The executable answer is a contract declaration, not a flag.** A table may now carry a
+  `historicalOnly` entry in `tools/db/promotion-inventory.ts` naming the environments it applies to,
+  **every** lineage-bound column of that table, the deciding issue, a summary and the full reason.
+  One declaration drives four things together, so the gate, the plan and the comparison cannot
+  disagree: the plan omits the table's `pg_restore` line and prints an `INTENTIONALLY NOT
+  REINSTATED` block with the reason; the candidate is still truncated, so `--phase candidate`
+  expects **0** rows instead of the snapshot's count; `--phase restored` reports the column as
+  `hist` with its count and per-id reasons rather than `FAIL`, and generates no statement for it in
+  `--lineage-remap-out`; and the `database.promoted` audit marker carries a `historical_only` array
+  plus a recorded-gap sentence per table, so the promoted database records what it was not given.
+- **Fail-closed everywhere else, by construction.** There is no command-line override and no
+  verdict-level relaxation: acceptance is decided per `(table, column, environment)` by
+  `judgeLineage()`, so another table, another column of the *same* table, or the same table under
+  an undeclared environment all still refuse exactly as before. `assertContractCoherent()` runs
+  before the checker's first query and refuses a declaration that names only some of its table's
+  lineage-bound columns, sits on a table that is not reinstated, names an unknown environment, has
+  an empty reason — or that the generated plan would still reinstate. Adding a new lineage-bound
+  column to a declared table therefore re-opens the decision rather than inheriting it.
+- **Nothing is deleted and nothing is remapped by name.** The withheld rows stay in the mandatory
+  pre-cutover dump and the retained `<live>_pre_rebuild_<stamp>` database; the identity rules,
+  `resolveLineageRemap` and the AFLDB-ISSUE-142 remap path are untouched, and a row that *can* be
+  evidenced is still remapped through its stable external identity.
+- **Production behaviour is unchanged.** Nothing is declared for `--environment prod`: the prod
+  plan, its resync SQL and its audit marker are byte-identical to before, and an unresolved id
+  still refuses there in every case. Declared today, for `--environment dev` only:
+  `player_link_resolutions` (`player_id`, `target_id` — the seven honours tables `target_id` points
+  at carry no external key, so not one row can be evidenced, and remapping `player_id` alone is
+  explicitly not an answer) and `data_edits` (`row_id` — every lineage-bound row is in the
+  bootstrap id space, and two of its matches were created and then deleted on `afldb_dev` itself).
+  §7.4c answer (1), reinstating such a table as a not-live historical ledger, remains deliberately
+  **unimplemented** and still refuses.
+
 ### AFLDB-ISSUE-117 — Retired access keys can be permanently deleted from `/admin/access` - 6 September 2026
 
 - Beta access keys gain the last step of their lifecycle: **Active → Revoke → Delete**. Revoking

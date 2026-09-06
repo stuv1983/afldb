@@ -103,6 +103,53 @@ export type LineageRef = {
   remediation: string;
 };
 
+/**
+ * AFLDB-ISSUE-143 — an intentional HISTORICAL-ONLY / recorded-gap disposition.
+ *
+ * §7.4c of docs/production-promotion.md names two supportable answers for a lineage-bound
+ * row that cannot be evidenced. Until this issue the checker could execute neither, so a
+ * DEV promotion could never pass `--phase restored`. This declaration is the executable
+ * form of answer (2): the table is truncated in the candidate like any other, its rows are
+ * NOT reinstated as live state, and it survives as evidence in the mandatory pre-cutover
+ * dump and in the retained `<live>_pre_rebuild_<stamp>` database. It is the
+ * `promotion_decisions` treatment, decided per table instead of once for all time.
+ *
+ * It is NOT a switch that lets unresolved lineage pass. Three things must hold together,
+ * and all three come from this one declaration, so the plan and the gate cannot disagree:
+ *
+ *   1. this exact table AND this exact column are declared here, for the environment being
+ *      promoted (`environments` is explicit — a `dev` declaration never applies to `prod`);
+ *   2. the generated plan omits the table's `pg_restore` line (`reinstatedPublicTables`)
+ *      and the candidate comparison therefore expects zero rows (`effectiveCompare`);
+ *   3. the report, the plan and the `database.promoted` marker all name the table, the
+ *      count and the reason.
+ *
+ * Everything else still refuses. Another table's unresolved rows refuse; a column of THIS
+ * table that is not listed refuses; and `assertContractCoherent()` rejects a declaration
+ * that does not name every lineage-bound column of its table, so adding a new lineage
+ * column re-opens the decision rather than inheriting the old one.
+ */
+export type HistoricalOnly = {
+  /**
+   * The environments this disposition applies to. Never inferred, never defaulted: a
+   * promotion of an environment not named here gets today's refusal. Production is listed
+   * only if the same evidence genuinely applies to a production promotion.
+   */
+  environments: readonly Environment[];
+  /**
+   * Every lineage-bound column of the table, exhaustively. A table that is not reinstated
+   * cannot have one of its columns remapped, so a partial list is a contradiction and
+   * `assertContractCoherent()` refuses it.
+   */
+  columns: readonly string[];
+  /** The issue and operator decision that chose this. Printed beside every acceptance. */
+  decidedBy: string;
+  /** One line for the audit marker's recorded gaps and the plan's omission block. */
+  summary: string;
+  /** Why no live reinstatement is supportable. Printed in full by the `restored` gate. */
+  reason: string;
+};
+
 export type TableTreatment = {
   /** `public` unless stated. Schema-level entries use `schema` + `name: '*'`. */
   schema: 'public' | 'staging' | 'staging_aflw';
@@ -142,6 +189,12 @@ export type TableTreatment = {
    * that can silently change meaning when the candidate's ids denote different rows.
    */
   lineageRefs?: readonly LineageRef[];
+  /**
+   * AFLDB-ISSUE-143. Declared only where an operator has decided, in writing, that this
+   * table's lineage-bound rows are historical evidence rather than live state in the named
+   * environments. Absent everywhere else, which is the default and the refusal.
+   */
+  historicalOnly?: HistoricalOnly;
   note: string;
 };
 
@@ -236,6 +289,27 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         + 'settle re-acquires the season; the supportable answer is to apply that part of '
         + 'the remap after the settle, stated in the promotion record.',
     }],
+    // AFLDB-ISSUE-143 / AFLDB-ISSUE-139 D2 (operator decision, 2026-09-06).
+    historicalOnly: {
+      environments: ['dev'],
+      columns: ['row_id'],
+      decidedBy: 'AFLDB-ISSUE-139 D2 (2026-09-06), docs/production-promotion.md §7.4c option 2',
+      summary: 'data_edits: NOT reinstated on a DEV promotion — the human edit audit is kept as '
+        + 'historical evidence in the pre-cutover dump and the retained pre-rebuild database',
+      reason: 'Every lineage-bound data_edits row on afldb_dev is in the bootstrap id space. Its '
+        + "'players' rows name ids that carry no external identity at all (measured 0 of 7 "
+        + "evidenced), and two of its 'matches' rows were created and then DELETED on afldb_dev "
+        + 'itself, so nothing can ever resolve them. Forcing those ids into the rebuilt lineage '
+        + 'would re-attribute a human edit to a different footballer or a different match — the '
+        + 'exact misattribution AFLDB-ISSUE-142 (B) exists to prevent — and the reference cannot '
+        + 'be nulled instead, because table_name + row_id is what the audit row is ABOUT. The '
+        + 'rows are therefore historical evidence, not live state: retained in full in the '
+        + 'mandatory pre-cutover dump and in the kept <live>_pre_rebuild_<stamp>, named in the '
+        + 'database.promoted marker, and never reinstated into the candidate. The one '
+        + 'current-season match edit that would resolve by match_key after the post-swap settle '
+        + 'is part of this same gap: it is NOT carried as a pending remap, so it can neither '
+        + 'weaken the pre-swap gate nor be forgotten silently.',
+    },
     note: 'Append-only audit of every human canonical edit (before/after snapshots). '
       + 'table_name + row_id is a row id in players or matches, NOT a foreign key: it '
       + 'reinstates without tripping a constraint, and therefore without noticing a lineage '
@@ -306,6 +380,27 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
           + 'person and points at the wrong honours row.',
       },
     ],
+    // AFLDB-ISSUE-143 / AFLDB-ISSUE-139 D1 (operator decision, 2026-09-06): answer (2) above.
+    historicalOnly: {
+      environments: ['dev'],
+      columns: ['player_id', 'target_id'],
+      decidedBy: 'AFLDB-ISSUE-139 D1 (2026-09-06), docs/production-promotion.md §7.4c option 2',
+      summary: 'player_link_resolutions: NOT reinstated on a DEV promotion — the human link '
+        + 'decisions are kept as historical evidence in the pre-cutover dump and the retained '
+        + 'pre-rebuild database',
+      reason: "target_id's seven honours tables carry no external key of any kind, so its "
+        + 'identity is `none` and NOT ONE target_id row can be evidenced across a lineage '
+        + 'change. Remapping player_id alone is explicitly not an answer (§7.4c): it produces a '
+        + 'row that looks resolved, names the right person and points at the wrong honours row. '
+        + 'The whole table is therefore historical evidence rather than live state — the '
+        + 'promotion_decisions treatment, on the same reasoning that a decision cannot outlive '
+        + 'the row it is about. Every row is retained in the mandatory pre-cutover dump and in '
+        + 'the kept <live>_pre_rebuild_<stamp>, named in the database.promoted marker, and '
+        + 'never reinstated into the candidate. Consequence to state in the promotion record: '
+        + 'player_link_match_candidates is regenerated from rebuilt players plus reinstated '
+        + 'resolutions, so with none reinstated the admin link queue re-surfaces the '
+        + 'previously-decided suggestions for a fresh decision against the new lineage.',
+    },
     note: 'Append-only human link decisions the honours reload is forbidden to overwrite. '
       + 'player_id can dangle after an identity merge; probed before reinstatement. Both '
       + 'player_id and target_id are ids of the replaced database — AFLDB-ISSUE-142 (B).',
@@ -510,18 +605,183 @@ export function truncatedPublicTables(): string[] {
     .map((t) => t.name);
 }
 
-/** Public tables restored from the pre-cutover dump, in FK-safe order. */
-export function reinstatedPublicTables(): string[] {
+/**
+ * Public tables restored from the pre-cutover dump, in FK-safe order.
+ *
+ * AFLDB-ISSUE-143: a table declared historical-only for this environment is NOT here, which
+ * is what makes the omission real rather than a comment — `reinstatePlan` generates its
+ * `pg_restore` lines from this list and `resyncIdentitySql` its sequences.
+ */
+export function reinstatedPublicTables(environment: Environment = DEFAULT_ENVIRONMENT): string[] {
   return publicContractTables()
-    .filter((t) => t.treatment === 'reinstate')
+    .filter((t) => effectiveTreatment(t, environment) === 'reinstate')
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
     .map((t) => t.name);
 }
 
-export function tablesWithTreatment(treatment: Treatment): string[] {
+/**
+ * The tables under each treatment, as the audit marker lists them. A historical-only table
+ * appears under none of them — it has its own list (`historicalOnlyTables`), because
+ * "truncated and left empty" is what happens to it but not why.
+ */
+export function tablesWithTreatment(
+  treatment: Treatment, environment: Environment = DEFAULT_ENVIRONMENT,
+): string[] {
   return PROMOTION_CONTRACT
-    .filter((t) => t.treatment === treatment)
+    .filter((t) => historicalOnlyFor(t, environment) === undefined && t.treatment === treatment)
     .map((t) => (t.schema === 'public' ? t.name : `${t.schema}.*`));
+}
+
+// ---------------------------------------------------------------------------
+// Historical-only / recorded-gap disposition — AFLDB-ISSUE-143
+// ---------------------------------------------------------------------------
+
+/** The disposition in force for one table in one environment, or `undefined`. */
+export function historicalOnlyFor(
+  table: TableTreatment, environment: Environment = DEFAULT_ENVIRONMENT,
+): HistoricalOnly | undefined {
+  const declared = table.historicalOnly;
+  if (!declared) return undefined;
+  return declared.environments.includes(environment) ? declared : undefined;
+}
+
+export type HistoricalOnlyEntry = { table: TableTreatment; disposition: HistoricalOnly };
+
+/** Every table intentionally not reinstated in this environment, in reinstatement order. */
+export function historicalOnlyTables(
+  environment: Environment = DEFAULT_ENVIRONMENT,
+): HistoricalOnlyEntry[] {
+  return publicContractTables()
+    .map((table) => ({ table, disposition: historicalOnlyFor(table, environment) }))
+    .filter((e): e is HistoricalOnlyEntry => e.disposition !== undefined)
+    .sort((a, b) => a.table.order - b.table.order || a.table.name.localeCompare(b.table.name));
+}
+
+/**
+ * Is this EXACT table and column declared historical-only here? The whole acceptance rule
+ * of AFLDB-ISSUE-143 in one predicate: anything it says no to still refuses.
+ */
+export function isHistoricalOnlyColumn(
+  tableName: string, column: string, environment: Environment = DEFAULT_ENVIRONMENT,
+): boolean {
+  const table = contractByName(tableName);
+  if (!table) return false;
+  const disposition = historicalOnlyFor(table, environment);
+  return disposition !== undefined && disposition.columns.includes(column);
+}
+
+/** What actually happens to the rows here: `reset` (truncated, left empty) when declared. */
+export function effectiveTreatment(
+  table: TableTreatment, environment: Environment = DEFAULT_ENVIRONMENT,
+): Treatment {
+  return historicalOnlyFor(table, environment) ? 'reset' : table.treatment;
+}
+
+/** `--compare` expects zero rows for a table the plan deliberately did not reinstate. */
+export function effectiveCompare(
+  table: TableTreatment, environment: Environment = DEFAULT_ENVIRONMENT,
+): CompareRule {
+  return historicalOnlyFor(table, environment) ? 'zero' : table.compare;
+}
+
+/**
+ * Everything wrong with one table's historical-only declaration, as plain sentences. Pure,
+ * so the unit tests exercise every rule on synthetic tables instead of on the real contract.
+ * An undeclared table has no problems by definition.
+ */
+export function historicalOnlyProblems(table: TableTreatment): string[] {
+  const d = table.historicalOnly;
+  if (!d) return [];
+  const problems: string[] = [];
+  if (table.schema !== 'public') problems.push('is not a public table, so it has no lineage-bound columns');
+  if (table.treatment !== 'reinstate') {
+    problems.push(`has treatment '${table.treatment}': only a reinstated table can be withheld as historical-only`);
+  }
+  if (d.environments.length === 0) problems.push('declares a historical-only disposition for no environment');
+  for (const environment of d.environments) {
+    if (!ENVIRONMENTS.includes(environment)) problems.push(`names an unknown environment '${environment}'`);
+  }
+  const declared = (table.lineageRefs ?? []).map((r) => r.column);
+  if (declared.length === 0) {
+    problems.push('declares no lineage-bound column, so there is nothing for a lineage disposition to decide');
+  }
+  const missing = declared.filter((c) => !d.columns.includes(c));
+  const extra = d.columns.filter((c) => !declared.includes(c));
+  if (missing.length > 0) {
+    problems.push(`withholds the table but does not name its lineage-bound column(s) ${missing.join(', ')} — `
+      + 'a table that is not reinstated cannot have one of its columns remapped, so the '
+      + 'disposition must name every one of them or be re-decided');
+  }
+  if (extra.length > 0) problems.push(`names column(s) ${extra.join(', ')}, which are not lineage-bound`);
+  for (const [field, value] of [['decidedBy', d.decidedBy], ['summary', d.summary], ['reason', d.reason]] as const) {
+    if (value.trim().length === 0) problems.push(`has an empty ${field}`);
+  }
+  return problems;
+}
+
+/**
+ * The contract's own invariants, checked before anything reads it — `tools/db/promotion-check.ts`
+ * calls this before its first query, and the unit tests call it directly. Every rule here
+ * exists so a historical-only declaration cannot quietly become a general relaxation.
+ */
+export function assertContractCoherent(): void {
+  for (const table of PROMOTION_CONTRACT) {
+    const where = `${table.schema}.${table.name}`;
+    const problems = historicalOnlyProblems(table);
+    // Condition (2) of AFLDB-ISSUE-143, proved rather than promised: acceptance and omission
+    // come from one declaration, so the gate and the generated plan cannot disagree.
+    for (const environment of table.historicalOnly?.environments ?? []) {
+      if (ENVIRONMENTS.includes(environment) && reinstatedPublicTables(environment).includes(table.name)) {
+        problems.push(`is declared historical-only for '${environment}' yet the generated plan still reinstates it`);
+      }
+    }
+    if (problems.length > 0) {
+      throw new PromotionRefused(`Incoherent promotion contract: ${where} ${problems.join('; ')}.`);
+    }
+  }
+}
+
+/**
+ * Why one lineage-bound column's unresolved rows are refused or accepted. The gate reports
+ * this; it does not decide it.
+ */
+export type LineageJudgement = {
+  refused: { table: string; column: string; unresolved: number }[];
+  accepted: { table: string; column: string; unresolved: number; decidedBy: string }[];
+  refusedTotal: number;
+  acceptedTotal: number;
+  /** `FAIL` if anything is refused; otherwise `WARN` — a lineage change is never silent. */
+  verdict: 'WARN' | 'FAIL';
+};
+
+/**
+ * The acceptance rule, as a pure function of the contract and the measured counts.
+ *
+ * A column's unresolved rows are accepted ONLY when this exact table and this exact column
+ * are declared historical-only for the environment being promoted. Every other unresolved
+ * row refuses, exactly as before AFLDB-ISSUE-143 — including another column of a table that
+ * has a disposition, and including every column of every other table.
+ */
+export function judgeLineage(input: {
+  environment: Environment;
+  columns: readonly { table: string; column: string; unresolved: number }[];
+}): LineageJudgement {
+  const out: LineageJudgement = {
+    refused: [], accepted: [], refusedTotal: 0, acceptedTotal: 0, verdict: 'WARN',
+  };
+  for (const c of input.columns) {
+    if (c.unresolved === 0) continue;
+    if (isHistoricalOnlyColumn(c.table, c.column, input.environment)) {
+      const decidedBy = contractByName(c.table)!.historicalOnly!.decidedBy;
+      out.accepted.push({ ...c, decidedBy });
+      out.acceptedTotal += c.unresolved;
+    } else {
+      out.refused.push({ ...c });
+      out.refusedTotal += c.unresolved;
+    }
+  }
+  out.verdict = out.refusedTotal === 0 ? 'WARN' : 'FAIL';
+  return out;
 }
 
 /** Non-public schemas reinstated wholesale. */
@@ -742,6 +1002,8 @@ export type LineageRemapInput = {
  */
 export function lineageRemapSql(input: LineageRemapInput): string {
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
+  const withheld = (plan: LineageColumnPlan): boolean =>
+    isHistoricalOnlyColumn(plan.table, plan.column, names.environment);
   const lines: string[] = [];
   lines.push('-- AFLDB-ISSUE-142 (B) — lineage remap for reinstated human/admin rows.');
   lines.push(`-- Candidate '${input.candidate}' (${names.environment}) does NOT share the id lineage of`);
@@ -756,6 +1018,21 @@ export function lineageRemapSql(input: LineageRemapInput): string {
     const scope = plan.kindColumn ? ` WHERE ${plan.kindColumn} = '${plan.kind}'` : '';
     lines.push('');
     lines.push(`-- ${plan.table}.${plan.column}${scope} -> ${plan.entity} (identity: ${plan.rule})`);
+    // AFLDB-ISSUE-143. Nothing is emitted for a table the plan did not reinstate: there are
+    // no rows in the candidate to update, and an UPDATE here would be the very
+    // reinstatement the disposition declined. The evidence is written down instead.
+    if (withheld(plan)) {
+      const disposition = contractByName(plan.table)!.historicalOnly!;
+      lines.push(`-- HISTORICAL-ONLY (AFLDB-ISSUE-143) under --environment ${names.environment}:`);
+      lines.push(`--   ${disposition.decidedBy}`);
+      lines.push(`--   ${plan.rows.length} row(s) read from ${input.oldDatabase}, `
+        + `${plan.remap.mapped.length} evidenced, ${plan.remap.unresolved.length} unresolved — `
+        + 'NONE of them reinstated, so NONE of them remapped.');
+      for (const line of wrapComment(disposition.reason, 92)) lines.push(`--   ${line}`);
+      lines.push(`--   The rows survive in the pre-cutover dump and in `
+        + `${names.preRebuildPrefix}<stamp>. No statement is generated for this column.`);
+      continue;
+    }
     const byOld = new Map(plan.remap.mapped.map((m) => [m.oldId, m] as const));
     for (const row of plan.rows) {
       const m = byOld.get(row.oldValue);
@@ -782,6 +1059,12 @@ export function lineageRemapSql(input: LineageRemapInput): string {
   }
 
   lines.push('');
+  const withheldColumns = input.plans.filter(withheld);
+  if (withheldColumns.length > 0) {
+    lines.push(`-- ${withheldColumns.length} column(s) are HISTORICAL-ONLY by contract and generate`);
+    lines.push('-- nothing here; the tables they belong to have no reinstate line in the plan and');
+    lines.push('-- must read 0 rows at --phase candidate. This file remaps the REST.');
+  }
   lines.push(unresolvedTotal === 0
     ? '-- Every referenced id was evidenced. COMMIT is safe once the counts above are read.'
     : `-- ${unresolvedTotal} id(s) could NOT be evidenced. NOTHING above resolves them: decide each`);
@@ -794,7 +1077,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
   lines.push('-- Verification: every remapped value must now resolve to the identity it was');
   lines.push('-- proved against. This is the proof that no row changed semantic owner.');
   for (const plan of input.plans) {
-    if (plan.remap.mapped.length === 0) continue;
+    if (plan.remap.mapped.length === 0 || withheld(plan)) continue;
     const pairs = plan.remap.mapped.map((m) => `(${m.newId}, ${quote(m.identity)})`).join(', ');
     const guard = plan.kindColumn ? ` AND t.${plan.kindColumn} = '${plan.kind}'` : '';
     lines.push(`-- ${plan.table}.${plan.column}: expect 0 rows`);
@@ -1127,6 +1410,19 @@ function sqlArray(names: readonly string[]): string {
   return `ARRAY[${names.map((n) => `'${n}'`).join(', ')}]`;
 }
 
+/** Soft-wrap a reason for a comment block, so a plan stays readable in a terminal. */
+function wrapComment(text: string, width: number): string[] {
+  const out: string[] = [];
+  let line = '';
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line.length === 0) line = word;
+    else if (line.length + 1 + word.length <= width) line += ` ${word}`;
+    else { out.push(line); line = word; }
+  }
+  if (line.length > 0) out.push(line);
+  return out;
+}
+
 /** SQL that empties every non-rebuilt contract table in the candidate. */
 export function truncateSql(): string {
   const tables = truncatedPublicTables().map((t) => `public.${t}`).join(',\n  ');
@@ -1152,7 +1448,7 @@ ${schemaBlocks}
 }
 
 /** SQL that re-syncs identity sequences after a data-only restore of the listed tables. */
-export function resyncIdentitySql(): string {
+export function resyncIdentitySql(environment: Environment = DEFAULT_ENVIRONMENT): string {
   return `-- AFLDB-ISSUE-125: pg_restore --data-only --table=<t> restores rows but not the
 -- SEQUENCE SET entries of identity columns. Advance each identity sequence past the
 -- reinstated maximum so the next INSERT cannot collide.
@@ -1165,7 +1461,7 @@ BEGIN
       JOIN pg_class c ON c.oid = a.attrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public'
-       AND c.relname = ANY (${sqlArray(reinstatedPublicTables())})
+       AND c.relname = ANY (${sqlArray(reinstatedPublicTables(environment))})
        AND a.attidentity <> ''
        AND NOT a.attisdropped
   LOOP
@@ -1183,6 +1479,16 @@ export function auditMarkerSql(input: PlanInput): string {
   const j = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
   const label = names.environment === 'prod' ? 'production promotion' : 'dev promotion';
+  // AFLDB-ISSUE-143: an intentional omission is only a decision if the promoted database
+  // carries the record of it. Each withheld table is named twice — once in a list the marker
+  // can be queried by, once in prose among the recorded gaps, with the deciding issue.
+  const withheld = historicalOnlyTables(names.environment);
+  const historicalList = withheld.length === 0
+    ? "ARRAY[]::text[]"
+    : `ARRAY[${withheld.map((e) => j(`${e.table.name} (${e.disposition.decidedBy})`)).join(', ')}]`;
+  const historicalGaps = withheld
+    .map((e) => `,\n      ${j(`${e.disposition.summary} [${e.disposition.decidedBy}]`)}`)
+    .join('');
   return `-- AFLDB-ISSUE-125: the audit trail records the promotion itself. An operator, not a
 -- user, so actor_user_id is NULL and actor_label names the procedure.
 INSERT INTO auth_audit_log (actor_user_id, actor_label, action, detail)
@@ -1197,16 +1503,17 @@ VALUES (
     'rebuilt_dump', ${j(input.rebuiltDump)},
     'pre_cutover_dump', ${j(input.preCutoverDump)},
     'environment', ${j(input.environment ?? DEFAULT_ENVIRONMENT)},
-    'reinstated', to_jsonb(${sqlArray(tablesWithTreatment('reinstate'))}),
-    'reset', to_jsonb(${sqlArray(tablesWithTreatment('reset'))}),
-    'regenerated', to_jsonb(${sqlArray(tablesWithTreatment('regenerate'))}),
-    'taken_from_rebuild', to_jsonb(${sqlArray(tablesWithTreatment('rebuilt'))}),
+    'reinstated', to_jsonb(${sqlArray(tablesWithTreatment('reinstate', names.environment))}),
+    'reset', to_jsonb(${sqlArray(tablesWithTreatment('reset', names.environment))}),
+    'regenerated', to_jsonb(${sqlArray(tablesWithTreatment('regenerate', names.environment))}),
+    'taken_from_rebuild', to_jsonb(${sqlArray(tablesWithTreatment('rebuilt', names.environment))}),
+    'historical_only', to_jsonb(${historicalList}),
     'recorded_gaps', to_jsonb(ARRAY[
       'promotion_decisions: reset, retained only in the pre-cutover dump',
       'canonical_applications and staging.*: settle history replaced by the rebuild',
       'auth_sessions: reset, every administrator signs in again',
       'external_grids.import_batch_id: the capturing batch is not in the rebuilt candidate; see the promotion record',
-      'id-keyed ledgers (player_link_resolutions, data_edits): if the candidate did not share the replaced database''s id lineage, the promotion record states how each lineage-bound column was resolved'
+      'id-keyed ledgers (player_link_resolutions, data_edits): if the candidate did not share the replaced database''s id lineage, the promotion record states how each lineage-bound column was resolved'${historicalGaps}
     ])
   )
 );
@@ -1229,9 +1536,27 @@ export function reinstatePlan(input: PlanInput): string {
   lines.push('# 1. Empty every production-owned/operational table the rebuilt dump carried.');
   lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-truncate.sql`);
   lines.push('');
+  // AFLDB-ISSUE-143. The omission is stated in the plan an operator actually follows, with
+  // the reason and the deciding issue, before the restore lines it is missing from.
+  const withheld = historicalOnlyTables(names.environment);
+  if (withheld.length > 0) {
+    lines.push('# INTENTIONALLY NOT REINSTATED (AFLDB-ISSUE-143 historical-only / recorded gap).');
+    lines.push(`# ${withheld.length} table(s) below have NO pg_restore line in step 2 by contract, not by`);
+    lines.push('# oversight. Each is still TRUNCATED in step 1, so the candidate holds none of the');
+    lines.push(`# rebuilt copy either; --phase candidate expects 0 rows in each. Nothing is deleted:`);
+    lines.push(`# every row survives in ${input.preCutoverDump} and in the retained`);
+    lines.push(`# ${names.preRebuildPrefix}<stamp> database. Record this in the promotion record.`);
+    for (const { table, disposition } of withheld) {
+      lines.push('#');
+      lines.push(`#   public.${table.name} — ${disposition.decidedBy}`);
+      lines.push(`#     columns withheld: ${disposition.columns.join(', ')}`);
+      for (const line of wrapComment(disposition.reason, 84)) lines.push(`#     ${line}`);
+    }
+    lines.push('');
+  }
   lines.push('# 2. Reinstate production-owned rows from the pre-cutover dump, one table at a time,');
   lines.push('#    in foreign-key order. --data-only: the schema is the rebuilt one.');
-  for (const table of reinstatedPublicTables()) {
+  for (const table of reinstatedPublicTables(names.environment)) {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
     lines.push(`           --single-transaction --exit-on-error --table=${table} "${input.preCutoverDump}"`);
   }
@@ -1272,6 +1597,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Every production-owned/operational table truncated in the candidate, then reinstated per the printed plan, in order, each under --single-transaction.',
   'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE its restore lines: external_grid_sources.ingest_source_id onto the candidate\'s gridley sources row, and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. Rows are never dropped to make the FK pass.',
   'Lineage proved at `--phase restored`: the candidate either shares the replaced database\'s id lineage, or every reinstated id-keyed column (player_link_resolutions.player_id and .target_id, data_edits.row_id) was resolved through a stable external identity and the generated remap applied — with every unresolved id decided deliberately and recorded. Never remapped by name, never left on the old integer.',
+  'Historical-only tables (AFLDB-ISSUE-143) confirmed: for each table the contract withholds in this environment, the generated plan had no pg_restore line, the candidate reads 0 rows, the rows are present in the pre-cutover dump and the retained pre-rebuild database, and the database.promoted marker names the table and the deciding issue. Nothing was deleted to achieve this and no column was remapped by name.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',
   'Service stopped; afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod; service started.',

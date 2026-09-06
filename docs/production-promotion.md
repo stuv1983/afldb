@@ -66,12 +66,12 @@ promoted by accident.
 | `beta_login_tokens` | beta | yes | reset | Short-lived single-use magic links. |
 | `site_settings` | admin | yes | reinstate | Deliberate super-admin choices; the app silently falls back to defaults without them. |
 | `site_media` | admin | yes | reinstate | Uploaded images. Not in the original issue list — found in the schema. |
-| `data_edits` | data editor | yes | reinstate | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`, not a FK → **lineage-bound** (§7.4c). |
+| `data_edits` | data editor | yes | reinstate (**dev: historical-only**) | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`, not a FK → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
 | `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). |
 | `data_submissions` | uploads | yes | reinstate | `import_batch_id` may dangle → probed (§7.4). |
 | `data_submission_rows` | uploads | yes | reinstate | After `data_submissions`. |
 | `player_link_suggestions` | player links | yes | reinstate | Reader suggestions; `target_id` is deliberately not a FK. |
-| `player_link_resolutions` | player links | yes | reinstate | Append-only human decisions; `player_id` may dangle → probed (§7.4). Both `player_id` and `target_id` are ids of the replaced database → **lineage-bound** (§7.4c). |
+| `player_link_resolutions` | player links | yes | reinstate (**dev: historical-only**) | Append-only human decisions; `player_id` may dangle → probed (§7.4). Both `player_id` and `target_id` are ids of the replaced database → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
 | `player_link_match_candidates` | player links | no | **regenerate** | Rebuilt by `/admin/player-links` refresh; `player_id` is NOT NULL against rebuilt players. |
 | `nl_search_log` | NL telemetry | yes | reinstate | Carries human review and reader feedback; clearable later via `nl_search_telemetry_clear()`, never reconstructible. |
 | `nl_search_review` | NL telemetry | yes | reinstate | After `nl_search_log`. |
@@ -92,7 +92,9 @@ promoted by accident.
 Reinstatement order is foreign-key order and is generated, not typed: `auth_users`, then
 every table that references it and `external_grid_sources`, then `data_submission_rows`,
 `nl_search_review`, `nl_search_feedback`, `app_health_events` and `external_grids`, then
-`external_grid_axes` last.
+`external_grid_axes` last. A table declared **historical-only** for the environment being
+promoted (§7.4d) is absent from that generated order altogether — it is still truncated, but
+it gets no `pg_restore` line and is expected to read zero rows at acceptance.
 
 **Why the migration-080 tables are here.** They are deliberately **not** in
 `afldb_meta.import_writable_tables` (`080_external_grids.sql`: `grant_import_write()` hands out
@@ -141,7 +143,7 @@ and refuses any other by name:
 |---|---|---|---|
 | `source` | `afldb_test` | `afldb_test` | identity, classification, migration parity, fixtures (info), optional `--expect-fingerprint` |
 | `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, `--snapshot <file>` of row counts |
-| `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe, + lineage identity of reinstated id-keyed rows (§7.4c), optional `--lineage-remap-out <file>` |
+| `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe, + lineage identity of reinstated id-keyed rows (§7.4c, §7.4d), optional `--lineage-remap-out <file>` |
 | `candidate` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
 | `production` | `afldb_prod` | `afldb_dev` | same as `candidate`, on the live name |
 
@@ -397,8 +399,65 @@ supportable, and the choice must be recorded in the promotion record and the
 **Never** drop the rows to make the gate pass, and never leave a lineage-bound column on its
 old integer. One further case is normal rather than exceptional: a `data_edits` row about a
 **current-season match** cannot resolve at candidate time, because the rebuild carries seasons
-only to the accepted baseline and the season is re-acquired *after* the swap (§9). Apply that
-part of the remap after the post-promotion settle, and say so in the record.
+only to the accepted baseline and the season is re-acquired *after* the swap (§9). Where the
+table is reinstated, apply that part of the remap after the post-promotion settle and say so
+in the record; where it is withheld under §7.4d, that row is part of the same recorded gap and
+there is nothing pending.
+
+### 7.4d The historical-only / recorded-gap disposition (`AFLDB-ISSUE-143`)
+
+§7.4c names two supportable answers and, until `AFLDB-ISSUE-143`, the checker and the plan
+could execute **neither** — so a promotion that met a real lineage change could not pass
+`--phase restored` at all, whichever answer the operator chose. Answer (2) is now executable,
+and it is a **contract declaration, not a flag**.
+
+`tools/db/promotion-inventory.ts` gives the table a `historicalOnly` entry naming the
+environments it applies to, **every** lineage-bound column of that table, the deciding issue,
+a one-line summary and the full reason. One declaration then drives four things at once, so
+the gate, the plan and the comparison cannot disagree:
+
+1. **the plan** omits the table's `pg_restore` line and prints an `INTENTIONALLY NOT
+   REINSTATED` block naming the table, the withheld columns and the reason, before the restore
+   lines it is missing from;
+2. **the candidate is still truncated**, so it holds none of the rebuilt copy either, and
+   `--phase candidate --compare` expects **0** rows rather than the snapshot's count;
+3. **`--phase restored`** reports the column as `hist` instead of `FAIL`, prints the count, the
+   per-id reasons and the decision, and generates **no** statement for it in
+   `--lineage-remap-out`;
+4. **the `database.promoted` marker** carries a `historical_only` array and one recorded-gap
+   sentence per table, so the promoted database records what it was not given.
+
+Everything the declaration does not name still refuses, exactly as before: another table,
+another column of the *same* table, or the same table under an environment the declaration
+does not list. There is no command-line override, no verdict-level relaxation and no way to
+express this outside the tracked contract; `assertContractCoherent()` runs before the first
+query and refuses a declaration that is partial (it must name every lineage-bound column of
+its table), sits on a table that is not reinstated, names an unknown environment, has an empty
+reason — or that the generated plan would still reinstate.
+
+**What is *not* implemented, deliberately.** §7.4c answer (1) — reinstate the table as a
+historical, not-live ledger — has **no** executable path and still refuses. It would mean
+writing ids that denote different rows into the promoted database and trusting a note to say
+so; the operator decisions this mechanism serves (`AFLDB-ISSUE-139` D1/D2) both chose answer
+(2). If answer (1) is ever wanted it is a new decision, not a flag on this one.
+
+**Nothing is deleted, ever.** The withheld rows are in the mandatory pre-cutover dump (§4) and
+in the retained `<live>_pre_rebuild_<stamp>` database (§8), both of which are kept until the
+promotion record is closed. Record in the promotion record which tables were withheld and why;
+the acceptance checklist has a line for it.
+
+**Declared today** (`--environment dev` only; production declares nothing and its behaviour is
+byte-identical to before this issue):
+
+| Table | Columns | Decision |
+|---|---|---|
+| `player_link_resolutions` | `player_id`, `target_id` | `AFLDB-ISSUE-139` D1. `target_id`'s seven honours tables carry no external key, so not one row can be evidenced; remapping `player_id` alone is explicitly not an answer (§7.4c). |
+| `data_edits` | `row_id` | `AFLDB-ISSUE-139` D2. Every lineage-bound row is in the bootstrap id space: its `players` ids carry no external identity at all, and two of its matches were created and then deleted on `afldb_dev` itself. |
+
+One consequence to state in the DEV promotion record: `player_link_match_candidates` is
+regenerated from rebuilt players **plus reinstated resolutions** (§8), so with none reinstated
+the admin link queue re-surfaces the previously-decided suggestions for a fresh decision
+against the new lineage. That is the honest outcome of a lineage change, not a defect.
 
 ### 7.5 Accept the candidate
 
@@ -547,12 +606,14 @@ with `afldb_dev` for `afldb_prod`, `afldb_dev_candidate_<stamp>` for the candida
 `afldb_dev_pre_rebuild_<stamp>` for the database renamed aside, and `DEV: streamanator` on
 every command line where §§3–10 say `PROD: afldb-prod`.
 
-**What differs — and only these two things.**
+**What differs — and only these three things.** The first two are command-line flags; the
+third is a tracked contract declaration with no flag at all.
 
 | Gate | `--environment prod` | `--environment dev` |
 |---|---|---|
 | Test-fixture identities | Refusal in `pre-cutover`, `candidate`, `production`. No override exists. | **Still a refusal by default.** `--allow-fixture-identities` accepts them consciously: the scan still runs, the verdict becomes WARN instead of FAIL, and the ten-row sample cap is **lifted** so every offending address is printed. Never silent, never partial. |
 | `--expect-super-admin` | Required in those phases: a database nobody can administer is not promoted. | Enforced exactly as on production **when the flag is given**. Omitted, the gate WARNs and says it is not enforced — optional, never silently dropped. |
+| Lineage-unresolvable ledgers (§7.4d) | Nothing is declared, so an unresolved id refuses in every case — unchanged by `AFLDB-ISSUE-143`. | `player_link_resolutions` and `data_edits` are declared **historical-only** in the contract: not reinstated, still truncated, expected empty at `candidate`, and named in the audit marker. Any *other* table or column still refuses. |
 
 `--allow-fixture-identities` is refused outright under `--environment prod`, including the
 implicit `prod` of no `--environment` at all, and including modes that never consult it. A
@@ -563,8 +624,13 @@ authority to protect, but it is not stateless:
 
 * the **captured Gridley corpus** (migration 080) — immutable evidence with no rebuild stage
   and no re-fetch, and the reason `AFLDB-ISSUE-141` exists (§1, §7.4b);
-* admin and beta access state, `site_settings`, uploads, `data_edits`/`data_overrides` — real
-  operator choices, reinstated by the same contract;
+* admin and beta access state, `site_settings`, uploads and `data_overrides` — real operator
+  choices, reinstated by the same contract;
+* `data_edits` and `player_link_resolutions` — equally real, but **not reinstated on DEV**
+  (§7.4d): they are bound to the bootstrap id lineage the promotion replaces, so they are kept
+  as historical evidence in the pre-cutover dump and the retained
+  `afldb_dev_pre_rebuild_<stamp>` rather than written into the candidate. Withheld is not
+  discarded, and it is a recorded decision, not an omission;
 * the current season, which is **re-acquired** by a settle run (§9), not copied.
 
 **Before the first DEV promotion**, take the same mandatory backup (§4) and the same
@@ -577,9 +643,11 @@ not.
 
 * **The id lineage really does change.** `afldb_dev` is the pre-rebuild bootstrap database, so
   a candidate restored from a rebuilt `afldb_test` does **not** share its player or match ids.
-  §7.4c is therefore mandatory reading for a DEV promotion rather than a rare case: expect the
-  `restored` phase to report a lineage change and to refuse until every lineage-bound column
-  is either evidenced or deliberately decided. Production has never met this because its
+  §7.4c and §7.4d are therefore mandatory reading for a DEV promotion rather than a rare case:
+  expect the `restored` phase to report a lineage change and to refuse until every
+  lineage-bound column is either evidenced or covered by a declared historical-only
+  disposition. As the contract stands, `player_link_resolutions` and `data_edits` are declared
+  (§7.4d) and everything else must be evidenced. Production has never met this because its
   candidate is a rebuild of its own lineage.
 * **Migration parity refuses at `pre-cutover`, truthfully.** `afldb_dev`'s ledger carries
   `079_access_code_delete.sql`, which is committed only on the unmerged branch

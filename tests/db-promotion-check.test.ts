@@ -15,6 +15,15 @@ import {
   ACCEPTANCE_CHECKLIST,
   CANDIDATE_PREFIX,
   DEFAULT_ENVIRONMENT,
+  assertContractCoherent,
+  effectiveCompare,
+  effectiveTreatment,
+  historicalOnlyFor,
+  historicalOnlyProblems,
+  historicalOnlyTables,
+  isHistoricalOnlyColumn,
+  judgeLineage,
+  type TableTreatment,
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
   ENVIRONMENTS,
@@ -434,8 +443,9 @@ describe('reinstatement order and generated SQL', () => {
     expect(dev).toContain('DEV (streamanator)');
     expect(dev).toContain('--environment dev');
     expect(dev).not.toContain('afldb-prod');
-    // Same contract, same tables, same order: dev is a name shape, not a different plan.
-    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables());
+    // Same contract, same order: dev is a name shape, not a different plan — except for the
+    // tables AFLDB-ISSUE-143 withholds there, which the dev list itself accounts for.
+    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
   });
 
   it('names the environment in the audit marker, defaulting to production', () => {
@@ -916,8 +926,10 @@ describe('lineage-safe reinstatement', () => {
       replacedIdentities: [{ id: 151, identity: 'players/B/Craig_Bradley.html' }],
       candidateIdentities: [{ id: 907, identity: 'players/B/Craig_Bradley.html' }],
     });
+    // Under `prod` no historical-only disposition applies (AFLDB-ISSUE-143 declares them
+    // for `dev` only), so this is the AFLDB-ISSUE-142 remap exactly as it always was.
     const sql = lineageRemapSql({
-      candidate: 'afldb_dev_candidate_20260906', oldDatabase: 'afldb_dev', environment: 'dev',
+      candidate: 'afldb_prod_candidate_20260906', oldDatabase: 'afldb_prod', environment: 'prod',
       plans: [{
         table: 'player_link_resolutions', column: 'player_id', entity: 'players', rule: PROFILE,
         remediation: contractByName('player_link_resolutions')!.lineageRefs![0].remediation,
@@ -958,6 +970,267 @@ describe('lineage-safe reinstatement', () => {
     });
     expect(sql.split('\n').filter((l) => l.startsWith('UPDATE'))).toHaveLength(0);
     expect(sql).toContain('Every referenced id was evidenced');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-143. §7.4c of docs/production-promotion.md documents two answers for a
+ * lineage-bound row that cannot be evidenced; until this issue the checker and the plan
+ * could execute neither, so a DEV promotion could never pass `--phase restored`.
+ *
+ * The executable answer is (2): the table is truncated in the candidate, given no
+ * `pg_restore` line, expected to read 0 rows, named in the audit marker, and retained in
+ * full in the pre-cutover dump and the kept pre-rebuild database. What these tests hold it
+ * to is that it is a DECLARATION and not a switch — one contract entry drives the gate, the
+ * plan and the comparison together, and everything it does not name still refuses.
+ */
+describe('historical-only / recorded-gap disposition', () => {
+  const PROFILE = 'afltables_profile_url';
+  const withheldOnDev = ['data_edits', 'player_link_resolutions'];
+
+  const synthetic = (over: Partial<TableTreatment>): TableTreatment => ({
+    schema: 'public', name: 't', subsystem: 's', category: 'operations',
+    productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    lineageRefs: [{
+      column: 'row_id', targets: [{ entity: 'players', identity: PROFILE }], remediation: 'x',
+    }],
+    note: 'n', ...over,
+  });
+  const declaration = (over: Partial<NonNullable<TableTreatment['historicalOnly']>> = {}) => ({
+    environments: ['dev'] as const, columns: ['row_id'], decidedBy: 'd', summary: 's', reason: 'r', ...over,
+  });
+
+  it('the real contract is coherent, and declares nothing for production', () => {
+    expect(() => assertContractCoherent()).not.toThrow();
+    expect(historicalOnlyTables('prod')).toEqual([]);
+    expect(historicalOnlyTables('dev').map((e) => e.table.name).sort()).toEqual(withheldOnDev);
+    for (const { table, disposition } of historicalOnlyTables('dev')) {
+      expect(disposition.environments, table.name).toEqual(['dev']);
+      // Exhaustive by construction: every lineage-bound column is named, so adding one
+      // re-opens the decision instead of inheriting it.
+      expect([...disposition.columns].sort(), table.name)
+        .toEqual(table.lineageRefs!.map((r) => r.column).sort());
+      expect(disposition.decidedBy, table.name).toContain('AFLDB-ISSUE-139');
+      expect(disposition.reason.length, table.name).toBeGreaterThan(200);
+    }
+  });
+
+  it('refuses a declaration that is partial, misplaced or unbacked', () => {
+    expect(historicalOnlyProblems(synthetic({ historicalOnly: declaration() }))).toEqual([]);
+    // A table with two lineage columns and only one named: the other could never be remapped.
+    const twoColumns = synthetic({
+      lineageRefs: [
+        { column: 'a', targets: [{ entity: 'players', identity: PROFILE }], remediation: 'x' },
+        { column: 'b', targets: [{ entity: 'players', identity: PROFILE }], remediation: 'x' },
+      ],
+      historicalOnly: declaration({ columns: ['a'] }),
+    });
+    expect(historicalOnlyProblems(twoColumns).join(' ')).toContain('does not name its lineage-bound column(s) b');
+
+    expect(historicalOnlyProblems(synthetic({ historicalOnly: declaration({ columns: ['row_id', 'nope'] }) })).join(' '))
+      .toContain('names column(s) nope, which are not lineage-bound');
+    expect(historicalOnlyProblems(synthetic({ lineageRefs: undefined, historicalOnly: declaration({ columns: [] }) })).join(' '))
+      .toContain('declares no lineage-bound column');
+    expect(historicalOnlyProblems(synthetic({ treatment: 'reset', historicalOnly: declaration() })).join(' '))
+      .toContain("has treatment 'reset'");
+    expect(historicalOnlyProblems(synthetic({ historicalOnly: declaration({ environments: [] as never }) })).join(' '))
+      .toContain('for no environment');
+    expect(historicalOnlyProblems(synthetic({ historicalOnly: declaration({ environments: ['staging'] as never }) })).join(' '))
+      .toContain("unknown environment 'staging'");
+    for (const field of ['decidedBy', 'summary', 'reason'] as const) {
+      expect(historicalOnlyProblems(synthetic({ historicalOnly: declaration({ [field]: '  ' }) })).join(' '), field)
+        .toContain(`has an empty ${field}`);
+    }
+  });
+
+  it('accepts unresolved rows ONLY for the exact declared table, column and environment', () => {
+    // The measured AFLDB-ISSUE-139 Phase 4C′ shape, to the row.
+    const dev = judgeLineage({
+      environment: 'dev',
+      columns: [
+        { table: 'player_link_resolutions', column: 'player_id', unresolved: 3 },
+        { table: 'player_link_resolutions', column: 'target_id', unresolved: 94 },
+        { table: 'data_edits', column: 'row_id', unresolved: 15 },
+      ],
+    });
+    expect(dev.verdict).toBe('WARN');
+    expect(dev.refused).toEqual([]);
+    expect(dev.acceptedTotal).toBe(112);
+    expect(dev.accepted.map((a) => `${a.table}.${a.column}`))
+      .toEqual(['player_link_resolutions.player_id', 'player_link_resolutions.target_id', 'data_edits.row_id']);
+    for (const a of dev.accepted) expect(a.decidedBy).toContain('AFLDB-ISSUE-139');
+
+    // The SAME rows, under the production contract: refused, exactly as before this issue.
+    const prod = judgeLineage({
+      environment: 'prod',
+      columns: [
+        { table: 'player_link_resolutions', column: 'target_id', unresolved: 94 },
+        { table: 'data_edits', column: 'row_id', unresolved: 15 },
+      ],
+    });
+    expect(prod.verdict).toBe('FAIL');
+    expect(prod.accepted).toEqual([]);
+    expect(prod.refusedTotal).toBe(109);
+  });
+
+  it('still refuses another table, another column, and a column that resolved anyway', () => {
+    const mixed = judgeLineage({
+      environment: 'dev',
+      columns: [
+        { table: 'player_link_resolutions', column: 'target_id', unresolved: 94 },
+        // A column of a DECLARED table that the declaration does not name.
+        { table: 'player_link_resolutions', column: 'some_future_column', unresolved: 1 },
+        // An undeclared table, and one that is not in the contract at all.
+        { table: 'nl_search_review', column: 'search_id', unresolved: 2 },
+        { table: 'not_in_the_contract', column: 'x', unresolved: 5 },
+      ],
+    });
+    expect(mixed.verdict).toBe('FAIL');
+    expect(mixed.refused.map((r) => `${r.table}.${r.column}`))
+      .toEqual(['player_link_resolutions.some_future_column', 'nl_search_review.search_id', 'not_in_the_contract.x']);
+    expect(mixed.refusedTotal).toBe(8);
+    expect(mixed.acceptedTotal).toBe(94);
+
+    // Nothing unresolved is nothing to judge, and a clean lineage change is still a WARN.
+    expect(judgeLineage({ environment: 'dev', columns: [
+      { table: 'data_edits', column: 'row_id', unresolved: 0 },
+    ] })).toMatchObject({ verdict: 'WARN', accepted: [], refused: [] });
+
+    expect(isHistoricalOnlyColumn('player_link_resolutions', 'target_id', 'dev')).toBe(true);
+    expect(isHistoricalOnlyColumn('player_link_resolutions', 'target_id', 'prod')).toBe(false);
+    expect(isHistoricalOnlyColumn('player_link_resolutions', 'other', 'dev')).toBe(false);
+    expect(isHistoricalOnlyColumn('data_submissions', 'import_batch_id', 'dev')).toBe(false);
+  });
+
+  it('production and the default are unchanged in every derived view', () => {
+    expect(reinstatedPublicTables()).toEqual(reinstatedPublicTables('prod'));
+    for (const name of withheldOnDev) {
+      const table = contractByName(name)!;
+      expect(reinstatedPublicTables('prod'), name).toContain(name);
+      expect(historicalOnlyFor(table, 'prod'), name).toBeUndefined();
+      expect(effectiveTreatment(table, 'prod'), name).toBe('reinstate');
+      expect(effectiveCompare(table, 'prod'), name).toBe('equal');
+      expect(tablesWithTreatment('reinstate', 'prod'), name).toContain(name);
+      // …and withheld on DEV, in all four views at once.
+      expect(reinstatedPublicTables('dev'), name).not.toContain(name);
+      expect(effectiveTreatment(table, 'dev'), name).toBe('reset');
+      expect(effectiveCompare(table, 'dev'), name).toBe('zero');
+      expect(tablesWithTreatment('reinstate', 'dev'), name).not.toContain(name);
+      expect(tablesWithTreatment('reset', 'dev'), name).not.toContain(name);
+      // Still truncated: the candidate keeps none of the rebuilt copy either, which is what
+      // makes `compare: zero` true and what stops test-state rows surviving the promotion.
+      expect(truncatedPublicTables(), name).toContain(name);
+      expect(truncateSql(), name).toContain(`public.${name}`);
+    }
+    const base = { oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump' };
+    const prodPlan = reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x' });
+    expect(prodPlan).not.toContain('HISTORICAL-ONLY');
+    expect(prodPlan).toContain('--table=player_link_resolutions');
+    expect(prodPlan).toContain('--table=data_edits');
+    expect(resyncIdentitySql('prod')).toBe(resyncIdentitySql());
+    expect(auditMarkerSql({ candidate: 'c', oldDatabase: 'o', preCutoverDump: 'p', rebuiltDump: 'r' }))
+      .toContain("'historical_only', to_jsonb(ARRAY[]::text[])");
+  });
+
+  it('the DEV plan visibly omits the withheld tables and generates no write for their rows', () => {
+    const dev = reinstatePlan({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev',
+      preCutoverDump: '/backups/pre.dump', rebuiltDump: 'rebuilt.dump', environment: 'dev',
+    });
+    expect(dev).toContain('INTENTIONALLY NOT REINSTATED (AFLDB-ISSUE-143 historical-only / recorded gap)');
+    for (const name of withheldOnDev) {
+      expect(dev, name).toContain(`public.${name} — AFLDB-ISSUE-139`);
+      // No restore line, and no write of any kind naming the table outside the comments.
+      expect(dev, name).not.toContain(`--table=${name}`);
+      for (const line of dev.split('\n').filter((l) => !l.trimStart().startsWith('#'))) {
+        expect(line, `${name}: ${line}`).not.toMatch(new RegExp(`\\b(INSERT|UPDATE|DELETE)\\b.*${name}`));
+      }
+    }
+    // The reader is told where the rows went, and that the candidate must read empty.
+    expect(dev).toContain('/backups/pre.dump');
+    expect(dev).toContain('afldb_dev_pre_rebuild_<stamp>');
+    expect(dev).toContain('expects 0 rows');
+    expect(dev).toContain('Nothing is deleted');
+    // Every other reinstated table is untouched, in the same order.
+    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
+    expect(reinstatedPublicTables('dev').length).toBe(reinstatedPublicTables('prod').length - 2);
+  });
+
+  it('the DEV audit marker records the gap, the table and the deciding issue', () => {
+    const sql = auditMarkerSql({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev',
+      preCutoverDump: 'p', rebuiltDump: 'r', environment: 'dev',
+    });
+    for (const name of withheldOnDev) {
+      expect(sql, name).toContain(`${name} (AFLDB-ISSUE-139`);
+      expect(sql, name).toContain(`${name}: NOT reinstated on a DEV promotion`);
+    }
+    expect(sql).toContain("'historical_only', to_jsonb(ARRAY[");
+    // And they are no longer claimed as reinstated.
+    expect(sql).toMatch(/'reinstated', to_jsonb\(ARRAY\[[^\]]*\]\)/);
+    const reinstated = sql.match(/'reinstated', to_jsonb\(ARRAY\[([^\]]*)\]\)/)![1];
+    for (const name of withheldOnDev) expect(reinstated, name).not.toContain(`'${name}'`);
+  });
+
+  it('the remap file writes no statement for a withheld column, and still remaps the rest', () => {
+    const unresolvable = resolveLineageRemap({
+      entity: 'award_winners', rule: 'none', referencedIds: [7, 9],
+      replacedIdentities: [], candidateIdentities: [],
+    });
+    const evidenced = resolveLineageRemap({
+      entity: 'import_batches', rule: PROFILE, referencedIds: [151],
+      replacedIdentities: [{ id: 151, identity: 'players/B/Craig_Bradley.html' }],
+      candidateIdentities: [{ id: 907, identity: 'players/B/Craig_Bradley.html' }],
+    });
+    const sql = lineageRemapSql({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev', environment: 'dev',
+      plans: [
+        {
+          table: 'player_link_resolutions', column: 'target_id', kindColumn: 'target_table',
+          kind: 'award_winners', entity: 'award_winners', rule: 'none',
+          remediation: 'unused here', rows: [{ rowId: 1, oldValue: 7 }, { rowId: 2, oldValue: 9 }],
+          remap: unresolvable,
+        },
+        // An undeclared table under the same environment: the AFLDB-ISSUE-142 path, intact.
+        {
+          table: 'data_submissions', column: 'import_batch_id', entity: 'import_batches', rule: PROFILE,
+          remediation: 'unused here', rows: [{ rowId: 5, oldValue: 151 }], remap: evidenced,
+        },
+      ],
+    });
+    expect(sql).toContain('-- HISTORICAL-ONLY (AFLDB-ISSUE-143) under --environment dev:');
+    expect(sql).toContain('NONE of them reinstated, so NONE of them remapped.');
+    expect(sql).toContain('afldb_dev_pre_rebuild_<stamp>');
+    expect(sql).not.toMatch(/player_link_resolutions.*\bUPDATE\b|UPDATE[^\n]*player_link_resolutions/);
+    expect(sql).not.toContain('-- UNRESOLVED player_link_resolutions');
+    // The stable row still takes the existing remap path, guarded by the value it was proved
+    // against, and the verification query covers it and only it.
+    expect(sql).toContain('UPDATE public.data_submissions SET import_batch_id = 907'
+      + ' WHERE id = 5 AND import_batch_id = 151;');
+    expect(sql).toContain('SELECT t.id, t.import_batch_id FROM public.data_submissions t');
+    expect(sql).not.toContain('SELECT t.id, t.target_id');
+    expect(sql).toContain('Every referenced id was evidenced');
+    expect(sql).toContain('1 column(s) are HISTORICAL-ONLY by contract');
+    expect(sql).not.toMatch(/\b(DELETE|INSERT|TRUNCATE|ALTER|DROP)\b/);
+  });
+
+  it('introduces no name matching and no generic override flag', () => {
+    const inventory = readFileSync(join(REPO, 'tools', 'db', 'promotion-inventory.ts'), 'utf8');
+    const checker = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    for (const source of [inventory, checker]) {
+      expect(source).not.toMatch(/\bilike\b|similarity|levenshtein|soundex/i);
+      expect(source).not.toMatch(/display_name|search_name|full_name/i);
+    }
+    // The disposition is reachable only from the contract: no command-line flag, and no
+    // environment-blind acceptance.
+    expect(checker).not.toMatch(/--allow-unresolved|--ignore-lineage|--force/);
+    expect(checker).toContain('judgeLineage');
+    // Acceptance is decided per (table, column, environment) — never per verdict.
+    const gate = checker.slice(checker.indexOf('async function gateLineageIdentity'),
+                              checker.indexOf('async function gateFingerprint'));
+    expect(gate).toMatch(/unresolvedTotal === 0 \? 'WARN' : 'FAIL'/);
+    expect(gate).toContain('const unresolvedTotal = judgement.refusedTotal;');
+    expect(gate).toContain('historicalOnlyFor(t, environment)');
   });
 });
 

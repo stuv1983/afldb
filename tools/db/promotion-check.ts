@@ -70,6 +70,7 @@ import {
   PROMOTION_CONTRACT,
   PromotionRefused,
   TEST_FIXTURE_EMAIL_SQL,
+  assertContractCoherent,
   assertDatabaseForPhase,
   assertOldDatabaseName,
   auditMarkerSql,
@@ -77,7 +78,12 @@ import {
   compareCounts,
   databaseOf,
   detectLineageChange,
+  effectiveCompare,
+  effectiveTreatment,
   environmentNames,
+  historicalOnlyFor,
+  historicalOnlyTables,
+  judgeLineage,
   lineageBoundTables,
   lineageRemapSql,
   lineageTargetsOf,
@@ -90,6 +96,7 @@ import {
   withDatabase,
   type CompareRule,
   type Environment,
+  type HistoricalOnly,
   type IdentityPair,
   type LineageColumnPlan,
   type LineageIdentityRule,
@@ -479,7 +486,7 @@ async function gateSuperAdmin(
 }
 
 async function gateInventory(
-  q: Query, present: readonly string[], report: Report,
+  q: Query, present: readonly string[], environment: Environment, report: Report,
 ): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   const lines: string[] = [];
@@ -487,7 +494,12 @@ async function gateInventory(
     if (!present.includes(t.name)) { lines.push(`${t.name.padEnd(30)} absent`); continue; }
     const n = asInt((await q(`SELECT count(*)::int AS n FROM public.${t.name}`))[0]?.n);
     counts[`public.${t.name}`] = n;
-    lines.push(`${t.name.padEnd(30)} ${String(n).padStart(8)}  ${t.treatment.padEnd(10)} ${t.category}`);
+    // AFLDB-ISSUE-143: the EFFECTIVE treatment, so the transcript never says 'reinstate'
+    // beside a table this environment's plan deliberately does not reinstate.
+    const withheld = historicalOnlyFor(t, environment);
+    lines.push(`${t.name.padEnd(30)} ${String(n).padStart(8)}  `
+      + `${effectiveTreatment(t, environment).padEnd(10)} ${t.category}`
+      + (withheld ? `  HISTORICAL-ONLY (${withheld.decidedBy})` : ''));
   }
   for (const schema of reinstatedSchemas()) {
     const tables = (await q('SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY 1', [schema]))
@@ -502,11 +514,20 @@ async function gateInventory(
   return counts;
 }
 
-function compareRules(): { table: string; rule: CompareRule }[] {
-  return publicContractTables().map((t) => ({ table: `public.${t.name}`, rule: t.compare }));
+/**
+ * AFLDB-ISSUE-143: `effectiveCompare`, so a table the plan intentionally did not reinstate
+ * is expected to be EMPTY here rather than equal to the snapshot. The candidate is never
+ * rejected for missing rows it was deliberately not given; every other table compares
+ * exactly as before.
+ */
+function compareRules(environment: Environment): { table: string; rule: CompareRule }[] {
+  return publicContractTables()
+    .map((t) => ({ table: `public.${t.name}`, rule: effectiveCompare(t, environment) }));
 }
 
-function gateCompare(snapshotPath: string, counts: Record<string, number>, report: Report): void {
+function gateCompare(
+  snapshotPath: string, counts: Record<string, number>, environment: Environment, report: Report,
+): void {
   let snapshot: Snapshot;
   try {
     snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8')) as Snapshot;
@@ -518,13 +539,17 @@ function gateCompare(snapshotPath: string, counts: Record<string, number>, repor
     report.add('Counts against the pre-cutover snapshot', 'FAIL', [`${snapshotPath} is not a promotion snapshot`]);
     return;
   }
-  const rules = compareRules();
+  const rules = compareRules(environment);
   // Reinstated schemas: every table the snapshot knew must be equal.
   for (const key of Object.keys(snapshot.counts)) {
     if (!key.startsWith('public.')) rules.push({ table: key, rule: 'equal' });
   }
   const findings = compareCounts(snapshot, rules, counts);
   const lines = [`snapshot of ${snapshot.database} taken ${snapshot.takenAt}`];
+  for (const { table, disposition } of historicalOnlyTables(environment)) {
+    lines.push(`note public.${table.name}: HISTORICAL-ONLY, expected 0 not `
+      + `${snapshot.counts[`public.${table.name}`] ?? '-'} — ${disposition.decidedBy}`);
+  }
   for (const f of findings) {
     lines.push(`${f.ok ? 'ok  ' : 'FAIL'} ${f.table.padEnd(34)} ${f.rule.padEnd(8)} ${String(f.before ?? '-').padStart(8)} -> ${String(f.after ?? '-').padStart(8)}  ${f.detail}`);
   }
@@ -563,13 +588,15 @@ async function gatePrivileges(q: Query, present: readonly string[], required: bo
 }
 
 async function gateDanglingReferences(
-  candidate: Query, old: Query, present: readonly string[], report: Report,
+  candidate: Query, old: Query, present: readonly string[], environment: Environment,
+  report: Report,
 ): Promise<void> {
   const lines: string[] = [];
   let fail = false;
   let fixups = 0;
   for (const t of PROMOTION_CONTRACT) {
     if (t.schema !== 'public' || !t.footballRefs) continue;
+    const withheld = historicalOnlyFor(t, environment);
     for (const ref of t.footballRefs) {
       if (!present.includes(t.name) || !present.includes(ref.references)) { lines.push(`${t.name}.${ref.column}: table absent`); continue; }
       const idsRows = await old(`SELECT DISTINCT ${ref.column} AS id FROM public.${t.name} WHERE ${ref.column} IS NOT NULL ORDER BY 1`);
@@ -581,6 +608,14 @@ async function gateDanglingReferences(
       const n = asInt(missing?.n);
       const label = `${t.name}.${ref.column} -> ${ref.references}: ${ids.length} distinct id(s) referenced, ${n} missing in the candidate`;
       if (n === 0) { lines.push(`ok   ${label}`); continue; }
+      // AFLDB-ISSUE-143: this table's rows are not reinstated in this environment, so a
+      // reference from them cannot dangle in the candidate. Narrow by construction — it is
+      // the declared table's own reference, and every other table is judged as before.
+      if (withheld) {
+        lines.push(`info ${label} — HISTORICAL-ONLY under --environment ${environment}: `
+          + `not reinstated, so this reference is never created (${withheld.decidedBy})`);
+        continue;
+      }
       if (t.treatment !== 'reinstate') { lines.push(`info ${label} (treatment '${t.treatment}', not reinstated)`); continue; }
       if (ref.nullable) {
         fixups += 1;
@@ -669,25 +704,43 @@ async function gateLineageIdentity(
 
   // 1. Read the referenced ids and their rows from the database being replaced.
   type Slot = { table: string; ref: LineageRef; target: LineageTarget;
+    /** AFLDB-ISSUE-143: set only where the contract withholds this table HERE. */
+    disposition?: HistoricalOnly;
+    totalRows: number; enumerated: boolean;
     rows: { rowId: number; oldValue: number }[] };
   const slots: Slot[] = [];
   for (const t of tables) {
+    const declared = historicalOnlyFor(t, environment);
     for (const { ref, target } of lineageTargetsOf(t)) {
+      // Column-exact, not table-level: the declaration must name THIS column. (The contract
+      // coherence check already requires it to name every one, so this can only agree — but
+      // the acceptance site should read the same rule `judgeLineage` applies.)
+      const disposition = declared?.columns.includes(ref.column) ? declared : undefined;
       const where = ref.kindColumn ? ` AND ${ref.kindColumn} = $1` : '';
       const params = ref.kindColumn ? [target.kind] : [];
+      const totalRows = asInt((await old(
+        `SELECT count(*)::int AS n FROM public.${t.name}
+          WHERE ${ref.column} IS NOT NULL${where}`, params))[0]?.n);
+      if (totalRows > LINEAGE_ROW_CAP) {
+        // The cap exists because a per-row remap is only honest while an operator can read
+        // it. A withheld table generates no remap at all, so the cap does not apply to it —
+        // its rows are still COUNTED and reported, just not enumerated.
+        if (!disposition) {
+          lines.push(`FAIL ${t.name}.${ref.column}: ${totalRows} rows exceed the ${LINEAGE_ROW_CAP}-row`
+            + ' per-row remap cap — the contract needs a set-based treatment for this table');
+          report.add('Lineage identity of reinstated id-keyed rows', 'FAIL', lines);
+          return;
+        }
+        slots.push({ table: t.name, ref, target, disposition, totalRows, enumerated: false, rows: [] });
+        continue;
+      }
       const rows = await old(
         `SELECT id::bigint AS row_id, ${ref.column}::bigint AS old_value
            FROM public.${t.name}
           WHERE ${ref.column} IS NOT NULL${where}
           ORDER BY id`, params);
-      if (rows.length > LINEAGE_ROW_CAP) {
-        lines.push(`FAIL ${t.name}.${ref.column}: ${rows.length} rows exceed the ${LINEAGE_ROW_CAP}-row`
-          + ' per-row remap cap — the contract needs a set-based treatment for this table');
-        report.add('Lineage identity of reinstated id-keyed rows', 'FAIL', lines);
-        return;
-      }
       slots.push({
-        table: t.name, ref, target,
+        table: t.name, ref, target, disposition, totalRows, enumerated: true,
         rows: rows.map((r) => ({ rowId: asInt(r.row_id), oldValue: asInt(r.old_value) })),
       });
     }
@@ -733,7 +786,8 @@ async function gateLineageIdentity(
   // 3. Resolve every declared column, per row.
   const plans: LineageColumnPlan[] = [];
   const remediationPrinted = new Set<string>();
-  let unresolvedTotal = 0;
+  const dispositionPrinted = new Set<string>();
+  const measured: { table: string; column: string; unresolved: number }[] = [];
   for (const slot of slots) {
     const referencedIds = [...new Set(slot.rows.map((r) => r.oldValue))];
     const rule = slot.target.identity;
@@ -752,11 +806,15 @@ async function gateLineageIdentity(
       kind: slot.target.kind, entity: slot.target.entity, rule,
       remediation: slot.ref.remediation, rows: slot.rows, remap,
     });
-    unresolvedTotal += remap.unresolved.length;
+    measured.push({ table: slot.table, column: slot.ref.column, unresolved: remap.unresolved.length });
     const scope = slot.ref.kindColumn ? ` (${slot.ref.kindColumn} = '${slot.target.kind}')` : '';
     const label = `${slot.table}.${slot.ref.column}${scope} -> ${slot.target.entity}`;
-    lines.push(`${remap.unresolved.length === 0 ? 'ok  ' : 'FAIL'} ${label}: `
-      + `${slot.rows.length} row(s), ${referencedIds.length} distinct id(s), `
+    // The status word is the CONTRACT's answer for this exact table and column, never a
+    // relaxation of the resolver: `hist` is only reachable through a declaration.
+    const status = remap.unresolved.length === 0 ? 'ok  ' : (slot.disposition ? 'hist' : 'FAIL');
+    lines.push(`${status} ${label}: `
+      + `${slot.totalRows} row(s)${slot.enumerated ? '' : ' (not enumerated: above the per-row cap)'}`
+      + `, ${referencedIds.length} distinct id(s), `
       + `${remap.mapped.length} evidenced by ${rule}, ${remap.unresolved.length} unresolved`
       + `${remap.merges.length ? `, ${remap.merges.length} merge(s)` : ''}`
       + `${remap.unchanged ? `, ${remap.unchanged} unchanged` : ''}`);
@@ -774,13 +832,39 @@ async function gateLineageIdentity(
     for (const m of remap.merges) {
       lines.push(`       MERGE ${slot.target.entity} ${m.oldIds.join(', ')} -> ${m.newId}`);
     }
-    // One remediation per column, not per polymorphic target: target_id has seven.
+    // One remediation per column, not per polymorphic target: target_id has seven. A
+    // withheld column prints its DECISION instead: the remediation asks for one, and it has
+    // already been made and written into the contract.
     const remediationKey = `${slot.table}.${slot.ref.column}`;
-    if (remap.unresolved.length > 0 && !remediationPrinted.has(remediationKey)) {
+    if (remap.unresolved.length > 0 && slot.disposition) {
+      if (!dispositionPrinted.has(slot.table)) {
+        dispositionPrinted.add(slot.table);
+        lines.push(`       INTENTIONALLY HISTORICAL-ONLY — ${slot.disposition.decidedBy}`);
+        lines.push(`       ${slot.disposition.summary}`);
+        for (const line of slot.disposition.reason.split('\n')) lines.push(`       ${line}`);
+        lines.push(`       The plan for --environment ${environment} therefore has NO pg_restore line for `
+          + `public.${slot.table}, and --phase candidate expects 0 rows in it. Nothing is deleted: `
+          + 'every row stays in the pre-cutover dump and the retained pre-rebuild database.');
+      }
+    } else if (remap.unresolved.length > 0 && !remediationPrinted.has(remediationKey)) {
       remediationPrinted.add(remediationKey);
       for (const line of slot.ref.remediation.split('\n')) lines.push(`       ${line}`);
     }
   }
+
+  // 4. The contract decides what is acceptable; this gate only reports it.
+  const judgement = judgeLineage({ environment, columns: measured });
+  for (const a of judgement.accepted) {
+    lines.push(`ACCEPTED ${a.table}.${a.column}: ${a.unresolved} unresolved id(s) accepted as `
+      + `historical-only — ${a.decidedBy}`);
+  }
+  for (const r of judgement.refused) {
+    lines.push(`REFUSED  ${r.table}.${r.column}: ${r.unresolved} unresolved id(s) with no `
+      + `historical-only declaration for --environment ${environment}`);
+  }
+  lines.push(`${judgement.acceptedTotal} unresolved id(s) accepted by contract, `
+    + `${judgement.refusedTotal} refused.`);
+  const unresolvedTotal = judgement.refusedTotal;
 
   if (remapOut) {
     if (existsSync(remapOut)) throw new PromotionRefused(`${remapOut} already exists; refusing to overwrite a remap.`);
@@ -821,7 +905,7 @@ export function writePlan(opts: Options): string[] {
   mkdirSync(dir, { recursive: true });
   const files = [
     ['promotion-truncate.sql', truncateSql()],
-    ['promotion-resync-identity.sql', resyncIdentitySql()],
+    ['promotion-resync-identity.sql', resyncIdentitySql(opts.environment)],
     ['promotion-audit-marker.sql', auditMarkerSql(input)],
     ['promotion-reinstate.sh', reinstatePlan(input)],
   ] as const;
@@ -866,6 +950,9 @@ async function openReadOnly(dsn: string, name: string): Promise<{ q: Query; end:
 
 async function main(): Promise<number> {
   const opts = parseArgs(process.argv.slice(2));
+  // AFLDB-ISSUE-143. Refuse before anything else if the contract's own invariants do not
+  // hold — in particular, a historical-only declaration that the plan would still reinstate.
+  assertContractCoherent();
 
   if (opts.checklist) { printChecklist(); return 0; }
   if (opts.plan) {
@@ -873,6 +960,18 @@ async function main(): Promise<number> {
     console.log(`AFLDB-ISSUE-125 promotion plan written for --environment ${opts.environment} `
       + '(nothing executed, no database contacted):');
     for (const path of written) console.log(`  ${path}`);
+    const withheld = historicalOnlyTables(opts.environment);
+    if (withheld.length > 0) {
+      console.log(`\nAFLDB-ISSUE-143 — ${withheld.length} table(s) are INTENTIONALLY NOT reinstated `
+        + `under --environment ${opts.environment}. They are truncated in the candidate, given no `
+        + 'pg_restore line, expected to read 0 rows at --phase candidate, and named in the '
+        + 'database.promoted marker. Every row survives in the pre-cutover dump and the retained '
+        + 'pre-rebuild database:');
+      for (const { table, disposition } of withheld) {
+        console.log(`  public.${table.name} — ${disposition.decidedBy}`);
+        console.log(`      ${disposition.summary}`);
+      }
+    }
     console.log('\nRead every file before running it. The .sh is a transcript to follow, not a script to pipe.');
     return 0;
   }
@@ -900,19 +999,19 @@ async function main(): Promise<number> {
       conn.q, present, phase, opts.environment, opts.allowFixtureIdentities, report);
     const superAdmins = await gateSuperAdmin(
       conn.q, present, phase, opts.environment, opts.expectSuperAdmin, report);
-    const counts = await gateInventory(conn.q, present, report);
+    const counts = await gateInventory(conn.q, present, opts.environment, report);
     await gatePrivileges(conn.q, present, phase === 'candidate' || phase === 'production', report);
 
     if (phase === 'restored') {
       old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
-      await gateDanglingReferences(conn.q, old.q, present, report);
+      await gateDanglingReferences(conn.q, old.q, present, opts.environment, report);
       await gateLineageIdentity(
         conn.q, old.q, present, opts.lineageRemapOut,
         opts.database!, opts.oldDatabase!, opts.environment, report);
     }
-    if (opts.compare) gateCompare(opts.compare, counts, report);
+    if (opts.compare) gateCompare(opts.compare, counts, opts.environment, report);
 
     if (opts.snapshot) {
       const snapshot: Snapshot = {
