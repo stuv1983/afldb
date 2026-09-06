@@ -411,7 +411,7 @@ DECLARE
     ['auth_users',             'SELECT, INSERT, UPDATE'],           -- 023
     ['auth_sessions',          'SELECT, INSERT, UPDATE'],           -- 023
     ['auth_audit_log',         'SELECT, INSERT'],                   -- 023
-    ['beta_access_codes',      'SELECT, INSERT, UPDATE'],           -- 023
+    ['beta_access_codes',      'SELECT, INSERT, UPDATE, DELETE'],   -- 023, 091
     ['beta_allowed_emails',    'SELECT, INSERT, UPDATE'],           -- 023
     ['beta_login_tokens',      'SELECT, INSERT, UPDATE'],           -- 023
     ['data_submissions',       'SELECT, INSERT, UPDATE'],           -- 023

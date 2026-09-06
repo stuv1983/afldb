@@ -8,6 +8,13 @@ session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
 **Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `-118`, `-137`.
+<!-- 2026-09-06 (`claude/issue-117`): this count line is NOT corrected here on purpose. It is
+     already stale on `main` (it omits `-138`, `-139`, `-140`, whose rows are in the table below),
+     and `AFLDB-ISSUE-142`'s synchronisation of it is UNCOMMITTED in the `main` working tree, where
+     it reads 6. Writing a fourth value on this branch would collide with that fix for no benefit.
+     `AFLDB-ISSUE-117` adds ONE open issue and its row is in the table below. At merge, take
+     ISSUE-142's corrected set and add `-117` to it. -->
+
 <!-- 2026-09-05: `-118` REOPENED (the 2026-09-05 closeout counted 28 valid Gridley criteria as acceptable because they were classified data_absent; acceptance is now zero unsupported valid criteria). Row restored below; 2 -> 3. -->
 <!-- 2026-09-05: `-118` Resolved and removed at the closeout; 3 -> 2 (superseded the same day by the reopen above). -->
 <!-- 2026-09-04: `-118` (Gridley compatibility corpus) restored to this table by its own branch; it was allocated 2026-08-31 on `opus/gridley-corpus` and never listed on `main`; 2 -> 3. -->
@@ -154,6 +161,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-138` | Low | Testing / Database privileges | **OPEN — found 2026-09-05 during ISSUE-118 §23.28.** `tests/integration/privileges.test.ts` ("afldb_import writes exactly the tables the registry allows") reports `external_grids` / `external_grid_axes` as writable-but-unregistered on every database since migration `080`, whose narrow `afldb_import` grants (SELECT + INSERT, UPDATE on `is_current`) are deliberate and outside the registry; reproduced hand-migrated and after a clean 18-stage rebuild, 34/35 pass. No privilege is wrong. | Extend the suite's exclusion list with the two tables and assert the 080 narrow shape (no DELETE/TRUNCATE), mirroring the `data_overrides` column-scoped case; no privilege change. |
 | `AFLDB-ISSUE-139` | High | Data integrity / Import architecture / Database (dev) | **OPEN — found 2026-09-06 during the ISSUE-118 DEV load.** `afldb_dev` is the pre-rebuild bootstrap database and has never been through the canonical rebuild: its AFL Tables profile identity register holds **12,472** rows against the accepted baseline's **13,271** players, so **891** `players` rows carry no `afltables_profile_url` identity (all eras, 1890s-1990s). Three ISSUE-118 loaders are fail-closed on that identity and therefore cannot run on DEV: `father_son.py` (2 missing profiles), `family_siblings.py` (40), `import_match_coaches.py` (29 of 368 coach pages). The only tracked writer of a complete register is `import_fitzroy_core.py` against a database whose players it created; the legacy register pass (`enrich_birth_dates.py`) is retired (needs `AFLDB_LEGACY_SQLITE` + a `legacy_player_id` nothing writes), and no supported tool converges an already-live database. DEV also lacks the accepted baseline bytes (`full-history-20260902`), so the coach loader refuses before the database. `after_siren.py` resolves by match participation, not identity, and **loaded cleanly on DEV 2026-09-06 (126 rows, reconcile 38/38)**. **Phase 1 done 2026-09-06 (read-only):** path (a) chosen and the supported contract established; two tooling blockers found — **P1-A** the promotion checker refuses `afldb_dev` / `afldb_dev_candidate_*` by name at 4 of 5 phases and at `--plan` (`tools/db/promotion-inventory.ts:424`), **P1-B** the migration-080 `external_grid*` trio is in neither classification set so the fail-closed classification gate refuses any database carrying it (production too). **Phase 2 done (operator inventory); the Phase 3 gate was BLOCKED on `AFLDB-ISSUE-141`, which is Resolved 2026-09-06 (implemented and verified, not yet committed) — Phase 3 passes once that work is merged.** Path (a) stays chosen and the DEV-only state is classified (preserve / reacquire / reproducible / discardable / uncertain) in the entry below, but the supported preservation plan cannot be generated or accepted for a DEV database, and the migration-080 Gridley corpus has no treatment at all — a plan generated today would silently drop it. No rebuild, candidate or swap may run until 141 lands. Options for the record: **(a)** rebuild-and-promote `afldb_dev` under the `AFLDB-ISSUE-125` contract (`afldb_dev` has no production-only state to reinstate, but it is a full replace and DEV-only state must be inventoried first); **(b)** build a tracked, evidenced profile-url -> existing-player reconciliation artefact (never name matching) and a fail-closed loader that registers it; or **(c)** accept DEV as a partial-coverage environment and record coaches / father-son / siblings as unavailable there. No name-based identity may be fabricated under any option. |
 | `AFLDB-ISSUE-140` | Medium | Data integrity / Import (current season) | **OPEN — found 2026-09-06 during the ISSUE-118 DEV load.** `afldb_dev` holds **17 duplicate 2026 `matches` rows** — the same fixture (date + both clubs) written twice under two `round_number`s one apart, e.g. `2026|23|2026-08-14|Fremantle|Adelaide` (id 17042, round 23, **0** `player_match_stats`) beside `2026|24|2026-08-14|Fremantle|Adelaide` (id 17060, round 24, 46 rows). 17 fixtures are duplicated (34 rows, rounds 23-25); all 17 stat-less copies sit under round 23 (9) and round 24 (8) and carry no `match_period_scores`. The populated copies use AFLDB's Opening-Round-inclusive numbering (week 23 = 2026-08-06, 24 = 08-14, 25 = 08-20); the stat-less copies are one lower, i.e. AFL Tables' own numbering. Consequence observed: the after-siren loader resolved `2026-vfl-afl-23-hawthorn-dylan-moore` to the empty round-23 Hawthorn v Collingwood row and left the kicker unresolved. Whether `afldb_prod` carries the same duplicates is **not measured** (production untouched). | Read-only: identify which writer produced the stat-less copies (fixture load vs AFL Tables settle) and whether the round-number convention differs between them; then measure production read-only. Repair is a separate authorised step; do not delete rows before the writer is identified. |
+| `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Retired beta access keys cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, and a **spent** key (`use_count >= max_uses`) is offered neither Revoke (shown only while `live`) nor Delete, so obsolete keys accumulate with no disposal path. Implemented 2026-08-31 on the unmerged branch `claude/issue-116` and **applied to `afldb_dev` from there as migration `079_access_code_delete.sql`**, which `main` has since taken for `079_nl_search_log_head_to_head_grain.sql`. **RECONCILED 2026-09-06 on `claude/issue-117`:** the migration is renumbered **091**, the obsolete `audit()`-with-optional-`tx` change is dropped in favour of `main`'s `auditInTransaction` (ISSUE-119), and DB-free validation is green (13/13 unit, `tsc --noEmit` exit 0, `eslint` exit 0). Deletable = **retired** (revoked OR spent); a partly-used or unlimited key is still refused because it remains redeemable, and expiry is deliberately excluded. The rule is a `WHERE` clause inside the DELETE, not a hidden button, and `access.code_deleted` is written on the deleting transaction so the row cannot outlive its trail. | **Awaiting the three DB-backed suites and merge.** Not resolved. Run `db:migrate:test` then `tests/integration/access-codes.test.ts` + `tests/integration/privileges.test.ts` against `afldb_test`, then merge. **Deploy order is load-bearing:** migration `091` and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. **`afldb_dev` keeps its orphan `079_access_code_delete.sql` ledger row** — applying `091` there is safe (GRANT is idempotent) but does NOT clear it, so `AFLDB-ISSUE-139`'s `pre-cutover` parity refusal stands exactly as `AFLDB-ISSUE-142` Finding C decided. Runbook: `issues/open/AFLDB-ISSUE-117.md`. |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -15231,3 +15239,185 @@ Branch, commit and merge the five changed files (`tools/db/promotion-inventory.t
 `AFLDB-ISSUE-139` Phase 4: rebuild `afldb_test`, restore into `afldb_dev_candidate_<stamp>`,
 and run every phase with `--environment dev` — settling `external_grids.import_batch_id` per
 `docs/production-promotion.md` §7.4b **before** the corpus's reinstate line.
+
+---
+
+## AFLDB-ISSUE-117 — Retired access keys cannot be removed from the admin UI
+
+- **Status:** Open — implemented and reconciled onto current `main`; DB-free validation green
+  2026-09-06; the three DB-backed suites and the merge remain
+- **Severity:** Medium
+- **Area:** Admin / Access management / Security
+- **Found:** 2026-08-31 (operator report)
+- **Branch:** `claude/issue-117` (worktree `D:\dev\afldb-issue-117`), cut from `main` @ `8dd96c5`.
+  Supersedes the original, unmerged `claude/issue-116` @ `2344ab5`, which stays as history.
+- **Files:** `src/db/migrations/091_access_code_delete.sql` (new);
+  `src/db/queries/access-codes.ts` (new — `deleteRetiredAccessCode`, `retirementReason`);
+  `src/app/admin/access/actions.ts` (`deleteAccessCode`);
+  `src/app/admin/access/AccessManager.tsx` (`DeleteCodeButton`);
+  `src/styles/globals.css`; `tools/maintenance/privileges.sql`;
+  `tests/admin-access-actions.test.ts` (new); `tests/integration/access-codes.test.ts` (new);
+  `tests/integration/privileges.test.ts`
+- **Related:** `AFLDB-ISSUE-027` (a required audit commits atomically with its mutation);
+  `AFLDB-ISSUE-119` (which built `auditInTransaction`, the mechanism this issue now uses);
+  `AFLDB-ISSUE-142` Finding C and `AFLDB-ISSUE-139` (the DEV migration-parity consequence)
+- **Runbook:** `issues/open/AFLDB-ISSUE-117.md`
+
+> **ID note.** The operator brief was written as "AFLDB-ISSUE-116" and the original branch is
+> `claude/issue-116`. `AFLDB-ISSUE-116` was already allocated to the `player_match_stats` Data QA
+> anchor, and `AFLDB-ISSUE-115`'s Resolution cites 116 as its follow-up, so renumbering that would
+> falsify a closed issue's history. This work took **117**.
+
+### Problem
+
+`/admin/access` can revoke an access key but never remove one. `revokeAccessCode` sets
+`beta_access_codes.revoked_at` and the row survives, which is correct — revocation disables a key
+immediately while keeping its record — but nothing then disposes of a key that is finished with.
+`src/app/admin/access/page.tsx` selects every code with no state filter, so retired rows accumulate
+permanently. A **spent** key is worse than untidy: the table offers Revoke only in the `live`
+state, so a spent key could be neither revoked nor deleted.
+
+### Investigation — what had to be true before adding any DELETE
+
+1. **No foreign key references `beta_access_codes`.** Every migration searched for
+   `REFERENCES beta_access_codes`: no hits. Deleting a row orphans nothing and needs no cascade.
+2. **Two soft references exist, and both are safe.** The redeem path mints a beta session whose
+   claim subject is `code:<id>`, but `hasBetaAccess()` and `src/middleware.ts` verify signature,
+   kind, expiry and epoch and **never look the id up** — so deleting a key ends no live session,
+   exactly as revoking one does not. `auth_audit_log` keeps `codeId`/`label` in its
+   `beta.code_redeemed` detail, so redemption history survives the row. `id` is
+   `GENERATED ALWAYS AS IDENTITY`, so a freed id is never reissued.
+3. **`afldb_auth` held no DELETE on the table** (023 granted `SELECT, INSERT, UPDATE`), so the
+   feature would have failed closed in production on a permission error while passing every test
+   that did not connect as that role.
+4. **`privileges.sql`'s `afldb_auth` section is subtractive**, so a grant made only by a migration
+   is revoked by the next reconcile or restore. Both files had to change.
+
+### Fix
+
+- **Migration 091** grants `afldb_auth` `DELETE` on `beta_access_codes` and nothing else, under the
+  usual `IF EXISTS (afldb_auth)` role guard. Precedent: `data_submission_rows` (023),
+  `site_media` (037).
+- **`tools/maintenance/privileges.sql`** specifies `SELECT, INSERT, UPDATE, DELETE`, so the
+  reconciler preserves the grant instead of revoking it.
+- **`deleteRetiredAccessCode`** holds the one destructive statement, with the eligibility rule in
+  its `WHERE` clause: `revoked_at IS NOT NULL OR (max_uses IS NOT NULL AND use_count >= max_uses)`.
+  A forged POST naming a still-redeemable key matches no row and deletes nothing.
+- **`deleteAccessCode`** calls `requireAdmin()` first, then runs the delete and its
+  `access.code_deleted` audit inside one `authSql.begin`, so an audit failure aborts the deletion.
+  Detail carries `codeId`, `label`, `reason`, `useCount`, `maxUses` — what was destroyed and which
+  rule allowed it — and no secret, since only the sha256 was ever stored and it leaves with the
+  row. "Not retired", "never existed" and "already deleted" return one message, so the endpoint is
+  not an oracle for which ids exist.
+- **UI.** A revoked **or spent** row offers **Delete…**, which opens an in-row confirmation naming
+  the key and its state before anything submits. Revoke's semantics and visibility are untouched.
+
+### The rule, and why widening it was safe
+
+Every limb of the predicate is a reason `redeemBetaCode` would refuse the code — it redeems only
+when `revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now()) AND (max_uses IS NULL OR
+use_count < max_uses)`. "Revoked or spent" is therefore a **strict subset of "not redeemable"**: no
+key that could still admit somebody became deletable. A **partly used** key stays refused (two of
+five uses spent still leaves three admissions) and an **unlimited** key is never spent
+(`max_uses IS NULL` makes the comparison NULL, not true) — the case only real PostgreSQL
+three-valued logic settles. An **expired** key is deliberately still not deletable: expiry is a
+moving line that passes on its own, with nobody deciding anything, and deletion is irreversible.
+Consequence, unchanged and deliberate: an expired unspent key is offered neither control.
+
+### Reconciliation onto current `main` (2026-09-06)
+
+The 2026-08-31 implementation could not merge as written. Two things were wrong with it *relative
+to `main`*, and neither is a defect in the original work:
+
+1. **Migration number.** It was `079_access_code_delete.sql`; `main` has since taken `079` for
+   `079_nl_search_log_head_to_head_grain.sql`, which is applied everywhere including production.
+   Renumbered to **`091`** — confirmed free by unioning `src/db/migrations` across **every local
+   and remote ref** and across **every sibling worktree** (the uncommitted case that once hid
+   ISSUE-122's `083`); both scans stop at `090`. The SQL is byte-unchanged apart from the header
+   and a numbering note. References updated in `privileges.sql` (`-- 023, 091`),
+   `tests/integration/privileges.test.ts` and `access-codes.ts`.
+2. **`src/lib/auth/session.ts` is superseded and was DROPPED.** The original gave `audit()` an
+   optional 4th transaction argument. `AFLDB-ISSUE-119` §8/§9 has since refactored the same file
+   into a shared `insertAuditRow(sql: postgres.ISql, …)` behind two exported forms —
+   `audit(action, detail, actor)` on the pool and `auditInTransaction(tx, action, detail, actor)`
+   on a caller's handle — reaching the identical `postgres.ISql` conclusion the ISSUE-117
+   typecheck failure had reached. `deleteAccessCode` now calls `auditInTransaction`, so **no change
+   to `session.ts` is required at all** and the atomicity guarantee is unchanged. The unit suite
+   was adapted accordingly and additionally asserts that the pooled `audit()` is *not* used on the
+   delete path, since substituting it would silently drop the guarantee.
+
+Everything else applied unchanged: `main` still holds `AccessManager.tsx`, `actions.ts`,
+`globals.css`, `privileges.sql` and `privileges.test.ts` at the shape the original branch diffed
+against.
+
+### Validation
+
+**2026-09-06, `D:\dev\afldb-issue-117`, DB-free — all green:**
+
+| Command | Result |
+|---|---|
+| `npx vitest run tests/admin-access-actions.test.ts` | **PASS — 13/13**, 0 failures, 0 skips |
+| `npx tsc --noEmit` | **PASS — exit 0**, repo-wide |
+| `npx eslint` on the six touched TypeScript files | **PASS — exit 0** |
+
+**DB-backed, operator-run 2026-09-06 after `npm run db:migrate:test` applied `091`:**
+`tests/integration/access-codes.test.ts` **PASSED 8/8**.
+
+`tests/integration/privileges.test.ts` does **not** reach the 30/30 the original branch recorded on
+2026-08-31, and the shortfall is **not** this issue's: `writes exactly the tables the registry
+allows, and no others` fails on `external_grids` / `external_grid_axes` as `WRITABLE BUT NOT
+REGISTERED`. That is **`AFLDB-ISSUE-138`**, open since 2026-09-05. Determined 2026-09-06 by
+inspection, changing nothing: migration `080` **intentionally** withholds registration and
+hand-grants `SELECT, INSERT` (+ column-scoped `UPDATE (is_current)` on `external_grids`), because
+`grant_import_write()` would hand out UPDATE/DELETE/TRUNCATE and `privileges.sql` regenerates that
+set from the registry on every reconcile — so registering the corpus would destroy its immutability
+and a hand-written `REVOKE` would be silently undone. `tools/maintenance/privileges.sql:360-371`
+re-grants exactly the migration's set, so the shape is stable and correct. The stale component is
+the **test's** table-level INSERT probe, whose exception list (`data_edits`,
+`player_link_resolutions`, `canonical_applications`) was never extended to migration 080's fifth,
+deliberate exception class. The grants are intended; no ISSUE-117 change follows from it.
+
+The ISSUE-117 assertion in that same file is a **different** case — `afldb_auth is confined to the
+operational tables`, now carrying `('beta_access_codes', 'DELETE')` — and must pass; the ISSUE-138
+failure must be present both before and after this branch.
+
+### Consequence for `afldb_dev` and AFLDB-ISSUE-139 — the orphan ledger row survives
+
+`afldb_dev` has `079_access_code_delete.sql` **applied**, from the original branch. Renumbering
+does not and cannot remove that row, so the arithmetic after this merge is:
+
+- `tools/db/migrate.ts:192` computes pending as *files not in the ledger*, so an applied row with
+  no file is ignored. **`afldb_dev` can safely be migrated forward**, and applying `091` there is
+  additionally safe because `GRANT` is idempotent — the grant is already present.
+- `tools/db/promotion-check.ts:366` computes `unknown` as *applied names not in files*, and any
+  non-empty `unknown` FAILS the gate. After applying `091`, `afldb_dev` would hold 92 applied rows
+  against 91 files and still report `UNKNOWN 079_access_code_delete.sql`.
+
+**So merging this issue does NOT clear ISSUE-139's `pre-cutover` parity refusal**, and nothing in
+this issue tries to. That refusal is truthful and stays exactly as `AFLDB-ISSUE-142` Finding C
+decided it: the checker is not weakened, no ledger row is edited or deleted, and **the promotion
+itself is the reconciliation** — the candidate is built from the checkout's migrations, so
+`restored`, `candidate` and `production` all read parity clean and the orphan row is gone at the
+swap. What this issue does change for ISSUE-139 is that the candidate will now be built *with* the
+grant: before this merge, `privileges.sql` lacked the DELETE, so a promotion would have silently
+revoked a grant `afldb_dev` depends on.
+
+Three things could clear the orphan row, and **none is taken here**: the promotion (decided,
+above); an operator-approved direct ledger `DELETE`, which the brief for this work forbids; or a
+tracked forward reconciliation migration carrying a guarded delete of that one row (a no-op on
+`afldb_test` and production, where it never existed). The third is not defined anywhere in the
+repository today and would be a new, operator-approved mechanism, not an improvisation.
+
+### Next action
+
+1. Operator: `npm run db:migrate:test` (applies `091`), then the two integration suites above.
+2. Merge `claude/issue-117` into `main`. Expect text conflicts in `CHANGELOG.md`, `issues.md` and
+   `IssuesIndex.md` against the uncommitted `AFLDB-ISSUE-142` work in the `main` working tree; the
+   code files do not overlap.
+3. Deploy in this order — **load-bearing**: migration `091`, then `privileges.sql`
+   (`npm run db:privileges`), then the application code. Reversed, every Delete fails closed on a
+   permission error and the audit records nothing, because the transaction aborts before the INSERT.
+4. Manual dev check on `/admin/access`, all four states: spent deletes directly; revoked deletes;
+   active-unused offers Revoke only; partly-used offers Revoke only. This is the one piece of
+   evidence the original branch never captured for the spent-key widening.
+5. Only then resolve.
