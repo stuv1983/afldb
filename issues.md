@@ -7,7 +7,12 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-143`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`.
+
+<!-- 2026-09-06 (ISSUE-143 closeout): `-143` Resolved (the historical-only / recorded-gap promotion
+     disposition is implemented and validated); removed from this count and from the Open Issues
+     table, its number stays allocated, and it claims **NO migration number**. 8 -> 7 open. Next
+     free issue ID is `AFLDB-ISSUE-144`. -->
 
 <!-- 2026-09-06 (ISSUE-142): synchronised with `IssuesIndex.md`; the merged ISSUE-117/142 state now lists seven open issues. This line still read "3 tracked here — -110, -118, -137": `-118` was
      Resolved on 2026-09-06 (§23.38) and `-138`, `-139`, `-140`, `-142` were allocated after it was last
@@ -156,11 +161,24 @@ created, reopened, resolved, or materially reclassified.
      (ISSUE-137 sequencing), International Rules scope, `AFLDB-ISSUE-138`. -->
 | `AFLDB-ISSUE-137` | High | Data integrity / Operations / Database (production) | Production `afldb_prod` still holds the four canonical player splits that `AFLDB-ISSUE-136` fixed at rebuild time: Charlie Cameron, Jack Graham, Jack Ross and Jack Williams each exist as a career player and a 2025-only duplicate keyed on the renumbered AFL Tables url (`Charlie_Cameron3`, `Jack_Graham2`, `Jack_Ross3`, `Jack_Williams3`), with the duplicates carrying their 2025 `player_match_stats`, the awards-census rows keyed on the live urls, and every 2026 settle row. The fixed importer HALTs (`external-identity split`) against such a database by design, so production cannot be repaired by re-running it. Allocated 2026-09-04 at ISSUE-136 closeout; **not started; no production mutation authorised yet.** | Operator chooses the repair path: (a) the canonical rebuild-and-promote path (`AFLDB-ISSUE-125` governs preserving production-only state), or (b) a supervised identity reconciliation that re-points each renumbered identity, its `player_match_stats`, award rows and settle-written rows to the career player and retires the duplicate, verified with the ISSUE-136 runbook §10.3 / §13.4 SQL. Until then every 2026 settle keeps writing the four players' rows to the duplicates. |
 | `AFLDB-ISSUE-138` | Low | Testing / Database privileges | **OPEN — found 2026-09-05 during ISSUE-118 §23.28.** `tests/integration/privileges.test.ts` ("afldb_import writes exactly the tables the registry allows") reports `external_grids` / `external_grid_axes` as writable-but-unregistered on every database since migration `080`, whose narrow `afldb_import` grants (SELECT + INSERT, UPDATE on `is_current`) are deliberate and outside the registry; reproduced hand-migrated and after a clean 18-stage rebuild, 34/35 pass. No privilege is wrong. | Extend the suite's exclusion list with the two tables and assert the 080 narrow shape (no DELETE/TRUNCATE), mirroring the `data_overrides` column-scoped case; no privilege change. |
-| `AFLDB-ISSUE-139` | High | Data integrity / Import architecture / Database (dev) | **OPEN — Phase 4C′ done 2026-09-06 on merged `main` `59250a6` (`claude/issue-139`, read-only) and STOPPED at the §7.4c decision boundary: `db:promotion:check --environment dev` now **PASSES** `source` on `afldb_test` (7 gates) and refuses `pre-cutover` on `afldb_dev` on migration parity only (`UNKNOWN 079_access_code_delete.sql` + `PENDING 091`, both truthful). Lineage measured read-only: 42 lineage-bound player ids, 33 evidenced by profile url and present in the rebuilt lineage, 9 with no identity (Rendell 1347, six 1897–1900 players in `data_edits`, two 2026 debutants); `player_link_resolutions.target_id` 94/94 unresolvable by contract; `data_edits` 8 match rows unresolvable now (2 matches already deleted on DEV, 1 current-season). **Finding D:** the `restored` gate FAILs on any unresolved row and nothing in the checker/plan can express either §7.4c answer → `AFLDB-ISSUE-143`. `afldb_test` is the proven ISSUE-118 rebuild + 091 with unchanged inputs and no other session, so re-running 4D is optional (D0). Operator decisions D0 (source reuse vs rebuild), D1 (`player_link_resolutions` option 1/2), D2 (`data_edits` option 1/2), D3 (resolve 143) required before Phase 4E. §7.4b settled: option 1 (batches 82/84, `gridley` 80→7).** Earlier: found 2026-09-06 during the ISSUE-118 DEV load. `afldb_dev` is the pre-rebuild bootstrap database and has never been through the canonical rebuild: its AFL Tables profile identity register holds **12,472** rows against the accepted baseline's **13,271** players, so **891** `players` rows carry no `afltables_profile_url` identity (all eras, 1890s-1990s). Three ISSUE-118 loaders are fail-closed on that identity and therefore cannot run on DEV: `father_son.py` (2 missing profiles), `family_siblings.py` (40), `import_match_coaches.py` (29 of 368 coach pages). The only tracked writer of a complete register is `import_fitzroy_core.py` against a database whose players it created; the legacy register pass (`enrich_birth_dates.py`) is retired (needs `AFLDB_LEGACY_SQLITE` + a `legacy_player_id` nothing writes), and no supported tool converges an already-live database. DEV also lacks the accepted baseline bytes (`full-history-20260902`), so the coach loader refuses before the database. `after_siren.py` resolves by match participation, not identity, and **loaded cleanly on DEV 2026-09-06 (126 rows, reconcile 38/38)**. **Phase 1 done 2026-09-06 (read-only):** path (a) chosen and the supported contract established; two tooling blockers found — **P1-A** the promotion checker refuses `afldb_dev` / `afldb_dev_candidate_*` by name at 4 of 5 phases and at `--plan` (`tools/db/promotion-inventory.ts:424`), **P1-B** the migration-080 `external_grid*` trio is in neither classification set so the fail-closed classification gate refuses any database carrying it (production too). **Phase 2 done (operator inventory); the Phase 3 gate was BLOCKED on `AFLDB-ISSUE-141`, which is Resolved 2026-09-06 (implemented and verified, not yet committed) — Phase 3 passes once that work is merged.** Path (a) stays chosen and the DEV-only state is classified (preserve / reacquire / reproducible / discardable / uncertain) in the entry below, but the supported preservation plan cannot be generated or accepted for a DEV database, and the migration-080 Gridley corpus has no treatment at all — a plan generated today would silently drop it. No rebuild, candidate or swap may run until 141 lands. Options for the record: **(a)** rebuild-and-promote `afldb_dev` under the `AFLDB-ISSUE-125` contract (`afldb_dev` has no production-only state to reinstate, but it is a full replace and DEV-only state must be inventoried first); **(b)** build a tracked, evidenced profile-url -> existing-player reconciliation artefact (never name matching) and a fail-closed loader that registers it; or **(c)** accept DEV as a partial-coverage environment and record coaches / father-son / siblings as unavailable there. No name-based identity may be fabricated under any option. |
+| `AFLDB-ISSUE-139` | High | Data integrity / Import architecture / Database (dev) | **OPEN — Phase 4C′ done 2026-09-06 on merged `main` `59250a6` (`claude/issue-139`, read-only) and STOPPED at the §7.4c decision boundary: `db:promotion:check --environment dev` now **PASSES** `source` on `afldb_test` (7 gates) and refuses `pre-cutover` on `afldb_dev` on migration parity only (`UNKNOWN 079_access_code_delete.sql` + `PENDING 091`, both truthful). Lineage measured read-only: 42 lineage-bound player ids, 33 evidenced by profile url and present in the rebuilt lineage, 9 with no identity (Rendell 1347, six 1897–1900 players in `data_edits`, two 2026 debutants); `player_link_resolutions.target_id` 94/94 unresolvable by contract; `data_edits` 8 match rows unresolvable now (2 matches already deleted on DEV, 1 current-season). **Finding D:** the `restored` gate FAILed on any unresolved row and nothing in the checker/plan could express either §7.4c answer → `AFLDB-ISSUE-143`. **CLEARED 2026-09-06:** D0 = reuse `afldb_test` (no rebuild); D1 and D2 = §7.4c **option 2** (historical-only / recorded gap) for `player_link_resolutions` and `data_edits`; D3 = `AFLDB-ISSUE-143`, **Resolved** on `claude/issue-143` (unmerged) — both tables now declared `historicalOnly` for `--environment dev`, so the plan omits their `pg_restore` lines, `restored` reports them as accepted `hist` and `candidate` expects 0 rows. **Phase 4E is unblocked and has not started.** §7.4b settled: option 1 (batches 82/84, `gridley` 80→7).** Earlier: found 2026-09-06 during the ISSUE-118 DEV load. `afldb_dev` is the pre-rebuild bootstrap database and has never been through the canonical rebuild: its AFL Tables profile identity register holds **12,472** rows against the accepted baseline's **13,271** players, so **891** `players` rows carry no `afltables_profile_url` identity (all eras, 1890s-1990s). Three ISSUE-118 loaders are fail-closed on that identity and therefore cannot run on DEV: `father_son.py` (2 missing profiles), `family_siblings.py` (40), `import_match_coaches.py` (29 of 368 coach pages). The only tracked writer of a complete register is `import_fitzroy_core.py` against a database whose players it created; the legacy register pass (`enrich_birth_dates.py`) is retired (needs `AFLDB_LEGACY_SQLITE` + a `legacy_player_id` nothing writes), and no supported tool converges an already-live database. DEV also lacks the accepted baseline bytes (`full-history-20260902`), so the coach loader refuses before the database. `after_siren.py` resolves by match participation, not identity, and **loaded cleanly on DEV 2026-09-06 (126 rows, reconcile 38/38)**. **Phase 1 done 2026-09-06 (read-only):** path (a) chosen and the supported contract established; two tooling blockers found — **P1-A** the promotion checker refuses `afldb_dev` / `afldb_dev_candidate_*` by name at 4 of 5 phases and at `--plan` (`tools/db/promotion-inventory.ts:424`), **P1-B** the migration-080 `external_grid*` trio is in neither classification set so the fail-closed classification gate refuses any database carrying it (production too). **Phase 2 done (operator inventory); the Phase 3 gate was BLOCKED on `AFLDB-ISSUE-141`, which is Resolved 2026-09-06 (implemented and verified, not yet committed) — Phase 3 passes once that work is merged.** Path (a) stays chosen and the DEV-only state is classified (preserve / reacquire / reproducible / discardable / uncertain) in the entry below, but the supported preservation plan cannot be generated or accepted for a DEV database, and the migration-080 Gridley corpus has no treatment at all — a plan generated today would silently drop it. No rebuild, candidate or swap may run until 141 lands. Options for the record: **(a)** rebuild-and-promote `afldb_dev` under the `AFLDB-ISSUE-125` contract (`afldb_dev` has no production-only state to reinstate, but it is a full replace and DEV-only state must be inventoried first); **(b)** build a tracked, evidenced profile-url -> existing-player reconciliation artefact (never name matching) and a fail-closed loader that registers it; or **(c)** accept DEV as a partial-coverage environment and record coaches / father-son / siblings as unavailable there. No name-based identity may be fabricated under any option. |
 | `AFLDB-ISSUE-140` | Medium | Data integrity / Import (current season) | **OPEN — found 2026-09-06 during the ISSUE-118 DEV load.** `afldb_dev` holds **17 duplicate 2026 `matches` rows** — the same fixture (date + both clubs) written twice under two `round_number`s one apart, e.g. `2026|23|2026-08-14|Fremantle|Adelaide` (id 17042, round 23, **0** `player_match_stats`) beside `2026|24|2026-08-14|Fremantle|Adelaide` (id 17060, round 24, 46 rows). 17 fixtures are duplicated (34 rows, rounds 23-25); all 17 stat-less copies sit under round 23 (9) and round 24 (8) and carry no `match_period_scores`. The populated copies use AFLDB's Opening-Round-inclusive numbering (week 23 = 2026-08-06, 24 = 08-14, 25 = 08-20); the stat-less copies are one lower, i.e. AFL Tables' own numbering. Consequence observed: the after-siren loader resolved `2026-vfl-afl-23-hawthorn-dylan-moore` to the empty round-23 Hawthorn v Collingwood row and left the kicker unresolved. Whether `afldb_prod` carries the same duplicates is **not measured** (production untouched). | Read-only: identify which writer produced the stat-less copies (fixture load vs AFL Tables settle) and whether the round-number convention differs between them; then measure production read-only. Repair is a separate authorised step; do not delete rows before the writer is identified. |
 | `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Retired beta access keys cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, and a **spent** key (`use_count >= max_uses`) is offered neither Revoke (shown only while `live`) nor Delete, so obsolete keys accumulate with no disposal path. Implemented 2026-08-31 on the unmerged branch `claude/issue-116` and **applied to `afldb_dev` from there as migration `079_access_code_delete.sql`**, which `main` has since taken for `079_nl_search_log_head_to_head_grain.sql`. **RECONCILED 2026-09-06 on `claude/issue-117`:** the migration is renumbered **091**, the obsolete `audit()`-with-optional-`tx` change is dropped in favour of `main`'s `auditInTransaction` (ISSUE-119), and DB-free validation is green (13/13 unit, `tsc --noEmit` exit 0, `eslint` exit 0). Deletable = **retired** (revoked OR spent); a partly-used or unlimited key is still refused because it remains redeemable, and expiry is deliberately excluded. The rule is a `WHERE` clause inside the DELETE, not a hidden button, and `access.code_deleted` is written on the deleting transaction so the row cannot outlive its trail. | **Awaiting the three DB-backed suites and merge.** Not resolved. Run `db:migrate:test` then `tests/integration/access-codes.test.ts` + `tests/integration/privileges.test.ts` against `afldb_test`, then merge. **Deploy order is load-bearing:** migration `091` and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. **`afldb_dev` keeps its orphan `079_access_code_delete.sql` ledger row** — applying `091` there is safe (GRANT is idempotent) but does NOT clear it, so `AFLDB-ISSUE-139`'s `pre-cutover` parity refusal stands exactly as `AFLDB-ISSUE-142` Finding C decided. Runbook: `issues/open/AFLDB-ISSUE-117.md`. |
 | `AFLDB-ISSUE-142` | High | Operations / Database tooling / Data integrity | **OPEN — IMPLEMENTED 2026-09-06, AWAITING VALIDATION. Uncommitted in the `main` working tree; no migration, no privilege change, no database contacted.** (A) `player_match_period_stats` (migration 062) was in neither `afldb_meta.import_writable_tables` nor `publicContractTables()` — the only such table any migration creates — so the fail-closed gate refused every phase on every real database. Decided **in the contract** as `rebuilt` / `compare: zero`, NOT registered import-writable: `grant_import_write()` registers and grants in one statement, so a registry row would hand `afldb_import` UPDATE/DELETE/TRUNCATE for a writer that does not exist (nothing writes it; the NL read paths are refused upstream by `plan.ts:1054`; 0 rows everywhere). The suite now derives the registry from the migrations and runs the real classifier, so a future 062-shaped migration fails at test time. (B) A `restored`-phase lineage gate proves identity instead of existence — AFL Tables profile url for players, `matches.match_key` for matches — PASSES silently on a same-lineage (production) promotion, and REFUSES anything unevidenced; `--lineage-remap-out` writes the evidenced per-row remap. `player_link_resolutions.target_id` is declared identity `none` (no external key exists for an honours row), so a DEV promotion is refused with the two supportable answers printed (§7.4c). (C) `079_access_code_delete.sql` is committed only on `claude/issue-116` @ `2344ab5`, exists in no checkout, and cannot merge at 079 (`main` owns a different file there): the DEV parity refusal is truthful, the checker is not weakened, and the promotion itself is the reconciliation. | Run the validation in the entry (focused suite, typecheck, lint, then `--environment dev --phase source --database afldb_test` → PASS and `--phase pre-cutover --database afldb_dev --allow-fixture-identities` → refused on migration parity only), then commit/merge. Unblocks `AFLDB-ISSUE-139` Phase 4D and `AFLDB-ISSUE-137` path (a). |
+<!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-143` is **Resolved** and is NO LONGER an open issue. The
+     historical-only / recorded-gap disposition is implemented and validated (73/73 DB-free,
+     typecheck and lint clean, DEV `source` PASS and `pre-cutover` at its recorded parity-only
+     refusal, both read-only). `AFLDB-ISSUE-139` Phase 4E is unblocked. Authoritative record: the
+     `AFLDB-ISSUE-143` entry in this file (Resolution — 2026-09-06). The pre-resolution row below
+     is lineage only and its "OPEN" / "Design and implement" text is SUPERSEDED.
 | `AFLDB-ISSUE-143` | High | Operations / Database tooling / Data integrity | **OPEN — found 2026-09-06 during `AFLDB-ISSUE-139` Phase 4C′ (read-only; no code changed).** `docs/production-promotion.md` §7.4c and the contract's own remediation text document two supportable treatments for lineage-unresolvable ledger rows (reinstate as a historical, not-live ledger; or do not reinstate and record the gap) and a deferred current-season `data_edits` remap after the settle — but nothing can execute them: `gateLineageIdentity` (`tools/db/promotion-check.ts`) FAILs on any unresolved row, identity `none` makes every `player_link_resolutions.target_id` row unresolved by construction (`resolveLineageRemap`, `tools/db/promotion-inventory.ts:646`), the generated reinstate plan cannot omit a table, the gate reads the old database so skipping a restore line changes nothing, and `--phase candidate --compare` (`compare: equal`) would refuse the omitted table. So a DEV promotion (a real lineage change) can never pass `restored` under either documented answer. Measured on `afldb_dev`: `target_id` 94/94, `player_id` 3/36, `data_edits` players 7/7 ids and matches 8/8 rows unresolved. Production is unaffected (same lineage, gate PASSES). | Design and implement a declared, explicitly flagged, audit-marked per-table lineage disposition (`historical` / `gap`, and a deferred current-season remap) honoured by the `restored` gate, the plan's reinstate list, the `database.promoted` marker and the `candidate` compare — fail-closed by default, refused under `--environment prod` unless the same evidence applies. Fresh worktree at Fable High / Opus High. Blocks `AFLDB-ISSUE-139` Phase 4E. |
+-->
+
+<!-- Open issues continue. The header is repeated because the retired ISSUE-143 row above
+     interrupts the table. -->
+
+| Issue | Severity | Area | Current state |
+|---|---|---|---|
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -14841,7 +14859,7 @@ Extend the suite's exclusion list with the two tables and add a narrow-shape ass
 
 ## AFLDB-ISSUE-139 — `afldb_dev` cannot be converged onto the canonical AFL Tables identity layer
 
-- **Status:** Open — found 2026-09-06 while executing the `AFLDB-ISSUE-118` follow-up DEV load. **Phases 1–3 done; Phase 4A–4C done 2026-09-06 (read-only); Phase 4C′ re-gate done 2026-09-06 on merged `main` `59250a6` (`claude/issue-139`, read-only) and STOPPED at the §7.4c decision boundary:** `source` on `afldb_test` **PASSES** (7 gates), `pre-cutover` on `afldb_dev` refuses on migration parity only (`UNKNOWN 079` + `PENDING 091`, both truthful), and the `restored` phase **cannot pass on DEV under either §7.4c answer** because the checker/plan has no supported way to express the chosen disposition (`AFLDB-ISSUE-143`, Finding D). Operator decisions D0–D3 below are required before Phase 4E. Earlier 4C findings stand: the promotion checker refuses `source` and `pre-cutover` on unclassified `player_match_period_stats` (`AFLDB-ISSUE-142` A), DEV's ledger carries the unmerged `079_access_code_delete.sql`, and id-keyed ledgers are in the bootstrap id space (`AFLDB-ISSUE-142` B). §7.4b settled: option 1. No rebuild, candidate, dump or swap has run; no convergence write was attempted.
+- **Status:** Open — found 2026-09-06 while executing the `AFLDB-ISSUE-118` follow-up DEV load. **Phases 1–3 done; Phase 4A–4C done 2026-09-06 (read-only); Phase 4C′ re-gate done 2026-09-06 on merged `main` `59250a6` (`claude/issue-139`, read-only) and STOPPED at the §7.4c decision boundary:** `source` on `afldb_test` **PASSES** (7 gates), `pre-cutover` on `afldb_dev` refuses on migration parity only (`UNKNOWN 079` + `PENDING 091`, both truthful), and the `restored` phase **could not pass on DEV under either §7.4c answer** because the checker/plan had no supported way to express the chosen disposition (Finding D). **Cleared 2026-09-06:** the operator recorded D0–D3 below and `AFLDB-ISSUE-143` is **Resolved** — `docs/production-promotion.md` §7.4d's historical-only / recorded-gap disposition is now executable, `player_link_resolutions` and `data_edits` are declared for `--environment dev`, and Phase 4E is unblocked (nothing of 4E has been executed). Earlier 4C findings stand: the promotion checker refuses `source` and `pre-cutover` on unclassified `player_match_period_stats` (`AFLDB-ISSUE-142` A), DEV's ledger carries the unmerged `079_access_code_delete.sql`, and id-keyed ledgers are in the bootstrap id space (`AFLDB-ISSUE-142` B). §7.4b settled: option 1. No rebuild, candidate, dump or swap has run; no convergence write was attempted.
 - **Severity:** High — three ISSUE-118 canonical domains (coaches, father-son, siblings) cannot exist on `afldb_dev` at all, and any future loader that resolves by AFL Tables profile url inherits the same wall.
 - **Area:** Data integrity / Import architecture / Database (dev)
 - **Found:** 2026-09-06
@@ -15176,7 +15194,14 @@ remap at any time. This is a bounded promotion-tooling gap of exactly the ISSUE-
 semantics exist, the executable path does not — and it is not decided by either of those issues. Tracked as
 **`AFLDB-ISSUE-143`**. No checker was weakened, no ledger row was edited, no row was discarded.
 
-**Decisions required before Phase 4E (the STOP boundary of this session):**
+**Decisions required before Phase 4E — ALL RECORDED BY THE OPERATOR 2026-09-06.** D0 = reuse the current `afldb_test`,
+no rebuild. D1 = §7.4c **option 2** for `player_link_resolutions` (historical evidence only; no `target_id` mapping by
+name, by integer-id existence or by guessed honours equivalence). D2 = the **same** historical-only / recorded-gap
+treatment for `data_edits`, with the one current-season row part of the gap rather than a pending remap, so it cannot
+weaken the pre-swap gate. D3 = `AFLDB-ISSUE-143`, **Resolved 2026-09-06**: both tables are declared `historicalOnly`
+for `--environment dev` in `tools/db/promotion-inventory.ts`, the `restored` gate reports them as accepted `hist` with
+every count and reason, the generated plan omits their `pg_restore` lines, `--phase candidate` expects 0 rows, and the
+`database.promoted` marker records the gap. The original option statements are kept below as the decision's lineage:
 
 * **D0 — source database.** Reuse the current `afldb_test` as the rebuilt source (recommended: it is the proven ISSUE-118
   final rebuild plus 091, `source` PASSES, rebuild inputs are unchanged, nothing else holds it, and the candidate's
@@ -15197,23 +15222,38 @@ semantics exist, the executable path does not — and it is not decided by eithe
   the `candidate` compare) before 4E can start. Fresh worktree, **Fable High or Opus High** — it is a semantic tooling
   design, not a runbook step.
 
-### Exact next action (Phase 4C′, 2026-09-06)
+### Exact next action (Phase 4E, unblocked 2026-09-06)
 
-1. Operator records D0, D1 and D2 in this entry (the §7.4b option-1 decision is the model).
-2. Resolve `AFLDB-ISSUE-143` (D3) on its own worktree and merge; re-run
-   `npm run db:promotion:check -- --environment dev --phase source --database afldb_test` (expect PASS) afterwards.
+1. ~~Operator records D0, D1 and D2~~ — **done 2026-09-06**, recorded above.
+2. ~~Resolve `AFLDB-ISSUE-143` (D3)~~ — **done 2026-09-06** on branch `claude/issue-143`
+   (worktree `D:\dev\afldb-issue-143`), not merged. **Merge it first**, then re-run the source gate on the merged
+   checkout — this is the exact command Phase 4E resumes on:
+
+   ```bash
+   npm run db:promotion:check -- --environment dev --phase source --database afldb_test
+   ```
+
+   Expect `PROMOTION CHECK (dev/source): PASS — 7 gate(s) evaluated, none failed`, with `data_edits` and
+   `player_link_resolutions` shown in the inventory as `reset … HISTORICAL-ONLY (AFLDB-ISSUE-139 D2/D1 …)`. Both were
+   already confirmed PASS from the ISSUE-143 worktree on 2026-09-06 (read-only).
 3. Then Phase 4E, host-side on `streamanator`, per `docs/production-promotion.md` §§3–8 with §13's names: mandatory
    `backup.sh` of `afldb_dev` (§4); `pre-cutover` with the real `--snapshot` on the host (expect the same single parity
    refusal, recorded); `pg_dump` of the D0 source; restore into `afldb_dev_candidate_<stamp>`; `--plan`
    (`--old-database afldb_dev --pre-cutover-dump … --rebuilt-dump …`); the §7.4b option-1 steps (reinstate `import_batches`
    82 and 84 and the `external_grid_sources` row with `source_id` / `ingest_source_id` → the candidate's `gridley` id,
    `setval` past 84, verified against `pg_restore -f - --table=import_batches <dump>`) before the corpus's three
-   `pg_restore` lines; `--phase restored … --lineage-remap-out <file>` (expect the 33 evidenced `UPDATE`s plus the D1/D2
-   dispositions, nothing unresolved); apply the remap after the reinstate; `privileges.sql`; `candidate`; swap;
-   `production`.
-4. Post-swap: replay `data_overrides`, `rebuild_derived.py` if rows changed, regenerate `player_link_match_candidates`,
-   re-acquire 2026 through the supervised ladder (`docs/deployment.md` §7b), apply the deferred `data_edits` row-19 remap
-   after the settle, then Phase 6 validation and the `AFLDB-ISSUE-140` re-measurement (baseline 17 / 34 / 17).
+   `pg_restore` lines; `--phase restored … --lineage-remap-out <file>` — with the D1/D2 dispositions now executable,
+   expect the whole `restored` gate to read **WARN, not FAIL**: `hist` beside
+   `player_link_resolutions.player_id` (3 unresolved of 36 ids), `player_link_resolutions.target_id` (94) and
+   `data_edits.row_id` (`players` 7, `matches` 8), `0 refused`, and a remap file containing a `-- HISTORICAL-ONLY`
+   block for each and **no UPDATE for either table** (the 33 evidenced `player_id` mappings are NOT applied — the table
+   is not reinstated). The `--plan` transcript will already have omitted both `pg_restore` lines. Then
+   `privileges.sql`; `candidate` (both tables must read **0** rows); swap; `production`.
+4. Post-swap: replay `data_overrides`, `rebuild_derived.py` if rows changed, regenerate `player_link_match_candidates`
+   — expect the admin link queue to re-surface the previously-decided suggestions, because no resolutions were
+   reinstated (§7.4d) — re-acquire 2026 through the supervised ladder (`docs/deployment.md` §7b), then Phase 6
+   validation and the `AFLDB-ISSUE-140` re-measurement (baseline 17 / 34 / 17). **There is no deferred `data_edits`
+   row-19 remap any more:** under D2 that row is part of the recorded gap, not a pending statement.
 
 Files changed this phase: `issues.md`, `IssuesIndex.md` only. No code, no data, no Git.
 
@@ -15905,13 +15945,13 @@ identity predicate: the count that comes back is `mapped`, and the difference is
 
 ## AFLDB-ISSUE-143 — The promotion contract documents two treatments for lineage-unresolvable ledger rows, but the checker and plan can execute neither
 
-- **Status:** Open — found 2026-09-06 during `AFLDB-ISSUE-139` Phase 4C′ (read-only; no database written, no code changed).
+- **Status:** **Resolved 2026-09-06** — the historical-only / recorded-gap disposition is implemented, DB-free validated (73/73), and re-validated read-only against the live DEV databases. Found 2026-09-06 during `AFLDB-ISSUE-139` Phase 4C′.
 - **Severity:** High — a DEV promotion (the only real lineage change the contract has met) can never pass `--phase restored`, so `AFLDB-ISSUE-139` Phase 4E cannot start. Production is unaffected: its candidate shares its lineage and the gate PASSES silently (`AFLDB-ISSUE-142` B).
 - **Area:** Operations / Database tooling / Data integrity
 - **Found:** 2026-09-06
-- **Resolved:** N/A
-- **Related:** `AFLDB-ISSUE-142` (the gate and the §7.4c text this completes), `AFLDB-ISSUE-141` (same shape: documented semantics ahead of the executable path), `AFLDB-ISSUE-125` (the contract), `AFLDB-ISSUE-139` (blocked on this at Phase 4E).
-- **Migration:** none expected.
+- **Resolved:** 2026-09-06
+- **Related:** `AFLDB-ISSUE-142` (the gate and the §7.4c text this completes), `AFLDB-ISSUE-141` (same shape: documented semantics ahead of the executable path), `AFLDB-ISSUE-125` (the contract), `AFLDB-ISSUE-139` (blocked on this at Phase 4E; unblocked by this resolution).
+- **Migration:** none — none was needed. No schema, no `privileges.sql` and no grant change.
 
 ### Problem
 
@@ -15949,8 +15989,108 @@ covered in `tests/db-promotion-check.test.ts`, documented in §7.4c and §13. Do
 match by name, do not add a stable identity for honours rows by inference. Design at Fable High / Opus High on a fresh
 worktree; `AFLDB-ISSUE-139` records the operator's D1/D2 choices that this issue must honour.
 
-### Validation
+### Operator decisions honoured (recorded by `AFLDB-ISSUE-139`, 2026-09-06)
 
-Not yet run. Proof will be `--environment dev --phase restored --database afldb_dev_candidate_<stamp> --old-database
-afldb_dev --lineage-remap-out <file>` reading PASS/WARN with every unresolved id listed under its disposition, then
-`candidate` and `production` reading PASS, on the `AFLDB-ISSUE-139` candidate.
+* **D0** — reuse the current `afldb_test` as the canonical source; no rebuild. Nothing in this issue touches it.
+* **D1** — `player_link_resolutions`: §7.4c **option 2**. Not reinstated into live canonical state; preserved as
+  historical evidence in the mandatory dump and the renamed pre-rebuild database. No `target_id` mapping by name, by
+  integer-id existence or by guessed honours equivalence.
+* **D2** — `data_edits`: the same historical-only / recorded-gap treatment. No stale bootstrap id is forced into the
+  rebuilt lineage, and the single current-season row that could resolve after the post-swap settle is part of the same
+  gap rather than a pending remap, so it cannot weaken the pre-swap gate.
+* **D3** — this issue: an explicit, fail-closed contract/tooling mechanism that can represent that disposition.
+
+### Resolution — 2026-09-06
+
+**Root cause.** §7.4c's two answers existed only as prose. `gateLineageIdentity` reported `FAIL` whenever
+`unresolvedTotal > 0`; `reinstatedPublicTables()` had no exclusion, so the generated plan reinstated every `reinstate`
+table; and `compare: 'equal'` would then have refused the omission from the other side. Both answers were therefore
+unreachable, and the deferred current-season `data_edits` case was counted as a plain refusal.
+
+**The fix — a contract declaration, not a flag.** A `TableTreatment` may now carry a `historicalOnly` entry
+(`tools/db/promotion-inventory.ts`) naming the `environments` it applies to, **every** lineage-bound column of that
+table, the deciding issue, a one-line `summary` and the full `reason`. One declaration drives four things at once, so
+the gate, the plan and the comparison cannot disagree:
+
+1. `reinstatedPublicTables(environment)` drops the table, so `reinstatePlan()` emits no `pg_restore --table=` line and
+   `resyncIdentitySql(environment)` no sequence — and the plan prints an `INTENTIONALLY NOT REINSTATED` block naming
+   the table, the withheld columns, the reason, the dump the rows are in and the retained pre-rebuild database, before
+   the restore lines it is missing from;
+2. the table is **still truncated** (`truncatedPublicTables()` is unchanged), so the candidate holds none of the
+   rebuilt copy either and `effectiveCompare()` expects `zero` instead of `equal` at `--phase candidate`;
+3. `--phase restored` reports the column as `hist` with its row count, distinct ids, evidenced/unresolved split and
+   per-id reasons, prints the decision in full, and `lineageRemapSql()` writes a `-- HISTORICAL-ONLY` evidence block
+   and **no statement** for it;
+4. `auditMarkerSql()` writes a `historical_only` array plus one recorded-gap sentence per table into
+   `database.promoted`, so the promoted database records what it was not given.
+
+**Fail-closed everywhere else, by construction.** Acceptance is decided per `(table, column, environment)` by the pure
+`judgeLineage()`, never by a verdict-level relaxation: another table, another column of the *same* table, or the same
+table under an environment the declaration does not list all still refuse exactly as before. There is no command-line
+override (`--allow-unresolved`/`--ignore-lineage`/`--force` do not exist and a test asserts they never appear).
+`assertContractCoherent()` runs before the checker's first query and refuses a declaration that names only some of its
+table's lineage-bound columns, sits on a table that is not `reinstate`, declares no environment or an unknown one, has
+an empty `decidedBy`/`summary`/`reason`, or that `reinstatedPublicTables()` would still reinstate — condition (2) of
+the scope, proved rather than promised. Adding a new lineage-bound column to a declared table re-opens the decision
+instead of inheriting it. The dangling-reference gate reports `info` for a withheld table's own reference (the rows are
+never created, so it cannot dangle) and is untouched for every other table; migration parity, classification, fixture
+identity, super-admin and privilege gates are untouched.
+
+**What was deliberately NOT built.** §7.4c answer (1) — reinstate the table as a not-live historical ledger — has no
+executable path and still refuses. It would mean writing ids that denote different rows into the promoted database and
+trusting a note to say so, and both D1 and D2 chose answer (2). If it is ever wanted it is a new decision, not a flag
+on this one. No `deferred` third outcome was built either: under D2 the current-season `data_edits` row is part of the
+gap, so there is nothing pending to carry.
+
+**Declared today** — `--environment dev` only; production declares nothing:
+
+| Table | Columns | Decision |
+|---|---|---|
+| `player_link_resolutions` | `player_id`, `target_id` | `AFLDB-ISSUE-139` D1. `target_id`'s seven honours tables carry no external key, so not one row can be evidenced; remapping `player_id` alone is explicitly not an answer. |
+| `data_edits` | `row_id` | `AFLDB-ISSUE-139` D2. Every lineage-bound row is in the bootstrap id space; two of its matches were created and then deleted on `afldb_dev` itself. |
+
+One consequence recorded in `docs/production-promotion.md` §7.4d for the DEV promotion record:
+`player_link_match_candidates` is regenerated from rebuilt players **plus reinstated resolutions**, so with none
+reinstated the admin link queue re-surfaces the previously-decided suggestions for a fresh decision against the new
+lineage. That is the honest outcome of a lineage change, not a defect.
+
+### Validation — 2026-09-06
+
+DB-free, on this worktree (`D:\dev\afldb-issue-143`, branch `claude/issue-143`):
+
+* `npx vitest run tests/db-promotion-check.test.ts` — **73 passed / 73**, 0 failures (was 64; 9 added, 2 amended).
+  The added block proves: the real contract is coherent and declares nothing for `prod`; a partial, misplaced,
+  environment-less, unknown-environment or empty-reason declaration is refused (on synthetic tables, so the real
+  contract is never mutated); the measured ISSUE-139 shape (`target_id` 94, `player_id` 3, `data_edits.row_id` 15) is
+  **accepted under `dev` and refused under `prod`**; another table, another column of a declared table, and a table
+  outside the contract all still refuse; `prod` is byte-identical across `reinstatedPublicTables`, `reinstatePlan`,
+  `resyncIdentitySql` and `auditMarkerSql`, and the withheld tables are still truncated; the DEV plan carries the
+  omission block and generates **no** `--table=`, `INSERT`, `UPDATE` or `DELETE` for either table; the DEV marker
+  records the gap and no longer claims them as reinstated; the remap file writes the `-- HISTORICAL-ONLY` block for a
+  withheld column while an undeclared column **still takes the ISSUE-142 remap path** (guarded `UPDATE` plus its
+  verification query); and neither source file introduces a name-matching predicate or an override flag.
+  The two amended tests are the ISSUE-141/142 ones whose premise moved: the remap test now runs under `prod` (where no
+  disposition applies, so the ISSUE-142 output is unchanged) and the DEV plan's table list is compared against
+  `reinstatedPublicTables('dev')`.
+* `npx tsc --noEmit -p tsconfig.json` — clean, repo-wide.
+* `npx eslint tools/db/promotion-inventory.ts tools/db/promotion-check.ts tests/db-promotion-check.test.ts` — clean.
+* `--plan --environment dev` generated into a scratch directory and read back: the four files are written, the
+  reinstate transcript carries the omission block with both reasons and omits both `pg_restore` lines, and the marker
+  carries `'historical_only', to_jsonb(ARRAY['data_edits (…D2…)', 'player_link_resolutions (…D1…)'])`.
+
+Read-only against the live DEV databases (no write, no snapshot file, no candidate, no swap):
+
+* `db:promotion:check --environment dev --phase source --database afldb_test` — **PASS, 7 gates**, unchanged from
+  Phase 4C′. The inventory now prints `data_edits` and `player_link_resolutions` as `reset … HISTORICAL-ONLY (…)`.
+* `db:promotion:check --environment dev --phase pre-cutover --database afldb_dev` — REFUSED on migration parity
+  (`PENDING 091` + `UNKNOWN 079`) and on fixture identities; with `--allow-fixture-identities`, **REFUSED on migration
+  parity only**, exactly the recorded Phase 4C′ state. Inventory confirms the measured counts live: `data_edits` **24**
+  rows, `player_link_resolutions` **94** rows.
+
+Not run, and not runnable here: `--phase restored`, `candidate` and `production` need a candidate database that only
+Phase 4E creates on `streamanator`. That is `AFLDB-ISSUE-139`'s step, not this issue's.
+
+### Follow-up
+
+None tracked. If §7.4c answer (1) is ever wanted, or if a future table needs a per-ROW rather than per-table
+disposition, that is a new decision and a new issue.
