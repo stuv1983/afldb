@@ -441,6 +441,17 @@ export default async function ClubPage({
           {club.homeState ? ` · ${club.homeState}` : ''}
           {!club.isCurrent && ` · ${club.succession}`}
         </p>
+        {/* /clubs/compare resolves ORGANISATION slugs only, so a historical
+            era seeds the identity its organisation continues under rather
+            than its own slug — current_identity IS that mapping, so no
+            special table is needed. AFLDB-ISSUE-144. */}
+        <p className="section-note">
+          <Link href={`/clubs/compare?club1=${club.currentIdentitySlug}`}>
+            {club.slug === club.currentIdentitySlug
+              ? 'Compare with another club →'
+              : `Compare ${club.currentIdentityName} with another club →`}
+          </Link>
+        </p>
       </div>
 
       {club.notes && <p className="notice">{club.notes}</p>}

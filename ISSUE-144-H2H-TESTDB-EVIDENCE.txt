@@ -1,0 +1,660 @@
+Pager usage is off.
+Border style is 2.
+Null display is "[NULL]".
+
+============================================================
+AFLDB ISSUE-138 - CLUB VS CLUB / H2H TEST DB EVIDENCE
+Generated read-only from afldb_test
+============================================================
+
+=== 1. DATABASE ===
++------------+-------------+-------------------------------+
+|  database  |   db_user   |         generated_at          |
++------------+-------------+-------------------------------+
+| afldb_test | afldb_owner | 2026-09-06 13:30:01.607035+10 |
++------------+-------------+-------------------------------+
+(1 row)
+
+
+=== 2. RELEVANT ENUM VALUES ===
++-----------------------+---------------+-------------------+
+|       enum_type       | enumsortorder |     enumlabel     |
++-----------------------+---------------+-------------------+
+| after_siren_result    |             1 | win               |
+| after_siren_result    |             2 | draw              |
+| after_siren_result    |             3 | loss              |
+| club_succession       |             1 | current           |
+| club_succession       |             2 | renamed           |
+| club_succession       |             3 | relocated         |
+| club_succession       |             4 | merged            |
+| club_succession       |             5 | defunct           |
+| coverage_status       |             1 | complete          |
+| coverage_status       |             2 | partial           |
+| coverage_status       |             3 | not_collected     |
+| coverage_status       |             4 | not_applicable    |
+| coverage_status       |             5 | pending           |
+| match_result          |             1 | home_win          |
+| match_result          |             2 | away_win          |
+| match_result          |             3 | draw              |
+| organization_relation |             1 | merged_into       |
+| organization_relation |             2 | relocated_to      |
+| organization_relation |             3 | folded            |
+| round_type            |             1 | home_and_away     |
+| round_type            |           1.5 | wildcard_final    |
+| round_type            |             2 | elimination_final |
+| round_type            |             3 | qualifying_final  |
+| round_type            |             4 | semi_final        |
+| round_type            |             5 | preliminary_final |
+| round_type            |             6 | grand_final       |
++-----------------------+---------------+-------------------+
+(26 rows)
+
+
+=== 3. PLAYERS TABLE SHAPE ===
++-----------------------+--------------+
+|      column_name      |  data_type   |
++-----------------------+--------------+
+| id                    | integer      |
+| legacy_player_id      | integer      |
+| display_name          | text         |
+| sort_name             | text         |
+| search_name           | text         |
+| slug                  | text         |
+| given_name            | text         |
+| surname               | text         |
+| dob                   | date         |
+| dob_confidence        | USER-DEFINED |
+| birth_year            | smallint     |
+| birth_year_min        | smallint     |
+| birth_year_max        | smallint     |
+| birth_year_confidence | USER-DEFINED |
+| height_cm             | smallint     |
+| weight_kg             | smallint     |
+| debut_season          | smallint     |
+| final_season          | smallint     |
+| notes                 | text         |
+| search_rank           | integer      |
+| dob_evidence_id       | bigint       |
+| dob_disputed          | boolean      |
+| height_evidence_id    | bigint       |
++-----------------------+--------------+
+(23 rows)
+
+
+=== 4. ALL CLUB IDENTITIES AND ORGANISATIONS ===
++---------+------------------------+------------------------+------------------+--------------+-----------------+------------------------+------------------------+---------------------+------------+--------------+-------------+---------------------+
+| club_id |          name          |          slug          |    short_name    | abbreviation | organization_id |   organization_name    |   organization_slug    | current_identity_id | succession | first_season | last_season | is_current_afl_club |
++---------+------------------------+------------------------+------------------+--------------+-----------------+------------------------+------------------------+---------------------+------------+--------------+-------------+---------------------+
+|       1 | Adelaide               | adelaide               | Adelaide         | ADE          |               1 | Adelaide               | adelaide               |                   1 | current    |         1991 |        2026 | t                   |
+|       2 | Brisbane Bears         | brisbane-bears         | Brisbane Bears   | BB           |               2 | Brisbane Bears         | brisbane-bears         |                   2 | merged     |         1987 |        1996 | f                   |
+|       3 | Brisbane Lions         | brisbane-lions         | Brisbane Lions   | BL           |               3 | Brisbane Lions         | brisbane-lions         |                   3 | current    |         1997 |        2026 | t                   |
+|       4 | Carlton                | carlton                | Carlton          | CARL         |               4 | Carlton                | carlton                |                   4 | current    |         1897 |        2026 | t                   |
+|       5 | Collingwood            | collingwood            | Collingwood      | COLL         |               5 | Collingwood            | collingwood            |                   5 | current    |         1897 |        2026 | t                   |
+|       6 | Essendon               | essendon               | Essendon         | ESS          |               6 | Essendon               | essendon               |                   6 | current    |         1897 |        2026 | t                   |
+|       7 | Fitzroy                | fitzroy                | Fitzroy          | FITZ         |               7 | Fitzroy                | fitzroy                |                   7 | merged     |         1897 |        1996 | f                   |
+|       9 | Fremantle              | fremantle              | Fremantle        | FRE          |               9 | Fremantle              | fremantle              |                   9 | current    |         1995 |        2026 | t                   |
+|      10 | Geelong                | geelong                | Geelong          | GEEL         |              10 | Geelong                | geelong                |                  10 | current    |         1897 |        2026 | t                   |
+|      11 | Gold Coast             | gold-coast             | Gold Coast       | GC           |              11 | Gold Coast             | gold-coast             |                  11 | current    |         2011 |        2026 | t                   |
+|      12 | Greater Western Sydney | greater-western-sydney | GWS              | GWS          |              12 | Greater Western Sydney | greater-western-sydney |                  12 | current    |         2012 |        2026 | t                   |
+|      13 | Hawthorn               | hawthorn               | Hawthorn         | HAW          |              13 | Hawthorn               | hawthorn               |                  13 | current    |         1925 |        2026 | t                   |
+|      15 | Melbourne              | melbourne              | Melbourne        | MELB         |              15 | Melbourne              | melbourne              |                  15 | current    |         1897 |        2026 | t                   |
+|      16 | North Melbourne        | north-melbourne        | North Melbourne  | NM           |              16 | North Melbourne        | north-melbourne        |                  16 | current    |         1925 |        2026 | t                   |
+|      14 | Kangaroos              | kangaroos              | Kangaroos        | KANG         |              16 | North Melbourne        | north-melbourne        |                  16 | renamed    |         1999 |        2007 | f                   |
+|      17 | Port Adelaide          | port-adelaide          | Port Adelaide    | PA           |              17 | Port Adelaide          | port-adelaide          |                  17 | current    |         1997 |        2026 | t                   |
+|      18 | Richmond               | richmond               | Richmond         | RICH         |              18 | Richmond               | richmond               |                  18 | current    |         1908 |        2026 | t                   |
+|      20 | St Kilda               | st-kilda               | St Kilda         | STK          |              20 | St Kilda               | st-kilda               |                  20 | current    |         1897 |        2026 | t                   |
+|      19 | South Melbourne        | south-melbourne        | South Melbourne  | SM           |              21 | Sydney                 | sydney                 |                  21 | relocated  |         1897 |        1981 | f                   |
+|      21 | Sydney                 | sydney                 | Sydney           | SYD          |              21 | Sydney                 | sydney                 |                  21 | current    |         1982 |        2026 | t                   |
+|      22 | University             | university             | University       | UNI          |              22 | University             | university             |                  22 | defunct    |         1908 |        1914 | f                   |
+|      23 | West Coast             | west-coast             | West Coast       | WCE          |              23 | West Coast             | west-coast             |                  23 | current    |         1987 |        2026 | t                   |
+|       8 | Footscray              | footscray              | Footscray        | FOOT         |              24 | Western Bulldogs       | western-bulldogs       |                  24 | renamed    |         1925 |        1996 | f                   |
+|      24 | Western Bulldogs       | western-bulldogs       | Western Bulldogs | WB           |              24 | Western Bulldogs       | western-bulldogs       |                  24 | current    |         1997 |        2026 | t                   |
++---------+------------------------+------------------------+------------------+--------------+-----------------+------------------------+------------------------+---------------------+------------+--------------+-------------+---------------------+
+(24 rows)
+
+
+=== 5. CLUB ORGANISATION RELATIONS ===
++----------------------+-------------------+--------------------+-----------------+-------------+------------------+------------------------------------------------------------------------------------------------------------------------------------------+
+| from_organization_id | from_organization | to_organization_id | to_organization |  relation   | effective_season |                                                                  notes                                                                   |
++----------------------+-------------------+--------------------+-----------------+-------------+------------------+------------------------------------------------------------------------------------------------------------------------------------------+
+|                    2 | Brisbane Bears    |                  3 | Brisbane Lions  | merged_into |             1997 | Brisbane Bears and Fitzroy combined to form Brisbane Lions in 1997. Statistics are not combined.                                         |
+|                    7 | Fitzroy           |                  3 | Brisbane Lions  | merged_into |             1997 | Fitzroy and Brisbane Bears combined to form Brisbane Lions in 1997. Statistics are not combined: each organization keeps its own record. |
+|                   22 | University        |             [NULL] | [NULL]          | folded      |             1915 | University withdrew from the competition after the 1914 season and never returned.                                                       |
++----------------------+-------------------+--------------------+-----------------+-------------+------------------+------------------------------------------------------------------------------------------------------------------------------------------+
+(3 rows)
+
+
+=== 6. ADELAIDE / BRISBANE IDENTITIES ===
++---------+----------------+----------------+-----------------+-------------------+-------------------+---------------------+------------+--------------+-------------+---------------------+
+| club_id |      name      |      slug      | organization_id | organization_name | organization_slug | current_identity_id | succession | first_season | last_season | is_current_afl_club |
++---------+----------------+----------------+-----------------+-------------------+-------------------+---------------------+------------+--------------+-------------+---------------------+
+|       1 | Adelaide       | adelaide       |               1 | Adelaide          | adelaide          |                   1 | current    |         1991 |        2026 | t                   |
+|       2 | Brisbane Bears | brisbane-bears |               2 | Brisbane Bears    | brisbane-bears    |                   2 | merged     |         1987 |        1996 | f                   |
+|       3 | Brisbane Lions | brisbane-lions |               3 | Brisbane Lions    | brisbane-lions    |                   3 | current    |         1997 |        2026 | t                   |
+|      17 | Port Adelaide  | port-adelaide  |              17 | Port Adelaide     | port-adelaide     |                  17 | current    |         1997 |        2026 | t                   |
++---------+----------------+----------------+-----------------+-------------------+-------------------+---------------------+------------+--------------+-------------+---------------------+
+(4 rows)
+
+
+=== 7. ADELAIDE VS BRISBANE LIONS - H2H SUMMARY ===
++----------+----------------+---------+-------------+-------------+-------+---------------+----------------+------------------+-----------------------+
+|  club_a  |     club_b     | matches | club_a_wins | club_b_wins | draws | first_meeting | latest_meeting | is_final_matches | finals_series_matches |
++----------+----------------+---------+-------------+-------------+-------+---------------+----------------+------------------+-----------------------+
+| Adelaide | Brisbane Lions |      41 |          19 |          21 |     1 | 1997-03-30    | 2025-06-06     |                2 |                     2 |
++----------+----------------+---------+-------------+-------------+-------+---------------+----------------+------------------+-----------------------+
+(1 row)
+
+
+=== 8. ADELAIDE VS BRISBANE LIONS - EVERY MATCH ===
++----------+--------+------------+--------------+------------------+----------+------------------+-------------+------------+---------------+----------------+------------+------------+----------------+----------------+----------+--------+------------+
+| match_id | season | round_code | round_number |    round_type    | is_final | is_finals_series | match_event | match_date |     venue     |   home_club    | home_score | away_score |   away_club    |     winner     |  result  | margin | attendance |
++----------+--------+------------+--------------+------------------+----------+------------------+-------------+------------+---------------+----------------+------------+------------+----------------+----------------+----------+--------+------------+
+|    11178 |   1997 | 1          |            1 | home_and_away    | f        | f                | [NULL]      | 1997-03-30 | Football Park | Adelaide       |        132 |         96 | Brisbane Lions | Adelaide       | home_win |     36 |      36602 |
+|    11293 |   1997 | 16         |           16 | home_and_away    | f        | f                | [NULL]      | 1997-07-18 | Gabba         | Brisbane Lions |        118 |         87 | Adelaide       | Brisbane Lions | home_win |     31 |      21348 |
+|    11423 |   1998 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 1998-05-23 | Gabba         | Brisbane Lions |         50 |         98 | Adelaide       | Adelaide       | away_win |     48 |      19509 |
+|    11568 |   1999 | 4          |            4 | home_and_away    | f        | f                | [NULL]      | 1999-04-17 | Gabba         | Brisbane Lions |        115 |         54 | Adelaide       | Brisbane Lions | home_win |     61 |      21360 |
+|    11692 |   1999 | 19         |           19 | home_and_away    | f        | f                | [NULL]      | 1999-08-08 | Football Park | Adelaide       |         44 |         83 | Brisbane Lions | Brisbane Lions | away_win |     39 |      33398 |
+|    11761 |   2000 | 5          |            5 | home_and_away    | f        | f                | [NULL]      | 2000-04-08 | Gabba         | Brisbane Lions |        122 |         92 | Adelaide       | Brisbane Lions | home_win |     30 |      26395 |
+|    11885 |   2000 | 20         |           20 | home_and_away    | f        | f                | [NULL]      | 2000-07-23 | Football Park | Adelaide       |         78 |        115 | Brisbane Lions | Brisbane Lions | away_win |     37 |      40817 |
+|    11978 |   2001 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 2001-05-26 | Gabba         | Brisbane Lions |        122 |        127 | Adelaide       | Adelaide       | away_win |      5 |      24122 |
+|    12171 |   2002 | 10         |           10 | home_and_away    | f        | f                | [NULL]      | 2002-06-01 | Football Park | Adelaide       |        101 |         94 | Brisbane Lions | Adelaide       | home_win |      7 |      47279 |
+|    12275 |   2002 | QF         |       [NULL] | qualifying_final | t        | t                | [NULL]      | 2002-09-07 | Gabba         | Brisbane Lions |        115 |         44 | Adelaide       | Brisbane Lions | home_win |     71 |      31854 |
+|    12340 |   2003 | 8          |            8 | home_and_away    | f        | f                | [NULL]      | 2003-05-17 | Gabba         | Brisbane Lions |        107 |         89 | Adelaide       | Brisbane Lions | home_win |     18 |      34469 |
+|    12463 |   2003 | SF         |       [NULL] | semi_final       | t        | t                | [NULL]      | 2003-09-12 | Gabba         | Brisbane Lions |        124 |         82 | Adelaide       | Brisbane Lions | home_win |     42 |      32432 |
+|    12477 |   2004 | 2          |            2 | home_and_away    | f        | f                | [NULL]      | 2004-04-03 | Football Park | Adelaide       |         83 |        104 | Brisbane Lions | Brisbane Lions | away_win |     21 |      41095 |
+|    12597 |   2004 | 17         |           17 | home_and_away    | f        | f                | [NULL]      | 2004-07-24 | Gabba         | Brisbane Lions |        189 |         48 | Adelaide       | Brisbane Lions | home_win |    141 |      33443 |
+|    12710 |   2005 | 8          |            8 | home_and_away    | f        | f                | [NULL]      | 2005-05-14 | Football Park | Adelaide       |         63 |         72 | Brisbane Lions | Brisbane Lions | away_win |      9 |      42357 |
+|    12919 |   2006 | 11         |           11 | home_and_away    | f        | f                | [NULL]      | 2006-06-10 | Gabba         | Brisbane Lions |         60 |         75 | Adelaide       | Adelaide       | away_win |     15 |      27516 |
+|    13072 |   2007 | 7          |            7 | home_and_away    | f        | f                | [NULL]      | 2007-05-12 | Gabba         | Brisbane Lions |         69 |        100 | Adelaide       | Adelaide       | away_win |     31 |      26978 |
+|    13184 |   2007 | 21         |           21 | home_and_away    | f        | f                | [NULL]      | 2007-08-25 | Football Park | Adelaide       |         86 |         60 | Brisbane Lions | Adelaide       | home_win |     26 |      46507 |
+|    13305 |   2008 | 13         |           13 | home_and_away    | f        | f                | [NULL]      | 2008-06-21 | Gabba         | Brisbane Lions |         83 |         70 | Adelaide       | Brisbane Lions | home_win |     13 |      29964 |
+|    13450 |   2009 | 8          |            8 | home_and_away    | f        | f                | [NULL]      | 2009-05-16 | Gabba         | Brisbane Lions |        119 |         83 | Adelaide       | Brisbane Lions | home_win |     36 |      27767 |
+|    13647 |   2010 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 2010-05-23 | Football Park | Adelaide       |         93 |         81 | Brisbane Lions | Adelaide       | home_win |     12 |      31517 |
+|    13735 |   2010 | 20         |           20 | home_and_away    | f        | f                | [NULL]      | 2010-08-15 | Gabba         | Brisbane Lions |         97 |        104 | Adelaide       | Adelaide       | away_win |      7 |      25403 |
+|    13838 |   2011 | 10         |           10 | home_and_away    | f        | f                | [NULL]      | 2011-05-29 | Football Park | Adelaide       |         61 |        101 | Brisbane Lions | Brisbane Lions | away_win |     40 |      34583 |
+|    13916 |   2011 | 20         |           20 | home_and_away    | f        | f                | [NULL]      | 2011-08-07 | Gabba         | Brisbane Lions |        105 |        110 | Adelaide       | Adelaide       | away_win |      5 |      17930 |
+|    14132 |   2012 | 21         |           21 | home_and_away    | f        | f                | [NULL]      | 2012-08-18 | Gabba         | Brisbane Lions |         95 |         85 | Adelaide       | Brisbane Lions | home_win |     10 |      18979 |
+|    14177 |   2013 | 2          |            2 | home_and_away    | f        | f                | [NULL]      | 2013-04-06 | Gabba         | Brisbane Lions |         77 |         96 | Adelaide       | Adelaide       | away_win |     19 |      21308 |
+|    14542 |   2014 | 20         |           20 | home_and_away    | f        | f                | [NULL]      | 2014-08-10 | Gabba         | Brisbane Lions |         63 |        168 | Adelaide       | Adelaide       | away_win |    105 |      19657 |
+|    14685 |   2015 | 13         |           13 | home_and_away    | f        | f                | [NULL]      | 2015-06-27 | Gabba         | Brisbane Lions |         69 |         82 | Adelaide       | Adelaide       | away_win |     13 |      18146 |
+|    14752 |   2015 | 21         |           21 | home_and_away    | f        | f                | [NULL]      | 2015-08-22 | Adelaide Oval | Adelaide       |        131 |         44 | Brisbane Lions | Adelaide       | home_win |     87 |      46609 |
+|    14950 |   2016 | 20         |           20 | home_and_away    | f        | f                | [NULL]      | 2016-08-06 | Adelaide Oval | Adelaide       |        177 |         39 | Brisbane Lions | Adelaide       | home_win |    138 |      43549 |
+|    15067 |   2017 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 2017-05-20 | Gabba         | Brisbane Lions |         60 |        140 | Adelaide       | Adelaide       | away_win |     80 |      13802 |
+|    15346 |   2018 | 18         |           18 | home_and_away    | f        | f                | [NULL]      | 2018-07-21 | Gabba         | Brisbane Lions |         88 |         93 | Adelaide       | Adelaide       | away_win |      5 |      20475 |
+|    15481 |   2019 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 2019-05-18 | Gabba         | Brisbane Lions |         93 |         92 | Adelaide       | Brisbane Lions | home_win |      1 |      20405 |
+|    15647 |   2020 | 4          |            4 | home_and_away    | f        | f                | [NULL]      | 2020-06-28 | Gabba         | Brisbane Lions |         83 |         46 | Adelaide       | Brisbane Lions | home_win |     37 |       7354 |
+|    15905 |   2021 | 16         |           16 | home_and_away    | f        | f                | [NULL]      | 2021-07-03 | Adelaide Oval | Adelaide       |         59 |        111 | Brisbane Lions | Brisbane Lions | away_win |     52 |      16178 |
+|    16057 |   2022 | 9          |            9 | home_and_away    | f        | f                | [NULL]      | 2022-05-14 | Adelaide Oval | Adelaide       |         66 |        102 | Brisbane Lions | Brisbane Lions | away_win |     36 |      36579 |
+|    16287 |   2023 | 11         |           11 | home_and_away    | f        | f                | [NULL]      | 2023-05-28 | Adelaide Oval | Adelaide       |         95 |         78 | Brisbane Lions | Adelaide       | home_win |     17 |      33188 |
+|    16372 |   2023 | 22         |           22 | home_and_away    | f        | f                | [NULL]      | 2023-08-12 | Gabba         | Brisbane Lions |         99 |         93 | Adelaide       | Brisbane Lions | home_win |      6 |      30107 |
+|    16486 |   2024 | 10         |           10 | home_and_away    | f        | f                | [NULL]      | 2024-05-12 | Adelaide Oval | Adelaide       |         90 |         90 | Brisbane Lions | [NULL]         | draw     |      0 |      40278 |
+|    16548 |   2024 | 18         |           18 | home_and_away    | f        | f                | [NULL]      | 2024-07-07 | Gabba         | Brisbane Lions |         97 |         86 | Adelaide       | Brisbane Lions | home_win |     11 |      30183 |
+|    16729 |   2025 | 14         |           14 | home_and_away    | f        | f                | [NULL]      | 2025-06-06 | Adelaide Oval | Adelaide       |         68 |         63 | Brisbane Lions | Adelaide       | home_win |      5 |      42921 |
++----------+--------+------------+--------------+------------------+----------+------------------+-------------+------------+---------------+----------------+------------+------------+----------------+----------------+----------+--------+------------+
+(41 rows)
+
+
+=== 9. ADELAIDE VS BRISBANE LIONS - RECORD BY VENUE ===
++---------------+---------+-------------+-------------+-------+---------------+----------------+
+|     venue     | matches | club_a_wins | club_b_wins | draws | first_meeting | latest_meeting |
++---------------+---------+-------------+-------------+-------+---------------+----------------+
+| Gabba         |      25 |          11 |          14 |     0 | 1997-07-18    | 2024-07-07     |
+| Football Park |       9 |           4 |           5 |     0 | 1997-03-30    | 2011-05-29     |
+| Adelaide Oval |       7 |           4 |           2 |     1 | 2015-08-22    | 2025-06-06     |
++---------------+---------+-------------+-------------+-------+---------------+----------------+
+(3 rows)
+
+
+=== 10. ADELAIDE VS BRISBANE LIONS - FINALS MEETINGS ===
++-------+--------+------------+------------------+----------+------------------+-------------+------------+----------------+------------+------------+-----------+----------------+--------+
+|  id   | season | round_code |    round_type    | is_final | is_finals_series | match_event | match_date |   home_club    | home_score | away_score | away_club |     winner     | margin |
++-------+--------+------------+------------------+----------+------------------+-------------+------------+----------------+------------+------------+-----------+----------------+--------+
+| 12275 |   2002 | QF         | qualifying_final | t        | t                | [NULL]      | 2002-09-07 | Brisbane Lions |        115 |         44 | Adelaide  | Brisbane Lions |     71 |
+| 12463 |   2003 | SF         | semi_final       | t        | t                | [NULL]      | 2003-09-12 | Brisbane Lions |        124 |         82 | Adelaide  | Brisbane Lions |     42 |
++-------+--------+------------+------------------+----------+------------------+-------------+------------+----------------+------------+------------+-----------+----------------+--------+
+(2 rows)
+
+
+=== 11. PLAYER_CLUBS - CROSSOVER PLAYERS BETWEEN ADELAIDE AND BRISBANE LIONS ===
+psql : psql:D:/dev/ISSUE-138-H2H-TESTDB-EVIDENCE.sql:361: ERROR:  syntax error at or near "both"
+At line:1 char:1
++ psql -X --dbname="$dsn" -f "$tmpSql" 2>&1 |
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (psql:D:/dev/ISS... or near "both":String) [], RemoteExc
+   eption
+    + FullyQualifiedErrorId : NativeCommandError
+
+LINE 26: both AS (
+         ^
+
+=== 12. PLAYER MATCH STAT COLUMNS AVAILABLE ===
++------------------+-----------+
+|   column_name    | data_type |
++------------------+-----------+
+| id               | bigint    |
+| player_id        | integer   |
+| match_id         | integer   |
+| club_id          | integer   |
+| career_game_no   | smallint  |
+| jumper_number    | text      |
+| kicks            | smallint  |
+| marks            | smallint  |
+| handballs        | smallint  |
+| disposals        | smallint  |
+| goals            | smallint  |
+| behinds          | smallint  |
+| hitouts          | smallint  |
+| tackles          | smallint  |
+| rebounds         | smallint  |
+| inside_50s       | smallint  |
+| clearances       | smallint  |
+| clangers         | smallint  |
+| frees_for        | smallint  |
+| frees_against    | smallint  |
+| contested        | smallint  |
+| uncontested      | smallint  |
+| contested_marks  | smallint  |
+| marks_inside_50  | smallint  |
+| one_percenters   | smallint  |
+| bounces          | smallint  |
+| goal_assists     | smallint  |
+| brownlow_votes   | smallint  |
+| source_id        | smallint  |
+| import_batch_id  | bigint    |
+| source_record_id | text      |
++------------------+-----------+
+(31 rows)
+
+
+=== 13. STAT AVAILABILITY - COVERAGE BY STAT ===
++-----------------------+-----------------------+----------------------+------------------+----------------+------------+
+|       stat_key        | first_recorded_season | last_recorded_season | recorded_seasons | populated_rows | total_rows |
++-----------------------+-----------------------+----------------------+------------------+----------------+------------+
+| behinds               |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| bounces               |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
+| brownlow_match_votes  |                  1931 |                 2025 |               46 |         [NULL] |     [NULL] |
+| brownlow_round_votes  |                  1984 |                 2025 |               42 |         [NULL] |     [NULL] |
+| brownlow_season_total |                  1924 |                 2025 |               98 |         [NULL] |     [NULL] |
+| clangers              |                  1998 |                 2026 |               29 |         [NULL] |     [NULL] |
+| clearances            |                  1998 |                 2026 |               29 |         [NULL] |     [NULL] |
+| contested             |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
+| contested_marks       |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
+| disposals             |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| frees_against         |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| frees_for             |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| goal_assists          |                  2003 |                 2026 |               24 |         [NULL] |     [NULL] |
+| goals                 |                  1897 |                 2026 |              130 |         [NULL] |     [NULL] |
+| handballs             |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| hitouts               |                  1966 |                 2026 |               61 |         [NULL] |     [NULL] |
+| inside50s             |                  1998 |                 2026 |               29 |         [NULL] |     [NULL] |
+| kicks                 |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| marks                 |                  1965 |                 2026 |               62 |         [NULL] |     [NULL] |
+| marks_i50             |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
+| one_percenters        |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
+| rebounds              |                  1998 |                 2026 |               29 |         [NULL] |     [NULL] |
+| tackles               |                  1987 |                 2026 |               40 |         [NULL] |     [NULL] |
+| uncontested           |                  1999 |                 2026 |               28 |         [NULL] |     [NULL] |
++-----------------------+-----------------------+----------------------+------------------+----------------+------------+
+(24 rows)
+
+
+=== 14. STAT AVAILABILITY - RECENT SEASONS ===
++-----------------------+--------+-------------+----------------+------------+----------+
+|       stat_key        | season | is_recorded | populated_rows | total_rows | coverage |
++-----------------------+--------+-------------+----------------+------------+----------+
+| behinds               |   2026 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2026 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_match_votes  |   2026 | f           |         [NULL] |     [NULL] | pending  |
+| brownlow_round_votes  |   2026 | f           |         [NULL] |     [NULL] | pending  |
+| brownlow_season_total |   2026 | f           |         [NULL] |     [NULL] | pending  |
+| clangers              |   2026 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2026 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2026 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2026 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2026 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2026 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2026 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2026 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2026 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2026 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2026 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2026 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2026 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2026 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2025 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2025 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_match_votes  |   2025 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2025 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2025 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2025 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2025 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2025 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2025 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2025 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2025 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2025 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2025 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2025 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2025 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2025 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2025 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2025 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2025 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2024 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2024 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_match_votes  |   2024 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2024 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2024 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2024 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2024 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2024 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2024 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2024 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2024 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2024 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2024 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2024 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2024 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2024 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2024 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2024 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2024 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2023 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2023 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_match_votes  |   2023 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2023 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2023 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2023 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2023 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2023 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2023 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2023 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2023 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2023 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2023 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2023 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2023 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2023 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2023 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2023 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2023 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2022 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2022 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_match_votes  |   2022 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2022 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2022 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2022 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2022 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2022 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2022 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2022 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2022 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2022 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2022 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2022 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2022 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2022 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2022 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2022 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2022 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2021 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2021 | t           |         [NULL] |     [NULL] | partial  |
+| brownlow_match_votes  |   2021 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2021 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2021 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2021 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2021 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2021 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2021 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2021 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2021 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2021 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2021 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2021 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2021 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2021 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2021 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2021 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2021 | t           |         [NULL] |     [NULL] | complete |
+| behinds               |   2020 | t           |         [NULL] |     [NULL] | complete |
+| bounces               |   2020 | t           |         [NULL] |     [NULL] | partial  |
+| brownlow_match_votes  |   2020 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_round_votes  |   2020 | t           |         [NULL] |     [NULL] | complete |
+| brownlow_season_total |   2020 | t           |         [NULL] |     [NULL] | complete |
+| clangers              |   2020 | t           |         [NULL] |     [NULL] | complete |
+| clearances            |   2020 | t           |         [NULL] |     [NULL] | complete |
+| contested             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| contested_marks       |   2020 | t           |         [NULL] |     [NULL] | complete |
+| disposals             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| frees_against         |   2020 | t           |         [NULL] |     [NULL] | complete |
+| frees_for             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| goal_assists          |   2020 | t           |         [NULL] |     [NULL] | complete |
+| goals                 |   2020 | t           |         [NULL] |     [NULL] | complete |
+| handballs             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| hitouts               |   2020 | t           |         [NULL] |     [NULL] | complete |
+| inside50s             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| kicks                 |   2020 | t           |         [NULL] |     [NULL] | complete |
+| marks                 |   2020 | t           |         [NULL] |     [NULL] | complete |
+| marks_i50             |   2020 | t           |         [NULL] |     [NULL] | complete |
+| one_percenters        |   2020 | t           |         [NULL] |     [NULL] | complete |
+| rebounds              |   2020 | t           |         [NULL] |     [NULL] | complete |
+| tackles               |   2020 | t           |         [NULL] |     [NULL] | complete |
+| uncontested           |   2020 | t           |         [NULL] |     [NULL] | complete |
++-----------------------+--------+-------------+----------------+------------+----------+
+(168 rows)
+
+
+=== 15. ADELAIDE / BRISBANE SELECTED-SEASON CLUB RECORDS ===
++--------+----------------+----------------+--------+------+-------+--------+------------+----------------+--------------------+------------+-------------+---------------+------------+--------------+
+| season |  organization  | club_identity  | played | wins | draws | losses | points_for | points_against | premiership_points | percentage | ladder_rank | finals_played | is_premier | wooden_spoon |
++--------+----------------+----------------+--------+------+-------+--------+------------+----------------+--------------------+------------+-------------+---------------+------------+--------------+
+|   2025 | Adelaide       | Adelaide       |     23 |   18 |     0 |      5 |       2278 |           1635 |                 72 |   139.3272 |           1 |             2 | f          | f            |
+|   2025 | Brisbane Lions | Brisbane Lions |     23 |   16 |     1 |      6 |       2061 |           1804 |                 66 |   114.2461 |           3 |             4 | t          | f            |
+|   2025 | Port Adelaide  | Port Adelaide  |     23 |    9 |     0 |     14 |       1705 |           2136 |                 36 |    79.8221 |          13 |             0 | f          | f            |
+|   2024 | Adelaide       | Adelaide       |     23 |    8 |     1 |     14 |       1906 |           1923 |                 34 |    99.1160 |          15 |             0 | f          | f            |
+|   2024 | Brisbane Lions | Brisbane Lions |     23 |   14 |     1 |      8 |       2130 |           1747 |                 58 |   121.9233 |           5 |             4 | t          | f            |
+|   2024 | Port Adelaide  | Port Adelaide  |     23 |   16 |     0 |      7 |       2011 |           1752 |                 64 |   114.7831 |           2 |             3 | f          | f            |
++--------+----------------+----------------+--------+------+-------+--------+------------+----------------+--------------------+------------+-------------+---------------+------------+--------------+
+(6 rows)
+
+
+=== 16. PLAYER_CLUB_SEASON_STATS COVERAGE ===
++--------------+-------------+-------+---------+-----------------+
+| first_season | last_season | rows  | players | club_identities |
++--------------+-------------+-------+---------+-----------------+
+|         1897 |        2025 | 58425 |   13271 |              24 |
++--------------+-------------+-------+---------+-----------------+
+(1 row)
+
+
+=== 17. BROWNLOW SEASON COVERAGE ===
++--------------+-------------+-------+---------+---------+-------------+-----------------+
+| first_season | last_season | rows  | seasons | players | winner_rows | ineligible_rows |
++--------------+-------------+-------+---------+---------+-------------+-----------------+
+|         1924 |        2025 | 16120 |      98 |    4275 |         112 |               3 |
++--------------+-------------+-------+---------+---------+-------------+-----------------+
+(1 row)
+
+
+=== 18. ADELAIDE / BRISBANE BROWNLOW SEASON SUMMARY ===
++--------+--------------+-------------+-----------------+---------------+------------------+---------+
+| season | organization | total_votes | players_polling | leading_votes | three_vote_games | winners |
++--------+--------------+-------------+-----------------+---------------+------------------+---------+
++--------+--------------+-------------+-----------------+---------------+------------------+---------+
+(0 rows)
+
+
+=== 19. BROWNLOW ROUND VOTE COVERAGE ===
++--------------+-------------+--------+---------+---------+-------------+-----------+
+| first_season | last_season |  rows  | seasons | players | played_rows | vote_rows |
++--------------+-------------+--------+---------+---------+-------------+-----------+
+|         1984 |        2025 | 320861 |      42 |    4185 |      320861 |     22239 |
++--------------+-------------+--------+---------+---------+-------------+-----------+
+(1 row)
+
+
+=== 20. PLAYER_MATCH_STATS BROWNLOW COVERAGE ===
++--------------+-------------+---------------+--------------+-------------+
+| first_season | last_season | recorded_rows | polling_rows | total_votes |
++--------------+-------------+---------------+--------------+-------------+
+|         1931 |        2025 |        336821 |        23486 |       46970 |
++--------------+-------------+---------------+--------------+-------------+
+(1 row)
+
+
+=== 21. ADELAIDE VS BRISBANE - H2H PLAYER LEADERS ===
++-----------+---------------------+----------------+-------+-------+--------------------+------------------------+----------------+
+| player_id |     player_name     |  organization  | games | goals | max_goals_in_match | max_disposals_in_match | brownlow_votes |
++-----------+---------------------+----------------+-------+-------+--------------------+------------------------+----------------+
+|     11866 | Simon Black         | Brisbane Lions |    23 |    17 |                  3 |                     37 |             11 |
+|     11880 | Simon Goodwin       | Adelaide       |    21 |     7 |                  2 |                     31 |              1 |
+|     12205 | Taylor Walker       | Adelaide       |    20 |    54 |                  7 |                     22 |              5 |
+|       598 | Andrew McLeod       | Adelaide       |    20 |    15 |                  3 |                     31 |              6 |
+|     12902 | Tyson Edwards       | Adelaide       |    19 |     8 |                  2 |                     33 |              0 |
+|      8948 | Luke Power          | Brisbane Lions |    18 |    11 |                  3 |                     40 |              5 |
+|      3603 | Dayne Zorko         | Brisbane Lions |    17 |    13 |                  2 |                     38 |              5 |
+|      9958 | Nigel Lappin        | Brisbane Lions |    17 |    11 |                  4 |                     36 |              4 |
+|      9127 | Mark Ricciuto       | Adelaide       |    17 |     9 |                  2 |                     36 |              8 |
+|      9596 | Michael Voss        | Brisbane Lions |    16 |    23 |                  7 |                     38 |             14 |
+|     11388 | Rory Sloane         | Adelaide       |    16 |     8 |                  2 |                     34 |              9 |
+|      6824 | Jason Akermanis     | Brisbane Lions |    15 |    20 |                  4 |                     35 |             10 |
+|      7805 | Jonathan Brown      | Brisbane Lions |    15 |    15 |                  3 |                     17 |              0 |
+|      3249 | Daniel Rich         | Brisbane Lions |    15 |     8 |                  2 |                     29 |              3 |
+|      2770 | Chris Johnson       | Brisbane Lions |    15 |     4 |                  1 |                     22 |              2 |
+|      2346 | Brodie Smith        | Adelaide       |    15 |     3 |                  1 |                     25 |              0 |
+|      9765 | Nathan Bassett      | Adelaide       |    15 |     1 |                  1 |                     24 |              2 |
+|      9496 | Michael Doughty     | Adelaide       |    15 |     0 |                  0 |                     38 |              0 |
+|      5347 | Graham Johncock     | Adelaide       |    14 |    11 |                  4 |                     28 |              1 |
+|     11732 | Scott Thompson      | Adelaide       |    14 |     9 |                  3 |                     38 |             16 |
+|     11386 | Rory Laird          | Adelaide       |    14 |     1 |                  1 |                     37 |              9 |
+|      6891 | Jed Adcock          | Brisbane Lions |    14 |     0 |                  0 |                     30 |              0 |
+|       905 | Ashley McGrath      | Brisbane Lions |    13 |    15 |                  4 |                     31 |              1 |
+|     12424 | Tim Notting         | Brisbane Lions |    13 |    10 |                  2 |                     27 |              1 |
+|     10990 | Richard Douglas     | Adelaide       |    13 |     8 |                  3 |                     33 |              6 |
+|      9802 | Nathan van Berlo    | Adelaide       |    13 |     5 |                  2 |                     29 |              2 |
+|      2173 | Brent Reilly        | Adelaide       |    13 |     3 |                  1 |                     38 |              0 |
+|      5539 | Harris Andrews      | Brisbane Lions |    13 |     1 |                  1 |                     17 |              0 |
+|      1128 | Ben Rutten          | Adelaide       |    13 |     0 |                  0 |                     24 |              2 |
+|       207 | Alastair Lynch      | Brisbane Lions |    12 |    45 |                  7 |                     17 |              5 |
+|      3212 | Daniel Bradshaw     | Brisbane Lions |    12 |    16 |                  5 |                     15 |              0 |
+|      2192 | Brett Burton        | Adelaide       |    12 |    15 |                  4 |                     22 |              0 |
+|      4135 | Eric Hipwood        | Brisbane Lions |    12 |     7 |                  2 |                     12 |              0 |
+|      9023 | Marcus Ashcroft     | Brisbane Lions |    12 |     6 |                  2 |                     32 |              5 |
+|      3381 | Darryl White        | Brisbane Lions |    12 |     5 |                  2 |                     24 |              0 |
+|      7930 | Justin Leppitsch    | Brisbane Lions |    12 |     5 |                  3 |                     18 |              1 |
+|      1088 | Ben Hart            | Adelaide       |    12 |     3 |                  2 |                     25 |              1 |
+|      8916 | Luke Brown          | Adelaide       |    12 |     1 |                  1 |                     25 |              0 |
+|      3241 | Daniel Merrett      | Brisbane Lions |    12 |     1 |                  1 |                     19 |              1 |
+|      7420 | Joel Patfull        | Brisbane Lions |    12 |     1 |                  1 |                     17 |              0 |
+|     11583 | Ryan Lester         | Brisbane Lions |    12 |     0 |                  0 |                     23 |              0 |
+|      3099 | Craig McRae         | Brisbane Lions |    11 |    16 |                  4 |                     32 |              3 |
+|      5930 | Hugh McCluggage     | Brisbane Lions |    11 |     8 |                  2 |                     31 |              5 |
+|     11840 | Shaun Hart          | Brisbane Lions |    11 |     7 |                  2 |                     28 |              0 |
+|      6804 | Jarrod Berry        | Brisbane Lions |    11 |     4 |                  2 |                     30 |              2 |
+|      2803 | Chris Scott         | Brisbane Lions |    11 |     3 |                  2 |                     32 |              2 |
+|      9053 | Mark Bickley        | Adelaide       |    11 |     2 |                  1 |                     25 |              0 |
+|      9960 | Nigel Smart         | Adelaide       |    11 |     1 |                  1 |                     27 |              3 |
+|      3254 | Daniel Talia        | Adelaide       |    11 |     0 |                  0 |                     27 |              1 |
+|     10244 | Patrick Dangerfield | Adelaide       |    10 |     9 |                  3 |                     30 |              0 |
++-----------+---------------------+----------------+-------+-------+--------------------+------------------------+----------------+
+(50 rows)
+
+
+=== 22. H2H PERIOD SCORE COVERAGE ===
++-------------+----------------------------+-------------------+------------+------------+
+| h2h_matches | matches_with_period_scores | period_score_rows | min_period | max_period |
++-------------+----------------------------+-------------------+------------+------------+
+|          41 |                         41 |               328 |          1 |          4 |
++-------------+----------------------------+-------------------+------------+------------+
+(1 row)
+
+
+=== 23. LONG-RUNNING RIVALRY SCALE - TOP ORGANISATION PAIRS ===
++----------------+----------------+---------+--------------+-------------+
+| organization_a | organization_b | matches | first_season | last_season |
++----------------+----------------+---------+--------------+-------------+
+| Carlton        | Collingwood    |     268 |         1897 |        2025 |
+| Carlton        | Essendon       |     255 |         1897 |        2025 |
+| Collingwood    | Essendon       |     249 |         1897 |        2025 |
+| Collingwood    | Melbourne      |     248 |         1897 |        2025 |
+| Collingwood    | Geelong        |     243 |         1897 |        2025 |
+| Carlton        | Sydney         |     236 |         1897 |        2025 |
+| Collingwood    | Sydney         |     235 |         1897 |        2025 |
+| Geelong        | Sydney         |     233 |         1897 |        2025 |
+| Essendon       | Sydney         |     232 |         1897 |        2025 |
+| Carlton        | Richmond       |     229 |         1908 |        2025 |
+| Carlton        | St Kilda       |     228 |         1897 |        2025 |
+| Carlton        | Geelong        |     227 |         1897 |        2025 |
+| Collingwood    | St Kilda       |     226 |         1897 |        2025 |
+| Essendon       | Geelong        |     226 |         1897 |        2025 |
+| Geelong        | Melbourne      |     226 |         1897 |        2025 |
+| Geelong        | St Kilda       |     225 |         1897 |        2025 |
+| St Kilda       | Sydney         |     225 |         1897 |        2025 |
+| Melbourne      | St Kilda       |     223 |         1897 |        2025 |
+| Essendon       | St Kilda       |     222 |         1897 |        2025 |
+| Essendon       | Melbourne      |     221 |         1897 |        2025 |
++----------------+----------------+---------+--------------+-------------+
+(20 rows)
+
+
+=== 24. PLAYER-MATCH SCALE FOR TOP H2H PAIRS ===
++----------------+----------------+---------+-------------------+
+| organization_a | organization_b | matches | player_match_rows |
++----------------+----------------+---------+-------------------+
+| Carlton        | Collingwood    |     268 |             10610 |
+| Carlton        | Essendon       |     255 |             10106 |
+| Collingwood    | Essendon       |     249 |              9908 |
+| Collingwood    | Melbourne      |     248 |              9780 |
+| Collingwood    | Geelong        |     243 |              9594 |
+| Carlton        | Sydney         |     236 |              9276 |
+| Collingwood    | Sydney         |     235 |              9240 |
+| Geelong        | Sydney         |     233 |              9218 |
+| Essendon       | Sydney         |     232 |              9156 |
+| Carlton        | Richmond       |     229 |              9098 |
+| Carlton        | St Kilda       |     228 |              9008 |
+| Carlton        | Geelong        |     227 |              8938 |
+| Collingwood    | St Kilda       |     226 |              8918 |
+| Essendon       | Geelong        |     226 |              8914 |
+| Geelong        | Melbourne      |     226 |              8956 |
+| Geelong        | St Kilda       |     225 |              8914 |
+| St Kilda       | Sydney         |     225 |              8908 |
+| Melbourne      | St Kilda       |     223 |              8818 |
+| Essendon       | St Kilda       |     222 |              8767 |
+| Essendon       | Melbourne      |     221 |              8708 |
++----------------+----------------+---------+-------------------+
+(20 rows)
+
+
+============================================================
+END ISSUE-138 TEST DATABASE EVIDENCE
+============================================================

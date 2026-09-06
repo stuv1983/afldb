@@ -89,6 +89,11 @@ export default async function sitemap({
       { url: `${baseUrl}/coaches`, changeFrequency: 'monthly', priority: 0.6 },
       { url: `${baseUrl}/match-search`, changeFrequency: 'monthly', priority: 0.8 },
       { url: `${baseUrl}/players/compare`, changeFrequency: 'monthly', priority: 0.5 },
+      // The BASE comparison surface only. A pair, a season, a match filter
+      // and a page are view state on one document, not separate documents:
+      // enumerating pairs would publish 210 near-identical URLs whose
+      // canonical is this one anyway. AFLDB-ISSUE-144.
+      { url: `${baseUrl}/clubs/compare`, changeFrequency: 'monthly', priority: 0.5 },
       { url: `${baseUrl}/about`, changeFrequency: 'yearly', priority: 0.3 },
       ...clubs.map((c) => ({
         url: `${baseUrl}/clubs/${c.slug}`,

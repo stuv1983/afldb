@@ -7,7 +7,15 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`.
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`.
+
+<!-- 2026-09-06 (ISSUE-144 Stage 0): `AFLDB-ISSUE-144` is now ALLOCATED and Open — Club vs Club
+     comparison and connected history (public UI / club history / database queries), on branch
+     `codex/issue-144` in worktree `D:\dev\afldb-issue-144`. The approved V1.6 runbook is persisted as
+     `AFLDB-ISSUE-144.md` at the repository root and is the implementation contract; execution is one
+     stage per session. Stage 0 (persist + reconfirm schema semantics + Next.js guidance) is complete;
+     Stage 1 (H2H core queries) is next. It claims **NO migration number** and adds no schema, index,
+     materialization or persistent cache. 7 -> 8 open. Next free issue ID is `AFLDB-ISSUE-145`. -->
 
 <!-- 2026-09-06 (ISSUE-143 closeout): `-143` Resolved (the historical-only / recorded-gap promotion
      disposition is implemented and validated); removed from this count and from the Open Issues
@@ -165,6 +173,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-140` | Medium | Data integrity / Import (current season) | **RE-MEASURED 2026-09-06 after the ISSUE-139 DEV promotion: 0 / 0 / 0 on the promoted lineage (baseline 17 / 34 / 17); the old lineage with the duplicates is retained as `afldb_dev_pre_rebuild_20260906-112500` for the writer identification. No repair performed.** **OPEN — found 2026-09-06 during the ISSUE-118 DEV load.** `afldb_dev` holds **17 duplicate 2026 `matches` rows** — the same fixture (date + both clubs) written twice under two `round_number`s one apart, e.g. `2026|23|2026-08-14|Fremantle|Adelaide` (id 17042, round 23, **0** `player_match_stats`) beside `2026|24|2026-08-14|Fremantle|Adelaide` (id 17060, round 24, 46 rows). 17 fixtures are duplicated (34 rows, rounds 23-25); all 17 stat-less copies sit under round 23 (9) and round 24 (8) and carry no `match_period_scores`. The populated copies use AFLDB's Opening-Round-inclusive numbering (week 23 = 2026-08-06, 24 = 08-14, 25 = 08-20); the stat-less copies are one lower, i.e. AFL Tables' own numbering. Consequence observed: the after-siren loader resolved `2026-vfl-afl-23-hawthorn-dylan-moore` to the empty round-23 Hawthorn v Collingwood row and left the kicker unresolved. Whether `afldb_prod` carries the same duplicates is **not measured** (production untouched). | Read-only: identify which writer produced the stat-less copies (fixture load vs AFL Tables settle) and whether the round-number convention differs between them; then measure production read-only. Repair is a separate authorised step; do not delete rows before the writer is identified. |
 | `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Retired beta access keys cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, and a **spent** key (`use_count >= max_uses`) is offered neither Revoke (shown only while `live`) nor Delete, so obsolete keys accumulate with no disposal path. Implemented 2026-08-31 on the unmerged branch `claude/issue-116` and **applied to `afldb_dev` from there as migration `079_access_code_delete.sql`**, which `main` has since taken for `079_nl_search_log_head_to_head_grain.sql`. **RECONCILED 2026-09-06 on `claude/issue-117`:** the migration is renumbered **091**, the obsolete `audit()`-with-optional-`tx` change is dropped in favour of `main`'s `auditInTransaction` (ISSUE-119), and DB-free validation is green (13/13 unit, `tsc --noEmit` exit 0, `eslint` exit 0). Deletable = **retired** (revoked OR spent); a partly-used or unlimited key is still refused because it remains redeemable, and expiry is deliberately excluded. The rule is a `WHERE` clause inside the DELETE, not a hidden button, and `access.code_deleted` is written on the deleting transaction so the row cannot outlive its trail. | **Awaiting the three DB-backed suites and merge.** Not resolved. Run `db:migrate:test` then `tests/integration/access-codes.test.ts` + `tests/integration/privileges.test.ts` against `afldb_test`, then merge. **Deploy order is load-bearing:** migration `091` and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. **`afldb_dev` keeps its orphan `079_access_code_delete.sql` ledger row** — applying `091` there is safe (GRANT is idempotent) but does NOT clear it, so `AFLDB-ISSUE-139`'s `pre-cutover` parity refusal stands exactly as `AFLDB-ISSUE-142` Finding C decided. Runbook: `issues/open/AFLDB-ISSUE-117.md`. |
 | `AFLDB-ISSUE-142` | High | Operations / Database tooling / Data integrity | **OPEN — IMPLEMENTED 2026-09-06, AWAITING VALIDATION. Uncommitted in the `main` working tree; no migration, no privilege change, no database contacted.** (A) `player_match_period_stats` (migration 062) was in neither `afldb_meta.import_writable_tables` nor `publicContractTables()` — the only such table any migration creates — so the fail-closed gate refused every phase on every real database. Decided **in the contract** as `rebuilt` / `compare: zero`, NOT registered import-writable: `grant_import_write()` registers and grants in one statement, so a registry row would hand `afldb_import` UPDATE/DELETE/TRUNCATE for a writer that does not exist (nothing writes it; the NL read paths are refused upstream by `plan.ts:1054`; 0 rows everywhere). The suite now derives the registry from the migrations and runs the real classifier, so a future 062-shaped migration fails at test time. (B) A `restored`-phase lineage gate proves identity instead of existence — AFL Tables profile url for players, `matches.match_key` for matches — PASSES silently on a same-lineage (production) promotion, and REFUSES anything unevidenced; `--lineage-remap-out` writes the evidenced per-row remap. `player_link_resolutions.target_id` is declared identity `none` (no external key exists for an honours row), so a DEV promotion is refused with the two supportable answers printed (§7.4c). (C) `079_access_code_delete.sql` is committed only on `claude/issue-116` @ `2344ab5`, exists in no checkout, and cannot merge at 079 (`main` owns a different file there): the DEV parity refusal is truthful, the checker is not weakened, and the promotion itself is the reconciliation. | Run the validation in the entry (focused suite, typecheck, lint, then `--environment dev --phase source --database afldb_test` → PASS and `--phase pre-cutover --database afldb_dev --allow-fixture-identities` → refused on migration parity only), then commit/merge. Unblocks `AFLDB-ISSUE-139` Phase 4D and `AFLDB-ISSUE-137` path (a). |
+| `AFLDB-ISSUE-144` | Medium | Public UI / club history / database queries | **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT. Stages 0-10 complete (11 stages total) on `codex/issue-144` (worktree `D:\dev\afldb-issue-144`); the `/clubs/compare` surface is fully built — the route (`src/app/clubs/compare/page.tsx` + `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6 query surface, and the Stage 8 presentation (`src/components/ClubComparisonView.tsx` plus `ClubComparisonControls` / `ClubComparisonSeason` / `ClubComparisonHeadToHead` / `ClubComparisonPlayers` / `ClubComparisonBrownlow` / `ClubComparisonTrends` and `src/lib/club-comparison-format.ts`) — and Stage 9 made it public: `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (organisation slug from `current_identity`), and the BASE `/clubs/compare` in sitemap segment 0 with no pair/season/filter/page permutation. Stage 9 also fixed two acceptance defects: a 360px page-wide horizontal overflow (`.grid-shrink > * { min-width: 0 }` on the four `.grid-panels` grids holding tables) and an h2→h4 heading jump in the club Brownlow history panel. 172 tests pass: 68 integration query, 28 integration route-state/metadata/budget, 14 database-free URL, 35 database-free presentation/accessibility (`tests/club-comparison-view.test.ts`), 4 real-state render tests and 23 SEO tests; production `npm run build` exit 0; 18 Playwright ISSUE-144 checks pass on the standalone build in both desktop and mobile projects; a scripted five-state accessibility audit reports no problems and the responsive sweep is clean at 360/390/768/1280/1600 px.** A new AFL-only public `/clubs/compare` surface: selected-season comparison (record, ladder, scoring, team metrics with runtime coverage denominators, player leaders, Brownlow), complete head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage) and connected club history (players who represented both organisations, direction, intervening clubs, club-attributed Brownlow). Contract: the approved V1.7 runbook `AFLDB-ISSUE-144.md` at the repository root — **season-generic**, with no hard-coded year, supported-season list, historical cutoff, metric-year branch or club mapping; seasons come from canonical `seasons` rows and provisionality/coverage from `seasons.status` and `stat_availability.coverage` at request time. Aggregation grain: organisation -> selected-season identity -> match/club -> player-stat sum -> average of eligible team-match totals; `club_organization_relations` is context only and never merges statistics. Stage 0 re-verified every load-bearing schema semantic against the migrations with no contradiction. The approved runbook is now **V1.7**: decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment into V1 as the new **Stage 6 — Extended rivalry analytics**, so the plan is now eleven stages (Stage 0 through Stage 10) and the former Stages 6-9 are renumbered 7-10. Read-only supporting evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`. Planned key files: `src/db/queries/club-comparison.ts`, `src/app/clubs/compare/page.tsx`, `src/components/ClubComparisonView.tsx`, `tests/integration/club-comparison.test.ts`, `tests/club-comparison.test.ts`. **No migration, no index, no materialization, no persistent cache, no public API.** | **READY FOR USER GIT CLOSEOUT**: Stage 10 re-proved the baseline (`npm test -- tests/club-comparison.test.ts tests/club-comparison-view.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-route.test.ts tests/integration/club-comparison-view.test.ts tests/seo.test.ts` — 172 passed), `npx tsc --noEmit` and `npm run build`; then add the single Unreleased CHANGELOG entry and prepare (do not perform) the user's Git close-out. **Outstanding, and the only unresolved acceptance prerequisite:** the supported-Linux route recheck deferred from Stages 5, 7 and 8 still cannot be taken — `codex/issue-144` exists only in the Windows worktree and putting it on the Linux dev host is a user-controlled Git operation. Exact command once it is there: `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (Adelaide/Brisbane Lions and Carlton/Collingwood, warm median under 1.5 s). The full `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` run should also be repeated there: 20 PRE-EXISTING, dataset-dependent failures in unrelated player/records/Brownlow journeys occur on this workstation because its application database carries the pre-ISSUE-136/137 entity numbering those tests hard-code, and none of them touches ISSUE-144. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-143` is **Resolved** and is NO LONGER an open issue. The
      historical-only / recorded-gap disposition is implemented and validated (73/73 DB-free,
      typecheck and lint clean, DEV `source` PASS and `pre-cutover` at its recorded parity-only
@@ -16799,3 +16808,168 @@ Phase 4E creates on `streamanator`. That is `AFLDB-ISSUE-139`'s step, not this i
 
 None tracked. If §7.4c answer (1) is ever wanted, or if a future table needs a per-ROW rather than per-table
 disposition, that is a new decision and a new issue.
+
+## AFLDB-ISSUE-144 — Club vs Club comparison and connected history
+
+- **Status:** **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT, awaiting user Git review/commit/merge/deploy.** V1.7
+  runbook approved and persisted as `AFLDB-ISSUE-144.md` (repository root, branch `codex/issue-144`,
+  worktree `D:\dev\afldb-issue-144`, uncommitted). **Stages 0-10 complete (11 stages total) 2026-09-06.** Stage 10
+  re-proved the full baseline with no regression (172 tests, `tsc` clean, `eslint` 0 errors, build exit
+  0, Windows Playwright rerun identical to Stage 9) and added the single Unreleased `CHANGELOG.md`
+  entry. The only two acceptance items still outstanding are the Linux warm route-budget measurement
+  and the full Playwright run on the Linux dev host's matching dataset, both blocked solely on the
+  user-controlled Git action of putting this branch on that host — see the Stage 10 entry in the
+  runbook's "Stage execution log" for the exact commands and full evidence. The `/clubs/compare`
+  surface is fully built and PUBLIC: the route
+  (`src/app/clubs/compare/page.tsx` and `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6
+  query surface, the Stage 8 public presentation — `src/components/ClubComparisonView.tsx` plus six
+  section components (`ClubComparisonControls`, `ClubComparisonSeason`, `ClubComparisonHeadToHead`,
+  `ClubComparisonPlayers`, `ClubComparisonBrownlow`, `ClubComparisonTrends`) and the database-free
+  presentation vocabulary `src/lib/club-comparison-format.ts` — and the Stage 9 entry points:
+  `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (the
+  organisation slug taken from `current_identity`, verified as that mapping for all 24 club rows), and
+  the BASE `/clubs/compare` in sitemap segment 0 with no pair, season, match-filter or page permutation.
+  Stage 9 fixed two acceptance defects — a 360 px page-wide horizontal overflow, caused by a grid column
+  taking its minimum width from the table inside its `.table-wrap` (`.grid-shrink > * { min-width: 0 }`
+  on the four `.grid-panels` grids that hold tables), and an h2 → h4 heading jump in the club Brownlow
+  history panel. 172 tests pass: 68 integration query tests
+  (`tests/integration/club-comparison.test.ts`), 28 integration route-state, canonical-metadata,
+  route-budget and navigation-seed tests (`tests/integration/club-comparison-route.test.ts`), 14
+  database-free URL-contract tests (`tests/club-comparison.test.ts`), 35 database-free presentation and
+  accessibility tests (`tests/club-comparison-view.test.ts`), 4 tests that render the view from real
+  resolved route state (`tests/integration/club-comparison-view.test.ts`) and 23 SEO tests
+  (`tests/seo.test.ts`). `npx tsc --noEmit` is clean, `npm run build` exits 0 with `/clubs/compare`
+  dynamic, 18 Playwright ISSUE-144 checks pass against the standalone build in the desktop and mobile
+  projects, a scripted five-state accessibility audit reports no problems, and the responsive sweep is
+  clean at 360/390/768/1280/1600 px with every disclosure open. The supported-Linux route recheck
+  deferred from Stage 5 is still OUTSTANDING and is carried into Stage 10 as the only unresolved
+  acceptance prerequisite: the branch is unpushed, so no Linux host has the route, and the recorded
+  324.8 ms / 381.5 ms warm medians against the 1.5 s ceiling are a conservative Windows/forwarded
+  measurement of the route's own state resolver. A whole-file Playwright run on this workstation also
+  reports 20 PRE-EXISTING failures in unrelated player/records/Brownlow journeys, caused by the local
+  application database carrying the pre-ISSUE-136/137 entity numbering those tests hard-code; they must
+  be re-run on the Linux dev host rather than read as ISSUE-144 regressions. The per-stage evidence lives in the
+  "Stage execution log" of `AFLDB-ISSUE-144.md`. The runbook was amended to **V1.7** on 2026-09-06:
+  decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages
+  (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment
+  into V1 as the new **Stage 6 — Extended rivalry analytics**, taking the plan to eleven stages
+  (Stage 0 through Stage 10) and renumbering the former Stages 6-9 to 7-10. The supporting read-only
+  evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`.
+- **Severity:** Medium — public product enhancement. No data-integrity, security or operational risk.
+- **Area:** Public UI / club history / database queries
+- **Found:** 2026-09-06 (allocated at the ISSUE-143 closeout)
+- **Related:** `AFLDB-ISSUE-129` (finals-series semantics — `matches.is_finals_series` is the only
+  finals-series definition this feature may read), `AFLDB-ISSUE-118` (organisation-grain precedent in
+  the Grid Solver), `AFLDB-ISSUE-113` (Brownlow season-grain authority).
+- **Migration:** none — the approved runbook forbids schema changes, indexes, materialized views and
+  persistent caching without measured before/after evidence and a reapproved runbook.
+
+### Scope
+
+A new AFL-only public `/clubs/compare` surface with three layers: (1) selected-season comparison
+(record, ladder, scoring, team metrics with runtime coverage, player leaders, Brownlow), (2) complete
+head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow), and
+(3) connected club history (players who represented both organisations, direction, intervening clubs,
+club-attributed Brownlow history).
+
+The binding contract is `AFLDB-ISSUE-144.md` (V1.7). Its non-negotiable requirement is that the
+implementation is **season-generic**: no hard-coded year, supported-season list, historical cutoff,
+metric-year branch or club mapping. Seasons come from canonical `seasons` rows, the default is the
+maximum canonical season, and provisionality/coverage are read from `seasons.status` /
+`seasons.data_through_date` and `stat_availability.coverage` at request time.
+
+Execution is one runbook stage per session (Stage 0 through Stage 10), each persisting its own
+handoff into `AFLDB-ISSUE-144.md`.
+
+### Stage 0 evidence (2026-09-06)
+
+Schema semantics were re-verified against the migrations in this worktree and **agree with the
+runbook on every load-bearing point**:
+
+* `afldb_identity_for_season(p_organization_id, p_season)` exists (`017_club_organizations.sql:141`),
+  `STABLE PARALLEL SAFE`, and deliberately prefers the narrower later-starting identity (Kangaroos
+  inside North Melbourne's span).
+* `clubs.organization_id` (NOT NULL) is the lineage key; `clubs.current_identity_id` is retained for
+  compatibility only. `club_organization_relations` carries `merged_into` / `relocated_to` / `folded`
+  as context — its own comment records that a merger does not transfer history.
+* `seasons.status` (`season_status` = `in_progress` | `complete`), `data_through_date`,
+  `source_built_at`, `last_loaded_round` and `completed_at` all exist (`015_brownlow_grain_and_coverage.sql:53`);
+  `is_complete` is now a generated mirror of `status`.
+* `coverage_status` = `complete` | `partial` | `not_collected` | `not_applicable` | `pending`
+  (`015_…:38`) and `stat_availability.coverage` (`015_…:161`) carry the runtime metric coverage the
+  runbook requires, keyed per `(stat_key, season)`. `016_brownlow_grain_availability.sql` populates
+  `brownlow_season_total`, `brownlow_round_votes` and `brownlow_match_votes` **computed from loaded
+  data, not hardcoded**, and defines a fully polled match as exactly 3+2+1 = 6 votes over
+  home-and-away matches — the same rule the runbook's H2H Brownlow coverage disclosure needs.
+* `brownlow_season_votes.club_id` is **nullable** (`005_brownlow_awards.sql:15`) with `is_winner` and
+  `is_ineligible`; `player_season_stats` carries `primary_club_id` + `club_count` (`015_…:99`); the
+  club-grain table is `player_club_season_stats` (renamed from `player_season_stats` by `015_…:83`)
+  and carries no award totals by design. `player_career_stats.brownlow_votes` is summed from
+  `brownlow_season_votes` and its comment records that summing `player_match_stats.brownlow_votes`
+  instead yields 46,979 against the authoritative 79,113 — the runbook's prohibition is materially
+  correct.
+* `matches` has `season`, `round_type`, `round_number`, `match_date`, `venue_id` (nullable) plus
+  `venue_raw` (NOT NULL), `home_club_id` / `away_club_id`, `home_score` / `away_score`, `result`,
+  `winner_club_id` (NULL on a draw) and `margin`; `is_finals_series` is added by
+  `085_matches_is_finals_series.sql` as the single finals-series definition.
+* `club_seasons` carries `played`, `wins`, `draws`, `losses`, `points_for`, `points_against`,
+  `premiership_points`, `percentage`, `ladder_rank` and `finals_played`, unique on `(season, club_id)`.
+* `player_clubs` is the derived historical-identity stint table with `games`, `goals`, `first_season`,
+  `last_season`, `first_match_id` and `last_match_id`.
+* `player_match_stats` carries `marks_inside_50` and `brownlow_votes` (constrained 0-3).
+
+Bundled Next.js guidance (16.3.1, `node_modules/next/dist/docs/`) was inspected and **does not
+contradict the route design**: `searchParams` is a `Promise` in a Server Component page and must be
+awaited (`01-app/03-api-reference/03-file-conventions/page.md`), and
+`export const dynamic = 'force-dynamic'` remains supported
+(`01-app/02-guides/caching-without-cache-components.md`); `cacheComponents` is not enabled in
+`next.config.*`, so no Cache Components migration applies.
+
+Reusable surfaces confirmed present: `src/components/Pagination.tsx`, `CollapsiblePanel.tsx`,
+`CollapsibleTable.tsx`, `SortableTable.tsx`, `SortableHeader.tsx`; `src/lib/seo.ts` `pageMetadata()`;
+`src/lib/format.ts`, `src/lib/pagination.ts`, `src/lib/params.ts` and `src/lib/slugs.ts`.
+`src/lib/player-compare.ts` and the existing player-comparison route are the closest structural
+precedent for Stage 6/7 and should be read then, not before.
+
+### Validation
+
+* Stage 0 gate `npx vitest run tests/finals-semantics-contract.test.ts` — **9 passed, 1 failed**, in
+  224 ms. The single failure is the **known Windows-only CRLF artefact**, not a semantics change: the
+  test splits `084_round_type_wildcard_final.sql` on a bare `\n` and compares statements, and
+  `git ls-files --eol` reports `i/lf w/crlf` for that file (this worktree is an `autocrlf=true`
+  checkout), so every statement carries a trailing `\r`. The expected and received arrays are
+  character-identical apart from that CR. The suite passes on the supported Linux runtime; the
+  repository must not flip `core.autocrlf` to work around it.
+* No database was contacted, and no schema, privilege or deployment command was run.
+
+### Blockers and environment notes
+
+* This worktree had **no `node_modules`**. A directory junction was created to
+  `D:\dev\afldb-issue-139\node_modules` (identical `package.json`, verified by `md5sum`; `next`
+  16.3.1). `D:\dev\afldb-issue-143\node_modules` exists but is **empty** — do not junction to it.
+  `node_modules` is untracked, so the junction is not a repository change.
+* `AFLDB-ISSUE-144.md.encoding-backup` is a stray pre-conversion copy of the runbook left in the
+  worktree. It is untracked and must not be committed.
+
+### Next action
+
+**Implementation is COMPLETE (Stages 0-10 complete; 11 stages total, 2026-09-06). Remaining actions are user-controlled:**
+
+1. Review `git status` / `git diff`; separately triage (do not include in this issue's changeset) the
+   foreign untracked `AFLDB-ISSUE-144-venue-evidence.ts`, `.txt`, `AFLDB-ISSUE-144-venue-probes.ts`,
+   `AFLDB-ISSUE-144-venue-schema-probe.ts` and the stray `AFLDB-ISSUE-144.md.encoding-backup`.
+2. Commit the ISSUE-144 implementation files (full inventory in the runbook's Stage 10 entry), then
+   push/merge per normal workflow.
+3. Make the merged code available on the Linux dev host, then run the two acceptance items that could
+   not be taken from this Windows worktree:
+   `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (target: warm
+   median under 1.5 s for Adelaide/Brisbane Lions and Carlton/Collingwood), and
+   `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` (expect the 20 pre-existing
+   Windows failures to be absent on the matching dataset).
+4. Close ISSUE-144 once both pass, then deploy to dev and run the post-deploy smoke checklist recorded
+   in the runbook's Stage 10 entry.
+
+This session (Stage 10) re-proved the 172-test baseline, `tsc --noEmit`, `eslint` and
+`npm run build` with no regression, and reran the Windows Playwright suite for a like-for-like
+comparison against Stage 9's recorded result. See the "Stage execution log" Stage 10 entry in
+`AFLDB-ISSUE-144.md` for full evidence.
