@@ -9,6 +9,21 @@ created, reopened, resolved, or materially reclassified.
 
 **Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`.
 
+<!-- 2026-09-06 (ISSUE-145 closeout): `AFLDB-ISSUE-145` Resolved — the existing `/venues` index is now
+     exposed in site navigation (primary-nav Venues entry after Seasons, home "Browse the record" Venues
+     card after Seasons, focused Playwright nav-reachability test, one CHANGELOG entry). Navigation
+     exposure only — **NO migration number**, no schema, no query, no new route. Validated: `tsc
+     --noEmit` clean, the focused nav Playwright test passes (desktop; mobile skipped by design),
+     `npm run build` exit 0 with `/venues` still present. Removed from this count and from the Open
+     Issues table; its number stays allocated. 9 -> 8 open. Next free issue ID is `AFLDB-ISSUE-146`. -->
+
+<!-- 2026-09-06 (ISSUE-145): `AFLDB-ISSUE-145` was ALLOCATED and Open — the existing `/venues` index
+     is exposed in site navigation (primary-nav Venues entry after Seasons, home "Browse the record"
+     Venues card after Seasons, focused Playwright nav-reachability test, one CHANGELOG entry). Branch
+     `sonnet/issue-145-venues`, worktree `D:\dev\afldb-issue-144-venues`. Navigation exposure only —
+     **NO migration number**, no schema, no query, no new route. 8 -> 9 open. SUPERSEDED by the
+     closeout comment above. -->
+
 <!-- 2026-09-06 (ISSUE-144 Stage 0): `AFLDB-ISSUE-144` is now ALLOCATED and Open — Club vs Club
      comparison and connected history (public UI / club history / database queries), on branch
      `codex/issue-144` in worktree `D:\dev\afldb-issue-144`. The approved V1.6 runbook is persisted as
@@ -174,6 +189,15 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Retired beta access keys cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, and a **spent** key (`use_count >= max_uses`) is offered neither Revoke (shown only while `live`) nor Delete, so obsolete keys accumulate with no disposal path. Implemented 2026-08-31 on the unmerged branch `claude/issue-116` and **applied to `afldb_dev` from there as migration `079_access_code_delete.sql`**, which `main` has since taken for `079_nl_search_log_head_to_head_grain.sql`. **RECONCILED 2026-09-06 on `claude/issue-117`:** the migration is renumbered **091**, the obsolete `audit()`-with-optional-`tx` change is dropped in favour of `main`'s `auditInTransaction` (ISSUE-119), and DB-free validation is green (13/13 unit, `tsc --noEmit` exit 0, `eslint` exit 0). Deletable = **retired** (revoked OR spent); a partly-used or unlimited key is still refused because it remains redeemable, and expiry is deliberately excluded. The rule is a `WHERE` clause inside the DELETE, not a hidden button, and `access.code_deleted` is written on the deleting transaction so the row cannot outlive its trail. | **Awaiting the three DB-backed suites and merge.** Not resolved. Run `db:migrate:test` then `tests/integration/access-codes.test.ts` + `tests/integration/privileges.test.ts` against `afldb_test`, then merge. **Deploy order is load-bearing:** migration `091` and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. **`afldb_dev` keeps its orphan `079_access_code_delete.sql` ledger row** — applying `091` there is safe (GRANT is idempotent) but does NOT clear it, so `AFLDB-ISSUE-139`'s `pre-cutover` parity refusal stands exactly as `AFLDB-ISSUE-142` Finding C decided. Runbook: `issues/open/AFLDB-ISSUE-117.md`. |
 | `AFLDB-ISSUE-142` | High | Operations / Database tooling / Data integrity | **OPEN — IMPLEMENTED 2026-09-06, AWAITING VALIDATION. Uncommitted in the `main` working tree; no migration, no privilege change, no database contacted.** (A) `player_match_period_stats` (migration 062) was in neither `afldb_meta.import_writable_tables` nor `publicContractTables()` — the only such table any migration creates — so the fail-closed gate refused every phase on every real database. Decided **in the contract** as `rebuilt` / `compare: zero`, NOT registered import-writable: `grant_import_write()` registers and grants in one statement, so a registry row would hand `afldb_import` UPDATE/DELETE/TRUNCATE for a writer that does not exist (nothing writes it; the NL read paths are refused upstream by `plan.ts:1054`; 0 rows everywhere). The suite now derives the registry from the migrations and runs the real classifier, so a future 062-shaped migration fails at test time. (B) A `restored`-phase lineage gate proves identity instead of existence — AFL Tables profile url for players, `matches.match_key` for matches — PASSES silently on a same-lineage (production) promotion, and REFUSES anything unevidenced; `--lineage-remap-out` writes the evidenced per-row remap. `player_link_resolutions.target_id` is declared identity `none` (no external key exists for an honours row), so a DEV promotion is refused with the two supportable answers printed (§7.4c). (C) `079_access_code_delete.sql` is committed only on `claude/issue-116` @ `2344ab5`, exists in no checkout, and cannot merge at 079 (`main` owns a different file there): the DEV parity refusal is truthful, the checker is not weakened, and the promotion itself is the reconciliation. | Run the validation in the entry (focused suite, typecheck, lint, then `--environment dev --phase source --database afldb_test` → PASS and `--phase pre-cutover --database afldb_dev --allow-fixture-identities` → refused on migration parity only), then commit/merge. Unblocks `AFLDB-ISSUE-139` Phase 4D and `AFLDB-ISSUE-137` path (a). |
 | `AFLDB-ISSUE-144` | Medium | Public UI / club history / database queries | **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT. Stages 0-10 complete (11 stages total) on `codex/issue-144` (worktree `D:\dev\afldb-issue-144`); the `/clubs/compare` surface is fully built — the route (`src/app/clubs/compare/page.tsx` + `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6 query surface, and the Stage 8 presentation (`src/components/ClubComparisonView.tsx` plus `ClubComparisonControls` / `ClubComparisonSeason` / `ClubComparisonHeadToHead` / `ClubComparisonPlayers` / `ClubComparisonBrownlow` / `ClubComparisonTrends` and `src/lib/club-comparison-format.ts`) — and Stage 9 made it public: `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (organisation slug from `current_identity`), and the BASE `/clubs/compare` in sitemap segment 0 with no pair/season/filter/page permutation. Stage 9 also fixed two acceptance defects: a 360px page-wide horizontal overflow (`.grid-shrink > * { min-width: 0 }` on the four `.grid-panels` grids holding tables) and an h2→h4 heading jump in the club Brownlow history panel. 172 tests pass: 68 integration query, 28 integration route-state/metadata/budget, 14 database-free URL, 35 database-free presentation/accessibility (`tests/club-comparison-view.test.ts`), 4 real-state render tests and 23 SEO tests; production `npm run build` exit 0; 18 Playwright ISSUE-144 checks pass on the standalone build in both desktop and mobile projects; a scripted five-state accessibility audit reports no problems and the responsive sweep is clean at 360/390/768/1280/1600 px.** A new AFL-only public `/clubs/compare` surface: selected-season comparison (record, ladder, scoring, team metrics with runtime coverage denominators, player leaders, Brownlow), complete head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage) and connected club history (players who represented both organisations, direction, intervening clubs, club-attributed Brownlow). Contract: the approved V1.7 runbook `AFLDB-ISSUE-144.md` at the repository root — **season-generic**, with no hard-coded year, supported-season list, historical cutoff, metric-year branch or club mapping; seasons come from canonical `seasons` rows and provisionality/coverage from `seasons.status` and `stat_availability.coverage` at request time. Aggregation grain: organisation -> selected-season identity -> match/club -> player-stat sum -> average of eligible team-match totals; `club_organization_relations` is context only and never merges statistics. Stage 0 re-verified every load-bearing schema semantic against the migrations with no contradiction. The approved runbook is now **V1.7**: decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment into V1 as the new **Stage 6 — Extended rivalry analytics**, so the plan is now eleven stages (Stage 0 through Stage 10) and the former Stages 6-9 are renumbered 7-10. Read-only supporting evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`. Planned key files: `src/db/queries/club-comparison.ts`, `src/app/clubs/compare/page.tsx`, `src/components/ClubComparisonView.tsx`, `tests/integration/club-comparison.test.ts`, `tests/club-comparison.test.ts`. **No migration, no index, no materialization, no persistent cache, no public API.** | **READY FOR USER GIT CLOSEOUT**: Stage 10 re-proved the baseline (`npm test -- tests/club-comparison.test.ts tests/club-comparison-view.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-route.test.ts tests/integration/club-comparison-view.test.ts tests/seo.test.ts` — 172 passed), `npx tsc --noEmit` and `npm run build`; then add the single Unreleased CHANGELOG entry and prepare (do not perform) the user's Git close-out. **Outstanding, and the only unresolved acceptance prerequisite:** the supported-Linux route recheck deferred from Stages 5, 7 and 8 still cannot be taken — `codex/issue-144` exists only in the Windows worktree and putting it on the Linux dev host is a user-controlled Git operation. Exact command once it is there: `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (Adelaide/Brisbane Lions and Carlton/Collingwood, warm median under 1.5 s). The full `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` run should also be repeated there: 20 PRE-EXISTING, dataset-dependent failures in unrelated player/records/Brownlow journeys occur on this workstation because its application database carries the pre-ISSUE-136/137 entity numbering those tests hard-code, and none of them touches ISSUE-144. |
+<!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
+     existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
+     the focused nav Playwright test passes on desktop / skips on mobile, `npm run build` exit 0 with
+     `/venues` still present). Navigation exposure only — no migration, no schema, no query, no new
+     route. Authoritative record: the `AFLDB-ISSUE-145` entry in this file (Resolution — 2026-09-06).
+     The pre-resolution row below is lineage only and its "OPEN" text is SUPERSEDED.
+| `AFLDB-ISSUE-145` | Low | Public UI / navigation | **OPEN — IMPLEMENTATION COMPLETE, awaiting the focused nav verification, on branch `sonnet/issue-145-venues` (worktree `D:\dev\afldb-issue-144-venues`).** The `/venues` index, its `listVenues` query and its data already shipped, but nothing links to it: the AFL primary navigation had no Venues entry and the home "Browse the record" card grid had no Venues card, so the page was reachable only by search or a typed URL. Navigation exposure only, recreated directly against current `main`: a `Venues` entry after `Seasons` in `PRIMARY_NAV` (`src/components/SiteNav.tsx`; the mobile `TABS` and the `/aflw` nav are unchanged — `/aflw/venues` was already listed there), a `Venues` card after `Seasons` in the "Browse the record" grid (`src/app/page.tsx`), a focused Playwright reachability test (`tests/e2e/journeys.spec.ts`, mirroring "match search is reachable from the primary navigation"), and one Unreleased `CHANGELOG.md` entry. **No migration, no schema, no query, no new route.** | Run `npx playwright test tests/e2e/journeys.spec.ts -g "venues is reachable from the primary navigation"` (expect pass; mobile projects skip it, as the existing match-search test does). Then commit/merge per normal workflow and Resolve. |
+-->
+
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-143` is **Resolved** and is NO LONGER an open issue. The
      historical-only / recorded-gap disposition is implemented and validated (73/73 DB-free,
      typecheck and lint clean, DEV `source` PASS and `pre-cutover` at its recorded parity-only
@@ -16973,3 +16997,54 @@ This session (Stage 10) re-proved the 172-test baseline, `tsc --noEmit`, `eslint
 `npm run build` with no regression, and reran the Windows Playwright suite for a like-for-like
 comparison against Stage 9's recorded result. See the "Stage execution log" Stage 10 entry in
 `AFLDB-ISSUE-144.md` for full evidence.
+
+## AFLDB-ISSUE-145 — Venues missing from site navigation
+
+- **Status:** **RESOLVED — 2026-09-06.** Branch `sonnet/issue-145-venues`, worktree
+  `D:\dev\afldb-issue-144-venues`. Implementation and validation complete; awaiting the user's Git
+  commit/merge.
+- **Severity / Area:** Low / Public UI — navigation.
+- **Reported:** 2026-09-06.
+- **Resolved:** 2026-09-06.
+
+### Problem
+
+The `/venues` index page (`src/app/venues/page.tsx`), its `listVenues` / `getVenueStates` queries
+(`src/db/queries/venues.ts`) and its data were already in the tree and working, but no navigation
+surface linked to it. The AFL `PRIMARY_NAV` (`src/components/SiteNav.tsx`) had no Venues entry, and the
+home page's "Browse the record" card grid (`src/app/page.tsx`) had no Venues card, so an AFL reader
+could reach the venues index only via search or by typing the URL. (The AFLW nav already listed
+`/aflw/venues`.)
+
+### Change
+
+Navigation exposure only, recreated directly against current `main` (an earlier patch against a stale
+base no longer applied cleanly):
+
+- `src/components/SiteNav.tsx` — `{ href: '/venues', label: 'Venues' }` in `PRIMARY_NAV`, positioned
+  after `Seasons`. The mobile `TABS`, `AFLW_PRIMARY_NAV` and `AFLW_TABS` are deliberately unchanged.
+- `src/app/page.tsx` — a `Venues` card after `Seasons` in the "Browse the record" grid, meta
+  "Every ground since 1897, and the matches played there".
+- `tests/e2e/journeys.spec.ts` — `test('venues is reachable from the primary navigation', …)`,
+  mirroring the existing "match search is reachable from the primary navigation" test (skips on the
+  mobile projects, where the masthead nav is hidden).
+- `CHANGELOG.md` — one `Unreleased` entry under `### AFLDB-ISSUE-145`.
+
+**No migration, no schema change, no query change, no new route.** This issue claims **no migration
+number**.
+
+### Validation
+
+- `npx tsc --noEmit` — PASS.
+- `npx playwright test tests/e2e/journeys.spec.ts -g "venues is reachable from the primary navigation"`
+  — 1 passed ([desktop]), 1 skipped ([mobile], by test design), 0 failed.
+- `npm run build` — PASS. Next.js 16.3.1 production Webpack build compiled successfully, TypeScript
+  build phase completed, 1,529 static pages generated, `/venues` present as a dynamic route,
+  `/venues/[slug]` generated all 52 canonical venue detail pages, `prepare-standalone` completed.
+- Note (environment, not a product failure): earlier `npm run build` attempts hit `EBUSY` because a
+  manually running `.next/standalone/server.js` process held the directory open; stopping only that
+  Node process let the same build command pass cleanly.
+
+### Follow-up
+
+None tracked.
