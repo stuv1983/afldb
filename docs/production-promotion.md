@@ -287,12 +287,25 @@ transcript to follow line by line, not a script to pipe into a shell.
 
 `promotion-truncate.sql` — one `TRUNCATE … RESTART IDENTITY` over every table in §1 except
 `canonical_applications`, plus every `staging_aflw` table. This is what removes the test
-fixtures. No cascade is needed: every table that references one of these is in the list.
+fixtures. No cascade is needed: every table that references one of these is in the list — with
+one exception the first live run found (`AFLDB-ISSUE-139` Phase 4E-2): the **rebuilt**
+`promotion_candidates` holds `resolved_decision_id → promotion_decisions(id)` (migration 074), and
+PostgreSQL refuses to truncate a referenced table unless every referrer is in the same statement,
+a structural check made even when both tables are empty. A rebuilt referrer can neither join the
+`TRUNCATE` nor be cascaded, and `promotion_decisions` cannot leave the statement either (it
+references `auth_users`). So the file is one transaction that drops exactly that constraint, runs
+the one `TRUNCATE`, and re-adds the constraint by its original name (`REBUILT_REFERRER_FKS` in
+`promotion-inventory.ts`) — the `ADD CONSTRAINT` re-validates every rebuilt row, so a row that
+still pointed at a decision refuses the whole file, the same fail-closed shape as §7.4.
 
 ### 7.2 Restore the rows, one table at a time, in FK order
 
 One `pg_restore --data-only --single-transaction --exit-on-error --table=<t>` per reinstated
-table from the **pre-cutover dump**, in the generated order, then `--schema=staging_aflw`.
+table from the **pre-cutover dump**, in the generated order, then the eight `staging_aflw` tables
+one per line with `--schema=staging_aflw --table=<t>` in the contract's FK order (`seasons` first).
+A single `--schema=staging_aflw` line was the original shape and failed on the first live run
+(`AFLDB-ISSUE-139` Phase 4E-2): `pg_restore --data-only` restores in TOC (alphabetical) order, so
+`fixtures` arrived before `seasons` and the single transaction rolled back.
 A failure names the table and leaves earlier tables committed and that table empty.
 
 ### 7.3 Identity sequences, audit marker, privileges
@@ -482,7 +495,7 @@ sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service 
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity
  WHERE datname IN ('afldb_prod', '$CAND') AND pid <> pg_backend_pid();
-ALTER DATABASE afldb_prod RENAME TO afldb_prod_pre_rebuild_$STAMP;
+ALTER DATABASE afldb_prod RENAME TO "afldb_prod_pre_rebuild_$STAMP";
 ALTER DATABASE "$CAND" RENAME TO afldb_prod;
 SQL
 sudo systemctl start afldb
@@ -492,7 +505,10 @@ npm run db:promotion:check -- --phase production --database afldb_prod \
 ```
 
 The kept database is named `afldb_prod_pre_rebuild_<stamp>` on purpose: `tools/db/rebuild-test.ts`
-refuses to touch any `pre_rebuild` name, and the checker accepts it as `--old-database`.
+refuses to touch any `pre_rebuild` name, and the checker accepts it as `--old-database`. **Quote every
+stamped name inside SQL**: the stamp's hyphen makes `afldb_prod_pre_rebuild_$STAMP` an invalid bare identifier, so an
+unquoted `RENAME TO` refuses at parse time (met on the first DEV swap, `AFLDB-ISSUE-139` Phase 4E-3 — it failed safely
+before any rename; the quoted form succeeded).
 
 **Post-promotion state, in this order:**
 
@@ -542,8 +558,8 @@ sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service 
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 SELECT pg_terminate_backend(pid) FROM pg_stat_activity
  WHERE datname IN ('afldb_prod', 'afldb_prod_pre_rebuild_$STAMP') AND pid <> pg_backend_pid();
-ALTER DATABASE afldb_prod RENAME TO $CAND;
-ALTER DATABASE afldb_prod_pre_rebuild_$STAMP RENAME TO afldb_prod;
+ALTER DATABASE afldb_prod RENAME TO "$CAND";
+ALTER DATABASE "afldb_prod_pre_rebuild_$STAMP" RENAME TO afldb_prod;
 SQL
 sudo systemctl start afldb
 ```

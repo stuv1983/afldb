@@ -40,14 +40,36 @@ export default async function RecordsPage() {
 
         {/* Listed by hand rather than from RECORD_CATEGORIES: that
             catalogue drives the computed /records/[category] leaderboards,
-            and this is a curated list from a cited source, with no
-            underlying column to rank. */}
+            and these are curated boards over their own bounded tables,
+            with no shared ranking column to generalise over. */}
         <Link href="/records/first-kick-goal" className="card">
           <h3>Goal with first VFL/AFL kick</h3>
           <div className="meta">
             Players recognised as having kicked a goal with their first kick in a senior
             VFL/AFL match.
           </div>
+        </Link>
+
+        <Link href="/records/family" className="card">
+          <h3>Most Games by Family</h3>
+          <div className="meta">Combined career games by a linked sibling family.</div>
+        </Link>
+
+        <Link href="/records/father-son" className="card">
+          <h3>Father–Son Records</h3>
+          <div className="meta">
+            Father and son pairs recorded under the AFL/VFL father-son rule.
+          </div>
+        </Link>
+
+        <Link href="/records/coaches" className="card">
+          <h3>Coach Records</h3>
+          <div className="meta">Most games coached and best coaching win percentage.</div>
+        </Link>
+
+        <Link href="/records/after-the-siren" className="card">
+          <h3>After-the-Siren Records</h3>
+          <div className="meta">Most after-the-siren attempts and most goals kicked.</div>
         </Link>
       </div>
     </>

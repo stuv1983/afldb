@@ -15,6 +15,66 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-139 — Family, Father–Son, Coach and After-the-Siren Records; Coaches navigation - 6 September 2026
+
+- Four new curated Records boards read from data the DEV promotion above makes reachable: Most Games
+  by Family (linked sibling families, `player_relationships.family_key`), Father–Son Records
+  (`relationship = 'parent_child'`, read separately from sibling families and never merged with them),
+  Coach Records (most games coached, best win percentage at a 50-game minimum), and After-the-Siren
+  Records (most attempts, most goals — first/latest occurrence for each drawn only from the matching
+  kind of event). A `Coaches` entry was added to the main navigation; the existing `/coaches` index and
+  coach-only profile route needed no change. No migration, no new table.
+- Fixed a synthetic-draw defect while building the coach win-percentage query: counting draws as
+  `m.winner_club_id IS NULL` alone, across the `LEFT JOIN match_coaches`/`matches` a zero-game coach
+  uses, would have credited them a draw they never played.
+
+### AFLDB-ISSUE-139 — `afldb_dev` promoted onto the canonical AFL Tables identity lineage - 6 September 2026
+
+- The development database was replaced through the `AFLDB-ISSUE-125` promotion contract under
+  `--environment dev` (`AFLDB-ISSUE-141`/`142`/`143`): the accepted `afldb_test` rebuild was restored
+  into `afldb_dev_candidate_20260906-112500`, every DEV-only state class was treated as decided
+  (identities, beta access, settings, uploads, overrides, telemetry, the captured Gridley corpus under
+  its original import batches 82/84 with the source key re-resolved to the candidate's `sources` id;
+  `data_edits` and `player_link_resolutions` withheld as historical-only), grants reconciled, all
+  five checker phases recorded, and the databases swapped by rename. The previous database is
+  retained as `afldb_dev_pre_rebuild_20260906-112500` until the record is closed. 13,271 of 13,273
+  players now carry an AFL Tables profile identity (previously 12,472 of 13,363), so the coach,
+  father-son and sibling loaders that could not run on DEV are represented from the rebuild.
+- The 2026 season was re-acquired through the supported settle ladder (batch 86: 209 matches,
+  10,683 canonical rows; batch 87 appended finals week 1). The first settle into empty staging
+  took 3 h 49 min against 51 s once staging held the season — recorded as a performance finding
+  for follow-up, not fixed here.
+- `AFLDB-ISSUE-140`'s 17 duplicate 2026 matches do not exist on the promoted lineage (re-measured
+  0 / 0 / 0); the old lineage holding them is retained for that issue's writer identification.
+
+### AFLDB-ISSUE-139 — Two generated promotion-plan steps could not run on a live database - 6 September 2026
+
+- The first live run of the `AFLDB-ISSUE-125` promotion plan (the DEV promotion, candidate
+  `afldb_dev_candidate_20260906-112500`) refused twice inside `promotion-truncate.sql` and once in
+  `promotion-reinstate.sh`, each time atomically and before any row was lost. Both defects are in
+  the tracked generator (`tools/db/promotion-inventory.ts`) and would have refused a production
+  promotion identically.
+- **Truncate.** PostgreSQL refuses `TRUNCATE` on a referenced table unless every referrer is in
+  the same statement, and the check is structural (both tables empty still refuses). The
+  **rebuilt** `promotion_candidates` holds `resolved_decision_id → promotion_decisions(id)`
+  (migration 074), so the contract's one-statement truncate could never run; emptying
+  `promotion_decisions` with `DELETE` instead only moved the refusal to `auth_users`, which
+  `promotion_decisions` references. The generated file is now one transaction that drops exactly
+  that constraint (`REBUILT_REFERRER_FKS`), runs the same single `TRUNCATE`, and re-adds the
+  constraint by its original name — the `ADD CONSTRAINT` re-validates every rebuilt row, so a
+  rebuilt row still pointing at a decision refuses the whole file. The `staging_aflw` block
+  likewise truncated one table at a time and failed on `matches → fixtures`; it is now one
+  `TRUNCATE` over every table of the schema.
+- **Reinstate.** `pg_restore --data-only --schema=staging_aflw` restores in TOC (alphabetical)
+  order, so `fixtures` arrived before `seasons` and the single transaction rolled back. The
+  schema-level contract entry now declares its tables in FK order (`TableTreatment.tables`) and the
+  plan emits one `--schema=staging_aflw --table=<t>` line per table; a schema entry without that
+  list is refused rather than restored in TOC order.
+- `tests/db-promotion-check.test.ts` pins all three: the drop/truncate/re-add order and the 074
+  constraint name against the migration text, the single-statement schema truncate, and the
+  schema table list against migration 025's `CREATE TABLE` / `REFERENCES` clauses.
+  `docs/production-promotion.md` §7.1 and §7.2 describe both.
+
 ### AFLDB-ISSUE-143 — The promotion contract can express an intentional historical-only disposition - 6 September 2026
 
 - `docs/production-promotion.md` §7.4c had named two supportable answers for a lineage-bound

@@ -31,6 +31,7 @@ import {
   PRE_REBUILD_PREFIX,
   PROMOTION_CONTRACT,
   PromotionRefused,
+  REBUILT_REFERRER_FKS,
   RESERVED_EXAMPLE_DOMAINS,
   RESERVED_TEST_TLDS,
   TEST_FIXTURE_EMAIL_SQL,
@@ -51,6 +52,7 @@ import {
   reinstatePlan,
   resolveLineageRemap,
   reinstatedPublicTables,
+  reinstatedSchemaTables,
   reinstatedSchemas,
   resyncIdentitySql,
   tablesWithTreatment,
@@ -375,6 +377,46 @@ describe('reinstatement order and generated SQL', () => {
     expect(sql).toContain("schemaname = 'staging_aflw'");
     expect(sql).not.toContain("schemaname = 'staging'");
     expect(sql).toContain('RESTART IDENTITY');
+    // AFLDB-ISSUE-139 Phase 4E-2: staging_aflw.matches -> staging_aflw.fixtures refused a
+    // table-at-a-time truncate of the schema; it must be one statement over every table.
+    expect(sql).toContain("string_agg(format('%I.%I', schemaname, tablename)");
+    expect(sql).toContain("EXECUTE 'TRUNCATE TABLE ' || tabs || ' RESTART IDENTITY'");
+    expect(sql).not.toMatch(/FOR r IN SELECT tablename/);
+  });
+
+  // AFLDB-ISSUE-139 Phase 4E-2: the first live run of promotion-truncate.sql was refused —
+  // "cannot truncate a table referenced in a foreign key constraint": migration 074's
+  // promotion_candidates.resolved_decision_id -> promotion_decisions(id). The referrer is
+  // REBUILT, so it can neither join the TRUNCATE nor be cascaded, and promotion_decisions
+  // cannot leave the statement either (it references auth_users). The constraint is dropped
+  // before the one TRUNCATE and re-added by its original name after it, in one transaction.
+  it('drops and re-adds the rebuilt-side FK around the one TRUNCATE (074)', () => {
+    const fk = REBUILT_REFERRER_FKS.find((f) => f.references === 'promotion_decisions');
+    expect(fk).toBeDefined();
+    expect(fk!.referrer).toBe('promotion_candidates');
+    expect(fk!.constraint).toBe('promotion_candidates_decision_fk');
+    expect(fk!.column).toBe('resolved_decision_id');
+    const sql = truncateSql();
+    const drop = sql.indexOf('ALTER TABLE public.promotion_candidates DROP CONSTRAINT promotion_candidates_decision_fk;');
+    const truncate = sql.indexOf('TRUNCATE TABLE');
+    const add = sql.indexOf('ALTER TABLE public.promotion_candidates ADD CONSTRAINT promotion_candidates_decision_fk');
+    expect(drop).toBeGreaterThan(sql.indexOf('BEGIN;'));
+    expect(truncate).toBeGreaterThan(drop);
+    expect(add).toBeGreaterThan(truncate);
+    expect(sql.indexOf('COMMIT;')).toBeGreaterThan(add);
+    expect(sql).toContain('FOREIGN KEY (resolved_decision_id) REFERENCES public.promotion_decisions(id);');
+    expect(sql).not.toMatch(/CASCADE/);
+    expect(sql).not.toMatch(/DELETE FROM/);
+    for (const f of REBUILT_REFERRER_FKS) {
+      expect(truncatedPublicTables(), f.references).toContain(f.references);
+      expect(contractByName(f.referrer)?.treatment ?? 'rebuilt', f.referrer).toBe('rebuilt');
+    }
+    // The constraint name and column are pinned to the migration that created them.
+    const migrations = readdirSync(join(process.cwd(), 'src', 'db', 'migrations'))
+      .filter((f) => f.endsWith('.sql'))
+      .map((f) => readFileSync(join(process.cwd(), 'src', 'db', 'migrations', f), 'utf8'))
+      .join('\n');
+    expect(migrations).toMatch(/promotion_candidates_decision_fk\s+FOREIGN KEY \(resolved_decision_id\)\s+REFERENCES promotion_decisions\(id\)/);
   });
 
   it('re-syncs identity sequences of exactly the reinstated tables', () => {
@@ -402,10 +444,25 @@ describe('reinstatement order and generated SQL', () => {
 
   it('emits one single-transaction data-only pg_restore per reinstated table, in order, plus the AFLW schema', () => {
     const plan = reinstatePlan({ candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump' });
-    const tables = [...plan.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1]);
-    expect(tables).toEqual(reinstatedPublicTables());
-    expect(plan).toContain('--schema=staging_aflw');
-    expect((plan.match(/--single-transaction/g) ?? []).length).toBe(tables.length + 1);
+    const publicTables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
+    expect(publicTables).toEqual(reinstatedPublicTables());
+    // AFLDB-ISSUE-139 Phase 4E-2: `--schema=staging_aflw` alone restores in TOC (alphabetical)
+    // order and the single transaction dies on fixtures -> seasons. One line per table, in
+    // the contract's FK order, and every table of migration 025's schema is listed exactly once.
+    const schemaTables = [...plan.matchAll(/--schema=staging_aflw --table=([a-z_]+)/g)].map((m) => m[1]);
+    expect(plan).not.toMatch(/--schema=staging_aflw "/);
+    expect(schemaTables).toEqual(reinstatedSchemaTables().map((t) => t.table));
+    const migration025 = readFileSync(join(process.cwd(), 'src', 'db', 'migrations', '025_staging_aflw.sql'), 'utf8');
+    const created = [...migration025.matchAll(/CREATE TABLE staging_aflw\.([a-z_]+)/g)].map((m) => m[1]);
+    expect([...schemaTables].sort()).toEqual([...new Set(created)].sort());
+    // Every referenced table precedes its referrer in the plan.
+    for (const m of migration025.matchAll(/CREATE TABLE staging_aflw\.([a-z_]+)([\s\S]*?)\);/g)) {
+      const referrer = m[1];
+      for (const ref of m[2].matchAll(/REFERENCES staging_aflw\.([a-z_]+)/g)) {
+        expect(schemaTables.indexOf(ref[1]), `${referrer} -> ${ref[1]}`).toBeLessThan(schemaTables.indexOf(referrer));
+      }
+    }
+    expect((plan.match(/--single-transaction/g) ?? []).length).toBe(publicTables.length + schemaTables.length);
     expect(plan).toContain('--data-only');
     expect(plan).toContain('privileges.sql');
     expect(plan).toContain('--phase candidate');
@@ -417,7 +474,7 @@ describe('reinstatement order and generated SQL', () => {
       candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod',
       preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump',
     });
-    const tables = [...plan.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1]);
+    const tables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
     expect(tables).toContain('external_grid_sources');
     expect(tables).toContain('external_grids');
     expect(tables).toContain('external_grid_axes');
@@ -445,7 +502,7 @@ describe('reinstatement order and generated SQL', () => {
     expect(dev).not.toContain('afldb-prod');
     // Same contract, same order: dev is a name shape, not a different plan — except for the
     // tables AFLDB-ISSUE-143 withholds there, which the dev list itself accounts for.
-    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
+    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
   });
 
   it('names the environment in the audit marker, defaulting to production', () => {
@@ -1152,7 +1209,7 @@ describe('historical-only / recorded-gap disposition', () => {
     expect(dev).toContain('expects 0 rows');
     expect(dev).toContain('Nothing is deleted');
     // Every other reinstated table is untouched, in the same order.
-    expect([...dev.matchAll(/--table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
+    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
     expect(reinstatedPublicTables('dev').length).toBe(reinstatedPublicTables('prod').length - 2);
   });
 

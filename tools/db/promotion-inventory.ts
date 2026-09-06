@@ -154,6 +154,15 @@ export type TableTreatment = {
   /** `public` unless stated. Schema-level entries use `schema` + `name: '*'`. */
   schema: 'public' | 'staging' | 'staging_aflw';
   name: string;
+  /**
+   * Schema-level `reinstate` entries only: every table of the schema, in foreign-key
+   * order. `pg_restore --data-only --schema=<s>` restores tables in the dump's TOC order
+   * (alphabetical), and `--single-transaction --exit-on-error` then fails on the first
+   * FK it meets (`staging_aflw.fixtures` before `staging_aflw.seasons`, met on the first
+   * live DEV promotion, `AFLDB-ISSUE-139` Phase 4E-2), so the plan restores one table per
+   * line in this order instead.
+   */
+  tables?: readonly string[];
   subsystem: string;
   category: Category;
   /** True when the rows only ever existed on production (never produced by a rebuild). */
@@ -569,9 +578,14 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'staging_aflw', name: '*', subsystem: 'AFLW (tools/aflw)', category: 'staging',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    // Migration 025's FK order: seasons first; fixtures, ladders, player_seasons -> seasons;
+    // matches -> seasons + fixtures; scoring_events, player_match_stats -> matches (+ seasons);
+    // issues stands alone.
+    tables: ['seasons', 'fixtures', 'ladders', 'player_seasons', 'matches', 'scoring_events',
+      'player_match_stats', 'issues'],
     note: 'The aflwstats.com scrape the aflw.* views read. NOT produced by '
-      + 'db:test:rebuild, so a rebuilt database has it empty; reinstated schema-wide '
-      + 'from the pre-cutover dump (or reloaded with tools/aflw/load_staging.py --load).',
+      + 'db:test:rebuild, so a rebuilt database has it empty; reinstated table by table '
+      + 'in FK order from the pre-cutover dump (or reloaded with tools/aflw/load_staging.py --load).',
   },
 ];
 
@@ -789,6 +803,23 @@ export function reinstatedSchemas(): string[] {
   return PROMOTION_CONTRACT
     .filter((t) => t.schema !== 'public' && t.treatment === 'reinstate')
     .map((t) => t.schema);
+}
+
+/**
+ * The tables of every reinstated non-public schema, in the FK order the contract declares
+ * (`TableTreatment.tables`). Refuses a schema entry that declares none: a schema restored
+ * in TOC order is the failure this exists to prevent, so it is not a silent fallback.
+ */
+export function reinstatedSchemaTables(): { schema: string; table: string }[] {
+  const out: { schema: string; table: string }[] = [];
+  for (const t of PROMOTION_CONTRACT) {
+    if (t.schema === 'public' || t.treatment !== 'reinstate') continue;
+    if (!t.tables || t.tables.length === 0) {
+      throw new PromotionRefused(`Contract entry ${t.schema}.* is reinstated but declares no FK-ordered table list.`);
+    }
+    for (const table of t.tables) out.push({ schema: t.schema, table });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1423,27 +1454,82 @@ function wrapComment(text: string, width: number): string[] {
   return out;
 }
 
+/**
+ * Foreign keys from a REBUILT table into a truncated contract table. PostgreSQL refuses
+ * `TRUNCATE` on a referenced table unless every referrer is in the same statement — a
+ * structural check, made even when both tables are empty — and the rebuilt referrer can
+ * neither join the statement nor be cascaded. The truncate therefore drops exactly these
+ * constraints first and re-adds them, by their original names, after the one `TRUNCATE`,
+ * inside the same transaction: the `ADD CONSTRAINT` re-validates every rebuilt row, so a
+ * rebuilt row that still pointed at an emptied table refuses the whole file — the same
+ * fail-closed shape as the §7.4 exception path. Met on the first live DEV promotion
+ * (`AFLDB-ISSUE-139` Phase 4E-2): migration 074's
+ * `promotion_candidates.resolved_decision_id -> promotion_decisions(id)`. Any other
+ * arrangement was wrong: emptying `promotion_decisions` with `DELETE` instead only moves the
+ * refusal to `auth_users`, which `promotion_decisions` itself references.
+ */
+export interface RebuiltReferrerFk {
+  /** Rebuilt table holding the constraint. */
+  referrer: string;
+  /** Its constraint name, exactly as the migration created it. */
+  constraint: string;
+  /** Referencing column on the rebuilt table. */
+  column: string;
+  /** Truncated contract table the constraint points at. */
+  references: string;
+  /** Migration that created it. */
+  migration: string;
+}
+export const REBUILT_REFERRER_FKS: readonly RebuiltReferrerFk[] = [
+  {
+    referrer: 'promotion_candidates', constraint: 'promotion_candidates_decision_fk',
+    column: 'resolved_decision_id', references: 'promotion_decisions', migration: '074',
+  },
+];
+
 /** SQL that empties every non-rebuilt contract table in the candidate. */
 export function truncateSql(): string {
   const tables = truncatedPublicTables().map((t) => `public.${t}`).join(',\n  ');
+  const dropFks = REBUILT_REFERRER_FKS.map((fk) => `-- ${fk.referrer} is REBUILT and holds ${fk.column} -> ${fk.references} (migration ${fk.migration}),
+-- so ${fk.references} cannot be truncated while the constraint exists (AFLDB-ISSUE-139).
+ALTER TABLE public.${fk.referrer} DROP CONSTRAINT ${fk.constraint};`).join('\n');
+  const addFks = REBUILT_REFERRER_FKS.map((fk) => `-- Re-added by its original name; this re-validates every rebuilt row, so a row that still
+-- pointed into the emptied table refuses the whole transaction rather than dangling.
+ALTER TABLE public.${fk.referrer} ADD CONSTRAINT ${fk.constraint}
+  FOREIGN KEY (${fk.column}) REFERENCES public.${fk.references}(id);`).join('\n');
   const schemas = PROMOTION_CONTRACT
     .filter((t) => t.schema !== 'public' && t.treatment === 'reinstate')
     .map((t) => t.schema);
+  // One TRUNCATE over every table of the schema, not one per table: the schema's own
+  // foreign keys (staging_aflw.matches -> staging_aflw.fixtures) refuse a table-at-a-time
+  // truncate exactly as the public list would (AFLDB-ISSUE-139 Phase 4E-2).
   const schemaBlocks = schemas.map((schema) => `DO $$
-DECLARE r record;
+DECLARE tabs text;
 BEGIN
-  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = '${schema}' LOOP
-    EXECUTE format('TRUNCATE TABLE %I.%I RESTART IDENTITY', '${schema}', r.tablename);
-  END LOOP;
+  SELECT string_agg(format('%I.%I', schemaname, tablename), ', ' ORDER BY tablename)
+    INTO tabs FROM pg_tables WHERE schemaname = '${schema}';
+  IF tabs IS NOT NULL THEN
+    EXECUTE 'TRUNCATE TABLE ' || tabs || ' RESTART IDENTITY';
+  END IF;
 END $$;`).join('\n');
   return `-- AFLDB-ISSUE-125: remove every row of production-owned/operational state the
 -- rebuilt dump carried (test fixtures included). One statement, no cascading: every table
--- that references one of these is itself in the list.
+-- that references one of these is itself in the list — bar the rebuilt referrers whose
+-- constraints are dropped and re-added around it below (AFLDB-ISSUE-139). One transaction:
+-- a refusal anywhere leaves the candidate exactly as it was.
+BEGIN;
+
+${dropFks}
+
 TRUNCATE TABLE
   ${tables}
 RESTART IDENTITY;
 
+${addFks}
+
 ${schemaBlocks}
+
+COMMIT;
 `;
 }
 
@@ -1560,9 +1646,11 @@ export function reinstatePlan(input: PlanInput): string {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
     lines.push(`           --single-transaction --exit-on-error --table=${table} "${input.preCutoverDump}"`);
   }
-  for (const schema of reinstatedSchemas()) {
+  // One line per table of the schema, in the contract's FK order — never `--schema=` alone,
+  // which restores in TOC (alphabetical) order and fails on the schema's own foreign keys.
+  for (const { schema, table } of reinstatedSchemaTables()) {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
-    lines.push(`           --single-transaction --exit-on-error --schema=${schema} "${input.preCutoverDump}"`);
+    lines.push(`           --single-transaction --exit-on-error --schema=${schema} --table=${table} "${input.preCutoverDump}"`);
   }
   lines.push('');
   lines.push('# 3. Re-sync identity sequences (a data-only table restore does not carry SEQUENCE SET).');
