@@ -7,28 +7,9 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-06
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`.
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`.
 
-<!-- UPDATE 2026-09-06 (ISSUE-117 lineage reconciliation, branch `claude/issue-117`):
-     `AFLDB-ISSUE-117` is now listed here for the first time — its record previously existed only on
-     the unmerged branch `claude/issue-116` @ `2344ab5`, which is why `main` had no row for it. Its
-     migration is renumbered `079_access_code_delete.sql` -> **`091_access_code_delete.sql`**, because
-     `main` owns `079_nl_search_log_head_to_head_grain.sql` (applied everywhere, production included).
-     **`091` was confirmed free by a full scan**: the union of `src/db/migrations` over every local and
-     remote ref, and separately over every sibling worktree (the uncommitted case that once hid
-     ISSUE-122's `083`) — both stop at `090`. `091` IS NOW TAKEN; the next free migration number is
-     `092`, and any other branch must still re-scan every live tip before claiming it.
-     This branch is cut from committed `main` @ `8dd96c5`, so it does NOT contain the uncommitted
-     `AFLDB-ISSUE-142` work in the `main` working tree. That work also edits `CHANGELOG.md`,
-     `issues.md` and `IssuesIndex.md`, so expect text conflicts there at merge (no code overlap); take
-     ISSUE-142's corrected open-issue count and add `-117` to it. 5 -> 6 open here.
-     **Next free issue ID is `AFLDB-ISSUE-143`.** -->
-
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`.
-
-<!-- UPDATE 2026-09-06 (ISSUE-142 implementation): `AFLDB-ISSUE-142` is **implemented and awaiting
-     validation** — five files in the `main` working tree, uncommitted, with **no migration, no
-     privilege change and no database contact**. (A) `player_match_period_stats` is decided in the
+<!-- UPDATE 2026-09-06 (ISSUE-142 implementation): `AFLDB-ISSUE-142` is **implemented, validated, committed and pushed** as `12a3995`, with **no migration and no privilege change**. (A) `player_match_period_stats` is decided in the
      promotion contract (`rebuilt` / `compare: zero`) rather than registered import-writable, and
      `tests/db-promotion-check.test.ts` now DERIVES the import-writable registry from the migrations and
      runs the real classifier over it, so a future 062-shaped migration fails at test time. (B) a new

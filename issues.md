@@ -7,17 +7,9 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3 tracked here — `AFLDB-ISSUE-110`, `-118`, `-137`.
-<!-- 2026-09-06 (`claude/issue-117`): this count line is NOT corrected here on purpose. It is
-     already stale on `main` (it omits `-138`, `-139`, `-140`, whose rows are in the table below),
-     and `AFLDB-ISSUE-142`'s synchronisation of it is UNCOMMITTED in the `main` working tree, where
-     it reads 6. Writing a fourth value on this branch would collide with that fix for no benefit.
-     `AFLDB-ISSUE-117` adds ONE open issue and its row is in the table below. At merge, take
-     ISSUE-142's corrected set and add `-117` to it. -->
+**Open issues:** 7 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`.
 
-**Open issues:** 6 tracked here — `AFLDB-ISSUE-110`, `-137`, `-138`, `-139`, `-140`, `-142`.
-<!-- 2026-09-06 (ISSUE-142): synchronised with `IssuesIndex.md`, which has listed six open issues since
-     the ISSUE-139 Phase 4C update. This line still read "3 tracked here — -110, -118, -137": `-118` was
+<!-- 2026-09-06 (ISSUE-142): synchronised with `IssuesIndex.md`; the merged ISSUE-117/142 state now lists seven open issues. This line still read "3 tracked here — -110, -118, -137": `-118` was
      Resolved on 2026-09-06 (§23.38) and `-138`, `-139`, `-140`, `-142` were allocated after it was last
      written. No issue's state was changed by this correction. -->
 <!-- 2026-09-05: `-118` REOPENED (the 2026-09-05 closeout counted 28 valid Gridley criteria as acceptable because they were classified data_absent; acceptance is now zero unsupported valid criteria). Row restored below; 2 -> 3. -->
