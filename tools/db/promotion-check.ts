@@ -5,7 +5,7 @@
  *     npm run db:promotion:check -- --phase pre-cutover --database afldb_prod \
  *         --snapshot ~/backups/afldb/promotion-<stamp>.json --expect-super-admin <email>
  *     npm run db:promotion:check -- --phase restored    --database afldb_prod_candidate_<stamp> \
- *         --old-database afldb_prod
+ *         --old-database afldb_prod [--lineage-remap-out <file>]
  *     npm run db:promotion:check -- --phase candidate   --database afldb_prod_candidate_<stamp> \
  *         --compare ~/backups/afldb/promotion-<stamp>.json --expect-super-admin <email>
  *     npm run db:promotion:check -- --phase production  --database afldb_prod \
@@ -46,10 +46,11 @@
  *      so the SERVER refuses a write even if one were somehow issued;
  *   3. tests/db-promotion-check.test.ts asserts (1) and (2) from the source text.
  *
- * The one thing it writes is a local JSON snapshot of ROW COUNTS (`--snapshot`) and, with
- * `--plan`, the SQL/command files the operator then reads and runs by hand. No DSN, no
- * password, no hash and no secret is ever printed or written; email addresses are printed
- * only when they are test fixtures being refused.
+ * The only things it writes are a local JSON snapshot of ROW COUNTS (`--snapshot`), the
+ * `--plan` SQL/command files, and — AFLDB-ISSUE-142 — the `--lineage-remap-out` file, all of
+ * which the operator reads and runs by hand. No DSN, no password, no hash and no secret is
+ * ever printed or written; email addresses are printed only when they are test fixtures
+ * being refused, and the remap file carries row ids and AFL Tables profile paths only.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -64,6 +65,7 @@ import {
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
   ENVIRONMENTS,
+  LINEAGE_IDENTITY_SQL,
   PHASES,
   PROMOTION_CONTRACT,
   PromotionRefused,
@@ -74,15 +76,26 @@ import {
   classifyPublicTables,
   compareCounts,
   databaseOf,
+  detectLineageChange,
   environmentNames,
+  lineageBoundTables,
+  lineageRemapSql,
+  lineageTargetsOf,
   publicContractTables,
   reinstatePlan,
   reinstatedSchemas,
+  resolveLineageRemap,
   resyncIdentitySql,
   truncateSql,
   withDatabase,
   type CompareRule,
   type Environment,
+  type IdentityPair,
+  type LineageColumnPlan,
+  type LineageIdentityRule,
+  type LineageRef,
+  type LineageSample,
+  type LineageTarget,
   type Phase,
   type Snapshot,
 } from './promotion-inventory';
@@ -121,6 +134,12 @@ export type Options = {
    * ten-row sample cap is lifted), and reports WARN instead of FAIL. Refused under `prod`.
    */
   allowFixtureIdentities: boolean;
+  /**
+   * AFLDB-ISSUE-142 (B). Where to write the evidenced lineage remap the `restored` phase
+   * computes when the candidate does not share the replaced database's id lineage. Reading
+   * both databases is the only way to compute it, so it belongs to a phase, not to `--plan`.
+   */
+  lineageRemapOut?: string;
 };
 
 export function parseArgs(argv: readonly string[]): Options {
@@ -163,6 +182,7 @@ export function parseArgs(argv: readonly string[]): Options {
         }
         out.dsnEnv = value; i += 1; break;
       }
+      case '--lineage-remap-out': out.lineageRemapOut = need(i, arg); i += 1; break;
       case '--snapshot': out.snapshot = need(i, arg); i += 1; break;
       case '--compare': out.compare = need(i, arg); i += 1; break;
       case '--expect-super-admin': out.expectSuperAdmin = need(i, arg); i += 1; break;
@@ -218,6 +238,11 @@ export function parseArgs(argv: readonly string[]): Options {
     assertOldDatabaseName(out.oldDatabase, out.environment);
   } else if (out.oldDatabase) {
     throw new PromotionRefused("--old-database is only meaningful with --phase restored.");
+  }
+  if (out.lineageRemapOut && out.phase !== 'restored') {
+    throw new PromotionRefused(
+      "--lineage-remap-out is only meaningful with --phase restored: the remap is computed by "
+      + 'reading the candidate and the database it replaces in the same pass.');
   }
   if (out.compare && !['candidate', 'production'].includes(out.phase)) {
     throw new PromotionRefused('--compare is only meaningful in the candidate and production phases.');
@@ -583,6 +608,194 @@ async function gateDanglingReferences(
   report.add('Dangling references from production-owned rows into rebuilt data', fail ? 'FAIL' : (fixups ? 'WARN' : 'PASS'), lines);
 }
 
+// ---------------------------------------------------------------------------
+// Lineage identity — AFLDB-ISSUE-142 (B)
+// ---------------------------------------------------------------------------
+
+/** Ids compared to decide whether the two databases share an id lineage. */
+const LINEAGE_SAMPLE_LIMIT = 50;
+/**
+ * A per-row remap is only honest while the rows can be enumerated and read by an operator.
+ * Beyond this the contract needs a set-based answer, so the gate refuses rather than
+ * emitting a file nobody can check.
+ */
+const LINEAGE_ROW_CAP = 5000;
+/** Unresolved ids printed per column before the transcript says how many more there are. */
+const LINEAGE_PRINT_LIMIT = 20;
+
+async function identitiesById(
+  q: Query, rule: Exclude<LineageIdentityRule, 'none'>, ids: readonly number[],
+): Promise<IdentityPair[]> {
+  if (ids.length === 0) return [];
+  const rows = await q(LINEAGE_IDENTITY_SQL[rule].byId, [ids]);
+  return rows.map((r) => ({ id: asInt(r.id), identity: String(r.identity) }));
+}
+
+async function identitiesByIdentity(
+  q: Query, rule: Exclude<LineageIdentityRule, 'none'>, identities: readonly string[],
+): Promise<IdentityPair[]> {
+  if (identities.length === 0) return [];
+  const rows = await q(LINEAGE_IDENTITY_SQL[rule].byIdentity, [identities]);
+  return rows.map((r) => ({ id: asInt(r.id), identity: String(r.identity) }));
+}
+
+/**
+ * Does a reinstated id still mean the same thing?
+ *
+ * `gateDanglingReferences` asks only whether an id EXISTS in the candidate. Existence is not
+ * identity: when the candidate comes from a different id lineage almost every id exists and
+ * denotes a different row, so "0 missing" is exactly the answer a silent misattribution
+ * gives. This gate asks the other question, from evidence on both databases:
+ *
+ *   1. sample ids that exist on both sides and compare their STABLE identity. Equal on every
+ *      comparable sample -> one lineage -> id-keyed reinstatement is sound (the production
+ *      case, where the candidate is a rebuild of the same lineage) and the gate passes;
+ *   2. otherwise every lineage-bound column declared in the contract is resolved old id ->
+ *      identity -> new id, per row, and anything not evidenced REFUSES.
+ *
+ * Fails closed in both directions: no comparable sample counts as a lineage change.
+ */
+async function gateLineageIdentity(
+  candidate: Query, old: Query, present: readonly string[], remapOut: string | undefined,
+  candidateName: string, oldName: string, environment: Environment, report: Report,
+): Promise<void> {
+  const tables = lineageBoundTables().filter((t) => present.includes(t.name));
+  const lines: string[] = [];
+  if (tables.length === 0) {
+    report.add('Lineage identity of reinstated id-keyed rows', 'INFO',
+      ['no reinstated table declares a lineage-bound column on this database']);
+    return;
+  }
+
+  // 1. Read the referenced ids and their rows from the database being replaced.
+  type Slot = { table: string; ref: LineageRef; target: LineageTarget;
+    rows: { rowId: number; oldValue: number }[] };
+  const slots: Slot[] = [];
+  for (const t of tables) {
+    for (const { ref, target } of lineageTargetsOf(t)) {
+      const where = ref.kindColumn ? ` AND ${ref.kindColumn} = $1` : '';
+      const params = ref.kindColumn ? [target.kind] : [];
+      const rows = await old(
+        `SELECT id::bigint AS row_id, ${ref.column}::bigint AS old_value
+           FROM public.${t.name}
+          WHERE ${ref.column} IS NOT NULL${where}
+          ORDER BY id`, params);
+      if (rows.length > LINEAGE_ROW_CAP) {
+        lines.push(`FAIL ${t.name}.${ref.column}: ${rows.length} rows exceed the ${LINEAGE_ROW_CAP}-row`
+          + ' per-row remap cap — the contract needs a set-based treatment for this table');
+        report.add('Lineage identity of reinstated id-keyed rows', 'FAIL', lines);
+        return;
+      }
+      slots.push({
+        table: t.name, ref, target,
+        rows: rows.map((r) => ({ rowId: asInt(r.row_id), oldValue: asInt(r.old_value) })),
+      });
+    }
+  }
+
+  // 2. Decide whether the lineage changed at all, from identities read on both sides.
+  const rules = [...new Set(slots.map((s) => s.target.identity))]
+    .filter((r): r is Exclude<LineageIdentityRule, 'none'> => r !== 'none');
+  const samples: LineageSample[] = [];
+  for (const rule of rules) {
+    const entity = LINEAGE_IDENTITY_SQL[rule].entity;
+    if (!present.includes(entity)) {
+      lines.push(`incomparable ${entity}: absent from the candidate`);
+      continue;
+    }
+    const referenced = [...new Set(slots.filter((s) => s.target.identity === rule)
+      .flatMap((s) => s.rows.map((r) => r.oldValue)))].sort((a, b) => a - b);
+    const spread = (await old(
+      `SELECT id::bigint AS id FROM public.${entity} ORDER BY id LIMIT ${LINEAGE_SAMPLE_LIMIT}`))
+      .map((r) => asInt(r.id));
+    const ids = [...new Set([...referenced.slice(0, LINEAGE_SAMPLE_LIMIT), ...spread])];
+    const before = new Map((await identitiesById(old, rule, ids)).map((p) => [p.id, p.identity] as const));
+    const after = new Map((await identitiesById(candidate, rule, ids)).map((p) => [p.id, p.identity] as const));
+    for (const id of ids) samples.push({ id, replaced: before.get(id), candidate: after.get(id) });
+    lines.push(`${entity}: ${ids.length} id(s) compared by ${rule} (${LINEAGE_IDENTITY_SQL[rule].description})`);
+  }
+
+  const verdict = detectLineageChange(samples);
+  lines.push(`identity agreed on ${verdict.agreed} sampled id(s), differed on ${verdict.differed.length}, `
+    + `${verdict.incomparable} incomparable`);
+  for (const d of verdict.differed.slice(0, 5)) {
+    lines.push(`  id ${d.id}: ${oldName} = ${d.replaced} vs ${candidateName} = ${d.candidate}`);
+  }
+  if (!verdict.changed) {
+    lines.push(`${candidateName} shares the id lineage of ${oldName}: reinstating id-keyed rows `
+      + 'unchanged is sound, and no remap is needed or generated.');
+    report.add('Lineage identity of reinstated id-keyed rows', 'PASS', lines);
+    return;
+  }
+  lines.push('LINEAGE CHANGE: the same id denotes a different row in the candidate. Every reinstated');
+  lines.push('id-keyed column must be resolved through a stable identity — never by integer, never by name.');
+
+  // 3. Resolve every declared column, per row.
+  const plans: LineageColumnPlan[] = [];
+  const remediationPrinted = new Set<string>();
+  let unresolvedTotal = 0;
+  for (const slot of slots) {
+    const referencedIds = [...new Set(slot.rows.map((r) => r.oldValue))];
+    const rule = slot.target.identity;
+    let replacedIdentities: IdentityPair[] = [];
+    let candidateIdentities: IdentityPair[] = [];
+    if (rule !== 'none' && referencedIds.length > 0) {
+      replacedIdentities = await identitiesById(old, rule, referencedIds);
+      candidateIdentities = await identitiesByIdentity(
+        candidate, rule, [...new Set(replacedIdentities.map((p) => p.identity))]);
+    }
+    const remap = resolveLineageRemap({
+      entity: slot.target.entity, rule, referencedIds, replacedIdentities, candidateIdentities,
+    });
+    plans.push({
+      table: slot.table, column: slot.ref.column, kindColumn: slot.ref.kindColumn,
+      kind: slot.target.kind, entity: slot.target.entity, rule,
+      remediation: slot.ref.remediation, rows: slot.rows, remap,
+    });
+    unresolvedTotal += remap.unresolved.length;
+    const scope = slot.ref.kindColumn ? ` (${slot.ref.kindColumn} = '${slot.target.kind}')` : '';
+    const label = `${slot.table}.${slot.ref.column}${scope} -> ${slot.target.entity}`;
+    lines.push(`${remap.unresolved.length === 0 ? 'ok  ' : 'FAIL'} ${label}: `
+      + `${slot.rows.length} row(s), ${referencedIds.length} distinct id(s), `
+      + `${remap.mapped.length} evidenced by ${rule}, ${remap.unresolved.length} unresolved`
+      + `${remap.merges.length ? `, ${remap.merges.length} merge(s)` : ''}`
+      + `${remap.unchanged ? `, ${remap.unchanged} unchanged` : ''}`);
+    // Every unresolved id is named. Past a readable number the transcript states how many
+    // more there are and where all of them are listed — a count, never a silent truncation.
+    for (const u of remap.unresolved.slice(0, LINEAGE_PRINT_LIMIT)) {
+      lines.push(`       ${slot.table}.${slot.ref.column} = ${u.oldId}: ${u.reason}`
+        + `${u.identity ? ` (${u.identity})` : ''} — row(s) `
+        + `${slot.rows.filter((r) => r.oldValue === u.oldId).map((r) => r.rowId).join(', ')}`);
+    }
+    if (remap.unresolved.length > LINEAGE_PRINT_LIMIT) {
+      lines.push(`       …and ${remap.unresolved.length - LINEAGE_PRINT_LIMIT} more, every one of them `
+        + 'listed in the file written by --lineage-remap-out');
+    }
+    for (const m of remap.merges) {
+      lines.push(`       MERGE ${slot.target.entity} ${m.oldIds.join(', ')} -> ${m.newId}`);
+    }
+    // One remediation per column, not per polymorphic target: target_id has seven.
+    const remediationKey = `${slot.table}.${slot.ref.column}`;
+    if (remap.unresolved.length > 0 && !remediationPrinted.has(remediationKey)) {
+      remediationPrinted.add(remediationKey);
+      for (const line of slot.ref.remediation.split('\n')) lines.push(`       ${line}`);
+    }
+  }
+
+  if (remapOut) {
+    if (existsSync(remapOut)) throw new PromotionRefused(`${remapOut} already exists; refusing to overwrite a remap.`);
+    writeFileSync(remapOut, lineageRemapSql({
+      candidate: candidateName, oldDatabase: oldName, environment, plans,
+    }), { encoding: 'utf8', mode: 0o600 });
+    lines.push(`remap written: ${remapOut} — read it, then run it on the candidate AFTER the reinstate`);
+  } else {
+    lines.push('re-run with --lineage-remap-out <file> to write the evidenced per-row remap');
+  }
+
+  report.add('Lineage identity of reinstated id-keyed rows',
+    unresolvedTotal === 0 ? 'WARN' : 'FAIL', lines);
+}
+
 async function gateFingerprint(q: Query, expected: string, report: Report): Promise<void> {
   const sections = await collectSections((text) => q(text));
   const fp = fingerprintOf(sections);
@@ -695,6 +908,9 @@ async function main(): Promise<number> {
       const oldName = String((await old.q('SELECT current_database() AS d'))[0]?.d);
       if (oldName !== opts.oldDatabase) throw new PromotionRefused(`Old database connection landed on '${oldName}', not '${opts.oldDatabase}'.`);
       await gateDanglingReferences(conn.q, old.q, present, report);
+      await gateLineageIdentity(
+        conn.q, old.q, present, opts.lineageRemapOut,
+        opts.database!, opts.oldDatabase!, opts.environment, report);
     }
     if (opts.compare) gateCompare(opts.compare, counts, report);
 

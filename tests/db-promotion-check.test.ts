@@ -18,6 +18,7 @@ import {
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
   ENVIRONMENTS,
+  LINEAGE_IDENTITY_SQL,
   PRE_REBUILD_PREFIX,
   PROMOTION_CONTRACT,
   PromotionRefused,
@@ -31,10 +32,15 @@ import {
   compareCounts,
   contractByName,
   databaseOf,
+  detectLineageChange,
   environmentNames,
   isTestFixtureEmail,
+  lineageBoundTables,
+  lineageRemapSql,
+  lineageTargetsOf,
   publicContractTables,
   reinstatePlan,
+  resolveLineageRemap,
   reinstatedPublicTables,
   reinstatedSchemas,
   resyncIdentitySql,
@@ -49,10 +55,17 @@ import { DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs } from '../tools/db/promotion
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
 
-/** Every `public` table any migration creates, after the one rename (015). */
-function migrationPublicTables(): Set<string> {
+function migrationFiles(): string[] {
+  return readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
+}
+
+/**
+ * Every `public` table any migration creates, after the one rename (015). `upTo` includes
+ * that file and stops, which is how the migration-045 registry seed is reconstructed.
+ */
+function migrationPublicTables(upTo?: string): Set<string> {
   const names = new Set<string>();
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+  for (const file of migrationFiles()) {
     const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
     // Statements in file order: 015 renames player_season_stats and then creates a new
     // table of the same name, so order within a file matters.
@@ -64,14 +77,67 @@ function migrationPublicTables(): Set<string> {
       else if (m[4]) { names.delete(m[4]); names.add(m[5]); }
       else if (m[7]) names.delete(m[7]);
     }
+    if (upTo && file === upTo) break;
   }
   return names;
 }
 
+/** SQL with `--` line comments removed: migration 045 documents its own API in one. */
+function withoutComments(sql: string): string {
+  return sql.replace(/--[^\n]*/g, '');
+}
+
 /**
- * The football tables: everything the migrations create that the contract does NOT
- * name. Pinned so that a new table cannot appear without someone classifying it — the
- * live checker refuses at runtime, this refuses at test time.
+ * AFLDB-ISSUE-142 (A). `afldb_meta.import_writable_tables` reconstructed FROM THE MIGRATIONS,
+ * the way the live database builds it: migration 045 seeds it from the catalogue as it stood
+ * then, minus a hand-typed operational exclusion list, and every later migration that creates
+ * a table the ETL reloads calls `grant_import_write()`.
+ *
+ * The suite used to pin the football tables as a hand-written list, which silently ASSUMED
+ * that a migration's non-contract table is import-writable. Migration 062 is the case that
+ * assumption gets wrong: it registers nothing at all, so the live gate — which reads the
+ * registry — refused every phase on every real database while this file passed. Deriving the
+ * registry here means a future 062-shaped migration fails at test time, which is what
+ * AFLDB-ISSUE-141's fail-closed classification was for.
+ */
+function migrationImportWritableTables(): Set<string> {
+  const files = migrationFiles();
+  const seedFile = files.find((f) => /^045_/.test(f));
+  if (!seedFile) throw new Error('migration 045 (the registry) is missing');
+  const seedSql = withoutComments(readFileSync(join(MIGRATIONS, seedFile), 'utf8'));
+
+  // The exclusion list is read out of the migration, never re-typed here.
+  const excludedBlock = /<>\s*ALL\s*\(\s*ARRAY\s*\[([\s\S]*?)\]\s*\)/.exec(seedSql);
+  if (!excludedBlock) throw new Error('migration 045 no longer seeds the registry from the catalogue');
+  const excluded = new Set([...excludedBlock[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]));
+
+  const registry = new Set<string>();
+  for (const name of migrationPublicTables(seedFile)) if (!excluded.has(name)) registry.add(name);
+
+  for (const file of files) {
+    if (file < seedFile) continue;   // 045 defines grant_import_write(); nothing calls it earlier
+    const sql = withoutComments(readFileSync(join(MIGRATIONS, file), 'utf8'));
+    for (const m of sql.matchAll(/grant_import_write\(\s*'([a-z_]+)'\s*\)/g)) registry.add(m[1]);
+    for (const m of sql.matchAll(/revoke_import_write\(\s*'([a-z_]+)'\s*\)/g)) registry.delete(m[1]);
+    // A registered table that is renamed away or dropped leaves a stale row privileges.sql
+    // prunes, so the derived registry loses it too — and the new name is then unclassified
+    // until someone decides it, which is the fail-closed direction.
+    for (const m of sql.matchAll(/alter\s+table\s+([a-z_]+)\s+rename\s+to\s+([a-z_]+)|drop\s+table\s+(?:if\s+exists\s+)?([a-z_]+)/gi)) {
+      registry.delete(m[1] ?? m[3]);
+    }
+  }
+  return registry;
+}
+
+/**
+ * The football tables: everything the migrations create that the contract does NOT name.
+ * Pinned so that a new table cannot appear without someone classifying it — the live checker
+ * refuses at runtime, this refuses at test time.
+ *
+ * AFLDB-ISSUE-142 (A): this list is no longer taken on trust. It is asserted equal to the
+ * registry derived from the migrations themselves (`migrationImportWritableTables()`), so a
+ * table that is merely *assumed* import-writable — as `player_match_period_stats` was, which
+ * is why the live gate refused every phase while this suite passed — fails here.
  */
 const PINNED_FOOTBALL_TABLES = [
   'after_siren_kicks', 'award_nominations', 'award_winners', 'awards', 'brownlow_round_votes',
@@ -81,7 +147,7 @@ const PINNED_FOOTBALL_TABLES = [
   'father_son_selections', 'hall_of_fame', 'honour_team_members', 'import_batches', 'import_rejections',
   'match_coaches', 'match_period_scores', 'matches', 'player_achievements', 'player_birth_evidence',
   'player_career_stats', 'player_height_evidence',
-  'player_club_season_stats', 'player_clubs', 'player_match_period_stats', 'player_match_stats',
+  'player_club_season_stats', 'player_clubs', 'player_match_stats',
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',
 ];
@@ -139,6 +205,38 @@ describe('the contract covers every non-football table the migrations create', (
     for (const name of trio) expect(migrationPublicTables().has(name), name).toBe(true);
   });
 
+  // AFLDB-ISSUE-142 (A). The live gate reads afldb_meta.import_writable_tables and refuses a
+  // public table that is in neither set. Reconstruct that registry from the migrations and
+  // run the real classifier over it, so this suite fails exactly where the checker does.
+  it('classifies every migration-created table the way the live gate does', () => {
+    const created = [...migrationPublicTables()].sort();
+    const registry = [...migrationImportWritableTables()].sort();
+    for (const name of registry) expect(created, `${name} is registered but never created`).toContain(name);
+    expect(classifyPublicTables(created, registry)).toEqual([]);
+  });
+
+  it('pins the football tables to the derived registry, not to an assumption', () => {
+    expect([...migrationImportWritableTables()].sort()).toEqual([...PINNED_FOOTBALL_TABLES].sort());
+  });
+
+  // The table that proved the assumption wrong: created by migration 062, registered by
+  // nothing (no grant_import_write, no grant_app_read), written by nothing, produced by no
+  // rebuild stage — and therefore refused by the live gate on afldb_test AND afldb_dev.
+  it('decides player_match_period_stats in the contract, without granting the ETL anything', () => {
+    const t = contractByName('player_match_period_stats')!;
+    expect(t, 'player_match_period_stats must have an explicit treatment').toBeDefined();
+    expect(t.treatment).toBe('rebuilt');
+    expect(t.compare).toBe('zero');
+    expect(t.category).toBe('football');
+    expect(truncatedPublicTables()).not.toContain('player_match_period_stats');
+    expect(reinstatedPublicTables()).not.toContain('player_match_period_stats');
+    expect(migrationImportWritableTables().has('player_match_period_stats')).toBe(false);
+    const migration = readFileSync(join(MIGRATIONS, '062_player_match_period_stats.sql'), 'utf8');
+    expect(migration).toContain('CREATE TABLE player_match_period_stats');
+    expect(migration).not.toContain('grant_import_write');
+    expect(migration).not.toContain('grant_app_read');
+  });
+
   it('has no duplicate entries and a note on every row', () => {
     const keys = PROMOTION_CONTRACT.map((t) => `${t.schema}.${t.name}`);
     expect(new Set(keys).size).toBe(keys.length);
@@ -181,7 +279,8 @@ describe('the production-only state contract', () => {
 
   it('takes the machine mutation ledger and the acquisition spine from the rebuild, and reinstates AFLW', () => {
     expect(contractByName('canonical_applications')?.treatment).toBe('rebuilt');
-    expect(tablesWithTreatment('rebuilt')).toEqual(['canonical_applications', 'staging.*']);
+    expect(tablesWithTreatment('rebuilt'))
+      .toEqual(['canonical_applications', 'player_match_period_stats', 'staging.*']);
     expect(reinstatedSchemas()).toEqual(['staging_aflw']);
   });
 
@@ -575,6 +674,12 @@ describe('checker arguments', () => {
     expect(() => parseArgs(['--phase', 'source', '--database', 'afldb_test', '--expect-fingerprint', 'zz'])).toThrow(/sha256/);
     expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_prod', '--expect-super-admin', 'nope'])).toThrow(/email/);
     expect(() => parseArgs(['--phase', 'production', '--database', 'afldb_prod', '--bogus'])).toThrow(/Unknown argument/);
+    // AFLDB-ISSUE-142: the remap needs both databases, which only `restored` opens.
+    expect(() => parseArgs(['--phase', 'candidate', '--database', `${CANDIDATE_PREFIX}1`,
+      '--lineage-remap-out', 'remap.sql'])).toThrow(/only meaningful with --phase restored/);
+    expect(parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`,
+      '--old-database', 'afldb_prod', '--lineage-remap-out', 'remap.sql']).lineageRemapOut)
+      .toBe('remap.sql');
     const restored = parseArgs(['--phase', 'restored', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod']);
     expect(restored.oldDatabase).toBe('afldb_prod');
   });
@@ -652,6 +757,210 @@ describe('checker arguments', () => {
   });
 });
 
+/**
+ * AFLDB-ISSUE-142 (B). A reinstated id-keyed row is only meaningful while the candidate
+ * shares the replaced database's id lineage. On `afldb_dev` it does not: 34 of the 36
+ * `player_link_resolutions` player ids exist in the rebuilt lineage and every one of them
+ * names a DIFFERENT person (151 Craig Bradley vs Alan McGowan; 318 Gary O'Donnell vs Alex
+ * Georgiou). The old dangling-reference probe reports "0 missing" for exactly those rows,
+ * because it asks whether an id exists, not whether it still means the same thing.
+ */
+describe('lineage-safe reinstatement', () => {
+  const PROFILE = 'afltables_profile_url';
+
+  it('declares the lineage-bound columns of both human/admin ledgers', () => {
+    expect(lineageBoundTables().map((t) => t.name).sort())
+      .toEqual(['data_edits', 'player_link_resolutions']);
+
+    const resolutions = lineageTargetsOf(contractByName('player_link_resolutions')!);
+    expect(resolutions.find((x) => x.ref.column === 'player_id')!.target)
+      .toMatchObject({ entity: 'players', identity: PROFILE });
+    // The seven honours tables target_id points into have NO stable external identity, and
+    // saying so explicitly is the decision: the checker refuses instead of reinstating an id
+    // that now names a different honours row.
+    const targets = resolutions.filter((x) => x.ref.column === 'target_id');
+    expect(targets).toHaveLength(7);
+    for (const { ref, target } of targets) {
+      expect(target.identity).toBe('none');
+      expect(ref.kindColumn).toBe('target_table');
+      expect(target.kind).toBe(target.entity);
+    }
+
+    const edits = lineageTargetsOf(contractByName('data_edits')!);
+    expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
+      .toEqual(['matches:match_key', 'players:afltables_profile_url']);
+    for (const { ref } of [...resolutions, ...edits]) {
+      expect(ref.remediation.length, ref.column).toBeGreaterThan(80);
+    }
+  });
+
+  it('identifies rows by a stable external key only — never by a name', () => {
+    for (const rule of ['afltables_profile_url', 'match_key'] as const) {
+      const sql = `${LINEAGE_IDENTITY_SQL[rule].byId}\n${LINEAGE_IDENTITY_SQL[rule].byIdentity}`;
+      expect(sql).not.toMatch(/display_name|search_name|given_name|surname|full_name/i);
+      expect(sql).not.toMatch(/\bilike\b|similarity|levenshtein|soundex/i);
+      // Both directions of the same identity, so a mapping can be proved round trip.
+      expect(sql).toContain('$1::bigint[]');
+      expect(sql).toContain('$1::text[]');
+    }
+    expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("s.key = 'afltables'");
+    expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("match_method = 'afltables_profile_url'");
+    expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("status IN ('unique', 'resolved')");
+    expect(LINEAGE_IDENTITY_SQL.match_key.byId).toContain('match_key');
+  });
+
+  it('remaps through the identity and never through the integer', () => {
+    const remap = resolveLineageRemap({
+      entity: 'players', rule: PROFILE,
+      referencedIds: [151, 318, 4242, 999],
+      replacedIdentities: [
+        { id: 151, identity: 'players/B/Craig_Bradley.html' },
+        { id: 318, identity: 'players/O/Gary_ODonnell.html' },
+        { id: 4242, identity: 'players/W/Ward_Retired.html' },
+        // 999 carries no identity at all in the replaced database.
+      ],
+      candidateIdentities: [
+        { id: 907, identity: 'players/B/Craig_Bradley.html' },
+        { id: 1188, identity: 'players/O/Gary_ODonnell.html' },
+        // The same INTEGER exists in the candidate and is somebody else entirely.
+        { id: 151, identity: 'players/M/Alan_McGowan.html' },
+        { id: 318, identity: 'players/G/Alex_Georgiou.html' },
+      ],
+    });
+    expect(remap.mapped).toEqual([
+      { oldId: 151, identity: 'players/B/Craig_Bradley.html', newId: 907 },
+      { oldId: 318, identity: 'players/O/Gary_ODonnell.html', newId: 1188 },
+    ]);
+    expect(remap.unchanged).toBe(0);
+    // Reported in id order, the order the resolver walks the referenced ids in.
+    expect(remap.unresolved).toEqual([
+      { oldId: 999, reason: 'no_identity_in_replaced' },
+      { oldId: 4242, reason: 'identity_absent_in_candidate', identity: 'players/W/Ward_Retired.html' },
+    ]);
+  });
+
+  it('refuses an ambiguous identity in either database, and a column with no identity at all', () => {
+    const ambiguousOld = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [500],
+      // A renumbered AFL Tables url leaves one player carrying two identities.
+      replacedIdentities: [{ id: 500, identity: 'players/C/Charlie_Cameron.html' },
+        { id: 500, identity: 'players/C/Charlie_Cameron3.html' }],
+      candidateIdentities: [{ id: 2604, identity: 'players/C/Charlie_Cameron.html' },
+        { id: 2608, identity: 'players/C/Charlie_Cameron3.html' }],
+    });
+    expect(ambiguousOld.mapped).toEqual([]);
+    expect(ambiguousOld.unresolved).toEqual([{ oldId: 500, reason: 'ambiguous_in_replaced' }]);
+
+    const ambiguousNew = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [500],
+      replacedIdentities: [{ id: 500, identity: 'players/J/Jack_Ross.html' }],
+      candidateIdentities: [{ id: 11, identity: 'players/J/Jack_Ross.html' },
+        { id: 12, identity: 'players/J/Jack_Ross.html' }],
+    });
+    expect(ambiguousNew.unresolved)
+      .toEqual([{ oldId: 500, reason: 'ambiguous_in_candidate', identity: 'players/J/Jack_Ross.html' }]);
+
+    const noRule = resolveLineageRemap({
+      entity: 'award_winners', rule: 'none', referencedIds: [7, 9],
+      replacedIdentities: [], candidateIdentities: [],
+    });
+    expect(noRule.mapped).toEqual([]);
+    expect(noRule.unresolved).toEqual([
+      { oldId: 7, reason: 'no_stable_identity_rule' },
+      { oldId: 9, reason: 'no_stable_identity_rule' },
+    ]);
+  });
+
+  it('surfaces a merge rather than hiding it, and counts an unchanged id', () => {
+    const remap = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [2604, 2608, 77],
+      replacedIdentities: [
+        { id: 2604, identity: 'players/C/Charlie_Cameron.html' },
+        { id: 2608, identity: 'players/C/Charlie_Cameron3.html' },
+        { id: 77, identity: 'players/S/Same_Id.html' },
+      ],
+      candidateIdentities: [
+        { id: 500, identity: 'players/C/Charlie_Cameron.html' },
+        { id: 500, identity: 'players/C/Charlie_Cameron3.html' },
+        { id: 77, identity: 'players/S/Same_Id.html' },
+      ],
+    });
+    expect(remap.merges).toEqual([{ newId: 500, oldIds: [2604, 2608] }]);
+    expect(remap.unchanged).toBe(1);
+  });
+
+  it('treats a shared lineage as shared, and anything unproven as changed', () => {
+    expect(detectLineageChange([
+      { id: 1, replaced: 'players/A/A.html', candidate: 'players/A/A.html' },
+      { id: 2, replaced: 'players/B/B.html', candidate: 'players/B/B.html' },
+    ])).toMatchObject({ changed: false, agreed: 2, incomparable: 0 });
+
+    const changed = detectLineageChange([
+      { id: 151, replaced: 'players/B/Craig_Bradley.html', candidate: 'players/M/Alan_McGowan.html' },
+      { id: 2, replaced: 'players/B/B.html', candidate: 'players/B/B.html' },
+    ]);
+    expect(changed.changed).toBe(true);
+    expect(changed.differed).toEqual([
+      { id: 151, replaced: 'players/B/Craig_Bradley.html', candidate: 'players/M/Alan_McGowan.html' },
+    ]);
+
+    // Nothing comparable proves nothing, so it is not "same lineage".
+    expect(detectLineageChange([{ id: 1, replaced: 'x' }, { id: 2, candidate: 'y' }]))
+      .toMatchObject({ changed: true, agreed: 0, incomparable: 2 });
+    expect(detectLineageChange([]).changed).toBe(true);
+  });
+
+  it('writes only evidenced UPDATEs, comments every unresolved id, and touches nothing else', () => {
+    const mapped = resolveLineageRemap({
+      entity: 'players', rule: PROFILE, referencedIds: [151, 999],
+      replacedIdentities: [{ id: 151, identity: 'players/B/Craig_Bradley.html' }],
+      candidateIdentities: [{ id: 907, identity: 'players/B/Craig_Bradley.html' }],
+    });
+    const sql = lineageRemapSql({
+      candidate: 'afldb_dev_candidate_20260906', oldDatabase: 'afldb_dev', environment: 'dev',
+      plans: [{
+        table: 'player_link_resolutions', column: 'player_id', entity: 'players', rule: PROFILE,
+        remediation: contractByName('player_link_resolutions')!.lineageRefs![0].remediation,
+        rows: [{ rowId: 12, oldValue: 151 }, { rowId: 13, oldValue: 999 }],
+        remap: mapped,
+      }],
+    });
+    expect(sql).toContain('UPDATE public.player_link_resolutions SET player_id = 907'
+      + ' WHERE id = 12 AND player_id = 151;');
+    expect(sql).toContain('--   151 -> players/B/Craig_Bradley.html -> 907');
+    expect(sql).toContain('-- UNRESOLVED player_link_resolutions.player_id = 999 (no_identity_in_replaced)');
+    expect(sql).toContain('row(s) 13');
+    // One column per statement, and no other kind of write anywhere in the file.
+    for (const stmt of sql.split('\n').filter((l) => l.startsWith('UPDATE '))) {
+      expect(stmt.match(/ SET /g)).toHaveLength(1);
+      expect(stmt).not.toContain(',');
+    }
+    expect(sql).not.toMatch(/\b(DELETE|INSERT|TRUNCATE|ALTER|DROP)\b/);
+    // Re-running is a no-op, and the verification query is the proof of ownership.
+    expect(sql).toContain('BEGIN;');
+    expect(sql).toContain('COMMIT;');
+    expect(sql).toContain('NOT IN (SELECT id FROM (VALUES (907,');
+  });
+
+  it('emits nothing for an id that already points at the right row', () => {
+    const remap = resolveLineageRemap({
+      entity: 'matches', rule: 'match_key', referencedIds: [17042],
+      replacedIdentities: [{ id: 17042, identity: '2026|23|2026-08-14|fremantle|adelaide' }],
+      candidateIdentities: [{ id: 17042, identity: '2026|23|2026-08-14|fremantle|adelaide' }],
+    });
+    const sql = lineageRemapSql({
+      candidate: 'c', oldDatabase: 'o',
+      plans: [{
+        table: 'data_edits', column: 'row_id', kindColumn: 'table_name', kind: 'matches',
+        entity: 'matches', rule: 'match_key', remediation: 'x',
+        rows: [{ rowId: 3, oldValue: 17042 }], remap,
+      }],
+    });
+    expect(sql.split('\n').filter((l) => l.startsWith('UPDATE'))).toHaveLength(0);
+    expect(sql).toContain('Every referenced id was evidenced');
+  });
+});
+
 describe('the checker is read-only by construction', () => {
   const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
 
@@ -665,8 +974,9 @@ describe('the checker is read-only by construction', () => {
     expect(source).not.toMatch(/child_process/);
     expect(source).not.toMatch(/from '\.\/psql'/);
     expect(source).not.toMatch(/runPsql|RESET_SQL|spawnSync/);
-    // The only files it writes are the counts snapshot and the operator plan.
-    expect((source.match(/writeFileSync\(/g) ?? []).length).toBe(2);
+    // The only files it writes are the counts snapshot, the operator plan and the
+    // AFLDB-ISSUE-142 lineage remap — all read and run by hand, none of them a database write.
+    expect((source.match(/writeFileSync\(/g) ?? []).length).toBe(3);
   });
 
   it('never prints a DSN: the target line names the variable and the database only', () => {
@@ -709,6 +1019,23 @@ describe('the DEV relaxations are explicit, and never silent', () => {
     expect(gate).toContain("warn = true");
   });
 
+  // AFLDB-ISSUE-142 (B). The lineage gate must ask a different question from the dangling
+  // probe, must fail closed, and must never reach for a name.
+  it('proves lineage from identities, refuses what it cannot evidence, and never matches a name', () => {
+    const gate = source.slice(source.indexOf('async function gateLineageIdentity'),
+                              source.indexOf('async function gateFingerprint'));
+    expect(gate).toContain('detectLineageChange');
+    expect(gate).toContain('resolveLineageRemap');
+    // Same lineage passes and generates nothing; a change refuses unless every id is evidenced.
+    expect(gate).toMatch(/if \(!verdict\.changed\)[\s\S]*'PASS'/);
+    expect(gate).toMatch(/unresolvedTotal === 0 \? 'WARN' : 'FAIL'/);
+    // Identity SQL is the contract's, asked of both databases by identical logic.
+    expect(gate).not.toMatch(/display_name|search_name|ilike/i);
+    expect(gate).toContain('LINEAGE_IDENTITY_SQL');
+    // A remap nobody could read by hand is a refusal, not a file.
+    expect(gate).toContain('LINEAGE_ROW_CAP');
+  });
+
   it('never infers the environment from a database name', () => {
     // The only writers of Options.environment are the explicit flag and the default.
     expect(source).toMatch(/case '--environment'/);
@@ -726,7 +1053,8 @@ describe('acceptance checklist', () => {
     const text = ACCEPTANCE_CHECKLIST.join('\n');
     for (const needle of ['hostname', 'backup.sh', 'sha256', 'restore-test.sh', '--phase source', '--phase pre-cutover',
       'candidate', '--phase restored', '--phase candidate', '--phase production', 'privileges.sql', 'super admin',
-      'TOTP', 'data_overrides', 'settle', 'Rollback', 'afldb_prod_pre_rebuild_', 'afldb-prod', 'streamanator']) {
+      'TOTP', 'data_overrides', 'settle', 'Rollback', 'afldb_prod_pre_rebuild_', 'afldb-prod', 'streamanator',
+      'lineage', 'player_link_resolutions.player_id', 'data_edits.row_id']) {
       expect(text, needle).toContain(needle);
     }
   });

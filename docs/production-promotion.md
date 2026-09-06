@@ -66,12 +66,12 @@ promoted by accident.
 | `beta_login_tokens` | beta | yes | reset | Short-lived single-use magic links. |
 | `site_settings` | admin | yes | reinstate | Deliberate super-admin choices; the app silently falls back to defaults without them. |
 | `site_media` | admin | yes | reinstate | Uploaded images. Not in the original issue list — found in the schema. |
-| `data_edits` | data editor | yes | reinstate | Append-only audit of human canonical edits. |
+| `data_edits` | data editor | yes | reinstate | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`, not a FK → **lineage-bound** (§7.4c). |
 | `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). |
 | `data_submissions` | uploads | yes | reinstate | `import_batch_id` may dangle → probed (§7.4). |
 | `data_submission_rows` | uploads | yes | reinstate | After `data_submissions`. |
 | `player_link_suggestions` | player links | yes | reinstate | Reader suggestions; `target_id` is deliberately not a FK. |
-| `player_link_resolutions` | player links | yes | reinstate | Append-only human decisions; `player_id` may dangle → probed (§7.4). |
+| `player_link_resolutions` | player links | yes | reinstate | Append-only human decisions; `player_id` may dangle → probed (§7.4). Both `player_id` and `target_id` are ids of the replaced database → **lineage-bound** (§7.4c). |
 | `player_link_match_candidates` | player links | no | **regenerate** | Rebuilt by `/admin/player-links` refresh; `player_id` is NOT NULL against rebuilt players. |
 | `nl_search_log` | NL telemetry | yes | reinstate | Carries human review and reader feedback; clearable later via `nl_search_telemetry_clear()`, never reconstructible. |
 | `nl_search_review` | NL telemetry | yes | reinstate | After `nl_search_log`. |
@@ -82,6 +82,7 @@ promoted by accident.
 | `external_grid_sources` | Grid Solver corpus | yes | reinstate (first of three) | Seeded by migration 080 itself: the truncate removes the candidate's seed so the dump's row keeps its id. `ingest_source_id` → rebuilt `sources` → probed (§7.4b). |
 | `external_grids` | Grid Solver corpus | yes | reinstate | Captured Gridley boards with their raw payloads. **Immutable evidence, no rebuild stage** — a rebuilt candidate has this empty and the rescued legacy archive cannot be re-fetched. `import_batch_id` is NOT NULL into rebuilt `import_batches` → §7.4b. |
 | `external_grid_axes` | Grid Solver corpus | yes | reinstate (last of three) | The six captured criteria per board revision. `ON DELETE CASCADE` from `external_grids`. |
+| `player_match_period_stats` | quarter-by-quarter stats | no | rebuilt | Football schema (migration 062) with **no writer, no rebuild stage and no registry row** — see below. `compare = zero`. |
 | `staging.*` | import / spine | no | rebuilt | Keyed to rebuilt `import_batches`. The current season is re-acquired (§9). |
 | `staging_aflw.*` | AFLW | yes | reinstate (schema) | **Not produced by the rebuild**; a rebuilt database has it empty. |
 | `afldb_meta.schema_migrations` | migrations | — | rebuilt, **parity-gated** | Must equal this checkout (§3, §6). |
@@ -102,6 +103,26 @@ generated plan named them in neither the truncate list nor the reinstate list. B
 no Gridley rebuild stage (`docs/deployment.md` §6a), the swap would have replaced an explicitly
 immutable captured corpus with the candidate's empty tables, and no gate would have noticed.
 
+**Why `player_match_period_stats` is here** (`AFLDB-ISSUE-142`). Migration 062 creates it and
+registers it **nowhere**: it calls neither `afldb_meta.grant_import_write()` — as migrations 053,
+074, 086, 087 and 089 all do for the tables the ETL reloads — nor `grant_app_read()`. It was
+therefore the one public table in neither classification set, and the fail-closed gate refused
+**every phase on every real database**, `--phase source` on a rebuilt `afldb_test` included. The
+same shape as the migration-080 gap above, except that here the absence was an omission rather
+than a decision.
+
+It is decided as a **contract entry, not a registry row**, because `grant_import_write()`
+registers *and grants* in one statement: registering it would hand `afldb_import` UPDATE, DELETE
+and TRUNCATE — restored at every `privileges.sql` reconcile — for a writer that does not exist.
+Nothing in the tree writes the table (the only references are reads:
+`tools/current-season/repair-match-rekeys.ts` and the NL period-split queries in
+`src/db/queries/nl/`), no rebuild stage produces it, and it held **0 rows** on `afldb_dev` and on
+the rebuilt `afldb_test` when this was measured. `rebuilt` is therefore the honest treatment —
+the candidate's copy stands, exactly as for a registry table — and `compare = zero` is the
+tripwire: the day a writer exists, the `candidate`/`production` comparison fails and this entry
+must be revisited, at which point registering it import-writable, with the grant it then
+genuinely needs, is the right answer.
+
 ## 2. The checker
 
 ```bash
@@ -120,7 +141,7 @@ and refuses any other by name:
 |---|---|---|---|
 | `source` | `afldb_test` | `afldb_test` | identity, classification, migration parity, fixtures (info), optional `--expect-fingerprint` |
 | `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, `--snapshot <file>` of row counts |
-| `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe |
+| `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe, + lineage identity of reinstated id-keyed rows (§7.4c), optional `--lineage-remap-out <file>` |
 | `candidate` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
 | `production` | `afldb_prod` | `afldb_dev` | same as `candidate`, on the live name |
 
@@ -232,11 +253,14 @@ The two "must be owner of extension" messages are the only tolerated errors
 (`docs/backup-restore.md` §2). Then:
 
 ```bash
-npm run db:promotion:check -- --phase restored --database "$CAND" --old-database afldb_prod
+npm run db:promotion:check -- --phase restored --database "$CAND" --old-database afldb_prod \
+    [--lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql]
 ```
 
 This proves the candidate is the source (migration parity), reports the fixture rows the
-restore brought in (expected, removed next), and **probes dangling references**: for each
+restore brought in (expected, removed next), **proves the id lineage** of every reinstated
+id-keyed column (§7.4c — on a same-lineage promotion this passes and generates nothing), and
+**probes dangling references**: for each
 production-owned row whose FK points into rebuilt data (`player_link_resolutions.player_id`,
 `data_submissions.import_batch_id`), whether the target still exists in the candidate. A
 `WARN` here prints the exception SQL for §7.4; a `FAIL` means the contract itself must be
@@ -313,6 +337,68 @@ recorded in the promotion record.
   **Never drop the rows to make the FK pass.** The captured payload is the evidence, the
   rescued legacy archive cannot be re-fetched, and there is no rebuild stage that would
   recreate it.
+
+### 7.4c Id-keyed human/admin rows across a lineage change (`AFLDB-ISSUE-142`)
+
+§7.4 and §7.4b both ask whether a referenced id still **exists**. Existence is not identity.
+When the candidate does not share the replaced database's id lineage, almost every id exists
+and denotes a **different row** — so "0 missing" is precisely the answer a silent
+misattribution produces.
+
+This is not hypothetical. Measured read-only on `afldb_dev` on 2026-09-06: its 94
+`player_link_resolutions` rows reference 36 distinct `player_id`s; 34 of them exist in the
+rebuilt lineage and **all 34 name a different person** (151 Craig Bradley vs Alan McGowan; 318
+Gary O'Donnell vs Alex Georgiou; 380 Doug Hawkins vs Alf Copsey). `data_edits.row_id` and
+`player_link_resolutions.target_id` are in the same old id space. A production promotion has
+never met this, because its candidate is a rebuild of the same lineage.
+
+**The gate.** `--phase restored` now proves the lineage from evidence before anything is
+reinstated:
+
+1. it reads the **stable identity** of sampled ids on both databases — for a player, the AFL
+   Tables profile url (`external_identities`, source `afltables`, `match_method`
+   `afltables_profile_url`, status unique/resolved: the identity every `AFLDB-ISSUE-118` loader
+   already resolves people through); for a match, `matches.match_key` (NOT NULL UNIQUE since
+   migration 003). **A display name is never used, in either direction** — two footballers
+   share a name often enough that a name match would silently retarget a human decision;
+2. identities equal on every comparable sample → one lineage → id-keyed reinstatement is sound
+   and the gate PASSES, generating nothing. **Nothing comparable also counts as a change**, so
+   a missing identity layer can never read as "safe";
+3. otherwise every lineage-bound column declared in the contract is resolved per row, old id →
+   identity → new id. An id is mapped **only** when exactly one identity is read for it in the
+   replaced database and exactly one candidate row carries that same identity string. Every
+   other shape — no identity, two identities, an identity absent from the candidate, an
+   identity resolving to two rows — is unresolved, and **unresolved REFUSES**.
+
+`--lineage-remap-out <file>` writes the result as SQL: one `UPDATE` per row, guarded by the
+value it was proved against (so re-running it is a no-op), each preceded by the evidence
+comment `old id -> identity -> new id`; `-- UNRESOLVED` lines naming the reason for everything
+that could not be evidenced; `-- MERGE` lines where two old rows fold onto one candidate row
+(an `AFLDB-ISSUE-136` identity merge); and a trailing verification query that must return zero
+rows. Run it on the candidate **after** the reinstate and **before** `--phase candidate`. It
+touches one column per statement and never inserts, deletes or truncates: the ledgers stay
+append-only and every audit field is untouched.
+
+**Where no remap is possible.** `player_link_resolutions.target_id` points into seven
+import-writable honours tables whose ids the rebuild assigns, and the repository carries **no
+external key for one of their rows**, so the contract declares its identity as `none` and the
+gate refuses. Remapping `player_id` alone is *not* an answer: it produces a row that looks
+resolved, names the right person and points at the wrong honours row. Two answers are
+supportable, and the choice must be recorded in the promotion record and the
+`database.promoted` marker:
+
+1. reinstate it as a **historical audit ledger of the replaced database**, stating in the
+   record that its links are not live; or
+2. **do not reinstate it into the candidate at all** and keep it as a recorded gap — the
+   `promotion_decisions` treatment, on the same reasoning: a decision cannot outlive the row it
+   is about. The rows survive in the pre-cutover dump and in the kept pre-rebuild database
+   either way.
+
+**Never** drop the rows to make the gate pass, and never leave a lineage-bound column on its
+old integer. One further case is normal rather than exceptional: a `data_edits` row about a
+**current-season match** cannot resolve at candidate time, because the rebuild carries seasons
+only to the accepted baseline and the season is re-acquired *after* the swap (§9). Apply that
+part of the remap after the post-promotion settle, and say so in the record.
 
 ### 7.5 Accept the candidate
 
@@ -485,6 +571,30 @@ authority to protect, but it is not stateless:
 pre-cutover snapshot (§5). The relaxations above concern identity gates, not evidence: a DEV
 database is still restored into a *new* candidate and swapped by rename, never restored over.
 
+**Two conditions specific to `afldb_dev` today.** Neither is a relaxation and neither has a
+flag; both are stated here because a DEV operator meets them and a production operator does
+not.
+
+* **The id lineage really does change.** `afldb_dev` is the pre-rebuild bootstrap database, so
+  a candidate restored from a rebuilt `afldb_test` does **not** share its player or match ids.
+  §7.4c is therefore mandatory reading for a DEV promotion rather than a rare case: expect the
+  `restored` phase to report a lineage change and to refuse until every lineage-bound column
+  is either evidenced or deliberately decided. Production has never met this because its
+  candidate is a rebuild of its own lineage.
+* **Migration parity refuses at `pre-cutover`, truthfully.** `afldb_dev`'s ledger carries
+  `079_access_code_delete.sql`, which is committed only on the unmerged branch
+  `claude/issue-116` and which **cannot merge at that number** — `main` owns a different
+  `079_nl_search_log_head_to_head_grain.sql`, applied everywhere including production. The
+  gate reports `UNKNOWN 079_access_code_delete.sql`: the live database is ahead of every
+  tracked checkout by a migration no checkout can reproduce, which is exactly what that gate
+  exists to say. Do not delete the ledger row, do not reverse the migration and do not
+  special-case the checker. The promotion **is** the reconciliation: the candidate is built
+  from this checkout's migrations, so `restored`, `candidate` and `production` all read parity
+  clean and the orphan row is gone at the swap. The `pre-cutover` phase still writes its
+  snapshot, which is what the later phases compare against; record the refusal and its reason
+  in the promotion record before continuing. (The branch must claim the next free migration
+  number before it can ever merge — `091` as this checkout stands.)
+
 ```bash
 # DEV: streamanator — the same five phases, with the environment stated every time
 npm run db:promotion:check -- --environment dev --phase source      --database afldb_test
@@ -493,7 +603,7 @@ npm run db:promotion:check -- --environment dev --phase pre-cutover --database a
 npm run db:promotion:check -- --environment dev --plan --database "$CAND" \
     --old-database afldb_dev --pre-cutover-dump <file> --rebuilt-dump <file> --plan-dir <dir>
 npm run db:promotion:check -- --environment dev --phase restored    --database "$CAND" \
-    --old-database afldb_dev
+    --old-database afldb_dev --lineage-remap-out ~/backups/afldb/promotion-dev-lineage-$STAMP.sql
 npm run db:promotion:check -- --environment dev --phase candidate   --database "$CAND" \
     --compare ~/backups/afldb/promotion-dev-$STAMP.json
 npm run db:promotion:check -- --environment dev --phase production  --database afldb_dev \

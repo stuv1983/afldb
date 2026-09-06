@@ -48,10 +48,60 @@ export type Category =
   | 'application'   // production-only application/auth/authorisation state
   | 'ephemeral'     // session/security state that must not cross a database identity
   | 'operations'    // audit, telemetry and review state
+  | 'football'      // canonical football data that is NOT in the import-writable registry
   | 'staging';      // acquisition state, decided by ownership
 
 /** How `--compare` judges a table against the pre-cutover snapshot. */
 export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
+
+// ---------------------------------------------------------------------------
+// Lineage — AFLDB-ISSUE-142 (B)
+// ---------------------------------------------------------------------------
+
+/**
+ * The stable, external identity a row id can be resolved through when the candidate does
+ * NOT share the replaced database's id lineage.
+ *
+ *   afltables_profile_url  external_identities(source 'afltables', match_method
+ *                          'afltables_profile_url', status unique/resolved) -> the AFL
+ *                          Tables profile path. The identity every AFLDB-ISSUE-118 loader
+ *                          and the AFLDB-ISSUE-113 artefact already resolve people through.
+ *   match_key              matches.match_key — NOT NULL UNIQUE since migration 003 and the
+ *                          natural key migration 076's settle projections link on.
+ *   none                   NO stable identity exists in this repository for the entity this
+ *                          column points at. The column therefore CANNOT be remapped, and
+ *                          across a lineage change the checker refuses rather than
+ *                          reinstating an id that now denotes something else.
+ *
+ * A display name is deliberately not on this list and must never be added: every loader in
+ * the tree refuses name matching, and two footballers share a name often enough that a name
+ * match would silently retarget a human decision — the exact failure this type exists to
+ * prevent.
+ */
+export type LineageIdentityRule = 'afltables_profile_url' | 'match_key' | 'none';
+
+export type LineageTarget = {
+  /** The `kindColumn` value this applies to; omitted when the column points at one table. */
+  kind?: string;
+  /** The table the id lives in, on BOTH databases. */
+  entity: string;
+  identity: LineageIdentityRule;
+};
+
+/**
+ * A column carrying row ids from the REPLACED database's lineage. Distinct from
+ * `footballRefs`, which asks only whether an id still exists: existence is not identity, and
+ * on a lineage change almost every id exists and denotes a different row.
+ */
+export type LineageRef = {
+  column: string;
+  /** The column naming which table `column` points into, for a polymorphic reference. */
+  kindColumn?: string;
+  /** One target per `kindColumn` value, or exactly one when the column is monomorphic. */
+  targets: readonly LineageTarget[];
+  /** Printed beside a refusal: what an operator does when a value cannot be remapped. */
+  remediation: string;
+};
 
 export type TableTreatment = {
   /** `public` unless stated. Schema-level entries use `schema` + `name: '*'`. */
@@ -86,6 +136,12 @@ export type TableTreatment = {
      */
     remediation?: string;
   }[];
+  /**
+   * AFLDB-ISSUE-142 (B). Columns holding row ids from the REPLACED database's lineage.
+   * Declared only on tables whose rows are reinstated: a reinstated id-keyed row is the one
+   * that can silently change meaning when the candidate's ids denote different rows.
+   */
+  lineageRefs?: readonly LineageRef[];
   note: string;
 };
 
@@ -164,8 +220,27 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'data_edits', subsystem: 'admin data editor', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    lineageRefs: [{
+      column: 'row_id', kindColumn: 'table_name',
+      targets: [
+        { kind: 'players', entity: 'players', identity: 'afltables_profile_url' },
+        { kind: 'matches', entity: 'matches', identity: 'match_key' },
+      ],
+      remediation: 'Both entities have a stable identity, so every row is remappable in '
+        + 'principle: resolve row_id through the AFL Tables profile url (players) or '
+        + 'matches.match_key, and apply the generated per-row UPDATEs after the reinstate. '
+        + 'A row that does not resolve is NOT dropped and NOT left pointing at the old id: '
+        + 'the promotion stops and the operator records the decision. The common case is a '
+        + 'CURRENT-SEASON match edit — the rebuild carries seasons to the accepted baseline '
+        + 'only, so those matches do not exist in the candidate until the post-promotion '
+        + 'settle re-acquires the season; the supportable answer is to apply that part of '
+        + 'the remap after the settle, stated in the promotion record.',
+    }],
     note: 'Append-only audit of every human canonical edit (before/after snapshots). '
-      + 'Entities are referenced by key, not FK, so it reinstates cleanly. References auth_users.',
+      + 'table_name + row_id is a row id in players or matches, NOT a foreign key: it '
+      + 'reinstates without tripping a constraint, and therefore without noticing a lineage '
+      + 'change. AFLDB-ISSUE-142 (B): remapped through a stable identity, never by id. '
+      + 'References auth_users.',
   },
   {
     schema: 'public', name: 'data_overrides', subsystem: 'admin data editor', category: 'application',
@@ -198,8 +273,42 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     schema: 'public', name: 'player_link_resolutions', subsystem: 'player links', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
     footballRefs: [{ column: 'player_id', references: 'players', nullable: true }],
+    lineageRefs: [
+      {
+        column: 'player_id',
+        targets: [{ entity: 'players', identity: 'afltables_profile_url' }],
+        remediation: 'Resolve player_id through the AFL Tables profile url and apply the '
+          + 'generated per-row UPDATEs after the reinstate. It cannot be nulled instead: '
+          + "plr_action_player_ck requires a player whenever action is 'linked', so a "
+          + 'reinstated decision always asserts a person — it is either the right one or a '
+          + 'wrong one. Where no identity resolves, the promotion stops; the row is never '
+          + 'dropped (it survives in the pre-cutover dump and the kept pre-rebuild database) '
+          + 'and never silently retargeted.',
+      },
+      {
+        column: 'target_id', kindColumn: 'target_table',
+        targets: [
+          'award_winners', 'award_nominations', 'hall_of_fame', 'honour_team_members',
+          'captaincies', 'player_achievements', 'draft_picks',
+        ].map((t) => ({ kind: t, entity: t, identity: 'none' as const })),
+        remediation: 'NO stable identity exists for an honours row: the seven target tables '
+          + 'are import-writable, the rebuild assigns their ids, and nothing in the tree '
+          + 'carries an external key for one of their rows. target_id is deliberately not a '
+          + 'foreign key (migration 056), so a stale value reinstates silently and either '
+          + 'hides the decision from the admin queue or attaches it to a different honours '
+          + 'row. Across a lineage change there are exactly two supportable answers, and the '
+          + 'choice must be recorded in the promotion record and the database.promoted '
+          + 'marker: (1) reinstate as a HISTORICAL audit ledger of the replaced database, '
+          + 'stating that its links are not live; or (2) do not reinstate it into the '
+          + 'candidate at all and keep it as a recorded gap, the promotion_decisions '
+          + 'treatment — a decision cannot outlive the row it is about. Remapping player_id '
+          + 'alone is NOT an answer: it produces a row that looks resolved, names the right '
+          + 'person and points at the wrong honours row.',
+      },
+    ],
     note: 'Append-only human link decisions the honours reload is forbidden to overwrite. '
-      + 'player_id can dangle after an identity merge; probed before reinstatement.',
+      + 'player_id can dangle after an identity merge; probed before reinstatement. Both '
+      + 'player_id and target_id are ids of the replaced database — AFLDB-ISSUE-142 (B).',
   },
   {
     schema: 'public', name: 'player_link_match_candidates', subsystem: 'player links', category: 'operations',
@@ -258,6 +367,41 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       + 'mutation, and deliberately not registered import-writable. The rebuilt ledger '
       + 'describes the rebuilt rows; production\'s settle ledger describes rows that no '
       + 'longer exist and is retained only in the pre-cutover dump (a recorded gap).',
+  },
+  // --- Canonical football schema with no writer (migration 062) -----------------------
+  // AFLDB-ISSUE-142 (A). player_match_period_stats is football data by shape — player_id,
+  // match_id, club_id NOT NULL into canonical tables, per-period statistic columns, a
+  // source_id/import_batch_id provenance pair and UNIQUE (player_id, match_id, period).
+  // Migration 062 nevertheless registered it NOWHERE: it calls neither
+  // afldb_meta.grant_import_write() (as 053, 074, 086, 087 and 089 all do) nor
+  // grant_app_read(). It is the ONLY public table any migration creates that is in neither
+  // classification set, so the fail-closed gate refused EVERY phase on EVERY real database
+  // — the same "a deliberate absence read as a decision" shape as AFLDB-ISSUE-141, except
+  // here the absence was an omission rather than a decision.
+  //
+  // Decided as a CONTRACT entry, not a registry row. grant_import_write() registers and
+  // GRANTS in one statement (045), so registering it would hand afldb_import UPDATE, DELETE
+  // and TRUNCATE — and privileges.sql would restore that at every reconcile — to serve a
+  // writer that does not exist. Nothing in the tree writes this table: the only references
+  // are reads (tools/current-season/repair-match-rekeys.ts counts rows;
+  // src/db/queries/nl/player-{career,game}.ts read it for period-split questions), no
+  // db:test:rebuild stage produces it, and it held 0 rows on afldb_dev and on the rebuilt
+  // afldb_test when this was measured (AFLDB-ISSUE-139 Phase 4C, read-only).
+  //
+  // 'rebuilt' is the honest treatment: there is nothing to reinstate and nothing to reset,
+  // and if the table ever does carry canonical rows they are the rebuild's, exactly like
+  // every table in the registry. compare 'zero' is the tripwire — the day a writer exists,
+  // the candidate/production comparison FAILS and this entry must be revisited, at which
+  // point registering it import-writable, with the grant it then genuinely needs, is the
+  // right answer. See docs/production-promotion.md §1.
+  {
+    schema: 'public', name: 'player_match_period_stats', subsystem: 'quarter-by-quarter player stats',
+    category: 'football', productionOnly: false, treatment: 'rebuilt', compare: 'zero', order: 20,
+    note: 'Canonical football schema created by migration 062 with no writer, no rebuild '
+      + 'stage and no registry row. Classified here rather than registered import-writable: '
+      + 'the registry grants UPDATE/DELETE/TRUNCATE, and no importer needs them. Never '
+      + 'truncated and never reinstated — the candidate\'s copy stands, as for any rebuilt '
+      + 'football table. compare \'zero\' fails the moment that stops being true.',
   },
   // --- Captured external grid corpus (migration 080) ----------------------------------
   // AFLDB-ISSUE-141. Deliberately NOT in afldb_meta.import_writable_tables — see the foot
@@ -385,6 +529,284 @@ export function reinstatedSchemas(): string[] {
   return PROMOTION_CONTRACT
     .filter((t) => t.schema !== 'public' && t.treatment === 'reinstate')
     .map((t) => t.schema);
+}
+
+// ---------------------------------------------------------------------------
+// Lineage-safe reinstatement — AFLDB-ISSUE-142 (B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every reinstated table that carries ids of the replaced database, with its columns.
+ * Empty of consequence when the candidate shares the old id lineage (a production
+ * promotion restored from the same rebuild), which is why the gate proves that first.
+ */
+export function lineageBoundTables(): TableTreatment[] {
+  return publicContractTables().filter((t) => (t.lineageRefs?.length ?? 0) > 0);
+}
+
+/** Every entity a lineage-bound column can point at, with the rule that identifies it. */
+export function lineageTargetsOf(table: TableTreatment): { ref: LineageRef; target: LineageTarget }[] {
+  return (table.lineageRefs ?? []).flatMap((ref) => ref.targets.map((target) => ({ ref, target })));
+}
+
+/**
+ * The identity of a row, in SQL, asked of BOTH databases by identical logic. `byId` takes a
+ * bigint[] of row ids; `byIdentity` takes a text[] of identities. Both return `(id,
+ * identity)` pairs and nothing else — no name, no date, no club — so a name match is not
+ * merely forbidden here, it is unavailable.
+ */
+export const LINEAGE_IDENTITY_SQL: Readonly<Record<
+  Exclude<LineageIdentityRule, 'none'>,
+  { entity: string; description: string; byId: string; byIdentity: string }
+>> = {
+  afltables_profile_url: {
+    entity: 'players',
+    description: "external_identities: source 'afltables', match_method "
+      + "'afltables_profile_url', status unique/resolved — the AFL Tables profile path",
+    byId: `
+      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+        FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables'
+         AND ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.player_id IS NOT NULL
+         AND ei.player_id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+        FROM external_identities ei
+        JOIN sources s ON s.id = ei.source_id
+       WHERE s.key = 'afltables'
+         AND ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND ei.player_id IS NOT NULL
+         AND ei.external_id = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  match_key: {
+    entity: 'matches',
+    description: 'matches.match_key — NOT NULL UNIQUE (migration 003), the natural key the '
+      + 'settle projections link on (migration 076)',
+    byId: `
+      SELECT id::bigint AS id, match_key AS identity
+        FROM public.matches
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, match_key AS identity
+        FROM public.matches
+       WHERE match_key = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+};
+
+/** Why one id could not be carried across the lineage change. Every case refuses. */
+export type LineageRemapReason =
+  | 'no_stable_identity_rule'      // the contract has no identity for this entity at all
+  | 'no_identity_in_replaced'      // the replaced database's row carries no stable identity
+  | 'ambiguous_in_replaced'        // one old id, more than one stable identity
+  | 'identity_absent_in_candidate' // the identity does not exist in the new lineage
+  | 'ambiguous_in_candidate';      // one identity, more than one candidate row
+
+export type IdentityPair = { id: number; identity: string };
+
+export type LineageRemap = {
+  entity: string;
+  rule: LineageIdentityRule;
+  /** Evidenced old -> new, each proved by one identity string read from both databases. */
+  mapped: { oldId: number; identity: string; newId: number }[];
+  unresolved: { oldId: number; reason: LineageRemapReason; identity?: string }[];
+  /** Old rows that fold onto one candidate row (an AFLDB-ISSUE-136 identity merge). */
+  merges: { newId: number; oldIds: number[] }[];
+  /** Mapped ids whose value does not change. On a shared lineage this is all of them. */
+  unchanged: number;
+};
+
+/**
+ * The whole remap rule, as a pure function of two id<->identity readings.
+ *
+ * It never sees a name, so it cannot match on one. It maps an old id ONLY when exactly one
+ * stable identity is read for it in the replaced database and exactly one candidate row
+ * carries that same identity string. Every other shape is unresolved, and unresolved always
+ * refuses: dropping the row, nulling the reference or keeping the old integer would each
+ * silently change who a human decision is about.
+ */
+export function resolveLineageRemap(input: {
+  entity: string;
+  rule: LineageIdentityRule;
+  referencedIds: readonly number[];
+  replacedIdentities: readonly IdentityPair[];
+  candidateIdentities: readonly IdentityPair[];
+}): LineageRemap {
+  const ids = [...new Set(input.referencedIds)].sort((a, b) => a - b);
+  const out: LineageRemap = {
+    entity: input.entity, rule: input.rule, mapped: [], unresolved: [], merges: [], unchanged: 0,
+  };
+  if (input.rule === 'none') {
+    for (const oldId of ids) out.unresolved.push({ oldId, reason: 'no_stable_identity_rule' });
+    return out;
+  }
+
+  const oldIdentities = new Map<number, Set<string>>();
+  for (const row of input.replacedIdentities) {
+    if (!oldIdentities.has(row.id)) oldIdentities.set(row.id, new Set());
+    oldIdentities.get(row.id)!.add(row.identity);
+  }
+  const newIds = new Map<string, Set<number>>();
+  for (const row of input.candidateIdentities) {
+    if (!newIds.has(row.identity)) newIds.set(row.identity, new Set());
+    newIds.get(row.identity)!.add(row.id);
+  }
+
+  for (const oldId of ids) {
+    const identities = [...(oldIdentities.get(oldId) ?? [])].sort();
+    if (identities.length === 0) { out.unresolved.push({ oldId, reason: 'no_identity_in_replaced' }); continue; }
+    if (identities.length > 1) { out.unresolved.push({ oldId, reason: 'ambiguous_in_replaced' }); continue; }
+    const identity = identities[0];
+    const candidates = [...(newIds.get(identity) ?? [])].sort((a, b) => a - b);
+    if (candidates.length === 0) { out.unresolved.push({ oldId, reason: 'identity_absent_in_candidate', identity }); continue; }
+    if (candidates.length > 1) { out.unresolved.push({ oldId, reason: 'ambiguous_in_candidate', identity }); continue; }
+    out.mapped.push({ oldId, identity, newId: candidates[0] });
+    if (candidates[0] === oldId) out.unchanged += 1;
+  }
+
+  const byNew = new Map<number, number[]>();
+  for (const m of out.mapped) {
+    if (!byNew.has(m.newId)) byNew.set(m.newId, []);
+    byNew.get(m.newId)!.push(m.oldId);
+  }
+  for (const [newId, oldIds] of [...byNew].sort((a, b) => a[0] - b[0])) {
+    if (oldIds.length > 1) out.merges.push({ newId, oldIds: [...oldIds].sort((a, b) => a - b) });
+  }
+  return out;
+}
+
+export type LineageSample = { id: number; replaced?: string; candidate?: string };
+
+export type LineageVerdict = {
+  /** True unless every comparable sample agreed. No comparable sample = changed. */
+  changed: boolean;
+  agreed: number;
+  differed: { id: number; replaced: string; candidate: string }[];
+  /** Ids with no identity on one side or the other: they prove nothing either way. */
+  incomparable: number;
+};
+
+/**
+ * Does the candidate share the replaced database's id lineage? Answered from evidence — the
+ * same id read on both sides must denote the same identity — and fails closed: if nothing
+ * could be compared, the answer is "changed", so a missing identity layer can never be read
+ * as "safe to reinstate by id".
+ */
+export function detectLineageChange(samples: readonly LineageSample[]): LineageVerdict {
+  const differed: LineageVerdict['differed'] = [];
+  let agreed = 0;
+  let incomparable = 0;
+  for (const s of samples) {
+    if (s.replaced === undefined || s.candidate === undefined) { incomparable += 1; continue; }
+    if (s.replaced === s.candidate) agreed += 1;
+    else differed.push({ id: s.id, replaced: s.replaced, candidate: s.candidate });
+  }
+  return { changed: differed.length > 0 || agreed === 0, agreed, differed, incomparable };
+}
+
+/** One column of one table, resolved against the candidate. Rows carry their own row id. */
+export type LineageColumnPlan = {
+  table: string;
+  column: string;
+  kindColumn?: string;
+  kind?: string;
+  entity: string;
+  rule: LineageIdentityRule;
+  remediation: string;
+  /** The rows read from the replaced database, one per (row id, current value). */
+  rows: { rowId: number; oldValue: number }[];
+  remap: LineageRemap;
+};
+
+export type LineageRemapInput = {
+  candidate: string;
+  oldDatabase: string;
+  environment?: Environment;
+  plans: readonly LineageColumnPlan[];
+};
+
+/**
+ * The remap as SQL an operator reads, then runs on the candidate AFTER the reinstate.
+ *
+ * One UPDATE per ROW, each guarded by the value it was proved against, so the file is its
+ * own audit trail and re-running it is a no-op. Nothing is emitted for an id that was not
+ * evidenced: those become `-- UNRESOLVED` lines naming the reason, and the trailing
+ * verification query fails until every one of them has been dealt with deliberately.
+ */
+export function lineageRemapSql(input: LineageRemapInput): string {
+  const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
+  const lines: string[] = [];
+  lines.push('-- AFLDB-ISSUE-142 (B) — lineage remap for reinstated human/admin rows.');
+  lines.push(`-- Candidate '${input.candidate}' (${names.environment}) does NOT share the id lineage of`);
+  lines.push(`-- '${input.oldDatabase}'. Each UPDATE below is evidenced by ONE stable identity string`);
+  lines.push('-- read from both databases in the same read-only pass: old id -> identity -> new id.');
+  lines.push('-- No row is matched by name. Run AFTER the reinstate, BEFORE --phase candidate.');
+  lines.push('');
+  lines.push('BEGIN;');
+
+  let unresolvedTotal = 0;
+  for (const plan of input.plans) {
+    const scope = plan.kindColumn ? ` WHERE ${plan.kindColumn} = '${plan.kind}'` : '';
+    lines.push('');
+    lines.push(`-- ${plan.table}.${plan.column}${scope} -> ${plan.entity} (identity: ${plan.rule})`);
+    const byOld = new Map(plan.remap.mapped.map((m) => [m.oldId, m] as const));
+    for (const row of plan.rows) {
+      const m = byOld.get(row.oldValue);
+      if (!m) continue;
+      if (m.newId === m.oldId) continue;
+      const guard = plan.kindColumn ? ` AND ${plan.kindColumn} = '${plan.kind}'` : '';
+      lines.push(`--   ${m.oldId} -> ${m.identity} -> ${m.newId}`);
+      lines.push(`UPDATE public.${plan.table} SET ${plan.column} = ${m.newId}`
+        + ` WHERE id = ${row.rowId} AND ${plan.column} = ${m.oldId}${guard};`);
+    }
+    for (const u of plan.remap.unresolved) {
+      unresolvedTotal += 1;
+      const rows = plan.rows.filter((r) => r.oldValue === u.oldId).map((r) => r.rowId);
+      lines.push(`-- UNRESOLVED ${plan.table}.${plan.column} = ${u.oldId} (${u.reason}`
+        + `${u.identity ? `, identity ${u.identity}` : ''}) — ${plan.table} row(s) ${rows.join(', ')}`);
+    }
+    for (const merge of plan.remap.merges) {
+      lines.push(`-- MERGE ${plan.entity} ${merge.oldIds.join(', ')} -> ${merge.newId}`
+        + ' (one candidate row; both decisions now attach to it)');
+    }
+    if (plan.remap.unresolved.length > 0) {
+      for (const line of plan.remediation.split('\n')) lines.push(`--   ${line}`);
+    }
+  }
+
+  lines.push('');
+  lines.push(unresolvedTotal === 0
+    ? '-- Every referenced id was evidenced. COMMIT is safe once the counts above are read.'
+    : `-- ${unresolvedTotal} id(s) could NOT be evidenced. NOTHING above resolves them: decide each`);
+  if (unresolvedTotal > 0) {
+    lines.push('-- one deliberately, record the decision in the promotion record and the');
+    lines.push('-- database.promoted marker, and do not COMMIT until you have.');
+  }
+  lines.push('COMMIT;');
+  lines.push('');
+  lines.push('-- Verification: every remapped value must now resolve to the identity it was');
+  lines.push('-- proved against. This is the proof that no row changed semantic owner.');
+  for (const plan of input.plans) {
+    if (plan.remap.mapped.length === 0) continue;
+    const pairs = plan.remap.mapped.map((m) => `(${m.newId}, ${quote(m.identity)})`).join(', ');
+    const guard = plan.kindColumn ? ` AND t.${plan.kindColumn} = '${plan.kind}'` : '';
+    lines.push(`-- ${plan.table}.${plan.column}: expect 0 rows`);
+    lines.push(`SELECT t.id, t.${plan.column} FROM public.${plan.table} t`
+      + ` WHERE t.${plan.column} IS NOT NULL${guard}`
+      + ` AND t.${plan.column} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function quote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
 
 // ---------------------------------------------------------------------------
@@ -783,7 +1205,8 @@ VALUES (
       'promotion_decisions: reset, retained only in the pre-cutover dump',
       'canonical_applications and staging.*: settle history replaced by the rebuild',
       'auth_sessions: reset, every administrator signs in again',
-      'external_grids.import_batch_id: the capturing batch is not in the rebuilt candidate; see the promotion record'
+      'external_grids.import_batch_id: the capturing batch is not in the rebuilt candidate; see the promotion record',
+      'id-keyed ledgers (player_link_resolutions, data_edits): if the candidate did not share the replaced database''s id lineage, the promotion record states how each lineage-bound column was resolved'
     ])
   )
 );
@@ -848,6 +1271,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase restored` passed: candidate name, migration parity, dangling-reference probe against the old database resolved.',
   'Every production-owned/operational table truncated in the candidate, then reinstated per the printed plan, in order, each under --single-transaction.',
   'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE its restore lines: external_grid_sources.ingest_source_id onto the candidate\'s gridley sources row, and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. Rows are never dropped to make the FK pass.',
+  'Lineage proved at `--phase restored`: the candidate either shares the replaced database\'s id lineage, or every reinstated id-keyed column (player_link_resolutions.player_id and .target_id, data_edits.row_id) was resolved through a stable external identity and the generated remap applied — with every unresolved id decided deliberately and recorded. Never remapped by name, never left on the old integer.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',
   'Service stopped; afldb_prod renamed to afldb_prod_pre_rebuild_<stamp>; candidate renamed to afldb_prod; service started.',
