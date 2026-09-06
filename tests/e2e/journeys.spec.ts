@@ -363,3 +363,199 @@ test('statistical tables stay usable on mobile', async ({ page, isMobile }) => {
   );
   expect(overflow).toBe(true);
 });
+
+/**
+ * AFLDB-ISSUE-144 Stage 9 — /clubs/compare in a browser.
+ *
+ * Stages 1-8 proved the queries, the route state and the rendered markup;
+ * what none of them could prove is that a reader arrives at the surface at
+ * all, that the collapsed sections open, that a shareable URL survives a
+ * real navigation, and that a bad parameter is an explanation rather than a
+ * 500. The pair (Adelaide, Brisbane Lions) is the runbook witness; 1930 is
+ * used only because Adelaide's first season is 1991, which is permanent.
+ */
+
+test('clubs → compare clubs', async ({ page }) => {
+  await page.goto('/clubs');
+  await page.getByRole('link', { name: /Compare clubs/ }).click();
+
+  await expect(page).toHaveURL(/\/clubs\/compare$/);
+  await expect(page.getByRole('heading', { name: 'Compare clubs', level: 1 })).toBeVisible();
+  // Nothing is chosen for the reader, and no comparison is rendered.
+  await expect(page.getByLabel('First club')).toHaveValue('');
+  await expect(page.getByLabel('Second club')).toHaveValue('');
+  await expect(page.getByRole('heading', { name: 'Head-to-head' })).toHaveCount(0);
+});
+
+test('a club page seeds a comparison with that club', async ({ page }) => {
+  await page.goto('/clubs/adelaide');
+  await page.getByRole('link', { name: /Compare with another club/ }).click();
+
+  await expect(page).toHaveURL(/\/clubs\/compare\?club1=adelaide/);
+  await expect(page.getByLabel('First club')).toHaveValue('adelaide');
+  await expect(page.getByLabel('Second club')).toHaveValue('');
+});
+
+test('a rivalry renders every section of the comparison', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+
+  await expect(
+    page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
+  ).toBeVisible();
+
+  const headings: (string | RegExp)[] = [
+    /^Selected season/,
+    'Head-to-head',
+    'Rivalry records',
+    'Match history',
+    'Player rivalry leaders',
+    'Connected players',
+    'Brownlow',
+    'By decade',
+    'Period records',
+    'Player averages in this rivalry',
+  ];
+  for (const heading of headings) {
+    await expect(
+      page.getByRole('heading', { name: heading }).first(),
+      String(heading),
+    ).toBeVisible();
+  }
+
+  // A collapsed section opens without client state: it is <details>.
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Every meeting' }),
+  });
+  await history.locator('summary').click();
+  await expect(history.getByRole('table').first()).toBeVisible();
+});
+
+test('reversing the pair reverses the presentation, not the canonical', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=brisbane-lions&club2=adelaide');
+  await expect(
+    page.getByRole('heading', { name: 'Brisbane Lions v Adelaide', level: 1 }),
+  ).toBeVisible();
+
+  const canonical = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  expect(new URL(canonical!).search).toBe('?club1=adelaide&club2=brisbane-lions');
+
+  await page.getByRole('link', { name: 'Swap the order of the two clubs' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/club1=adelaide&club2=brisbane-lions/);
+});
+
+test('a historical season stays selected, and a club that did not compete says so', async ({ page }) => {
+  // Adelaide entered the competition in 1991, so 1930 is a permanent witness.
+  await page.goto('/clubs/compare?club1=adelaide&club2=carlton&season=1930');
+
+  await expect(page.getByLabel('Season')).toHaveValue('1930');
+  // Two headings carry the season: the section h2 and the Brownlow h3
+  // beneath it, which is the intended hierarchy rather than a duplicate.
+  await expect(
+    page.getByRole('heading', { name: 'Selected season — 1930' }).first(),
+  ).toBeVisible();
+  await expect(page.getByText('Did not compete in 1930').first()).toBeVisible();
+  // No silent substitution of a season the club did play in.
+  await expect(page).toHaveURL(/season=1930/);
+});
+
+test('the match filter and the history page are shareable state', async ({ page }) => {
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood&matchType=finals');
+  await expect(page.getByLabel('Match type')).toHaveValue('finals');
+
+  await page.goto('/clubs/compare?club1=carlton&club2=collingwood');
+  const history = page.locator('details').filter({
+    has: page.getByRole('heading', { name: 'Every meeting' }),
+  });
+  await history.locator('summary').click();
+  await history.getByRole('link', { name: 'Next →' }).click();
+
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page).toHaveURL(/club1=carlton&club2=collingwood/);
+  await expect(page.getByText(/Page 2 of/).first()).toBeVisible();
+});
+
+test('every invalid comparison state answers 200 with an explanation', async ({ page }) => {
+  const cases: [string, RegExp][] = [
+    ['club1=not-a-club&club2=adelaide', /could not be found/],
+    ['club1=adelaide&club2=adelaide', /Choose two different clubs/],
+    ['club1=footscray&club2=western-bulldogs', /could not be found|different clubs/],
+    ['club1=adelaide&club2=carlton&season=not-a-year', /Adelaide v Carlton/],
+    ['club1=adelaide&club2=carlton&matchType=nonsense', /Adelaide v Carlton/],
+    ['club1=adelaide&club2=carlton&page=99999', /Adelaide v Carlton/],
+  ];
+
+  for (const [query, expected] of cases) {
+    const response = await page.goto('/clubs/compare?' + query);
+    expect(response?.status(), query).toBe(200);
+    await expect(page.locator('body'), query).toContainText(expected);
+    // One h1 on every state, and never Next's error page.
+    await expect(page.locator('h1'), query).toHaveCount(1);
+  }
+});
+
+test('the comparison stays inside the viewport on mobile', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'mobile-only check');
+
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+  // Wide tables scroll inside .table-wrap; the document must not.
+  const contained = await page.evaluate(
+    () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+  );
+  expect(contained).toBe(true);
+
+  // The same holds at the narrowest supported width with EVERY disclosure
+  // open, which is how the Stage 9 defect was found: a grid column holding
+  // a `.table-wrap` took its minimum width from the table inside it, so the
+  // track — and with it the page — grew instead of the table scrolling.
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.evaluate(() => {
+    for (const disclosure of document.querySelectorAll('details')) disclosure.open = true;
+  });
+  await expect(
+    page.locator('details').filter({
+      has: page.getByRole('heading', { name: 'Season player leaders' }),
+    }).getByRole('table').first(),
+  ).toBeVisible();
+  const stillContained = await page.evaluate(
+    () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+  );
+  expect(stillContained).toBe(true);
+});
+
+test('the comparison controls are labelled and keyboard-operable', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'keyboard traversal is a pointer-free check');
+
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+
+  // Every control is reachable by its label, which is the association.
+  for (const label of ['First club', 'Second club', 'Season', 'Match type']) {
+    await expect(page.getByLabel(label), label).toBeVisible();
+  }
+
+  await page.getByLabel('First club').focus();
+  const reached: string[] = [];
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press('Tab');
+    reached.push(await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return '';
+      return (active.getAttribute('aria-label') ?? active.textContent ?? '').trim();
+    }));
+  }
+  // The swap control is a link with a sentence for a name, and the keyboard
+  // reaches it from the first selector without being trapped on the way.
+  expect(reached.join(' | ')).toContain('Swap the order of the two clubs');
+
+  // Focus is visible rather than suppressed.
+  const focusStyle = await page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null;
+    if (!active) return '';
+    const style = getComputedStyle(active);
+    return style.outlineStyle + ':' + style.outlineWidth + ':' + style.boxShadow;
+  });
+  expect(focusStyle).not.toBe('');
+  expect(focusStyle).not.toBe('none:0px:none');
+});

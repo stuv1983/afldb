@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-144 — Public club-vs-club comparison - 6 September 2026
+
+- Added `/clubs/compare`, a public AFL-only comparison of two club organisations covering selected-
+  season record/ladder/scoring/team-stats/player-leaders/Brownlow, complete head-to-head history
+  (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage), decade-by-decade H2H
+  breakdowns, period-score rivalry records (biggest leads and comebacks by quarter/half/three-quarter
+  time), coverage-aware H2H player averages (minimum 5 recorded games per metric), and connected-
+  player history (every player who represented both organisations, direction, intervening clubs, and
+  club-attributed Brownlow history).
+- Entry points added from `/clubs` (`Compare clubs →`) and every club page (`Compare with another
+  club →`, seeded with that club's current organisation).
+- Season selection defaults to the maximum canonical season and is entirely data-driven: no season,
+  year, or metric-year cutoff is hard-coded, so newly ingested seasons and Brownlow coverage becoming
+  complete require no code change to appear.
+- Statistical coverage is always disclosed rather than guessed — partial, pending, and not-collected
+  metrics are shown as such, and a missing recorded value is never presented as zero.
+
 ### AFLDB-ISSUE-139 — Family, Father–Son, Coach and After-the-Siren Records; Coaches navigation - 6 September 2026
 
 - Four new curated Records boards read from data the DEV promotion above makes reachable: Most Games
