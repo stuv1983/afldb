@@ -147,6 +147,112 @@ export async function getCoach(id: number): Promise<CoachIdentity | null> {
   return row ?? null;
 }
 
+export type CoachRecordRow = {
+  rank: number;
+  coachId: number;
+  displayName: string;
+  coachOnly: boolean;
+  playerId: number | null;
+  playerSlug: string | null;
+  firstSeason: number | null;
+  lastSeason: number | null;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  finals: number;
+  grandFinals: number;
+  premierships: number;
+  /** From `round(...)::numeric`, so postgres.js returns this as a string, never a number. */
+  winPct: string | null;
+};
+
+/**
+ * Most games coached, for the Coach Records board (AFLDB-ISSUE-139 UI
+ * handoff). Draws use `m.id IS NOT NULL AND m.winner_club_id IS NULL`
+ * rather than `m.winner_club_id IS NULL` alone: on the LEFT JOIN through
+ * match_coaches, a coach with zero games has both `mc` and `m` null, and
+ * `m.winner_club_id IS NULL` alone would count that absence as a draw.
+ */
+export async function getCoachRecordsByGames(limit = 50): Promise<CoachRecordRow[]> {
+  return sql<CoachRecordRow[]>`
+    SELECT dense_rank() OVER (ORDER BY count(mc.match_id) DESC)::int AS rank,
+           c.id AS "coachId", c.display_name AS "displayName",
+           (c.player_id IS NULL) AS "coachOnly",
+           c.player_id AS "playerId", p.slug AS "playerSlug",
+           min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
+           count(mc.match_id)::int AS games,
+           count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+           count(*) FILTER (WHERE m.id IS NOT NULL AND m.winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (
+             WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+           )::int AS losses,
+           count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+           count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+           count(*) FILTER (
+             WHERE m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id
+           )::int AS premierships,
+           CASE WHEN count(mc.match_id) > 0
+                THEN round((
+                  (count(*) FILTER (WHERE m.winner_club_id = mc.club_id)
+                    + count(*) FILTER (WHERE m.id IS NOT NULL AND m.winner_club_id IS NULL) * 0.5
+                  ) * 100.0 / count(mc.match_id)
+                )::numeric, 2)
+           END AS "winPct"
+      FROM coaches c
+      LEFT JOIN players p ON p.id = c.player_id
+      LEFT JOIN match_coaches mc ON mc.coach_id = c.id
+      LEFT JOIN matches m ON m.id = mc.match_id
+     GROUP BY c.id, c.display_name, c.player_id, p.slug
+     ORDER BY count(mc.match_id) DESC, c.display_name
+     LIMIT ${limit}
+  `;
+}
+
+/**
+ * Best coaching win percentage, qualified at a minimum of 50 games
+ * coached. AFLDB has no existing percentage-based record convention to
+ * follow (nl-search's average-ranking support is deliberately deferred
+ * for the same reason, docs/search.md), so 50 is chosen here and stated
+ * on the page rather than left implicit.
+ */
+export async function getCoachRecordsByWinPct(minGames = 50, limit = 50): Promise<CoachRecordRow[]> {
+  return sql<CoachRecordRow[]>`
+    WITH totals AS (
+      SELECT c.id AS "coachId", c.display_name AS "displayName",
+             (c.player_id IS NULL) AS "coachOnly",
+             c.player_id AS "playerId", p.slug AS "playerSlug",
+             min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
+             count(mc.match_id)::int AS games,
+             count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+             count(*) FILTER (WHERE m.id IS NOT NULL AND m.winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (
+               WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+             )::int AS losses,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+             count(*) FILTER (
+               WHERE m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id
+             )::int AS premierships
+        FROM coaches c
+        LEFT JOIN players p ON p.id = c.player_id
+        LEFT JOIN match_coaches mc ON mc.coach_id = c.id
+        LEFT JOIN matches m ON m.id = mc.match_id
+       GROUP BY c.id, c.display_name, c.player_id, p.slug
+    )
+    SELECT dense_rank() OVER (
+             ORDER BY ((wins + draws * 0.5) * 100.0 / games) DESC
+           )::int AS rank,
+           "coachId", "displayName", "coachOnly", "playerId", "playerSlug",
+           "firstSeason", "lastSeason", games, wins, draws, losses, finals, "grandFinals", premierships,
+           round(((wins + draws * 0.5) * 100.0 / games)::numeric, 2) AS "winPct"
+      FROM totals
+     WHERE games >= ${minGames}
+     ORDER BY ((wins + draws * 0.5) * 100.0 / games) DESC, "displayName"
+     LIMIT ${limit}
+  `;
+}
+
 export type CoachIndexRow = {
   id: number;
   displayName: string;
