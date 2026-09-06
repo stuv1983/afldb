@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB-ISSUE-145 — Venues exposed in site navigation - 6 September 2026
+
+- The existing `/venues` index is now linked from the primary navigation (a `Venues` entry after
+  `Seasons`) and from the home page's "Browse the record" card grid (a `Venues` card after `Seasons`).
+  The page, its query and its data were already in the tree; this is navigation exposure only, with no
+  migration, schema, or query change.
+
 ### AFLDB-ISSUE-144 — Public club-vs-club comparison - 6 September 2026
 
 - Added `/clubs/compare`, a public AFL-only comparison of two club organisations covering selected-

@@ -257,6 +257,15 @@ test('match search is reachable from the primary navigation', async ({ page, isM
   await expect(page).toHaveURL(/\/match-search/);
 });
 
+test('venues is reachable from the primary navigation', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'the masthead nav is hidden on a phone');
+
+  await page.goto('/');
+  await page.getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Venues' }).click();
+  await expect(page).toHaveURL(/\/venues/);
+});
+
 test('the AFLW landing is reachable from site navigation', async ({ page, isMobile }) => {
   // Start on a static route so this UI-only check does not depend on the database.
   await page.goto('/not-a-real-page');

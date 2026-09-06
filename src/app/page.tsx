@@ -176,6 +176,7 @@ export default async function HomePage() {
             { href: '/players', title: 'Players', meta: 'Every player since 1897, filtered by career statistics' },
             { href: '/clubs', title: 'Clubs', meta: 'Current and historical clubs' },
             { href: '/seasons', title: 'Seasons', meta: 'Ladders, results and finals' },
+            { href: '/venues', title: 'Venues', meta: 'Every ground since 1897, and the matches played there' },
             { href: '/records', title: 'Records', meta: 'Career, season and single-game' },
             { href: '/brownlow', title: 'Brownlow', meta: 'Vote counts by season' },
             { href: '/awards', title: 'Awards', meta: 'All-Australian, Rising Star, Hall of Fame' },

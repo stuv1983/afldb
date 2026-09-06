@@ -22,6 +22,7 @@ export const PRIMARY_NAV = [
   { href: '/players', label: 'Players' },
   { href: '/clubs', label: 'Clubs' },
   { href: '/seasons', label: 'Seasons' },
+  { href: '/venues', label: 'Venues' },
   { href: '/records', label: 'Records' },
   { href: '/coaches', label: 'Coaches' },
   { href: '/brownlow', label: 'Brownlow' },
