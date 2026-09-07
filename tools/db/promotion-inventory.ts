@@ -82,6 +82,14 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  */
 export type LineageIdentityRule = 'afltables_profile_url' | 'match_key' | 'source_key' | 'none';
 
+/**
+ * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
+ * NOT NULL foreign key whose target ids belong to the candidate's lineage (see
+ * `isStagedReinstatement`). Created by the generated plan, dropped by the same plan; never
+ * part of the application schema.
+ */
+export const STAGING_SCHEMA = 'promotion_staging';
+
 export type RestoreDependency = {
   /** The table whose rows are restored after every table in `dependsOn`. */
   table: string;
@@ -556,23 +564,30 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     footballRefs: [{
       column: 'ingest_source_id', references: 'sources', nullable: false,
       remediation: "sources is import-writable, so the candidate's sources.id for key "
-        + "'gridley' need not equal the dumped one. Resolve BEFORE the reinstate: read the "
-        + "candidate id (SELECT id FROM sources WHERE key = 'gridley') and restore this "
-        + 'table with ingest_source_id set to it, or reinstate and then UPDATE the column. '
+        + "'gridley' need not equal the dumped one, and the column is NOT NULL against an "
+        + 'immediate FK, so a plain pg_restore of the old integer refuses (AFLDB-ISSUE-151). '
+        + 'The generated plan therefore STAGES this table: its rows are restored into '
+        + `${STAGING_SCHEMA}.external_grid_sources (no FK), the evidenced --lineage-remap-out `
+        + 'UPDATE (old id -> sources.key -> candidate id) is applied THERE, and only then are '
+        + 'the rows promoted into public.external_grid_sources under the FK, ids preserved. '
         + 'Never insert a sources row for this: migration 080 seeds it, so the candidate '
         + 'already has one.',
     }],
     lineageRefs: [{
       column: 'ingest_source_id',
       targets: [{ entity: 'sources', identity: 'source_key' }],
-      remediation: "Resolve ingest_source_id through sources.key (the stable 'gridley' key) "
-        + 'and apply the generated guarded UPDATE after reinstatement. The numeric source id '
-        + 'is deliberately not stable across rebuilt lineages and must never be assumed.',
+      remediation: "Resolve ingest_source_id through sources.key (the stable 'gridley' key). "
+        + 'The generated guarded UPDATE targets the STAGED copy of this table and runs at the '
+        + "plan's remap step, BEFORE the rows are promoted under the FK (AFLDB-ISSUE-151). The "
+        + 'numeric source id is deliberately not stable across rebuilt lineages and must never '
+        + 'be assumed.',
     }],
     note: 'The grid platforms boards are captured from — one row, gridley, seeded by '
       + 'migration 080 itself. Reinstated FIRST of the three: the truncate removes the '
       + "candidate's seed so the dump's row keeps its id and external_grids.source_id "
-      + 'lands on the same id. Immutable captured evidence with no rebuild stage.',
+      + 'lands on the same id. Immutable captured evidence with no rebuild stage. '
+      + 'STAGED (AFLDB-ISSUE-151): ingest_source_id is NOT NULL into rebuilt sources, so the '
+      + 'plan restores it via the staging schema and remaps it before the FK sees it.',
   },
   {
     schema: 'public', name: 'external_grids', subsystem: 'Grid Solver corpus', category: 'operations',
@@ -833,6 +848,7 @@ export function promotionContractProblems(
   for (const table of contract) {
     const where = `${table.schema}.${table.name}`;
     for (const problem of historicalOnlyProblems(table)) problems.push(`${where} ${problem}`);
+    for (const problem of stagedReinstatementProblems(table)) problems.push(`${where} ${problem}`);
     if (table.schema === 'public') {
       if (table.tables || table.tableDependencies) {
         problems.push(`${where} is public but declares schema-table restore metadata`);
@@ -864,6 +880,11 @@ export function promotionContractProblems(
       .map((parent) => ({ table: table.name, dependsOn: [parent] })));
     problems.push(...dependencyProblems(
       `public (${environment})`, ordered.map((table) => table.name), dependencies,
+    ));
+    // AFLDB-ISSUE-151: the order the plan restores in (direct -> staged -> dependants) must
+    // satisfy the same FK dependencies as the contract order it was derived from.
+    problems.push(...dependencyProblems(
+      `public plan (${environment})`, plannedReinstateOrder(environment, contract), dependencies,
     ));
     for (const table of contract) {
       if (table.schema !== 'public' || !historicalOnlyFor(table, environment)) continue;
@@ -1027,6 +1048,211 @@ export function stableLineageTargetForFootballRef(
       && target.identity !== 'none')
     .map(({ target }) => target);
   return targets.length === 1 ? targets[0] : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Staged reinstatement — AFLDB-ISSUE-151
+// ---------------------------------------------------------------------------
+
+/**
+ * A NOT NULL foreign key from a reinstated table into rebuilt data whose old integer is
+ * carried across the lineage change through a stable identity. The remap exists (§7.4c),
+ * but a plain `pg_restore --data-only` of the table would present the OLD integer to an
+ * immediate FK before any UPDATE could run — met on the first production promotion, where
+ * `external_grid_sources.ingest_source_id` = 57 (old `sources` 57 = gridley) had to land in a
+ * candidate whose gridley row is `sources` 7 and whose id 57 does not exist.
+ */
+export type StagedLineageColumn = {
+  column: string;
+  references: string;
+  identity: LineageIdentityRule;
+};
+
+/**
+ * Every NOT NULL reference of this table that is BOTH probed as a football reference AND
+ * remappable through a stable identity. Empty for every table that is not staged.
+ */
+export function stagedLineageColumns(table: TableTreatment): StagedLineageColumn[] {
+  if (table.schema !== 'public' || table.treatment !== 'reinstate') return [];
+  return (table.footballRefs ?? [])
+    .filter((ref) => !ref.nullable)
+    .flatMap((ref) => {
+      const target = stableLineageTargetForFootballRef(table, ref.column, ref.references);
+      return target ? [{ column: ref.column, references: ref.references, identity: target.identity }] : [];
+    });
+}
+
+/**
+ * Is this table reinstated THROUGH the staging schema rather than straight into `public`?
+ *
+ * Decided from the contract alone, never from a table name: any reinstated public table
+ * carrying a NOT NULL football reference that has a stable lineage identity is staged. Its
+ * rows are restored into `promotion_staging.<table>` (the same columns, no constraints, no
+ * identity), the evidenced `--lineage-remap-out` UPDATE is applied there, and the rows are
+ * then promoted into `public.<table>` — where the FK checks them — with their ids preserved.
+ * Nothing is bypassed: the FK never sees the old integer, and a row the remap did not settle
+ * refuses the promotion.
+ *
+ * Invariant the mechanism relies on: a staged table HOLDS ROWS in the database being
+ * replaced. A data-only restore of an empty table leaves no trace, so the promotion cannot
+ * tell "restored zero rows" from "the staged restore never ran", and it refuses an empty
+ * staging copy rather than guess. That ambiguity is settled before any plan exists:
+ * `--phase pre-cutover` refuses (`judgeStagedSourceRows`) when a staged table is empty in the
+ * live database, so an operator decides the table's disposition then, not mid-transcript.
+ * Today the one staged table is seeded by its own migration (080) and cannot be empty on a
+ * migrated database; the gate is what keeps that true for any table this predicate selects.
+ */
+export function isStagedReinstatement(table: TableTreatment): boolean {
+  return stagedLineageColumns(table).length > 0;
+}
+
+export type StagedSourceRowsJudgement = {
+  /** Staged tables with rows in the replaced database, with their counts. */
+  populated: { table: string; rows: number }[];
+  /** Staged tables the replaced database has but which hold no rows. */
+  empty: string[];
+  /** Staged tables the inventory did not count (absent from the replaced database). */
+  missing: string[];
+  verdict: 'PASS' | 'FAIL';
+};
+
+/**
+ * AFLDB-ISSUE-151: the narrower invariant behind staged reinstatement, judged from the
+ * `--phase pre-cutover` inventory counts (`public.<table>` keys). Every staged table must
+ * hold at least one row in the database being replaced; an empty or absent one refuses,
+ * because the generated promotion would refuse it later anyway, when the transcript is
+ * half-run. Nothing here reads a database.
+ */
+export function judgeStagedSourceRows(
+  counts: Readonly<Record<string, number>>, environment: Environment = DEFAULT_ENVIRONMENT,
+): StagedSourceRowsJudgement {
+  const out: StagedSourceRowsJudgement = { populated: [], empty: [], missing: [], verdict: 'PASS' };
+  for (const t of stagedReinstateTables(environment)) {
+    const n = counts[`public.${t.name}`];
+    if (n === undefined) out.missing.push(t.name);
+    else if (n <= 0) out.empty.push(t.name);
+    else out.populated.push({ table: t.name, rows: n });
+  }
+  out.verdict = out.empty.length + out.missing.length === 0 ? 'PASS' : 'FAIL';
+  return out;
+}
+
+export type StagingLeftoverJudgement = { verdict: 'PASS' | 'FAIL'; lines: string[] };
+
+/**
+ * AFLDB-ISSUE-151: a `promotion_staging` schema exists only between plan steps 2b and 2d.
+ * Found at ANY checker phase it is the residue of an interrupted staged reinstatement, and
+ * the verdict is a refusal that tells the operator what to do: inspect it, never reuse it,
+ * and remove it only by hand after the inspection is recorded. `null` means the schema is
+ * absent; an empty list means the schema exists with no tables — still a leftover.
+ */
+export function judgeStagingLeftover(
+  found: readonly { table: string; rows: number }[] | null,
+): StagingLeftoverJudgement {
+  if (found === null) return { verdict: 'PASS', lines: [`schema ${STAGING_SCHEMA} is absent`] };
+  const lines = [
+    `schema ${STAGING_SCHEMA} EXISTS: an earlier staged reinstatement (plan steps 2b-2d) did not finish.`,
+    ...(found.length === 0
+      ? ['       it holds no tables']
+      : found.map((f) => `       ${STAGING_SCHEMA}.${f.table.padEnd(30)} ${String(f.rows).padStart(8)} row(s)`)),
+    'Inspect it before anything else (docs/production-promotion.md §7.2): which step stopped, what',
+    'the staged rows hold, whether the remap was applied, and whether public already has the rows.',
+    'Never reuse it and never run a plan over it: promotion-stage.sql refuses CREATE SCHEMA while it',
+    'exists, and nothing generated drops it. Drop it by hand, deliberately, only after the inspection',
+    'is recorded in the promotion record; then regenerate the plan and start its step 1 again.',
+  ];
+  return { verdict: 'FAIL', lines };
+}
+
+/** Staged tables reinstated in this environment, in contract order. */
+export function stagedReinstateTables(environment: Environment = DEFAULT_ENVIRONMENT): TableTreatment[] {
+  return publicContractTables()
+    .filter((t) => effectiveTreatment(t, environment) === 'reinstate' && isStagedReinstatement(t))
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+/** Is the named table's named column settled in the staging schema before its FK applies? */
+export function isStagedLineageColumn(
+  tableName: string, column: string, environment: Environment = DEFAULT_ENVIRONMENT,
+): boolean {
+  const table = contractByName(tableName);
+  if (!table || effectiveTreatment(table, environment) !== 'reinstate') return false;
+  return stagedLineageColumns(table).some((c) => c.column === column);
+}
+
+/**
+ * The public reinstatement, split into the three groups the plan restores in turn.
+ *
+ *   direct      restored straight into `public`, in contract order — every reinstated table
+ *               that is neither staged nor a (transitive) FK descendant of a staged table;
+ *   staged      restored into `promotion_staging`, remapped there, then promoted;
+ *   dependants  tables whose `restoreAfter` chain reaches a staged table, restored only
+ *               after the staged rows exist in `public` (external_grids, external_grid_axes).
+ *
+ * The lineage remap runs between `staged` and the promotion, so at that one moment every
+ * non-staged lineage-bound table is already in `public` and every staged table is in the
+ * staging schema — one file, applied once.
+ */
+export type ReinstateGroups = { direct: string[]; staged: string[]; dependants: string[] };
+
+function reinstateGroupsOf(
+  contract: readonly TableTreatment[], environment: Environment,
+): ReinstateGroups {
+  const ordered = contract
+    .filter((t) => t.schema === 'public' && effectiveTreatment(t, environment) === 'reinstate')
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  const byName = new Map(ordered.map((t) => [t.name, t] as const));
+  const staged = new Set(ordered.filter(isStagedReinstatement).map((t) => t.name));
+  const descendsFromStaged = new Map<string, boolean>();
+  const descends = (name: string, seen: Set<string> = new Set()): boolean => {
+    if (descendsFromStaged.has(name)) return descendsFromStaged.get(name)!;
+    if (seen.has(name)) return false;
+    seen.add(name);
+    const parents = byName.get(name)?.restoreAfter ?? [];
+    const result = parents.some((parent) => staged.has(parent) || descends(parent, seen));
+    descendsFromStaged.set(name, result);
+    return result;
+  };
+  const groups: ReinstateGroups = { direct: [], staged: [], dependants: [] };
+  for (const t of ordered) {
+    if (staged.has(t.name)) groups.staged.push(t.name);
+    else if (descends(t.name)) groups.dependants.push(t.name);
+    else groups.direct.push(t.name);
+  }
+  return groups;
+}
+
+export function reinstateGroups(environment: Environment = DEFAULT_ENVIRONMENT): ReinstateGroups {
+  return reinstateGroupsOf(PROMOTION_CONTRACT, environment);
+}
+
+/**
+ * The order the plan actually restores public tables in: direct, then staged, then their
+ * dependants. Same membership as `reinstatedPublicTables`, which stays in contract order
+ * for everything that is not the restore transcript (sequence re-sync, comparisons).
+ */
+export function plannedReinstateOrder(
+  environment: Environment = DEFAULT_ENVIRONMENT, contract: readonly TableTreatment[] = PROMOTION_CONTRACT,
+): string[] {
+  const groups = reinstateGroupsOf(contract, environment);
+  return [...groups.direct, ...groups.staged, ...groups.dependants];
+}
+
+/** Everything wrong with the staging of one table, as plain sentences. */
+export function stagedReinstatementProblems(table: TableTreatment): string[] {
+  const columns = stagedLineageColumns(table);
+  if (columns.length === 0) return [];
+  const problems: string[] = [];
+  for (const c of columns) {
+    const ref = (table.lineageRefs ?? []).find((r) => r.column === c.column);
+    if (!ref) {
+      problems.push(`stages ${c.column} without a lineage-bound declaration`);
+    } else if (ref.kindColumn) {
+      problems.push(`stages polymorphic column ${c.column}, which the staged promotion does not support`);
+    }
+    if (c.identity === 'none') problems.push(`stages ${c.column} with no stable identity`);
+  }
+  return problems;
 }
 
 /**
@@ -1238,12 +1464,21 @@ export function lineageRemapSql(input: LineageRemapInput): string {
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
   const withheld = (plan: LineageColumnPlan): boolean =>
     isHistoricalOnlyColumn(plan.table, plan.column, names.environment);
+  // AFLDB-ISSUE-151: a staged column is remapped in the staging schema, where its rows sit
+  // BEFORE they are promoted under the FK. Every other column is remapped in `public`, where
+  // its rows have already been restored by the time the plan reaches this file.
+  const staged = (plan: LineageColumnPlan): boolean =>
+    isStagedLineageColumn(plan.table, plan.column, names.environment);
+  const relationOf = (plan: LineageColumnPlan): string =>
+    `${quoteIdent(staged(plan) ? STAGING_SCHEMA : 'public')}.${quoteIdent(plan.table)}`;
   const lines: string[] = [];
   lines.push('-- AFLDB-ISSUE-142 (B) — lineage remap for reinstated human/admin rows.');
   lines.push(`-- Candidate '${input.candidate}' (${names.environment}) does NOT share the id lineage of`);
   lines.push(`-- '${input.oldDatabase}'. Each UPDATE below is evidenced by ONE stable identity string`);
   lines.push('-- read from both databases in the same read-only pass: old id -> identity -> new id.');
-  lines.push('-- No row is matched by name. Run AFTER the reinstate, BEFORE --phase candidate.');
+  lines.push('-- No row is matched by name. Run at the REMAP step of promotion-reinstate.sh: after');
+  lines.push('-- every directly-restored table, BEFORE the staged tables are promoted under their');
+  lines.push(`-- foreign keys (AFLDB-ISSUE-151) — a staged column is updated in ${STAGING_SCHEMA}.`);
   lines.push('');
   lines.push('BEGIN;');
 
@@ -1254,6 +1489,10 @@ export function lineageRemapSql(input: LineageRemapInput): string {
       : '';
     lines.push('');
     lines.push(`-- ${plan.table}.${plan.column}${scope} -> ${plan.entity} (identity: ${plan.rule})`);
+    if (staged(plan)) {
+      lines.push(`-- STAGED (AFLDB-ISSUE-151): updated in ${STAGING_SCHEMA}.${plan.table}, where the rows`);
+      lines.push('--   wait without a foreign key; the plan promotes them into public afterwards.');
+    }
     // AFLDB-ISSUE-143. Nothing is emitted for a table the plan did not reinstate: there are
     // no rows in the candidate to update, and an UPDATE here would be the very
     // reinstatement the disposition declined. The evidence is written down instead.
@@ -1278,7 +1517,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
         ? ` AND ${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
         : '';
       lines.push(`--   ${m.oldId} -> ${m.identity} -> ${m.newId}`);
-      lines.push(`UPDATE ${quoteIdent('public')}.${quoteIdent(plan.table)} SET ${quoteIdent(plan.column)} = ${m.newId}`
+      lines.push(`UPDATE ${relationOf(plan)} SET ${quoteIdent(plan.column)} = ${m.newId}`
         + ` WHERE ${quoteIdent('id')} = ${row.rowId} AND ${quoteIdent(plan.column)} = ${m.oldId}${guard};`);
     }
     for (const u of plan.remap.unresolved) {
@@ -1321,7 +1560,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
       ? ` AND t.${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
       : '';
     lines.push(`-- ${plan.table}.${plan.column}: expect 0 rows`);
-    lines.push(`SELECT t.${quoteIdent('id')}, t.${quoteIdent(plan.column)} FROM ${quoteIdent('public')}.${quoteIdent(plan.table)} t`
+    lines.push(`SELECT t.${quoteIdent('id')}, t.${quoteIdent(plan.column)} FROM ${relationOf(plan)} t`
       + ` WHERE t.${quoteIdent(plan.column)} IS NOT NULL${guard}`
       + ` AND t.${quoteIdent(plan.column)} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
   }
@@ -1355,6 +1594,21 @@ export function lineageRemapProblems(
     );
     if (executable.some((line) => write.test(line))) {
       problems.push(`historical-only table ${table} receives a generated remap write`);
+    }
+  }
+  // AFLDB-ISSUE-151: a staged column is settled in the staging schema. A write to its public
+  // relation here would run against rows that are not there yet, and the promotion would
+  // then present the old integer to the FK — the exact failure staging exists to prevent.
+  const stagedTables = new Set(plans
+    .filter((plan) => isStagedLineageColumn(plan.table, plan.column, environment))
+    .map((plan) => plan.table));
+  for (const table of stagedTables) {
+    const relation = `${regexLiteral(quoteIdent('public'))}\\.${regexLiteral(quoteIdent(table))}`;
+    const write = new RegExp(
+      `^(?:UPDATE|INSERT\\s+INTO|DELETE\\s+FROM|TRUNCATE(?:\\s+TABLE)?)\\s+${relation}(?:\\s|$)`, 'i',
+    );
+    if (executable.some((line) => write.test(line))) {
+      problems.push(`staged table ${table} receives a generated remap write in public instead of ${STAGING_SCHEMA}`);
     }
   }
   return problems;
@@ -1832,6 +2086,110 @@ END $$;
 `;
 }
 
+// ---------------------------------------------------------------------------
+// Staged reinstatement SQL — AFLDB-ISSUE-151
+// ---------------------------------------------------------------------------
+
+/** The generated restore script one staged table is loaded from (plan directory, relative). */
+export function stagedRestoreScript(table: string): string {
+  if (!/^[a-z][a-z0-9_]*$/.test(table)) throw new PromotionRefused(`Unexpected staged table name '${table}'.`);
+  return `promotion-stage-${table}.sql`;
+}
+
+/**
+ * The one-line `sed` expression that points the dump's COPY at the staging copy. Anchored to
+ * the COPY header `pg_restore -f` writes (`COPY public.<table> (col, …) FROM stdin;`), so no
+ * data line can match; if the header is ever shaped differently the redirect does not
+ * apply, the COPY still targets `public`, and the FK refuses the load — fail closed, and the
+ * plan's `grep` line names it first.
+ */
+export function stagedCopyRedirect(table: string): string {
+  stagedRestoreScript(table);
+  return `s/^COPY public\\.${table} (/COPY ${STAGING_SCHEMA}.${table} (/`;
+}
+
+/**
+ * SQL that creates the staging schema and one constraint-free copy of each staged table.
+ * `LIKE` without options copies the columns (names, types, order, NOT NULL) and nothing
+ * else: no identity, no primary key, no unique, no foreign key — so the dump's rows land
+ * with their ids intact and their old reference integers, ready to be remapped.
+ */
+export function stageSql(environment: Environment = DEFAULT_ENVIRONMENT): string {
+  const tables = stagedReinstateTables(environment);
+  const schema = quoteIdent(STAGING_SCHEMA);
+  const creates = tables.map((t) => {
+    const columns = stagedLineageColumns(t)
+      .map((c) => `${c.column} -> ${c.references} (identity: ${c.identity})`).join('; ');
+    return `-- ${t.name}: ${columns}
+CREATE TABLE ${schema}.${quoteIdent(t.name)} (LIKE ${quoteIdent('public')}.${quoteIdent(t.name)});`;
+  }).join('\n');
+  return `-- AFLDB-ISSUE-151: staging copies for the tables whose NOT NULL reference into rebuilt
+-- data is lineage-bound. Each is the public table's columns and nothing else — no identity,
+-- no key, no foreign key — so the pre-cutover rows can be restored here with their old
+-- integers, remapped by the evidenced --lineage-remap-out file, and only then promoted into
+-- public under the foreign key (promotion-promote-staged.sql), ids preserved.
+-- CREATE SCHEMA refuses if ${STAGING_SCHEMA} already exists: a leftover means an earlier
+-- attempt did not finish. Inspect it; never reuse it.
+BEGIN;
+CREATE SCHEMA ${schema};
+${creates}
+COMMIT;
+`;
+}
+
+/**
+ * SQL that moves the remapped rows from the staging schema into `public`, then removes the
+ * staging schema. Refuses, before any INSERT, a staged table that is empty (the staged
+ * restore did not run) or a staged row whose reference still points at an id the candidate
+ * does not have (the remap was not applied or did not settle it). The foreign key is the
+ * final judge either way: `OVERRIDING SYSTEM VALUE` keeps the dumped ids, and nothing here
+ * defers, disables or drops a constraint.
+ */
+export function promoteStagedSql(environment: Environment = DEFAULT_ENVIRONMENT): string {
+  const tables = stagedReinstateTables(environment);
+  const schema = quoteIdent(STAGING_SCHEMA);
+  const blocks = tables.map((t) => {
+    const staged = `${schema}.${quoteIdent(t.name)}`;
+    const target = `${quoteIdent('public')}.${quoteIdent(t.name)}`;
+    const checks = stagedLineageColumns(t).map((c) => {
+      const referenced = `${quoteIdent('public')}.${quoteIdent(c.references)}`;
+      return `  SELECT string_agg(format('id %s -> ${c.column} %s', t.${quoteIdent('id')}, t.${quoteIdent(c.column)}), ', ' ORDER BY t.${quoteIdent('id')})
+    INTO unsettled
+    FROM ${staged} t
+   WHERE NOT EXISTS (SELECT 1 FROM ${referenced} r WHERE r.id = t.${quoteIdent(c.column)});
+  IF unsettled IS NOT NULL THEN
+    RAISE EXCEPTION '${t.name}.${c.column} still carries the replaced database''s id(s) [%]: apply the --lineage-remap-out file (plan step 2c) first; never insert a ${c.references} row to make it fit', unsettled;
+  END IF;`;
+    }).join('\n');
+    return `-- ${t.name}
+DO $$
+DECLARE staged_rows bigint; unsettled text;
+BEGIN
+  SELECT count(*) INTO staged_rows FROM ${staged};
+  IF staged_rows = 0 THEN
+    RAISE EXCEPTION '${STAGING_SCHEMA}.${t.name} is empty: the staged restore (plan step 2b) did not run or restored nothing (--phase pre-cutover proved the replaced database holds rows here, so an empty copy is never a legitimate state)';
+  END IF;
+${checks}
+  RAISE NOTICE '${t.name}: % staged row(s) settled', staged_rows;
+END $$;
+INSERT INTO ${target} OVERRIDING SYSTEM VALUE SELECT * FROM ${staged} ORDER BY ${quoteIdent('id')};
+DROP TABLE ${staged};`;
+  }).join('\n\n');
+  return `-- AFLDB-ISSUE-151: promote the staged, remapped rows into public under the foreign key.
+-- Column order is the public table's (the staging copy was created with LIKE), the ids are
+-- the dumped ids (OVERRIDING SYSTEM VALUE), and a row the remap did not settle refuses the
+-- whole file before any INSERT. No constraint is deferred, disabled or dropped: the FK
+-- checks every promoted row as it is inserted. One transaction.
+BEGIN;
+
+${blocks}
+
+DROP SCHEMA ${schema};
+
+COMMIT;
+`;
+}
+
 /** The explicit cutover marker. Written AFTER reinstatement, BEFORE acceptance. */
 export function auditMarkerSql(input: PlanInput): string {
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
@@ -1942,6 +2300,9 @@ export function reinstatePlan(input: PlanInput): string {
   lines.push(`# AFLDB-ISSUE-125 reinstatement plan — candidate '${input.candidate}' (${names.environment})`);
   lines.push(`# Run on ${names.host} as the owner role. CANDIDATE_DSN is the owner DSN with the`);
   lines.push('# database name replaced; never paste a DSN into a tracked file or a transcript.');
+  if (stagedReinstateTables(names.environment).length > 0) {
+    lines.push('# LINEAGE_REMAP_SQL is the file --phase restored wrote through --lineage-remap-out.');
+  }
   lines.push('');
   lines.push('# 1. Empty every production-owned/operational table the rebuilt dump carried.');
   lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-truncate.sql`);
@@ -1964,11 +2325,59 @@ export function reinstatePlan(input: PlanInput): string {
     }
     lines.push('');
   }
-  lines.push('# 2. Reinstate production-owned rows from the pre-cutover dump, one table at a time,');
-  lines.push('#    in foreign-key order. --data-only: the schema is the rebuilt one.');
-  for (const table of reinstatedPublicTables(names.environment)) {
+  const groups = reinstateGroups(names.environment);
+  const restoreLine = (table: string): void => {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
     lines.push(`           --single-transaction --exit-on-error --table=${table} ${shellQuote(input.preCutoverDump)}`);
+  };
+  lines.push('# 2. Reinstate production-owned rows from the pre-cutover dump, one table at a time,');
+  lines.push('#    in foreign-key order. --data-only: the schema is the rebuilt one.');
+  if (groups.staged.length > 0) {
+    lines.push(`#    NOT here: ${groups.staged.join(', ')} (staged in 2b) and ${groups.dependants.join(', ')}`);
+    lines.push('#    (restored in 2e, after the staged rows exist in public).');
+  }
+  for (const table of groups.direct) restoreLine(table);
+  if (groups.staged.length > 0) {
+    // AFLDB-ISSUE-151. A staged table carries a NOT NULL reference into rebuilt data whose
+    // old integer may denote nothing (or something else) in the candidate. Restoring it
+    // straight into public would present that integer to an immediate FK before any remap
+    // could run, so its rows go through the staging schema instead: no FK there, the
+    // evidenced remap is applied there, and the promotion is what the FK checks.
+    lines.push('');
+    lines.push('# 2b. STAGE the tables whose NOT NULL reference into rebuilt data is lineage-bound');
+    lines.push('#     (AFLDB-ISSUE-151). Their rows are restored into the constraint-free');
+    lines.push(`#     ${STAGING_SCHEMA} copies created by promotion-stage.sql, NOT into public: the`);
+    lines.push('#     dumped integer may not exist in the candidate, and an immediate FK would refuse');
+    lines.push('#     the plain restore before any UPDATE could run. The COPY target is redirected');
+    lines.push('#     in the generated restore script; read the small file before loading it.');
+    for (const table of groups.staged) {
+      const columns = stagedLineageColumns(contractByName(table)!)
+        .map((c) => `${c.column} -> ${c.references} (identity: ${c.identity})`).join('; ');
+      lines.push(`#     ${table}: ${columns}`);
+    }
+    lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-stage.sql`);
+    for (const table of groups.staged) {
+      const script = stagedRestoreScript(table);
+      lines.push(`pg_restore --data-only --no-owner --no-privileges --table=${table} -f - ${shellQuote(input.preCutoverDump)} \\`);
+      lines.push(`  | sed -e ${shellQuote(stagedCopyRedirect(table))} > ${script}`);
+      lines.push(`grep -q ${shellQuote(`^COPY ${STAGING_SCHEMA}.${table} (`)} ${script}   # must succeed: the COPY now targets ${STAGING_SCHEMA}`);
+      lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 --single-transaction -f ${script}`);
+    }
+    lines.push('');
+    lines.push('# 2c. Apply the evidenced lineage remap written by --phase restored --lineage-remap-out');
+    lines.push('#     (AFLDB-ISSUE-142, docs/production-promotion.md §7.4c). Every directly restored');
+    lines.push(`#     lineage-bound table is in public by now; every staged table is in ${STAGING_SCHEMA},`);
+    lines.push('#     and that is where its UPDATE lands. On a shared lineage the file holds no UPDATE');
+    lines.push('#     and this is a no-op; it is still run, so the step is never silently skipped.');
+    lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f "$LINEAGE_REMAP_SQL"`);
+    lines.push('');
+    lines.push('# 2d. PROMOTE the staged rows into public, ids preserved, under the foreign key. The');
+    lines.push('#     file refuses — before any INSERT — if a staged row still points at an id absent');
+    lines.push(`#     from the candidate, then drops ${STAGING_SCHEMA}. One transaction.`);
+    lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-promote-staged.sql`);
+    lines.push('');
+    lines.push('# 2e. Tables that reference a staged table, now that its rows exist in public.');
+    for (const table of groups.dependants) restoreLine(table);
   }
   // One line per table of the schema, in the contract's FK order — never `--schema=` alone,
   // which restores in TOC (alphabetical) order and fails on the schema's own foreign keys.
@@ -1999,6 +2408,10 @@ export type PromotionPlanArtifacts = {
   reinstate: string;
   resyncIdentity: string;
   auditMarker: string;
+  /** AFLDB-ISSUE-151: `promotion-stage.sql`. */
+  stage: string;
+  /** AFLDB-ISSUE-151: `promotion-promote-staged.sql`. */
+  promoteStaged: string;
 };
 
 function occurrences(source: string, needle: string): number {
@@ -2058,10 +2471,12 @@ export function promotionPlanProblems(
 
   const publicRestores = [...artifacts.reinstate.matchAll(/--exit-on-error --table=([a-z_]+)/g)]
     .map((match) => match[1]);
-  const expectedPublic = reinstatedPublicTables(environment);
+  const groups = reinstateGroups(environment);
+  const expectedPublic = [...groups.direct, ...groups.dependants];
   if (JSON.stringify(publicRestores) !== JSON.stringify(expectedPublic)) {
     problems.push(`public restore order differs from the ${environment} contract`);
   }
+  problems.push(...stagedPlanProblems(artifacts, environment));
   for (const schema of reinstatedSchemas()) {
     const schemaRestores = [...artifacts.reinstate.matchAll(
       new RegExp(`--schema=${schema} --table=([a-z_]+)`, 'g'),
@@ -2091,6 +2506,114 @@ export function promotionPlanProblems(
   return problems;
 }
 
+/**
+ * AFLDB-ISSUE-151. Everything the staged path must hold to, checked on the generated text:
+ * no plain `pg_restore --table=<staged>` into public anywhere; the staging schema created,
+ * each staged table loaded through its redirected script, the remap applied, the promotion
+ * run, and every dependant restored — in that order, all of it after the last direct restore
+ * and before the schema restores; the staging SQL creating exactly the staged copies; the
+ * promotion inserting under the FK with ids preserved and dropping the schema without
+ * CASCADE; and no constraint bypass of any kind in any of the three files.
+ */
+export function stagedPlanProblems(
+  artifacts: Pick<PromotionPlanArtifacts, 'reinstate' | 'stage' | 'promoteStaged'>,
+  environment: Environment = DEFAULT_ENVIRONMENT,
+): string[] {
+  const problems: string[] = [];
+  const groups = reinstateGroups(environment);
+  const plan = artifacts.reinstate;
+  const schemaIdent = quoteIdent(STAGING_SCHEMA);
+  const bypass = /session_replication_role|DISABLE\s+TRIGGER|DROP\s+CONSTRAINT|SET\s+CONSTRAINTS|DEFERRABLE|NOT\s+VALID|--disable-triggers|--superuser/i;
+  for (const [name, text] of [['reinstate', plan], ['stage', artifacts.stage], ['promoteStaged', artifacts.promoteStaged]] as const) {
+    if (bypass.test(text)) problems.push(`${name} bypasses or weakens a constraint`);
+  }
+  if (/\bCASCADE\b/i.test(artifacts.stage) || /\bCASCADE\b/i.test(artifacts.promoteStaged)) {
+    problems.push('staged lifecycle uses CASCADE');
+  }
+  // AFLDB-ISSUE-151: a leftover staging schema is evidence of an interrupted attempt. The
+  // plan must refuse it (CREATE SCHEMA without IF NOT EXISTS), never adopt it and never
+  // remove it: no generated file drops the schema except the promotion, once, at the end.
+  const silentReuse = /CREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS|DROP\s+SCHEMA\s+IF\s+EXISTS|DROP\s+TABLE\s+IF\s+EXISTS/i;
+  for (const [name, text] of [['reinstate', plan], ['stage', artifacts.stage], ['promoteStaged', artifacts.promoteStaged]] as const) {
+    if (silentReuse.test(text)) problems.push(`${name} silently reuses or removes a leftover staging schema`);
+  }
+  if (/DROP\s+SCHEMA/i.test(artifacts.stage) || /DROP\s+SCHEMA/i.test(plan)) {
+    problems.push('a leftover staging schema is dropped outside promotion-promote-staged.sql');
+  }
+  if (groups.staged.length === 0) {
+    if (plan.includes('promotion-stage.sql') || plan.includes(STAGING_SCHEMA)) {
+      problems.push('plan stages a table the contract does not stage');
+    }
+    return problems;
+  }
+  const indexOfLine = (needle: string): number => plan.indexOf(needle);
+  const lastDirect = groups.direct.length > 0
+    ? plan.lastIndexOf(`--exit-on-error --table=${groups.direct[groups.direct.length - 1]} `)
+    : -1;
+  const stageCreate = indexOfLine('-f promotion-stage.sql');
+  const remap = indexOfLine('-f "$LINEAGE_REMAP_SQL"');
+  const promote = indexOfLine('-f promotion-promote-staged.sql');
+  const firstDependant = groups.dependants.length > 0
+    ? indexOfLine(`--exit-on-error --table=${groups.dependants[0]} `)
+    : plan.length;
+  const firstSchema = plan.search(/--schema=[a-z_]+ --table=/);
+  if (occurrences(plan, '-f promotion-stage.sql') !== 1) problems.push('plan must run promotion-stage.sql exactly once');
+  if (occurrences(plan, '-f "$LINEAGE_REMAP_SQL"') !== 1) problems.push('plan must apply the lineage remap exactly once');
+  if (occurrences(plan, '-f promotion-promote-staged.sql') !== 1) problems.push('plan must run promotion-promote-staged.sql exactly once');
+  if (!(lastDirect < stageCreate && stageCreate < remap && remap < promote && promote < firstDependant
+      && (firstSchema < 0 || promote < firstSchema))) {
+    problems.push('staged lifecycle is not ordered direct restores -> stage -> remap -> promote -> dependants');
+  }
+  for (const table of groups.staged) {
+    if (new RegExp(`--exit-on-error --table=${table}(?:\\s|$)`).test(plan)) {
+      problems.push(`staged table ${table} receives a plain pg_restore into public`);
+    }
+    const script = stagedRestoreScript(table);
+    const restore = indexOfLine(`--table=${table} -f - `);
+    const load = indexOfLine(`--single-transaction -f ${script}`);
+    if (restore < 0 || occurrences(plan, `--table=${table} -f - `) !== 1) {
+      problems.push(`staged table ${table} has no single redirected restore`);
+    }
+    if (!plan.includes(shellQuote(stagedCopyRedirect(table)))) {
+      problems.push(`staged table ${table} restore does not redirect its COPY to ${STAGING_SCHEMA}`);
+    }
+    if (load < 0 || occurrences(plan, `--single-transaction -f ${script}`) !== 1) {
+      problems.push(`staged table ${table} is not loaded from ${script} in one transaction`);
+    }
+    if (!(stageCreate < restore && restore < load && load < remap)) {
+      problems.push(`staged table ${table} is not restored between promotion-stage.sql and the remap`);
+    }
+    const stagedRelation = `${schemaIdent}.${quoteIdent(table)}`;
+    const publicRelation = `${quoteIdent('public')}.${quoteIdent(table)}`;
+    if (!artifacts.stage.includes(`CREATE TABLE ${stagedRelation} (LIKE ${publicRelation});`)) {
+      problems.push(`promotion-stage.sql does not create ${stagedRelation} as a bare copy`);
+    }
+    if (!artifacts.promoteStaged.includes(
+      `INSERT INTO ${publicRelation} OVERRIDING SYSTEM VALUE SELECT * FROM ${stagedRelation} ORDER BY "id";`,
+    )) {
+      problems.push(`promotion-promote-staged.sql does not promote ${table} with its ids preserved`);
+    }
+    if (!artifacts.promoteStaged.includes(`DROP TABLE ${stagedRelation};`)) {
+      problems.push(`promotion-promote-staged.sql does not drop ${stagedRelation}`);
+    }
+    for (const c of stagedLineageColumns(contractByName(table)!)) {
+      if (!artifacts.promoteStaged.includes(`${table}.${c.column} still carries the replaced database''s id(s)`)) {
+        problems.push(`promotion-promote-staged.sql does not refuse an unsettled ${table}.${c.column}`);
+      }
+    }
+  }
+  const stagedCreates = [...artifacts.stage.matchAll(/CREATE TABLE "promotion_staging"\."([a-z_]+)"/g)].map((m) => m[1]);
+  if (JSON.stringify(stagedCreates) !== JSON.stringify(groups.staged)) {
+    problems.push('promotion-stage.sql does not create exactly the staged tables, in order');
+  }
+  if (!artifacts.stage.includes(`CREATE SCHEMA ${schemaIdent};`)) problems.push('promotion-stage.sql does not create the staging schema');
+  if (!artifacts.promoteStaged.includes(`DROP SCHEMA ${schemaIdent};`)) problems.push('promotion-promote-staged.sql does not drop the staging schema');
+  if (/\b(?:DELETE\s+FROM|TRUNCATE|UPDATE)\b/i.test(artifacts.promoteStaged)) {
+    problems.push('promotion-promote-staged.sql writes something other than the promotion INSERT');
+  }
+  return problems;
+}
+
 export function assertPromotionPlanCoherent(
   artifacts: PromotionPlanArtifacts,
   environment: Environment = DEFAULT_ENVIRONMENT,
@@ -2114,8 +2637,8 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   'Rebuilt dump restored into a NEW candidate database (afldb_prod_candidate_<stamp>) — never over afldb_prod.',
   '`--phase restored` passed: candidate name, migration parity, dangling-reference probe against the old database resolved.',
   'Every production-owned/operational table truncated in the candidate, then reinstated per the printed plan, in order, each under --single-transaction.',
-  'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE its restore lines: external_grid_sources.ingest_source_id onto the candidate\'s gridley sources row, and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. Rows are never dropped to make the FK pass.',
-  'Lineage proved at `--phase restored`: the candidate either shares the replaced database\'s id lineage, or every reinstated id-keyed column (player_link_resolutions.player_id and .target_id, data_edits.row_id) was resolved through a stable external identity and the generated remap applied — with every unresolved id decided deliberately and recorded. Never remapped by name, never left on the old integer.',
+  'Captured grid corpus (migration 080) reinstated, and its two NOT NULL references settled BEFORE the rows met their foreign keys: external_grid_sources STAGED per the plan (AFLDB-ISSUE-151 — restored into promotion_staging, ingest_source_id remapped there onto the candidate\'s gridley sources row through sources.key by the --lineage-remap-out file, then promoted into public with its id preserved and the staging schema dropped), and external_grids.import_batch_id per docs/production-promotion.md §7.4b, with the choice recorded. No sources row inserted, no constraint dropped or deferred, and rows are never dropped to make the FK pass. The promotion_staging schema is gone (the checker refuses it at every phase); a leftover one was inspected and recorded before it was dropped by hand, never reused.',
+  'Lineage proved at `--phase restored`: the candidate either shares the replaced database\'s id lineage, or every reinstated id-keyed column (player_link_resolutions.player_id and .target_id, data_edits.row_id, external_grid_sources.ingest_source_id) was resolved through a stable external identity and the generated remap applied at the plan\'s remap step (after the direct restores, before the staged promotion) — with every unresolved id decided deliberately and recorded. Never remapped by name, never left on the old integer.',
   'Historical-only tables (AFLDB-ISSUE-143) confirmed: for each table the contract withholds in this environment, the generated plan had no pg_restore line, the candidate reads 0 rows, the rows are present in the pre-cutover dump and the retained pre-rebuild database, and the database.promoted marker names the table and the deciding issue. Nothing was deleted to achieve this and no column was remapped by name.',
   'Identity sequences re-synced; database.promoted audit marker written; privileges.sql run on the candidate.',
   '`--phase candidate` passed: no test-fixture identity anywhere, expected super admin present and enabled, counts match the snapshot per rule, grants reconciled, migrations at parity.',

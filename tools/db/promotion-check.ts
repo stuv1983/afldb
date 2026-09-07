@@ -86,10 +86,14 @@ import {
   historicalOnlyFor,
   historicalOnlyTables,
   judgeLineage,
+  judgeStagedSourceRows,
+  judgeStagingLeftover,
   lineageBoundTables,
   lineageRemapSql,
   lineageTargetsOf,
+  isStagedLineageColumn,
   stableLineageTargetForFootballRef,
+  promoteStagedSql,
   publicContractTables,
   quoteIdent,
   quoteSqlLiteral,
@@ -99,6 +103,8 @@ import {
   resolveLineageRemap,
   resyncIdentitySql,
   shellQuote,
+  stageSql,
+  STAGING_SCHEMA,
   swapSql,
   truncateSql,
   withDatabase,
@@ -362,6 +368,51 @@ async function gateClassification(q: Query, report: Report): Promise<{ present: 
   }
   report.add('Table classification (fail-closed)', 'FAIL', lines);
   return { present, registry };
+}
+
+/**
+ * AFLDB-ISSUE-151: the staging schema exists only between plan steps 2b and 2d. Present at
+ * any phase, it is an interrupted staged reinstatement and the check refuses — the operator
+ * inspects it first; nothing generated ever reuses or removes it.
+ */
+async function gateStagingLeftover(q: Query, report: Report): Promise<void> {
+  const gate = `No leftover ${STAGING_SCHEMA} schema (AFLDB-ISSUE-151)`;
+  const schema = await q('SELECT 1 AS present FROM pg_namespace WHERE nspname = $1', [STAGING_SCHEMA]);
+  if (schema.length === 0) {
+    const verdict = judgeStagingLeftover(null);
+    report.add(gate, verdict.verdict, verdict.lines);
+    return;
+  }
+  const tables = (await q('SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY 1', [STAGING_SCHEMA]))
+    .map((r) => String(r.tablename));
+  const found: { table: string; rows: number }[] = [];
+  for (const table of tables) {
+    const n = asInt((await q(`SELECT count(*)::int AS n FROM ${quoteIdent(STAGING_SCHEMA)}.${quoteIdent(table)}`))[0]?.n);
+    found.push({ table, rows: n });
+  }
+  const verdict = judgeStagingLeftover(found);
+  report.add(gate, verdict.verdict, verdict.lines);
+}
+
+/**
+ * AFLDB-ISSUE-151: a staged table must hold rows in the database being replaced — the
+ * promotion cannot tell an empty restore from one that never ran, and refuses both. Judged
+ * here, at pre-cutover, so the ambiguity never reaches a half-run transcript.
+ */
+function gateStagedSourceRows(counts: Record<string, number>, environment: Environment, report: Report): void {
+  const gate = 'Staged tables hold rows in the replaced database (AFLDB-ISSUE-151)';
+  const judged = judgeStagedSourceRows(counts, environment);
+  const lines = judged.populated.map((p) => `${p.table.padEnd(30)} ${String(p.rows).padStart(8)}  staged`);
+  for (const table of judged.empty) {
+    lines.push(`${table.padEnd(30)} ${'0'.padStart(8)}  staged — EMPTY: the staged reinstatement presumes rows`);
+  }
+  for (const table of judged.missing) lines.push(`${table.padEnd(30)}   absent  staged — the table itself is missing`);
+  if (judged.verdict === 'FAIL') {
+    lines.push('promotion-promote-staged.sql would refuse an empty staging copy mid-transcript; decide the');
+    lines.push("table's disposition now (docs/production-promotion.md §7.2) rather than promote past it.");
+  }
+  if (judged.populated.length + judged.empty.length + judged.missing.length === 0) lines.push('no staged table in this environment');
+  report.add(gate, judged.verdict, lines);
 }
 
 async function gateMigrationParity(q: Query, report: Report): Promise<void> {
@@ -641,7 +692,16 @@ async function gateDanglingReferences(
         fixups += 1;
         lines.push(`WARN ${label} — numeric ids differ, but ${stableTarget.identity} is declared as the stable identity.`);
         lines.push('       --phase restored resolves old id -> stable identity -> candidate id and writes a');
-        lines.push('       guarded UPDATE through --lineage-remap-out; apply it after reinstate, before acceptance.');
+        lines.push('       guarded UPDATE through --lineage-remap-out.');
+        if (!ref.nullable && isStagedLineageColumn(t.name, ref.column, environment)) {
+          // AFLDB-ISSUE-151: an immediate NOT NULL FK refuses the old integer on a plain
+          // restore, so the plan stages this table and the remap lands in the staging schema.
+          lines.push(`       NOT NULL: the plan STAGES ${t.name} (AFLDB-ISSUE-151) — restored into promotion_staging`);
+          lines.push('       with no FK, the remap applied THERE at plan step 2c, then promoted into public under');
+          lines.push('       the FK with its ids preserved. Never restore this table straight into public.');
+        } else {
+          lines.push('       Apply it at the plan\'s remap step (promotion-reinstate.sh step 2c), before acceptance.');
+        }
         continue;
       }
       if (ref.nullable) {
@@ -804,9 +864,26 @@ async function gateLineageIdentity(
   for (const d of verdict.differed.slice(0, 5)) {
     lines.push(`  id ${d.id}: ${oldName} = ${d.replaced} vs ${candidateName} = ${d.candidate}`);
   }
+  // The one place the remap file is written. AFLDB-ISSUE-151: the plan applies it at a fixed
+  // step (2c) whenever a staged table exists, so on a shared lineage it is still written — as
+  // an explicit no-op holding no UPDATE — rather than leaving the step with nothing to run.
+  const writeRemap = (plans: readonly LineageColumnPlan[], shared: boolean): void => {
+    if (!remapOut) {
+      lines.push('re-run with --lineage-remap-out <file> to write the evidenced per-row remap');
+      return;
+    }
+    if (existsSync(remapOut)) throw new PromotionRefused(`${remapOut} already exists; refusing to overwrite a remap.`);
+    writeFileSync(remapOut, lineageRemapSql({
+      candidate: candidateName, oldDatabase: oldName, environment, plans,
+    }), { encoding: 'utf8', mode: 0o600 });
+    lines.push(shared
+      ? `remap written: ${remapOut} — an explicit no-op (shared lineage, no UPDATE); the plan still runs it at step 2c`
+      : `remap written: ${remapOut} — read it, then run it at the plan's remap step (promotion-reinstate.sh 2c)`);
+  };
   if (!verdict.changed) {
     lines.push(`${candidateName} shares the id lineage of ${oldName}: reinstating id-keyed rows `
-      + 'unchanged is sound, and no remap is needed or generated.');
+      + 'unchanged is sound, and no remap is needed.');
+    writeRemap([], true);
     report.add('Lineage identity of reinstated id-keyed rows', 'PASS', lines);
     return;
   }
@@ -896,15 +973,7 @@ async function gateLineageIdentity(
     + `${judgement.refusedTotal} refused.`);
   const unresolvedTotal = judgement.refusedTotal;
 
-  if (remapOut) {
-    if (existsSync(remapOut)) throw new PromotionRefused(`${remapOut} already exists; refusing to overwrite a remap.`);
-    writeFileSync(remapOut, lineageRemapSql({
-      candidate: candidateName, oldDatabase: oldName, environment, plans,
-    }), { encoding: 'utf8', mode: 0o600 });
-    lines.push(`remap written: ${remapOut} — read it, then run it on the candidate AFTER the reinstate`);
-  } else {
-    lines.push('re-run with --lineage-remap-out <file> to write the evidenced per-row remap');
-  }
+  writeRemap(plans, false);
 
   report.add('Lineage identity of reinstated id-keyed rows',
     unresolvedTotal === 0 ? 'WARN' : 'FAIL', lines);
@@ -937,10 +1006,14 @@ export function writePlan(opts: Options): string[] {
     resyncIdentity: resyncIdentitySql(opts.environment),
     auditMarker: auditMarkerSql(input),
     reinstate: reinstatePlan(input),
+    stage: stageSql(opts.environment),
+    promoteStaged: promoteStagedSql(opts.environment),
   };
   assertPromotionPlanCoherent(artifacts, opts.environment);
   const files = [
     ['promotion-truncate.sql', artifacts.truncate],
+    ['promotion-stage.sql', artifacts.stage],
+    ['promotion-promote-staged.sql', artifacts.promoteStaged],
     ['promotion-resync-identity.sql', artifacts.resyncIdentity],
     ['promotion-audit-marker.sql', artifacts.auditMarker],
     ['promotion-reinstate.sh', artifacts.reinstate],
@@ -1037,6 +1110,7 @@ async function main(): Promise<number> {
   try {
     await gateIdentity(conn.q, opts.database!, report);
     const { present } = await gateClassification(conn.q, report);
+    await gateStagingLeftover(conn.q, report);
     await gateMigrationParity(conn.q, report);
     if (opts.expectFingerprint) await gateFingerprint(conn.q, opts.expectFingerprint, report);
     const fixtures = await gateFixtureIdentities(
@@ -1044,6 +1118,7 @@ async function main(): Promise<number> {
     const superAdmins = await gateSuperAdmin(
       conn.q, present, phase, opts.environment, opts.expectSuperAdmin, report);
     const counts = await gateInventory(conn.q, present, opts.environment, report);
+    if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);
     await gatePrivileges(conn.q, present, phase === 'candidate' || phase === 'production', report);
 
     if (phase === 'restored') {

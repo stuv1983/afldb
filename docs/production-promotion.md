@@ -79,7 +79,7 @@ promoted by accident.
 | `app_health_events` | health telemetry | yes | reinstate | Conscious retention; FK is `ON DELETE SET NULL`. |
 | `promotion_decisions` | observation spine | yes | **reset — recorded gap** | Decisions on `promotion_candidates`, which the rebuild replaces. Retained only in the pre-cutover dump and the kept database; named in the audit marker. |
 | `canonical_applications` | settle ledger | no | rebuilt | Machine ledger of the rebuilt rows. Production's settle ledger is a recorded gap. |
-| `external_grid_sources` | Grid Solver corpus | yes | reinstate (first of three) | Seeded by migration 080 itself: the truncate removes the candidate's seed so the dump's row keeps its id. `ingest_source_id` → rebuilt `sources` → probed (§7.4b). |
+| `external_grid_sources` | Grid Solver corpus | yes | reinstate (**staged**, first of three) | Seeded by migration 080 itself: the truncate removes the candidate's seed so the dump's row keeps its id. `ingest_source_id` → rebuilt `sources` is **NOT NULL and lineage-bound**, so the table is restored through `promotion_staging`, remapped there, then promoted under the FK (§7.4b, `AFLDB-ISSUE-151`). |
 | `external_grids` | Grid Solver corpus | yes | reinstate | Captured Gridley boards with their raw payloads. **Immutable evidence, no rebuild stage** — a rebuilt candidate has this empty and the rescued legacy archive cannot be re-fetched. `import_batch_id` is NOT NULL into rebuilt `import_batches` → §7.4b. |
 | `external_grid_axes` | Grid Solver corpus | yes | reinstate (last of three) | The six captured criteria per board revision. `ON DELETE CASCADE` from `external_grids`. |
 | `player_match_period_stats` | quarter-by-quarter stats | no | rebuilt | Football schema (migration 062) with **no writer, no rebuild stage and no registry row** — see below. `compare = zero`. |
@@ -147,8 +147,8 @@ and refuses any other by name:
 
 | Phase | Database (`--environment prod`, the default) | Database (`--environment dev`) | Gates |
 |---|---|---|---|
-| `source` | `afldb_test` | `afldb_test` | identity, classification, migration parity, fixtures (info), optional `--expect-fingerprint` |
-| `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, `--snapshot <file>` of row counts |
+| `source` | `afldb_test` | `afldb_test` | identity, classification, no leftover `promotion_staging` schema (every phase, `AFLDB-ISSUE-151`), migration parity, fixtures (info), optional `--expect-fingerprint` |
+| `pre-cutover` | `afldb_prod` | `afldb_dev` | + fixtures must be absent, super admin present, every staged table holds rows (§7.2), `--snapshot <file>` of row counts |
 | `restored` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | + `--old-database` dangling-reference probe, + lineage identity of reinstated id-keyed rows (§7.4c, §7.4d), optional `--lineage-remap-out <file>` |
 | `candidate` | `afldb_prod_candidate_<stamp>` | `afldb_dev_candidate_<stamp>` | full acceptance: fixtures absent, `--expect-super-admin`, `--compare <snapshot>`, privileges reconciled |
 | `production` | `afldb_prod` | `afldb_dev` | same as `candidate`, on the live name |
@@ -282,17 +282,21 @@ The two "must be owner of extension" messages are the only tolerated errors
 
 ```bash
 npm run db:promotion:check -- --phase restored --database "$CAND" --old-database afldb_prod \
-    [--lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql]
+    --lineage-remap-out ~/backups/afldb/promotion-lineage-$STAMP.sql
 ```
 
 This proves the candidate is the source (migration parity), reports the fixture rows the
 restore brought in (expected, removed next), **proves the id lineage** of every reinstated
-id-keyed column (§7.4c — on a same-lineage promotion this passes and generates nothing), and
+id-keyed column (§7.4c — on a same-lineage promotion this passes and the remap file is written
+as an explicit no-op holding no `UPDATE`), and
 **probes dangling references**: for each
 production-owned row whose FK points into rebuilt data (`player_link_resolutions.player_id`,
-`data_submissions.import_batch_id`), whether the target still exists in the candidate. A
-`WARN` here prints the exception SQL for §7.4; a `FAIL` means the contract itself must be
-revisited before continuing.
+`data_submissions.import_batch_id`, `external_grid_sources.ingest_source_id`), whether the
+target still exists in the candidate. A
+`WARN` here prints the exception SQL for §7.4, or names the table the plan **stages** (§7.4b);
+a `FAIL` means the contract itself must be revisited before continuing. Always pass
+`--lineage-remap-out`: the generated plan runs that file at a fixed step (§7.2, `AFLDB-ISSUE-151`),
+and the file is what settles a staged table before its rows meet the FK.
 
 ## 7. Reinstate production-owned state into the candidate
 
@@ -310,15 +314,21 @@ When this command is launched from Git Bash, set `MSYS_NO_PATHCONV=1` and
 Windows drive/`Program Files` path, so `/home/arm/example.dump` cannot silently become
 `C:/Program Files/Git/home/arm/example.dump` in a Linux-host plan.
 
-Six files, mode 600: `promotion-truncate.sql`, `promotion-resync-identity.sql`,
-`promotion-audit-marker.sql`, `promotion-reinstate.sh`, `promotion-swap.sql` and
-`promotion-rollback.sql`. **Read all six.** The `.sh` is a transcript to follow line by line,
-not a script to pipe into a shell.
+Eight files, mode 600: `promotion-truncate.sql`, `promotion-stage.sql`,
+`promotion-promote-staged.sql`, `promotion-resync-identity.sql`, `promotion-audit-marker.sql`,
+`promotion-reinstate.sh`, `promotion-swap.sql` and `promotion-rollback.sql`. **Read all eight.**
+The `.sh` is a transcript to follow line by line, not a script to pipe into a shell; it also
+names `LINEAGE_REMAP_SQL`, the `--lineage-remap-out` file §6 wrote, and one further file it
+generates itself on the host (`promotion-stage-<table>.sql`, §7.2).
 
-The generator validates the assembled truncate, restore, sequence and audit artefacts before it
-creates the plan directory. It refuses DELETE/CASCADE substitution, an incomplete or misordered
-rebuilt-side FK lifecycle, a per-table/TOC-ordered schema restore, a restore order that differs
-from the contract, or any write/restore/sequence action for a historical-only table.
+The generator validates the assembled truncate, stage, restore, promotion, sequence and audit
+artefacts before it creates the plan directory. It refuses DELETE/CASCADE substitution, an
+incomplete or misordered rebuilt-side FK lifecycle, a per-table/TOC-ordered schema restore, a
+restore order that differs from the contract, any write/restore/sequence action for a
+historical-only table, a plain `pg_restore` of a staged table into `public`, a staged lifecycle
+that is not ordered stage → remap → promote → dependants, and any constraint bypass
+(`session_replication_role`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, `SET CONSTRAINTS`,
+`DEFERRABLE`, `NOT VALID`, `--disable-triggers`) in the stage, promotion or transcript files.
 
 ### 7.1 Empty every non-rebuilt table
 
@@ -350,6 +360,68 @@ A single `--schema=staging_aflw` line was the original shape and failed on the f
 `fixtures` arrived before `seasons` and the single transaction rolled back.
 A failure names the table and leaves earlier tables committed and that table empty.
 
+**Staged tables (`AFLDB-ISSUE-151`).** A reinstated table whose **NOT NULL** reference into
+rebuilt data is lineage-bound with a stable identity — today exactly `external_grid_sources`,
+`ingest_source_id` → `sources` through `sources.key` — is never restored straight into `public`.
+The first production promotion (stamp `20260907-234124`) proved why: the dumped row carried
+`ingest_source_id = 57` (old `sources` 57 = `gridley`), the candidate's gridley row is `sources`
+7 and its id 57 does not exist, so a plain restore meets the immediate FK before any `UPDATE`
+can run, and the evidenced remap of §7.4c came too late. The transcript therefore splits step 2
+around such tables:
+
+1. **2 — direct restores.** Every reinstated table that is neither staged nor an FK descendant of
+   a staged table, in contract order, as above.
+2. **2b — stage.** `promotion-stage.sql` creates `promotion_staging` and one bare copy per staged
+   table (`CREATE TABLE promotion_staging.<t> (LIKE public.<t>)` — columns only: no identity, no
+   key, no FK). Then, per staged table, `pg_restore --data-only --table=<t> -f -` writes the
+   dump's restore script through a `sed` that redirects its one `COPY public.<t> (` header to
+   `promotion_staging.<t>`, into `promotion-stage-<t>.sql`; a `grep` proves the redirect
+   applied; `psql --single-transaction -f` loads it. The rows land with their **own ids and the
+   old reference integers**, and nothing checks them yet. Read the small file before loading it.
+3. **2c — remap.** `psql -f "$LINEAGE_REMAP_SQL"` — the §6 `--lineage-remap-out` file, once. At
+   this moment every directly restored lineage-bound table is in `public` and every staged table
+   is in `promotion_staging`, which is where its guarded `UPDATE … WHERE id = <row> AND <col> =
+   <old>` lands. On a shared lineage the file holds no `UPDATE` and the step is a no-op; it is
+   still run, so it is never silently skipped.
+4. **2d — promote.** `promotion-promote-staged.sql`, one transaction: for each staged table it
+   refuses — before any `INSERT` — an empty staging copy or a row whose reference still points
+   at an id the candidate does not have, then `INSERT INTO public.<t> OVERRIDING SYSTEM VALUE
+   SELECT * FROM promotion_staging.<t> ORDER BY id` (ids preserved; the FK checks every row as it
+   is inserted), drops the staging table, and finally drops the schema without `CASCADE`.
+5. **2e — dependants.** Tables whose `restoreAfter` chain reaches a staged table
+   (`external_grids`, `external_grid_axes`), plain restores as in step 2, now that the rows they
+   reference exist in `public`.
+
+No constraint is dropped, deferred, disabled or validated later, no `sources` row is inserted,
+and the id of every staged row is the dumped id. The staging schema exists only between 2b and
+2d; if it is still there, an earlier attempt did not finish — inspect it, never reuse it.
+
+**A staged table must hold rows in the database being replaced.** A data-only restore of an
+empty table leaves no trace, so 2d cannot tell "restored zero rows" from "2b never ran" and
+refuses an empty `promotion_staging.<t>` either way. `--phase pre-cutover` therefore refuses
+when a staged table is empty (or absent) in the live database, before any plan exists: decide
+that table's disposition then (it is not a case the staged path promotes past), not
+mid-transcript. Today the one staged table is seeded by migration 080 and cannot be empty on a
+migrated database; the gate keeps that true for any table the contract's shape rule selects.
+
+**Interrupted staged reinstatement.** If anything stops between 2b and 2d — a refused
+`COPY`, a refused promotion, a lost session — `promotion_staging` remains, and everything
+fails closed around it: the checker refuses at every phase (`No leftover promotion_staging
+schema`), `promotion-stage.sql`'s `CREATE SCHEMA` refuses while it exists, and no generated
+file drops it (the plan validator refuses `IF NOT EXISTS`, `IF EXISTS` and any `DROP SCHEMA`
+outside 2d). Before any cleanup or retry:
+
+1. Inspect it and write the findings into the promotion record: which step stopped and why
+   (the psql error is the evidence), what `promotion_staging.<t>` holds (`SELECT count(*)`,
+   then the rows), whether the 2c `UPDATE` was applied (the reference column shows the
+   candidate's id, not the replaced database's), and whether `public.<t>` already holds the
+   rows (2d ran to its `INSERT` and failed on the FK — the transaction rolled back, so it
+   should not; prove it).
+2. Only after the inspection is recorded, drop the schema by hand — an operator statement,
+   never a generated one — then regenerate the plan (the generator refuses to overwrite: move
+   the old files aside) and start again at its step 1. Never load rows into a leftover copy,
+   never run 2c or 2d against one, and never pass a `--phase` check that names it.
+
 ### 7.3 Identity sequences, audit marker, privileges
 
 `promotion-resync-identity.sql` advances every identity sequence of the reinstated tables
@@ -372,15 +444,19 @@ is regenerated instead (§8) and `promotion_decisions` is a recorded gap (§1).
 
 Two of the migration-080 references are **NOT NULL** into import-writable (rebuilt) tables, so
 neither can take the §7.4 nullable path. The checker prints the contract's decision beside the
-finding; both must be settled **before** the corpus's `pg_restore` line, and what was done
+finding; both must be settled **before the rows meet their foreign keys**, and what was done
 recorded in the promotion record.
 
 * `external_grid_sources.ingest_source_id` → `sources`. `sources` is import-writable, so the
   candidate's id for key `gridley` need not equal the dumped one. The contract declares
   `sources.key` as the stable identity: `--phase restored --lineage-remap-out <file>` proves old
-  id → key → candidate id and emits a guarded `UPDATE` to run after reinstatement and before
-  candidate acceptance. Migration 080 seeds that source, so **never insert a `sources` row** and
-  never assume either run's numeric id is stable.
+  id → key → candidate id and emits a guarded `UPDATE`. Because the column is NOT NULL against an
+  immediate FK, that `UPDATE` cannot follow a plain restore — the restore itself would refuse
+  the old integer (`AFLDB-ISSUE-151`). The plan therefore **stages** the table (§7.2): the
+  `UPDATE` targets `promotion_staging.external_grid_sources` and runs at step 2c, and the rows
+  are promoted into `public` under the FK at 2d with their ids preserved. Migration 080 seeds
+  that source, so **never insert a `sources` row** and never assume either run's numeric id is
+  stable.
 * `external_grids.import_batch_id` → `import_batches`. The rebuilt candidate holds the
   *rebuild's* batches, not the batch that captured the corpus, so this reference dangles on any
   real promotion. Two supportable answers, and the choice is the operator's:
@@ -432,9 +508,11 @@ value it was proved against (so re-running it is a no-op), each preceded by the 
 comment `old id -> identity -> new id`; `-- UNRESOLVED` lines naming the reason for everything
 that could not be evidenced; `-- MERGE` lines where two old rows fold onto one candidate row
 (an `AFLDB-ISSUE-136` identity merge); and a trailing verification query that must return zero
-rows. Run it on the candidate **after** the reinstate and **before** `--phase candidate`. It
-touches one column per statement and never inserts, deletes or truncates: the ledgers stay
-append-only and every audit field is untouched.
+rows. Run it on the candidate at the transcript's **remap step 2c** (§7.2): after every direct
+restore, before the staged tables are promoted, and **before** `--phase candidate`. A staged
+column's `UPDATE` targets its `promotion_staging` copy (`AFLDB-ISSUE-151`); every other column's
+targets `public`. It touches one column per statement and never inserts, deletes or truncates:
+the ledgers stay append-only and every audit field is untouched.
 
 **Where no remap is possible.** `player_link_resolutions.target_id` points into seven
 import-writable honours tables whose ids the rebuild assigns, and the repository carries **no
@@ -612,6 +690,10 @@ rm ~/backups/afldb/promotion-$STAMP/promotion-*.sql ~/backups/afldb/promotion-$S
 ```
 
 Keep the pre-cutover dump under normal backup retention and keep the off-host copy.
+
+A `promotion_staging` schema is never part of cleanup: it does not exist after a finished
+promotion, and one that does exist is an interrupted attempt handled by §7.2 (inspect and record
+first, then drop by hand), not something to tidy.
 
 ## 11. Why restore-then-reinstate, not football-data-only import
 

@@ -15,6 +15,40 @@ commit.
 
 ## [Unreleased]
 
+### Production promotion - staged reinstatement of NOT NULL lineage-bound references (AFLDB-ISSUE-151) - 8 September 2026
+
+- The generated promotion plan (`npm run db:promotion:check -- --plan`) no longer restores a
+  reinstated table straight into `public` when one of its NOT NULL foreign keys into rebuilt
+  data is lineage-bound with a stable identity. Found by the first real production promotion
+  (stamp `20260907-234124`): `external_grid_sources` row 1 carried `ingest_source_id = 57`
+  (old `sources` 57 = gridley), the rebuilt candidate's gridley row is `sources` 7 and its id
+  57 does not exist, so the plain `pg_restore` met the immediate FK before the evidenced
+  AFLDB-ISSUE-142 remap (57 -> gridley -> 7) could run.
+- Such a table is now **staged**, decided by the contract's shape and never by name
+  (`isStagedReinstatement` in `tools/db/promotion-inventory.ts`; today exactly
+  `external_grid_sources`). Two new generated files, `promotion-stage.sql` and
+  `promotion-promote-staged.sql`, and a re-sequenced `promotion-reinstate.sh`: direct restores
+  (2), stage into `promotion_staging.<t>` with the dump's `COPY` header redirected and
+  grep-guarded (2b), the `--lineage-remap-out` file applied once at a fixed step with its
+  `UPDATE` targeting the staging copy (2c), promotion into `public` under the FK with
+  `OVERRIDING SYSTEM VALUE` so ids are preserved, refusing any unsettled reference before the
+  `INSERT` (2d), then the staged table's dependants `external_grids` / `external_grid_axes`
+  (2e). No constraint is dropped, deferred or disabled and no `sources` row is inserted.
+- `--phase restored` now writes the `--lineage-remap-out` file on a shared lineage too, as an
+  explicit no-op, so the plan's remap step always has its file. The plan validator refuses a
+  plain restore of a staged table, a misordered stage/remap/promote/dependants lifecycle and
+  every constraint bypass; the checker output, contract remediations, acceptance checklist and
+  `docs/production-promotion.md` (§1, §6, §7, §7.2, §7.4b, §7.4c) now say the same thing about
+  when the remap runs. Nullable-reference handling (§7.4) and the `external_grids.import_batch_id`
+  operator decision (§7.4b) are unchanged. Two hardening points: `--phase pre-cutover` refuses
+  when a staged table is empty or absent in the replaced database (the promotion cannot tell an
+  empty restore from one that never ran, so the invariant is asserted before any plan exists),
+  and a leftover `promotion_staging` schema fails closed everywhere (refused by every checker
+  phase, by `CREATE SCHEMA`, and by the plan validator for any `IF [NOT] EXISTS` or out-of-place
+  `DROP SCHEMA`) with §7.2 requiring inspection and a recorded finding before any hand cleanup or
+  retry. `ISSUE-151-staged-reinstate-rehearsal.sh` reproduces
+  the exact case on two throwaway databases.
+
 ### Public UI - historical venue record pages (AFLDB-ISSUE-150) - 7 September 2026
 
 - Every public AFL/VFL venue page (`/venues/[slug]`) is rebuilt from a truncated "most recent 50
