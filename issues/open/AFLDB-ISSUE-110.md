@@ -4,7 +4,7 @@
 - **Severity:** Medium
 - **Area:** Natural-language search / deterministic semantics
 - **Found:** 2026-08-30
-- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate
+- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate → 33 career-predicate field ownership (findings A and B)
 - **Evidence export:** `artifacts/issue-110/problem-search/afldb-nl-problems-30d-2026-08-29.csv`
 - **Codebase-memory project:** `D-dev-afldb-issue-110`
 - **Latest checked graph generation:** `2026-08-30T01:26:53Z` (`full`, recording complete)
@@ -2070,3 +2070,144 @@ red tests; `players who kicked a goal with their first kick for Carlton in the 1
 
 Verdicts: **A CONFIRMED, B CONFIRMED.** The recorded next action (fix A and B fail-closed,
 then fresh independent re-review) stands unchanged.
+## 2026-09-08 Findings A and B fixed fail-closed (parser v33)
+
+Session: `opus/issue-110-semantic-closeout`, worktree `D:\dev\afldb-issue-110`, from merged
+`main` `a6b1689`. The database was treated as **strictly read-only** for the whole session: no
+INSERT/UPDATE/DELETE/TRUNCATE, no migration, no rebuild, no importer, no telemetry write, and
+nothing touched outside `afldb_test`.
+
+### Ledger reconciliation against current `main`
+
+Three recorded items moved before any code was written:
+
+| Recorded item | State on `a6b1689` |
+|---|---|
+| `CURRENT_WRONG_ANSWER` / WRONG_SCOPE — club-scoped career threshold projects whole-career `games` | **Already fixed.** `projectedGames()` (`src/db/queries/nl/player-career.ts`) club-scopes the rendered `games` for any plan carrying `clubFor`. Re-proved read-only against `afldb_test`: `players with exactly 200 games for Collingwood` renders Josh Fraser at **200** (career 218); `most games for Geelong` renders Tom Hawkins at **359**. Population counts have moved with the data since 2026-08-29 (`>= 200` is now **40**, `> 200` **39**, `= 200` still Josh Fraser alone; Scott Pendlebury now leads on 442). |
+| `most games in a game` — retained unsafe collision | **Now a safe decline**: `"games" is not a recognised statistic for this kind of question.` Reclassified `CORRECT_DECLINE`. |
+| Findings A and B (2026-08-31 adjudication) | **Reproduced exactly**, and the only current defects ISSUE-110 still owned. Probe output: A → `preds=[grand_finals_played_min] scope={"seasonMin":2000} validate=OK`; B → `preds=[debuted_between] scope={clubFor:carlton, seasonMin:2000} validate=OK`. |
+
+The remaining `NEEDS_SEMANTIC_DECISION` families were re-checked only as far as closeout
+requires, and every one is a safe decline on current `main`: `geelong collingwood 1990` and
+`collingwood v geelong 1990` → `unrecognised`; `richmond first grand final` →
+`low_confidence`; `most points` / `most points in a game` → `unrecognised` with `points`
+reported unsupported. The `Unclear goal/handball numeric wording` family could not be replayed
+verbatim — `artifacts/issue-110/problem-search/afldb-nl-problems-30d-2026-08-29.csv` is not
+present in this worktree — so it stays classified as recorded, undecided, and declining.
+
+### The fix
+
+The invariant the adjudication required, implemented literally: a career plan may keep a field
+only if something **provably consumes** it.
+
+- `src/search/nl/plan.ts` declares ownership once, per builder, beside `PARSER_VERSION`:
+  `NL_CAREER_SEASON_OWNING_BUILDERS` (`debuted_between`, `first_kick_goal_between`),
+  `NL_CAREER_CLUB_OWNING_BUILDERS` (`first_kick_goal_for_club`), with the two predicates
+  `careerPredicatesOwnSeasonRange()` / `careerPredicatesOwnClubFor()`.
+- The season gate no longer exempts a plan for having any predicate: it exempts only a plan
+  whose predicates own the range. (former `plan.ts:1197-1202`)
+- A new gate refuses `clubFor` on a career plan whose predicates do not own the club, with the
+  message `This kind of career question cannot be limited to one club.` The predicate-free club
+  path — the supported-metric gate and the "no match or season scope" gate — is untouched.
+  (former `plan.ts:1158`)
+- `src/db/queries/nl/player-career.ts` emits its generic club `EXISTS` filter on the same
+  ownership test instead of `careerPredicates.length === 0`, so the validator and the compiler
+  cannot drift and a club can never again reach SQL as nothing at all. (former
+  `player-career.ts:146`)
+- `src/db/queries/nl/answer.ts`'s comment claiming era coverage is the only parser-reachable
+  `validatePlan` rejection is corrected, and records why all such rejections still log as
+  `coverage_unavailable` (migration 047 CHECK-constrains the taxonomy; a finer label would be a
+  migration, not a code change).
+
+Measured behaviour (real parser, DB-backed directory, read-only):
+
+| Question | Before | After |
+|---|---|---|
+| `players with at least 3 grand finals since 2000` | answered whole-career GF counts | `A career question cannot be restricted to a season range.` |
+| `Carlton players who debuted since 2000` | listed every club's debutants, Games column club-scoped to 0 | `This kind of career question cannot be limited to one club.` |
+| `Carlton players who played in at least 3 grand finals` | all clubs | same club refusal |
+| `players who debuted in the 1990s` | valid | valid — 938 players |
+| `players who kicked a goal with their first kick for Carlton in the 1940s` | valid | valid |
+| `players with at least 3 grand finals` | valid | valid |
+
+### Semantic decision S1 — the club fold is deliberately NOT taken
+
+A club beside a club-blind career predicate is refused, not folded into a `played_for_club` or
+`debut_club` predicate. `Carlton players who played in 3 grand finals` reads equally as "played
+for Carlton and played 3 grand finals anywhere" and "played 3 grand finals for Carlton"; the two
+return different players, the second is unexpressible for `grand_finals_played_min`,
+`match_event_min` and `matchup_played_min`, and the parser's own settled reading for the one
+club-scoped achievement builder it has (`first_kick_goal_for_club`: "means players who did it
+FOR Carlton, not players who did it anywhere and later happened to play there") is the
+achievement-scoped one. `debuted_between` is the one case where the tight reading IS expressible
+(`debut_club`), and it was still not taken: choosing between "players at Carlton who debuted
+since 2000" and "players who debuted for Carlton since 2000" without evidence is exactly the
+guess this issue exists to stop. A future issue may add the fold with an agreed reading; until
+then the decline is the decision, not an oversight.
+
+### Second defect of the same family, found and fixed
+
+`describePlan`'s grain label called a `player_game`/`mode: 'sum'` plan a *single-match* search.
+That is the scoped-total shape ISSUE-110's own v29/v30 work introduced, so `most goals for
+Geelong` was explained as "Searched for the highest single-match goals" above an answer that
+correctly read "Total across N games in scope". The explain trace is the panel that tells the
+reader which question was answered — the same surface that made findings A and B dangerous — so
+the label is now mode-aware ("Searched for the highest total goals" / "Ranked total goals, the
+top 5"); `mode: 'single'` wording is unchanged.
+
+### Tests added (existing suites extended; no new file)
+
+- `tests/nl-semantic-mapping.test.ts` — `AFLDB-ISSUE-110 closeout: a career predicate must OWN
+  the scope it keeps`: 3 red controls (both findings plus the club-with-no-season variant) and
+  3 green controls, all end to end from the question.
+- `tests/nl-plan.test.ts` — `career predicate field ownership` under the existing career-grain
+  backstop block: 5 direct `validatePlan` cases including "the predicate-free club and
+  predicate-only shapes are exactly as they were"; plus a `describePlan` case pinning the
+  scoped-total wording.
+- `tests/integration/nl-answers.test.ts` — two read-only DB tests: the rendered Games column
+  equals club appearances for every row of a club-scoped threshold (with a non-vacuity check
+  that some qualifier's club total is below their career total), and the compiler keeps the club
+  filter when a career predicate is present (asserting the validator's refusal in the same test).
+
+### Validation (2026-09-08, operator-authorised, database read-only)
+
+| Gate | Result |
+|---|---|
+| `npx vitest run tests/nl-parser tests/nl-plan tests/nl-describe tests/nl-semantic-mapping tests/nl-regression-corpus tests/nl-audit-acceptance tests/query-intent` | **593/593 PASS** |
+| Whole DB-free repository suite (`tests/`, excluding `integration`/`e2e`/`nl-ui`) | **3,419 passed, 14 skipped, 2 failed** — both pre-existing, reproduced on clean `main` `a6b1689`: `reference-data.test.ts` §H12 (expected list predates the migration-080 Gridley trio) and `finals-semantics-contract.test.ts` (known Windows `autocrlf` CRLF artefact) |
+| `tests/integration/nl-answers.test.ts` | **28/28 PASS** (2 new) |
+| `nl-answers-team-club`, `nl-answer-boundary` (telemetry sink mocked), `nl-vocab`, `grid-solver-investigation`, `venue-records`, `query-builder`, `player-matching`, `player-honours`, `player-family-and-coaching`, `player-compare`, `db-health`, `datasets`, `after-siren`, `import-role-parity`, and 8 `club-*` suites | **PASS** |
+| `tests/integration/grid-solver.test.ts` | 2 failed — **identical on clean `main`** (oracle counts 283/3658 vs live 282/3644: `afldb_test` data drift) |
+| `tests/integration/club-comparison*.test.ts` | 26 failed — **identical on clean `main`** (same drift) |
+| `tests/integration/gridley-corpus.test.ts` | 4 failed — **identical on clean `main`** (ISSUE-118, corpus load unrun) |
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | 284 problems (194 errors, 90 warnings) — **identical count on clean `main`**; `eslint` over the six changed files reports only pre-existing `as any` / `_t` findings on untouched lines |
+| `npm run build` | **PASS** (standalone bundle written) |
+| Realistic corpora, parsed + validated read-only through the real DB-backed context | 1,435 + 60 questions, **1,495 plans, 86 validation refusals, 0 affected by the new ownership rule** — the fix removes no realistic corpus answer |
+
+NOT run, and why: every write-performing integration suite (`nl-semantic-mapping`,
+`nl-answers-game-season`, `nl-search-telemetry-clear`, `settle-afltables`, `awards-reload-links`,
+`data-editor`, `privileges`, and the rest) and the rendered `nl:ui` / `nl:stress` corpora, all of
+which insert or delete rows (the corpora write `nl_search_log`) — out of scope for a read-only
+session. `tests/e2e` needs a running server.
+
+### Files changed in this pass
+
+- `src/search/nl/plan.ts` — ownership catalogue + predicates, both career gates, mode-aware
+  describe label, `PARSER_VERSION` 33 with its history entry.
+- `src/db/queries/nl/player-career.ts` — generic club filter keyed on ownership.
+- `src/db/queries/nl/answer.ts` — corrected comment on parser-reachable validation rejections.
+- `tests/nl-semantic-mapping.test.ts`, `tests/nl-plan.test.ts`,
+  `tests/integration/nl-answers.test.ts` — regressions above.
+- `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this runbook — tracking.
+
+No migration, schema, privilege, route, unit-file or deployment change. Nothing was committed,
+pushed, merged or deployed.
+
+### Exact next action
+
+**Operator gate:** run the realistic UI corpus (1,440) and the decline corpus (60) against DEV
+with a run tag (`npm run nl:ui`, then inspect `nl_search_log` by that tag), confirm no new
+refusal or regression against the recorded expectations, and ISSUE-110 resolves. Every other
+recorded gate is green. The 22,607-search stress run remains incomplete and is not a resolution
+gate.

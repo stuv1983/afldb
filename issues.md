@@ -323,7 +323,7 @@ created, reopened, resolved, or materially reclassified.
      inspection only; no settle triggered, no cadence altered, no row written, `AFLDB-ISSUE-137`
      untouched. Authoritative records: the `AFLDB-ISSUE-123` entry below (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-123.md`. -->
-| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31; parser v32 including the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; authoritative post-final-revision operator DB gate **2 files, 46/46 in 20.65 s, started 18:52:45** (24/24 + 22/22) — distinct from the earlier pre-revision 17:47 run. The three documented temporary artifacts were removed exactly. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, with two unresolved HIGH findings: (A) career-predicate season ownership — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; (B) `clubFor` ownership with career predicates — e.g. `Carlton players who debuted since 2000`: execution bypasses the generic club filter merely because `careerPredicates` exist. | **Fix findings A and B fail-closed, then a fresh independent re-review.** For A, replace the blanket career-predicate exemption with explicit period ownership — only predicates that actually consume the relevant period bounds may permit them. For B, allow the `clubFor` bypass only when a predicate explicitly owns the relevant club semantics; otherwise reject or correctly compile the club constraint. No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
+| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31. **Findings A and B are FIXED fail-closed on `opus/issue-110-semantic-closeout` (from `main` `a6b1689`), parser v32 -> v33.** Both blanket `careerPredicates.length === 0` exemptions are replaced by explicit per-builder ownership (`NL_CAREER_SEASON_OWNING_BUILDERS` = `debuted_between` / `first_kick_goal_between`; `NL_CAREER_CLUB_OWNING_BUILDERS` = `first_kick_goal_for_club`), and `player-career.ts`'s generic club filter is keyed on the same test, so `players with at least 3 grand finals since 2000` and `Carlton players who debuted since 2000` now refuse instead of answering a wider question. Semantic decision S1: a club beside a club-blind predicate is deliberately NOT folded into `played_for_club`/`debut_club` (two readings, different answers) - it declines. Ledger reconciliation: the recorded `CURRENT_WRONG_ANSWER` club-scoped `Games` projection was ALREADY fixed on `main` (`projectedGames()`; re-proved read-only - Josh Fraser renders 200, Tom Hawkins 359) and `most games in a game` now refuses, so both are historical. One further defect of the same family found and fixed: `describePlan` called a `player_game`/`sum` scoped total a *single-match* search. No migration, schema, privilege, route or deploy change. **Validation 2026-09-08 (database strictly read-only):** focused NL 593/593; DB-free repo suite 3,419 passed / 2 failed, both reproduced on clean `main`; read-only integration `nl-answers` 28/28 plus 13 further suites green (`grid-solver` 2, `club-comparison` 26, `gridley-corpus` 4 fail identically on clean `main` - afldb_test data drift / ISSUE-118); typecheck, build PASS; eslint adds no new problem; both realistic corpora (1,495 questions) re-parsed and re-validated read-only with **zero** affected by the new rule. | **Operator gate only: run the realistic UI (1,440) + decline (60) corpora against DEV with a run tag** (they write `nl_search_log`, so they were out of scope for a read-only session), confirm no new refusal, then resolve. |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-104` is **Resolved** and is NO LONGER an open issue.
      Closed as **NOT REACHABLE**, not fixed. Re-derived from the current tree, not assumed: a
      SECOND `issue_key` writer now exists (`canonical_apply_failed`, owner `AFLDB-ISSUE-122`,
@@ -12096,6 +12096,91 @@ EXISTS filter is skipped whenever predicates exist (`player-career.ts:146`) — 
 render under a club-scoped Games column (`games = 0` rows). Full mechanism, required
 ownership invariant, fix sites and regression controls: runbook 2026-08-31 adjudication
 section. Next action unchanged.
+
+### 2026-09-08 — findings A and B fixed fail-closed (parser v33)
+
+Resumed on `opus/issue-110-semantic-closeout` from merged `main` `a6b1689`. The ledger was
+first reconciled against current source, which moved three recorded items:
+
+- The recorded **`CURRENT_WRONG_ANSWER` / WRONG_SCOPE (club-scoped career threshold
+  projection)** is **already fixed on `main`**: `projectedGames()`
+  (`src/db/queries/nl/player-career.ts`) club-scopes the rendered `games` field for any plan
+  carrying `clubFor`. Re-proved against `afldb_test` read-only: `players with exactly 200
+  games for Collingwood` returns Josh Fraser rendering **200**, not his 218 whole-career
+  games. (The population counts have moved with the data since the 2026-08-29 evidence —
+  `>= 200` is now 40 players, `> 200` 39, `= 200` still Josh Fraser alone; Scott Pendlebury
+  now leads on 442.) `most games for Geelong` returns Tom Hawkins on **359**, the recorded
+  independent figure.
+- The recorded unsafe collision **`most games in a game`** now refuses
+  (`"games" is not a recognised statistic for this kind of question.`) and is reclassified
+  `CORRECT_DECLINE`, not an open defect.
+- Findings **A and B reproduce exactly** on `a6b1689` and are the only current defects
+  ISSUE-110 still owned.
+
+**Fix (the ownership invariant the adjudication required).** Both blanket
+`careerPredicates.length === 0` exemptions are replaced by explicit per-builder ownership,
+declared once in `src/search/nl/plan.ts` as `NL_CAREER_SEASON_OWNING_BUILDERS`
+(`debuted_between`, `first_kick_goal_between`) and `NL_CAREER_CLUB_OWNING_BUILDERS`
+(`first_kick_goal_for_club`), with `careerPredicatesOwnSeasonRange()` /
+`careerPredicatesOwnClubFor()`. A career plan may keep `seasonMin`/`seasonMax` only when a
+predicate takes the range as a builder parameter, and may keep `clubFor` only when a
+predicate takes the club (or, with no predicates at all, when the compiler's own club filter
+and club-scoped totals consume it — that path is unchanged). `player-career.ts`'s generic
+club `EXISTS` filter is now keyed on the same ownership test rather than on a predicate
+count, so the two layers cannot drift. Measured effect: `players with at least 3 grand finals
+since 2000` → `A career question cannot be restricted to a season range.`; `Carlton players
+who debuted since 2000` and `Carlton players who played in at least 3 grand finals` → the new
+`This kind of career question cannot be limited to one club.`; the controls `players who
+debuted in the 1990s` (938 players) and `players who kicked a goal with their first kick for
+Carlton in the 1940s` still validate and answer.
+
+**Semantic decision S1 (deliberate decline, not a capability gap to patch).** A club beside a
+club-blind career predicate is NOT folded into a `played_for_club` or `debut_club` predicate.
+`Carlton players who played in 3 grand finals` reads equally as "played for Carlton and played
+3 grand finals anywhere" and "played 3 grand finals for Carlton"; the two return different
+players, the second is unexpressible for most builders, and the parser's own settled reading
+for the one club-scoped achievement it has (`first_kick_goal_for_club`, `parser.ts` step 11
+comment) is the achievement-scoped one. With no evidence of which a reader means, the
+question declines. Recorded so a later session does not read the refusal as an oversight.
+
+**Second rendering defect found and fixed in the same family.** `describePlan`'s grain label
+called a `player_game`/`mode: 'sum'` plan a *single-match* search — the scoped-total shape
+ISSUE-110's own v29/v30 work introduced — so `most goals for Geelong` was explained as
+"Searched for the highest single-match goals" above an answer that correctly said "Total
+across N games in scope". The explain trace is the panel that tells the reader which question
+was answered, which is precisely what made findings A and B dangerous. The label is now
+mode-aware ("Searched for the highest total goals"); `mode: 'single'` is untouched.
+
+`PARSER_VERSION` 32 → **33**, with the history entry the contract requires. No migration, no
+schema, no privilege, no route and no deployment change.
+
+**Validation (2026-09-08, this session; the database was treated as strictly read-only).**
+DB-free: `nl-plan` 51/51, `nl-semantic-mapping` 142/142, and the focused NL set
+(`nl-parser`, `nl-plan`, `nl-describe`, `nl-semantic-mapping`, `nl-regression-corpus`,
+`nl-audit-acceptance`, `query-intent`) **593/593**; the whole DB-free repository suite
+**3,419 passed / 14 skipped / 2 failed**, both failures pre-existing and reproduced on clean
+`main` (`reference-data.test.ts` — the migration-080 Gridley trio is absent from the §H12
+expected list; `finals-semantics-contract.test.ts` — the known Windows `autocrlf` CRLF
+artefact). Read-only integration: `nl-answers` **28/28** (two new ISSUE-110 tests),
+`nl-answers-team-club`, `nl-answer-boundary` (telemetry sink mocked), `nl-vocab`,
+`grid-solver-investigation`, and 9 further read-only suites all green; `grid-solver` (2),
+`club-comparison`/`club-comparison-route` (26) and `gridley-corpus` (4) fail identically on
+clean `main` — `afldb_test` data drift against pinned expectations and ISSUE-118's unrun
+corpus load, not ISSUE-110. `npm run typecheck` PASS; `npm run build` PASS; `eslint` on the
+six changed files adds no new problem (repo-wide 284 problems is byte-identical on clean
+`main`). **Corpus impact measured read-only without a UI run:** both realistic corpora
+(1,435 + 60 questions) were parsed and validated through the real DB-backed context —
+1,495 plans, 86 validation refusals, and **zero** questions carrying career-predicate scope
+that the new ownership rule refuses. The fix removes no realistic corpus answer.
+
+**Outstanding, and why ISSUE-110 stays Open.** The runbook's own resolution gate — the
+rendered realistic UI corpus (1,440) and decline corpus (60) through `npm run nl:ui` /
+`npm run nl:stress` — writes `nl_search_log` telemetry and needs a running server, so it was
+NOT run under this session's read-only database constraint. Everything it would exercise is
+otherwise green, and the read-only corpus scan above shows no expected change in its
+outcomes. **Exact next action: operator runs the realistic UI + decline corpora against DEV
+with a run tag, confirms no new refusal or regression, then ISSUE-110 resolves.** The
+22,607-search stress run remains incomplete and is not a resolution gate.
 
 ---
 

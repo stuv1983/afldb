@@ -728,6 +728,86 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     });
   });
 
+  describe('AFLDB-ISSUE-110 closeout: a career predicate must OWN the scope it keeps', () => {
+    // Findings A and B of the independent adjudication. A career
+    // predicate used to exempt a plan from BOTH career-grain scope
+    // backstops merely by existing, but a builder consumes only its own
+    // parameters: grand_finals_played_min has no season and no club, so
+    // the range and the club reached no SQL at all while the plan
+    // description still displayed them.
+    const SEASON_ERROR = 'A career question cannot be restricted to a season range.';
+    const CLUB_ERROR = 'This kind of career question cannot be limited to one club.';
+
+    it('refuses a season range no predicate consumes instead of counting whole careers', async () => {
+      const p = await plan('players with at least 3 grand finals since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'grand_finals_played_min', params: { times: '3' } },
+      ]);
+      // The period genuinely survived parsing: this is the backstop
+      // refusing a plan whose executor would ignore it, not a decline
+      // for want of understanding "since 2000".
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(validatePlan(p)).toEqual({ error: SEASON_ERROR });
+    });
+
+    it('refuses a club no predicate consumes instead of listing every club', async () => {
+      const p = await plan('Carlton players who debuted since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'debuted_between', params: { from: '2000', to: '2100' } },
+      ]);
+      // debuted_between owns the SEASON range; nothing owns the club,
+      // and the career compiler dropped it entirely once any predicate
+      // was present -- so this answered for every club while the Games
+      // column stayed club-scoped and read 0 for the extra players.
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(validatePlan(p)).toEqual({ error: CLUB_ERROR });
+    });
+
+    it('refuses a club beside a club-blind predicate with no season range in play', async () => {
+      const p = await plan('Carlton players who played in at least 3 grand finals');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'grand_finals_played_min', params: { times: '3' } },
+      ]);
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(validatePlan(p)).toEqual({ error: CLUB_ERROR });
+    });
+
+    it('keeps a debut window valid: debuted_between owns the range', async () => {
+      const p = await plan('players who debuted in the 1990s');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerPredicates: [{ builder: 'debuted_between', params: { from: '1990', to: '1999' } }],
+        scope: { seasonMin: 1990, seasonMax: 1999 },
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('keeps a club-and-season achievement valid: both fields are builder parameters', async () => {
+      const p = await plan('players who kicked a goal with their first kick for Carlton in the 1940s');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerPredicates).toEqual([
+        { builder: 'first_kick_goal_for_club', params: { club: '2' } },
+        { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } },
+      ]);
+      expect(p.scope.clubFor?.slug).toBe('carlton');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('keeps the unscoped predicate question valid', async () => {
+      const p = await plan('players with at least 3 grand finals');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+        scope: {},
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
   describe('AFLDB-ISSUE-110 C: two-club wins/losses-against head-to-head', () => {
     it.each([
       'Richmond wins against Carlton',

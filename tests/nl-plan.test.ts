@@ -195,6 +195,81 @@ describe('validatePlan', () => {
         scope: { clubFor: carlton },
       }))).toBe(false);
     });
+
+    // AFLDB-ISSUE-110 findings A and B: a career predicate exempted a plan
+    // from both backstops by existing, but a builder consumes only its own
+    // parameters. Ownership is per builder, and a field nothing owns fails
+    // closed -- it is never folded into a guessed played_for_club reading.
+    describe('career predicate field ownership', () => {
+      const CLUB_ERROR = 'This kind of career question cannot be limited to one club.';
+      const listPlan = { metric: null, agg: { kind: 'list' } } as const;
+
+      it('rejects a season range no predicate consumes', () => {
+        expect(validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+          scope: { seasonMin: 2000 },
+        }))).toEqual({ error: SEASON_ERROR });
+        expect(validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'premierships_min', params: { times: '2' } }],
+          scope: { seasonMin: 1990, seasonMax: 1999 },
+        }))).toEqual({ error: SEASON_ERROR });
+      });
+
+      it('accepts a season range a predicate takes as a builder parameter', () => {
+        expect('error' in validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'debuted_between', params: { from: '1990', to: '1999' } }],
+          scope: { seasonMin: 1990, seasonMax: 1999 },
+        }))).toBe(false);
+        expect('error' in validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } }],
+          scope: { seasonMin: 1940, seasonMax: 1949 },
+        }))).toBe(false);
+      });
+
+      it('rejects a club no predicate consumes, with or without a season range', () => {
+        expect(validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'debuted_between', params: { from: '2000', to: '2100' } }],
+          scope: { clubFor: carlton, seasonMin: 2000 },
+        }))).toEqual({ error: CLUB_ERROR });
+        expect(validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+          scope: { clubFor: carlton },
+        }))).toEqual({ error: CLUB_ERROR });
+      });
+
+      it('accepts a club a predicate takes as a builder parameter', () => {
+        expect('error' in validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [
+            { builder: 'first_kick_goal_for_club', params: { club: '2' } },
+            { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } },
+          ],
+          scope: { clubFor: carlton, seasonMin: 1940, seasonMax: 1949 },
+        }))).toBe(false);
+      });
+
+      it('leaves the predicate-free club and predicate-only shapes exactly as they were', () => {
+        // No predicates: the compiler's own clubFor filter and club-scoped
+        // totals own the club, so the supported-metric gate still decides.
+        expect('error' in validatePlan(basePlan({
+          metric: 'games', agg: { kind: 'max' }, scope: { clubFor: carlton },
+        }))).toBe(false);
+        expect(validatePlan(basePlan({
+          metric: 'premierships', agg: { kind: 'max' }, scope: { clubFor: carlton },
+        }))).toEqual({ error: 'This career statistic cannot currently be totalled for one club.' });
+        // A predicate with no season range and no club is untouched.
+        expect('error' in validatePlan(basePlan({
+          ...listPlan,
+          careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+        }))).toBe(false);
+      });
+    });
   });
 
   describe('season-grain scope backstop (AFLDB-ISSUE-110 final review)', () => {
@@ -430,6 +505,32 @@ describe('describePlan', () => {
     expect(lines.some((l) => l.includes('Carlton'))).toBe(true);
     expect(lines.some((l) => l.includes('Melbourne Cricket Ground'))).toBe(true);
     expect(lines.some((l) => l.includes('1980'))).toBe(true);
+  });
+
+  it('calls a scoped total a total, not a single-match performance (AFLDB-ISSUE-110)', () => {
+    // "most goals for Geelong" elects player_game in SUM mode -- a
+    // club-scoped career total. The explain trace is what tells the
+    // reader which question was answered, and the flat grain label
+    // called it a single-match search while the answer text underneath
+    // correctly said "Total across N games in scope".
+    const summed = describePlan(basePlan({
+      grain: 'player_game', mode: 'sum', metric: 'goals', agg: { kind: 'max' },
+      scope: { clubFor: { organizationId: 4, slug: 'geelong', name: 'Geelong' } },
+    }));
+    expect(summed[0]).toBe('Searched for the highest total goals.');
+    expect(summed).toContain('Club: Geelong.');
+    expect(summed.join(' ')).not.toContain('single-match');
+
+    const rankedTotals = describePlan(basePlan({
+      grain: 'player_game', mode: 'sum', metric: 'goals', agg: { kind: 'top_n', n: 5 },
+    }));
+    expect(rankedTotals[0]).toBe('Ranked total goals, the top 5.');
+
+    // Single mode is untouched: it really is one performance.
+    const single = describePlan(basePlan({
+      grain: 'player_game', mode: 'single', metric: 'goals', agg: { kind: 'max' },
+    }));
+    expect(single[0]).toBe('Searched for the highest single-match goals.');
   });
 
   it('describes career conditions and predicates in plain words', () => {

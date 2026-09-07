@@ -289,8 +289,20 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    and non-season-capable columns fail closed instead of answering at
  *    career grain. player_season also rejects tiePolicy "first" until its
  *    rank()-based executor deliberately supports first-tie selection.
+ * 33: a career predicate no longer exempts a plan from the career-grain
+ *    backstops merely by existing (AFLDB-ISSUE-110 findings A and B).
+ *    Both exemptions are now per-builder ownership: the season range
+ *    survives only for a builder that takes it as a parameter
+ *    (debuted_between, first_kick_goal_between) and the club only for
+ *    first_kick_goal_for_club. "Players with at least 3 grand finals
+ *    since 2000" was counting grand finals over whole careers and
+ *    "Carlton players who debuted since 2000" was listing every club's
+ *    debutants -- both with the discarded scope still displayed in the
+ *    plan description. Each now refuses. The career compiler emits its
+ *    generic club filter on the same ownership rule, so a club can no
+ *    longer reach SQL as nothing at all.
  */
-export const PARSER_VERSION = 32;
+export const PARSER_VERSION = 33;
 
 // ------------------------------------------------------------------ grain
 
@@ -867,6 +879,53 @@ export const NL_CONFIDENCE = {
   clarify: 0.60,
 } as const;
 
+// -------------------------------------------- career predicate ownership
+
+/**
+ * A career plan's season range and club reach SQL in exactly two ways: as
+ * a parameter of a career predicate's grid builder, or through the career
+ * compiler's own generic club filter. Nothing else consumes them --
+ * conditionsWhere()'s columns and metricValueExpr()'s totals never read
+ * scope.seasonMin/seasonMax, and player-career.ts emits the clubFor EXISTS
+ * filter only when no predicate already carries the club.
+ *
+ * The PRESENCE of a career predicate is therefore no licence for either
+ * field to survive validation, which is what the two blanket
+ * `careerPredicates.length === 0` exemptions used to grant: "players with
+ * at least 3 grand finals since 2000" counted grand finals over the whole
+ * career and "Carlton players who debuted since 2000" listed every club's
+ * debutants -- both while the plan description still displayed the
+ * silently discarded scope (AFLDB-ISSUE-110 findings A and B).
+ *
+ * Ownership is per builder and explicit: only a builder that takes the
+ * field as one of its parameters owns it. A field nothing owns fails
+ * closed. It is deliberately NOT folded into a `played_for_club` /
+ * `debut_club` predicate to keep the question answerable: "Carlton
+ * players who played in 3 grand finals" reads equally as "played for
+ * Carlton and played 3 grand finals anywhere" and "played 3 grand finals
+ * for Carlton", the second is not expressible by any builder, and the two
+ * return different players -- so the question declines rather than
+ * guessing (ISSUE-110 semantic decision S1).
+ */
+export const NL_CAREER_SEASON_OWNING_BUILDERS: readonly string[] = [
+  'debuted_between',
+  'first_kick_goal_between',
+];
+
+export const NL_CAREER_CLUB_OWNING_BUILDERS: readonly string[] = [
+  'first_kick_goal_for_club',
+];
+
+/** True when some predicate consumes the plan's season range as a builder parameter. */
+export function careerPredicatesOwnSeasonRange(predicates: readonly GridAxisState[]): boolean {
+  return predicates.some((axis) => NL_CAREER_SEASON_OWNING_BUILDERS.includes(axis.builder));
+}
+
+/** True when some predicate consumes the plan's clubFor as a builder parameter. */
+export function careerPredicatesOwnClubFor(predicates: readonly GridAxisState[]): boolean {
+  return predicates.some((axis) => NL_CAREER_CLUB_OWNING_BUILDERS.includes(axis.builder));
+}
+
 // -------------------------------------------------------------- validation
 
 export type NlValidationError = { error: string };
@@ -1163,6 +1222,19 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (forErr) return forErr;
   const againstErr = validateRef(raw.scope.clubAgainst, 'organizationId', 'Opponent club');
   if (againstErr) return againstErr;
+  // A club survives a career plan only if something consumes it: a
+  // club-owning predicate parameter, or -- with no predicates at all --
+  // the compiler's own clubFor filter and club-scoped totals. A predicate
+  // plan carrying a club nothing owns answered a wider question with the
+  // club dropped entirely at compile time, while projectedGames() still
+  // club-scoped the visible Games column, so the extra players rendered
+  // with 0 games for the club asked about (ISSUE-110 finding B).
+  if (
+    raw.grain === 'player_career' && raw.scope.clubFor
+    && raw.careerPredicates.length > 0 && !careerPredicatesOwnClubFor(raw.careerPredicates)
+  ) {
+    return { error: 'This kind of career question cannot be limited to one club.' };
+  }
   if (raw.grain === 'player_career' && raw.scope.clubFor && raw.careerPredicates.length === 0) {
     const def = raw.metric ? NL_METRICS.player_career[raw.metric] : undefined;
     const scopedGamesConditions = raw.metric === null
@@ -1200,10 +1272,13 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // scope.seasonMin/seasonMax. Both "players with more than 500 career goals
   // since 2000" and "most career goals since 2000" must therefore refuse
   // rather than quietly answer the all-time question. A career-predicate plan
-  // is exempt -- its predicates own their season range as a builder parameter
-  // (debut windows, achievement windows).
+  // is exempt only when one of its predicates actually OWNS the range as a
+  // builder parameter (debut windows, achievement windows) -- a predicate
+  // that merely exists consumes nothing, which is how "players with at least
+  // 3 grand finals since 2000" came to count grand finals over whole careers
+  // (ISSUE-110 finding A).
   if (
-    raw.grain === 'player_career' && raw.careerPredicates.length === 0
+    raw.grain === 'player_career' && !careerPredicatesOwnSeasonRange(raw.careerPredicates)
     && (raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined)
   ) {
     return { error: 'A career question cannot be restricted to a season range.' };
@@ -1370,6 +1445,15 @@ export function describePlan(plan: NlQueryPlan): string[] {
 
   const metricLabel = metricLabelOf(plan.grain, plan.metric);
   const aggWord = AGG_WORDS[plan.agg.kind];
+  // A player_game plan in sum mode totals the matches in scope -- the
+  // shape "most goals for Geelong" and "more than 2 goals against
+  // Carlton" elect -- so the flat grain label called a scoped total a
+  // single-match one in the very panel that tells the reader what was
+  // answered (AFLDB-ISSUE-110: the answer text is already mode-aware,
+  // describe.ts's "Total across N games in scope").
+  const grainLabel = plan.grain === 'player_game' && plan.mode === 'sum'
+    ? 'total'
+    : GRAIN_LABEL[plan.grain];
   if (plan.headToHead) {
     const kind = plan.headToHead.kind.replace(/_/g, ' ');
     lines.push(`Head-to-head calculation: ${kind}.`);
@@ -1381,10 +1465,10 @@ export function describePlan(plan: NlQueryPlan): string[] {
     }
   } else if (metricLabel) {
     lines.push(plan.agg.kind === 'top_n'
-      ? `Ranked ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}, ${aggWord} ${(plan.agg as { n: number }).n}.`
-      : `Searched for ${aggWord} ${GRAIN_LABEL[plan.grain]} ${metricLabel.toLowerCase()}.`);
+      ? `Ranked ${grainLabel} ${metricLabel.toLowerCase()}, ${aggWord} ${(plan.agg as { n: number }).n}.`
+      : `Searched for ${aggWord} ${grainLabel} ${metricLabel.toLowerCase()}.`);
   } else {
-    lines.push(`Searched ${GRAIN_LABEL[plan.grain]} records for ${aggWord} matching ${GRAIN_SUBJECT[plan.grain]}.`);
+    lines.push(`Searched ${grainLabel} records for ${aggWord} matching ${GRAIN_SUBJECT[plan.grain]}.`);
   }
 
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);

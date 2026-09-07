@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - a career question may only keep the scope something consumes (AFLDB-ISSUE-110) - 8 September 2026
+
+- A career-grain plan carrying a season range or a club now has to prove that something
+  actually reads it. Until now the presence of any career predicate exempted the plan from
+  both career-grain backstops, but a grid builder consumes only its own parameters, so
+  `players with at least 3 grand finals since 2000` counted grand finals over whole careers
+  and `Carlton players who debuted since 2000` listed every club's debutants - each with the
+  discarded scope still shown in the "what AFLDB decided you meant" panel.
+- Ownership is now declared per builder in `src/search/nl/plan.ts`: the season range survives
+  only for `debuted_between` / `first_kick_goal_between`, the club only for
+  `first_kick_goal_for_club`, and the career compiler emits its generic club filter on the same
+  test rather than on "no predicates at all". Anything unowned refuses:
+  `A career question cannot be restricted to a season range.` or the new
+  `This kind of career question cannot be limited to one club.` A club beside a club-blind
+  predicate is deliberately declined rather than folded into a played-for-club reading, because
+  "Carlton players who played in 3 grand finals" has two plausible meanings that return
+  different players.
+- Unaffected: club-scoped career totals and thresholds (`most games for Geelong`,
+  `players with at least 200 games for Collingwood`), debut windows
+  (`players who debuted in the 1990s`), scoped achievements
+  (`players who kicked a goal with their first kick for Carlton in the 1940s`) and every
+  question in the two realistic UI corpora - all 1,495 were re-parsed and re-validated, and
+  none is affected by the new rule.
+- The plan trace also stopped calling a scoped total a single-match search: a `player_game`
+  plan in `sum` mode (`most goals for Geelong`) now reads "Searched for the highest total
+  goals", matching the answer text below it.
+- `PARSER_VERSION` 32 -> 33. No migration, schema, privilege, route or deployment change.
+
 ### Production promotion - staged reinstatement of NOT NULL lineage-bound references (AFLDB-ISSUE-151) - 8 September 2026
 
 - The generated promotion plan (`npm run db:promotion:check -- --plan`) no longer restores a

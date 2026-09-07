@@ -214,6 +214,103 @@ describe('player_career: awards match hand-written SQL', () => {
   });
 });
 
+describe('player_career: club scope is projected and filtered, never silently dropped (AFLDB-ISSUE-110)', () => {
+  /** The organization lineage with the most players at 200+ appearances -- picked from data, not hard-coded. */
+  async function busiestOrganization(): Promise<number> {
+    const [row] = await sql<{ organization_id: number }[]>`
+      SELECT cl.organization_id, count(*) AS players
+        FROM (
+          SELECT pms.player_id, c2.organization_id, count(DISTINCT pms.match_id) AS games
+            FROM player_match_stats pms
+            JOIN clubs c2 ON c2.id = pms.club_id
+           GROUP BY pms.player_id, c2.organization_id
+        ) AS per_club
+        JOIN clubs cl ON cl.organization_id = per_club.organization_id
+       WHERE per_club.games >= 200
+       GROUP BY cl.organization_id
+       ORDER BY count(*) DESC, cl.organization_id
+       LIMIT 1
+    `;
+    return row.organization_id;
+  }
+
+  it('renders club appearances under the Games column, not the whole-career total', async () => {
+    // The recorded CURRENT_WRONG_ANSWER: qualification was exactly
+    // club-scoped, but each row still carried whole-career games under a
+    // visible "Games" heading, so a player who qualified on 200 club
+    // appearances displayed 218.
+    const organizationId = await busiestOrganization();
+    const { rows, total } = await career(plan({
+      careerConditions: [{ kind: 'column', column: 'games', op: 'gte', value: 200 }],
+      scope: { clubFor: { organizationId, slug: 'x', name: 'x' } },
+    }), 100);
+
+    const expected = await sql<{ player_id: number; club_games: number; career_games: number }[]>`
+      SELECT pms.player_id,
+             count(DISTINCT pms.match_id)::int AS club_games,
+             c.games AS career_games
+        FROM player_match_stats pms
+        JOIN clubs cl ON cl.id = pms.club_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE cl.organization_id = ${organizationId}
+       GROUP BY pms.player_id, c.games
+      HAVING count(DISTINCT pms.match_id) >= 200
+    `;
+    expect(total).toBe(expected.length);
+    expect(total).toBeGreaterThan(0);
+
+    const clubGames = new Map(expected.map((r) => [r.player_id, r.club_games]));
+    for (const row of rows) {
+      expect(row.games).toBe(clubGames.get(row.playerId));
+    }
+    // The defect is only observable where the two totals differ, so prove
+    // this fixture actually contains such a player rather than passing
+    // vacuously on a one-club cohort.
+    expect(expected.some((r) => r.club_games < r.career_games)).toBe(true);
+  });
+
+  it('keeps the club filter in the SQL when a career predicate is present', async () => {
+    // Finding B's compiler half. The club EXISTS filter used to be emitted
+    // only when careerPredicates was empty, so a plan mixing a club with a
+    // club-blind predicate reached SQL with no club constraint at all and
+    // answered for every club. validatePlan now refuses that combination
+    // outright; this asserts the compiler itself no longer drops the club,
+    // so the invariant holds at both layers. Built raw, deliberately
+    // bypassing plan()'s validation, because the refusal is the point.
+    const organizationId = await busiestOrganization();
+    const raw: NlQueryPlan = {
+      v: 1,
+      grain: 'player_career',
+      metric: null,
+      agg: { kind: 'list' },
+      scope: { clubFor: { organizationId, slug: 'x', name: 'x' } },
+      careerConditions: [],
+      careerPredicates: [{ builder: 'grand_finals_played_min', params: { times: '3' } }],
+      clubSeasonConditions: [],
+      tiePolicy: 'all',
+      limit: 100,
+    };
+    expect(validatePlan(raw)).toEqual({
+      error: 'This kind of career question cannot be limited to one club.',
+    });
+
+    const { total } = await career(raw, 100);
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(*) FROM players p
+       WHERE EXISTS (
+               SELECT 1 FROM player_match_stats pms
+                 JOIN clubs cl ON cl.id = pms.club_id
+                WHERE pms.player_id = p.id AND cl.organization_id = ${organizationId})
+         AND (SELECT count(*) FROM player_match_stats pms
+                JOIN matches m ON m.id = pms.match_id
+               WHERE pms.player_id = p.id AND m.round_type = 'grand_final') >= 3
+         AND EXISTS (SELECT 1 FROM player_career_stats c WHERE c.player_id = p.id)
+    `;
+    expect(total).toBe(Number(expected.count));
+    expect(total).toBeGreaterThan(0);
+  });
+});
+
 describe('player_career: boundary questions match hand-written SQL', () => {
   it('"players whose first game was a grand final" -- membership matches career_game_no = 1 in a real GF', async () => {
     const { rows, total } = await career(plan({
