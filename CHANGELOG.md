@@ -15,6 +15,69 @@ commit.
 
 ## [Unreleased]
 
+### Post-ISSUE-139 workflow hardening - Stage 6 - 7 September 2026
+
+- Added explicit implementation/merge/read-only preflight modes, a fail-closed issue-worktree
+  bootstrap from fetched exact main, and a read-only merge-readiness report covering branch/main
+  relationships, dirty/staged/untracked paths, migration collisions, declared file scope, recorded
+  validation and runbook hard blockers. The shared cross-ref migration scanner now uses Node's
+  supported raw-buffer child-process mode, so its live Git blob inventory no longer fails on the
+  invalid `encoding: "buffer"` option.
+- Deployment dirty-state output now lists every known preserved artifact as well as every blocker.
+  The scheduled settle launcher prints reusable process/database/log monitoring commands, measured
+  duration context and explicit success/failure markers before long work begins.
+- Documented the standard issue lifecycle and compact runbook/ledger discipline so issue evidence
+  stays in its runbook while the open index and changelog remain concise.
+
+### Post-ISSUE-139 workflow hardening - Stage 5 - 7 September 2026
+
+- Bounded successful current-season canonical-apply savepoints with an explicit PostgreSQL
+  anchor/release lifecycle, while preserving postgres.js row-level rollback isolation on failure.
+  A fresh 9,823-observation `afldb_test` settle improved from approximately 3:49:00 to
+  1:57:19.272 over the measured workstation tunnel (48.8% faster); 9,011 successful units held
+  at most one transaction-ID lock at boundary samples, and commit took 10.857 ms.
+- Added a deterministic structural regression that pins savepoint creation, successful release,
+  and failure rollback/release ordering without a workstation-dependent wall-clock assertion.
+
+### Post-ISSUE-139 workflow hardening - Stage 3 - 6 September 2026
+
+- DEV deployment now uses bounded post-restart readiness polling (120 seconds, every 2 seconds)
+  and requires the `/api/health` HTTP/JSON contract, while preserving the ISSUE-107 live-build
+  header gate. Definitive systemd failure stops early; timeout/failure emits bounded service,
+  journal, listener and last-probe diagnostics and remains nonzero.
+- Remote checkout safety now distinguishes tracked changes, narrowly recognised operational
+  untracked artifacts and unknown untracked paths. Known backups/settle manifests/diagnostic
+  corpora warn and remain preserved; tracked or unknown paths still block unless the operator
+  explicitly uses the fully reported `-AllowDirtyServer` escape hatch. No cleanup/reset is run.
+
+### Post-ISSUE-139 workflow hardening - Stage 2 - 6 September 2026
+
+- Promotion plans now validate their contract and assembled truncate/restore artefacts before
+  writing any plan file. The fail-closed checks cover contradictory dispositions, explicit FK
+  dependency order, the complete rebuilt-referrer DROP/TRUNCATE/ADD lifecycle, DELETE/CASCADE
+  substitution, FK-unsafe AFLW schema truncation/TOC restore, and historical-only restore,
+  sequence or remap writes.
+- Public and `staging_aflw` restore dependencies are explicit contract data and regression-tested
+  against migration 025. The Gridley corpus source reference now resolves old id to candidate id
+  through stable `sources.key`, generating a guarded remap without assuming the numeric ids from
+  the ISSUE-139 promotion; its source/grid/axis restore order and import-batch decision remain
+  structurally pinned.
+
+### Post-ISSUE-139 workflow hardening - Stage 1 - 6 September 2026
+
+- Added one read-only `npm run preflight` entry point for implementation, rebuild, promotion
+  and deploy preparation. It fails closed on wrong/main/dirty/stale worktree state, migration
+  collisions and unsafe branch migration sets; checks `.env`, required variable names and
+  tools without printing values; optionally proves SSH reachability; and, for operational
+  modes, verifies database identity/role/reachability and migration parity read-only.
+- Added deterministic migration prefix/name/content collision detection across current,
+  unmerged and main/origin refs plus worktrees. The migration runner now repeats the guard
+  before shared DEV/PROD applies, refuses unmerged migrations by default, keeps `*_test` as
+  the safe target, and permits only an explicit DEV `--allow-branch-local` acknowledgement.
+- Promotion plan generation now rejects Git Bash/MSYS-rewritten Linux dump paths, shell-quotes
+  accepted host paths, quotes generated SQL identifiers, and emits generated swap/rollback SQL.
+  The hyphenated `afldb_dev_pre_rebuild_20260906-112500` failure is pinned by regression tests.
+
 ### AFLDB-ISSUE-139 — Family, Father–Son, Coach and After-the-Siren Records; Coaches navigation - 6 September 2026
 
 - Four new curated Records boards read from data the DEV promotion above makes reachable: Most Games

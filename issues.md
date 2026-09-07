@@ -15891,6 +15891,1223 @@ MSYS guard), with a unit test per check, and wire the two read-only database che
 "never match lineage by name" and "never point `import_fitzroy_core.py` at `afldb_dev`" rules, or the ISSUE-140
 "re-measure only" boundary; they are settled operator decisions recorded above.
 
+## Stage 1 handoff
+
+Status:
+- COMPLETE
+
+Objective:
+- Complete only the P0 fail-fast preflight, migration-collision detection, safe SQL
+  identifier quoting and Git Bash/MSYS path safeguards from the post-ISSUE-139 hardening
+  plan. Do not begin promotion truncate/FK/staging restore hardening (Stage 2).
+
+Implementation:
+- Added `tools/dev/preflight.ts` and `tools/dev/preflight-core.ts`, exposed as
+  `npm run preflight`. The entry point is read-only, exits nonzero on blockers and reports
+  explicit next actions for repository-root/branch/main/worktree/dirty/base problems,
+  migration conflicts, `.env` and named-DSN presence, required tools, optional SSH,
+  Git Bash/MSYS path conversion, database reachability/name/role, migration parity and
+  promotion-contract coherence. It does not fetch, write a plan, migrate, deploy, change a
+  service or print a DSN.
+- Added `tools/db/migration-safety.ts`. It deterministically checks invalid migration names,
+  duplicate numeric prefixes, same-name/different-content collisions, current-vs-base gaps,
+  branch-local migrations, pending/unknown database migrations and stored checksum mismatch.
+  Relevant Git inventory includes current/unmerged refs and linked worktrees. Ref blobs are
+  batch-read and compared using canonical LF content IDs so Windows CRLF materialisation does
+  not create false collisions.
+- Hardened `tools/db/migrate.ts`: filename conflicts are refused before a database connection;
+  shared DEV/PROD applies also require cross-ref/worktree collision safety and base parity.
+  Branch-local migrations belong on `afldb_test` by default; the only acknowledgement is
+  explicit `--allow-branch-local` for DEV, never test or production. Existing applied-checksum
+  refusal remains in force.
+- Hardened `tools/db/promotion-inventory.ts` and `tools/db/promotion-check.ts`: dynamic database,
+  schema, table, column and constraint identifiers in generated/executable SQL use central
+  PostgreSQL identifier quoting; generated literals use literal quoting. The plan now emits
+  operator-reviewed `promotion-swap.sql` and `promotion-rollback.sql`, both with
+  `ON_ERROR_STOP`, quoted database identifiers and bounded environment/name validation. A
+  hyphenated retained database such as `afldb_dev_pre_rebuild_20260906-112500` is valid and
+  cannot be emitted as an unquoted identifier through this path.
+- Promotion plan dump paths must be absolute Linux host paths. Windows/MSYS-shaped or
+  control-character paths are refused with the exact `MSYS_NO_PATHCONV=1` /
+  `MSYS2_ARG_CONV_EXCL='*'` remediation; accepted paths are POSIX-shell quoted.
+- Added/extended focused regressions in `tests/workflow-preflight.test.ts` and
+  `tests/db-promotion-check.test.ts`, including the real migration directory, synthetic H1
+  branch/worktree collisions, checksum mismatch, LF/CRLF equivalence, test-vs-DEV mistakes,
+  MSYS rewriting, identifier escaping, the exact hyphenated retained database name and plan
+  file output.
+- Updated `package.json`, `docs/production-promotion.md`, `docs/deployment.md`,
+  `docs/development/WORKFLOW.md` and `CHANGELOG.md`. `IssuesIndex.md` was intentionally not
+  changed: no new issue was created and ISSUE-139 remains complete.
+
+Files changed:
+- `tools/db/migration-safety.ts` (new)
+- `tools/dev/preflight-core.ts` (new)
+- `tools/dev/preflight.ts` (new)
+- `tools/db/migrate.ts`
+- `tools/db/promotion-inventory.ts`
+- `tools/db/promotion-check.ts`
+- `tests/workflow-preflight.test.ts` (new)
+- `tests/db-promotion-check.test.ts`
+- `package.json`
+- `docs/production-promotion.md`
+- `docs/deployment.md`
+- `docs/development/WORKFLOW.md`
+- `CHANGELOG.md`
+- `issues.md` (this handoff)
+
+Evidence:
+- Initial worktree gate:
+  - `git branch --show-current` -> `codex/workflow-hardening`.
+  - `git rev-parse HEAD` -> `6b5581281f44babb215f83b53dc43b3a3b89f8c5`.
+  - `git merge-base --is-ancestor 6b55812 HEAD` -> exit 0.
+  - `git status --porcelain=v1 --untracked-files=all` -> empty.
+- The exact ISSUE-139 Post-139 H1-H15/P0 handoff was used as established evidence; completed
+  rebuild, promotion, settle, duplicate and browser/deploy outcomes were not reinvestigated.
+- Knowledge-graph verification used the exact worktree project and was refreshed after the
+  edits (17,412 nodes / 58,792 edges). Coverage flagged only parser lines containing tagged
+  SQL in `tools/dev/preflight.ts:191,204` and `tools/db/migrate.ts:242`; those ranges were read
+  directly and are the intended parameterised read-only queries. All eight operated TypeScript
+  paths received an exact coverage check; graph coverage remains best-effort.
+- The line-ending audit found apply-patch-local mixed endings in touched Windows-checkout
+  files. Only touched files were mechanically restored to their existing CRLF convention;
+  no repository-wide ledger rewrite was performed.
+- `npm run preflight -- --help` prints the four modes, named-variable/database/role/SSH options
+  and the read-only contract without reading a DSN.
+
+Validation:
+- Dependency preparation (worktree only):
+  - `npm ci --include=dev`
+  - PASS: 419 packages installed; 0 vulnerabilities. No package/lock dependency change was
+    made.
+- Focused regression gate:
+  - `npm test -- tests/workflow-preflight.test.ts tests/db-promotion-check.test.ts`
+  - PASS: 2 files, 86 tests, 0 failures (629 ms on the final post-handoff run).
+- Type validation:
+  - `npm run typecheck`
+  - PASS: Next route types generated; `tsc --noEmit` returned exit 0.
+- Touched TypeScript lint:
+  - `.\node_modules\.bin\eslint.cmd tools\db\migration-safety.ts tools\dev\preflight-core.ts tools\dev\preflight.ts tools\db\migrate.ts tools\db\promotion-inventory.ts tools\db\promotion-check.ts tests\workflow-preflight.test.ts tests\db-promotion-check.test.ts`
+  - PASS: exit 0, no findings.
+- CLI smoke:
+  - `npm run preflight -- --help`
+  - PASS: exit 0; usage/read-only contract printed.
+
+Safety:
+- Repository/worktree used: `D:\dev\afldb-workflow-hardening` only for implementation.
+- No other issue worktree was read or modified during Stage 1 execution. The new operator tool
+  can inspect migration filenames/content across linked worktrees when an operator runs the
+  full preflight, as required by H1; only its `--help` mode was executed in this stage.
+- Databases touched: none. `afldb_test`, `afldb_dev`, the retained pre-rebuild DEV database and
+  production were not connected to or changed.
+- Hosts/services touched: none. No SSH, deploy, systemd or health request ran.
+- Production was not touched.
+- Destructive actions: none. No Git commit/push/merge/fetch/checkout, migration, SQL write,
+  database swap, file deletion or deployment occurred.
+- Secrets: no password, DSN or `.env` value was printed.
+
+Deviations / blockers:
+- The first test attempt occurred before dependencies existed in this worktree; sandboxed
+  `npx` could not use its registry cache. After approved `npm ci --include=dev`, all planned
+  validation ran locally.
+- The first sandboxed TSX CLI smoke hit a sandbox-only `uv_os_get_passwd` / `ENOMEM` startup
+  failure before application code. The same read-only help command passed outside that sandbox.
+- The complete operational preflight was intentionally not run: Stage 1 changes make this
+  working tree dirty, the user prohibited inspecting another issue worktree during this chat,
+  and no DEV/test database or SSH host needed to be touched to validate the deterministic
+  logic. The pure tests plus CLI help smoke cover the new paths without weakening those safety
+  boundaries.
+- No blocker remains for Stage 1.
+
+Unresolved:
+- Stage 2 remains intentionally untouched: focused protections for
+  `promotion_candidates -> promotion_decisions`, historical-only ledgers, Gridley preservation,
+  `staging_aflw` schema-wide truncation/FK restore order and rejection of unsafe DELETE,
+  per-table truncate or alphabetical restore regressions.
+- Live DB/SSH branches of the general preflight remain operator/environment checks; they were
+  not exercised against a host in this DB-free stage.
+- Deploy readiness/dirty-server work remains Stage 3; settle measurement/optimisation remains
+  Stages 4/5; P2 workflow polish remains Stage 6.
+
+Exact next action:
+- The operator reviews and commits the Stage 1 changes on `codex/workflow-hardening` (Codex must
+  not perform Git actions). In a fresh Stage 2 chat, first re-run the branch/HEAD-descendant/
+  clean-tree gates, read this handoff, then run
+  `npm test -- tests/db-promotion-check.test.ts` as the Stage 2 baseline. Inspect and extend only
+  the existing `truncateSql()`, `REBUILT_REFERRER_FKS`, historical-only disposition and
+  `reinstatedSchemaTables()` regressions before making the Stage 2 promotion-safety changes.
+
+Recommended next model:
+- Codex High, high reasoning effort.
+
+## Stage 2 handoff
+
+Status:
+- COMPLETE
+
+Objective:
+- Harden only the ISSUE-139 promotion truncate/FK lifecycle, `staging_aflw` FK-safe
+  truncate/restore order, historical-only exclusions, Gridley preservation/remapping and
+  generated-plan coherence. Stage 3 deploy/dirty-server work was not started.
+
+Implementation:
+- `tools/db/promotion-inventory.ts`
+  - Added explicit `restoreAfter` dependencies for reinstated `public` tables and explicit
+    `tableDependencies` for all migration-025 `staging_aflw` FKs. The deterministic existing
+    order remains, but `promotionContractProblems()` now proves every declared parent is present
+    and precedes its child in both environments.
+  - Expanded `assertContractCoherent()` into a pure, synthetic-testable fail-closed validator.
+    It rejects duplicate/contradictory table dispositions, invalid or missing restore parents,
+    malformed historical-only/lineage declarations, ambiguous/missing NOT NULL preservation
+    dispositions, and rebuilt-referrer FK lifecycles that target data requiring later restore.
+  - Added `promotionPlanProblems()` / `assertPromotionPlanCoherent()`. The assembled artefacts
+    are rejected for DELETE or CASCADE substitution, missing/duplicate/misordered FK DROP/ADD,
+    a missing parent truncate, unsafe per-table schema truncation, whole-schema/TOC restoration,
+    restore-order drift, or historical-only restore/sequence writes.
+  - Added a stable `source_key` identity for `sources.key` and declared
+    `external_grid_sources.ingest_source_id` as lineage-bound. Gridley source ids can therefore
+    differ between the replaced and candidate databases; the generated guarded remap proves
+    old id -> `gridley` key -> candidate id without treating either numeric id as universal.
+  - Added `lineageRemapProblems()` so generated remap SQL itself fails closed if a table omitted
+    as historical-only receives UPDATE/INSERT/DELETE/TRUNCATE.
+- `tools/db/promotion-check.ts`
+  - `writePlan()` now assembles and validates the Stage 2 artefacts before creating the plan
+    directory or writing a file.
+  - The restored dangling-reference gate recognises a declared stable-identity remap. A changed
+    Gridley source id is WARN + guarded remap, while an undeclared/unremappable NOT NULL reference
+    remains FAIL.
+- `tests/db-promotion-check.test.ts`
+  - Extended the existing DB-free suite; no new test file was created.
+- `docs/production-promotion.md`
+  - Documented pre-write structural validation, explicit restore dependencies, the reset-target
+    FK lifecycle rule and `sources.key` Gridley remapping.
+- `CHANGELOG.md`
+  - Added the retained Stage 2 safeguards under `Unreleased`.
+- `issues.md`
+  - Added this Stage 2 handoff. No new issue was created; `IssuesIndex.md` is unchanged.
+
+Regression coverage:
+- `promotion_candidates.resolved_decision_id -> promotion_decisions.id`: exactly one original-name
+  FK DROP before the parent TRUNCATE and exactly one definition-correct ADD after it, all inside
+  BEGIN/COMMIT; missing or early ADD fails; DELETE and CASCADE substitutions fail. Because
+  `promotion_decisions` is deliberately reset/recorded-gap, no target rows are restored; changing
+  that target to `reinstate` is rejected as an unsupported pre-restore FK recreation.
+- `staging_aflw`: one grouped schema/table TRUNCATE is required; per-table truncation fails. The
+  explicit migration-025 dependency set is pinned, parent-before-child order is validated, and
+  alphabetical/whole-schema TOC restoration fails (`seasons` must precede `fixtures`).
+- Historical-only DEV ledgers: `data_edits` and `player_link_resolutions` remain truncated,
+  omitted from restore and sequence resync, recorded in the audit marker, and receive no remap
+  write. Another table/column/environment remains refused; duplicate/contradictory disposition
+  declarations fail closed.
+- Gridley: `external_grid_sources -> external_grids -> external_grid_axes` remains the required
+  restore chain; `external_grid_sources.ingest_source_id` resolves through stable `sources.key`;
+  a test maps deliberately different arbitrary old/candidate ids; the NOT NULL import-batch
+  reference retains its explicit operator disposition instead of fabricating an id.
+- Whole-plan coherence: the real PROD and DEV artefacts pass the pure validator; mutated plans
+  covering incomplete FK lifecycle, invalid dependency order, unsafe truncate/restore shapes and
+  historical-only writes are refused before execution.
+
+Validation:
+- Stage 2 baseline:
+  - `& npm.cmd test -- tests/db-promotion-check.test.ts`
+  - PASS: 1 file, 76 tests, 0 failures (947 ms).
+- Final focused/relevant promotion-check suite:
+  - `& npm.cmd test -- tests/db-promotion-check.test.ts`
+  - PASS: 1 file, 82 tests, 0 failures (452 ms on the final post-edit run).
+- Type validation:
+  - `& npm.cmd run typecheck`
+  - PASS: Next route types generated; `tsc --noEmit` returned exit 0.
+- Touched TypeScript lint:
+  - `.\node_modules\.bin\eslint.cmd tools\db\promotion-inventory.ts tools\db\promotion-check.ts tests\db-promotion-check.test.ts`
+  - PASS: exit 0, no findings.
+- Touched-file CRLF/encoding audit:
+  - PowerShell `[IO.File]::ReadAllText()` plus regex counts for `\r\n`, bare `\n` and a
+    leading U+FEFF over the six files listed under Implementation.
+  - PASS: every file has `bareLF=0` and `BOM=False`; CRLF counts were inventory 2130,
+    checker 1088, test 1587, promotion doc 730, changelog 3073 and issue ledger 17076.
+- Tier 2 graph verification used project `D-dev-afldb-workflow-hardening` on
+  `codex/workflow-hardening`. Exact coverage was checked for every relied-on path. The SQL parser
+  reported partial ranges in migrations 025, 074 and 080; every reported range was read directly,
+  as were the exact CREATE TABLE/FK clauses used by the tests. Edited TypeScript paths were also
+  reviewed directly because the watcher reported post-edit metadata changes; graph coverage is
+  best-effort.
+
+Safety:
+- Databases touched: none. No DSN was read or printed; `afldb_test`, DEV, retained pre-rebuild DEV
+  and production were not contacted.
+- Hosts/services touched: none. No SSH, deployment, health request, systemd operation or browser
+  action ran.
+- Production was not touched.
+- No Git command, commit, push, merge, migration, SQL execution, database write/swap or file
+  deletion occurred.
+
+Deviations / blockers:
+- A bare PowerShell `npm test ...` attempt was blocked by the workstation execution policy before
+  npm ran. All actual validations used `npm.cmd` and passed.
+- No DB-backed rehearsal was run: every Stage 2 invariant is structural and the DB-free suite
+  parses the authoritative migration clauses, providing equivalent confidence without touching a
+  database. Linux remains the authoritative runtime for any later operational rehearsal.
+- No blocker remains for Stage 2.
+
+Unresolved:
+- Stage 3 only: deploy health retry and dirty-server classification. Do not combine it with settle
+  performance, workflow polish, ISSUE-144 or production deployment.
+- Fresh-staging settle performance remains outside this stage and must not be investigated in the
+  Stage 3 chat.
+
+Exact next action for Stage 3:
+- The operator reviews and commits the Stage 2 changes on `codex/workflow-hardening` (Codex must
+  not perform Git actions), then starts a fresh chat. In that chat, read this Stage 2 handoff and
+  the Post-139 handoff, inspect `deploy/sync-dev.ps1` and its closest existing focused tests for
+  only the one-shot health-check/retry and dirty-server-classification paths, run the smallest
+  existing focused baseline, then implement and validate Stage 3 without touching settle logic.
+
+Recommended next model:
+- Codex High, high reasoning effort.
+
+Stage 2 complete. Start a fresh chat for Stage 3 using the persisted handoff.
+
+## Stage 3 handoff
+
+Status:
+- COMPLETE
+
+Objective:
+- Harden only `deploy/sync-dev.ps1` for the confirmed post-restart DEV readiness race and
+  for safe remote dirty-tree classification. Stage 1/2, settle performance, ISSUE-144,
+  production deployment and broad workflow work were not changed or investigated.
+
+Implementation:
+- `deploy/sync-dev.ps1`
+  - Embeds the new remote helper in the existing base64/LF SSH payload, so the first deploy of
+    this change does not depend on the old server checkout already containing the helper.
+  - Replaces the one-shot health `curl` with a single readiness call after the existing one
+    restart/systemd-respawn path. Defaults are an explicit 120-second timeout and 2-second retry
+    interval, configurable within bounded PowerShell parameter ranges. `-Issue107Gate` still
+    requires install/build/restart/health and passes the built BUILD_ID into the same readiness
+    loop for live `x-afldb-build` verification.
+  - Replaces the all-or-nothing dirty check with one always-visible classification step. The
+    default blocks tracked/staged/deleted/renamed/copied paths and unknown untracked paths, while
+    known operational untracked artifacts warn and continue. `-AllowDirtyServer` still exists,
+    but now lists every tracked/unknown blocker and prints an explicit bypass warning.
+  - Preserves the existing base64 transport, remote-expression quoting, `set -Eeuo pipefail`,
+    remote exit propagation and systemd `Restart=always` fallback. The successful path still
+    performs one restart only; the status display is non-fatal so it cannot pre-empt readiness.
+- `deploy/sync-dev-remote.sh` (new)
+  - Parses NUL-delimited `git status --porcelain=v1 -z --untracked-files=normal` output. Tracked
+    state is one blocker class; explicitly recognised untracked operational paths are another;
+    every other untracked path is unknown/blocking.
+  - The narrow operational allowlist is: `.deploy-backups/`; root `.env.bak-*`; root
+    `FETCH_HEAD`; root `afldb-ui-questions-*.csv`; and only
+    `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json`. `.env`, arbitrary source,
+    scripts/config/migrations, other manifest names and arbitrary JSON/CSV remain blockers.
+  - Polls with curl connect/max-time bounds and requires HTTP 200 plus parseable JSON containing
+    exactly the healthy contract fields `status: "ok"` and `database: "ok"`. Connection refusal
+    or reset, startup non-200, unhealthy/invalid JSON, and transient live-build absence/mismatch
+    are retried while systemd remains live/transitional.
+  - Stops immediately if systemd reports `failed` or `inactive/dead`. Terminal output is bounded:
+    last probe status/kind/error, elapsed time, 20 `systemctl status` lines, 40 journal lines and
+    an `ss`/`netstat` listener check for the explicit health port.
+  - Exit contract: healthy `0`; missing/mismatched ISSUE-107 build after retry `21`/`22`;
+    definitive service failure `26`; general timeout/bad health `27`; invalid readiness bounds
+    `28`. Dirty inspection failure is `19`; a default dirty blocker is `20`.
+  - Removes only its own `mktemp` probe/status files. It has no repository cleanup/reset path and
+    never deletes operator backups, manifests or evidence.
+- `tests/sync-dev-remote.test.sh` (new)
+  - Adds DB-free deterministic shell cases with mocked Git/curl/systemd/time/sleep. No case waits
+    in real time or contacts a host.
+- `tests/sync-dev-static.test.ps1` (new)
+  - Generates default, ISSUE-107 and custom-bound remote payloads under `-WhatIf`; proves literal
+    remote expansion, explicit dirty mode, readiness bounds, one restart/fallback, no Git cleanup,
+    LF/base64 integrity, payload-size safety and generated Bash syntax.
+- `docs/deployment.md`
+  - Documents readiness retry/timeout/diagnostics, the three dirty-tree classes, exact narrow
+    known-artifact rules, explicit `-AllowDirtyServer` behavior and the no-cleanup contract.
+- `CHANGELOG.md`
+  - Records the retained Stage 3 deployment safeguards under `Unreleased`.
+- `issues.md`
+  - Adds this handoff. No new issue was created and `IssuesIndex.md` is unchanged.
+
+Evidence:
+- Operator-supplied confirmed incident: the final ISSUE-139 DEV deploy built BUILD_ID
+  `EcAmCgBq3PWP6Z49D_eW5`, restarted successfully through systemd, then the immediate loopback
+  health curl was refused; about 47 seconds later `afldb.service` was active with its cluster
+  master/four workers, port 3100 listening, `/api/health` returning
+  `{"status":"ok","database":"ok","latencyMs":25}`, and `/seasons/2026` returning 200.
+  This established a readiness timing race, not a failed deploy.
+- Initial worktree gate:
+  - `git branch --show-current` -> `codex/workflow-hardening`.
+  - `git rev-parse HEAD` -> `6b5581281f44babb215f83b53dc43b3a3b89f8c5`.
+  - `git merge-base --is-ancestor 6b55812 HEAD` -> exit 0.
+  - `git rev-parse --show-toplevel` -> `D:/dev/afldb-workflow-hardening`.
+  - `git status --short --branch` showed only the retained uncommitted Stage 1/2 files before
+    Stage 3 began; they were preserved.
+- Tier 2 codebase-memory verification used project `D-dev-afldb-workflow-hardening` on the exact
+  branch/HEAD. `deploy/` is deliberately excluded from the graph, so every operated deploy file
+  was read directly and the generated payload was parsed/executed by focused tests. The graph
+  confirmed `/api/health` returns HTTP JSON `status=ok, database=ok` only after `SELECT 1`, and
+  returns HTTP 503 `status=error, database=unreachable` on failure. Exact final coverage was
+  checked for all eight relied-on paths; the only additional parser gaps were PowerShell
+  dot-sourcing lines 20 and 29 in `tests/sync-dev-static.test.ps1`, which were read directly.
+- The repository records the operational provenance of every allowlisted family: prior deploy
+  backups/environment backups/FETCH_HEAD/NL pressure corpora and generated settle manifests.
+  Rules use constrained path/prefix patterns, not individual dated filenames or a blanket
+  untracked-file exemption.
+
+Validation:
+- Deterministic readiness/dirty-tree regression:
+  - `& 'C:\Program Files\Git\usr\bin\bash.exe' --login tests/sync-dev-remote.test.sh`
+  - PASS: 18 passed, 0 failed. Cases cover clean, tracked, staged/rename, known-only, unknown,
+    known+unknown, explicit allow-dirty, narrow negative allowlist, immediate healthy, connection
+    refusal then healthy, service failed early, timeout, unhealthy HTTP-200 payload, expected build,
+    curl connection reset, real probe JSON/header parsing, diagnostics and no repository cleanup.
+- PowerShell/static payload integration:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\sync-dev-static.test.ps1`
+  - PASS: 14 assertions; three `-WhatIf` generations only, no SSH. Default/ISSUE-107/custom
+    payloads generated within the 24,000-character transport ceiling and generated Bash parsed.
+- PowerShell syntax:
+  - `[System.Management.Automation.Language.Parser]::ParseFile(...)` over
+    `deploy/sync-dev.ps1` and `tests/sync-dev-static.test.ps1`.
+  - PASS: 2 files, 0 parse errors.
+- Bash syntax:
+  - `bash --login -n deploy/sync-dev-remote.sh` and
+    `bash --login -n tests/sync-dev-remote.test.sh`.
+  - PASS: both exit 0.
+- Patch/whitespace:
+  - `git diff --check -- deploy/sync-dev.ps1 deploy/sync-dev-remote.sh`
+    `tests/sync-dev-remote.test.sh tests/sync-dev-static.test.ps1 docs/deployment.md CHANGELOG.md`
+    `issues.md`
+  - PASS: exit 0.
+- Encoding/line-ending audit with `[IO.File]::ReadAllText()`:
+  - PASS final: both `.sh` files LF-only/no BOM; both `.ps1` files and all three updated `.md`
+    files CRLF-only/no BOM, including the persisted issue ledger.
+- Typecheck/ESLint were not run because Stage 3 touched no TypeScript/JavaScript application file.
+  ShellCheck is not installed; Bash parsing plus deterministic execution supply the focused shell
+  validation.
+
+Safety:
+- Hosts/services touched: none. No SSH, deployment, health request, systemd action, restart or
+  browser action ran. All sync script generations used PowerShell `-WhatIf`.
+- Databases touched: none. No DSN or secret was read or printed.
+- Production was untouched.
+- No automatic cleanup occurred. Tests prove the classifier never invokes Git clean/reset and
+  known artifacts are preserved; only helper-owned temporary files are removed.
+- Git activity was read-only inspection/validation only (branch, HEAD, ancestry, status,
+  worktree root and diff-check). No commit, push, merge, fetch, pull, checkout, switch, reset,
+  stash, tag or other state-changing Git operation occurred.
+- `D:\dev\afldb` and every other issue worktree were not modified or used for implementation.
+
+Deviations / blockers:
+- The first Git-for-Windows test invocation used non-login `bash.exe`; that shell did not initialise
+  `/usr/bin` on PATH, so its captured mocks could not find `mktemp`, `tr` or `cut`. The authoritative
+  command uses `Git\usr\bin\bash.exe --login`; all 18 cases then pass. This was a workstation test
+  launcher issue, not remote-helper behavior.
+- No live DEV validation was run because proving readiness on the real host would require a
+  restart/redeploy, which was not authorised. The first operator-approved future DEV deploy is the
+  Linux integration confirmation; this is not a blocker to the deterministic Stage 3 scope.
+- No blocker remains for Stage 3.
+
+Unresolved:
+- Live Linux/SSH observation of one real delayed startup remains an operator deployment check; do
+  not redeploy or restart merely for this proof.
+- Stage 4 is intentionally untouched. No settle reproduction, measurement, diagnosis or
+  optimisation occurred in this chat.
+
+Exact next action:
+- Stage 4 is settle performance reproduction and root-cause measurement ONLY. Start a fresh chat,
+  re-run its worktree/HEAD/status gates, use this handoff as the boundary, and do not treat Stage 4
+  as optimisation authority.
+
+Recommended next model:
+- Codex High, High reasoning effort.
+
+Stage 3 complete. Start a fresh chat for Stage 4 using the persisted handoff.
+
+## Stage 4 handoff
+
+Status:
+- **COMPLETE** (2026-09-07).
+- Investigation and measurement only. No performance fix, schema/index change, deploy change or
+  Stage 5 implementation was made.
+
+Objective:
+- Reproduce and localise the fresh/empty-staging current-season settle slowdown from
+  `AFLDB-ISSUE-139`, explain the approximately 3 h 49 min versus 51 s production gap, and leave an
+  evidence-backed, bounded Stage 5 proposal and benchmark contract.
+
+Environment:
+- Worktree: `D:\dev\afldb-workflow-hardening`; branch named by the operator as
+  `codex/workflow-hardening` (no Git command or state-changing Git operation was run in Stage 4).
+- Database: **`afldb_test` only**, PostgreSQL 16.15, reached through a local SSH port-forward to
+  streamanator. `afldb_dev`, its pre-rebuild database, and production were not connected to or
+  modified.
+- Owner DSN: the operator supplied `AFLDB_TEST_DATABASE_URL` in the worktree `.env`. The restricted
+  test import DSN was derived ephemerally/in-process from that test owner endpoint/database plus the
+  established test import-role credential source. It was never printed or persisted, and the DEV
+  database name/DSN was never substituted. Runtime identity was independently verified as
+  `afldb_import@afldb_test`; a prohibited-table no-op write was denied with SQLSTATE `42501`.
+- No local PostgreSQL installation was needed. An initial attempt to use the incomplete pre-existing
+  Windows PostgreSQL files stopped before a database could start because `share/postgres.bki` was
+  missing. WSL contained no PostgreSQL installation; installing it there was rejected and was not
+  attempted. The incomplete local `.stage4/pgdata` never hosted a database.
+- Primary corpus: the exact retained ISSUE-139 11:45 acquisition bundle on streamanator:
+  `/home/arm/projects/afldb/data/sources/afltables/fitzroy_core/settle-2026-2026-09-06-1145/observations.json`,
+  with manifest
+  `/home/arm/projects/afldb/docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-06-1145.json`.
+- Comparison corpus: the retained 16:34 bundle and corresponding manifest at the operator-supplied
+  paths. No upstream reacquisition occurred.
+- Initial scoped test state was empty for the AFL Tables source spine, typed projections, and 2026
+  canonical matches/statistics. The database already held 13,275 AFL Tables player identities and
+  24 clubs, so the real identity and club resolution paths remained available.
+- Production was untouched.
+
+Monitoring (printed before every potentially long command):
+- Process, substituting the printed PID:
+  `while ($true) { Get-Process -Id <PID> -ErrorAction SilentlyContinue | Select-Object Id,@{n='Elapsed';e={(Get-Date)-$_.StartTime}},CPU,WorkingSet,Responding; Start-Sleep 2 }`
+- Database (preferred host-side form), substituting the printed application name:
+  `ssh streamanator 'watch -n 5 "sudo -u postgres psql -At -d afldb_test -c \"select pid,state,now()-xact_start as xact_age,now()-query_start as query_age,wait_event_type,wait_event,left(query,160) from pg_stat_activity where datname=''afldb_test'' and application_name=''<APP>'' and state <> ''idle'' order by query_start;\""'`
+- Database owner fallback used when non-interactive `sudo` was unavailable:
+  `while ($true) { node .stage4\stage4-monitor.mjs <APP>; Start-Sleep 5 }`
+  The owner could count/classify locks but PostgreSQL correctly hid the restricted role's query text
+  and state as `<insufficient privilege>`; no privilege was changed to improve diagnostics.
+- Log/tail:
+  `Get-Content -Wait .stage4\logs\<tag>.out.log`
+  and `Get-Content -Wait .stage4\logs\<tag>.err.log`.
+- Progress/counters:
+  `Select-String -Path .stage4\logs\<tag>.out.log -Pattern 'STAGE4_PROGRESS|STAGE4_RESULT|STAGE4_SUCCESS|STAGE4_FAILURE'`.
+- Exact success marker: `STAGE4_SUCCESS run=<tag>`.
+- Exact failure marker: `STAGE4_FAILURE run=<tag>`.
+- Healthy: counters advance, the current query changes, statements are short/sub-second, and no
+  sustained lock wait exists. Possible stall: the same query remains unchanged for approximately
+  5-10 minutes and counters remain static without an explained long phase. Actionable: sustained
+  `wait_event_type = Lock`, process disappearance without the success marker, or the explicit failure
+  marker. Elapsed time alone is not a reason to kill a run.
+- Measured run PIDs/tags were `eq-uninstrumented-10p` 20000, `empty-apply-10p` 11744,
+  `populated-apply-10p` 21588, `player-fresh-auto-100` 9720 and
+  `player-fresh-review-100` 36164 (plus diagnostic equivalence run PID 38144).
+
+Reproduction:
+- The retained files were copied read-only from streamanator into `.stage4` for local measurement.
+  The 11:45 JSON was 30,722,391 bytes and contained 9,823 records: 209 matches plus 9,614 player-match
+  statistics, with zero rejected or unkeyed records. Its manifest byte digest verified. The real
+  bundle reader/contract validation took 199.952 ms (read 9.434 ms, parse 82.936 ms, validation
+  107.582 ms).
+- The 16:34 JSON was 31,308,938 bytes and contained 10,011 records: 213 matches plus 9,798 player-match
+  statistics. Its manifest digest also verified. Its read/parse/validate total was 165.587 ms.
+- A byte/content-key comparison found all 209 match and 9,614 player-stat records from 11:45
+  unchanged at 16:34, plus exactly 4 new matches and 184 new player-stat records. Nothing was changed,
+  removed, unkeyed or rejected. The historical batch-87 display called 176 observations corrected
+  because of settle head/counter semantics; the actual retained-record diff establishes that the
+  records were new, consistent with the recorded 184 appended stat rows.
+- To avoid an unnecessary second 3 h 49 min run, the primary faithful reduction retained **all 209
+  match records plus 10 player-match records** from the exact 11:45 bundle. Bundle enumeration/count
+  fields were rewritten consistently and the original inputs were digest-verified before reduction.
+  The narrow diagnostic harness invoked the real `validateSettleBundle` and `runSettleAfltables`
+  functions, loaded the real manual-authority rules, used the restricted import role, and used
+  `autoApply: true`; it therefore exercised the real sequence: payload/version/head persistence,
+  typed projection, absence sweep, reconciliation, canonical gates/application, derived recompute,
+  and commit.
+- Exact diagnostic invocation shape for the two committed measurements was:
+  `node_modules\.bin\tsx.cmd .stage4/stage4-settle-measure.mjs --label settle-2026-2026-09-06-1145 --tag empty-apply-10p --mode apply --players 10 --instrument true --start-gate <gate>`
+  followed immediately by the identical command with tag `populated-apply-10p`. The start gate let
+  monitoring attach before transaction work. This was diagnostic machinery, not an alternate SQL
+  microbenchmark; the harness and copied material were removed after evidence was persisted.
+- A second real-path control contained no match observations and the first 110 player-stat records.
+  The first 10 were already populated and the next 100 were unseen. Existing canonical matches made
+  99 of the new records automatically applicable; one player identity remained unresolved. Commands
+  used the same harness with `--matches 0 --players 110 --mode dry`, once with `--auto-apply true`
+  (`player-fresh-auto-100`) and once with `--auto-apply false`
+  (`player-fresh-review-100`). Both transactions rolled back.
+- Destructive preparation: none before the primary run; only empty scoped test state was used. The
+  primary reduced apply intentionally committed its 219 test observations. Dry controls and the
+  savepoint probe rolled back. `afldb_test` was deliberately left with those reduced rows for audit:
+  219 payloads, versions and source heads; 209 typed matches; 10 typed player-match rows; 209
+  canonical matches; 1,672 period scores; 10 canonical player-match rows; and 428 applications.
+  There were zero run-created candidates or open issues. A pre-existing total of 681 unrelated
+  `import_rejections` was not attributed to this run; settle counters recorded zero rejections.
+
+Baseline and phase timings:
+- Historical faithful full run already retained by ISSUE-139: fresh apply batch 86 ran about
+  3 h 49 min (12:44-16:33), consumed 9,823 records, inserted 10,683 canonical rows, wrote 9,220
+  application-ledger rows, left 812 unresolved/debutant candidates, recorded zero refusal/failure,
+  and recomputed derived data for 577 players. The immediate populated batch 87 completed in 51 s
+  (34 s settle application), with 10,032 unchanged-observation events, 188 appended versions, 208
+  canonical rows, 180 ledger rows and 12 candidates for the genuine four-match/184-stat addition.
+- Reduced fresh run: 274.646 s total wall; 274.139 s transaction; 2.843 s process CPU (about 1%);
+  maximum RSS 154.9 MB; 6,480 SQL statements across 275 fingerprints.
+
+| Phase | Fresh 209-match + 10-stat run | SQL statements | Populated rerun | SQL statements |
+|---|---:|---:|---:|---:|
+| A. bundle read/validation | 0.234 s | 0 | same validated corpus | 0 |
+| setup/bulk maps | 0.220 s | 6 | 0.227 s | 6 |
+| B. source observation persistence | 26.802 s | 876 | 27.883 s | 438 |
+| C. typed staging projection | 2.100 s | 438 | 25.227 s | 438 |
+| D. absence sweep | 0.063 s | 2 | 0.060 s | 2 |
+| E. reconcile/candidate generation | 1.442 s | 219 | 42.035 s | 1,055 |
+| F. canonical application | **200.763 s** | **4,051** | **0.012 s** | **0** |
+| F. outcome/ledger cleanup | **40.833 s** | **856** | 0.001 s | 0 |
+| G. derived recomputation | 1.342 s | 18 | skipped, 0.000 s | 0 |
+| batch finalisation | 0.188 s | 2 | 0.179 s | 2 |
+| H. commit/final transaction completion | 0.013 s | 1 | 0.006 s | 1 |
+
+- Populated reduced rerun: 96.356 s total wall; 95.903 s transaction; 1.406 s process CPU; 1,953
+  SQL statements across 30 fingerprints. The absolute time is tunnel/workstation affected; the phase
+  and call-count comparison is within the same route and environment.
+- Fresh counters: 219 seen; 219 payloads created; 219 versions appended; 219 heads corrected; 219
+  projections; 209 initially unresolved matches; 1,891 canonical rows (209 matches + 1,672 period
+  rows + 10 player-stat rows); 428 ledger applications; zero failures, refusals, candidates or data
+  issues; one derived run for one player.
+- Populated counters: zero payloads, versions, canonical rows, ledger rows, candidates, issues or
+  derived runs; 219 projections; 428 unchanged-observation events (the counter includes both head and
+  observation no-op events). Scoped table counts were unchanged except for the new batch row.
+
+Phase/application call-count evidence:
+- Fresh query categories: `match_period_scores` 1,881; `matches` 1,081; canonical player-match stats
+  38; application ledger 428; data-issue handling 428; promotion-candidate handling 428;
+  source-payload operations 442; source-version operations 220; source-head operations 858; typed
+  matches 209; typed player stats 10; transaction control 221 (`BEGIN`, 219 successful per-unit
+  savepoints, `COMMIT`). The three-query authority loader ran once for every attempted unit; its
+  constraint, override and manual-attendance queries were represented 220 times each, although the
+  coarse category classifier assigned only the constraint query to `manual_authority`.
+- Dominant repetitions were 1,672 one-row period inserts, then 428 each for ledger writes,
+  data-issue resolution and candidate checks. Each fresh record also performed a source-head lookup,
+  payload insert/dedup, version insert and head write, followed by projection and reconciliation.
+- Populated query categories were `matches` 421, period rows 209, player stats 10, source records 649,
+  payloads 223, source versions 1, typed projections 219, and only two transaction-control statements
+  (`BEGIN`/`COMMIT`). The 6,480 versus 1,953 statement ratio is 3.318; fresh wall time was 2.85 times
+  the same-machine populated run.
+- In `player-fresh-auto-100`, the real dry-run automatic path took 66.620 s and 1,776 SQL statements:
+  persistence 13.085 s/420, projection 1.850 s/218, reconciliation 0.430 s/109, canonical application
+  43.619 s/792, outcome 4.791 s/200, derived 1.754 s/17. It made 99 canonical writes/ledger entries,
+  one candidate and 99 successful savepoints before rollback.
+- The exact same corpus in review-only mode took 6.374 s and 868 statements, with no canonical,
+  ledger, derived or savepoint work and 100 candidates. Persistence was 2.656 s/420, projection
+  1.711 s/218, reconciliation 0.433 s/109 and outcome 0.435 s. Thus automatic application added 908
+  statements and 60.246 s (10.45 times total).
+- Growth is measured, not inferred from code appearance. In the automatic control, canonical-unit
+  mean time rose from 283.668 ms in the first quartile (which included the 10 pre-populated no-ops) to
+  422.933 ms in the last; p50 430.756 ms, p95 471.603 ms, max 558.570 ms. More decisively, the last
+  quartile of the source-persistence phase rose to 117.674 ms/record versus 13.120 ms in the
+  review-only run (8.97 times), while last-quartile projection stayed essentially flat at 7.145 ms
+  versus 6.575 ms. This rules out a general tunnel/network slowdown and shows that accumulating
+  transaction state penalises later real database work.
+- Backend lock samples in the fresh match-heavy transaction grew from 274 locks (137 transaction-ID
+  `ExclusiveLock`) to 303 (166 transaction-ID locks). The automatic 100-player control had 55
+  transaction-ID locks by query 500. The populated rerun held 88 locks in total and only one
+  transaction-ID lock. Historical full-run monitoring recorded 7,383 held locks but no lock wait.
+- Source inspection establishes the mechanism: `applyCanonicalUnit` wraps every invited record in
+  `tx.savepoint(...)`, and it is the repository's only `.savepoint(` call. The installed postgres.js
+  implementation emits `SAVEPOINT sN`, but on successful nested scopes it does not emit
+  `RELEASE SAVEPOINT`; the savepoints and their subtransaction locks therefore survive until outer
+  commit. PostgreSQL evidence showed one additional transaction-ID lock per successful unit.
+- A rollback-only temporary-table probe isolated savepoint bookkeeping. With unreleased versus
+  explicitly released savepoints, respectively: 100 produced 101 versus 1 transaction-ID locks and
+  20.954 versus 7.992 ms; 500 produced 501 versus 1 and 47.107 versus 27.170 ms; 1,000 produced 1,001
+  versus 1 and 56.016 versus 40.673 ms; 2,000 produced 2,001 versus 1 and 97.715 versus 70.035 ms;
+  5,000 produced 5,001 versus 1 and 254.439 versus 167.239 ms. Retention is proven, but bare
+  SAVEPOINT parsing/bookkeeping alone is far too small to explain hours; the costly mechanism is its
+  interaction with thousands of subsequent real reads/writes and growing transaction state.
+
+Database evidence:
+- `pg_stat_statements` and `auto_explain` were not installed in this test database. Narrow diagnostic
+  query middleware supplied statement/fingerprint counts; `pg_stat_activity`/`pg_locks` supplied
+  transaction/lock evidence. No temp-file, I/O, lock-wait or backend-stall evidence appeared.
+- Read-only `EXPLAIN (ANALYZE, BUFFERS)` on the populated reduced state found:
+  - source head/version/payload lookup with `FOR UPDATE`: all three primary keys; 0.467 ms execution,
+    11 shared hits, 0 reads;
+  - manual constraint lookup: PostgreSQL catalogue index; 0.263 ms, 29 hits;
+  - active overrides: `ix_data_overrides_entity`; 0.036 ms, 2 hits;
+  - manual attendance resolution: `ix_matches_season_round` over 209 rows plus memoised source-PK
+    lookup; 0.642 ms, 20 hits, 0 reads;
+  - canonical match key: `matches_match_key_key`; 0.088 ms, 4 hits;
+  - canonical player-match lookup: `player_match_statistics_player_match_uq`; 0.468 ms, 3 hits,
+    1 read;
+  - pending candidate queue: `ix_promotion_candidates_queue`; 0.112 ms, 1 hit.
+- Estimates were not materially wrong, no relevant scan spilled to temp, and the statements were
+  individually sub-millisecond. Existing migrations provide primary/unique indexes for the source
+  spine, source sweep, match key, season/round, player-match key, overrides and typed projections.
+  No index was added.
+- The recorded slow full run used the source-record primary-key path approximately 9,011 times and
+  the sweep index only twice. This directly confirms the earlier “PostgreSQL chose the sweep index
+  instead of the primary key” explanation is false.
+
+Empty versus populated explanation:
+- Fresh source state appends payload/version/head state, but the decisive difference is that every
+  reconcilable fresh record creates an invitation to `applyCanonicalUnit`. That path is sequential,
+  reloads three pieces of manual authority at mutation time, performs target comparison and
+  one-row-at-a-time writes (including eight period rows per match), records the ledger, resolves data
+  issues/candidates, and creates a successful nested savepoint that remains live until outer commit.
+  Fresh work therefore has both a large approximately linear SQL/round-trip component and a measured
+  superlinear amplification as unreleased subtransactions accumulate.
+- On an identical populated rerun, reconciliation returns no invitation and
+  `applyRecordCanonically` returns immediately. It executes zero canonical statements, zero
+  per-record savepoints, zero outcome/ledger cleanup and no derived recompute. It still updates/checks
+  source `last_seen`, projects typed state and reconciles, explaining the non-zero 96 s local time.
+  Host-local evidence is the meaningful production comparison: the full batch-87 apply was 34 s
+  (51 s total), and a 9,823-observation populated production settle was 19 s in the settle phase/
+  35 s total.
+- Therefore the approximately 51 s populated result is fast because it bypasses the expensive
+  canonical mutation/savepoint path for unchanged records, not because its tables or indexes have
+  become more favourable.
+
+Hypotheses:
+
+PROVEN:
+- Bundle read, parsing, hashing and validation are sub-second and do not dominate.
+- Fresh canonical application dominates (200.763 s, 73.2% of the reduced total), followed by
+  outcome/ledger cleanup (40.833 s, 14.9%); persistence contributes 26.802 s (9.8%). Absence sweep,
+  derived recomputation and commit are individually negligible here.
+- The fresh path is a sequential per-record database pipeline: 6,480 statements for 219 observations
+  (29.59 statements/observation), including 4,051 canonical and 856 outcome statements.
+- Each successfully applied fresh unit creates a postgres.js nested savepoint that is not explicitly
+  released and retains a transaction-ID lock until the outer commit. Populated unchanged units never
+  enter this path.
+- Process CPU (2.843 s of 274.646 s) and JSON/hash work are not the limiting resources. SQL
+  round-trips and transaction/database work dominate; no sustained lock wait was observed.
+- Fresh staging causes materially more statements, source writes, authority lookups, canonical
+  comparisons/writes, ledger/candidate/data-issue operations and transaction state. Populated staging
+  still performs head/projection/reconciliation reads but avoids the mutation path.
+
+STRONGLY SUPPORTED:
+- The best-supported root cause is **one-row-at-a-time, sequential canonical SQL work amplified by
+  successful per-unit savepoints that postgres.js leaves unreleased until the outer commit**. Multiple
+  real-path phase/call/latency and lock measurements agree. The remaining decisive confirmation is a
+  Stage 5 same-corpus A/B in which successful nested savepoints are explicitly bounded/released.
+- Work has an approximately linear base (statements/writes scale with observations and match period
+  rows) plus a measured superlinear component: per-unit and even later persistence latency rises as
+  live subtransactions accumulate. Evidence does not justify labelling the whole algorithm strictly
+  O(N^2).
+
+POSSIBLE:
+- After bounding savepoints, remaining sequential round-trips may warrant a later measured batching
+  change if the 10-minute target is still missed. Repeated authority reads, eight individual period
+  inserts per match, and success-path candidate/data-issue cleanup are concrete secondary sources,
+  but changing them in the first fix would combine semantic risks before their residual cost is known.
+
+DISPROVEN:
+- Sweep-index selection instead of the source primary key caused the slow run (9,011 PK uses versus
+  two sweep uses, plus current PK-based plans).
+- A missing index, bad common query plan, disk I/O, temp spill or slow individual lookup is the
+  dominant cause in this corpus.
+- Application CPU, bundle JSON/hashing, absence sweep, derived recomputation or final commit dominates.
+- Lock contention caused the slowdown: many locks were held, but no sustained `Lock` wait occurred.
+- SAVEPOINT command parsing or retained-lock bookkeeping by itself explains hours; the isolated
+  5,000-savepoint probe was only 254 ms. The expensive effect requires the real growing transaction
+  plus subsequent per-row database work.
+- A fixed startup cost explains the gap, or pure O(N^2) can be asserted from source appearance alone.
+
+Root cause:
+- Fresh records enter a sequential, high-round-trip canonical mutation path. `applyCanonicalUnit`
+  creates one nested postgres.js savepoint per invited record so a unit failure cannot poison the
+  whole settle transaction. Successful postgres.js nested scopes are not released, causing live
+  subtransactions/transaction-ID locks to grow until commit. Against the real workload, later SQL
+  becomes measurably slower while 4,051 canonical plus 856 outcome statements execute for only 219
+  observations. That linear row-at-a-time load plus transaction-state amplification explains the
+  multi-hour full fresh run. An unchanged populated record creates no invitation, so it avoids the
+  entire savepoint/canonical/ledger/derived path and remains fast.
+
+Stage 5 proposed fix (do not implement in Stage 4):
+- File/function: `src/lib/acquisition/canonical-apply.ts`, `applyCanonicalUnit`.
+- Make the smallest change that preserves per-unit error isolation: place a fixed explicit **outer
+  anchor savepoint** around the existing `tx.savepoint(...)` scope. Immediately before the existing
+  nested call issue `SAVEPOINT afldb_canonical_apply_unit`. Run the existing callback, including the
+  in-scope authority reload and all writers, unchanged. On success issue
+  `RELEASE SAVEPOINT afldb_canonical_apply_unit`; PostgreSQL release of the earlier anchor also
+  releases postgres.js's later hidden `sN` savepoint, bounding subtransaction state. On a caught unit
+  failure, after postgres.js has rolled back to its hidden savepoint and thrown, issue
+  `ROLLBACK TO SAVEPOINT afldb_canonical_apply_unit` then
+  `RELEASE SAVEPOINT afldb_canonical_apply_unit`, and return the same `write_failed` outcome.
+- Reuse the fixed anchor name only after it is released. Do not rely on postgres.js's private `sN`
+  naming and do not patch the dependency.
+- Why it should reduce measured work: it leaves the existing SQL/write semantics intact while
+  preventing successful unit savepoints and transaction-ID locks from accumulating across thousands
+  of records. It adds two explicit transaction-control round trips per applied unit, a measurable but
+  bounded trade-off.
+- Invariants: one failed canonical unit rolls back all of that unit and does not abort the outer
+  settle; successful units remain atomic and durable only at outer commit; review-only and dry-run
+  semantics remain unchanged; invitation gates and refusal/candidate outcomes remain identical;
+  rekey and fixture-family writes remain unit-atomic; and manual authority is still re-read inside
+  the mutation savepoint immediately before writing so a newly committed override can veto.
+- Semantic risks: an incorrectly scoped release/rollback could preserve part of a failed unit, abort
+  the entire batch, defeat continue-on-unit-failure, disturb rekey/fixture-family atomicity, change
+  dry-run rollback, or weaken the authority race guarantee. Do **not** cache authority or batch
+  canonical writers in this first change. Do not add an index/migration.
+- Tests: extend the existing closest suite `tests/integration/settle-afltables.test.ts`, preserving its
+  per-unit failure-isolation, authority re-read, dry-run/apply and immediate-idempotence cases; add a
+  focused many-unit assertion that successful transaction-ID locks remain bounded (or an equivalent
+  transaction-control regression). Keep `tests/current-season-import.test.ts` static applier-contract
+  coverage. Run the focused integration suite, current-season unit suite, typecheck and lint only the
+  touched source/test files before broader benchmarking.
+
+Stage 5 benchmark/equivalence plan:
+1. State the exact targeted destruction, then reset **only** `afldb_test` or a new disposable Stage 5
+   database to an identical empty-staging snapshot. Never use `afldb_dev`. Print process, database,
+   log/progress, success/failure and stall monitoring commands before each long run.
+2. First run the old/new implementation A/B on the reduced 100-new-player control from identical
+   snapshots. Capture total and A-H timings, statement/fingerprint counts, per-unit distributions and
+   maximum transaction-ID locks. The fix must keep locks bounded (outer transaction plus only
+   anchor/hidden transient locks), preserve all counters/results, and materially remove the growing
+   late-unit/persistence latency before the full benchmark is authorised.
+3. Fresh empty-staging benchmark: use the exact full retained 11:45 bundle (9,823 observations) and
+   capture total wall, all A-H timings, observation/version/candidate/application/canonical-write
+   counts, actual writes, refusals/rejections/data issues, process CPU/RSS, waits and maximum locks.
+   Compare to historical batch 86 (10,683 canonical rows, 9,220 ledger applications, 812 candidates,
+   zero refusal/failure, 577 derived players) and to an old-code run from an identical snapshot where
+   practical.
+4. Immediate idempotent rerun of 11:45: capture the same phase/query metrics; require no new payload
+   content/version, canonical row, ledger application, candidate/data issue or derived recompute.
+   `last_seen`/projection metadata activity may occur, but unchanged records must not enter canonical
+   application.
+5. Genuine upstream change: apply the exact retained 16:34 bundle. Its proven delta is four new
+   matches plus 184 player-stat records. Require the needed new payload/version/head/projection,
+   reconciliation and canonical work and prove no old record is incorrectly suppressed. Compare with
+   historical batch-87 semantics (188 appended versions, 208 canonical rows, 180 ledger rows and 12
+   candidates), accounting explicitly for the same starting identity/candidate state.
+6. Semantic equivalence: from identical pre-run database clones/snapshots, compare stable-column
+   counts and deterministic sorted row hashes for `source_payloads`, `source_record_versions`,
+   `source_records`, every typed staging projection, `promotion_candidates`, canonical applications,
+   matches/period/player-stat canonical rows, rejections, `data_issues`, and relevant derived data.
+   Exclude only documented volatile timestamps and run/batch identifiers; compare their presence and
+   relationships separately. Also compare settle reports/counters and failure injection behaviour.
+7. Provisional target: approximately 10 minutes per 10,000 fresh observations, not a correctness
+   gate. It appears realistic: the exact 100-new-player review path was 6.374 s, populated host-local
+   full application was 34 s, and the proposed change attacks the measured growth mechanism. If the
+   release-only fix remains above target, measure residual phase/call costs before separately
+   considering batching; do not fold an unmeasured second optimisation into this fix.
+
+Validation:
+- Faithfulness: exact retained bundle/manifest digests and record counts verified; the reduced corpus
+  passed the actual bundle contract and executed the real settle transaction through the restricted
+  import role, including every A-H phase.
+- Diagnostic instrumentation was narrow: optional phase/query hooks only. Instrumented versus
+  uninstrumented dry runs over the same 219 records produced identical settle counters and exactly
+  6,480 queries; time was 281.048 s versus 276.793 s (+1.54%). The hooks were then removed.
+- After removal: `npm run typecheck` passed (`Types generated successfully`), and
+  `npx eslint src/lib/acquisition/settle-afltables.ts` exited 0 with no findings. Source search found
+  no remaining diagnostic identifiers or timing hooks. The temporary harness, monitor, copied
+  bundles, gates and logs were removed after this handoff was written.
+- Read-only plans, real phase/call counts, lock samples, reduced fresh/populated comparison and the
+  automatic/review control independently localise the slowdown. Graph-assisted Tier-2 source tracing
+  was checked against current source; reported partial/index gaps in relied-on code/test ranges were
+  read directly before conclusions were made.
+- No unrelated expensive suite was run. `CHANGELOG.md` is unchanged because this stage retained no
+  product behaviour change; `IssuesIndex.md` remains open/unchanged because ISSUE-139's tracking state
+  did not change.
+
+Safety:
+- Hosts/DB touched: streamanator was used only for read-only retained-file copy and an SSH tunnel to
+  `afldb_test`; only `afldb_test` was written. No service was restarted and nothing was deployed.
+- Test-state actions: one 219-observation reduced settle was committed to `afldb_test`; all later
+  automatic/review controls and the temporary savepoint probe rolled back. No database was dropped.
+- `afldb_dev` and `afldb_dev_pre_rebuild_20260906-112500` were untouched. Production/`afldb_prod`
+  were untouched. No state-changing Git operation, commit, push, merge, stash or issue creation
+  occurred.
+- No PostgreSQL package was installed locally or in WSL. No credential or derived DSN was printed or
+  persisted. A policy-rejected attempted transfer of a local source archive to a remote disposable
+  directory created no remote directory/file and caused no remote mutation.
+
+Deviations / blockers:
+- The earlier partial Stage 4 blocker is cleared: the test owner DSN was supplied, the real ISSUE-139
+  bundle was recovered, no local/WSL PostgreSQL installation was needed, and the restricted import DSN
+  remained ephemeral/non-persisted by design.
+- Host-side `sudo -u postgres` activity monitoring was unavailable non-interactively and the owner
+  cannot see another role's query text. Query middleware plus owner-visible lock aggregates supplied
+  the missing detail without broadening privileges. `pg_stat_statements`/`auto_explain` were absent;
+  exact statement counts and targeted EXPLAIN/BUFFERS evidence were captured by safer alternatives.
+- No Stage 4 blocker remains. The one unconfirmed causal step is intentionally the first Stage 5 A/B:
+  prove that releasing the nested savepoint chain removes the measured real-path amplification.
+
+Exact Stage 5 first action:
+- In a fresh chat, change only `applyCanonicalUnit` in
+  `src/lib/acquisition/canonical-apply.ts` to add the explicit anchor/release/rollback lifecycle above,
+  and add the focused existing-suite regression. Then reset only a declared disposable/test target and
+  run the reduced 100-player old/new A/B with lock and phase monitoring **before** attempting the full
+  9,823-observation benchmark. Do not add an index, cache manual authority, or batch writers in that
+  first action.
+
+Recommended next model:
+- Codex High, High reasoning effort.
+
+Stage 4 complete. Start a fresh chat for Stage 5 using the persisted handoff.
+
+## Stage 5 handoff
+
+Status:
+- **COMPLETE — 7 September 2026.**
+
+Objective:
+- Apply the smallest safe fix for Stage 4's successful-savepoint amplification, benchmark fresh,
+  idempotent and genuine-change paths, preserve settle semantics, and stop before Stage 6.
+- The provisional target was approximately 10 minutes per approximately 10,000 fresh observations.
+  The result did not meet it, but improved materially; the residual bottleneck is measured below.
+
+Stage 4 root cause carried forward:
+- Sequential one-row canonical SQL was amplified because each successful `postgres.js`
+  `tx.savepoint()` left its generated `sN` alive until outer commit. Stage 4's 99-unit control
+  retained 99 savepoints and the full old run fell to approximately 15–16 applications/minute late.
+  The PK was used about 9,011 times and the sweep index twice, so no index/planner/install
+  hypothesis was reintroduced.
+
+Implementation:
+- `src/lib/acquisition/canonical-apply.ts`: establish fixed
+  `SAVEPOINT afldb_canonical_apply_unit` before the existing `tx.savepoint()`; on success
+  `RELEASE` the anchor (also releasing later driver `sN`); after a driver-caught row failure
+  `ROLLBACK TO` and `RELEASE` it before returning the unchanged failure result. Anchor/cleanup
+  errors escape, so transaction faults never become silent skips.
+- `tests/current-season-import.test.ts`: deterministic structural regression pins one create,
+  nested-savepoint ordering, one failure rollback and release on both paths. No wall-clock test.
+- `CHANGELOG.md`: retained Stage 5 behaviour under `Unreleased`.
+- `IssuesIndex.md` is unchanged because Stage 5 created, resolved and reclassified no open issue.
+- Temporary phase/lock hooks and `.stage5/` harness/bundles/logs/gates were removed after capture;
+  no diagnostics remain in `src/lib/acquisition/settle-afltables.ts`.
+- Chosen because only lifecycle around the proven atomic unit changes. Releasing the private
+  generated name was unstable; removing the nested savepoint loses row isolation; batching/caching/
+  set processing crosses semantic boundaries; an index/migration was contradicted by Stage 4.
+
+Correctness invariants:
+- The canonical callback, gate re-reads, mutations, ledger writes, target grouping, failure result,
+  rejection/data-issue handling and one outer transaction are unchanged.
+- Success remains canonical row(s)+ledger atomic. Failure rolls back the complete match or
+  player-match unit and the batch continues; cleanup failure aborts the outer transaction. There is
+  no intermediate commit.
+- Source immutability/version ordering/`source_updated_at`, absence/scope sweep, deduplication,
+  candidates/stale review, disagreement, authority/ownership, match/period/player/vote grouping and
+  derived-recompute gating were unchanged.
+
+Benchmark environment:
+- Code: `D:\dev\afldb-workflow-hardening`. DB: `afldb_test` on `streamanator`, via loopback
+  SSH as `afldb_import`; evidence queries as test owner. No clone was possible because
+  `afldb_owner.rolcreatedb=false`, so the allowed `afldb_test` fallback was narrowly reset.
+- Fresh bundle `settle-2026-2026-09-06-1145`: 9,823 = 209 matches + 9,614 player-match.
+  Change bundle `...-1634`: 10,011 = 213 + 9,798. Direct comparison: exactly 188 additions
+  (4 match, 184 player-match), 0 removals, 0 changed existing.
+- Reset scope: AFL Tables `season=2026` source/history, typed projections, related candidates/
+  applications, 2026 canonical facts and affected derived rows. Post-reset scoped counts all 0;
+  unrelated rejections 681/open data issues 0 unchanged.
+- Printed monitoring command shapes before each long run:
+
+  ```powershell
+  while ($true) { Get-Process -Id <pid> | Select Id,CPU,WorkingSet64,StartTime; Start-Sleep 2 }
+  ssh streamanator "watch -n 5 \"sudo -u postgres psql -At -d afldb_test -c \\\"select pid,state,now()-xact_start,now()-query_start,wait_event_type,wait_event,left(query,160) from pg_stat_activity where datname='afldb_test' and state <> 'idle' order by query_start;\\\"\""
+  Get-Content .stage5\logs\<run>.log -Wait -Tail 20
+  ```
+
+  Success: `STAGE5_RESULT`/`STAGE5_SUCCESS`; failure: `STAGE5_FAILURE`; possible stall only
+  after a static query/no progress for 5–10+ minutes, `Lock` wait, or stopped process.
+
+Pre-full reduced control:
+- Old Stage 4 100-new-player automatic control: 66.620 s, 99 retained successful savepoints,
+  99 rows/applications, one candidate.
+- New anchor (110 rows: 10 unchanged + 100 unseen): 81.010875 s; repeat 73.576909 s; 99 rows/
+  applications, one candidate, no failures/refusals, derived 1 run/9 players,
+  `maxTransactionIdLocks=1`, `maxLocks=167`. Fixed tunnel round trips made this small case
+  21.6%/10.4% slower, but repeat source first/last means were 119.104/104.007 ms. The full result
+  proves the avoided transaction-size amplification outweighs that cost.
+
+Fresh benchmark:
+- Before: approximately **3:49:00** (13,740 s). After: batch **103**,
+  **7,039.271594 s = 1:57:19.272** wall; bundle 0.205958 s; CPU 48.688 s; max RSS 156,672,000.
+- Saving **6,700.728406 s = 1:51:40.728**; **48.77% faster**. The 10-minute target was not met.
+- Phases: setup 0.243220 s; source 1,181.866876 s; typed projection 93.389505 s; reconcile
+  33.467633 s; canonical 4,723.470387 s; outcome/candidate 998.502360 s; absence 0.064503 s;
+  derived 7.155934 s; finalise 0.186402 s; commit 0.010857 s.
+- Counters: observations 9,823; payloads created/reused 9,823/0; versions 9,823; unchanged 0;
+  application-eligible 9,011; history-only 0; projections 9,011; unresolved/candidates/rejections
+  812; canonical inserted/updated 10,683/0; applications 9,220; failures/refusals/disagreements/
+  data issues 0; derived 1 run/577 players.
+- Ledger by target: matches insert 209; period-set insert 209 (1,672 rows); player-match insert
+  8,802; Brownlow 0. Savepoints: 9,011 units/19 samples,
+  `maxTransactionIdLocks=1`/`maxLocks=183`; first/last canonical means
+  534.415/447.243 ms; commit 10.857 ms.
+- Committed: 9,823 heads/versions/payloads, all version 1/open, no absence,
+  `source_updated_at` present 0; canonical 209/1,672/8,802; 812 pending unresolved candidates;
+  no open owned data issue.
+
+Idempotence benchmark:
+- Before reference: Stage 4 on-host populated approximately 51 s end-to-end/34 s apply. After:
+  batch **104**, local tunnel **2,353.407225 s = 39:13.407**. Not directly comparable: Stage 5
+  crossed the workstation tunnel and unchanged source/projection SQL paid RTT; the changed
+  canonical function was never called.
+- Phases: setup 0.450098 s; source 1,238.909663 s; projection 1,032.469772 s; reconcile
+  79.945388 s; canonical **0.361036 s**; outcome 0.038997 s; absence 0.128102 s; finalise
+  0.194965 s; commit 0.007350 s; derived absent.
+- Counters: observations 9,823; unchanged events 10,032; payloads created/reused 0/0; versions 0;
+  candidates new/refreshed/owned 0/0/0; units/writes/applications 0/0/0; rejections/failures/
+  refusals/issues 0; derived 0/0.
+- `last_seen_at` advanced 2099-01-02→03; history/payload/candidate/ledger/canonical counts did
+  not move. Batch 104 opened/closed 0 versions, wrote 0 applications/candidates/rejections.
+
+Upstream-change benchmark:
+- Exact change: +4 match/+184 player-match; no existing payload changed and none disappeared.
+- Batch **105**, **2,513.214344 s = 41:53.214**; bundle 0.226658 s; CPU 19.594 s; max RSS
+  168,898,560.
+- Phases: setup 0.344235 s; source 1,275.534159 s; projection 1,038.994138 s; reconcile
+  79.819602 s; canonical 92.817048 s; outcome 21.750004 s; absence 0.105643 s; derived
+  2.719087 s; finalise 0.174528 s; commit 0.018575 s.
+- Counters: observations 10,011; new payloads/versions 188/188; unchanged events 10,032;
+  eligible units 176; history-only/absent/reappeared 0; candidates new/refreshed 12/0;
+  canonical inserted/updated 208/0; applications 180; failures/refusals/disagreements/issues 0;
+  derived 1 run/172 players.
+- History: 4 match + 184 player first versions opened, 0 closed; all 10,011 keys have one open
+  version, no later version/absence and NULL `source_updated_at`. Existing keys stayed no-op.
+- Ledger: matches 4; period sets 4 (32 rows); player-match 172. The other 12 player rows became
+  pending unresolved candidates + 12 import rejections. Final canonical totals 213 matches,
+  1,704 periods, 8,974 player-match, 0 Brownlow; candidates 824; open data issues 0.
+- Savepoints: 176 units/4 samples, `maxTransactionIdLocks=1`, `maxLocks=190`.
+
+Validation:
+- `npm.cmd test -- tests/current-season-import.test.ts`: **249 passed, 4 skipped; 928 ms**.
+- `npm.cmd test -- tests/integration/settle-afltables.test.ts` on PostgreSQL:
+  **64 passed, 1 skipped; 249.11 s**. Includes insert/no-op/correction, candidates/issues and an
+  injected constraint failure proving whole bad match-family rollback, no partial canonical/
+  ledger row, and continuation to the next match.
+- After temporary-hook removal,
+  `npm.cmd test -- tests/current-season-import.test.ts tests/settle-season-revalidation.test.ts tests/admin-current-season-settle.test.ts`:
+  **3 files; 353 passed, 4 skipped; 2.30 s**.
+- `npm.cmd run typecheck`: **exit 0**, route types generated and `tsc --noEmit` clean.
+- `.\node_modules\.bin\eslint.cmd src\lib\acquisition\canonical-apply.ts tests\current-season-import.test.ts`:
+  **exit 0, no output**.
+- Structural ordering, real integration failure isolation and an accidental tunnel disconnect
+  independently proved rollback/no partial commit. No wall-clock assertion was added.
+
+Safety:
+- `streamanator` was used only for read-only bundle copy and tunnel; only `afldb_test` was
+  written. `afldb_dev`, `afldb_dev_pre_rebuild_20260906-112500`, production/`afldb_prod`
+  and services were untouched. No deploy, migration, restart, Git state change, commit/push/merge.
+- Destructive test-only action: the scoped transactional reset above. An initial reset hit
+  `player_clubs_last_match_id_fkey` and fully rolled back; the corrected reset captured affected
+  players and removed their derived rows first.
+- A too-early reduced `observedAt` hit `source_records_seen_ck` and rolled back. The first full
+  attempt lost its tunnel; `CONNECTION_CLOSED` rolled the 9,823-record transaction back, and a
+  snapshot proved every Stage 5 scoped count 0. Keepalive retry completed.
+- Temporary artifacts/tunnel removed. No secret or derived DSN was printed or persisted.
+
+Deviations / blockers:
+- Clone unavailable due no `CREATEDB`; allowed scoped `afldb_test` fallback used.
+- Owner could see backend/locks/sequences but not importer query text; process, sequence, lock and
+  phase evidence filled the gap without more privilege.
+- The required final codebase-memory `check_index_coverage` call returned `Transport closed`
+  (also seen earlier in Stage 5). Exact retained source/test paths were read and searched directly;
+  no graph-completeness claim is made.
+- The 10-minute fresh target and on-host 51-second steady state were not reproduced over the
+  workstation tunnel. The change removes savepoint accumulation; unchanged source/projection RTT
+  remains. No Stage 5 blocker remains.
+
+Remaining limitation:
+- Fresh wall time remains sequential-round-trip dominated: canonical 4,723.470 s (**67.10%**),
+  source 1,181.867 s (**16.79%**), outcome 998.502 s (**14.18%**). The anchor adds fixed small-batch
+  cost but prevents transaction-size collapse. Any set-based source/projection/canonical/outcome
+  redesign belongs to a separately scoped future performance stage, not Stage 6.
+
+Exact next action:
+- **Stage 6 is P2 workflow hardening only.** In a fresh chat, read this handoff and Post-139 H10,
+  inspect `deploy/afldb-settle-afltables.sh` and its closest launcher tests, and implement the first
+  DB-free H10 slice: print exact command, PID/process watch, same-role `pg_stat_activity` watch,
+  log tail, success/failure markers, stall threshold and expected duration before a long settle
+  waits. Expand to rebuild/restore only after that focused test passes. Do not reopen H9.
+
+Recommended next model:
+- **Codex High, High reasoning effort.**
+
+Stage 5 complete. Start a fresh chat for Stage 6 using the persisted handoff.
+
+## Stage 6 handoff
+
+Status:
+- **COMPLETE — 7 September 2026.**
+
+Objective:
+- P2 workflow/tooling polish only: make main merge-only in normal implementation sessions,
+  provide deterministic worktree bootstrap and merge-readiness commands, complete transparent
+  dirty-server classification, expose long-settle monitoring, and document a short issue lifecycle.
+  No settle optimisation, canonical semantic change, merge or deploy was performed.
+
+Implementation:
+- `tools/dev/preflight-core.ts`, `tools/dev/preflight.ts`
+  - Added explicit `implementation`, `merge` and `read-only` workflow policies while preserving
+    `rebuild`, `promotion` and `deploy` modes. Implementation blocks main and requires a linked
+    worktree; merge requires clean main in the primary checkout; read-only permits main and
+    downgrades dirty/stale/migration observations to warnings so inspection itself remains usable.
+- `tools/dev/bootstrap-worktree.ts` (new), exposed as `npm run worktree:bootstrap`
+  - Fetches `origin/main`, requires clean primary main (apart from an explicitly named approved
+    same-issue untracked handoff), proves local main equals fetched origin/main, captures the exact
+    base SHA, and creates one new named branch/worktree at that SHA.
+  - Refuses an existing directory, registered worktree or branch (with the existing branch SHA),
+    restricts the target to a sibling of main, copies only explicitly named
+    `AFLDB-ISSUE-NNN*.md` / `issues/open/AFLDB-ISSUE-NNN*.md`, prints branch/SHA/path/status, and
+    never reuses or automatically deletes anything.
+- `tools/dev/merge-readiness.ts` (new), exposed as `npm run merge:ready`
+  - Read-only report of current branch, staged/unstaged/untracked paths, clean main worktree,
+    exact local-main/recorded-origin relationship, branch ahead/behind counts and ancestry,
+    cross-ref/worktree migration number/name/content checks, repository migration parity,
+    changed-file scope, recorded validation and explicit runbook blockers. It states that database
+    parity was not checked and points to operational preflight for that boundary.
+  - Supports an optional strict `afldb-merge-readiness` JSON comment in an issue runbook. Malformed
+    metadata fails closed; a legacy/no-block runbook warns. The command performs no fetch, test,
+    stage, commit, merge, push or database action and ends in `READY` or `BLOCKED`.
+- `tools/db/migration-safety.ts`
+  - Stage 6 fixtures exposed an existing Stage 1 execution defect: Node rejects child-process
+    `encoding: "buffer"`. The Git `cat-file --batch` scanner now uses supported raw-buffer mode
+    (`encoding: null`), allowing real ref/worktree migration inventory to run.
+- `deploy/sync-dev-remote.sh`, `tests/sync-dev-remote.test.sh`
+  - Preserved the Stage 3 three-class policy and emergency override, but now prints every known
+    operational artifact path as well as every tracked/unknown blocker. Nothing is deleted.
+- `deploy/afldb-settle-afltables.sh`, `tests/current-season-import.test.ts`
+  - Before acquisition, prints the exact launcher/PID, process watch, same-role
+    `pg_stat_activity` watch (DSN variable only), journal tail, success/failure markers, 10-minute
+    no-progress threshold and measured duration context. Emits terminal
+    `AFLDB_SETTLE_SUCCESS` / `AFLDB_SETTLE_FAILURE` markers; the three-step settle behavior is
+    unchanged.
+- `tests/workflow-preflight.test.ts`
+  - Extended the existing DB-free workflow suite with disposable real Git repositories. It covers
+    all new guardrail/bootstrap/readiness paths and removes every fixture after each case.
+- `package.json`, `CLAUDE.md`, `docs/development/WORKFLOW.md`, `docs/deployment.md`,
+  `docs/production-promotion.md`, `CHANGELOG.md`
+  - Added the two commands, short standard lifecycle, compact ledger/runbook convention,
+    machine-readable readiness example, deployment artifact transparency and settle monitoring.
+  - `IssuesIndex.md` is unchanged: no issue was created, resolved or reclassified; this is the
+    existing Post-139 hardening record. No ISSUE-139 history was moved or mass-formatted.
+
+Operator lifecycle:
+1. In the primary main checkout, the operator updates clean `main`.
+2. `npm run worktree:bootstrap -- --issue NNN --branch codex/issue-NNN`
+   (use `claude/issue-NNN` or another reviewed name as appropriate).
+3. Enter the printed worktree.
+4. `npm run preflight -- --mode implementation --issue NNN`
+5. Implement and run focused validation; keep detailed evidence in the issue runbook/section.
+6. The operator reviews and commits the local change.
+7. `npm run merge:ready -- --issue NNN`
+8. The operator pushes/merges; on main use `npm run preflight -- --mode merge`.
+9. DEV deploy uses `powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1`; smoke the
+   affected behavior, then synchronise/close the issue. Long settles use the launcher's printed
+   monitoring block.
+
+Main guardrail:
+- `implementation` on main is a blocker; implementation on a feature branch is allowed and the
+  existing linked-worktree requirement remains.
+- `merge` allows main, refuses a feature branch and requires the primary checkout.
+- `read-only` allows main and reports dirt/staleness/collisions without preventing inspection.
+- Regression: `tests/workflow-preflight.test.ts` pins all five branch-mode outcomes and proves
+  merge/read-only modes do not acquire a database default.
+
+Worktree bootstrap:
+- Fresh creation is from the fetched exact `origin/main` SHA; target, branch, SHA and status print.
+- Existing directory contents survive refusal; an existing branch is reported/refused; registered
+  worktree reuse is refused; no cleanup path exists.
+- The successful handoff case copies only the approved same-issue file. An unrelated untracked
+  `notes.txt` makes main dirty, blocks creation and is not copied.
+- Disposable-repository regression cases prove fresh creation, exact base preservation, directory
+  refusal/no deletion, stale-branch refusal, approved copy and arbitrary-untracked refusal.
+
+Merge readiness:
+- Clean fixture branch: READY, ahead 1 / behind 0, main clean/current, scope and recorded validation
+  accepted, migration scan/parity clean.
+- Blocker fixtures cover staged+unstaged changes, untracked files, ahead 1 / behind 1, migration
+  number collision, committed unexpected file and explicit runbook hard blocker. Every relevant
+  path/reason is printed.
+- Database checksum/applied parity is intentionally delegated to the existing operational preflight;
+  the merge report says so rather than implying it contacted a database.
+
+Dirty-server classification:
+- Stage 3 safety remains: tracked changes block; known `.deploy-backups/`, root `.env.bak-*`, root
+  `FETCH_HEAD`, root `afldb-ui-questions-*.csv` and only
+  `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json` warn/continue; unknown untracked
+  paths block. Every non-empty class now lists exact paths.
+- `-AllowDirtyServer` still prints and explicitly bypasses only the tracked/unknown blockers; known
+  artifacts are preserved in either mode. Tests prove no Git clean/reset or artifact deletion.
+
+Deploy ergonomics:
+- Stage 3's single readiness loop was reviewed, not redesigned. The 120 s / 2 s defaults and custom
+  bounds are visible; pending messages contain elapsed/timeout and the last probe error; terminal
+  timeout/service failure prints bounded status/journal/listener diagnostics; ISSUE-107 build
+  identity remains in the same loop. There is no second/conflicting health check.
+- Dirty classification runs once before fetch and integrates with the same remote fail-fast payload.
+
+Documentation:
+- `CLAUDE.md` now exposes the standard lifecycle at session start.
+- `docs/development/WORKFLOW.md` owns the detailed bootstrap/merge/runbook convention and discourages
+  duplicated stage history. `IssuesIndex.md` stays concise; detailed evidence stays in the issue
+  runbook/section; `CHANGELOG.md` receives material retained changes only.
+- `docs/deployment.md` documents exact artifact-class output and settle monitoring; the promotion
+  runbook points to merge readiness/merge-mode preflight without changing promotion procedure.
+
+Validation:
+- Final workflow + settle focused suite:
+  - `& npm.cmd test -- tests/workflow-preflight.test.ts tests/current-season-import.test.ts`
+  - **PASS: 2 files; 273 passed, 4 skipped; 16.05 s.** Workflow subset is 23/23; current-season
+    subset is 250 passed / 4 skipped.
+- Dirty-server/readiness regression:
+  - `& 'C:\Program Files\Git\usr\bin\bash.exe' --login tests/sync-dev-remote.test.sh`
+  - **PASS: 18 passed, 0 failed.** Includes tracked/staged, known exact paths, unknown, mixed,
+    override, narrow allowlist, retry/timeout/service failure/build identity/diagnostics and no cleanup.
+- PowerShell payload integration:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\sync-dev-static.test.ps1`
+  - **PASS: 14 assertions.** Three `-WhatIf` payloads only; generated Bash parsed; no SSH.
+- Shell syntax:
+  - `& 'C:\Program Files\Git\usr\bin\bash.exe' --login -n deploy/sync-dev-remote.sh tests/sync-dev-remote.test.sh deploy/afldb-settle-afltables.sh`
+  - **PASS: all three touched shell files parsed; exit 0.**
+- Type validation:
+  - `& npm.cmd run typecheck`
+  - **PASS: Next route types generated; `tsc --noEmit` exit 0.**
+- Touched TypeScript lint:
+  - `& .\node_modules\.bin\eslint.cmd tools\dev\preflight-core.ts tools\dev\preflight.ts tools\dev\bootstrap-worktree.ts tools\dev\merge-readiness.ts tools\db\migration-safety.ts tests\workflow-preflight.test.ts tests\current-season-import.test.ts`
+  - **PASS: exit 0, no output.**
+- CLI help smoke (outside the restricted sandbox after the known sandbox-only TSX failure):
+  - `npm.cmd run preflight -- --help`; `npm.cmd run worktree:bootstrap -- --help`;
+    `npm.cmd run merge:ready -- --help`
+  - **PASS: all exit 0; modes/options and read-only/no-reuse contracts printed; no secret output.**
+- Final static/encoding/cleanup audit (PowerShell parser plus byte/regex inspection of the touched
+  files and OS temporary fixture prefix):
+  - **PASS:** zero PowerShell parse errors; `package.json` parsed; zero UTF-8 BOM or EOL-policy
+    violations; zero credential literals; zero `afldb-workflow-*` fixture directories; the Stage 6
+    handoff has zero trailing whitespace and all required status/validation/next-action/model/boundary
+    fields. One unrelated legacy trailing space at `CHANGELOG.md:2504` was detected and deliberately
+    left unchanged to avoid out-of-scope history churn.
+
+Safety:
+- Real repositories/worktrees changed: only `D:\dev\afldb-workflow-hardening` source files. Git
+  fixture operations occurred only under OS temporary `afldb-workflow-*` directories; fixtures were
+  removed after every test. No real sibling worktree was created, deleted or changed.
+- Databases touched: none. `afldb_test`, `afldb_dev`, retained pre-rebuild DEV and production were
+  not contacted or modified. No DSN value was read or printed.
+- Hosts/services touched: none. No SSH, health request, deployment, restart or systemd action ran;
+  `sync-dev.ps1` ran only under `-WhatIf` test generation.
+- Production was untouched. No deploy was performed. No commit, push, pull, merge, checkout, reset,
+  stash, tag, migration, SQL or remote artifact deletion occurred in the real repository/workflow.
+
+Deviations / blockers:
+- Initial CLI subprocess cases under sandboxed Vitest failed before application code on the already
+  recorded TSX `uv_os_get_passwd` / `ENOMEM` sandbox condition. The suite now imports and exercises
+  the real command functions directly; the npm CLI wrappers passed help smoke outside that sandbox.
+- Once the fixtures reached migration inventory they exposed Stage 1's invalid
+  `encoding: "buffer"`; six readiness cases stopped before final reporting. The supported raw-buffer
+  correction is retained and all 23 workflow cases now pass. This was a Stage 6 workflow correctness
+  dependency, not settle/performance scope.
+- No live merge-readiness, bootstrap, deploy or delayed-health run was performed. Temporary local
+  repositories and simulated payloads cover the behavior without changing a real Git/host state.
+- No Stage 6 blocker remains.
+
+Remaining limitations:
+- `merge:ready` trusts only the optional explicit JSON summary for issue status, expected files and
+  validation evidence; legacy prose is reported as operator-review WARN rather than guessed.
+- It validates repository migration name/content parity but intentionally does not connect to a
+  database. Rebuild/promotion/deploy preflight remains the applied-checksum/parity authority.
+- Remote freshness is proven by bootstrap's fetch. Read-only preflight/merge readiness never fetch;
+  their `origin/main` conclusion is explicitly about the recorded ref until the operator updates it.
+- Stage 5's remaining settle round-trip bottleneck is still deferred and was not reopened.
+
+Exact next action:
+- **Stage 7 must start in a fresh chat and be final cross-stage release/readiness acceptance only.**
+  First, after the operator has reviewed and locally committed the Stage 6 files, read this handoff
+  and inspect the operator-supplied `npm run merge:ready` output for `codex/workflow-hardening` plus
+  the retained Stage 1-6 validation summaries. Resolve only a proven release blocker; otherwise
+  produce the exact operator commit/push/merge and first DEV deploy/smoke checklist. Do not reopen
+  settle optimisation and do not execute a merge or deploy without a new explicit operator request.
+
+Recommended next model:
+- **Codex High, High reasoning effort.**
+
+Stage 6 complete. Start a fresh chat for Stage 7 using the persisted handoff.
+
 ### Exact next action as recorded at Phase 4C (2026-09-06) — superseded by Phase 4C′ below
 
 1. Resolve `AFLDB-ISSUE-142` — (A) decide `player_match_period_stats` in the contract or register it by

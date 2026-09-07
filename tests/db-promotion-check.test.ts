@@ -6,7 +6,8 @@
  * argument and database-name rules are pinned so no phase can be pointed at the wrong
  * database; and the checker's source is asserted to carry no write path.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -37,6 +38,7 @@ import {
   TEST_FIXTURE_EMAIL_SQL,
   assertDatabaseForPhase,
   assertOldDatabaseName,
+  assertPromotionPlanCoherent,
   auditMarkerSql,
   classifyPublicTables,
   compareCounts,
@@ -45,23 +47,30 @@ import {
   detectLineageChange,
   environmentNames,
   isTestFixtureEmail,
+  lineageRemapProblems,
   lineageBoundTables,
   lineageRemapSql,
   lineageTargetsOf,
   publicContractTables,
+  promotionContractProblems,
+  promotionPlanProblems,
+  quoteIdent,
   reinstatePlan,
   resolveLineageRemap,
   reinstatedPublicTables,
   reinstatedSchemaTables,
   reinstatedSchemas,
   resyncIdentitySql,
+  rollbackSql,
+  swapSql,
+  stableLineageTargetForFootballRef,
   tablesWithTreatment,
   truncateSql,
   truncatedPublicTables,
   withDatabase,
   type Snapshot,
 } from '../tools/db/promotion-inventory';
-import { DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs } from '../tools/db/promotion-check';
+import { DEFAULT_DSN_ENV, READ_ONLY_SQL, parseArgs, writePlan } from '../tools/db/promotion-check';
 
 const REPO = process.cwd();
 const MIGRATIONS = join(REPO, 'src', 'db', 'migrations');
@@ -162,6 +171,20 @@ const PINNED_FOOTBALL_TABLES = [
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',
 ];
+
+function generatedPlanArtifacts(environment: 'prod' | 'dev' = 'prod') {
+  const input = {
+    candidate: environment === 'prod' ? 'afldb_prod_candidate_test' : 'afldb_dev_candidate_test',
+    oldDatabase: environment === 'prod' ? 'afldb_prod' : 'afldb_dev',
+    preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump', environment,
+  } as const;
+  return {
+    truncate: truncateSql(),
+    reinstate: reinstatePlan(input),
+    resyncIdentity: resyncIdentitySql(environment),
+    auditMarker: auditMarkerSql(input),
+  };
+}
 
 describe('the contract covers every non-football table the migrations create', () => {
   const created = migrationPublicTables();
@@ -362,7 +385,7 @@ describe('reinstatement order and generated SQL', () => {
     expect(at('external_grid_axes')).toBeGreaterThan(at('external_grids'));
     const truncate = truncateSql();
     for (const n of ['external_grid_sources', 'external_grids', 'external_grid_axes']) {
-      expect(truncate, n).toContain(`public.${n}`);
+      expect(truncate, n).toContain(`"public"."${n}"`);
     }
     // Truncated together in the one statement, so no CASCADE is needed for the cascade FK.
     expect(truncate).not.toMatch(/CASCADE/);
@@ -370,7 +393,7 @@ describe('reinstatement order and generated SQL', () => {
 
   it('truncates every non-rebuilt contract table in one statement, without CASCADE', () => {
     const sql = truncateSql();
-    for (const name of truncatedPublicTables()) expect(sql).toContain(`public.${name}`);
+    for (const name of truncatedPublicTables()) expect(sql).toContain(`"public"."${name}"`);
     expect(truncatedPublicTables()).not.toContain('canonical_applications');
     expect(sql).not.toContain('canonical_applications');
     expect(sql).not.toMatch(/CASCADE/);
@@ -397,14 +420,14 @@ describe('reinstatement order and generated SQL', () => {
     expect(fk!.constraint).toBe('promotion_candidates_decision_fk');
     expect(fk!.column).toBe('resolved_decision_id');
     const sql = truncateSql();
-    const drop = sql.indexOf('ALTER TABLE public.promotion_candidates DROP CONSTRAINT promotion_candidates_decision_fk;');
+    const drop = sql.indexOf('ALTER TABLE "public"."promotion_candidates" DROP CONSTRAINT "promotion_candidates_decision_fk";');
     const truncate = sql.indexOf('TRUNCATE TABLE');
-    const add = sql.indexOf('ALTER TABLE public.promotion_candidates ADD CONSTRAINT promotion_candidates_decision_fk');
+    const add = sql.indexOf('ALTER TABLE "public"."promotion_candidates" ADD CONSTRAINT "promotion_candidates_decision_fk"');
     expect(drop).toBeGreaterThan(sql.indexOf('BEGIN;'));
     expect(truncate).toBeGreaterThan(drop);
     expect(add).toBeGreaterThan(truncate);
     expect(sql.indexOf('COMMIT;')).toBeGreaterThan(add);
-    expect(sql).toContain('FOREIGN KEY (resolved_decision_id) REFERENCES public.promotion_decisions(id);');
+    expect(sql).toContain('FOREIGN KEY ("resolved_decision_id") REFERENCES "public"."promotion_decisions"("id");');
     expect(sql).not.toMatch(/CASCADE/);
     expect(sql).not.toMatch(/DELETE FROM/);
     for (const f of REBUILT_REFERRER_FKS) {
@@ -443,7 +466,7 @@ describe('reinstatement order and generated SQL', () => {
   });
 
   it('emits one single-transaction data-only pg_restore per reinstated table, in order, plus the AFLW schema', () => {
-    const plan = reinstatePlan({ candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump' });
+    const plan = reinstatePlan({ candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump' });
     const publicTables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
     expect(publicTables).toEqual(reinstatedPublicTables());
     // AFLDB-ISSUE-139 Phase 4E-2: `--schema=staging_aflw` alone restores in TOC (alphabetical)
@@ -456,12 +479,18 @@ describe('reinstatement order and generated SQL', () => {
     const created = [...migration025.matchAll(/CREATE TABLE staging_aflw\.([a-z_]+)/g)].map((m) => m[1]);
     expect([...schemaTables].sort()).toEqual([...new Set(created)].sort());
     // Every referenced table precedes its referrer in the plan.
+    const migrationDependencies: string[] = [];
     for (const m of migration025.matchAll(/CREATE TABLE staging_aflw\.([a-z_]+)([\s\S]*?)\);/g)) {
       const referrer = m[1];
       for (const ref of m[2].matchAll(/REFERENCES staging_aflw\.([a-z_]+)/g)) {
+        migrationDependencies.push(`${referrer}->${ref[1]}`);
         expect(schemaTables.indexOf(ref[1]), `${referrer} -> ${ref[1]}`).toBeLessThan(schemaTables.indexOf(referrer));
       }
     }
+    const schemaContract = PROMOTION_CONTRACT.find((t) => t.schema === 'staging_aflw')!;
+    const declaredDependencies = (schemaContract.tableDependencies ?? [])
+      .flatMap((dependency) => dependency.dependsOn.map((parent) => `${dependency.table}->${parent}`));
+    expect([...declaredDependencies].sort()).toEqual([...new Set(migrationDependencies)].sort());
     expect((plan.match(/--single-transaction/g) ?? []).length).toBe(publicTables.length + schemaTables.length);
     expect(plan).toContain('--data-only');
     expect(plan).toContain('privileges.sql');
@@ -472,7 +501,7 @@ describe('reinstatement order and generated SQL', () => {
   it('the generated plan restores the migration-080 corpus, in order', () => {
     const plan = reinstatePlan({
       candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod',
-      preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump',
+      preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump',
     });
     const tables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
     expect(tables).toContain('external_grid_sources');
@@ -482,11 +511,88 @@ describe('reinstatement order and generated SQL', () => {
     expect(tables.indexOf('external_grid_axes')).toBeGreaterThan(tables.indexOf('external_grids'));
   });
 
+  it('validates the complete generated plan before it can be written', () => {
+    for (const environment of ['prod', 'dev'] as const) {
+      const artifacts = generatedPlanArtifacts(environment);
+      expect(promotionContractProblems()).toEqual([]);
+      expect(promotionPlanProblems(artifacts, environment)).toEqual([]);
+      expect(() => assertPromotionPlanCoherent(artifacts, environment)).not.toThrow();
+    }
+  });
+
+  it('refuses DELETE substitution and an incomplete or misordered FK lifecycle', () => {
+    const artifacts = generatedPlanArtifacts();
+    const deleteSubstitution = {
+      ...artifacts,
+      truncate: artifacts.truncate.replace('TRUNCATE TABLE\n  ', 'DELETE FROM\n  '),
+    };
+    expect(() => assertPromotionPlanCoherent(deleteSubstitution))
+      .toThrow(/substitutes DELETE/);
+
+    const fk = REBUILT_REFERRER_FKS[0];
+    const addText = `ALTER TABLE "public"."${fk.referrer}" ADD CONSTRAINT "${fk.constraint}"`;
+    const addStart = artifacts.truncate.indexOf(addText);
+    const addEnd = artifacts.truncate.indexOf(';', addStart) + 1;
+    const missingAdd = {
+      ...artifacts,
+      truncate: artifacts.truncate.slice(0, addStart) + artifacts.truncate.slice(addEnd),
+    };
+    expect(() => assertPromotionPlanCoherent(missingAdd)).toThrow(/exactly one DROP and one ADD/);
+
+    const addBlock = artifacts.truncate.slice(addStart, addEnd);
+    const withoutAdd = artifacts.truncate.slice(0, addStart) + artifacts.truncate.slice(addEnd);
+    const beforeTruncate = withoutAdd.indexOf('TRUNCATE TABLE');
+    const earlyAdd = {
+      ...artifacts,
+      truncate: withoutAdd.slice(0, beforeTruncate) + addBlock + '\n' + withoutAdd.slice(beforeTruncate),
+    };
+    expect(() => assertPromotionPlanCoherent(earlyAdd)).toThrow(/BEGIN -> DROP -> TRUNCATE -> ADD -> COMMIT/);
+  });
+
+  it('refuses staging_aflw TOC/alphabetical restore and unsafe whole-schema fallback', () => {
+    const artifacts = generatedPlanArtifacts();
+    const perTableTruncate = artifacts.truncate.replace(
+      "EXECUTE 'TRUNCATE TABLE ' || tabs || ' RESTART IDENTITY'",
+      "EXECUTE format('TRUNCATE TABLE staging_aflw.%I RESTART IDENTITY', tablename)",
+    );
+    expect(() => assertPromotionPlanCoherent({ ...artifacts, truncate: perTableTruncate }))
+      .toThrow(/not one FK-safe schema\/table-group statement/);
+    const swapped = artifacts.reinstate
+      .replace('--schema=staging_aflw --table=seasons', '--schema=staging_aflw --table=__first__')
+      .replace('--schema=staging_aflw --table=fixtures', '--schema=staging_aflw --table=seasons')
+      .replace('--schema=staging_aflw --table=__first__', '--schema=staging_aflw --table=fixtures');
+    expect(() => assertPromotionPlanCoherent({ ...artifacts, reinstate: swapped }))
+      .toThrow(/staging_aflw restore order/);
+    expect(() => assertPromotionPlanCoherent({
+      ...artifacts, reinstate: `${artifacts.reinstate}\npg_restore --schema=staging_aflw "x.dump"\n`,
+    })).toThrow(/whole-schema\/TOC order/);
+  });
+
+  it('rejects contradictory dispositions, invalid dependencies and pre-restore FK recreation', () => {
+    const duplicate: TableTreatment = {
+      ...contractByName('data_edits')!, treatment: 'reset', compare: 'zero',
+    };
+    expect(promotionContractProblems([...PROMOTION_CONTRACT, duplicate]).join('\n'))
+      .toContain('public.data_edits has contradictory duplicate dispositions');
+
+    const badSchema = PROMOTION_CONTRACT.map((table) => table.schema === 'staging_aflw'
+      ? { ...table, tables: [...table.tables!].sort() }
+      : table);
+    expect(promotionContractProblems(badSchema).join('\n'))
+      .toContain("staging_aflw.* restore order puts 'fixtures' before required parent 'seasons'");
+
+    const restoreDecisions = PROMOTION_CONTRACT.map((table) => table.name === 'promotion_decisions'
+      ? { ...table, treatment: 'reinstate' as const, compare: 'equal' as const }
+      : table);
+    expect(promotionContractProblems(restoreDecisions).join('\n'))
+      .toContain('targets restored data, but this lifecycle recreates before restore');
+  });
+
   // AFLDB-ISSUE-141. The plan is environment-aware, and `prod` output is byte-identical to
   // what it was before the environment existed.
   it('generates the same production plan as before, and a DEV plan only when asked', () => {
     const base = {
-      oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump',
+      oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump',
     };
     const prod = reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x' });
     expect(prod).toBe(reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x', environment: 'prod' }));
@@ -495,7 +601,7 @@ describe('reinstatement order and generated SQL', () => {
 
     const dev = reinstatePlan({
       candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev',
-      preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump', environment: 'dev',
+      preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump', environment: 'dev',
     });
     expect(dev).toContain('DEV (streamanator)');
     expect(dev).toContain('--environment dev');
@@ -514,6 +620,45 @@ describe('reinstatement order and generated SQL', () => {
     });
     expect(dev).toContain("'operator: dev promotion (AFLDB-ISSUE-125)'");
     expect(dev).toContain("'environment', 'dev'");
+  });
+
+  it('quotes every database identifier in generated swap and rollback SQL', () => {
+    const input = {
+      candidate: 'afldb_dev_candidate_20260906-112500', oldDatabase: 'afldb_dev',
+      preCutoverDump: '/home/arm/example.dump', rebuiltDump: '/home/arm/rebuilt.dump',
+      environment: 'dev' as const,
+    };
+    expect(quoteIdent('afldb_dev_pre_rebuild_20260906-112500'))
+      .toBe('"afldb_dev_pre_rebuild_20260906-112500"');
+    expect(quoteIdent('a"b')).toBe('"a""b"');
+    const swap = swapSql(input);
+    expect(swap).toContain('ALTER DATABASE "afldb_dev" RENAME TO "afldb_dev_pre_rebuild_20260906-112500";');
+    expect(swap).toContain('ALTER DATABASE "afldb_dev_candidate_20260906-112500" RENAME TO "afldb_dev";');
+    const rollback = rollbackSql(input);
+    expect(rollback).toContain('ALTER DATABASE "afldb_dev" RENAME TO "afldb_dev_candidate_20260906-112500";');
+    expect(rollback).toContain('ALTER DATABASE "afldb_dev_pre_rebuild_20260906-112500" RENAME TO "afldb_dev";');
+    expect(`${swap}\n${rollback}`).not.toMatch(/ALTER DATABASE\s+[a-z_0-9-]+\s+RENAME TO\s+[a-z_0-9-]+/i);
+  });
+
+  it('writes the quoted hyphen-safe swap and rollback as part of the operator plan', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-promotion-plan-'));
+    try {
+      const files = writePlan({
+        environment: 'dev', plan: true, checklist: false, allowFixtureIdentities: false,
+        dsnEnv: 'AFLDB_OWNER_DATABASE_URL', database: 'afldb_dev_candidate_20260906-112500',
+        oldDatabase: 'afldb_dev', preCutoverDump: '/home/arm/example.dump',
+        rebuiltDump: '/home/arm/rebuilt.dump', planDir: dir,
+      });
+      expect(files.map((file) => file.split(/[\\/]/).at(-1))).toEqual([
+        'promotion-truncate.sql', 'promotion-resync-identity.sql',
+        'promotion-audit-marker.sql', 'promotion-reinstate.sh',
+        'promotion-swap.sql', 'promotion-rollback.sql',
+      ]);
+      expect(readFileSync(join(dir, 'promotion-swap.sql'), 'utf8'))
+        .toContain('RENAME TO "afldb_dev_pre_rebuild_20260906-112500"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -800,26 +945,30 @@ describe('checker arguments', () => {
     expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`])).toThrow(/--old-database/);
     expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod'])).toThrow(/--pre-cutover-dump/);
     const plan = parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
-      '--pre-cutover-dump', 'a.dump', '--rebuilt-dump', 'b.dump', '--plan-dir', 'out']);
-    expect(plan).toMatchObject({ plan: true, planDir: 'out', preCutoverDump: 'a.dump', rebuiltDump: 'b.dump' });
+      '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out']);
+    expect(plan).toMatchObject({ plan: true, planDir: 'out', preCutoverDump: '/home/arm/a.dump', rebuiltDump: '/home/arm/b.dump' });
+    expect(() => parseArgs(['--plan', '--database', `${CANDIDATE_PREFIX}1`, '--old-database', 'afldb_prod',
+      '--pre-cutover-dump', 'C:/Program Files/Git/home/arm/example.dump',
+      '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out']))
+      .toThrow(/MSYS_NO_PATHCONV=1/);
   });
 
   // AFLDB-ISSUE-141. --plan is the only supported producer of a preservation plan, so its
   // prefix check is the gate that decides whether DEV can be promoted by the procedure at all.
   it('binds --plan to the stated environment candidate prefix', () => {
     const devArgs = ['--plan', '--database', 'afldb_dev_candidate_1', '--old-database', 'afldb_dev',
-      '--pre-cutover-dump', 'a.dump', '--rebuilt-dump', 'b.dump', '--plan-dir', 'out'];
+      '--pre-cutover-dump', '/home/arm/a.dump', '--rebuilt-dump', '/home/arm/b.dump', '--plan-dir', 'out'];
     expect(() => parseArgs(devArgs)).toThrow(/only ever run on a candidate/);
     expect(parseArgs(['--environment', 'dev', ...devArgs])).toMatchObject({
       plan: true, environment: 'dev', database: 'afldb_dev_candidate_1', oldDatabase: 'afldb_dev',
     });
     // A bare prefix with no stamp is still not a candidate name.
     expect(() => parseArgs(['--environment', 'dev', '--plan', '--database', 'afldb_dev_candidate_',
-      '--old-database', 'afldb_dev', '--pre-cutover-dump', 'a', '--rebuilt-dump', 'b', '--plan-dir', 'o']))
+      '--old-database', 'afldb_dev', '--pre-cutover-dump', '/a', '--rebuilt-dump', '/b', '--plan-dir', 'o']))
       .toThrow(/only ever run on a candidate/);
     // The production candidate prefix is refused once dev is stated, and vice versa.
     expect(() => parseArgs(['--environment', 'dev', '--plan', '--database', `${CANDIDATE_PREFIX}1`,
-      '--old-database', 'afldb_dev', '--pre-cutover-dump', 'a', '--rebuilt-dump', 'b', '--plan-dir', 'o']))
+      '--old-database', 'afldb_dev', '--pre-cutover-dump', '/a', '--rebuilt-dump', '/b', '--plan-dir', 'o']))
       .toThrow(/only ever run on a candidate/);
   });
 });
@@ -835,9 +984,9 @@ describe('checker arguments', () => {
 describe('lineage-safe reinstatement', () => {
   const PROFILE = 'afltables_profile_url';
 
-  it('declares the lineage-bound columns of both human/admin ledgers', () => {
+  it('declares every lineage-bound column, including the Gridley source reference', () => {
     expect(lineageBoundTables().map((t) => t.name).sort())
-      .toEqual(['data_edits', 'player_link_resolutions']);
+      .toEqual(['data_edits', 'external_grid_sources', 'player_link_resolutions']);
 
     const resolutions = lineageTargetsOf(contractByName('player_link_resolutions')!);
     expect(resolutions.find((x) => x.ref.column === 'player_id')!.target)
@@ -856,13 +1005,18 @@ describe('lineage-safe reinstatement', () => {
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
       .toEqual(['matches:match_key', 'players:afltables_profile_url']);
-    for (const { ref } of [...resolutions, ...edits]) {
+    const gridSource = contractByName('external_grid_sources')!;
+    const gridTarget = stableLineageTargetForFootballRef(gridSource, 'ingest_source_id', 'sources');
+    expect(gridTarget).toMatchObject({ entity: 'sources', identity: 'source_key' });
+    const gridRefs = lineageTargetsOf(gridSource);
+    expect(gridRefs).toHaveLength(1);
+    for (const { ref } of [...resolutions, ...edits, ...gridRefs]) {
       expect(ref.remediation.length, ref.column).toBeGreaterThan(80);
     }
   });
 
   it('identifies rows by a stable external key only — never by a name', () => {
-    for (const rule of ['afltables_profile_url', 'match_key'] as const) {
+    for (const rule of ['afltables_profile_url', 'match_key', 'source_key'] as const) {
       const sql = `${LINEAGE_IDENTITY_SQL[rule].byId}\n${LINEAGE_IDENTITY_SQL[rule].byIdentity}`;
       expect(sql).not.toMatch(/display_name|search_name|given_name|surname|full_name/i);
       expect(sql).not.toMatch(/\bilike\b|similarity|levenshtein|soundex/i);
@@ -874,6 +1028,29 @@ describe('lineage-safe reinstatement', () => {
     expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("match_method = 'afltables_profile_url'");
     expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("status IN ('unique', 'resolved')");
     expect(LINEAGE_IDENTITY_SQL.match_key.byId).toContain('match_key');
+    expect(LINEAGE_IDENTITY_SQL.source_key.byId).toContain('key AS identity');
+  });
+
+  it('remaps Gridley preservation by source key when source and candidate ids differ', () => {
+    const remap = resolveLineageRemap({
+      entity: 'sources', rule: 'source_key', referencedIds: [41],
+      replacedIdentities: [{ id: 41, identity: 'gridley' }],
+      candidateIdentities: [{ id: 903, identity: 'gridley' }],
+    });
+    expect(remap.mapped).toEqual([{ oldId: 41, identity: 'gridley', newId: 903 }]);
+    expect(remap.unchanged).toBe(0);
+    const sql = lineageRemapSql({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev', environment: 'dev',
+      plans: [{
+        table: 'external_grid_sources', column: 'ingest_source_id', entity: 'sources',
+        rule: 'source_key', remediation: 'resolve by source key',
+        rows: [{ rowId: 5, oldValue: 41 }], remap,
+      }],
+    });
+    expect(sql).toContain('UPDATE "public"."external_grid_sources" SET "ingest_source_id" = 903'
+      + ' WHERE "id" = 5 AND "ingest_source_id" = 41;');
+    expect(sql).toContain('--   41 -> gridley -> 903');
+    expect(sql).not.toMatch(/\b(?:80|7)\b/);
   });
 
   it('remaps through the identity and never through the integer', () => {
@@ -994,8 +1171,8 @@ describe('lineage-safe reinstatement', () => {
         remap: mapped,
       }],
     });
-    expect(sql).toContain('UPDATE public.player_link_resolutions SET player_id = 907'
-      + ' WHERE id = 12 AND player_id = 151;');
+    expect(sql).toContain('UPDATE "public"."player_link_resolutions" SET "player_id" = 907'
+      + ' WHERE "id" = 12 AND "player_id" = 151;');
     expect(sql).toContain('--   151 -> players/B/Craig_Bradley.html -> 907');
     expect(sql).toContain('-- UNRESOLVED player_link_resolutions.player_id = 999 (no_identity_in_replaced)');
     expect(sql).toContain('row(s) 13');
@@ -1177,9 +1354,9 @@ describe('historical-only / recorded-gap disposition', () => {
       // Still truncated: the candidate keeps none of the rebuilt copy either, which is what
       // makes `compare: zero` true and what stops test-state rows surviving the promotion.
       expect(truncatedPublicTables(), name).toContain(name);
-      expect(truncateSql(), name).toContain(`public.${name}`);
+      expect(truncateSql(), name).toContain(`"public"."${name}"`);
     }
-    const base = { oldDatabase: 'afldb_prod', preCutoverDump: 'pre.dump', rebuiltDump: 'rebuilt.dump' };
+    const base = { oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump' };
     const prodPlan = reinstatePlan({ ...base, candidate: 'afldb_prod_candidate_x' });
     expect(prodPlan).not.toContain('HISTORICAL-ONLY');
     expect(prodPlan).toContain('--table=player_link_resolutions');
@@ -1192,7 +1369,7 @@ describe('historical-only / recorded-gap disposition', () => {
   it('the DEV plan visibly omits the withheld tables and generates no write for their rows', () => {
     const dev = reinstatePlan({
       candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev',
-      preCutoverDump: '/backups/pre.dump', rebuiltDump: 'rebuilt.dump', environment: 'dev',
+      preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump', environment: 'dev',
     });
     expect(dev).toContain('INTENTIONALLY NOT REINSTATED (AFLDB-ISSUE-143 historical-only / recorded gap)');
     for (const name of withheldOnDev) {
@@ -1262,13 +1439,32 @@ describe('historical-only / recorded-gap disposition', () => {
     expect(sql).not.toContain('-- UNRESOLVED player_link_resolutions');
     // The stable row still takes the existing remap path, guarded by the value it was proved
     // against, and the verification query covers it and only it.
-    expect(sql).toContain('UPDATE public.data_submissions SET import_batch_id = 907'
-      + ' WHERE id = 5 AND import_batch_id = 151;');
-    expect(sql).toContain('SELECT t.id, t.import_batch_id FROM public.data_submissions t');
-    expect(sql).not.toContain('SELECT t.id, t.target_id');
+    expect(sql).toContain('UPDATE "public"."data_submissions" SET "import_batch_id" = 907'
+      + ' WHERE "id" = 5 AND "import_batch_id" = 151;');
+    expect(sql).toContain('SELECT t."id", t."import_batch_id" FROM "public"."data_submissions" t');
+    expect(sql).not.toContain('SELECT t."id", t."target_id"');
     expect(sql).toContain('Every referenced id was evidenced');
     expect(sql).toContain('1 column(s) are HISTORICAL-ONLY by contract');
     expect(sql).not.toMatch(/\b(DELETE|INSERT|TRUNCATE|ALTER|DROP)\b/);
+  });
+
+  it('fails closed if a historical-only table ever receives a generated remap write', () => {
+    const remap = resolveLineageRemap({
+      entity: 'award_winners', rule: 'none', referencedIds: [17],
+      replacedIdentities: [], candidateIdentities: [],
+    });
+    const plans = [{
+      table: 'player_link_resolutions', column: 'target_id', kindColumn: 'target_table',
+      kind: 'award_winners', entity: 'award_winners', rule: 'none' as const,
+      remediation: 'not reinstated', rows: [{ rowId: 4, oldValue: 17 }], remap,
+    }];
+    const valid = lineageRemapSql({
+      candidate: 'afldb_dev_candidate_x', oldDatabase: 'afldb_dev', environment: 'dev', plans,
+    });
+    expect(lineageRemapProblems(valid, plans, 'dev')).toEqual([]);
+    const unsafe = valid.replace('COMMIT;', 'UPDATE "public"."player_link_resolutions" SET "target_id" = 99;\nCOMMIT;');
+    expect(lineageRemapProblems(unsafe, plans, 'dev'))
+      .toEqual(['historical-only table player_link_resolutions receives a generated remap write']);
   });
 
   it('introduces no name matching and no generic override flag', () => {

@@ -3871,6 +3871,25 @@ describe('AFLDB-ISSUE-122 S5 — the canonical applier contract', () => {
     expect(applierCode).toMatch(/INSERT\s+INTO\s+canonical_applications/);
   });
 
+  it('bounds the driver savepoint chain after both successful and failed units', () => {
+    // postgres.js creates one private `sN` savepoint for tx.savepoint(), but
+    // does not release it after a successful callback. The earlier public
+    // anchor lets the applier release that complete chain without depending
+    // on the driver's private name. The integration suite proves the success
+    // and failure semantics against PostgreSQL; this pins the transaction-
+    // control shape so one live subtransaction cannot accumulate per unit.
+    const anchor = 'afldb_canonical_apply_unit';
+    const create = `tx\`SAVEPOINT ${anchor}\``;
+    const rollback = `tx\`ROLLBACK TO SAVEPOINT ${anchor}\``;
+    const release = `tx\`RELEASE SAVEPOINT ${anchor}\``;
+
+    expect(applierCode.split(create)).toHaveLength(2);
+    expect(applierCode.split(rollback)).toHaveLength(2);
+    expect(applierCode.split(release)).toHaveLength(3);
+    expect(applierCode.indexOf(create)).toBeLessThan(applierCode.indexOf('tx.savepoint('));
+    expect(applierCode.indexOf(rollback)).toBeGreaterThan(applierCode.indexOf('tx.savepoint('));
+  });
+
   it('touches only the four canonical fact tables and the ledger', () => {
     const written = [...applierCode.matchAll(/(?:INSERT\s+INTO|UPDATE)\s+([a-z_]+)/g)]
       .map((match) => match[1]);
@@ -4221,6 +4240,22 @@ describe('AFLDB-ISSUE-128 — source completeness', () => {
       // pass that dropped rows, which is the defect ISSUE-128 owns.
       expect(shell).toContain('--require-complete-source');
       expect(shell).toContain('--apply --auto-apply --require-complete-source');
+    });
+
+    it('prints the complete operator monitoring contract before the long chain', () => {
+      const monitoringCall = shell.indexOf('\nprint_monitoring_block\n');
+      const acquisition = shell.indexOf('"$RSCRIPT" tools/rebuild/fitzroy/acquire_core.R');
+      expect(monitoringCall).toBeGreaterThan(-1);
+      expect(acquisition).toBeGreaterThan(monitoringCall);
+      expect(shell).toContain('[monitor] launcher PID: $$');
+      expect(shell).toContain('ps -o pid,ppid,etime,%cpu,%mem,stat,cmd');
+      expect(shell).toContain('psql "$AFLDB_IMPORT_DATABASE_URL"');
+      expect(shell).toContain('usename=current_user');
+      expect(shell).toContain('journalctl -u afldb-settle-afltables -f');
+      expect(shell).toContain('no child/log/database-statement change for 10 minutes');
+      expect(shell).toContain('AFLDB_SETTLE_SUCCESS label=$label');
+      expect(shell).toContain('AFLDB_SETTLE_FAILURE label=$label exit=$status');
+      expect(shell).not.toContain('echo "$AFLDB_IMPORT_DATABASE_URL"');
     });
   });
 });

@@ -1898,8 +1898,8 @@ export async function runSettleAfltables(
       `;
       // AFLDB-ISSUE-105: the column is bigint, so the driver hands it back as
       // decimal text. Decoded once, here, and opaque from this point on.
-      const runBatchId = asImportBatchId(batch.id);
-      batchId = runBatchId;
+      batchId = asImportBatchId(batch.id);
+      const runBatchId = batchId as ImportBatchId;
 
       // §19's completeness proof, reused by §13.3: a scope this run could not
       // prove complete is not a scope in which anything can be positively
