@@ -78,6 +78,56 @@ commit.
   accepted host paths, quotes generated SQL identifiers, and emits generated swap/rollback SQL.
   The hyphenated `afldb_dev_pre_rebuild_20260906-112500` failure is pinned by regression tests.
 
+### AFLDB-ISSUE-144 — Club Rivalry Explorer redesign - 7 September 2026
+
+- `/clubs/compare` is now all-time-first rather than season-first: the season selector and every
+  per-season block (record/ladder/scoring/team-stats/player-leaders/Brownlow) are removed from this
+  surface. The underlying selected-season query layer is untouched and still fully covered by its own
+  integration suite; only this page stopped using it.
+- Added an era explorer: a chip for every decade the chosen pair has actually met in (discovered from
+  their own meeting history, never a fixed list), plus "All time". Choosing an era narrows Rivalry
+  records and Match history to that decade and resets pagination; a new era is a new population, the
+  same treatment changing the match-type filter already gets. Streaks, Venues, Players and Brownlow
+  stay all-time regardless — a decade boundary would truncate a cross-boundary streak, and the design
+  review kept the other sections as whole-of-rivalry context.
+- Split the former single head-to-head block into four sections and reordered the page: Header → Hero
+  (all-time summary) → Era explorer → Rivalry records (records, streaks, decade breakdown, period-score
+  leads/comebacks/turnarounds) → Venues → Players → Brownlow → Match history (its own local match-type
+  filter, moved out of the shared controls form). Venues, Players, Brownlow and Match history are each
+  one collapsed disclosure; Rivalry records stays always expanded.
+- The shareable URL carries `era` and `matchType` alongside `page`; the SEO canonical URL continues to
+  carry the ordered pair only, with era/matchType/page/season never reaching it.
+- Fixed a heading-hierarchy defect found during acceptance: three subsections nested inside an
+  already-top-level section ("Leads, comebacks and turnarounds" under Rivalry records; "Every connected
+  player" and "Average leaderboards" under Players) were rendering as a second `<h2>` instead of
+  continuing the section's own outline. `CollapsiblePanel`/`CollapsibleTable` gained an optional
+  heading-level option (defaulting to `<h2>`, unchanged everywhere else on the site) so a nested
+  disclosure can render at the level that actually continues its parent section.
+
+### AFLDB-ISSUE-145 — Venues exposed in site navigation - 6 September 2026
+
+- The existing `/venues` index is now linked from the primary navigation (a `Venues` entry after
+  `Seasons`) and from the home page's "Browse the record" card grid (a `Venues` card after `Seasons`).
+  The page, its query and its data were already in the tree; this is navigation exposure only, with no
+  migration, schema, or query change.
+
+### AFLDB-ISSUE-144 — Public club-vs-club comparison - 6 September 2026
+
+- Added `/clubs/compare`, a public AFL-only comparison of two club organisations covering selected-
+  season record/ladder/scoring/team-stats/player-leaders/Brownlow, complete head-to-head history
+  (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage), decade-by-decade H2H
+  breakdowns, period-score rivalry records (biggest leads and comebacks by quarter/half/three-quarter
+  time), coverage-aware H2H player averages (minimum 5 recorded games per metric), and connected-
+  player history (every player who represented both organisations, direction, intervening clubs, and
+  club-attributed Brownlow history).
+- Entry points added from `/clubs` (`Compare clubs →`) and every club page (`Compare with another
+  club →`, seeded with that club's current organisation).
+- Season selection defaults to the maximum canonical season and is entirely data-driven: no season,
+  year, or metric-year cutoff is hard-coded, so newly ingested seasons and Brownlow coverage becoming
+  complete require no code change to appear.
+- Statistical coverage is always disclosed rather than guessed — partial, pending, and not-collected
+  metrics are shown as such, and a missing recorded value is never presented as zero.
+
 ### AFLDB-ISSUE-139 — Family, Father–Son, Coach and After-the-Siren Records; Coaches navigation - 6 September 2026
 
 - Four new curated Records boards read from data the DEV promotion above makes reachable: Most Games

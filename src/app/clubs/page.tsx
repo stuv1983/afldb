@@ -52,6 +52,12 @@ export default async function ClubsPage({
         {described.length > 0 && (
           <p className="subtitle">{described.join(' · ')}</p>
         )}
+        {/* The comparison surface takes ORGANISATION slugs, so it is seeded
+            from here without a club: choosing the pair is the first thing
+            that page asks for. AFLDB-ISSUE-144. */}
+        <p className="section-note">
+          <Link href="/clubs/compare">Compare clubs →</Link>
+        </p>
       </div>
 
       <FilterErrors errors={values.errors} />

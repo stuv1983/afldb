@@ -36,6 +36,7 @@ const PAGES: { path: string; canonical: string }[] = [
   { path: '/records/most-games', canonical: '/records/most-games' },
   { path: '/brownlow/2024', canonical: '/brownlow/2024' },
   { path: '/aflw', canonical: '/aflw' },
+  { path: '/clubs/compare', canonical: '/clubs/compare' },
 ];
 
 for (const { path, canonical } of PAGES) {
@@ -218,4 +219,59 @@ test('a stale player slug redirects once, permanently', async ({ request }) => {
   });
   expect(response.status()).toBe(308);
   expect(response.headers().location).toContain('/players/scott-pendlebury-4182');
+});
+
+/**
+ * AFLDB-ISSUE-144 Stage 9 — the comparison surface a crawler is served.
+ *
+ * The pair is the document; the match filter and the history page are view
+ * state on it (the comparison is all-time only since the Club Rivalry
+ * Explorer follow-up, FR-1). Both orders of a pair therefore resolve to one
+ * alphabetically ordered canonical, and a state that resolves to no pair
+ * canonicalises back to the bare surface.
+ *
+ * Nothing here asserts that a valid pair IS indexable, for the reason at
+ * the top of this file: on a deployment with indexing off every page is
+ * noindex, so the distinction between the pair states is proved against the
+ * route's own generateMetadata in
+ * tests/integration/club-comparison-route.test.ts.
+ */
+test('a club comparison canonicalises to its ordered pair alone', async ({ page }) => {
+  const canonicalOf = async (path: string) => {
+    await page.goto(path);
+    const href = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+    return new URL(href!);
+  };
+
+  const forward = await canonicalOf('/clubs/compare?club1=adelaide&club2=brisbane-lions');
+  const reversed = await canonicalOf('/clubs/compare?club1=brisbane-lions&club2=adelaide');
+  expect(forward.pathname).toBe('/clubs/compare');
+  expect(forward.search).toBe('?club1=adelaide&club2=brisbane-lions');
+  expect(reversed.href).toBe(forward.href);
+
+  // Era, match filter and page are dropped, not carried (an unrecognised
+  // `season` param on the same URL is simply ignored, not read).
+  const stateful = await canonicalOf(
+    '/clubs/compare?club1=brisbane-lions&club2=adelaide&season=2024&era=1990&matchType=finals&page=2',
+  );
+  expect(stateful.href).toBe(forward.href);
+
+  // A state that names no pair points at the bare surface.
+  for (const path of [
+    '/clubs/compare',
+    '/clubs/compare?club1=not-a-club&club2=adelaide',
+    '/clubs/compare?club1=adelaide&club2=adelaide',
+  ]) {
+    const url = await canonicalOf(path);
+    expect(url.pathname, path).toBe('/clubs/compare');
+    expect(url.search, path).toBe('');
+  }
+});
+
+test('an invalid comparison is followable, never a soft 404', async ({ page }) => {
+  const response = await page.goto('/clubs/compare?club1=not-a-club&club2=adelaide');
+  expect(response?.status()).toBe(200);
+  const robots = await content(page, 'meta[name="robots"]');
+  expect(robots).toContain('noindex');
+  expect(robots).not.toContain('nofollow');
 });

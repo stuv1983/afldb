@@ -595,6 +595,13 @@ details.filter-details > form { padding: 0.85rem; }
 .grid-fields { grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); }
 .grid-wide   { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
 .grid-panels { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+/* AFLDB-ISSUE-144. A grid item's automatic minimum size is its min-content
+   width, and a column holding a `.table-wrap` takes that from the table
+   inside it rather than from the wrapper that scrolls: at 360px the TRACK
+   grew past the viewport, so the PAGE scrolled sideways instead of the
+   table. `min-width: 0` puts the overflow back inside `.table-wrap`, which
+   is where it was always meant to be. Opt-in, so no existing grid moves. */
+.grid-shrink > * { min-width: 0; }
 .card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
