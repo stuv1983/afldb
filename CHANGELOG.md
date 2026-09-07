@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### Public UI - historical venue record pages (AFLDB-ISSUE-150) - 7 September 2026
+
+- Every public AFL/VFL venue page (`/venues/[slug]`) is rebuilt from a truncated "most recent 50
+  matches" list into a historical record page. All figures come from data AFLDB already holds; no
+  migration, schema, index or privilege change. New sections, each omitted when the venue has no
+  data for it:
+  - **Overview** - total matches at the ground, how many have no recorded attendance, and the
+    first and most recent recorded match (linked, with date, round, clubs, score and crowd).
+  - **Venue records** - highest attendance, lowest *recorded* attendance, highest single-team
+    score and biggest winning margin, each linked to its match with the clubs and date. A match
+    with no attendance figure is never counted as a small crowd; a genuine recorded 0 is kept.
+  - **Club records** - win-draw-loss and win percentage for every historical club identity that
+    has played at the venue, most games first. Footscray and the Western Bulldogs (and South
+    Melbourne and Sydney) stay as separate rows for the eras they played under. Win % is
+    `wins / games * 100`; a draw is not counted as half a win.
+  - **Player leaders** - the top five players at the ground for games, goals, marks, kicks and
+    handballs. Games count player-match rows at the venue. The statistical totals sum only the
+    matches where the statistic was recorded - a value that was not collected in that era is
+    never treated as 0 - and the marks / kicks / handballs boards are headed "Recorded" and show
+    the number of recorded games each total is drawn from.
+  - **Match history** - the arbitrary 50-match ceiling is removed. The venue page previews the
+    ten most recent matches and links to a new paginated route, `/venues/[slug]/matches`
+    (100 per page, newest first, stable ordering), that carries the complete history. The MCG's
+    ~16,000 matches are no longer loaded in one response.
+- New typed query functions in `src/db/queries/venues.ts` (`getVenueOverview`,
+  `getVenueClubRecords`, `getVenueRecords`, `getVenuePlayerLeaders`, `getVenueMatches`), each
+  scoped by `matches.venue_id`, run in parallel from the page, with deterministic tie-breaks on
+  every leaderboard and record so the database's row order never decides which row is shown.
+
 ### Public UI - club historical records and player honours on club pages (AFLDB-ISSUE-149) - 7 September 2026
 
 - Every public AFL club page gains six data sections, all derived from data AFLDB already owns,

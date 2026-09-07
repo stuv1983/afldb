@@ -7,7 +7,18 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 11 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`.
+**Open issues:** 12 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`.
+
+<!-- 2026-09-07 (ISSUE-150 allocated + implemented): `AFLDB-ISSUE-150` is now ALLOCATED and Open —
+     **Expand AFL venue pages with historical venue records and statistics** — on branch
+     `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), from merged `main` @
+     `00eea34`. Public venue page rebuilt from "recent 50 matches" into a historical record page;
+     five new venue-scoped query functions in `src/db/queries/venues.ts`, four new components, a
+     rewritten `src/app/venues/[slug]/page.tsx` and a new `src/app/venues/[slug]/matches` paged
+     route. **NO migration.** `tsc` / `eslint` / DB-free component suite (12/12) / `afldb_test`
+     integration suite (15/15) GREEN; evidence-SQL eyeball, `npm run build` and DEV browser smoke
+     outstanding. 11 -> 12 open. Next free issue ID is `AFLDB-ISSUE-151`. -->
+
 
 <!-- 2026-09-07 (ISSUE-146 closeout): `AFLDB-ISSUE-146` (`code_test_db` as a second explicitly
      supported disposable full-rebuild target) is **Resolved — 2026-09-07**. Merged to `main`
@@ -200,6 +211,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-146` | Medium | Rebuild tooling / Database (test, rehearsal) | **OPEN — IMPLEMENTED 2026-09-07 on `claude/issue-146` (worktree `D:\dev\afldb-issue-146`), uncommitted; local validation passed; the first real `code_test_db` rebuild has NOT been run.** `npm run db:test:rebuild` gains an explicit `--target <database>` restricted to an allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild rehearsal database `code_test_db`, which runs the identical stage graph through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` and matching `db:migrate:code-test` / `db:privileges:code-test` scripts. `--acknowledge-destroy` must name the selected database exactly; dev/prod/`*pre_rebuild*`/arbitrary `*_test` names are refused by name before any DSN is read, and a DSN naming any database other than the selected target is refused. Key files: `tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`, `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`. | **Operator:** review + commit the branch; create `code_test_db` (owned by `afldb_owner`, with `afldb_import` connect) on the rehearsal host and set the two `AFLDB_CODE_TEST_*` variables; then run the first real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db` (dry-run first with `--plan`). Resolve once the rehearsal passes its final validation. |
 | `AFLDB-ISSUE-147` | Medium | Public UI / navigation IA / responsive layout | **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data via an operator SSH tunnel; awaiting operator commit / merge / deploy.** Branch `claude/issue-147-ui`, worktree `D:\dev\afldb-issue-147-ui`. Full authenticated rendered audit of the public site (27 routes × 7 widths, 320–1440) found page-level responsive discipline sound (zero document-level horizontal overflow anywhere), with three concentrated defects: **P0** the phone nav was a smaller, independently hand-kept IA than the masthead — Clubs, Venues, Coaches, Brownlow, Awards, Draft and Match Search were unreachable from the phone chrome (same gap under `/aflw`; the home "Browse the record" grid was a third drifting list, already missing Coaches); **P1** a 641–~890 px masthead-nav overflow band; **P1** dense tables scroll inside `.table-wrap` with no cue that off-screen columns / sort headers exist. Fix (navigation + responsive CSS + tests only; **no migration**, schema, query, route, privilege or deployment change): new canonical `src/lib/site-nav-model.ts` (one `PRIMARY_NAV`, derived `QUICK_TABS` incl. Clubs, derived `BROWSE_SECTIONS` incl. Coaches); `TabBar` gains a "More" bottom sheet (`role="dialog"`, focus-trapped, Escape/backdrop/link/`popstate` close, `aria-current`) listing the **whole** active primary set; masthead nav wraps cleanly at 641–1080 px; `.table-wrap` gets a CSS-only theme-aware directional scroll shadow (`--edge-shadow`, self-hiding, no markup change); new committed `tests/e2e/responsive-nav.spec.ts` derives nav parity from the rendered masthead so a future one-sided addition fails; `tests/e2e/journeys.spec.ts` nav tests de-skipped on mobile via a `reachPrimary()` helper + a new "clubs is reachable" test. Validation: `tsc`/`eslint`/`npm run build` PASS; `responsive-nav.spec.ts` 32/32; journeys nav tests 10/10 on Desktop + Pixel 7; full viewport audit 200/200, zero overflow, zero 4xx/5xx; before/after screenshots in `artifacts/issue-147/` (gitignored). | **Operator:** review + commit `claude/issue-147-ui`; delete the audit scaffolding (`playwright.responsive.config.ts`, `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/`, `tests/nl-ui/.auth/`) or keep `playwright.responsive.config.ts` if you want the re-runnable audit; merge; deploy to DEV via `deploy/sync-dev.ps1` and smoke the phone nav + `/clubs` on a real device; then Resolve. Standard `npm run test:e2e` on the Linux dev host confirms the gate-off path for the new spec. |
 | `AFLDB-ISSUE-149` | Low | Public UI / club pages / database queries | **OPEN — IMPLEMENTATION COMPLETE; `tsc`, focused vitest and `npm run build` all NOT yet operator-run. Stays Open until merged and verified on DEV.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`), bootstrapped from merged `main` after ISSUE-148. SIX new public AFL club-page sections, all lineage-scoped by `clubs.organization_id`, all from existing canonical tables, **no migration**, ISSUE-148's Premierships / Coaches preserved. **(1) Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`): a `club_matches` CTE orients every lineage match to the club's perspective; six deterministic single-row picks — biggest win/loss margin, the club's OWN highest/lowest score, highest/lowest COMBINED match score; ties `match_date DESC, match_id DESC`. `src/components/ClubMatchRecords.tsx`. **(2) Record crowds** — `getClubCrowdRecords(clubId)`: same CTE + `attendance IS NOT NULL`; highest home-and-away / finals (`is_finals_series IS TRUE`) / Grand Final (`round_type='grand_final'`) crowd + Top 5; `attendance DESC, match_date DESC, match_id DESC`; null attendance never shown as 0. `src/components/ClubCrowdRecords.tsx`. **(3) Players** — `getClubPlayers(clubId)`: full `player_clubs` set summed by `organization_id`, one row per player, this club's games/goals only, not truncated. `src/components/ClubPlayers.tsx` (`SortableTable` in a `defaultOpen={false}` `CollapsibleTable`). **(4) Premiership players** — `getClubPremiershipPlayers(clubId)`: `player_club_season_stats.is_premier` in lineage, `season DESC, games DESC`. `src/components/ClubPremiershipPlayers.tsx`. **(5) Awards & honours** — `getClubBrownlowMedallists(clubId)` (`brownlow_season_votes` `is_winner` + linked + `club_id` in lineage, per ISSUE-118 §W.4) and `getClubHonours(clubId)` (`award_winners`, `awards.category='award'`, `slug<>'brownlow-medal'`, `club_id` in lineage) in `src/db/queries/awards.ts`; `src/components/ClubHonours.tsx`. Page wiring in `src/app/clubs/[slug]/page.tsx` (6 queries into the existing `Promise.all`; 5 section blocks, each omitted when empty). **Most Games / Most Goals / Captains from the brief were already on the page** (Games leaders / Goalkicking leaders / Captains — preserved). **Unsupported attribution omitted + reported:** `honour_team_members` (only `club_name_raw`, no `club_id`/season), `player_achievements` (0 rows), null-`club_id` Brownlow winners. Tests: `tests/integration/club-{match-records,crowd-records,players,premiership-players,honours}.test.ts` (new — record/crowd values re-derived from raw scorelines; club-specificity + no other-club leakage; honour attribution; premiership-season cross-check vs `club_seasons.is_premier` AND `getClubPremierships`), `tests/club-records-sections.test.ts` (new — component render). One Unreleased `CHANGELOG.md` entry. **Validation:** NONE run yet. | **Operator:** `npx tsc --noEmit`; `npx vitest run tests/club-records-sections.test.ts`; with `AFLDB_TEST_DATABASE_URL`=`afldb_test`, `npx vitest run tests/integration/club-match-records.test.ts tests/integration/club-crowd-records.test.ts tests/integration/club-players.test.ts tests/integration/club-premiership-players.test.ts tests/integration/club-honours.test.ts`; then `npm run build`. On green: commit on `fable/issue-149-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond`, a historical club (`/clubs/footscray` or `/clubs/western-bulldogs`) and a young club (`/clubs/gold-coast`), Resolve. |
+| `AFLDB-ISSUE-150` | Low | Public UI / venue pages / database queries | **OPEN — IMPLEMENTATION COMPLETE. On the implementation workstation (a tunnel to `afldb_test` was up): `npx tsc --noEmit` PASS; `npx eslint` 0 errors (one pre-existing-style `_total` warning); `tests/venue-records-sections.test.ts` 12/12 (no DB); `tests/integration/venue-records.test.ts` 15/15 against `afldb_test` (truth re-derived from raw `matches` / `player_match_stats`). NOT run: `ISSUE-150-venue-evidence.sql` eyeball spot-check (no `psql` here), `npm run build`, DEV deploy + browser smoke.** Branch `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), from merged `main` @ `00eea34` after ISSUE-149. `/venues/[slug]` rebuilt from a "most recent 50 matches" list into a historical record page — **no migration**, no schema / index / route-privilege / deploy change; one new server-rendered route `/venues/[slug]/matches`. Five venue-scoped (`matches.venue_id`) typed query functions in `src/db/queries/venues.ts`, run in parallel, each mirroring `ISSUE-150-venue-evidence.sql` (the semantic contract): `getVenueOverview` (total matches, recorded-attendance coverage, first + most recent linked match); `getVenueClubRecords` (W-D-L + win % `wins/games*100` — a draw is NOT half a win — for every historical club identity, grouped on the raw `clubs.id` from the match so Footscray ≠ Western Bulldogs; `games DESC, wins DESC, name, id`); `getVenueRecords` (highest / lowest **recorded** attendance — NULL never wins, a genuine recorded 0 is a valid minimum — highest single-team score, biggest winning margin; every ORDER BY ends on a unique column); `getVenuePlayerLeaders` (top 5 for games / goals / marks / kicks / handballs in one round trip — `games` counts `player_match_stats` rows; the stat boards `SUM` only `WHERE <stat> IS NOT NULL`, never COALESCE a NULL to 0, carry `recordedGames`, and the marks/kicks/handballs boards are headed "Recorded"; ranked `value DESC, player_id`); `getVenueMatches` (`match_date DESC, id DESC`, `count(*) OVER ()` + empty-page fallback — the 50-row ceiling removed). Components `src/components/Venue{Records,ClubRecords,PlayerLeaders,MatchHistory}.tsx` (server, omit when empty). `src/app/venues/[slug]/page.tsx` rewritten (keeps `revalidate=86400` + `generateStaticParams`; Overview → Venue records → Club records → Player leaders → 10-match preview → link to full log); new `src/app/venues/[slug]/matches/page.tsx` (`force-dynamic`, `?page=` 100/page, `<Pagination>`, `noindex` on filtered views) — the exact `/players/[slug]/matches` split. Not in `sitemap.ts`. Key files: `src/db/queries/venues.ts`, the four new components, both venue pages, `tests/venue-records-sections.test.ts` (new), `tests/integration/venue-records.test.ts` (new), `CHANGELOG.md`, `ISSUE-150-venue-evidence.sql`, `ISSUE-150-OPERATOR-VALIDATION.md`. | **Operator:** run `ISSUE-150-venue-evidence.sql` against `afldb_test` and eyeball the implementation output for MCG, a low-volume ground, first/latest match, W-D-L, win %, highest/lowest recorded attendance, highest score, biggest margin, each top-5 board (commands + captured smoke numbers in `ISSUE-150-OPERATOR-VALIDATION.md`); `npm run build` with a real `DATABASE_URL`. On green: commit on `sonnet/issue-150-venue-records`, merge, deploy to DEV, eyeball `/venues/melbourne-cricket-ground`, a low-volume ground and `/venues/melbourne-cricket-ground/matches` paging on desktop + narrow mobile, Resolve. |
 | `AFLDB-ISSUE-148` | Low | Public UI / club pages / database queries | **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; Premierships section added the same day (same issue, operator request), implemented + `tsc`-checked, its integration suite written but NOT yet operator-run. Awaiting operator commit / merge / DEV deployment / browser smoke.** Branch `fable/issue-148-coach-club-records` (worktree `D:\dev\afldb-issue-148-coach-club-records`). Public club pages showed players and season history but never the club's coaches or a premiership list. **(1) Coaching:** `getClubCoachRecords(clubId)` in `src/db/queries/coaches.ts` (lineage-scoped by `organization_id`, exactly like `getClubTotals` / `getClubLeaders`; W/D/L from `matches.winner_club_id`; draw-weighted win % `(W + D/2)/G` matching `/records/coaches`; one row per coach, separate tenures combined), `src/components/ClubCoachRecords.tsx` (Coach · **Span** · Games · W · D · L · Win % — "Span" because the value is `formatSpan(firstSeason, lastSeason)`, a first/last range; coach names link to player / `/coaches/[slug]-id`), pushed after Captains, omitted when empty. **(2) Premierships:** `getClubPremierships(clubId)` in `src/db/queries/clubs.ts` — one row per **won Grand Final** (`m.round_type = 'grand_final'`, the canonical predicate `getCoachCareer` / Grid Solver use — never every final, never a Wildcard Final; a drawn GF has a null winner so the replay is taken), opponent resolved home-or-away as the non-winner, score from the winner's perspective, venue via `COALESCE(v.canonical_name, m.venue_raw)` + `v.slug`, crowd = `m.attendance` (null, never zero-filled), lineage-scoped so Footscray/Western Bulldogs share 1954+2016; `src/components/ClubPremierships.tsx` (Year · Opponent · Score · Venue · Date · Crowd; opponent → `clubPath`, venue → `venuePath`; `formatDate` / `formatAttendance`), pushed **first**, omitted when empty. **No migration**, no schema/route/privilege change. Tests: `tests/integration/club-coach-records.test.ts`, `tests/club-coach-records.test.ts`, `tests/integration/club-premierships.test.ts` (new), `tests/club-premierships.test.ts` (new). `CHANGELOG.md` — one `Unreleased` entry (both sections). **Validation:** coaching — operator-run against `afldb_test` via SSH tunnel: `tests/club-coach-records.test.ts` 8/8 PASS, `tests/integration/club-coach-records.test.ts` 9/9 PASS, `npx tsc --noEmit` PASS, `npm run build` PASS. Premierships — `npx tsc --noEmit` self-checked; its integration suite NOT yet operator-run. No migration. | **Operator:** run `npx vitest run tests/club-premierships.test.ts` and, with `AFLDB_TEST_DATABASE_URL` = `afldb_test`, `npx vitest run tests/integration/club-premierships.test.ts`; `npx tsc --noEmit`. On green, commit on `fable/issue-148-coach-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond` + one historical club (both sections) and Resolve. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
@@ -19437,3 +19449,165 @@ removed `brownlow_season_votes.club_id`.
 - Data-quality watch: `tests/integration/club-premiership-players.test.ts` will fail if
   `player_club_season_stats.is_premier` and the won-Grand-Final record ever disagree for a season
   both cover — that is intentional (surface, do not hide).
+
+---
+
+## AFLDB-ISSUE-150 — Expand AFL venue pages with historical venue records and statistics
+
+- **Status:** **OPEN — IMPLEMENTATION COMPLETE. `tsc`, `eslint`, the DB-free component suite
+  (12/12) and the `afldb_test` integration suite (15/15) all GREEN on the implementation
+  workstation (a tunnel to `afldb_test` was up). NOT yet run: `ISSUE-150-venue-evidence.sql`
+  eyeball spot-check (no `psql` here), `npm run build`, DEV deploy + browser smoke.** Branch
+  `sonnet/issue-150-venue-records`, worktree `D:\dev\afldb-issue-150`, bootstrapped from merged
+  `main` @ `00eea34` (after ISSUE-149). Stays Open until the operator runs the evidence SQL and
+  the build, then merges and verifies on DEV.
+- **Severity / Area:** Low / Public UI — venue pages; database queries.
+- **Reported:** 2026-09-07 (operator request — every public AFL/VFL venue page should be a
+  historical record page, not a truncated "recent 50 matches" list).
+- **Claims NO migration number.** No schema, index, route-privilege or deployment change. Every
+  section is a focused venue-scoped query (`matches.venue_id`) over existing canonical tables
+  (`matches`, `venues`, `clubs`, `player_match_stats`, `players`). One new public route,
+  `/venues/[slug]/matches` (server-rendered, no prerender).
+- **Depends on nothing new.** Reuses `CollapsibleTable`, `Pagination`, `Breadcrumbs`, the
+  `count(*) OVER ()` paged-query shape from `getPlayerMatches`, and
+  `clubPath` / `venuePath` / `playerPath` / `matchPath` / `formatDate` / `formatRoundShort` /
+  `formatAttendance` / `formatNumber` / `formatPercentage` / `formatSpan`.
+
+### Problem
+
+`/venues/[slug]` rendered a venue header, a three-figure stat strip (matches / average crowd /
+record crowd) and the **most recent 50 matches only**. None of the venue's historical record —
+who has played there and with what record, the ground's attendance and scoring extremes, the
+leading players, or the match history before the last 50 — was exposed, though AFLDB holds all
+of it.
+
+### Change
+
+`ISSUE-150-venue-evidence.sql` (already in the worktree) is the semantic contract; every query
+mirrors it. **Five new typed query functions in `src/db/queries/venues.ts`**, run in parallel
+from the page:
+
+- **`getVenueOverview(venueId)`** (evidence §1–§2) — total matches, matches with a recorded
+  attendance, mean recorded attendance (`avg` ignores NULLs), and the first / most recent match
+  as full linked `VenueMatchBrief`s (`ORDER BY match_date, id` / `DESC` — `matches.id` unique, so
+  one deterministic row each).
+- **`getVenueClubRecords(venueId)`** (evidence §3) — a `club_games` set unions each venue match
+  from the home club's and the away club's perspective; grouped by the **raw `clubs.id` from the
+  match**, never `current_identity_id` / `organization_id`, so historical identities stay
+  separate. `wins` / `draws` / `losses` via `FILTER`; `winPct = round(100.0 * wins /
+  nullif(games,0), 2)` — the plain definition, a draw is **not** half a win. Order
+  `games DESC, wins DESC, name, id` (id is the final, total tie-break).
+- **`getVenueRecords(venueId)`** (evidence §4, §6, §7) — four deterministic single-row picks:
+  highest / lowest **recorded** attendance (`attendance IS NOT NULL`, `ORDER BY attendance
+  DESC|ASC, match_date, id`; a NULL crowd never appears, a recorded 0 is a real minimum),
+  highest single-team score (home/away union, `score DESC, match_date, match_id, club_id`),
+  biggest winning margin (`home_score <> away_score`, `abs(diff) DESC, match_date, id`). Each
+  ends on a unique column.
+- **`getVenuePlayerLeaders(venueId)`** (evidence §8–§12) — one round trip, a `venue_stats` CTE
+  then five `UNION ALL` aggregates then `row_number() OVER (PARTITION BY category ORDER BY value
+  DESC, player_id)` cut to 5. `games` counts `player_match_stats` rows; `goals` / `marks` /
+  `kicks` / `handballs` `SUM` the stat over **only** `WHERE <stat> IS NOT NULL` rows — a NULL
+  (not collected that era) is **never** COALESCEd to 0 — and each row carries `recordedGames =
+  count(<stat>)` so the UI can show the denominator and head the marks/kicks/handballs boards
+  "Recorded".
+- **`getVenueMatches(venueId, {limit, offset})`** — the complete history, `ORDER BY match_date
+  DESC, id DESC`, `count(*) OVER () AS total` with the same empty-page fallback count as
+  `getPlayerMatches`. The 50-row ceiling is gone.
+
+**Components (all server components):** `src/components/VenueRecords.tsx`,
+`src/components/VenueClubRecords.tsx`, `src/components/VenuePlayerLeaders.tsx` (five compact
+boards in a `.grid.grid-panels.grid-shrink`), `src/components/VenueMatchHistory.tsx`. Each
+renders nothing when its data is empty.
+
+**Pages:** `src/app/venues/[slug]/page.tsx` rewritten — keeps `revalidate = 86400` +
+`generateStaticParams` (still fully prerendered), adds Overview → Venue records → Club records →
+Player leaders → a 10-match preview that links on to the full log. New
+`src/app/venues/[slug]/matches/page.tsx` — `dynamic = 'force-dynamic'`, `?page=` (100/page),
+`<Pagination>`, `noindex` on any filtered view, mixed-case slug redirect — the exact split
+`/players/[slug]/matches` already uses, so the expensive aggregates stay on the cached venue
+page and the dynamic route only runs the cheap indexed paged query. Not added to `sitemap.ts`
+(same as the player match-log route).
+
+### Critical historical-data semantics honoured
+
+- **NULL attendance ≠ 0.** `matches.attendance` NULL (1,651 matches) is "not recorded": excluded
+  from every attendance record and from `avg`, never rendered as 0. A genuine recorded 0 is kept
+  and is a valid "lowest recorded attendance".
+- **NULL era-limited player stats excluded from aggregation.** marks / kicks / handballs / goals
+  are summed only over rows where they are recorded; the boards say "Recorded" and show
+  `recordedGames`, so a sparse-era total is not read as a complete one.
+- **Historical club identities preserved.** Club records key on the raw match club id; no folding
+  to the modern organisation.
+- **Win % is `wins / games * 100`.** Draws are not half-wins.
+- **Deterministic everywhere.** Every record ORDER BY ends on a unique column; every leaderboard
+  breaks ties on `player_id`; club records break ties on `name` then `id`; match history breaks a
+  shared date on `id`.
+
+### Tests
+
+- **`tests/venue-records-sections.test.ts`** (NEW, no DB) — `renderToStaticMarkup` of the four
+  components: all four record labels, links, NULL crowd → not-recorded marker (never 0), a real 0
+  kept, "Recorded marks/kicks/handballs" headings + `Rec. games` column, empty → renders nothing,
+  render order preserved. **12/12 PASS locally.**
+- **`tests/integration/venue-records.test.ts`** (NEW, needs `afldb_test`) — truth re-derived from
+  raw `matches` scorelines and raw `player_match_stats`, venues discovered dynamically (busiest
+  venue; a 2–6-match venue; a venue with a recorded 0 crowd if the data has one; a venue where
+  two same-`organization_id` identities both played). Covers: overview counts + first/latest;
+  club W-D-L / win % / total order + historical-identity separation; attendance extremes never
+  NULL, recorded 0 valid; highest team score; biggest margin; per-category top-5 re-derivation
+  with NULLs excluded, tie-break `value DESC, player_id`, `recordedGames <= games`; determinism;
+  `getVenueMatches` total, page disjointness, ordering, `total > 50` (no ceiling), full walk
+  returns each match once, offset-past-end still reports the true total; unknown venue id →
+  empty/nulls, never throws. **NOT RUN — no DB on this workstation.**
+
+### Validation
+
+1. **Completed on the implementation workstation** (a tunnel to `afldb_test` on
+   `127.0.0.1:5432` was available, so the DB checks below did run):
+   - `npx tsc --noEmit` — **PASS** (exit 0).
+   - `npx eslint` (all new + changed files) — **PASS**, 0 errors; one `_total` unused-var
+     *warning*, identical to the existing `src/db/queries/players.ts` house style.
+   - `npx vitest run tests/venue-records-sections.test.ts` — **12/12 PASS** (no DB).
+   - `npx vitest run tests/integration/venue-records.test.ts` — **15/15 PASS** against
+     `afldb_test`. Truth is re-derived from raw `matches` scorelines and raw
+     `player_match_stats`, not from the functions under test, so this IS the DB-backed
+     numeric verification for the query layer.
+   - Ad-hoc smoke dump (temporary test, since deleted) of `getVenue*` output for
+     `melbourne-cricket-ground`, `kardinia-park` and a 2-match ground — the figures are
+     recorded in `ISSUE-150-OPERATOR-VALIDATION.md` for the operator to reproduce.
+   - Full non-integration vitest run: 107/109 files pass; the 2 red files
+     (`reference-data.test.ts` §H12 = AFLDB-ISSUE-138 `external_grid_*` drift;
+     `finals-semantics-contract.test.ts` = Windows-checkout CRLF false-fail, passes on
+     Linux) are pre-existing and unrelated to ISSUE-150.
+2. **Not executed here — operator to run:**
+   - `ISSUE-150-venue-evidence.sql` against `afldb_test` (needs `psql`, absent on this
+     workstation) and an eyeball comparison of the implementation output vs the evidence
+     for a high-volume venue (MCG), a low-volume venue, first/latest match, W-D-L, win %,
+     highest / lowest recorded attendance, highest score, biggest margin, and each of the
+     five top-5 leaderboards. NOTE: this `afldb_test` has **no** match with a recorded
+     `attendance = 0`, so evidence §5 `attendance_zero` is empty everywhere; the 0-vs-NULL
+     rendering is covered by the component + integration tests instead.
+   - `npm run build` with `DATABASE_URL` on a real database (the venue page still
+     prerenders all ~52 slugs).
+   - DEV deploy + browser smoke of `/venues/melbourne-cricket-ground`, a low-volume ground,
+     and `/venues/melbourne-cricket-ground/matches` paging, on desktop and a narrow mobile
+     width.
+
+**Exact operator commands + the captured smoke numbers** are in the worktree as
+`ISSUE-150-OPERATOR-VALIDATION.md`.
+
+### Query-performance note
+
+Not measured (no DB access). The aggregates stay on the ISR-cached venue page (recomputed at
+most daily per venue); the only per-request query is the indexed paged `getVenueMatches`
+(`ix_matches_venue`). If `getVenuePlayerLeaders` on the MCG is slow at build time, measure it
+against `afldb_test` before considering any index — do not add one speculatively.
+
+### Follow-up (deliberately deferred — out of ISSUE-150 scope)
+
+- No charts, attendance-by-decade trends, record-progression timelines, single-match player
+  records, finals/GF venue analytics, club×venue high-score matrices, venue comparison, or
+  map/location features. If wanted, raise a separate issue.
+- A "sort by any column" affordance on the club-records and player-leaders tables (currently
+  fixed deterministic order) could be added with `SortableTable`, as the club page does — not
+  done here to keep client state minimal.
