@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### Rebuild tooling - `code_test_db` rehearsal target (AFLDB-ISSUE-146) - 7 September 2026
+
+- `npm run db:test:rebuild` now accepts an explicit `--target <database>` restricted to an
+  allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild
+  rehearsal database `code_test_db`. The rehearsal runs the identical stage graph — reset,
+  the complete migration set, privileges, every canonical data stage and the final
+  validation — through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` /
+  `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`, never the `afldb_test` variables. The former
+  `_test`-suffix rule is replaced by the allowlist, so `afldb_dev`, anything containing
+  `prod`, preserved `*pre_rebuild*` databases and arbitrary `*_test` names are all refused
+  by name before any DSN is read; `--acknowledge-destroy` must name the selected database
+  exactly, and a DSN naming any other database than the selected target is refused.
+- `tools/db/migrate.ts` and `tools/db/privileges.ts` gained the matching explicit
+  `code-test` target (`db:migrate:code-test`, `db:privileges:code-test`), bound to the same
+  dedicated variable; `code-test` shares `test`'s disposable-target exemption from the
+  shared-ledger migration guard and nothing else. `db:test:prove-reset` stays pinned to
+  `afldb_test`.
+
 ### Post-ISSUE-139 workflow hardening - Stage 7 - 7 September 2026
 
 - Made promotion-plan output fail before writing any file when any of its six destinations

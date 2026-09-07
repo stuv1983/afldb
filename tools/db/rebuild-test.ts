@@ -3,8 +3,16 @@
  *
  *     npm run db:test:rebuild -- --acknowledge-destroy afldb_test
  *
+ * AFLDB-ISSUE-146 — the same runner, the same stage graph, against the disposable
+ * full-rebuild rehearsal database `code_test_db`, selected ONLY by an explicit flag:
+ *
+ *     npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+ *
  * This is the ONE supported rebuild entry point. It runs the fixed dependency order,
- * fails closed at the first problem, and never touches `afldb_dev` or production.
+ * fails closed at the first problem, and never touches `afldb_dev` or production. The
+ * destructive targets are an explicit allowlist (REBUILD_TARGETS); the default is still
+ * `afldb_test`, each target has its OWN dedicated DSN variables, and the target is never
+ * inferred from a DSN — the DSN must name the target the operator selected.
  *
  * The core source is NOT named on the command line: it is the single accepted canonical
  * baseline in data/reference/fitzroy-accepted-baselines.json. Partial/trial core data stays
@@ -15,7 +23,8 @@
  * §10 contract, implemented here point for point:
  *   1. explicit named-target map, refusing anything unrecognised   -> resolveTarget()
  *   2. destination-must-equal-known-safe-name                      -> resolveTarget()
- *   3. refuse every target but afldb_test; reject dev/prod by name -> resolveTarget()
+ *   3. refuse every target outside the allowlist (afldb_test, and
+ *      code_test_db under --target); reject dev/prod by name       -> resolveTarget()
  *   4. full preflight BEFORE destruction or any database contact   -> stage 1
  *   5. explicit destructive acknowledgement before drop/reset      -> --acknowledge-destroy
  *   6. apply the complete tracked migration set via migrate.ts,
@@ -104,6 +113,8 @@ export type FitzroySource = {
 };
 
 export type Options = {
+  /** `--target`; absent means DEFAULT_TARGET (afldb_test). Never inferred from a DSN. */
+  target?: string;
   fitzroyLabel?: string;
   acknowledgeDestroy?: string;
   acknowledgePartialFitzroy?: boolean;
@@ -116,8 +127,50 @@ export class RebuildRefused extends Error {}
 
 const REPO_ROOT = process.cwd();
 
-/** The only rebuild target this runner will ever accept. §10 points 1-3. */
-const SUPPORTED_TARGET = 'afldb_test';
+/**
+ * The explicit destructive-target map. §10 points 1-3 (AFLDB-ISSUE-146 added the second
+ * entry). Nothing outside this map can be reset, migrated or loaded by this runner, and
+ * every target carries its OWN DSN variables: no target ever borrows another's connection.
+ *
+ * The package scripts named here are what the MIGRATIONS and PRIVILEGES stages run, so
+ * `npm run db:migrate:test` can never be pointed at the rehearsal database and vice versa
+ * (tools/db/migrate.ts and tools/db/privileges.ts each map the script's `--target` to the
+ * same dedicated variable).
+ */
+export const REBUILD_TARGETS = {
+  afldb_test: {
+    role: 'normal test/integration rebuild',
+    adminEnv: 'AFLDB_TEST_DATABASE_URL',
+    importEnv: 'AFLDB_TEST_IMPORT_DATABASE_URL',
+    migrateScript: 'db:migrate:test',
+    migrateTarget: 'test',
+    privilegesScript: 'db:privileges:test',
+  },
+  code_test_db: {
+    role: 'disposable full-rebuild rehearsal',
+    adminEnv: 'AFLDB_CODE_TEST_DATABASE_URL',
+    importEnv: 'AFLDB_CODE_TEST_IMPORT_DATABASE_URL',
+    migrateScript: 'db:migrate:code-test',
+    migrateTarget: 'code-test',
+    privilegesScript: 'db:privileges:code-test',
+  },
+} as const;
+
+export type RebuildTargetName = keyof typeof REBUILD_TARGETS;
+
+/** What `--target` means when it is omitted. Unchanged by AFLDB-ISSUE-146. */
+export const DEFAULT_TARGET: RebuildTargetName = 'afldb_test';
+
+function isRebuildTarget(name: string): name is RebuildTargetName {
+  return Object.hasOwn(REBUILD_TARGETS, name);
+}
+
+/** For messages: `'afldb_test' (normal test/integration rebuild), 'code_test_db' (…)`. */
+function describeRebuildTargets(): string {
+  return (Object.keys(REBUILD_TARGETS) as RebuildTargetName[])
+    .map((name) => `'${name}' (${REBUILD_TARGETS[name].role})`)
+    .join(', ');
+}
 
 /** Refused by name, whatever the DSN claims. */
 const FORBIDDEN_DATABASES = ['afldb_dev', 'afldb_prod'];
@@ -220,70 +273,92 @@ export function assertRebuildTargetName(database: string): void {
     throw new RebuildRefused(
       `Refusing to rebuild '${database}': the name looks like production.`);
   }
-  if (!/_test$/.test(database)) {
-    throw new RebuildRefused(
-      `Refusing to rebuild '${database}': only a database whose name ends in _test `
-      + 'may be destroyed by this runner.');
-  }
-  if (database !== SUPPORTED_TARGET) {
-    throw new RebuildRefused(
-      `Refusing to rebuild '${database}': the only supported rebuild target is `
-      + `'${SUPPORTED_TARGET}'.`);
-  }
   if (/pre_rebuild/i.test(database)) {
     throw new RebuildRefused(
       `Refusing to touch '${database}': preserved pre-rebuild databases are read-only.`);
+  }
+  // An allowlist, not a suffix rule: `random_test` is refused exactly as `afldb_scratch`
+  // is. The former `_test` suffix check is subsumed — every allowed name is listed.
+  if (!isRebuildTarget(database)) {
+    throw new RebuildRefused(
+      `Refusing to rebuild '${database}': the only explicit rebuild targets are `
+      + `${describeRebuildTargets()}. A target is never inferred from a DSN.`);
   }
 }
 
 /**
  * Resolve and validate the rebuild target. Throws rather than returning a bad target,
  * and never includes a DSN or password in any message.
+ *
+ * Order matters and is deliberate: the SELECTED name is checked before any environment
+ * variable is read (so `--target afldb_dev` is refused even on a host with no DSN at
+ * all), then the selected target's OWN dedicated DSN is read, and the database that DSN
+ * names must equal the selection. Nothing here consults another target's variables.
  */
 export function resolveTarget(
   env: Record<string, string | undefined>,
-  opts: { allowOwnerImportDsn?: boolean } = {},
+  opts: { target?: string; allowOwnerImportDsn?: boolean } = {},
 ): ResolvedTarget {
-  const adminDsn = env.AFLDB_TEST_DATABASE_URL;
+  const requested = opts.target ?? DEFAULT_TARGET;
+  assertRebuildTargetName(requested);
+  if (!isRebuildTarget(requested)) {
+    // Unreachable after the assertion; keeps the lookup below fully typed.
+    throw new RebuildRefused(`Refusing to rebuild '${requested}'.`);
+  }
+  const spec = REBUILD_TARGETS[requested];
+
+  const adminDsn = env[spec.adminEnv];
   if (!adminDsn) {
     throw new RebuildRefused(
-      'AFLDB_TEST_DATABASE_URL is not set. This runner rebuilds the test database only and '
-      + 'will not fall back to any other target.');
+      `${spec.adminEnv} is not set. Target '${requested}' is rebuilt only through its own `
+      + 'dedicated DSN; this runner never falls back to another database\'s connection.');
   }
 
   let database: string;
   try {
     database = databaseOf(adminDsn);
   } catch {
-    throw new RebuildRefused('AFLDB_TEST_DATABASE_URL is not a valid connection URL.');
+    throw new RebuildRefused(`${spec.adminEnv} is not a valid connection URL.`);
   }
 
   assertRebuildTargetName(database);
+  if (database !== requested) {
+    throw new RebuildRefused(
+      `${spec.adminEnv} names database '${database}', not the selected target `
+      + `'${requested}'. The target is never inferred from a DSN; fix the variable or the `
+      + '--target flag so they agree.');
+  }
 
   // Data stages must run as the restricted import role, never as owner and NEVER with the
   // development DSN this repository's .env sets. ISSUE-083 tracks the missing test import
   // credential; this runner fails closed rather than silently substituting owner access.
-  const testImportDsn = env.AFLDB_TEST_IMPORT_DATABASE_URL;
+  // The import DSN is the target's OWN variable — never another target's, never the dev one.
+  const restrictedImportDsn = env[spec.importEnv];
   let importDsn: string;
   let importIsOwnerSubstitution = false;
 
-  if (testImportDsn) {
-    if (databaseOf(testImportDsn) !== database) {
-      throw new RebuildRefused(
-        'AFLDB_TEST_IMPORT_DATABASE_URL names a different database from '
-        + 'AFLDB_TEST_DATABASE_URL. Both must point at the same test database.');
+  if (restrictedImportDsn) {
+    let importDatabase: string;
+    try {
+      importDatabase = databaseOf(restrictedImportDsn);
+    } catch {
+      throw new RebuildRefused(`${spec.importEnv} is not a valid connection URL.`);
     }
-    importDsn = testImportDsn;
+    if (importDatabase !== database) {
+      throw new RebuildRefused(
+        `${spec.importEnv} names a different database from ${spec.adminEnv}. `
+        + `Both must point at '${requested}'.`);
+    }
+    importDsn = restrictedImportDsn;
   } else if (opts.allowOwnerImportDsn) {
     importDsn = adminDsn;
     importIsOwnerSubstitution = true;
   } else {
     throw new RebuildRefused(
-      'AFLDB_TEST_IMPORT_DATABASE_URL is not set, so there is no restricted import '
-      + 'credential for the data stages. Set it to an afldb_import DSN for the test '
-      + 'database, or pass --allow-owner-import-dsn to run them as owner deliberately '
-      + '(that is the AFLDB-ISSUE-083 gap: a missing grant would then pass here and fail '
-      + 'in production).');
+      `${spec.importEnv} is not set, so there is no restricted import credential for the `
+      + `data stages. Set it to an afldb_import DSN for '${requested}', or pass `
+      + '--allow-owner-import-dsn to run them as owner deliberately (that is the '
+      + 'AFLDB-ISSUE-083 gap: a missing grant would then pass here and fail in production).');
   }
 
   return { database, adminDsn, importDsn, importIsOwnerSubstitution };
@@ -464,6 +539,15 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
   // One resolution for the whole graph, so no two stages can disagree.
   const python = resolvePython();
 
+  // The schema and privilege stages run through package scripts, and each target has its
+  // own pair bound to its own DSN variable. A ResolvedTarget only ever carries an
+  // allowlisted name, but the graph refuses rather than guesses if it does not.
+  if (!isRebuildTarget(target.database)) {
+    throw new RebuildRefused(
+      `No stage graph for '${target.database}': it is not an explicit rebuild target.`);
+  }
+  const spec = REBUILD_TARGETS[target.database];
+
   return [
     {
       id: 'precheck',
@@ -482,15 +566,15 @@ export function planStages(target: ResolvedTarget, fitzroy: FitzroySource,
       name: 'MIGRATIONS — the complete tracked set',
       kind: 'schema',
       run: 'command',
-      argv: ['npm', 'run', 'db:migrate:test'],
-      envOverlay: { AFLDB_MIGRATE_TARGET: 'test' },
+      argv: ['npm', 'run', spec.migrateScript],
+      envOverlay: { AFLDB_MIGRATE_TARGET: spec.migrateTarget },
     },
     {
       id: 'privileges',
       name: 'PRIVILEGES — reconcile roles from the registries',
       kind: 'privileges',
       run: 'command',
-      argv: ['npm', 'run', 'db:privileges:test'],
+      argv: ['npm', 'run', spec.privilegesScript],
     },
     {
       id: 'reference',
@@ -2485,7 +2569,16 @@ export function parseArgs(argv: string[]): Options {
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--fitzroy-label') opts.fitzroyLabel = argv[++i];
+    if (arg === '--target') {
+      // A bare `--target` must not silently fall through to the default database.
+      const value = argv[i + 1];
+      if (!value || value.startsWith('--')) {
+        throw new RebuildRefused(
+          `--target needs a database name: one of ${describeRebuildTargets()}.`);
+      }
+      opts.target = value;
+      i += 1;
+    } else if (arg === '--fitzroy-label') opts.fitzroyLabel = argv[++i];
     else if (arg === '--draftguru-label') opts.draftguruLabel = argv[++i];
     else if (arg === '--acknowledge-destroy') opts.acknowledgeDestroy = argv[++i];
     else if (arg === '--acknowledge-partial-fitzroy') opts.acknowledgePartialFitzroy = true;
@@ -2575,7 +2668,12 @@ async function main(): Promise<number> {
   };
 
   console.log('AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)');
-  console.log(`  target        : ${target.database}`);
+  // Names only — never a DSN, host or credential.
+  const spec = REBUILD_TARGETS[target.database as RebuildTargetName];
+  console.log(`  target        : ${target.database} (${spec.role}; `
+    + `${opts.target ? '--target' : 'default'})`);
+  console.log(`  credentials   : ${spec.adminEnv}`
+    + (target.importIsOwnerSubstitution ? ' (owner substituted for import)' : ` + ${spec.importEnv}`));
   console.log(`  fitzRoy label : ${fitzroy.label}`
     + (fitzroy.accepted
       ? ' (ACCEPTED canonical full-history baseline)'

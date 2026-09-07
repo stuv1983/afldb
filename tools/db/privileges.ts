@@ -3,6 +3,7 @@
  *
  *     npm run db:privileges              # AFLDB_OWNER_DATABASE_URL
  *     npm run db:privileges:test         # AFLDB_TEST_DATABASE_URL
+ *     npm run db:privileges:code-test    # AFLDB_CODE_TEST_DATABASE_URL (AFLDB-ISSUE-146)
  *
  * This exists for ONE reason: the package scripts used to interpolate the DSN with a
  * POSIX shell expansion —
@@ -39,6 +40,7 @@ const PRIVILEGES_SQL = join('tools', 'maintenance', 'privileges.sql');
 const TARGETS = {
   dev: 'AFLDB_OWNER_DATABASE_URL',
   test: 'AFLDB_TEST_DATABASE_URL',
+  'code-test': 'AFLDB_CODE_TEST_DATABASE_URL',
 } as const;
 
 type Target = keyof typeof TARGETS;
