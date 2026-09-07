@@ -826,7 +826,7 @@ type WritePlan = {
  * ------------------------------------------------------------------ */
 
 /**
- * Apply one record's canonical targets inside one savepoint (§13).
+ * Apply one record's canonical targets inside one bounded savepoint (§13).
  *
  * The savepoint boundary is the RECORD, which is exactly the runbook's two
  * units: a match family is a `matches` row plus its `match_period_scores`,
@@ -834,6 +834,10 @@ type WritePlan = {
  * `brownlow_round_votes`. Both or neither, and their `canonical_applications`
  * rows with them.
  *
+ * postgres.js rolls a failed nested scope back but does not release a
+ * successful one. The explicit anchor below is therefore released after every
+ * unit; releasing it also releases the driver's nested savepoint and prevents
+ * successful subtransactions accumulating until the outer settle commits.
  * A constraint or write failure rolls back that unit alone, leaves no ledger
  * row behind, and is reported to the caller so the run can open the
  * `canonical_apply_failed` finding and continue. It is never absorbed.
@@ -867,6 +871,13 @@ export async function applyCanonicalUnit(
   /** The target being written when a failure fires, for the finding's key. */
   let attempting: CanonicalTargetTable = unit.targets[0].targetTable;
 
+  // Stage 5 performance hardening. postgres.js creates its own later `sN`
+  // savepoint but does not RELEASE it on success. This earlier, fixed-name
+  // anchor gives us a public boundary we can release without relying on that
+  // private name; PostgreSQL releases every savepoint established after the
+  // named one at the same time. The name is safe to reuse because both paths
+  // below release it before this function returns.
+  await tx`SAVEPOINT afldb_canonical_apply_unit`;
   try {
     await tx.savepoint(async (scope) => {
       const sp = scope as Tx;
@@ -1079,11 +1090,20 @@ export async function applyCanonicalUnit(
         });
       }
     });
+    await tx`RELEASE SAVEPOINT afldb_canonical_apply_unit`;
   } catch (error) {
-    // §9.1. The savepoint has rolled back, so no canonical row and no ledger
-    // row survives from this unit. The outer transaction is intact and the
-    // run continues; the caller opens the `canonical_apply_failed` finding
-    // and routes the record to the exception queue.
+    // postgres.js has rolled back to its nested savepoint. Roll back once more
+    // to the explicit unit anchor, then release the complete chain so neither
+    // failed nor successful units leave live subtransactions behind. If
+    // either cleanup statement fails, let it escape: continuing with an
+    // uncertain transaction boundary would be unsafe.
+    await tx`ROLLBACK TO SAVEPOINT afldb_canonical_apply_unit`;
+    await tx`RELEASE SAVEPOINT afldb_canonical_apply_unit`;
+
+    // §9.1. No canonical row and no ledger row survives from this unit. The
+    // outer transaction is intact and the run continues; the caller opens the
+    // `canonical_apply_failed` finding and routes the record to the exception
+    // queue.
     return {
       results: unit.targets.map((target) => refused(target.targetTable, 'write_failed')),
       failure: {

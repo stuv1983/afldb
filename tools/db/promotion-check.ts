@@ -72,7 +72,9 @@ import {
   TEST_FIXTURE_EMAIL_SQL,
   assertContractCoherent,
   assertDatabaseForPhase,
+  assertLinuxHostPath,
   assertOldDatabaseName,
+  assertPromotionPlanCoherent,
   auditMarkerSql,
   classifyPublicTables,
   compareCounts,
@@ -87,11 +89,17 @@ import {
   lineageBoundTables,
   lineageRemapSql,
   lineageTargetsOf,
+  stableLineageTargetForFootballRef,
   publicContractTables,
+  quoteIdent,
+  quoteSqlLiteral,
   reinstatePlan,
   reinstatedSchemas,
+  rollbackSql,
   resolveLineageRemap,
   resyncIdentitySql,
+  shellQuote,
+  swapSql,
   truncateSql,
   withDatabase,
   type CompareRule,
@@ -230,8 +238,13 @@ export function parseArgs(argv: readonly string[]): Options {
     }
     if (!out.oldDatabase) throw new PromotionRefused(`--plan needs --old-database (the ${names.live} database being replaced).`);
     assertOldDatabaseName(out.oldDatabase, out.environment);
+    if (out.oldDatabase !== names.live) {
+      throw new PromotionRefused(`--plan must be generated before cutover with --old-database ${names.live}.`);
+    }
     if (!out.preCutoverDump) throw new PromotionRefused('--plan needs --pre-cutover-dump <file>.');
     if (!out.rebuiltDump) throw new PromotionRefused('--plan needs --rebuilt-dump <file>.');
+    assertLinuxHostPath(out.preCutoverDump, '--pre-cutover-dump');
+    assertLinuxHostPath(out.rebuiltDump, '--rebuilt-dump');
     if (!out.planDir) throw new PromotionRefused('--plan needs --plan-dir <dir> to write the SQL files into.');
     return out;
   }
@@ -391,11 +404,12 @@ async function gateFixtureIdentities(
   const lines: string[] = [];
   for (const table of EMAIL_BEARING_TABLES) {
     if (!present.includes(table)) { lines.push(`${table}: absent`); continue; }
+    const relation = `${quoteIdent('public')}.${quoteIdent(table)}`;
     const rows = await q(`
       SELECT count(*)::int AS n,
              (SELECT array_agg(email ORDER BY email)
-                FROM (SELECT email FROM public.${table} WHERE ${TEST_FIXTURE_EMAIL_SQL} ORDER BY email${sampleLimit}) s) AS sample
-        FROM public.${table}
+                FROM (SELECT email FROM ${relation} WHERE ${TEST_FIXTURE_EMAIL_SQL} ORDER BY email${sampleLimit}) s) AS sample
+        FROM ${relation}
        WHERE ${TEST_FIXTURE_EMAIL_SQL}`);
     const n = asInt(rows[0]?.n);
     total += n;
@@ -492,7 +506,9 @@ async function gateInventory(
   const lines: string[] = [];
   for (const t of publicContractTables()) {
     if (!present.includes(t.name)) { lines.push(`${t.name.padEnd(30)} absent`); continue; }
-    const n = asInt((await q(`SELECT count(*)::int AS n FROM public.${t.name}`))[0]?.n);
+    const n = asInt((await q(
+      `SELECT count(*)::int AS n FROM ${quoteIdent('public')}.${quoteIdent(t.name)}`,
+    ))[0]?.n);
     counts[`public.${t.name}`] = n;
     // AFLDB-ISSUE-143: the EFFECTIVE treatment, so the transcript never says 'reinstate'
     // beside a table this environment's plan deliberately does not reinstate.
@@ -599,12 +615,15 @@ async function gateDanglingReferences(
     const withheld = historicalOnlyFor(t, environment);
     for (const ref of t.footballRefs) {
       if (!present.includes(t.name) || !present.includes(ref.references)) { lines.push(`${t.name}.${ref.column}: table absent`); continue; }
-      const idsRows = await old(`SELECT DISTINCT ${ref.column} AS id FROM public.${t.name} WHERE ${ref.column} IS NOT NULL ORDER BY 1`);
+      const relation = `${quoteIdent('public')}.${quoteIdent(t.name)}`;
+      const column = quoteIdent(ref.column);
+      const referencedRelation = `${quoteIdent('public')}.${quoteIdent(ref.references)}`;
+      const idsRows = await old(`SELECT DISTINCT ${column} AS id FROM ${relation} WHERE ${column} IS NOT NULL ORDER BY 1`);
       const ids = idsRows.map((r) => asInt(r.id));
       if (ids.length === 0) { lines.push(`ok   ${t.name}.${ref.column} -> ${ref.references}: no references in ${'the old database'}`); continue; }
       const missing = (await candidate(`
         SELECT count(*)::int AS n FROM unnest($1::bigint[]) u(id)
-         WHERE NOT EXISTS (SELECT 1 FROM public.${ref.references} r WHERE r.id = u.id)`, [ids]))[0];
+         WHERE NOT EXISTS (SELECT 1 FROM ${referencedRelation} r WHERE r.id = u.id)`, [ids]))[0];
       const n = asInt(missing?.n);
       const label = `${t.name}.${ref.column} -> ${ref.references}: ${ids.length} distinct id(s) referenced, ${n} missing in the candidate`;
       if (n === 0) { lines.push(`ok   ${label}`); continue; }
@@ -617,17 +636,26 @@ async function gateDanglingReferences(
         continue;
       }
       if (t.treatment !== 'reinstate') { lines.push(`info ${label} (treatment '${t.treatment}', not reinstated)`); continue; }
+      const stableTarget = stableLineageTargetForFootballRef(t, ref.column, ref.references);
+      if (stableTarget) {
+        fixups += 1;
+        lines.push(`WARN ${label} — numeric ids differ, but ${stableTarget.identity} is declared as the stable identity.`);
+        lines.push('       --phase restored resolves old id -> stable identity -> candidate id and writes a');
+        lines.push('       guarded UPDATE through --lineage-remap-out; apply it after reinstate, before acceptance.');
+        continue;
+      }
       if (ref.nullable) {
         fixups += 1;
         const conname = (await candidate(`
           SELECT conname FROM pg_constraint
-           WHERE conrelid = 'public.${t.name}'::regclass AND contype = 'f'
+           WHERE conrelid = ${quoteSqlLiteral(`public.${t.name}`)}::regclass AND contype = 'f'
              AND (SELECT attname FROM pg_attribute WHERE attrelid = conrelid AND attnum = conkey[1]) = $1`, [ref.column]))[0]?.conname;
+        const constraint = conname ? quoteIdent(String(conname)) : '<quote-the-fk-constraint-name>';
         lines.push(`WARN ${label} — reinstating this table as-is will fail the FK. Documented exception path (docs/production-promotion.md §7.4):`);
-        lines.push(`       ALTER TABLE public.${t.name} DROP CONSTRAINT ${String(conname ?? '<fk constraint>')};`);
-        lines.push(`       -- pg_restore --data-only --table=${t.name} … (as in the plan)`);
-        lines.push(`       UPDATE public.${t.name} SET ${ref.column} = NULL WHERE ${ref.column} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.${ref.references} r WHERE r.id = ${ref.column});`);
-        lines.push(`       ALTER TABLE public.${t.name} ADD CONSTRAINT ${String(conname ?? '<fk constraint>')} FOREIGN KEY (${ref.column}) REFERENCES public.${ref.references}(id);`);
+        lines.push(`       ALTER TABLE ${relation} DROP CONSTRAINT ${constraint};`);
+        lines.push(`       -- pg_restore --data-only --table=${shellQuote(`public.${t.name}`)} … (as in the plan)`);
+        lines.push(`       UPDATE ${relation} SET ${column} = NULL WHERE ${column} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${referencedRelation} r WHERE r.id = ${column});`);
+        lines.push(`       ALTER TABLE ${relation} ADD CONSTRAINT ${constraint} FOREIGN KEY (${column}) REFERENCES ${referencedRelation}(id);`);
       } else {
         fail = true;
         lines.push(`FAIL ${label} — NOT NULL reference cannot be reinstated as-is`);
@@ -716,11 +744,13 @@ async function gateLineageIdentity(
       // coherence check already requires it to name every one, so this can only agree — but
       // the acceptance site should read the same rule `judgeLineage` applies.)
       const disposition = declared?.columns.includes(ref.column) ? declared : undefined;
-      const where = ref.kindColumn ? ` AND ${ref.kindColumn} = $1` : '';
+      const relation = `${quoteIdent('public')}.${quoteIdent(t.name)}`;
+      const column = quoteIdent(ref.column);
+      const where = ref.kindColumn ? ` AND ${quoteIdent(ref.kindColumn)} = $1` : '';
       const params = ref.kindColumn ? [target.kind] : [];
       const totalRows = asInt((await old(
-        `SELECT count(*)::int AS n FROM public.${t.name}
-          WHERE ${ref.column} IS NOT NULL${where}`, params))[0]?.n);
+        `SELECT count(*)::int AS n FROM ${relation}
+          WHERE ${column} IS NOT NULL${where}`, params))[0]?.n);
       if (totalRows > LINEAGE_ROW_CAP) {
         // The cap exists because a per-row remap is only honest while an operator can read
         // it. A withheld table generates no remap at all, so the cap does not apply to it —
@@ -735,9 +765,9 @@ async function gateLineageIdentity(
         continue;
       }
       const rows = await old(
-        `SELECT id::bigint AS row_id, ${ref.column}::bigint AS old_value
-           FROM public.${t.name}
-          WHERE ${ref.column} IS NOT NULL${where}
+        `SELECT id::bigint AS row_id, ${column}::bigint AS old_value
+           FROM ${relation}
+          WHERE ${column} IS NOT NULL${where}
           ORDER BY id`, params);
       slots.push({
         table: t.name, ref, target, disposition, totalRows, enumerated: true,
@@ -759,7 +789,7 @@ async function gateLineageIdentity(
     const referenced = [...new Set(slots.filter((s) => s.target.identity === rule)
       .flatMap((s) => s.rows.map((r) => r.oldValue)))].sort((a, b) => a - b);
     const spread = (await old(
-      `SELECT id::bigint AS id FROM public.${entity} ORDER BY id LIMIT ${LINEAGE_SAMPLE_LIMIT}`))
+      `SELECT id::bigint AS id FROM ${quoteIdent('public')}.${quoteIdent(entity)} ORDER BY id LIMIT ${LINEAGE_SAMPLE_LIMIT}`))
       .map((r) => asInt(r.id));
     const ids = [...new Set([...referenced.slice(0, LINEAGE_SAMPLE_LIMIT), ...spread])];
     const before = new Map((await identitiesById(old, rule, ids)).map((p) => [p.id, p.identity] as const));
@@ -902,17 +932,31 @@ export function writePlan(opts: Options): string[] {
     environment: opts.environment,
   };
   const dir = opts.planDir!;
-  mkdirSync(dir, { recursive: true });
+  const artifacts = {
+    truncate: truncateSql(),
+    resyncIdentity: resyncIdentitySql(opts.environment),
+    auditMarker: auditMarkerSql(input),
+    reinstate: reinstatePlan(input),
+  };
+  assertPromotionPlanCoherent(artifacts, opts.environment);
   const files = [
-    ['promotion-truncate.sql', truncateSql()],
-    ['promotion-resync-identity.sql', resyncIdentitySql(opts.environment)],
-    ['promotion-audit-marker.sql', auditMarkerSql(input)],
-    ['promotion-reinstate.sh', reinstatePlan(input)],
+    ['promotion-truncate.sql', artifacts.truncate],
+    ['promotion-resync-identity.sql', artifacts.resyncIdentity],
+    ['promotion-audit-marker.sql', artifacts.auditMarker],
+    ['promotion-reinstate.sh', artifacts.reinstate],
+    ['promotion-swap.sql', swapSql(input)],
+    ['promotion-rollback.sql', rollbackSql(input)],
   ] as const;
+  const paths = files.map(([name, content]) => ({ name, content, path: join(dir, name) }));
+  const existing = paths.filter(({ path }) => existsSync(path));
+  if (existing.length > 0) {
+    throw new PromotionRefused(
+      `${existing.map(({ path }) => path).join(', ')} already exists; refusing to write a partial plan.`,
+    );
+  }
+  mkdirSync(dir, { recursive: true });
   const written: string[] = [];
-  for (const [name, content] of files) {
-    const path = join(dir, name);
-    if (existsSync(path)) throw new PromotionRefused(`${path} already exists; refusing to overwrite a plan file.`);
+  for (const { content, path } of paths) {
     writeFileSync(path, content, { encoding: 'utf8', mode: 0o600 });
     written.push(path);
   }

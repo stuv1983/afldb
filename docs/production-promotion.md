@@ -96,6 +96,12 @@ every table that references it and `external_grid_sources`, then `data_submissio
 promoted (§7.4d) is absent from that generated order altogether — it is still truncated, but
 it gets no `pg_restore` line and is expected to read zero rows at acceptance.
 
+The dependencies behind that order are explicit contract data (`restoreAfter` for `public`,
+`tableDependencies` for a reinstated schema), not an incidental alphabetic tie-break. Before a
+plan is written, `assertContractCoherent()` validates that every declared parent is present and
+earlier than its child in every environment, and that every schema table dependency is satisfied.
+The test suite pins those schema dependencies against migration 025's actual FKs.
+
 **Why the migration-080 tables are here.** They are deliberately **not** in
 `afldb_meta.import_writable_tables` (`080_external_grids.sql`: `grant_import_write()` hands out
 UPDATE, DELETE and TRUNCATE, and `privileges.sql` would restore them at every reconcile, which
@@ -170,6 +176,26 @@ so a new fixture is caught without editing anything.
 ---
 
 ## 3. Preflight (DEV and PROD, nothing destructive)
+
+This runbook starts after the implementation branch has passed
+`npm run merge:ready -- --issue NNN` and the operator has merged it. On main,
+`npm run preflight -- --mode merge` is the compact merge-only guard; neither command performs the
+merge or fetches remote state.
+
+Run the shared fail-fast preflight before the phase-specific checker. It inspects the
+worktree/branch/base, dirty state, migration reservations across relevant refs/worktrees,
+`.env`/tool availability, database identity/role/reachability and migration parity without
+printing a DSN or changing state:
+
+```bash
+# Workstation, DEV source example. Add --expect-role when the step requires an exact role.
+npm run preflight -- --mode promotion --environment dev \
+    --dsn-env AFLDB_TEST_DATABASE_URL --expect-database afldb_test \
+    --ssh-host streamanator
+```
+
+Every `FAIL` is a stop. `WARN` is evidence to read, not an automatic waiver. The command does
+not fetch, so an operator-required `git fetch` remains a separate explicit action.
 
 ```bash
 # DEV: streamanator — the rebuilt source must be exactly what the checkout expects
@@ -279,9 +305,20 @@ npm run db:promotion:check -- --plan --database "$CAND" --old-database afldb_pro
     --plan-dir ~/backups/afldb/promotion-$STAMP
 ```
 
-Four files, mode 600: `promotion-truncate.sql`, `promotion-resync-identity.sql`,
-`promotion-audit-marker.sql` and `promotion-reinstate.sh`. **Read all four.** The `.sh` is a
-transcript to follow line by line, not a script to pipe into a shell.
+When this command is launched from Git Bash, set `MSYS_NO_PATHCONV=1` and
+`MSYS2_ARG_CONV_EXCL='*'` first. The checker also refuses any dump path that arrives as a
+Windows drive/`Program Files` path, so `/home/arm/example.dump` cannot silently become
+`C:/Program Files/Git/home/arm/example.dump` in a Linux-host plan.
+
+Six files, mode 600: `promotion-truncate.sql`, `promotion-resync-identity.sql`,
+`promotion-audit-marker.sql`, `promotion-reinstate.sh`, `promotion-swap.sql` and
+`promotion-rollback.sql`. **Read all six.** The `.sh` is a transcript to follow line by line,
+not a script to pipe into a shell.
+
+The generator validates the assembled truncate, restore, sequence and audit artefacts before it
+creates the plan directory. It refuses DELETE/CASCADE substitution, an incomplete or misordered
+rebuilt-side FK lifecycle, a per-table/TOC-ordered schema restore, a restore order that differs
+from the contract, or any write/restore/sequence action for a historical-only table.
 
 ### 7.1 Empty every non-rebuilt table
 
@@ -297,6 +334,11 @@ references `auth_users`). So the file is one transaction that drops exactly that
 the one `TRUNCATE`, and re-adds the constraint by its original name (`REBUILT_REFERRER_FKS` in
 `promotion-inventory.ts`) — the `ADD CONSTRAINT` re-validates every rebuilt row, so a row that
 still pointed at a decision refuses the whole file, the same fail-closed shape as §7.4.
+
+`promotion_decisions` is a reset/recorded-gap table, so there is no target data restoration to
+wait for: the FK is recreated immediately after the truncate inside that transaction. The
+contract validator refuses this lifecycle if a future entry changes the target to `reinstate`,
+because that would recreate the FK before its referenced data was restored.
 
 ### 7.2 Restore the rows, one table at a time, in FK order
 
@@ -334,11 +376,11 @@ finding; both must be settled **before** the corpus's `pg_restore` line, and wha
 recorded in the promotion record.
 
 * `external_grid_sources.ingest_source_id` → `sources`. `sources` is import-writable, so the
-  candidate's id for key `gridley` need not equal the dumped one. Migration 080 seeds that
-  `sources` row, so the candidate already has one: read it
-  (`SELECT id FROM sources WHERE key = 'gridley'`) and restore the table with
-  `ingest_source_id` set to it, or reinstate and then `UPDATE` the column. **Never insert a
-  `sources` row for this.**
+  candidate's id for key `gridley` need not equal the dumped one. The contract declares
+  `sources.key` as the stable identity: `--phase restored --lineage-remap-out <file>` proves old
+  id → key → candidate id and emits a guarded `UPDATE` to run after reinstatement and before
+  candidate acceptance. Migration 080 seeds that source, so **never insert a `sources` row** and
+  never assume either run's numeric id is stable.
 * `external_grids.import_batch_id` → `import_batches`. The rebuilt candidate holds the
   *rebuild's* batches, not the batch that captured the corpus, so this reference dangles on any
   real promotion. Two supportable answers, and the choice is the operator's:
@@ -492,12 +534,7 @@ costs a `dropdb "$CAND"` and nothing else.
 # PROD: afldb-prod
 hostname
 sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service afldb
-sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
-SELECT pg_terminate_backend(pid) FROM pg_stat_activity
- WHERE datname IN ('afldb_prod', '$CAND') AND pid <> pg_backend_pid();
-ALTER DATABASE afldb_prod RENAME TO "afldb_prod_pre_rebuild_$STAMP";
-ALTER DATABASE "$CAND" RENAME TO afldb_prod;
-SQL
+sudo -u postgres psql -d postgres -f ~/backups/afldb/promotion-$STAMP/promotion-swap.sql
 sudo systemctl start afldb
 npm run db:promotion:check -- --phase production --database afldb_prod \
     --compare ~/backups/afldb/promotion-$STAMP.json \
@@ -509,6 +546,10 @@ refuses to touch any `pre_rebuild` name, and the checker accepts it as `--old-da
 stamped name inside SQL**: the stamp's hyphen makes `afldb_prod_pre_rebuild_$STAMP` an invalid bare identifier, so an
 unquoted `RENAME TO` refuses at parse time (met on the first DEV swap, `AFLDB-ISSUE-139` Phase 4E-3 — it failed safely
 before any rename; the quoted form succeeded).
+
+The plan now makes that rule executable rather than dependent on memory: `promotion-swap.sql`
+and its exact `promotion-rollback.sql` reverse quote every database identifier through one
+generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinned by tests.
 
 **Post-promotion state, in this order:**
 
@@ -555,12 +596,7 @@ identities correctly, which is the point of promoting rather than repairing in p
 # PROD: afldb-prod
 hostname
 sudo systemctl stop afldb-settle-afltables.timer afldb-settle-afltables.service afldb
-sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
-SELECT pg_terminate_backend(pid) FROM pg_stat_activity
- WHERE datname IN ('afldb_prod', 'afldb_prod_pre_rebuild_$STAMP') AND pid <> pg_backend_pid();
-ALTER DATABASE afldb_prod RENAME TO "$CAND";
-ALTER DATABASE "afldb_prod_pre_rebuild_$STAMP" RENAME TO afldb_prod;
-SQL
+sudo -u postgres psql -d postgres -f ~/backups/afldb/promotion-$STAMP/promotion-rollback.sql
 sudo systemctl start afldb
 ```
 
@@ -649,35 +685,25 @@ authority to protect, but it is not stateless:
   discarded, and it is a recorded decision, not an omission;
 * the current season, which is **re-acquired** by a settle run (§9), not copied.
 
-**Before the first DEV promotion**, take the same mandatory backup (§4) and the same
+**Before every DEV promotion**, take the same mandatory backup (§4) and the same
 pre-cutover snapshot (§5). The relaxations above concern identity gates, not evidence: a DEV
 database is still restored into a *new* candidate and swapped by rename, never restored over.
 
-**Two conditions specific to `afldb_dev` today.** Neither is a relaxation and neither has a
-flag; both are stated here because a DEV operator meets them and a production operator does
-not.
+**Historical DEV reconciliation (completed 2026-09-06).** These were conditions of the first
+`afldb_dev` promotion, not assumptions for a future run:
 
-* **The id lineage really does change.** `afldb_dev` is the pre-rebuild bootstrap database, so
-  a candidate restored from a rebuilt `afldb_test` does **not** share its player or match ids.
-  §7.4c and §7.4d are therefore mandatory reading for a DEV promotion rather than a rare case:
-  expect the `restored` phase to report a lineage change and to refuse until every
-  lineage-bound column is either evidenced or covered by a declared historical-only
-  disposition. As the contract stands, `player_link_resolutions` and `data_edits` are declared
-  (§7.4d) and everything else must be evidenced. Production has never met this because its
-  candidate is a rebuild of its own lineage.
-* **Migration parity refuses at `pre-cutover`, truthfully.** `afldb_dev`'s ledger carries
-  `079_access_code_delete.sql`, which is committed only on the unmerged branch
-  `claude/issue-116` and which **cannot merge at that number** — `main` owns a different
-  `079_nl_search_log_head_to_head_grain.sql`, applied everywhere including production. The
-  gate reports `UNKNOWN 079_access_code_delete.sql`: the live database is ahead of every
-  tracked checkout by a migration no checkout can reproduce, which is exactly what that gate
-  exists to say. Do not delete the ledger row, do not reverse the migration and do not
-  special-case the checker. The promotion **is** the reconciliation: the candidate is built
-  from this checkout's migrations, so `restored`, `candidate` and `production` all read parity
-  clean and the orphan row is gone at the swap. The `pre-cutover` phase still writes its
-  snapshot, which is what the later phases compare against; record the refusal and its reason
-  in the promotion record before continuing. (The branch must claim the next free migration
-  number before it can ever merge — `091` as this checkout stands.)
+* The old bootstrap database did not share the rebuilt candidate's player or match ids. The
+  completed promotion exercised §7.4c/§7.4d: `player_link_resolutions` and `data_edits` were
+  withheld under the tracked DEV-only historical disposition, and every other lineage-bound
+  column still required evidence. Current `afldb_dev` is the promoted rebuilt lineage; a future
+  promotion must let the `restored` gate measure lineage again rather than assume either outcome.
+* The replaced database's ledger carried the obsolete branch-only name
+  `079_access_code_delete.sql`, while main owned `079_nl_search_log_head_to_head_grain.sql` and
+  the reconciled access-code migration was pending as `091_access_code_delete.sql`. The truthful
+  pre-cutover parity refusal was recorded, and the candidate swap removed the orphan ledger row.
+  `091_access_code_delete.sql` is now on main (provenance commit `0378180`); the stale
+  `claude/issue-116` refs were removed. Do not reserve or renumber either migration from this
+  historical note, and never weaken parity checks to accommodate an obsolete ledger name.
 
 ```bash
 # DEV: streamanator — the same five phases, with the environment stated every time

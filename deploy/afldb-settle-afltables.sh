@@ -95,6 +95,19 @@ snapshot_dir="$SNAPSHOT_ROOT/$label"
 manifest="$MANIFEST_ROOT/$label.json"
 bundle="$snapshot_dir/observations.json"
 
+print_monitoring_block() {
+  echo "[monitor] exact launcher: /bin/sh $0"
+  echo "[monitor] launcher PID: $$"
+  echo "[monitor] process: watch -n 5 \"ps -o pid,ppid,etime,%cpu,%mem,stat,cmd -p $$ --ppid $$\""
+  echo '[monitor] database (same role): while true; do psql "$AFLDB_IMPORT_DATABASE_URL" -XAtc "SELECT pid,state,wait_event_type,wait_event,now()-xact_start,now()-query_start,left(query,120) FROM pg_stat_activity WHERE datname=current_database() AND usename=current_user AND pid<>pg_backend_pid() ORDER BY query_start;"; sleep 5; done'
+  echo '[monitor] log: journalctl -u afldb-settle-afltables -f'
+  echo '[monitor] success marker: AFLDB_SETTLE_SUCCESS'
+  echo '[monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)'
+  echo '[monitor] possible stall: no child/log/database-statement change for 10 minutes; elapsed time alone is not a stall.'
+  echo '[monitor] expected: routine no-change host-local baseline about 51s; new-round runs may take minutes.'
+  echo '[monitor] fresh/backfill: about 9,823 records measured 1h57m over a workstation tunnel; supervise outside this 1h systemd unit.'
+}
+
 # A failed acquisition must leave NO consumable partial snapshot. The manifest
 # is written last, so its absence is exactly the "acquisition did not finish"
 # signal; the raw CSVs beside it are then removed. A failure AFTER the manifest
@@ -102,6 +115,9 @@ bundle="$snapshot_dir/observations.json"
 # the evidence for the failure.
 cleanup_partial() {
   status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "AFLDB_SETTLE_FAILURE label=$label exit=$status" >&2
+  fi
   if [ "$status" -ne 0 ] && [ ! -f "$manifest" ] && [ -d "$snapshot_dir" ]; then
     echo "acquisition did not write a manifest; removing partial snapshot $snapshot_dir"
     rm -rf "$snapshot_dir"
@@ -111,6 +127,8 @@ cleanup_partial() {
 trap cleanup_partial EXIT
 
 echo "AFLDB in-season settle — season $season, label $label"
+
+print_monitoring_block
 
 # --- 1. acquire -----------------------------------------------------------
 # --datasets is deliberately NOT passed: in-season it defaults to the
@@ -147,4 +165,5 @@ echo "[3/3] settle (apply, automatic canonical path)"
 "$NODE" "$TSX" tools/current-season/settle-afltables.ts \
   --label "$label" --apply --auto-apply --require-complete-source
 
+echo "AFLDB_SETTLE_SUCCESS label=$label"
 echo "settle chain complete — label $label"

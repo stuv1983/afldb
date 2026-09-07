@@ -21,6 +21,29 @@ Default workflow:
 
 Do not turn a focused task into a repository-wide investigation.
 
+## Standard issue lifecycle commands
+
+Keep the routine path memorable and use the hardened entry points instead of rebuilding the
+Git/deploy checks by hand:
+
+```text
+update clean main
+-> npm run worktree:bootstrap -- --issue NNN --branch <agent>/issue-NNN
+-> enter the new worktree
+-> npm run preflight -- --mode implementation --issue NNN
+-> implement and validate
+-> operator commits the reviewed local change
+-> npm run merge:ready -- --issue NNN
+-> operator pushes/merges
+-> deploy/sync-dev.ps1 (DEV) and smoke
+-> close the issue
+```
+
+Use `preflight -- --mode merge` for operator work on main and `--mode read-only` for inspection
+on main. Before a long scheduled settle, follow the monitoring block printed by
+`deploy/afldb-settle-afltables.sh`. Details and the optional merge-readiness runbook block live in
+`docs/development/WORKFLOW.md`.
+
 ---
 
 # 1. Session and Context Discipline

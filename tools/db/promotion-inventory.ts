@@ -68,6 +68,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  *                          and the AFLDB-ISSUE-113 artefact already resolve people through.
  *   match_key              matches.match_key — NOT NULL UNIQUE since migration 003 and the
  *                          natural key migration 076's settle projections link on.
+ *   source_key             sources.key — the stable acquisition-source key used across
+ *                          rebuilt id lineages (for example `gridley`).
  *   none                   NO stable identity exists in this repository for the entity this
  *                          column points at. The column therefore CANNOT be remapped, and
  *                          across a lineage change the checker refuses rather than
@@ -78,7 +80,14 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  * match would silently retarget a human decision — the exact failure this type exists to
  * prevent.
  */
-export type LineageIdentityRule = 'afltables_profile_url' | 'match_key' | 'none';
+export type LineageIdentityRule = 'afltables_profile_url' | 'match_key' | 'source_key' | 'none';
+
+export type RestoreDependency = {
+  /** The table whose rows are restored after every table in `dependsOn`. */
+  table: string;
+  /** Direct FK parents within the same reinstated schema. */
+  dependsOn: readonly string[];
+};
 
 export type LineageTarget = {
   /** The `kindColumn` value this applies to; omitted when the column points at one table. */
@@ -163,6 +172,10 @@ export type TableTreatment = {
    * line in this order instead.
    */
   tables?: readonly string[];
+  /** Direct FK parents among reinstated public tables. */
+  restoreAfter?: readonly string[];
+  /** Direct FK dependencies for `tables`, explicit so TOC/alphabetical order is never used. */
+  tableDependencies?: readonly RestoreDependency[];
   subsystem: string;
   category: Category;
   /** True when the rows only ever existed on production (never produced by a rebuild). */
@@ -232,6 +245,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'admin_invites', subsystem: 'auth', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Outstanding invitations (token hashes, expiry). Preserved so an invite sent '
       + 'before promotion still works after it. References auth_users.',
   },
@@ -239,17 +253,20 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'beta_access_codes', subsystem: 'beta', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Live access credentials cut by an operator. Explicitly preserved; the '
       + 'operator may revoke after promotion but must not lose them by accident.',
   },
   {
     schema: 'public', name: 'beta_allowed_emails', subsystem: 'beta', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Allowlisted readers. Fixture-domain rows are refused by the identity gate.',
   },
   {
     schema: 'public', name: 'beta_join_requests', subsystem: 'beta', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Early-access requests and their answers — reader-supplied, unrecoverable.',
   },
   {
@@ -268,6 +285,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'site_settings', subsystem: 'admin', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Deliberate super-admin choices (home layout, grid audience, early-access copy, '
       + 'footer, theme). The app falls back to compiled defaults when rows are missing, '
       + 'which is exactly how a loss goes unnoticed. References auth_users.',
@@ -275,6 +293,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'site_media', subsystem: 'admin', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Uploaded images (bytes live in the row). Not in the issue\'s original list; '
       + 'found in the schema. References auth_users.',
   },
@@ -282,6 +301,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'data_edits', subsystem: 'admin data editor', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     lineageRefs: [{
       column: 'row_id', kindColumn: 'table_name',
       targets: [
@@ -328,6 +348,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'data_overrides', subsystem: 'admin data editor', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Durable human overrides that destructive reloads REPLAY over source rows. The '
       + 'rebuild ran on afldb_test, which holds none of them, so after reinstatement they '
       + 'must be replayed onto the promoted canonical rows (docs/production-promotion.md §8).',
@@ -336,6 +357,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'data_submissions', subsystem: 'contributor uploads', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     footballRefs: [{ column: 'import_batch_id', references: 'import_batches', nullable: true }],
     note: 'Uploaded CSVs and their review state. import_batch_id points at a batch the '
       + 'rebuild no longer has; the checker probes it and the runbook nulls dangling refs.',
@@ -343,18 +365,21 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'data_submission_rows', subsystem: 'contributor uploads', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['data_submissions'],
     note: 'Per-row validation reports. References data_submissions.',
   },
   // --- Player-link review (migrations 056, 067) -------------------------------------
   {
     schema: 'public', name: 'player_link_suggestions', subsystem: 'player links', category: 'application',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Reader suggestions. target_id is deliberately not a FK (a dead id is an '
       + 'unsurfaced row, not an error). References auth_users.',
   },
   {
     schema: 'public', name: 'player_link_resolutions', subsystem: 'player links', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
     footballRefs: [{ column: 'player_id', references: 'players', nullable: true }],
     lineageRefs: [
       {
@@ -432,16 +457,19 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'nl_search_review', subsystem: 'NL search telemetry', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['auth_users', 'nl_search_log'],
     note: 'Human review verdicts. References nl_search_log and auth_users.',
   },
   {
     schema: 'public', name: 'nl_search_feedback', subsystem: 'NL search telemetry', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['nl_search_log'],
     note: 'Reader thumbs up/down. References nl_search_log.',
   },
   {
     schema: 'public', name: 'app_health_events', subsystem: 'app health telemetry', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['nl_search_log'],
     note: 'Runtime health events. related_search_id is ON DELETE SET NULL, so it '
       + 'tolerates a missing log row. Preserved as a conscious retention decision.',
   },
@@ -449,6 +477,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'auth_audit_log', subsystem: 'auth', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'atLeast', order: 20,
+    restoreAfter: ['auth_users'],
     note: 'Append-only administrative audit trail. Reinstated in full AND followed by an '
       + 'explicit database.promoted marker row, so the log itself records the cutover '
       + 'rather than presenting a seamless history. Count is therefore >= the snapshot.',
@@ -533,6 +562,13 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         + 'Never insert a sources row for this: migration 080 seeds it, so the candidate '
         + 'already has one.',
     }],
+    lineageRefs: [{
+      column: 'ingest_source_id',
+      targets: [{ entity: 'sources', identity: 'source_key' }],
+      remediation: "Resolve ingest_source_id through sources.key (the stable 'gridley' key) "
+        + 'and apply the generated guarded UPDATE after reinstatement. The numeric source id '
+        + 'is deliberately not stable across rebuilt lineages and must never be assumed.',
+    }],
     note: 'The grid platforms boards are captured from — one row, gridley, seeded by '
       + 'migration 080 itself. Reinstated FIRST of the three: the truncate removes the '
       + "candidate's seed so the dump's row keeps its id and external_grids.source_id "
@@ -541,6 +577,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'external_grids', subsystem: 'Grid Solver corpus', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 30,
+    restoreAfter: ['external_grid_sources'],
     footballRefs: [{
       column: 'import_batch_id', references: 'import_batches', nullable: false,
       remediation: 'import_batches is import-writable, so the rebuilt candidate holds the '
@@ -563,6 +600,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
   {
     schema: 'public', name: 'external_grid_axes', subsystem: 'Grid Solver corpus', category: 'operations',
     productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 40,
+    restoreAfter: ['external_grids'],
     note: 'The six captured criteria of one board revision. ON DELETE CASCADE from '
       + 'external_grids, so it is reinstated LAST of the three; its own rows carry the '
       + "source's stable criterion keys and raw text, which no later parse can recover.",
@@ -583,6 +621,14 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     // issues stands alone.
     tables: ['seasons', 'fixtures', 'ladders', 'player_seasons', 'matches', 'scoring_events',
       'player_match_stats', 'issues'],
+    tableDependencies: [
+      { table: 'fixtures', dependsOn: ['seasons'] },
+      { table: 'ladders', dependsOn: ['seasons'] },
+      { table: 'player_seasons', dependsOn: ['seasons'] },
+      { table: 'matches', dependsOn: ['seasons', 'fixtures'] },
+      { table: 'scoring_events', dependsOn: ['seasons', 'matches'] },
+      { table: 'player_match_stats', dependsOn: ['seasons', 'matches'] },
+    ],
     note: 'The aflwstats.com scrape the aflw.* views read. NOT produced by '
       + 'db:test:rebuild, so a rebuilt database has it empty; reinstated table by table '
       + 'in FK order from the pre-cutover dump (or reloaded with tools/aflw/load_staging.py --load).',
@@ -738,20 +784,151 @@ export function historicalOnlyProblems(table: TableTreatment): string[] {
  * calls this before its first query, and the unit tests call it directly. Every rule here
  * exists so a historical-only declaration cannot quietly become a general relaxation.
  */
-export function assertContractCoherent(): void {
-  for (const table of PROMOTION_CONTRACT) {
-    const where = `${table.schema}.${table.name}`;
-    const problems = historicalOnlyProblems(table);
-    // Condition (2) of AFLDB-ISSUE-143, proved rather than promised: acceptance and omission
-    // come from one declaration, so the gate and the generated plan cannot disagree.
-    for (const environment of table.historicalOnly?.environments ?? []) {
-      if (ENVIRONMENTS.includes(environment) && reinstatedPublicTables(environment).includes(table.name)) {
-        problems.push(`is declared historical-only for '${environment}' yet the generated plan still reinstates it`);
+function restoreOrderFor(
+  contract: readonly TableTreatment[], environment: Environment,
+): TableTreatment[] {
+  return contract
+    .filter((t) => t.schema === 'public' && effectiveTreatment(t, environment) === 'reinstate')
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+function dependencyProblems(
+  label: string, order: readonly string[], dependencies: readonly RestoreDependency[],
+): string[] {
+  const problems: string[] = [];
+  const positions = new Map(order.map((table, index) => [table, index] as const));
+  if (positions.size !== order.length) problems.push(`${label} restore order contains a duplicate table`);
+  const seen = new Set<string>();
+  for (const dependency of dependencies) {
+    if (!positions.has(dependency.table)) {
+      problems.push(`${label} dependency names missing child '${dependency.table}'`);
+      continue;
+    }
+    for (const parent of dependency.dependsOn) {
+      const edge = `${dependency.table}->${parent}`;
+      if (seen.has(edge)) problems.push(`${label} dependency ${edge} is declared more than once`);
+      seen.add(edge);
+      if (parent === dependency.table) problems.push(`${label} table '${dependency.table}' depends on itself`);
+      if (!positions.has(parent)) {
+        problems.push(`${label} dependency ${edge} names a parent absent from the restore`);
+      } else if (positions.get(parent)! >= positions.get(dependency.table)!) {
+        problems.push(`${label} restore order puts '${dependency.table}' before required parent '${parent}'`);
       }
     }
-    if (problems.length > 0) {
-      throw new PromotionRefused(`Incoherent promotion contract: ${where} ${problems.join('; ')}.`);
+  }
+  return problems;
+}
+
+/** Pure structural validation for the promotion contract, including synthetic test contracts. */
+export function promotionContractProblems(
+  contract: readonly TableTreatment[] = PROMOTION_CONTRACT,
+  rebuiltReferrerFks: readonly RebuiltReferrerFk[] = REBUILT_REFERRER_FKS,
+): string[] {
+  const problems: string[] = [];
+  const keys = contract.map((t) => `${t.schema}.${t.name}`);
+  for (const key of new Set(keys.filter((value, index) => keys.indexOf(value) !== index))) {
+    problems.push(`${key} has contradictory duplicate dispositions`);
+  }
+
+  for (const table of contract) {
+    const where = `${table.schema}.${table.name}`;
+    for (const problem of historicalOnlyProblems(table)) problems.push(`${where} ${problem}`);
+    if (table.schema === 'public') {
+      if (table.tables || table.tableDependencies) {
+        problems.push(`${where} is public but declares schema-table restore metadata`);
+      }
+      if (table.restoreAfter && table.treatment !== 'reinstate') {
+        problems.push(`${where} declares restore dependencies but is not reinstated`);
+      }
+    } else {
+      if (table.restoreAfter) problems.push(`${where} must use tableDependencies, not restoreAfter`);
+      if (table.treatment === 'reinstate' && (!table.tables || table.tables.length === 0)) {
+        problems.push(`${where} is reinstated but declares no FK-ordered table list`);
+      }
+      if (table.tables) {
+        problems.push(...dependencyProblems(where, table.tables, table.tableDependencies ?? []));
+      }
     }
+    if (table.lineageRefs && (table.schema !== 'public' || table.treatment !== 'reinstate')) {
+      problems.push(`${where} declares lineage-bound columns but is not a reinstated public table`);
+    }
+    const lineageColumns = (table.lineageRefs ?? []).map((ref) => ref.column);
+    if (new Set(lineageColumns).size !== lineageColumns.length) {
+      problems.push(`${where} declares a lineage-bound column more than once`);
+    }
+  }
+
+  for (const environment of ENVIRONMENTS) {
+    const ordered = restoreOrderFor(contract, environment);
+    const dependencies = ordered.flatMap((table) => (table.restoreAfter ?? [])
+      .map((parent) => ({ table: table.name, dependsOn: [parent] })));
+    problems.push(...dependencyProblems(
+      `public (${environment})`, ordered.map((table) => table.name), dependencies,
+    ));
+    for (const table of contract) {
+      if (table.schema !== 'public' || !historicalOnlyFor(table, environment)) continue;
+      if (ordered.some((restored) => restored.name === table.name)) {
+        problems.push(`${table.schema}.${table.name} is historical-only for '${environment}' yet still restored`);
+      }
+    }
+  }
+
+  const publicByName = new Map(contract
+    .filter((t) => t.schema === 'public')
+    .map((t) => [t.name, t] as const));
+  for (const table of publicByName.values()) {
+    for (const ref of table.footballRefs ?? []) {
+      const stableTargets = lineageTargetsOf(table)
+        .filter(({ ref: lineageRef, target }) => lineageRef.column === ref.column
+          && target.entity === ref.references
+          && target.identity !== 'none');
+      if (stableTargets.length > 1) {
+        problems.push(`${table.name}.${ref.column} has more than one stable remap target for ${ref.references}`);
+      }
+      if (table.treatment === 'reinstate' && !ref.nullable
+          && stableTargets.length === 0 && !ref.remediation?.trim()) {
+        problems.push(`${table.name}.${ref.column} is a preserved NOT NULL reference with no remap disposition`);
+      }
+      const restoredParent = publicByName.get(ref.references);
+      if (table.treatment === 'reinstate' && restoredParent?.treatment === 'reinstate'
+          && !(table.restoreAfter ?? []).includes(ref.references)) {
+        problems.push(`${table.name}.${ref.column} references restored table ${ref.references} without restoreAfter`);
+      }
+    }
+  }
+  const constraints = rebuiltReferrerFks.map((fk) => fk.constraint);
+  if (new Set(constraints).size !== constraints.length) {
+    problems.push('rebuilt-referrer FK lifecycle declares a constraint more than once');
+  }
+  for (const fk of rebuiltReferrerFks) {
+    const target = publicByName.get(fk.references);
+    const referrer = publicByName.get(fk.referrer);
+    const label = `${fk.referrer}.${fk.column} -> ${fk.references}`;
+    if (!fk.constraint.trim() || !fk.column.trim() || !fk.referrer.trim() || !fk.references.trim()) {
+      problems.push(`rebuilt-referrer FK ${label} has an empty lifecycle field`);
+      continue;
+    }
+    if (!target || target.treatment === 'rebuilt') {
+      problems.push(`rebuilt-referrer FK ${label} does not target a truncated contract table`);
+    }
+    if (target?.treatment === 'reinstate') {
+      problems.push(`rebuilt-referrer FK ${label} targets restored data, but this lifecycle recreates before restore`);
+    }
+    if (referrer && referrer.treatment !== 'rebuilt') {
+      problems.push(`rebuilt-referrer FK ${label} names a referrer that is not rebuilt`);
+    }
+  }
+  return problems;
+}
+
+/** The contract's invariants, checked before plan output or any database query. */
+export function assertContractCoherent(
+  contract: readonly TableTreatment[] = PROMOTION_CONTRACT,
+  rebuiltReferrerFks: readonly RebuiltReferrerFk[] = REBUILT_REFERRER_FKS,
+): void {
+  const problems = promotionContractProblems(contract, rebuiltReferrerFks);
+  if (problems.length > 0) {
+    throw new PromotionRefused(`Incoherent promotion contract: ${problems.join('; ')}.`);
   }
 }
 
@@ -840,6 +1017,18 @@ export function lineageTargetsOf(table: TableTreatment): { ref: LineageRef; targ
   return (table.lineageRefs ?? []).flatMap((ref) => ref.targets.map((target) => ({ ref, target })));
 }
 
+/** Stable-identity remap declared for a real FK into rebuilt data, when one exists. */
+export function stableLineageTargetForFootballRef(
+  table: TableTreatment, column: string, references: string,
+): LineageTarget | undefined {
+  const targets = lineageTargetsOf(table)
+    .filter(({ ref, target }) => ref.column === column
+      && target.entity === references
+      && target.identity !== 'none')
+    .map(({ target }) => target);
+  return targets.length === 1 ? targets[0] : undefined;
+}
+
 /**
  * The identity of a row, in SQL, asked of BOTH databases by identical logic. `byId` takes a
  * bigint[] of row ids; `byIdentity` takes a text[] of identities. Both return `(id,
@@ -888,6 +1077,20 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
       SELECT id::bigint AS id, match_key AS identity
         FROM public.matches
        WHERE match_key = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  source_key: {
+    entity: 'sources',
+    description: 'sources.key — NOT NULL UNIQUE, the stable acquisition-source identity',
+    byId: `
+      SELECT id::bigint AS id, key AS identity
+        FROM public.sources
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, key AS identity
+        FROM public.sources
+       WHERE key = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
 };
@@ -1046,7 +1249,9 @@ export function lineageRemapSql(input: LineageRemapInput): string {
 
   let unresolvedTotal = 0;
   for (const plan of input.plans) {
-    const scope = plan.kindColumn ? ` WHERE ${plan.kindColumn} = '${plan.kind}'` : '';
+    const scope = plan.kindColumn
+      ? ` WHERE ${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
+      : '';
     lines.push('');
     lines.push(`-- ${plan.table}.${plan.column}${scope} -> ${plan.entity} (identity: ${plan.rule})`);
     // AFLDB-ISSUE-143. Nothing is emitted for a table the plan did not reinstate: there are
@@ -1069,10 +1274,12 @@ export function lineageRemapSql(input: LineageRemapInput): string {
       const m = byOld.get(row.oldValue);
       if (!m) continue;
       if (m.newId === m.oldId) continue;
-      const guard = plan.kindColumn ? ` AND ${plan.kindColumn} = '${plan.kind}'` : '';
+      const guard = plan.kindColumn
+        ? ` AND ${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
+        : '';
       lines.push(`--   ${m.oldId} -> ${m.identity} -> ${m.newId}`);
-      lines.push(`UPDATE public.${plan.table} SET ${plan.column} = ${m.newId}`
-        + ` WHERE id = ${row.rowId} AND ${plan.column} = ${m.oldId}${guard};`);
+      lines.push(`UPDATE ${quoteIdent('public')}.${quoteIdent(plan.table)} SET ${quoteIdent(plan.column)} = ${m.newId}`
+        + ` WHERE ${quoteIdent('id')} = ${row.rowId} AND ${quoteIdent(plan.column)} = ${m.oldId}${guard};`);
     }
     for (const u of plan.remap.unresolved) {
       unresolvedTotal += 1;
@@ -1109,18 +1316,48 @@ export function lineageRemapSql(input: LineageRemapInput): string {
   lines.push('-- proved against. This is the proof that no row changed semantic owner.');
   for (const plan of input.plans) {
     if (plan.remap.mapped.length === 0 || withheld(plan)) continue;
-    const pairs = plan.remap.mapped.map((m) => `(${m.newId}, ${quote(m.identity)})`).join(', ');
-    const guard = plan.kindColumn ? ` AND t.${plan.kindColumn} = '${plan.kind}'` : '';
+    const pairs = plan.remap.mapped.map((m) => `(${m.newId}, ${quoteSqlLiteral(m.identity)})`).join(', ');
+    const guard = plan.kindColumn
+      ? ` AND t.${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
+      : '';
     lines.push(`-- ${plan.table}.${plan.column}: expect 0 rows`);
-    lines.push(`SELECT t.id, t.${plan.column} FROM public.${plan.table} t`
-      + ` WHERE t.${plan.column} IS NOT NULL${guard}`
-      + ` AND t.${plan.column} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
+    lines.push(`SELECT t.${quoteIdent('id')}, t.${quoteIdent(plan.column)} FROM ${quoteIdent('public')}.${quoteIdent(plan.table)} t`
+      + ` WHERE t.${quoteIdent(plan.column)} IS NOT NULL${guard}`
+      + ` AND t.${quoteIdent(plan.column)} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
   }
-  return `${lines.join('\n')}\n`;
+  const sql = `${lines.join('\n')}\n`;
+  const problems = lineageRemapProblems(sql, input.plans, names.environment);
+  if (problems.length > 0) {
+    throw new PromotionRefused(`Incoherent lineage remap: ${problems.join('; ')}.`);
+  }
+  return sql;
 }
 
-function quote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+function regexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Structural no-write guard for tables omitted as historical-only. */
+export function lineageRemapProblems(
+  sql: string, plans: readonly LineageColumnPlan[], environment: Environment,
+): string[] {
+  const problems: string[] = [];
+  const executable = sql.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('--'));
+  const withheld = new Set(plans
+    .filter((plan) => isHistoricalOnlyColumn(plan.table, plan.column, environment))
+    .map((plan) => plan.table));
+  for (const table of withheld) {
+    const relation = `(?:${regexLiteral(quoteIdent('public'))}\\.)?${regexLiteral(quoteIdent(table))}`;
+    const write = new RegExp(
+      `^(?:UPDATE|INSERT\\s+INTO|DELETE\\s+FROM|TRUNCATE(?:\\s+TABLE)?)\\s+${relation}(?:\\s|$)`, 'i',
+    );
+    if (executable.some((line) => write.test(line))) {
+      problems.push(`historical-only table ${table} receives a generated remap write`);
+    }
+  }
+  return problems;
 }
 
 // ---------------------------------------------------------------------------
@@ -1437,8 +1674,43 @@ export type PlanInput = {
   environment?: Environment;
 };
 
+/** PostgreSQL identifier quoting equivalent to format('%I', value). */
+export function quoteIdent(value: string): string {
+  if (!value || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new PromotionRefused('SQL identifiers must be non-empty and contain no control characters.');
+  }
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+/** PostgreSQL text literal quoting for generated, operator-reviewed SQL. */
+export function quoteSqlLiteral(value: string): string {
+  if (/[\u0000]/.test(value)) throw new PromotionRefused('SQL text values cannot contain NUL.');
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** POSIX shell argument quoting. Plans are transcripts for Linux hosts. */
+export function shellQuote(value: string): string {
+  if (/[\u0000]/.test(value)) throw new PromotionRefused('Shell arguments cannot contain NUL.');
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+/**
+ * Git Bash rewrites /home/... before Node receives argv. Refuse the rewritten value and
+ * every non-POSIX path rather than generating a plan that names a nonexistent host file.
+ */
+export function assertLinuxHostPath(value: string, flag: string): void {
+  const rewritten = /^[a-z]:[\\/]/i.test(value)
+    || /(?:^|[\\/])Program Files(?:[\\/]|$)/i.test(value);
+  if (rewritten || !value.startsWith('/') || /\\/.test(value) || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new PromotionRefused(
+      `${flag} must be an absolute Linux host path. Received a Windows/MSYS-shaped path. `
+      + "From Git Bash set MSYS_NO_PATHCONV=1 and MSYS2_ARG_CONV_EXCL='*', then rerun --plan.",
+    );
+  }
+}
+
 function sqlArray(names: readonly string[]): string {
-  return `ARRAY[${names.map((n) => `'${n}'`).join(', ')}]`;
+  return `ARRAY[${names.map(quoteSqlLiteral).join(', ')}]`;
 }
 
 /** Soft-wrap a reason for a comment block, so a plan stays readable in a terminal. */
@@ -1489,14 +1761,14 @@ export const REBUILT_REFERRER_FKS: readonly RebuiltReferrerFk[] = [
 
 /** SQL that empties every non-rebuilt contract table in the candidate. */
 export function truncateSql(): string {
-  const tables = truncatedPublicTables().map((t) => `public.${t}`).join(',\n  ');
+  const tables = truncatedPublicTables().map((t) => `${quoteIdent('public')}.${quoteIdent(t)}`).join(',\n  ');
   const dropFks = REBUILT_REFERRER_FKS.map((fk) => `-- ${fk.referrer} is REBUILT and holds ${fk.column} -> ${fk.references} (migration ${fk.migration}),
 -- so ${fk.references} cannot be truncated while the constraint exists (AFLDB-ISSUE-139).
-ALTER TABLE public.${fk.referrer} DROP CONSTRAINT ${fk.constraint};`).join('\n');
+ALTER TABLE ${quoteIdent('public')}.${quoteIdent(fk.referrer)} DROP CONSTRAINT ${quoteIdent(fk.constraint)};`).join('\n');
   const addFks = REBUILT_REFERRER_FKS.map((fk) => `-- Re-added by its original name; this re-validates every rebuilt row, so a row that still
 -- pointed into the emptied table refuses the whole transaction rather than dangling.
-ALTER TABLE public.${fk.referrer} ADD CONSTRAINT ${fk.constraint}
-  FOREIGN KEY (${fk.column}) REFERENCES public.${fk.references}(id);`).join('\n');
+ALTER TABLE ${quoteIdent('public')}.${quoteIdent(fk.referrer)} ADD CONSTRAINT ${quoteIdent(fk.constraint)}
+  FOREIGN KEY (${quoteIdent(fk.column)}) REFERENCES ${quoteIdent('public')}.${quoteIdent(fk.references)}(${quoteIdent('id')});`).join('\n');
   const schemas = PROMOTION_CONTRACT
     .filter((t) => t.schema !== 'public' && t.treatment === 'reinstate')
     .map((t) => t.schema);
@@ -1507,7 +1779,7 @@ ALTER TABLE public.${fk.referrer} ADD CONSTRAINT ${fk.constraint}
 DECLARE tabs text;
 BEGIN
   SELECT string_agg(format('%I.%I', schemaname, tablename), ', ' ORDER BY tablename)
-    INTO tabs FROM pg_tables WHERE schemaname = '${schema}';
+    INTO tabs FROM pg_tables WHERE schemaname = ${quoteSqlLiteral(schema)};
   IF tabs IS NOT NULL THEN
     EXECUTE 'TRUNCATE TABLE ' || tabs || ' RESTART IDENTITY';
   END IF;
@@ -1562,7 +1834,6 @@ END $$;
 
 /** The explicit cutover marker. Written AFTER reinstatement, BEFORE acceptance. */
 export function auditMarkerSql(input: PlanInput): string {
-  const j = (s: string) => `'${s.replace(/'/g, "''")}'`;
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
   const label = names.environment === 'prod' ? 'production promotion' : 'dev promotion';
   // AFLDB-ISSUE-143: an intentional omission is only a decision if the promoted database
@@ -1571,9 +1842,9 @@ export function auditMarkerSql(input: PlanInput): string {
   const withheld = historicalOnlyTables(names.environment);
   const historicalList = withheld.length === 0
     ? "ARRAY[]::text[]"
-    : `ARRAY[${withheld.map((e) => j(`${e.table.name} (${e.disposition.decidedBy})`)).join(', ')}]`;
+    : `ARRAY[${withheld.map((e) => quoteSqlLiteral(`${e.table.name} (${e.disposition.decidedBy})`)).join(', ')}]`;
   const historicalGaps = withheld
-    .map((e) => `,\n      ${j(`${e.disposition.summary} [${e.disposition.decidedBy}]`)}`)
+    .map((e) => `,\n      ${quoteSqlLiteral(`${e.disposition.summary} [${e.disposition.decidedBy}]`)}`)
     .join('');
   return `-- AFLDB-ISSUE-125: the audit trail records the promotion itself. An operator, not a
 -- user, so actor_user_id is NULL and actor_label names the procedure.
@@ -1584,11 +1855,11 @@ VALUES (
   'database.promoted',
   jsonb_build_object(
     'issue', 'AFLDB-ISSUE-125',
-    'candidate', ${j(input.candidate)},
-    'replaced', ${j(input.oldDatabase)},
-    'rebuilt_dump', ${j(input.rebuiltDump)},
-    'pre_cutover_dump', ${j(input.preCutoverDump)},
-    'environment', ${j(input.environment ?? DEFAULT_ENVIRONMENT)},
+    'candidate', ${quoteSqlLiteral(input.candidate)},
+    'replaced', ${quoteSqlLiteral(input.oldDatabase)},
+    'rebuilt_dump', ${quoteSqlLiteral(input.rebuiltDump)},
+    'pre_cutover_dump', ${quoteSqlLiteral(input.preCutoverDump)},
+    'environment', ${quoteSqlLiteral(input.environment ?? DEFAULT_ENVIRONMENT)},
     'reinstated', to_jsonb(${sqlArray(tablesWithTreatment('reinstate', names.environment))}),
     'reset', to_jsonb(${sqlArray(tablesWithTreatment('reset', names.environment))}),
     'regenerated', to_jsonb(${sqlArray(tablesWithTreatment('regenerate', names.environment))}),
@@ -1606,12 +1877,65 @@ VALUES (
 `;
 }
 
+function cutoverNames(input: PlanInput): {
+  candidate: string; live: string; preRebuild: string; environment: Environment;
+} {
+  const environment = input.environment ?? DEFAULT_ENVIRONMENT;
+  const names = environmentNames(environment);
+  assertDatabaseForPhase('candidate', input.candidate, environment);
+  if (input.oldDatabase !== names.live) {
+    throw new PromotionRefused(
+      `A swap plan replaces '${names.live}', not '${input.oldDatabase}'. Generate it before cutover.`,
+    );
+  }
+  const stamp = input.candidate.slice(names.candidatePrefix.length);
+  if (!stamp) throw new PromotionRefused('The candidate database name has no stamp.');
+  return {
+    candidate: input.candidate,
+    live: names.live,
+    preRebuild: `${names.preRebuildPrefix}${stamp}`,
+    environment,
+  };
+}
+
+/** Operator-reviewed SQL for the cutover. Every dynamic database name is an identifier. */
+export function swapSql(input: PlanInput): string {
+  const names = cutoverNames(input);
+  return `\\set ON_ERROR_STOP on
+-- Run as postgres only after the application/settle services are stopped.
+-- Connect to postgres (never to either database being renamed).
+SELECT pg_terminate_backend(pid)
+  FROM pg_stat_activity
+ WHERE datname IN (${quoteSqlLiteral(names.live)}, ${quoteSqlLiteral(names.candidate)})
+   AND pid <> pg_backend_pid();
+ALTER DATABASE ${quoteIdent(names.live)} RENAME TO ${quoteIdent(names.preRebuild)};
+ALTER DATABASE ${quoteIdent(names.candidate)} RENAME TO ${quoteIdent(names.live)};
+`;
+}
+
+/** Exact reverse of swapSql; writes made after cutover stay in the candidate database. */
+export function rollbackSql(input: PlanInput): string {
+  const names = cutoverNames(input);
+  return `\\set ON_ERROR_STOP on
+-- Run as postgres only after the application/settle services are stopped.
+-- The promoted live database is renamed back to the original candidate name.
+SELECT pg_terminate_backend(pid)
+  FROM pg_stat_activity
+ WHERE datname IN (${quoteSqlLiteral(names.live)}, ${quoteSqlLiteral(names.preRebuild)})
+   AND pid <> pg_backend_pid();
+ALTER DATABASE ${quoteIdent(names.live)} RENAME TO ${quoteIdent(names.candidate)};
+ALTER DATABASE ${quoteIdent(names.preRebuild)} RENAME TO ${quoteIdent(names.live)};
+`;
+}
+
 /**
  * The reinstatement command sequence. Each table is its own `pg_restore` under
  * `--single-transaction`, in FK order, so a failure names the table and leaves the
  * earlier ones committed and the failing one untouched.
  */
 export function reinstatePlan(input: PlanInput): string {
+  assertLinuxHostPath(input.preCutoverDump, '--pre-cutover-dump');
+  assertLinuxHostPath(input.rebuiltDump, '--rebuilt-dump');
   const names = environmentNames(input.environment ?? DEFAULT_ENVIRONMENT);
   const envFlag = names.environment === 'prod' ? '' : ` --environment ${names.environment}`;
   const lines: string[] = [];
@@ -1644,13 +1968,13 @@ export function reinstatePlan(input: PlanInput): string {
   lines.push('#    in foreign-key order. --data-only: the schema is the rebuilt one.');
   for (const table of reinstatedPublicTables(names.environment)) {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
-    lines.push(`           --single-transaction --exit-on-error --table=${table} "${input.preCutoverDump}"`);
+    lines.push(`           --single-transaction --exit-on-error --table=${table} ${shellQuote(input.preCutoverDump)}`);
   }
   // One line per table of the schema, in the contract's FK order — never `--schema=` alone,
   // which restores in TOC (alphabetical) order and fails on the schema's own foreign keys.
   for (const { schema, table } of reinstatedSchemaTables()) {
     lines.push(`pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\`);
-    lines.push(`           --single-transaction --exit-on-error --schema=${schema} --table=${table} "${input.preCutoverDump}"`);
+    lines.push(`           --single-transaction --exit-on-error --schema=${schema} --table=${table} ${shellQuote(input.preCutoverDump)}`);
   }
   lines.push('');
   lines.push('# 3. Re-sync identity sequences (a data-only table restore does not carry SEQUENCE SET).');
@@ -1663,11 +1987,118 @@ export function reinstatePlan(input: PlanInput): string {
   lines.push(`psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f tools/maintenance/privileges.sql`);
   lines.push('');
   lines.push('# 6. Acceptance, before the swap:');
-  lines.push(`npm run db:promotion:check -- --phase candidate --database ${input.candidate}${envFlag} \\`);
+  lines.push(`npm run db:promotion:check -- --phase candidate --database ${shellQuote(input.candidate)}${envFlag} \\`);
   lines.push(names.environment === 'prod'
     ? '    --compare <snapshot.json> --expect-super-admin <real production super admin email>'
     : '    --compare <snapshot.json> [--expect-super-admin <email>]   # optional on DEV, enforced when given');
   return `${lines.join('\n')}\n`;
+}
+
+export type PromotionPlanArtifacts = {
+  truncate: string;
+  reinstate: string;
+  resyncIdentity: string;
+  auditMarker: string;
+};
+
+function occurrences(source: string, needle: string): number {
+  return source.split(needle).length - 1;
+}
+
+/** Pure validation of the generated plan before any file is written or database is contacted. */
+export function promotionPlanProblems(
+  artifacts: PromotionPlanArtifacts,
+  environment: Environment = DEFAULT_ENVIRONMENT,
+): string[] {
+  const problems = promotionContractProblems();
+  const sql = artifacts.truncate;
+  const begin = sql.indexOf('BEGIN;');
+  const truncate = sql.indexOf('TRUNCATE TABLE');
+  const commit = sql.lastIndexOf('COMMIT;');
+  if (begin < 0 || truncate < begin || commit < truncate) {
+    problems.push('truncate lifecycle is not one ordered BEGIN -> TRUNCATE -> COMMIT sequence');
+  }
+  if (/\bDELETE\s+FROM\b/i.test(sql)) problems.push('truncate lifecycle substitutes DELETE for controlled TRUNCATE');
+  if (/\bCASCADE\b/i.test(sql)) problems.push('truncate lifecycle uses CASCADE');
+
+  const publicTruncate = truncate >= 0
+    ? sql.slice(truncate, sql.indexOf('RESTART IDENTITY;', truncate) + 'RESTART IDENTITY;'.length)
+    : '';
+  for (const table of truncatedPublicTables()) {
+    const target = `${quoteIdent('public')}.${quoteIdent(table)}`;
+    if (occurrences(publicTruncate, target) !== 1) {
+      problems.push(`truncate lifecycle must name ${target} exactly once in the public TRUNCATE`);
+    }
+  }
+  for (const fk of REBUILT_REFERRER_FKS) {
+    const relation = `${quoteIdent('public')}.${quoteIdent(fk.referrer)}`;
+    const constraint = quoteIdent(fk.constraint);
+    const dropText = `ALTER TABLE ${relation} DROP CONSTRAINT ${constraint};`;
+    const addText = `ALTER TABLE ${relation} ADD CONSTRAINT ${constraint}`;
+    const drop = sql.indexOf(dropText);
+    const add = sql.indexOf(addText);
+    if (occurrences(sql, dropText) !== 1 || occurrences(sql, addText) !== 1) {
+      problems.push(`FK lifecycle for ${fk.constraint} must contain exactly one DROP and one ADD`);
+    } else if (!(begin < drop && drop < truncate && truncate < add && add < commit)) {
+      problems.push(`FK lifecycle for ${fk.constraint} is not ordered BEGIN -> DROP -> TRUNCATE -> ADD -> COMMIT`);
+    }
+    const definition = `FOREIGN KEY (${quoteIdent(fk.column)}) REFERENCES `
+      + `${quoteIdent('public')}.${quoteIdent(fk.references)}(${quoteIdent('id')});`;
+    if (!sql.includes(definition)) problems.push(`FK lifecycle for ${fk.constraint} restores the wrong definition`);
+  }
+
+  for (const entry of PROMOTION_CONTRACT.filter((t) => t.schema !== 'public' && t.treatment === 'reinstate')) {
+    const schemaLiteral = quoteSqlLiteral(entry.schema);
+    if (!sql.includes(`schemaname = ${schemaLiteral}`)
+        || !sql.includes("string_agg(format('%I.%I', schemaname, tablename)")
+        || !sql.includes("EXECUTE 'TRUNCATE TABLE ' || tabs || ' RESTART IDENTITY'")) {
+      problems.push(`${entry.schema} truncate is not one FK-safe schema/table-group statement`);
+    }
+  }
+
+  const publicRestores = [...artifacts.reinstate.matchAll(/--exit-on-error --table=([a-z_]+)/g)]
+    .map((match) => match[1]);
+  const expectedPublic = reinstatedPublicTables(environment);
+  if (JSON.stringify(publicRestores) !== JSON.stringify(expectedPublic)) {
+    problems.push(`public restore order differs from the ${environment} contract`);
+  }
+  for (const schema of reinstatedSchemas()) {
+    const schemaRestores = [...artifacts.reinstate.matchAll(
+      new RegExp(`--schema=${schema} --table=([a-z_]+)`, 'g'),
+    )].map((match) => match[1]);
+    const expected = reinstatedSchemaTables()
+      .filter((entry) => entry.schema === schema)
+      .map((entry) => entry.table);
+    if (JSON.stringify(schemaRestores) !== JSON.stringify(expected)) {
+      problems.push(`${schema} restore order differs from its explicit FK dependency order`);
+    }
+    if (artifacts.reinstate.includes(`--schema=${schema} "`)) {
+      problems.push(`${schema} restore falls back to unsafe whole-schema/TOC order`);
+    }
+  }
+
+  for (const { table } of historicalOnlyTables(environment)) {
+    if (publicRestores.includes(table.name)) {
+      problems.push(`historical-only table ${table.name} receives a pg_restore command`);
+    }
+    if (!artifacts.auditMarker.includes(table.name)) {
+      problems.push(`historical-only table ${table.name} is absent from the audit marker`);
+    }
+    if (artifacts.resyncIdentity.includes(`'${table.name}'`)) {
+      problems.push(`historical-only table ${table.name} receives post-restore sequence writes`);
+    }
+  }
+  return problems;
+}
+
+export function assertPromotionPlanCoherent(
+  artifacts: PromotionPlanArtifacts,
+  environment: Environment = DEFAULT_ENVIRONMENT,
+): void {
+  const problems = promotionPlanProblems(artifacts, environment);
+  if (problems.length > 0) {
+    throw new PromotionRefused(`Incoherent promotion plan: ${problems.join('; ')}.`);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -50,6 +50,18 @@ Everything else runs unprivileged as `arm`.
 
 ## 3. Routine deployment
 
+Before install/migration/build work, run the shared read-only gate from the checkout being
+deployed. It refuses a dirty or stale checkout, migration collisions, an unexpected database,
+checksum/parity drift, missing environment/tooling, and an unguarded Git Bash/MSYS shell:
+
+```bash
+npm run preflight -- --mode deploy --environment dev \
+    --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev
+```
+
+From a workstation add `--ssh-host streamanator`; on the host itself omit it. The preflight
+does not fetch, migrate, deploy, restart, or print a DSN. Resolve every `FAIL` before continuing.
+
 ```bash
 cd ~/projects/afldb
 git pull
@@ -60,6 +72,10 @@ npm run build                # production build + standalone preparation
 sudo systemctl restart afldb
 ```
 
+The migration runner repeats the collision/base guard immediately before any shared DEV/PROD
+apply. An unmerged migration belongs on `afldb_test`; a conscious DEV-only exception requires
+`--allow-branch-local`. Production never accepts that acknowledgement.
+
 From a Windows workstation with SSH access to the development host, the same
 routine can be run with:
 
@@ -69,6 +85,38 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
 
 Use `-WhatIf` to print the target without touching the server, and
 `-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
+
+Before fetching, `sync-dev.ps1` classifies the remote checkout instead of treating every
+untracked path as equivalent:
+
+- any tracked or staged modification, deletion, rename or copy is a blocker;
+- an unknown untracked file or directory is a blocker;
+- these narrowly recognised operational artifacts warn and continue:
+  `.deploy-backups/`, root-level `.env.bak-*`, root-level `FETCH_HEAD`, root-level
+  `afldb-ui-questions-*.csv`, and
+  `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json`;
+- `.env`, other manifests, source/config/scripts/migrations and arbitrary JSON/CSV files are
+  not allowlisted.
+
+The preflight prints counts for tracked modifications, known operational untracked artifacts
+and unknown untracked paths, and lists every path in every non-empty class. `-AllowDirtyServer` remains an explicit
+escape hatch for tracked or unknown blockers: it prints every bypassed blocker and a warning,
+then continues. Known artifacts are preserved in either mode. The deploy never runs `git clean`,
+resets tracked files, or deletes backups, manifests, evidence or other checkout content.
+
+After the single restart/systemd respawn, the script polls readiness every 2 seconds for up to
+120 seconds by default. A ready response must be HTTP 200 JSON with both `status: "ok"` and
+`database: "ok"`; an open port alone is insufficient. Connection refusal/reset, a startup
+non-200 and an unhealthy payload are retried while systemd still reports a live/transitional
+service. `-Issue107Gate` validates the `x-afldb-build` header in the same retry loop, preserving
+its built-versus-live identity gate. The bounds are maintainable through
+`-ReadinessTimeoutSeconds` and `-ReadinessIntervalSeconds`.
+
+If systemd reports `failed` or `inactive/dead`, waiting stops immediately. A terminal failure
+or timeout exits nonzero and prints only bounded diagnostics: the last probe status/error,
+20 service-status lines, 40 recent journal lines, the elapsed wait and a listener check for the
+health URL's explicit port. Readiness testing is DB-free and simulated; do not restart DEV merely
+to test this logic.
 
 For AFLDB-ISSUE-107's controlled Next.js 16 deployment, first set
 `AFLDB_TRACE_REQUESTS=on` in the development host's `.env`, retain
@@ -448,6 +496,15 @@ acquire_core.R --acquire --in-season          network; writes files, manifest LA
 `deploy/afldb-settle-afltables.timer` fires it nightly. The season comes from
 `data/reference/seasons.json` `in_progress_seasons` and the datasets from the
 contract's own `in_season` block, so neither is duplicated in the unit.
+
+Before the launcher begins acquisition it prints a copy/paste monitoring block: the exact launcher
+and PID, process watch, a `pg_stat_activity` watch using the same import role without exposing its
+DSN, journal tail, success/failure markers, a 10-minute no-progress stall threshold and the measured
+duration ranges. `AFLDB_SETTLE_SUCCESS` is the terminal success marker and
+`AFLDB_SETTLE_FAILURE` includes the label and exit code. Routine no-change host-local evidence is
+about 51 seconds; a fresh approximately 9,823-record run took 1 h 57 min over a workstation tunnel
+and must be supervised outside the scheduled unit's one-hour timeout. Elapsed time alone is not a
+stall signal.
 
 **Squiggle and Kali are never invoked automatically**, and since §11.2 of
 ISSUE-122 neither can write a canonical row at all. There is no fallback
