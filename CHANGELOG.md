@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### Public UI - responsive navigation and dense-table affordance (AFLDB-ISSUE-147) - 7 September 2026
+
+- The phone navigation now reaches every primary destination. Previously the fixed bottom bar
+  carried only Home, Players, Seasons, Records and AFLW, so Clubs, Venues, Coaches, Brownlow,
+  Awards, Draft and Match Search were unreachable without the desktop site (the `/aflw` bar had the
+  same gap). The bar now shows Home, Players, Clubs, Seasons and a **More** button that opens a
+  sheet listing the complete primary set — the same list the wide-screen masthead shows in full.
+- Desktop and phone navigation, and the home "Browse the record" grid, are now derived from one
+  definition (`src/lib/site-nav-model.ts`), so a destination can no longer be added to one and
+  silently missing from another. The home grid gains a **Coaches** card it had been missing.
+- The "More" sheet is a modal dialog: focus moves into it on open and returns to the button on
+  close, Tab is trapped inside it, the page behind is scroll-locked, and it closes on Escape, a
+  backdrop tap, choosing a destination, or a browser back gesture.
+- The masthead navigation no longer overflows the wordmark between roughly 640 px and 900 px; the
+  links wrap to a second right-aligned row.
+- Wide statistical tables that scroll sideways now show a soft edge shadow on whichever side still
+  has off-screen columns, so it is visible that more data (and the column sort controls) are there.
+  Tables that already fit are unchanged.
+
 ### Host bootstrap - provision `code_test_db` extensions (AFLDB-ISSUE-146 follow-up) - 7 September 2026
 
 - `tools/maintenance/00_install_postgres.sh` now creates and provisions `code_test_db` (the

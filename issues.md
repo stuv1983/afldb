@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`.
+**Open issues:** 9 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`.
 
 <!-- 2026-09-07 (ISSUE-146 closeout): `AFLDB-ISSUE-146` (`code_test_db` as a second explicitly
      supported disposable full-rebuild target) is **Resolved — 2026-09-07**. Merged to `main`
@@ -198,6 +198,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-142` | High | Operations / Database tooling / Data integrity | **OPEN — IMPLEMENTED 2026-09-06, AWAITING VALIDATION. Uncommitted in the `main` working tree; no migration, no privilege change, no database contacted.** (A) `player_match_period_stats` (migration 062) was in neither `afldb_meta.import_writable_tables` nor `publicContractTables()` — the only such table any migration creates — so the fail-closed gate refused every phase on every real database. Decided **in the contract** as `rebuilt` / `compare: zero`, NOT registered import-writable: `grant_import_write()` registers and grants in one statement, so a registry row would hand `afldb_import` UPDATE/DELETE/TRUNCATE for a writer that does not exist (nothing writes it; the NL read paths are refused upstream by `plan.ts:1054`; 0 rows everywhere). The suite now derives the registry from the migrations and runs the real classifier, so a future 062-shaped migration fails at test time. (B) A `restored`-phase lineage gate proves identity instead of existence — AFL Tables profile url for players, `matches.match_key` for matches — PASSES silently on a same-lineage (production) promotion, and REFUSES anything unevidenced; `--lineage-remap-out` writes the evidenced per-row remap. `player_link_resolutions.target_id` is declared identity `none` (no external key exists for an honours row), so a DEV promotion is refused with the two supportable answers printed (§7.4c). (C) `079_access_code_delete.sql` is committed only on `claude/issue-116` @ `2344ab5`, exists in no checkout, and cannot merge at 079 (`main` owns a different file there): the DEV parity refusal is truthful, the checker is not weakened, and the promotion itself is the reconciliation. | Run the validation in the entry (focused suite, typecheck, lint, then `--environment dev --phase source --database afldb_test` → PASS and `--phase pre-cutover --database afldb_dev --allow-fixture-identities` → refused on migration parity only), then commit/merge. Unblocks `AFLDB-ISSUE-139` Phase 4D and `AFLDB-ISSUE-137` path (a). |
 | `AFLDB-ISSUE-144` | Medium | Public UI / club history / database queries | **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT. Stages 0-10 complete (11 stages total) on `codex/issue-144` (worktree `D:\dev\afldb-issue-144`); the `/clubs/compare` surface is fully built — the route (`src/app/clubs/compare/page.tsx` + `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6 query surface, and the Stage 8 presentation (`src/components/ClubComparisonView.tsx` plus `ClubComparisonControls` / `ClubComparisonSeason` / `ClubComparisonHeadToHead` / `ClubComparisonPlayers` / `ClubComparisonBrownlow` / `ClubComparisonTrends` and `src/lib/club-comparison-format.ts`) — and Stage 9 made it public: `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (organisation slug from `current_identity`), and the BASE `/clubs/compare` in sitemap segment 0 with no pair/season/filter/page permutation. Stage 9 also fixed two acceptance defects: a 360px page-wide horizontal overflow (`.grid-shrink > * { min-width: 0 }` on the four `.grid-panels` grids holding tables) and an h2→h4 heading jump in the club Brownlow history panel. 172 tests pass: 68 integration query, 28 integration route-state/metadata/budget, 14 database-free URL, 35 database-free presentation/accessibility (`tests/club-comparison-view.test.ts`), 4 real-state render tests and 23 SEO tests; production `npm run build` exit 0; 18 Playwright ISSUE-144 checks pass on the standalone build in both desktop and mobile projects; a scripted five-state accessibility audit reports no problems and the responsive sweep is clean at 360/390/768/1280/1600 px.** A new AFL-only public `/clubs/compare` surface: selected-season comparison (record, ladder, scoring, team metrics with runtime coverage denominators, player leaders, Brownlow), complete head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage) and connected club history (players who represented both organisations, direction, intervening clubs, club-attributed Brownlow). Contract: the approved V1.7 runbook `AFLDB-ISSUE-144.md` at the repository root — **season-generic**, with no hard-coded year, supported-season list, historical cutoff, metric-year branch or club mapping; seasons come from canonical `seasons` rows and provisionality/coverage from `seasons.status` and `stat_availability.coverage` at request time. Aggregation grain: organisation -> selected-season identity -> match/club -> player-stat sum -> average of eligible team-match totals; `club_organization_relations` is context only and never merges statistics. Stage 0 re-verified every load-bearing schema semantic against the migrations with no contradiction. The approved runbook is now **V1.7**: decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment into V1 as the new **Stage 6 — Extended rivalry analytics**, so the plan is now eleven stages (Stage 0 through Stage 10) and the former Stages 6-9 are renumbered 7-10. Read-only supporting evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`. Planned key files: `src/db/queries/club-comparison.ts`, `src/app/clubs/compare/page.tsx`, `src/components/ClubComparisonView.tsx`, `tests/integration/club-comparison.test.ts`, `tests/club-comparison.test.ts`. **No migration, no index, no materialization, no persistent cache, no public API.** | **READY FOR USER GIT CLOSEOUT**: Stage 10 re-proved the baseline (`npm test -- tests/club-comparison.test.ts tests/club-comparison-view.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-route.test.ts tests/integration/club-comparison-view.test.ts tests/seo.test.ts` — 172 passed), `npx tsc --noEmit` and `npm run build`; then add the single Unreleased CHANGELOG entry and prepare (do not perform) the user's Git close-out. **Outstanding, and the only unresolved acceptance prerequisite:** the supported-Linux route recheck deferred from Stages 5, 7 and 8 still cannot be taken — `codex/issue-144` exists only in the Windows worktree and putting it on the Linux dev host is a user-controlled Git operation. Exact command once it is there: `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (Adelaide/Brisbane Lions and Carlton/Collingwood, warm median under 1.5 s). The full `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` run should also be repeated there: 20 PRE-EXISTING, dataset-dependent failures in unrelated player/records/Brownlow journeys occur on this workstation because its application database carries the pre-ISSUE-136/137 entity numbering those tests hard-code, and none of them touches ISSUE-144. |
 | `AFLDB-ISSUE-146` | Medium | Rebuild tooling / Database (test, rehearsal) | **OPEN — IMPLEMENTED 2026-09-07 on `claude/issue-146` (worktree `D:\dev\afldb-issue-146`), uncommitted; local validation passed; the first real `code_test_db` rebuild has NOT been run.** `npm run db:test:rebuild` gains an explicit `--target <database>` restricted to an allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild rehearsal database `code_test_db`, which runs the identical stage graph through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` and matching `db:migrate:code-test` / `db:privileges:code-test` scripts. `--acknowledge-destroy` must name the selected database exactly; dev/prod/`*pre_rebuild*`/arbitrary `*_test` names are refused by name before any DSN is read, and a DSN naming any database other than the selected target is refused. Key files: `tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`, `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`. | **Operator:** review + commit the branch; create `code_test_db` (owned by `afldb_owner`, with `afldb_import` connect) on the rehearsal host and set the two `AFLDB_CODE_TEST_*` variables; then run the first real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db` (dry-run first with `--plan`). Resolve once the rehearsal passes its final validation. |
+| `AFLDB-ISSUE-147` | Medium | Public UI / navigation IA / responsive layout | **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data via an operator SSH tunnel; awaiting operator commit / merge / deploy.** Branch `claude/issue-147-ui`, worktree `D:\dev\afldb-issue-147-ui`. Full authenticated rendered audit of the public site (27 routes × 7 widths, 320–1440) found page-level responsive discipline sound (zero document-level horizontal overflow anywhere), with three concentrated defects: **P0** the phone nav was a smaller, independently hand-kept IA than the masthead — Clubs, Venues, Coaches, Brownlow, Awards, Draft and Match Search were unreachable from the phone chrome (same gap under `/aflw`; the home "Browse the record" grid was a third drifting list, already missing Coaches); **P1** a 641–~890 px masthead-nav overflow band; **P1** dense tables scroll inside `.table-wrap` with no cue that off-screen columns / sort headers exist. Fix (navigation + responsive CSS + tests only; **no migration**, schema, query, route, privilege or deployment change): new canonical `src/lib/site-nav-model.ts` (one `PRIMARY_NAV`, derived `QUICK_TABS` incl. Clubs, derived `BROWSE_SECTIONS` incl. Coaches); `TabBar` gains a "More" bottom sheet (`role="dialog"`, focus-trapped, Escape/backdrop/link/`popstate` close, `aria-current`) listing the **whole** active primary set; masthead nav wraps cleanly at 641–1080 px; `.table-wrap` gets a CSS-only theme-aware directional scroll shadow (`--edge-shadow`, self-hiding, no markup change); new committed `tests/e2e/responsive-nav.spec.ts` derives nav parity from the rendered masthead so a future one-sided addition fails; `tests/e2e/journeys.spec.ts` nav tests de-skipped on mobile via a `reachPrimary()` helper + a new "clubs is reachable" test. Validation: `tsc`/`eslint`/`npm run build` PASS; `responsive-nav.spec.ts` 32/32; journeys nav tests 10/10 on Desktop + Pixel 7; full viewport audit 200/200, zero overflow, zero 4xx/5xx; before/after screenshots in `artifacts/issue-147/` (gitignored). | **Operator:** review + commit `claude/issue-147-ui`; delete the audit scaffolding (`playwright.responsive.config.ts`, `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/`, `tests/nl-ui/.auth/`) or keep `playwright.responsive.config.ts` if you want the re-runnable audit; merge; deploy to DEV via `deploy/sync-dev.ps1` and smoke the phone nav + `/clubs` on a real device; then Resolve. Standard `npm run test:e2e` on the Linux dev host confirms the gate-off path for the new spec. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
      the focused nav Playwright test passes on desktop / skips on mobile, `npm run build` exit 0 with
@@ -18938,3 +18939,133 @@ Validation (this worktree, no database contact):
 
 - None outstanding. `prove-reset` deliberately does not accept `--target`; extend it only if a
   rollback-only reset proof against `code_test_db` is ever needed.
+
+## AFLDB-ISSUE-147 — Public UI responsive design review and remediation
+
+- **Status:** **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data; awaiting operator
+  commit / merge / deploy.** Branch `claude/issue-147-ui`, worktree `D:\dev\afldb-issue-147-ui`.
+- **Severity / Area:** Medium / Public UI — navigation information architecture, responsive layout,
+  dense-table affordance.
+- **Reported:** 2026-09-07 (operator request — full rendered review of the public UI at all
+  supported screen sizes; known defect: Clubs unreachable from the mobile navigation).
+- **Claims no migration number.** No schema, query, route, privilege, `.env` or deployment change.
+
+### Problem
+
+A full authenticated rendered audit of the public site against the DEV deployment
+(`http://10.0.40.100:8090`) at seven viewport widths (320 → 1440) over 27 representative routes /
+layout families found the page-level responsive discipline sound — **zero document-level horizontal
+overflow anywhere** — with the defects concentrated in three areas:
+
+1. **P0 — mobile primary navigation is a different, smaller information architecture.** The
+   wide-screen masthead (`PRIMARY_NAV`, `src/components/SiteNav.tsx`) carried 11 destinations; the
+   phone bottom bar (`TABS`) carried 5, and the two lists were maintained by hand and independently.
+   **Unreachable from the phone chrome: Clubs, Venues, Coaches, Brownlow, Awards, Draft, Match
+   Search.** The `/aflw` variant had the same gap (`AFLW_TABS` dropped Venues and Match Search from
+   `AFLW_PRIMARY_NAV`). The home "Browse the record" grid (`src/app/page.tsx`) was a **third**
+   hand-kept list (and had already drifted — no Coaches card). This is the mechanism by which
+   AFLDB-ISSUE-145 (Venues) half-landed: added to the masthead and the home grid, never to mobile.
+2. **P1 — a phone masthead-nav overflow band.** Between 641 px and ~890 px the 11-item masthead nav
+   needed ~635 px of a ~518 px flex track and spilled over / clipped against the wordmark
+   (measured `navScrollW 635 > navClientW 518` at 700 px and 820 px). The 640 px bottom-bar
+   breakpoint left this band with the full masthead nav and no room for it.
+3. **P1 — dense tables scroll with no cue that they do.** Wide statistical tables scroll correctly
+   inside `.table-wrap` (`overflow-x: auto`) and the page never overflows, but at phone widths the
+   trailing columns — including the sort-header controls on the players index — sit entirely
+   off-screen with no visual affordance that horizontal content exists (players index at 320 px:
+   `.table-wrap` client width 272, scroll width 828; the Games/Goals/Finals/Prem/Brownlow headers
+   start beyond x≈300).
+
+Full findings matrix, viewport list and baseline screenshots: the ISSUE-147 session record and
+`artifacts/issue-147/baseline/` (gitignored, not committed).
+
+### Change
+
+Navigation, responsive CSS and regression tests only. No behavioural change to any data path.
+
+- **`src/lib/site-nav-model.ts` (new).** The single canonical public navigation model: `PRIMARY_NAV`
+  / `AFLW_PRIMARY_NAV` (unchanged sets — now the one source of truth), `QUICK_TABS` /
+  `AFLW_QUICK_TABS` (the four one-tap phone sections: Home, Players, **Clubs**, Seasons),
+  `BROWSE_SECTIONS` (derived from `PRIMARY_NAV` + a per-href blurb map, so the home grid can no
+  longer omit or drift from a nav destination — **Coaches card added** as a side effect), and the
+  `inAflw` / `isCurrentSection` helpers. A plain module, deliberately **not** `'use client'`: a
+  Server Component importing a value from a client module gets a reference proxy, so the home grid's
+  `BROWSE_SECTIONS.map` fails at build (`k.BROWSE_SECTIONS.map is not a function`) — proven during
+  validation, fixed by relocating the data here.
+- **`src/components/SiteNav.tsx`.** `PrimaryNav` unchanged in behaviour (maps `PRIMARY_NAV`).
+  `TabBar` now renders the four `QUICK_TABS` plus a **"More"** button that opens a bottom sheet
+  (`role="dialog"`, `aria-modal`, `aria-label="All sections"`) listing the **entire** active
+  primary set (`PRIMARY_NAV` or `AFLW_PRIMARY_NAV`). The sheet: focus moves in on open and returns
+  to the trigger on Escape / backdrop / Close; Tab is trapped inside the panel; `body` scroll is
+  locked while open; it closes on Escape, backdrop click, a link click, and `popstate`; the current
+  destination carries `aria-current="page"`. `PRIMARY_NAV` / `AFLW_PRIMARY_NAV` / `BROWSE_SECTIONS`
+  are re-exported from here for continuity.
+- **`src/app/page.tsx`.** The "Browse the record" grid maps `BROWSE_SECTIONS` instead of its own
+  inline list (import moved to `@/lib/site-nav-model`).
+- **`src/styles/globals.css`.**
+  - `.tab-more` styled as a bar item; `.nav-sheet` / `.nav-sheet-panel` / `.nav-sheet-head` /
+    `.nav-sheet-list` — a phone-only bottom sheet, `z-index: 70` (above the tab bar and the consent
+    banner), `max-height: 80vh` with its own scroll, reduced-motion-safe fade. Base
+    `.nav-sheet { display: none }` so it can never render on the desktop layout.
+  - Masthead nav at `max-width: 1080px` and `min-width: 641px` now `flex-wrap`s to a tidy
+    right-aligned second row (`gap: 0.4rem 0.75rem`, `padding-block: 0.5rem`) instead of overflowing
+    the wordmark.
+  - `.table-wrap` gets a **CSS-only directional scroll shadow** (new theme-aware `--edge-shadow`
+    token; light = translucent ink, dark = faint light so it reads on near-black paper) built from
+    four background layers — two paper-coloured "cover" gradients `background-attachment: local` and
+    two shadow gradients `scroll` — so a shadow appears only on a side that still has hidden columns
+    and not at all on a table that already fits. No markup change to any of the ~10 `.table-wrap`
+    call sites.
+- **`tests/e2e/responsive-nav.spec.ts` (new — committed regression).** The public responsive
+  navigation contract: nav parity derived from what the wide masthead actually renders vs the phone
+  "More" sheet (so a destination added to one but not the other fails here); the sheet's
+  dialog behaviour (open, Escape + focus return, backdrop close, link close, scroll when taller than
+  the screen); the `/aflw` sheet carries the AFLW set; no document-level horizontal overflow on 11
+  routes × {320, 375}; a wide table scrolls inside its own region and not the page, with its sort
+  control reachable after scrolling; the players filter panel and pagination usable at 320 px; the
+  club comparison reachable and legible at 320 px.
+- **`tests/e2e/journeys.spec.ts`.** The three `test.skip(isMobile, 'the masthead nav is hidden on a
+  phone')` navigation tests replaced with a `reachPrimary()` helper that goes via the phone "More"
+  sheet on mobile projects; an explicit `'clubs is reachable from the primary navigation'` test
+  added (the ISSUE-147 regression).
+- **`CHANGELOG.md`** — one `Unreleased` entry under `### AFLDB-ISSUE-147`.
+
+### Validation
+
+Validated with the ISSUE-147 branch **built locally and run as the production standalone server**
+against the **live DEV PostgreSQL** through an operator-created SSH tunnel
+(`127.0.0.1:55432 → dev 5432`), with temporary process-level DSN overrides only (host/port; the
+checked-in `.env` was not modified; `AFLDB_BETA_GATE` forced `on` to mirror DEV). Beta admission
+reused the established `tests/nl-ui/auth.setup.ts` (the access code never entered a tool argument or
+a tracked file). `AFLDB_E2E_BASE_URL=http://127.0.0.1:3100`.
+
+- `npx tsc --noEmit` — PASS. `npx eslint` on every changed file — PASS.
+- `npm run build` (`next build --webpack` + `prepare-standalone`) — PASS; standalone bundle built,
+  1,529 pages, `/api/health` reports `database: ok` through the tunnel.
+- `tests/e2e/responsive-nav.spec.ts` — **32/32 pass** (plus the beta `setup`).
+- `tests/e2e/journeys.spec.ts` navigation tests, run on **both** a Desktop Chrome and a Pixel 7
+  profile — **10/10 pass** (`match search`, `venues`, `clubs`, AFLW landing reachable; light/dark
+  survives navigation).
+- Full viewport audit (`tests/responsive/_baseline-audit.spec.ts`, 27 routes × 7 widths = 189) on
+  the branch — **all 200 checks pass, zero document-level horizontal overflow, zero 4xx/5xx**
+  (`/matches/9966` substituted for the prod-only id used in the baseline).
+- Rendered confirmation from `artifacts/issue-147/after/` screenshots: phone bottom bar now
+  `Home · Players · Clubs · Seasons · More`; the "More" sheet lists the full set with the active
+  item marked; the `/aflw` sheet lists the AFLW set only (no Records/Brownlow/Awards/Draft); the
+  masthead nav wraps to two clean rows at 820 px instead of spilling; the home grid shows the
+  Coaches card; a mid-scroll players table shows the edge shadow; the 1280 px desktop layout is
+  unchanged (full 8-column table, single-row masthead nav, no bottom bar).
+
+### Follow-up
+
+- P2 items not addressed (recorded, not blocking): a matching edge-fade on the home `.try-chips`
+  horizontal scroller; a keyboard-focusable scroll region (`tabindex`/`role`) on every `.table-wrap`
+  — the sort/link controls inside already scroll into view when tab-focused, so the functional
+  contract holds; the CSS edge shadow adds the pointer affordance.
+- The committed regression spec (`tests/e2e/responsive-nav.spec.ts`) runs under the standard
+  `playwright.config.ts` (local standalone build, beta gate off) with no auth; it references no beta
+  code. It was proven here against a gate-**on** deployment via the reused storageState; a plain
+  `npm run test:e2e` run on the Linux dev host after merge should confirm the gate-off path.
+- **Not for commit** (audit / validation scaffolding): `playwright.responsive.config.ts`,
+  `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/` (gitignored),
+  `tests/nl-ui/.auth/` (gitignored). See the session handoff for the exact list.
