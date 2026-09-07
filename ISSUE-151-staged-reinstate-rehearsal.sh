@@ -70,7 +70,7 @@ CREATE TABLE external_grid_sources (
   code text NOT NULL UNIQUE, name text NOT NULL, base_url text,
   ingest_source_id smallint NOT NULL UNIQUE REFERENCES sources(id),
   notes text, created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT external_grid_sources_code_ck CHECK (code ~ ''^[a-z][a-z0-9_]*$''));
+  CONSTRAINT external_grid_sources_code_ck CHECK (code ~ $$^[a-z][a-z0-9_]*$$));
 CREATE TABLE external_grids (
   id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   source_id smallint NOT NULL REFERENCES external_grid_sources(id),
