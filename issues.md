@@ -189,6 +189,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-117` | Medium | Admin / Access management / Security | Retired beta access keys cannot be removed from `/admin/access`: revocation sets `beta_access_codes.revoked_at` and the row then stays in the list forever, and a **spent** key (`use_count >= max_uses`) is offered neither Revoke (shown only while `live`) nor Delete, so obsolete keys accumulate with no disposal path. Implemented 2026-08-31 on the unmerged branch `claude/issue-116` and **applied to `afldb_dev` from there as migration `079_access_code_delete.sql`**, which `main` has since taken for `079_nl_search_log_head_to_head_grain.sql`. **RECONCILED 2026-09-06 on `claude/issue-117`:** the migration is renumbered **091**, the obsolete `audit()`-with-optional-`tx` change is dropped in favour of `main`'s `auditInTransaction` (ISSUE-119), and DB-free validation is green (13/13 unit, `tsc --noEmit` exit 0, `eslint` exit 0). Deletable = **retired** (revoked OR spent); a partly-used or unlimited key is still refused because it remains redeemable, and expiry is deliberately excluded. The rule is a `WHERE` clause inside the DELETE, not a hidden button, and `access.code_deleted` is written on the deleting transaction so the row cannot outlive its trail. | **Awaiting the three DB-backed suites and merge.** Not resolved. Run `db:migrate:test` then `tests/integration/access-codes.test.ts` + `tests/integration/privileges.test.ts` against `afldb_test`, then merge. **Deploy order is load-bearing:** migration `091` and `privileges.sql` BEFORE the code, or every delete fails closed on a permission error. **`afldb_dev` keeps its orphan `079_access_code_delete.sql` ledger row** — applying `091` there is safe (GRANT is idempotent) but does NOT clear it, so `AFLDB-ISSUE-139`'s `pre-cutover` parity refusal stands exactly as `AFLDB-ISSUE-142` Finding C decided. Runbook: `issues/open/AFLDB-ISSUE-117.md`. |
 | `AFLDB-ISSUE-142` | High | Operations / Database tooling / Data integrity | **OPEN — IMPLEMENTED 2026-09-06, AWAITING VALIDATION. Uncommitted in the `main` working tree; no migration, no privilege change, no database contacted.** (A) `player_match_period_stats` (migration 062) was in neither `afldb_meta.import_writable_tables` nor `publicContractTables()` — the only such table any migration creates — so the fail-closed gate refused every phase on every real database. Decided **in the contract** as `rebuilt` / `compare: zero`, NOT registered import-writable: `grant_import_write()` registers and grants in one statement, so a registry row would hand `afldb_import` UPDATE/DELETE/TRUNCATE for a writer that does not exist (nothing writes it; the NL read paths are refused upstream by `plan.ts:1054`; 0 rows everywhere). The suite now derives the registry from the migrations and runs the real classifier, so a future 062-shaped migration fails at test time. (B) A `restored`-phase lineage gate proves identity instead of existence — AFL Tables profile url for players, `matches.match_key` for matches — PASSES silently on a same-lineage (production) promotion, and REFUSES anything unevidenced; `--lineage-remap-out` writes the evidenced per-row remap. `player_link_resolutions.target_id` is declared identity `none` (no external key exists for an honours row), so a DEV promotion is refused with the two supportable answers printed (§7.4c). (C) `079_access_code_delete.sql` is committed only on `claude/issue-116` @ `2344ab5`, exists in no checkout, and cannot merge at 079 (`main` owns a different file there): the DEV parity refusal is truthful, the checker is not weakened, and the promotion itself is the reconciliation. | Run the validation in the entry (focused suite, typecheck, lint, then `--environment dev --phase source --database afldb_test` → PASS and `--phase pre-cutover --database afldb_dev --allow-fixture-identities` → refused on migration parity only), then commit/merge. Unblocks `AFLDB-ISSUE-139` Phase 4D and `AFLDB-ISSUE-137` path (a). |
 | `AFLDB-ISSUE-144` | Medium | Public UI / club history / database queries | **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT. Stages 0-10 complete (11 stages total) on `codex/issue-144` (worktree `D:\dev\afldb-issue-144`); the `/clubs/compare` surface is fully built — the route (`src/app/clubs/compare/page.tsx` + `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6 query surface, and the Stage 8 presentation (`src/components/ClubComparisonView.tsx` plus `ClubComparisonControls` / `ClubComparisonSeason` / `ClubComparisonHeadToHead` / `ClubComparisonPlayers` / `ClubComparisonBrownlow` / `ClubComparisonTrends` and `src/lib/club-comparison-format.ts`) — and Stage 9 made it public: `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (organisation slug from `current_identity`), and the BASE `/clubs/compare` in sitemap segment 0 with no pair/season/filter/page permutation. Stage 9 also fixed two acceptance defects: a 360px page-wide horizontal overflow (`.grid-shrink > * { min-width: 0 }` on the four `.grid-panels` grids holding tables) and an h2→h4 heading jump in the club Brownlow history panel. 172 tests pass: 68 integration query, 28 integration route-state/metadata/budget, 14 database-free URL, 35 database-free presentation/accessibility (`tests/club-comparison-view.test.ts`), 4 real-state render tests and 23 SEO tests; production `npm run build` exit 0; 18 Playwright ISSUE-144 checks pass on the standalone build in both desktop and mobile projects; a scripted five-state accessibility audit reports no problems and the responsive sweep is clean at 360/390/768/1280/1600 px.** A new AFL-only public `/clubs/compare` surface: selected-season comparison (record, ladder, scoring, team metrics with runtime coverage denominators, player leaders, Brownlow), complete head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage) and connected club history (players who represented both organisations, direction, intervening clubs, club-attributed Brownlow). Contract: the approved V1.7 runbook `AFLDB-ISSUE-144.md` at the repository root — **season-generic**, with no hard-coded year, supported-season list, historical cutoff, metric-year branch or club mapping; seasons come from canonical `seasons` rows and provisionality/coverage from `seasons.status` and `stat_availability.coverage` at request time. Aggregation grain: organisation -> selected-season identity -> match/club -> player-stat sum -> average of eligible team-match totals; `club_organization_relations` is context only and never merges statistics. Stage 0 re-verified every load-bearing schema semantic against the migrations with no contradiction. The approved runbook is now **V1.7**: decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment into V1 as the new **Stage 6 — Extended rivalry analytics**, so the plan is now eleven stages (Stage 0 through Stage 10) and the former Stages 6-9 are renumbered 7-10. Read-only supporting evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`. Planned key files: `src/db/queries/club-comparison.ts`, `src/app/clubs/compare/page.tsx`, `src/components/ClubComparisonView.tsx`, `tests/integration/club-comparison.test.ts`, `tests/club-comparison.test.ts`. **No migration, no index, no materialization, no persistent cache, no public API.** | **READY FOR USER GIT CLOSEOUT**: Stage 10 re-proved the baseline (`npm test -- tests/club-comparison.test.ts tests/club-comparison-view.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-route.test.ts tests/integration/club-comparison-view.test.ts tests/seo.test.ts` — 172 passed), `npx tsc --noEmit` and `npm run build`; then add the single Unreleased CHANGELOG entry and prepare (do not perform) the user's Git close-out. **Outstanding, and the only unresolved acceptance prerequisite:** the supported-Linux route recheck deferred from Stages 5, 7 and 8 still cannot be taken — `codex/issue-144` exists only in the Windows worktree and putting it on the Linux dev host is a user-controlled Git operation. Exact command once it is there: `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (Adelaide/Brisbane Lions and Carlton/Collingwood, warm median under 1.5 s). The full `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` run should also be repeated there: 20 PRE-EXISTING, dataset-dependent failures in unrelated player/records/Brownlow journeys occur on this workstation because its application database carries the pre-ISSUE-136/137 entity numbering those tests hard-code, and none of them touches ISSUE-144. |
+| `AFLDB-ISSUE-146` | Medium | Rebuild tooling / Database (test, rehearsal) | **OPEN — IMPLEMENTED 2026-09-07 on `claude/issue-146` (worktree `D:\dev\afldb-issue-146`), uncommitted; local validation passed; the first real `code_test_db` rebuild has NOT been run.** `npm run db:test:rebuild` gains an explicit `--target <database>` restricted to an allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild rehearsal database `code_test_db`, which runs the identical stage graph through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` and matching `db:migrate:code-test` / `db:privileges:code-test` scripts. `--acknowledge-destroy` must name the selected database exactly; dev/prod/`*pre_rebuild*`/arbitrary `*_test` names are refused by name before any DSN is read, and a DSN naming any database other than the selected target is refused. Key files: `tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`, `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`. | **Operator:** review + commit the branch; create `code_test_db` (owned by `afldb_owner`, with `afldb_import` connect) on the rehearsal host and set the two `AFLDB_CODE_TEST_*` variables; then run the first real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db` (dry-run first with `--plan`). Resolve once the rehearsal passes its final validation. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
      the focused nav Playwright test passes on desktop / skips on mobile, `npm run build` exit 0 with
@@ -18767,3 +18768,98 @@ number**.
 ### Follow-up
 
 None tracked.
+
+## AFLDB-ISSUE-146 — `code_test_db` as a second explicitly supported disposable full-rebuild target
+
+- **Status:** **OPEN — implemented 2026-09-07 on `claude/issue-146` (worktree
+  `D:\dev\afldb-issue-146`, base `main` `5edf515`), uncommitted. Local validation passed. The
+  first real `code_test_db` rebuild has deliberately NOT been run.**
+- **Severity / Area:** Medium / Rebuild tooling — `tools/db/rebuild-test.ts`, migration and privilege
+  runners, deployment docs.
+- **Reported:** 2026-09-07 (operator request).
+
+### Problem
+
+The canonical rebuild runner (`npm run db:test:rebuild`, AFLDB-ISSUE-093 §10) accepted exactly one
+destructive target, `afldb_test`, resolved solely from `AFLDB_TEST_DATABASE_URL` and gated by a
+`_test`-suffix rule plus a single-name check. Rehearsing a complete clean rebuild therefore meant
+destroying `afldb_test` itself — the database integration tests and the promotion checker depend
+on — with no way to prove the real rebuild against a throwaway database. The
+MIGRATIONS and PRIVILEGES stages were also hard-bound to `db:migrate:test` /
+`db:privileges:test`, which read `AFLDB_TEST_DATABASE_URL` regardless of what the runner had
+resolved, so a second target could not be added without touching those runners too.
+
+### Contract (as implemented)
+
+- **Allowlist.** `REBUILD_TARGETS` in `tools/db/rebuild-test.ts` lists exactly `afldb_test`
+  (normal test/integration rebuild) and `code_test_db` (disposable full-rebuild rehearsal). The
+  former `_test`-suffix rule is subsumed by the allowlist: `random_test` is refused exactly as
+  `afldb_scratch` is. `afldb_dev` / `afldb_prod` are still refused by name, anything containing
+  `prod` still looks like production, and any `*pre_rebuild*` name is still read-only.
+- **Selection.** `--target <database>`; omitted means `afldb_test` (`DEFAULT_TARGET`), so existing
+  invocations are unchanged. A bare `--target` is refused rather than falling through to the
+  default. The selected name is validated BEFORE any environment variable is read.
+- **DSNs.** Each target has its own pair and reads only that pair: `AFLDB_TEST_DATABASE_URL` /
+  `AFLDB_TEST_IMPORT_DATABASE_URL` for `afldb_test`; `AFLDB_CODE_TEST_DATABASE_URL` /
+  `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` for `code_test_db`. A missing variable is a refusal, never
+  a fallback to the other target's DSN. The database named inside the DSN must equal the selected
+  target (the target is never inferred from a DSN); the import DSN must name the same database as
+  the owner DSN; `--allow-owner-import-dsn` remains the only, explicit, owner substitution.
+- **Acknowledgement.** `--acknowledge-destroy` must equal the selected database exactly
+  (`assertDestructiveAcknowledgement` is unchanged; it now simply sees the selected target).
+- **Stage graph.** `planStages()` is unchanged in shape: the same 22 stage ids, kinds and argv for
+  both targets. Only the MIGRATIONS and PRIVILEGES stages differ, binding to the target's own
+  package scripts (`db:migrate:code-test` with `AFLDB_MIGRATE_TARGET=code-test`, and
+  `db:privileges:code-test`). `tools/db/migrate.ts` and `tools/db/privileges.ts` map the new
+  `code-test` target to `AFLDB_CODE_TEST_DATABASE_URL`; in `migrate.ts`, `code-test` joins `test`
+  in `DISPOSABLE_TARGETS` (exempt from the shared-ledger cross-worktree guard because it is wiped
+  and rebuilt from nothing), and every other rule — filename-collision check, checksum drift refusal,
+  the whole tracked set from `001` to the current terminal migration with no hard-coded count — is
+  untouched. `--allow-branch-local` is still DEV-only.
+- **Leakage.** No refusal or banner prints a DSN, host or credential — database and variable names
+  only. `npm run db:test:prove-reset` stays pinned to `afldb_test` through its own
+  `PROOF_EXPECTED_DATABASE`.
+
+### Files changed
+
+`tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`
+(`db:migrate:code-test`, `db:privileges:code-test`), `.env.example` (commented
+`AFLDB_CODE_TEST_*` lines), `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`,
+`CHANGELOG.md`, `issues.md`, `IssuesIndex.md`.
+
+### Validation (2026-09-07, workstation, no database contact)
+
+- `npx vitest run tests/db-test-rebuild.test.ts` — **285 / 285 PASS** (271 pre-existing + the new
+  `explicit --target and the code_test_db rehearsal (AFLDB-ISSUE-146)` block: default unchanged,
+  explicit `afldb_test` ≡ default, `code_test_db` via its own DSNs, exact acknowledgement both ways,
+  identical 22-stage graph for both targets with only the bound scripts differing, by-name refusals
+  for `afldb_dev` / `afldb_prod` / `anything-prod` / `random_test` / `*pre_rebuild*` before any DSN is
+  read, wrong-database and invalid code-test DSNs, missing code-test DSNs without borrowing the test
+  ones, no target inference from a DSN, bare `--target` refused, and no DSN/host/credential in any
+  refusal). Three pre-existing prove-reset identity cases were updated for the allowlist wording and
+  one new case proves the proof still refuses `code_test_db`.
+- `npm run typecheck` (`next typegen && tsc --noEmit`) — PASS.
+- `npx eslint tools/db/rebuild-test.ts tools/db/migrate.ts tools/db/privileges.ts
+  tests/db-test-rebuild.test.ts` — 8 errors / 2 warnings, **all pre-existing on `main`** (identical
+  findings at the pre-shift line numbers when linting `git show main:<file>` through
+  `--stdin-filename`; none inside an ISSUE-146 hunk). Not fixed: out of scope.
+- `git diff --check` — clean; no conflict markers; every touched file is CRLF-only UTF-8 without BOM.
+- CLI smoke through `tsx tools/db/rebuild-test.ts` with fake DSNs (no `.env` in the worktree, no
+  server): `--target afldb_dev` refused by name with no environment at all; bare `--target` refused;
+  `--target random_test` refused as unlisted; default `--plan` with only `AFLDB_CODE_TEST_*` set
+  refused (`AFLDB_TEST_DATABASE_URL is not set`, no borrowing); `AFLDB_CODE_TEST_DATABASE_URL` naming
+  `afldb_test` refused as a target mismatch; `--target code_test_db --plan` printed the 22-stage
+  graph binding `npm run db:migrate:code-test` / `db:privileges:code-test`, and the default `--plan`
+  still binds `db:migrate:test` / `db:privileges:test`. No output contained the fake password.
+- **No database was contacted, migrated, reset or created.** `afldb_test`, `afldb_dev`, the retained
+  `afldb_dev_pre_rebuild_20260906-112500`, production and `code_test_db` are all untouched; no SSH,
+  deploy, restart, commit, push or merge.
+
+### Follow-up
+
+- Operator: create `code_test_db` on the rehearsal host (owner `afldb_owner`, `afldb_import` able
+  to connect), set the two `AFLDB_CODE_TEST_*` variables, dry-run with `--plan`, then run the first
+  real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db`.
+  Resolve this issue once that rebuild passes its final validation.
+- `prove-reset` deliberately does not accept `--target`; extend it only if a rollback-only reset
+  proof against `code_test_db` is ever needed.

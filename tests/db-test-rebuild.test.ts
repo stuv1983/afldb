@@ -14,6 +14,8 @@ import {
   ladderWitnessValidateArgv,
   DEFAULT_VENV_PYTHON,
   DEFAULT_DRAFTGURU_LABEL,
+  DEFAULT_TARGET,
+  REBUILD_TARGETS,
   parseArgs as parseRebuildArgs,
   DRAFTGURU_IMPORTER,
   draftguruImportArgv,
@@ -212,11 +214,17 @@ function fakeDeps(failAt?: string) {
 function idsOf(stages: Stage[]) { return stages.map((s) => s.id); }
 
 describe('rebuild target safety', () => {
-  it('refuses a target that is not a _test database', () => {
+  it('refuses a database outside the explicit allowlist', () => {
+    // AFLDB-ISSUE-146 replaced the `_test`-suffix rule with the allowlist; a name that is
+    // not listed is refused whether or not it happens to end in _test.
     expect(() => resolveTarget({
       AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/afldb_scratch',
       AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://u:p@h:5432/afldb_scratch',
-    })).toThrow(/ends in _test/);
+    })).toThrow(/only explicit rebuild targets/);
+    expect(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/random_test',
+      AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://u:p@h:5432/random_test',
+    })).toThrow(/only explicit rebuild targets/);
   });
 
   it('refuses afldb_dev by name', () => {
@@ -232,8 +240,7 @@ describe('rebuild target safety', () => {
   });
 
   it('refuses a preserved pre-rebuild database', () => {
-    // Caught by the _test-suffix rule before the pre_rebuild rule is even reached; what
-    // matters is that it is refused, not which guard fires first.
+    // What matters is that it is refused, not which guard fires first.
     expect(() => resolveTarget({
       AFLDB_TEST_DATABASE_URL: 'postgres://u:p@h:5432/afldb_test_pre_rebuild_20260825',
     })).toThrow(RebuildRefused);
@@ -278,6 +285,212 @@ describe('rebuild target safety', () => {
     expect(() => assertDestructiveAcknowledgement(target(), 'afldb_dev'))
       .toThrow(/--acknowledge-destroy afldb_test/);
     expect(() => assertDestructiveAcknowledgement(target(), 'afldb_test')).not.toThrow();
+  });
+});
+
+describe('explicit --target and the code_test_db rehearsal (AFLDB-ISSUE-146)', () => {
+  // Distinctive secrets and host, so a leak into any message is unmistakable.
+  const CODE_OWNER = 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/code_test_db';
+  const CODE_IMPORT = 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/code_test_db';
+  const SECRETS = ['s3cret-owner-LEAK', 's3cret-import-LEAK', 'db.internal', '6543', 'postgres://', ':pw@'];
+  const bothEnv = {
+    AFLDB_TEST_DATABASE_URL: OWNER,
+    AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT,
+    AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+    AFLDB_CODE_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+  };
+  const codeTarget = () => target({ database: 'code_test_db', adminDsn: CODE_OWNER, importDsn: CODE_IMPORT });
+
+  /** Run a refusal and hand back its message, failing if nothing was refused. */
+  function refusal(fn: () => unknown): string {
+    try {
+      fn();
+    } catch (error) {
+      expect(error).toBeInstanceOf(RebuildRefused);
+      return (error as Error).message;
+    }
+    throw new Error('expected a RebuildRefused');
+  }
+
+  it('allowlists exactly the two targets and still defaults to afldb_test', () => {
+    expect(Object.keys(REBUILD_TARGETS)).toEqual(['afldb_test', 'code_test_db']);
+    expect(DEFAULT_TARGET).toBe('afldb_test');
+    expect(parseRebuildArgs(['--acknowledge-destroy', 'afldb_test']).target).toBeUndefined();
+
+    const byDefault = resolveTarget(bothEnv);
+    expect(byDefault.database).toBe('afldb_test');
+    expect(byDefault.adminDsn).toBe(OWNER);
+    expect(byDefault.importDsn).toBe(IMPORT);
+    // Even with the rehearsal variables present, the default never reads them.
+    expect(JSON.stringify(byDefault)).not.toContain('code_test_db');
+  });
+
+  it('resolves an explicit afldb_test identically to the default', () => {
+    expect(resolveTarget(bothEnv, { target: 'afldb_test' })).toEqual(resolveTarget(bothEnv));
+  });
+
+  it('resolves code_test_db through its dedicated DSNs and never the test ones', () => {
+    const resolved = resolveTarget(bothEnv, { target: 'code_test_db' });
+    expect(resolved).toEqual({
+      database: 'code_test_db',
+      adminDsn: CODE_OWNER,
+      importDsn: CODE_IMPORT,
+      importIsOwnerSubstitution: false,
+    });
+    expect(JSON.stringify(resolved)).not.toContain('afldb_test');
+  });
+
+  it('requires the acknowledgement to name the selected database exactly', () => {
+    const code = resolveTarget(bothEnv, { target: 'code_test_db' });
+    expect(() => assertDestructiveAcknowledgement(code, 'code_test_db')).not.toThrow();
+    expect(() => assertDestructiveAcknowledgement(code, 'afldb_test'))
+      .toThrow(/--acknowledge-destroy code_test_db/);
+    expect(() => assertDestructiveAcknowledgement(code, undefined))
+      .toThrow(/--acknowledge-destroy code_test_db/);
+    // and the reverse mismatch, exactly as before ISSUE-146
+    expect(() => assertDestructiveAcknowledgement(resolveTarget(bothEnv), 'code_test_db'))
+      .toThrow(/--acknowledge-destroy afldb_test/);
+  });
+
+  it('produces the same stage graph for both targets, differing only in the bound scripts', () => {
+    const forTest = planStages(target(), fitzroy(), OPTS);
+    const forCode = planStages(codeTarget(), fitzroy(), OPTS);
+
+    expect(idsOf(forCode)).toEqual(idsOf(forTest));
+    expect(forCode.map((s) => s.kind)).toEqual(forTest.map((s) => s.kind));
+    expect(forCode.map((s) => s.run)).toEqual(forTest.map((s) => s.run));
+
+    // The schema and privilege stages are the ONLY argv difference, and they bind to the
+    // rehearsal's own package scripts / migrate target.
+    const migrations = forCode.find((s) => s.id === 'migrations')!;
+    expect(migrations.argv).toEqual(['npm', 'run', 'db:migrate:code-test']);
+    expect(migrations.envOverlay).toEqual({ AFLDB_MIGRATE_TARGET: 'code-test' });
+    expect(forCode.find((s) => s.id === 'privileges')!.argv)
+      .toEqual(['npm', 'run', 'db:privileges:code-test']);
+    for (const [i, stage] of forCode.entries()) {
+      if (stage.id === 'migrations' || stage.id === 'privileges') continue;
+      expect(stage.argv, stage.id).toEqual(forTest[i].argv);
+    }
+
+    // Every data stage gets the rehearsal's restricted import DSN, and nothing test-shaped.
+    for (const stage of forCode.filter((s) => s.kind === 'data')) {
+      expect(stage.envOverlay?.AFLDB_IMPORT_DATABASE_URL, stage.id).toBe(CODE_IMPORT);
+    }
+    expect(JSON.stringify(forCode)).not.toContain('afldb_test');
+    expect(JSON.stringify(forCode)).not.toMatch(/\b07\d\b/);
+    expect(JSON.stringify(forCode)).not.toContain('AFLDB_LEGACY_SQLITE');
+  });
+
+  it('refuses forbidden and unlisted targets by name, before reading any DSN', () => {
+    const cases: Array<[string, RegExp]> = [
+      ['afldb_dev', /rejected by name/],
+      ['afldb_prod', /rejected by name/],
+      ['anything-prod', /looks like production/],
+      ['afldb_production_test', /looks like production/],
+      ['random_test', /only explicit rebuild targets/],
+      ['afldb_scratch', /only explicit rebuild targets/],
+      ['afldb_dev_pre_rebuild_20260906-112500', /rejected by name|pre-rebuild/],
+      ['afldb_test_pre_rebuild_20260825', /pre-rebuild databases are read-only/],
+      ['code_test_db_pre_rebuild_20260907', /pre-rebuild databases are read-only/],
+    ];
+    for (const [name, pattern] of cases) {
+      // With no environment at all: the name is refused first, so no DSN is ever consulted.
+      expect(refusal(() => resolveTarget({}, { target: name })), name).toMatch(pattern);
+      // and with every variable present, the answer is the same
+      expect(refusal(() => resolveTarget(bothEnv, { target: name })), name).toMatch(pattern);
+    }
+  });
+
+  it('refuses a code-test DSN whose database is not code_test_db', () => {
+    const wrong = (owner: string, imp?: string) => refusal(() => resolveTarget({
+      ...bothEnv,
+      AFLDB_CODE_TEST_DATABASE_URL: owner,
+      AFLDB_CODE_TEST_IMPORT_DATABASE_URL: imp,
+    }, { target: 'code_test_db' }));
+
+    expect(wrong(OWNER, IMPORT))
+      .toMatch(/AFLDB_CODE_TEST_DATABASE_URL names database 'afldb_test', not the selected target 'code_test_db'/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/afldb_dev')).toMatch(/rejected by name/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test_db_prod')).toMatch(/looks like production/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test_db_pre_rebuild_1')).toMatch(/read-only/);
+    expect(wrong('postgres://afldb_owner:x@h:5432/code_test')).toMatch(/only explicit rebuild targets/);
+    expect(wrong('not a url')).toMatch(/AFLDB_CODE_TEST_DATABASE_URL is not a valid connection URL/);
+    // the import DSN must agree with the owner DSN, and both with the selection
+    expect(wrong(CODE_OWNER, IMPORT))
+      .toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL names a different database from AFLDB_CODE_TEST_DATABASE_URL/);
+    expect(wrong(CODE_OWNER, 'nope')).toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL is not a valid connection URL/);
+  });
+
+  it('fails closed when the code-test DSNs are missing, without borrowing the test ones', () => {
+    const testOnly = { AFLDB_TEST_DATABASE_URL: OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: IMPORT };
+    expect(refusal(() => resolveTarget(testOnly, { target: 'code_test_db' })))
+      .toMatch(/AFLDB_CODE_TEST_DATABASE_URL is not set/);
+    expect(refusal(() => resolveTarget({ ...testOnly, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER },
+      { target: 'code_test_db' })))
+      .toMatch(/AFLDB_CODE_TEST_IMPORT_DATABASE_URL is not set/);
+    // the owner substitution is the same explicit flag, and substitutes the CODE owner DSN
+    const substituted = resolveTarget({ ...testOnly, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER },
+      { target: 'code_test_db', allowOwnerImportDsn: true });
+    expect(substituted.importIsOwnerSubstitution).toBe(true);
+    expect(substituted.importDsn).toBe(CODE_OWNER);
+    // and the reverse: the default target never reads the rehearsal variables
+    expect(refusal(() => resolveTarget({
+      AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER, AFLDB_CODE_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }))).toMatch(/AFLDB_TEST_DATABASE_URL is not set/);
+  });
+
+  it('never infers the target from a DSN', () => {
+    // AFLDB_TEST_DATABASE_URL pointing at code_test_db does not make code_test_db the
+    // target; it is a mismatch and a refusal.
+    expect(refusal(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: CODE_OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }))).toMatch(/AFLDB_TEST_DATABASE_URL names database 'code_test_db', not the selected target 'afldb_test'/);
+    expect(refusal(() => resolveTarget({
+      AFLDB_TEST_DATABASE_URL: CODE_OWNER, AFLDB_TEST_IMPORT_DATABASE_URL: CODE_IMPORT,
+    }, { target: 'afldb_test' }))).toMatch(/not the selected target 'afldb_test'/);
+  });
+
+  it('parses --target and refuses a bare flag rather than defaulting', () => {
+    const parsed = parseRebuildArgs(['--target', 'code_test_db', '--acknowledge-destroy', 'code_test_db']);
+    expect(parsed.target).toBe('code_test_db');
+    expect(parsed.acknowledgeDestroy).toBe('code_test_db');
+    expect(() => parseRebuildArgs(['--target'])).toThrow(/--target needs a database name/);
+    expect(() => parseRebuildArgs(['--target', '--plan'])).toThrow(/--target needs a database name/);
+    // an unlisted name parses (parseArgs is not the gate) and is then refused by resolveTarget
+    expect(refusal(() => resolveTarget(bothEnv, parseRebuildArgs(['--target', 'afldb_dev']))))
+      .toMatch(/rejected by name/);
+  });
+
+  it('refuses through planStages too if a non-allowlisted name ever reached it', () => {
+    expect(() => planStages(target({ database: 'afldb_dev' }), fitzroy(), OPTS))
+      .toThrow(/not an explicit rebuild target/);
+  });
+
+  it('never leaks a DSN, host or credential in any refusal', () => {
+    const secretEnv = {
+      AFLDB_TEST_DATABASE_URL: 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/afldb_dev',
+      AFLDB_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/afldb_dev',
+      AFLDB_CODE_TEST_DATABASE_URL: 'postgres://afldb_owner:s3cret-owner-LEAK@db.internal:6543/afldb_test',
+      AFLDB_CODE_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/code_test_db',
+    };
+    const messages = [
+      refusal(() => resolveTarget(secretEnv)),
+      refusal(() => resolveTarget(secretEnv, { target: 'code_test_db' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+        AFLDB_CODE_TEST_IMPORT_DATABASE_URL: undefined }, { target: 'code_test_db' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: CODE_OWNER,
+        AFLDB_CODE_TEST_IMPORT_DATABASE_URL: 'postgres://afldb_import:s3cret-import-LEAK@db.internal:6543/afldb_test' },
+      { target: 'code_test_db' })),
+      refusal(() => resolveTarget(secretEnv, { target: 'afldb_prod' })),
+      refusal(() => resolveTarget({ ...secretEnv, AFLDB_CODE_TEST_DATABASE_URL: 'bad' },
+        { target: 'code_test_db' })),
+      refusal(() => assertDestructiveAcknowledgement(codeTarget(), 'afldb_test')),
+      refusal(() => parseRebuildArgs(['--target'])),
+    ];
+    expect(messages).toHaveLength(8);
+    for (const message of messages) {
+      for (const secret of SECRETS) expect(message, message).not.toContain(secret);
+    }
   });
 });
 
@@ -2702,10 +2915,15 @@ describe('reset proof', () => {
       // literal string as a database name. The getopt invariant this test exists for is
       // unchanged and is now asserted where the argv is actually built.
       const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-      for (const script of ['db:privileges', 'db:privileges:test']) {
+      const privilegeScripts = {
+        'db:privileges': 'dev',
+        'db:privileges:test': 'test',
+        'db:privileges:code-test': 'code-test', // AFLDB-ISSUE-146
+      };
+      for (const [script, expectedTarget] of Object.entries(privilegeScripts)) {
         const command: string = pkg.scripts[script];
         expect(command, `${script} must not build a psql argv in the shell`)
-          .toBe(`tsx tools/db/privileges.ts --target ${script.endsWith(':test') ? 'test' : 'dev'}`);
+          .toBe(`tsx tools/db/privileges.ts --target ${expectedTarget}`);
         expect(command, `${script} must not depend on shell expansion`)
           .not.toContain('$');
       }
@@ -2725,6 +2943,8 @@ describe('reset proof', () => {
       // Explicitly named targets, exactly as migrate.ts does — never a guessed default DSN.
       expect(source).toContain('AFLDB_OWNER_DATABASE_URL');
       expect(source).toContain('AFLDB_TEST_DATABASE_URL');
+      // AFLDB-ISSUE-146: the rehearsal target is bound to its OWN variable, never test's.
+      expect(source).toMatch(/'code-test': 'AFLDB_CODE_TEST_DATABASE_URL'/);
       // and it never prints what it resolved
       expect(source).not.toMatch(/console\.(log|error)\([^)]*\bdsn\b/);
     });
@@ -2735,7 +2955,14 @@ describe('reset proof', () => {
       // after the destructive reset (§H11 F1).
       const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
       expect(pkg.scripts['db:migrate:test']).toBe('tsx tools/db/migrate.ts --target test');
+      // AFLDB-ISSUE-146: the rehearsal's migrations go through the same explicit-target
+      // path, bound to the rehearsal's own variable and exempt from the shared-ledger guard
+      // exactly as `test` is (both are wiped and rebuilt from nothing).
+      expect(pkg.scripts['db:migrate:code-test']).toBe('tsx tools/db/migrate.ts --target code-test');
       const source = readFileSync(join(root, 'tools', 'db', 'migrate.ts'), 'utf8');
+      expect(source).toMatch(/'code-test': 'AFLDB_CODE_TEST_DATABASE_URL'/);
+      expect(source).toMatch(/DISPOSABLE_TARGETS: readonly Target\[\] = \['test', 'code-test'\]/);
+      expect(source).not.toMatch(/target === 'test'\) return/);
       // The environment variable stays supported, and a disagreement is a refusal rather
       // than a silent preference for one over the other.
       expect(source).toContain('AFLDB_MIGRATE_TARGET');
@@ -3091,11 +3318,16 @@ describe('reset proof', () => {
   describe('identity refusals — every one fires BEFORE the reset', () => {
     const cases: [string, Partial<Identity>, string, RegExp][] = [
       ['a database that is not afldb_test', { database: 'afldb_scratch_test' },
-        'afldb_scratch_test', /only supported rebuild target/],
+        'afldb_scratch_test', /only explicit rebuild targets/],
       ['afldb_dev by name', { database: 'afldb_dev' }, 'afldb_dev', /rejected by name/],
       ['anything that looks like production', { database: 'afldb_prod' }, 'afldb_prod',
         /rejected by name|looks like production/],
-      ['a name that does not end in _test', { database: 'afldb' }, 'afldb', /ends in _test/],
+      ['a name outside the rebuild allowlist', { database: 'afldb' }, 'afldb',
+        /only explicit rebuild targets/],
+      // AFLDB-ISSUE-146: code_test_db is an allowlisted REBUILD target, but this proof stays
+      // pinned to afldb_test — the shared name check passes and the proof's own pin refuses.
+      ['the code_test_db rehearsal target', { database: 'code_test_db' }, 'code_test_db',
+        /only ever runs against 'afldb_test'/],
       ['a server answering a different database from the DSN', { database: 'afldb_dev' },
         'afldb_test', /only ever runs against 'afldb_test'/],
       ['a current_user that is not afldb_owner', { role_name: 'afldb_import' },

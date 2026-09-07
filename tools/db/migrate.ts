@@ -3,6 +3,8 @@
  *
  *   npm run db:migrate            apply pending migrations to afldb_dev
  *   npm run db:migrate:test       apply pending migrations to afldb_test
+ *   npm run db:migrate:code-test  apply pending migrations to code_test_db (the disposable
+ *                                 full-rebuild rehearsal target, AFLDB-ISSUE-146)
  *   npm run db:status             show applied / pending without changing anything
  *
  * Migrations are plain .sql files in src/db/migrations, applied in filename
@@ -76,10 +78,18 @@ const allowBranchLocal = process.argv.includes('--allow-branch-local');
 const TARGETS = {
   dev: 'AFLDB_OWNER_DATABASE_URL',
   test: 'AFLDB_TEST_DATABASE_URL',
+  'code-test': 'AFLDB_CODE_TEST_DATABASE_URL',
   prod: 'AFLDB_PROD_DATABASE_URL',
 } as const;
 
 type Target = keyof typeof TARGETS;
+
+/**
+ * Targets that are wiped and rebuilt from nothing by tools/db/rebuild-test.ts, so an
+ * unmerged migration applied to them can never orphan a shared ledger. `code-test` is the
+ * AFLDB-ISSUE-146 rehearsal database and has its OWN variable — it never borrows `test`'s.
+ */
+const DISPOSABLE_TARGETS: readonly Target[] = ['test', 'code-test'];
 
 /**
  * `--target <name>` exists so the package scripts do not have to set the target
@@ -184,9 +194,9 @@ function checkMigrationSafety(): void {
     process.exit(1);
   }
 
-  // Status is read-only and test is explicitly disposable: neither can create the orphaned
-  // shared-database ledger state this guard exists to prevent.
-  if (statusOnly || target === 'test') return;
+  // Status is read-only and the disposable targets are rebuilt from nothing: none of them
+  // can create the orphaned shared-database ledger state this guard exists to prevent.
+  if (statusOnly || DISPOSABLE_TARGETS.includes(target)) return;
 
   let inventory: ReturnType<typeof collectMigrationSources>;
   try {

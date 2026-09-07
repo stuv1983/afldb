@@ -234,22 +234,69 @@ curl http://10.0.40.100:8090/api/health   # through the proxy
 
 Returns `{"status":"ok","database":"ok","latencyMs":N}`, or HTTP 503 with `"database":"unreachable"`. It deliberately reveals no version, hostname or connection detail. Caddy polls it every 30 s.
 
-## 6a. Clean test rebuild (`afldb_test`)
+## 6a. Clean rebuild (`afldb_test`, and the `code_test_db` rehearsal)
 
-The canonical clean rebuild of the **test** database is one command:
+The canonical clean rebuild is one runner with **two explicitly supported destructive
+targets** (AFLDB-ISSUE-093 §10; the second added by AFLDB-ISSUE-146):
+
+| Target | Purpose | Selected by | Dedicated DSN variables |
+|---|---|---|---|
+| `afldb_test` | normal test/integration rebuild | default (no `--target`), or `--target afldb_test` | `AFLDB_TEST_DATABASE_URL` (owner), `AFLDB_TEST_IMPORT_DATABASE_URL` (import) |
+| `code_test_db` | disposable full-rebuild rehearsal | `--target code_test_db` only | `AFLDB_CODE_TEST_DATABASE_URL` (owner), `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` (import) |
+
+Normal test rebuild — unchanged:
 
 ```bash
-npm run db:test:rebuild -- --fitzroy-label <full-history-label> \
-                           --acknowledge-destroy afldb_test
+npm run db:test:rebuild -- --acknowledge-destroy afldb_test
 ```
 
-Add `--plan` to print the stage graph and exit without touching anything.
+Rehearsal rebuild of `code_test_db` — the same runner, the same stage graph, nothing reduced:
 
-**It is destructive.** It drops every table, non-public schema, routine and type in
-`afldb_test` — a genuine clean slate, not a truncation — while preserving the `pg_trgm` and
-`unaccent` extensions, which are owned by another role. It refuses any target whose name is
-not exactly `afldb_test`, rejects `afldb_dev` and production by name, and requires you to
-name the database in `--acknowledge-destroy`.
+```bash
+npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+```
+
+```powershell
+npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+```
+
+Add `--plan` to print the stage graph and exit without touching anything. The core source is
+never named on the command line (it is the single accepted baseline in
+`data/reference/fitzroy-accepted-baselines.json`); `--fitzroy-label <label>
+--acknowledge-partial-fitzroy` is only for a deliberate partial rebuild.
+
+**It is destructive.** It drops every table, non-public schema, routine and type in the
+selected database — a genuine clean slate, not a truncation — while preserving the `pg_trgm`
+and `unaccent` extensions, which are owned by another role. The `code_test_db` rehearsal exists
+so a complete clean rebuild can be proven without touching `afldb_test`, `afldb_dev`, any
+retained `*_pre_rebuild_*` database or production.
+
+**Target contract — every refusal happens before any database contact:**
+
+- The target is an allowlist of exactly `afldb_test` and `code_test_db`. Anything else is
+  refused by name: `afldb_dev`, `afldb_prod`, any name containing `prod`, any preserved
+  `*pre_rebuild*` database, and any other database — an arbitrary `*_test` name such as
+  `random_test` included.
+- `--acknowledge-destroy` must name the selected database **exactly**: `afldb_test` for the
+  default target, `code_test_db` for the rehearsal. `--target code_test_db
+  --acknowledge-destroy afldb_test` is refused, and so is the reverse.
+- Each target reads only its own DSN variables. The rehearsal never borrows
+  `AFLDB_TEST_DATABASE_URL`, and the test rebuild never reads `AFLDB_CODE_TEST_*`. A missing
+  variable is a refusal, not a fallback.
+- The database named inside the DSN must equal the selected target. The target is never
+  inferred from a DSN: `AFLDB_CODE_TEST_DATABASE_URL` pointing at any database other than
+  `code_test_db` is refused, as is `AFLDB_TEST_DATABASE_URL` pointing at `code_test_db`.
+- The import DSN must name the same database as the owner DSN. Without a restricted import
+  credential the runner fails closed; `--allow-owner-import-dsn` is the only, explicit,
+  substitution.
+- A bare `--target` with no value is refused rather than falling through to the default.
+- No refusal message ever includes a DSN, host or credential — database and variable names
+  only.
+
+`code_test_db` must already exist and be owned by `afldb_owner` (no DSN in the credential model
+can create or drop a database — see the `afldb_test` bootstrap in
+`tools/maintenance/00_install_postgres.sh`); the runner resets it in place exactly as it resets
+`afldb_test`. `npm run db:test:prove-reset` remains pinned to `afldb_test` only.
 
 **Preflight runs before any destruction.** Every tracked DraftGuru input is checked and
 `import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057
@@ -262,8 +309,8 @@ stage `id` is what `--plan` prints and what a failure names.
 |---|---|---|---|
 | 1 | `precheck` | every required input, before anything is destroyed | none — no database contact |
 | 2 | `recreate` | database reset (clean slate, not a truncation) | `AFLDB_TEST_DATABASE_URL` (owner) |
-| 3 | `migrations` | migrations (`db:migrate:test`) | `AFLDB_TEST_DATABASE_URL` |
-| 4 | `privileges` | privileges (`db:privileges:test`) | `AFLDB_TEST_DATABASE_URL` |
+| 3 | `migrations` | migrations — the complete tracked set, `001` through the current terminal migration, no hard-coded count (`db:migrate:test`; `db:migrate:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
+| 4 | `privileges` | privileges (`db:privileges:test`; `db:privileges:code-test` for the rehearsal) | `AFLDB_TEST_DATABASE_URL` |
 | 5 | `reference` | reference data | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 6 | `fitzroy` | fitzRoy / AFL Tables core | `AFLDB_TEST_IMPORT_DATABASE_URL` |
 | 7 | `heights` | heights — AFL Tables player-details register | `AFLDB_TEST_IMPORT_DATABASE_URL` |
@@ -302,10 +349,15 @@ family carries player links and the canonical `players` population must be
 complete first. Coleman keeps its own later stage because it is derived and
 must run after `season_metadata` (AFLDB-ISSUE-111).
 
-Data stages need `AFLDB_TEST_IMPORT_DATABASE_URL` — a restricted `afldb_import` DSN for the
-test database. The runner **fails closed** without it and never inherits the development
-`AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`. `--allow-owner-import-dsn` runs the
-data stages as owner deliberately, at the cost of the AFLDB-ISSUE-083 blind spot.
+The credential column is written for the default target. Under `--target code_test_db` every
+stage is identical and reads `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL`
+wherever the table says `AFLDB_TEST_*`; the stage ids, order and validation gates do not change.
+
+Data stages need the target's restricted `afldb_import` DSN (`AFLDB_TEST_IMPORT_DATABASE_URL`,
+or `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` for the rehearsal). The runner **fails closed** without
+it and never inherits the development `AFLDB_IMPORT_DATABASE_URL`, which points at `afldb_dev`.
+`--allow-owner-import-dsn` runs the data stages as owner deliberately, at the cost of the
+AFLDB-ISSUE-083 blind spot.
 
 `--fitzroy-label` is required and must name a manifest declaring `full_history`.
 `trial-2024` is a trial snapshot and can never satisfy full-history mode; use
