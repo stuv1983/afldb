@@ -9,6 +9,14 @@ created, reopened, resolved, or materially reclassified.
 
 **Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`.
 
+<!-- 2026-09-07 (ISSUE-146 closeout): `AFLDB-ISSUE-146` (`code_test_db` as a second explicitly
+     supported disposable full-rebuild target) is **Resolved — 2026-09-07**. Merged to `main`
+     (`62e9536`); the first real rehearsal rebuild has since completed successfully (see the detailed
+     entry below for the bounded host-bootstrap fix found along the way). This table's count was
+     never incremented when `AFLDB-ISSUE-146` was allocated, so it stays at 8 tracked here — no
+     count change on this closeout. Number stays allocated; next free issue ID remains
+     `AFLDB-ISSUE-147`. -->
+
 <!-- 2026-09-06 (ISSUE-145 closeout): `AFLDB-ISSUE-145` Resolved — the existing `/venues` index is now
      exposed in site navigation (primary-nav Venues entry after Seasons, home "Browse the record" Venues
      card after Seasons, focused Playwright nav-reachability test, one CHANGELOG entry). Navigation
@@ -18771,9 +18779,10 @@ None tracked.
 
 ## AFLDB-ISSUE-146 — `code_test_db` as a second explicitly supported disposable full-rebuild target
 
-- **Status:** **OPEN — implemented 2026-09-07 on `claude/issue-146` (worktree
-  `D:\dev\afldb-issue-146`, base `main` `5edf515`), uncommitted. Local validation passed. The
-  first real `code_test_db` rebuild has deliberately NOT been run.**
+- **Status:** **RESOLVED — 2026-09-07.** Implemented on `claude/issue-146` and merged to `main`
+  (`62e9536`). The first real `code_test_db` rebuild has since been rehearsed to completion — see
+  "Rehearsal evidence" below — exposing and fixing one bounded host-bootstrap gap
+  (`tools/maintenance/00_install_postgres.sh` never provisioned `code_test_db`).
 - **Severity / Area:** Medium / Rebuild tooling — `tools/db/rebuild-test.ts`, migration and privilege
   runners, deployment docs.
 - **Reported:** 2026-09-07 (operator request).
@@ -18822,10 +18831,14 @@ resolved, so a second target could not be added without touching those runners t
 
 ### Files changed
 
-`tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`
-(`db:migrate:code-test`, `db:privileges:code-test`), `.env.example` (commented
-`AFLDB_CODE_TEST_*` lines), `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`,
-`CHANGELOG.md`, `issues.md`, `IssuesIndex.md`.
+Original implementation: `tools/db/rebuild-test.ts`, `tools/db/migrate.ts`,
+`tools/db/privileges.ts`, `package.json` (`db:migrate:code-test`, `db:privileges:code-test`),
+`.env.example` (commented `AFLDB_CODE_TEST_*` lines), `docs/deployment.md` §6a,
+`tests/db-test-rebuild.test.ts`, `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`.
+
+Bounded bootstrap follow-up (this worktree, 2026-09-07): `tools/maintenance/00_install_postgres.sh`
+(create + provision `code_test_db` alongside `afldb_dev`/`afldb_test`), `docs/deployment.md` §6a
+(provisioning note), `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`.
 
 ### Validation (2026-09-07, workstation, no database contact)
 
@@ -18855,11 +18868,73 @@ resolved, so a second target could not be added without touching those runners t
   `afldb_dev_pre_rebuild_20260906-112500`, production and `code_test_db` are all untouched; no SSH,
   deploy, restart, commit, push or merge.
 
+### Rehearsal evidence (2026-09-07, operator-run, `code_test_db` on the rehearsal host)
+
+The operator created `code_test_db`, set the two `AFLDB_CODE_TEST_*` variables and ran the first
+real rehearsal:
+
+```
+npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db
+```
+
+- Source prechecks (fail-closed, pre-destruction) initially refused on missing source artefacts;
+  after the operator restored them, all prechecks passed.
+- The first destructive run then failed inside stage 3 (MIGRATIONS), migration `008_search.sql`:
+  `function public.unaccent(unknown, text) does not exist`. `code_test_db` had been created by hand
+  (`createdb`) with no PostgreSQL extensions. A comparison of host state showed `afldb_dev` and
+  `afldb_test` both already had `pg_trgm` and `unaccent` — provisioned by
+  `tools/maintenance/00_install_postgres.sh` at host bootstrap — while `code_test_db`, created
+  outside that script, had neither.
+- After the operator manually ran `CREATE EXTENSION IF NOT EXISTS pg_trgm;` and
+  `CREATE EXTENSION IF NOT EXISTS unaccent;` against `code_test_db`, the complete rebuild
+  succeeded: all 91 tracked migrations applied, privileges reconciled, all 22 stages completed, the
+  AFLDB-ISSUE-095 ladder witness passed, and final validation **PASSED 85/85** ("Rebuild
+  complete."). Total runtime was comfortably inside the one-hour operational target.
+- No production database was touched at any point.
+
+### Bounded bootstrap follow-up (implemented 2026-09-07, this worktree)
+
+The rehearsal exposed a real gap, not a defect in the rebuild runner itself: `code_test_db` is
+created by the operator outside the runner (§10 point — no DSN in the credential model can
+create/drop a database), but the repository's normal host-bootstrap script,
+`tools/maintenance/00_install_postgres.sh`, only ever provisioned `afldb_dev` and `afldb_test` —
+it never created `code_test_db` or enabled `pg_trgm`/`unaccent` on it, even though
+`docs/deployment.md` §6a already pointed to that script as the model for how `code_test_db` should
+be provisioned. A database created by hand instead of through the documented bootstrap path was
+therefore missing the extensions migration `008_search.sql` requires.
+
+Fix — minimal, host-bootstrap-only, no change to any migration or to the rebuild runner's
+guardrails:
+
+- `tools/maintenance/00_install_postgres.sh`: `code_test_db` added to the database-creation loop
+  (`for DB in afldb_dev afldb_test code_test_db`, owner `afldb_owner`, same idempotent
+  create-if-absent check) and to the extensions/default-privileges loop (`CREATE EXTENSION
+  pg_trgm`/`unaccent`, schema ownership, default-privilege reconciliation, and the
+  `privileges.sql` reconciler run) — identical treatment to `afldb_dev` and `afldb_test`, applied
+  by extending two existing `for DB in ...` loops rather than adding a new one. The closing summary
+  banner was updated to list all three databases. `AFLDB_CODE_TEST_DATABASE_URL` /
+  `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` remain commented out in `.env.example` and are still never
+  written by the bootstrap script: creating the database and enabling its extensions is now
+  automatic, but selecting `code_test_db` as a rebuild target stays an explicit, separate operator
+  opt-in, unchanged from the original ISSUE-146 contract.
+- `docs/deployment.md` §6a: updated the `code_test_db` provisioning note to state that
+  `00_install_postgres.sh` now bootstraps it (including the required extensions) instead of only
+  citing the script as a manual model to replicate.
+- No change to `008_search.sql` or any other migration, to `tools/db/rebuild-test.ts`'s allowlist,
+  DSN handling or destructive guardrails, or to the explicit supported-target contract
+  (`afldb_test`, `code_test_db`).
+
+Validation (this worktree, no database contact):
+
+- `bash -n tools/maintenance/00_install_postgres.sh` — syntax OK.
+- Manual review confirms both extended loops are DB-name-generic (no `afldb_test`/`afldb_dev`
+  literals inside either loop body) and therefore behave identically for `code_test_db`.
+- No existing test suite exercises this shell script directly (`tests/db-test-rebuild.test.ts`
+  covers `tools/db/rebuild-test.ts`'s TypeScript logic only, which is unchanged here); none added,
+  per the "smallest test that proves the change" rule — the change is bash bootstrap SQL, not
+  logic under test elsewhere in the suite.
+
 ### Follow-up
 
-- Operator: create `code_test_db` on the rehearsal host (owner `afldb_owner`, `afldb_import` able
-  to connect), set the two `AFLDB_CODE_TEST_*` variables, dry-run with `--plan`, then run the first
-  real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db`.
-  Resolve this issue once that rebuild passes its final validation.
-- `prove-reset` deliberately does not accept `--target`; extend it only if a rollback-only reset
-  proof against `code_test_db` is ever needed.
+- None outstanding. `prove-reset` deliberately does not accept `--target`; extend it only if a
+  rollback-only reset proof against `code_test_db` is ever needed.

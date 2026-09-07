@@ -1,6 +1,7 @@
 # AFLDB-ISSUE-146 — code_test_db rebuild target
 
-Status: Open
+Status: Resolved (2026-09-07) — merged to main (62e9536); first real code_test_db rehearsal
+passed final validation 85/85 after a bounded host-bootstrap fix (see issues.md).
 
 ## Merge readiness
 
