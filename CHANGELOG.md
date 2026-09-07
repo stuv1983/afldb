@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### Public UI - club coaching records and premierships on club pages (AFLDB-ISSUE-148) - 7 September 2026
+
+- Every public AFL club page now has a **Premierships** section: one row per premiership the club
+  has won - year, the beaten Grand Final opponent, the score from the premiership club's
+  perspective, the venue, the date and the crowd - newest first. A premiership is a won Grand
+  Final drawn from the canonical match record; a Grand Final that ended in a draw is not counted
+  (its replay is). The crowd is left blank where the attendance was never recorded. On a club that
+  has traded under more than one name the section counts every era of the club, matching the
+  premiership count already shown in the page's headline totals. A club with no premierships has
+  no Premierships section.
+- Every public AFL club page now has a **Coaches** section: one row per coach who has coached
+  that club, with that coach's record while coaching *that* club - games, wins, draws, losses,
+  a **Span** column (first and last season coached, shown as a range) and win percentage. A coach
+  who coached more than one club shows only the matches they coached for the club whose page it
+  is; a coach with more than one separate period in charge of the club is shown once, with the
+  periods combined, so the Span is a first/last range rather than a statement that every season
+  in it was coached.
+- Games, wins, draws and losses are counted from the canonical per-match coaching record
+  (`match_coaches` joined to `matches`), never from the AFL Tables coach index's own stored
+  total, which is not club-specific. `games = wins + draws + losses` always holds; an equal-scores
+  match counts as a draw.
+- Win percentage uses the same draw-weighted convention as the Coach Records board and the coach
+  career panel - `(wins + draws / 2) / games` - and the section states it.
+- Coaches are listed most recently in charge first. A coach who also played at senior level links
+  to their player profile; a coach who did not links to their coach page.
+- On a club that has traded under more than one name, the section counts every era of the club,
+  consistent with the games and goalkicking leaders already shown on the page. A club with no
+  per-match coaching data simply has no Coaches section.
+
 ### Public UI - responsive navigation and dense-table affordance (AFLDB-ISSUE-147) - 7 September 2026
 
 - The phone navigation now reaches every primary destination. Previously the fixed bottom bar

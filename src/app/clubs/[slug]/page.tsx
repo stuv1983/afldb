@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { ClubCoachRecords } from '@/components/ClubCoachRecords';
+import { ClubPremierships } from '@/components/ClubPremierships';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
@@ -15,11 +17,13 @@ import {
   getClubGoalkickers,
   getClubLeaders,
   getClubLineage,
+  getClubPremierships,
   getClubRelations,
   getClubSeasons,
   getClubTotals,
   listClubs,
 } from '@/db/queries/clubs';
+import { getClubCoachRecords } from '@/db/queries/coaches';
 import {
   awardPath,
   clubPath,
@@ -95,7 +99,7 @@ export default async function ClubPage({
 
   const [
     totals, eraTotals, seasons, leaders, goalkickers, lineage, relations,
-    bestAndFairest, captains,
+    bestAndFairest, captains, coachRecords, premierships,
   ] = await Promise.all([
     getClubTotals(club.id),
     getClubEraTotals(club.id),
@@ -106,6 +110,8 @@ export default async function ClubPage({
     getClubRelations(club.id),
     getClubBestAndFairest(club.id, 25),
     getClubCaptains(club.id),
+    getClubCoachRecords(club.id),
+    getClubPremierships(club.id),
   ]);
 
   const winRate = totals.played > 0
@@ -119,6 +125,20 @@ export default async function ClubPage({
   const clubRecordName = club.currentIdentityName;
 
   const sections: { id: string; label: string; node: React.ReactNode }[] = [];
+
+  if (premierships.length > 0) {
+    sections.push({
+      id: 'premierships',
+      label: 'Premierships',
+      node: (
+        <ClubPremierships
+          premierships={premierships}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
 
   sections.push({
     id: 'games-leaders',
@@ -307,6 +327,20 @@ export default async function ClubPage({
           </div>
           </CollapsibleTable>
         </section>
+      ),
+    });
+  }
+
+  if (coachRecords.length > 0) {
+    sections.push({
+      id: 'coaches',
+      label: 'Coaches',
+      node: (
+        <ClubCoachRecords
+          records={coachRecords}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
       ),
     });
   }

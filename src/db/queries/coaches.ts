@@ -253,6 +253,85 @@ export async function getCoachRecordsByWinPct(minGames = 50, limit = 50): Promis
   `;
 }
 
+export type ClubCoachRecordRow = {
+  coachId: number;
+  displayName: string;
+  /** True when no player links to this coach (coaches_link_ck, migration 087). */
+  coachOnly: boolean;
+  playerId: number | null;
+  playerSlug: string | null;
+  firstSeason: number;
+  lastSeason: number;
+  /** Distinct seasons in charge of this club, tenure gaps not counted. */
+  seasons: number;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  /**
+   * The site's draw-weighted coaching win rate, `(W + D/2) / G * 100`,
+   * matching /records/coaches, {@link getCoachCareer} and the club page's
+   * own club win rate -- not a plain `W / G`. `round(...)::numeric`, so
+   * postgres.js returns it as a string.
+   */
+  winPct: string;
+};
+
+/**
+ * Every coach who has coached one club, with that coach's record for THAT
+ * club only (AFLDB-ISSUE-148) -- club-specific, never whole-career
+ * totals. Counted from the canonical per-match coaching assignment
+ * (`match_coaches` + `matches`), the same source {@link getCoachCareer}
+ * uses, so `source_games_coached` (evidence only, migration 087) is never
+ * read.
+ *
+ * One row per coach: a coach with more than one separate period in charge
+ * of the club (Tony Jewell coached Richmond 1979-81 and again 1986-87)
+ * has those periods aggregated into a single record, and
+ * `games = wins + draws + losses` always holds.
+ *
+ * Club scope follows the rest of the club page -- every identity in the
+ * club's lineage (`organization_id`, exactly {@link getClubLineage} /
+ * {@link getClubTotals}), so a coach of "Footscray" is counted on the
+ * Western Bulldogs page too. A merger is a different organisation and
+ * never reaches this set, the same way nothing of Fitzroy's is counted
+ * towards Brisbane Lions.
+ *
+ * Ordered most-recently-in-charge first. A club with no `match_coaches`
+ * rows returns `[]`.
+ */
+export async function getClubCoachRecords(clubId: number): Promise<ClubCoachRecordRow[]> {
+  return sql<ClubCoachRecordRow[]>`
+    SELECT c.id AS "coachId", c.display_name AS "displayName",
+           (c.player_id IS NULL) AS "coachOnly",
+           c.player_id AS "playerId", p.slug AS "playerSlug",
+           min(m.season)::int AS "firstSeason",
+           max(m.season)::int AS "lastSeason",
+           count(DISTINCT m.season)::int AS seasons,
+           count(*)::int AS games,
+           count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+           count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (
+             WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+           )::int AS losses,
+           round((
+             (count(*) FILTER (WHERE m.winner_club_id = mc.club_id)
+               + count(*) FILTER (WHERE m.winner_club_id IS NULL) * 0.5)
+             * 100.0 / count(*)
+           )::numeric, 2) AS "winPct"
+      FROM match_coaches mc
+      JOIN matches m ON m.id = mc.match_id
+      JOIN coaches c ON c.id = mc.coach_id
+      LEFT JOIN players p ON p.id = c.player_id
+     WHERE mc.club_id IN (
+       SELECT id FROM clubs
+        WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
+     )
+     GROUP BY c.id, c.display_name, c.player_id, p.slug
+     ORDER BY max(m.season) DESC, min(m.season) DESC, c.display_name
+  `;
+}
+
 export type CoachIndexRow = {
   id: number;
   displayName: string;
