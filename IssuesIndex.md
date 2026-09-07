@@ -7,14 +7,20 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-07
-**Open issues:** 9 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-146`.
+**Open issues:** 8 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`.
 
-<!-- UPDATE 2026-09-07 (ISSUE-146 allocation + implementation): `AFLDB-ISSUE-146` is ALLOCATED and Open —
+<!-- UPDATE 2026-09-07 (ISSUE-146 closeout): `AFLDB-ISSUE-146` is **Resolved — 2026-09-07**.
      `code_test_db` as a second explicitly supported disposable full-rebuild target for
-     `npm run db:test:rebuild` (`--target code_test_db --acknowledge-destroy code_test_db`, dedicated
-     `AFLDB_CODE_TEST_*` DSNs, identical stage graph). Implemented 2026-09-07 on `claude/issue-146`,
-     uncommitted, locally validated; the first real rehearsal rebuild has NOT been run. 8 -> 9 open.
-     Next free issue ID is `AFLDB-ISSUE-147`. -->
+     `npm run db:test:rebuild` merged to `main` (`62e9536`). The first real rehearsal rebuild has
+     since completed successfully: one bounded host-bootstrap gap was found and fixed along the way
+     — a freshly created `code_test_db` had no `pg_trgm`/`unaccent` extensions because
+     `tools/maintenance/00_install_postgres.sh` never provisioned it (only `afldb_dev`/`afldb_test`),
+     so migration `008_search.sql` failed on `unaccent`; the script now bootstraps `code_test_db`
+     identically. After that fix, the full rebuild applied all 91 migrations, completed all 22
+     stages, passed the ladder witness, and passed final validation 85/85. Removed from this index
+     and the Open Issues table; number stays allocated. 9 -> 8 open (this entry corrects the table's
+     count, which was not incremented when `AFLDB-ISSUE-146` was allocated). Next free issue ID
+     remains `AFLDB-ISSUE-147`. -->
 
 <!-- UPDATE 2026-09-06 (ISSUE-145 closeout): `AFLDB-ISSUE-145` is **Resolved — 2026-09-06** on branch
      `sonnet/issue-145-venues` (worktree `D:\dev\afldb-issue-144-venues`), not yet committed. The

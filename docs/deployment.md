@@ -294,9 +294,12 @@ retained `*_pre_rebuild_*` database or production.
   only.
 
 `code_test_db` must already exist and be owned by `afldb_owner` (no DSN in the credential model
-can create or drop a database — see the `afldb_test` bootstrap in
-`tools/maintenance/00_install_postgres.sh`); the runner resets it in place exactly as it resets
-`afldb_test`. `npm run db:test:prove-reset` remains pinned to `afldb_test` only.
+can create or drop a database); the runner resets it in place exactly as it resets `afldb_test`.
+`tools/maintenance/00_install_postgres.sh` bootstraps it alongside `afldb_dev` and `afldb_test` —
+including the `pg_trgm` and `unaccent` extensions migration `008_search.sql` requires — so a host
+provisioned through the normal bootstrap procedure never hits the AFLDB-ISSUE-146 missing-extension
+defect a manually created `code_test_db` did. `npm run db:test:prove-reset` remains pinned to
+`afldb_test` only.
 
 **Preflight runs before any destruction.** Every tracked DraftGuru input is checked and
 `import_draftguru.py --validate-only` must report 42 sha256-verified year pages, 5,057

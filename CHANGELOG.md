@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### Host bootstrap - provision `code_test_db` extensions (AFLDB-ISSUE-146 follow-up) - 7 September 2026
+
+- `tools/maintenance/00_install_postgres.sh` now creates and provisions `code_test_db` (the
+  AFLDB-ISSUE-146 disposable full-rebuild rehearsal target) alongside `afldb_dev` and
+  `afldb_test`: same idempotent create-if-absent step, and the same `pg_trgm`/`unaccent`
+  extensions, schema ownership and default-privilege reconciliation. A manually created
+  `code_test_db` had been missing both extensions, which failed the first real rehearsal
+  rebuild at migration `008_search.sql` (`function public.unaccent(unknown, text) does not
+  exist`); after manual extension provisioning the same rehearsal completed successfully (all
+  91 migrations, all 22 stages, ladder witness passed, final validation 85/85). No change to
+  any migration or to the rebuild runner's guardrails; selecting `code_test_db` as a rebuild
+  target remains an explicit, separate operator opt-in.
+
 ### Rebuild tooling - `code_test_db` rehearsal target (AFLDB-ISSUE-146) - 7 September 2026
 
 - `npm run db:test:rebuild` now accepts an explicit `--target <database>` restricted to an
