@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 
 import { JsonLd } from '@/components/JsonLd';
 import { SearchBox } from '@/components/SearchBox';
+import { BROWSE_SECTIONS } from '@/lib/site-nav-model';
 import { sql } from '@/db/client';
 import { getVaultMeetings } from '@/db/queries/matches';
 import { RECORD_CATEGORIES, getCareerRecord } from '@/db/queries/records';
@@ -172,19 +173,9 @@ export default async function HomePage() {
       <section className="section">
         <h2>Browse the record</h2>
         <nav className="grid" aria-label="Browse">
-          {[
-            { href: '/players', title: 'Players', meta: 'Every player since 1897, filtered by career statistics' },
-            { href: '/clubs', title: 'Clubs', meta: 'Current and historical clubs' },
-            { href: '/seasons', title: 'Seasons', meta: 'Ladders, results and finals' },
-            { href: '/venues', title: 'Venues', meta: 'Every ground since 1897, and the matches played there' },
-            { href: '/records', title: 'Records', meta: 'Career, season and single-game' },
-            { href: '/brownlow', title: 'Brownlow', meta: 'Vote counts by season' },
-            { href: '/awards', title: 'Awards', meta: 'All-Australian, Rising Star, Hall of Fame' },
-            { href: '/draft', title: 'Draft', meta: 'Every selection, by year and club' },
-            { href: '/match-search', title: 'Match Search', meta: 'Find games by scoreline and margin' },
-          ].map((item) => (
+          {BROWSE_SECTIONS.map((item) => (
             <Link key={item.href} href={item.href} className="card">
-              <h3>{item.title}</h3>
+              <h3>{item.label}</h3>
               <div className="meta">{item.meta}</div>
             </Link>
           ))}

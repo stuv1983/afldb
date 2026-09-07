@@ -248,32 +248,52 @@ test('match search shows every active club filter', async ({ page }) => {
   await expect(note).toContainText('Carlton');
 });
 
-test('match search is reachable from the primary navigation', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the masthead nav is hidden on a phone');
+/**
+ * Reaches a primary destination the way a reader on this device would:
+ * from the masthead on a wide screen, and from the phone bar's "More"
+ * sheet — which carries the full PRIMARY_NAV — on a narrow one. Neither
+ * device is allowed to have a destination the other cannot reach
+ * (AFLDB-ISSUE-147).
+ */
+async function reachPrimary(
+  page: import('@playwright/test').Page,
+  isMobile: boolean | undefined,
+  name: string,
+) {
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('dialog', { name: 'All sections' })
+      .getByRole('link', { name, exact: true }).click();
+  } else {
+    await page.getByRole('navigation', { name: 'Primary' })
+      .getByRole('link', { name, exact: true }).click();
+  }
+}
 
+test('match search is reachable from the primary navigation', async ({ page, isMobile }) => {
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Primary' })
-    .getByRole('link', { name: 'Match Search' }).click();
+  await reachPrimary(page, isMobile, 'Match Search');
   await expect(page).toHaveURL(/\/match-search/);
 });
 
 test('venues is reachable from the primary navigation', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'the masthead nav is hidden on a phone');
-
   await page.goto('/');
-  await page.getByRole('navigation', { name: 'Primary' })
-    .getByRole('link', { name: 'Venues' }).click();
+  await reachPrimary(page, isMobile, 'Venues');
   await expect(page).toHaveURL(/\/venues/);
+});
+
+test('clubs is reachable from the primary navigation', async ({ page, isMobile }) => {
+  // The AFLDB-ISSUE-147 regression: Clubs had no path in the phone nav.
+  await page.goto('/');
+  await reachPrimary(page, isMobile, 'Clubs');
+  await expect(page).toHaveURL(/\/clubs$/);
 });
 
 test('the AFLW landing is reachable from site navigation', async ({ page, isMobile }) => {
   // Start on a static route so this UI-only check does not depend on the database.
   await page.goto('/not-a-real-page');
 
-  const navigation = page.getByRole('navigation', {
-    name: isMobile ? 'Sections' : 'Primary',
-  });
-  await navigation.getByRole('link', { name: 'AFLW' }).click();
+  await reachPrimary(page, isMobile, 'AFLW');
 
   await expect(page).toHaveURL(/\/aflw$/);
   await expect(

@@ -23,6 +23,12 @@
   --text-faint:    #746c61;
   --text-invert:   #f3efe6;
 
+  /* Edge cue for a table that scrolls sideways inside .table-wrap: a soft
+     shadow at whichever end still has hidden columns, drawn in CSS from
+     the scroll position (see .table-wrap). Dark reads it as a faint glow
+     because a dark shadow vanishes on near-black paper. */
+  --edge-shadow:   rgba(33, 31, 27, 0.24);
+
   /* Accent: aged gold leaf, deliberately not a betting-site red */
   --accent:        #765913;
   --accent-hover:  #57400b;
@@ -64,6 +70,7 @@
     --bg-hover:      #1d2023;
     --border:        #292d30;
     --border-strong: #42484c;
+    --edge-shadow:   rgba(232, 229, 222, 0.16);
 
     --text:          #e8e5de;
     --text-muted:    #aaa69d;
@@ -90,6 +97,7 @@
   --bg-hover:      #1d2023;
   --border:        #292d30;
   --border-strong: #42484c;
+  --edge-shadow:   rgba(232, 229, 222, 0.16);
 
   --text:          #e8e5de;
   --text-muted:    #aaa69d;
@@ -283,8 +291,10 @@ main { min-height: 72vh; padding: clamp(1.5rem, 3vw, 2.25rem) 0 3.5rem; }
 
 /* Mobile tab bar ----------------------------------------------------- */
 /* Desktop navigates from the masthead; on a phone the primary sections sit
-   within thumb reach instead. */
+   within thumb reach instead, with the rest one tap away in the "More"
+   sheet. Neither appears until the masthead nav is hidden at 640px. */
 .tab-bar { display: none; }
+.nav-sheet { display: none; }
 
 /* Page header -------------------------------------------------------- */
 .page-header { margin-bottom: 1.5rem; }
@@ -379,10 +389,20 @@ main { min-height: 72vh; padding: clamp(1.5rem, 3vw, 2.25rem) 0 3.5rem; }
   overflow-x: auto;
   border-top: 1px solid var(--border-strong);
   border-bottom: 1px solid var(--border-strong);
-  background: transparent;
   -webkit-overflow-scrolling: touch;
   scrollbar-color: var(--border-strong) var(--bg-subtle);
   scrollbar-width: thin;
+  /* Sideways-scroll cue, pure CSS. Two "cover" layers painted in the
+     paper colour scroll WITH the content (background-attachment: local);
+     two shadow layers stay pinned to the box (scroll). At each end the
+     cover sits over its shadow and hides it, so a shadow shows only on a
+     side that still has columns off-screen — and not at all on a table
+     that already fits. */
+  background:
+    linear-gradient(to right, var(--bg) 40%, rgba(0, 0, 0, 0)) 0 0 / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--bg) 40%, rgba(0, 0, 0, 0)) 100% 0 / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--edge-shadow), rgba(0, 0, 0, 0)) 0 0 / 16px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--edge-shadow), rgba(0, 0, 0, 0)) 100% 0 / 16px 100% no-repeat scroll;
 }
 
 table {
@@ -1282,8 +1302,18 @@ details.admin-section > summary h2 {
 
 @media (max-width: 1080px) and (min-width: 641px) {
   .masthead .span { display: none; }
-  .site-nav { gap: 0.75rem; }
+  /* The full set no longer fits masthead width on a small tablet, so let
+     it wrap to a tidy second row aligned to the right rather than
+     spilling over the wordmark. The bottom tab bar does not appear until
+     640px, so this band keeps the complete nav visible. */
+  .site-nav {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem 0.75rem;
+    padding-block: 0.5rem;
+  }
   .site-nav a { font-size: 0.6875rem; }
+  .site-header .container { align-items: center; }
 }
 
 @media (max-width: 640px) {
@@ -1367,7 +1397,8 @@ details.admin-section > summary h2 {
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid var(--border-strong);
   }
-  .tab-bar a {
+  .tab-bar a,
+  .tab-bar .tab-more {
     flex: 1 1 20%;
     min-height: 52px;
     display: grid;
@@ -1379,14 +1410,91 @@ details.admin-section > summary h2 {
     color: var(--text-faint);
     font-weight: 500;
   }
-  .tab-bar a:hover { text-decoration: none; color: var(--text); }
+  .tab-bar .tab-more {
+    background: none;
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .tab-bar a:hover,
+  .tab-bar .tab-more:hover { text-decoration: none; color: var(--text); }
   .tab-bar a[aria-current='page'] {
+    color: var(--accent);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+  .tab-bar .tab-more[aria-expanded='true'] {
     color: var(--accent);
     box-shadow: inset 0 2px 0 var(--accent);
   }
 
   /* Clear the fixed bar so the last row of any page stays reachable. */
   body { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+
+  /* "More" sheet --------------------------------------------------------
+     The mobile equivalent of the rest of the masthead nav: the same
+     PRIMARY_NAV list the wide screen shows in full. Sits above the tab
+     bar and the consent banner while open; its own panel scrolls if the
+     list is taller than the screen. */
+  .nav-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    /* A dark scrim in both themes — conventional for a modal overlay, and
+       a theme-mixed one would wash the screen pale in dark mode. */
+    background: rgba(0, 0, 0, 0.5);
+    animation: nav-sheet-in 0.14s ease-out;
+  }
+  @keyframes nav-sheet-in {
+    from { background: rgba(0, 0, 0, 0); }
+  }
+  .nav-sheet-panel {
+    background: var(--bg-raised);
+    border-top: 1px solid var(--border-strong);
+    max-height: 80vh;
+    overflow-y: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .nav-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1rem 0.6rem;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-sheet-close {
+    background: none;
+    border: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: var(--accent);
+    padding: 0.4rem 0.2rem;
+    cursor: pointer;
+  }
+  .nav-sheet-list { display: flex; flex-direction: column; }
+  .nav-sheet-list a {
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    font-size: 0.9375rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-sheet-list a:last-child { border-bottom: 0; }
+  .nav-sheet-list a:hover { text-decoration: none; }
+  .nav-sheet-list a[aria-current='page'] {
+    color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
 }
 
 @media (max-width: 380px) {
