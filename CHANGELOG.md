@@ -15,6 +15,34 @@ commit.
 
 ## [Unreleased]
 
+### Public UI - club historical records and player honours on club pages (AFLDB-ISSUE-149) - 7 September 2026
+
+- Every public AFL club page gains six data sections, all derived from data AFLDB already owns,
+  all counting every era of a club that has traded under more than one name, and each omitted when
+  the club has no data for it:
+  - **Club records** - biggest win, biggest loss, highest and lowest score the club itself has
+    made in a match, and the highest- and lowest-scoring matches the club has played (combined
+    score of both sides). Every score is shown from the club's perspective whether the club was
+    home or away. Where a record is shared, the most recent match is shown.
+  - **Record crowds** - the club's highest home-and-away crowd, highest finals crowd and highest
+    Grand Final crowd, plus its five largest crowds at any match. Matches with no recorded
+    attendance are excluded; a blank crowd is never shown as zero.
+  - **Players** - the complete list of every player in the canonical `player_clubs` record for the
+    club, with that club's games and goals only, as one player per row with a season range.
+    Default-collapsed because for an old club it runs to many hundreds of names, but never
+    truncated and sortable by any column.
+  - **Premiership players** - the players in each of the club's premiership sides, grouped by
+    season, newest first, from the canonical `player_club_season_stats.is_premier` flag. The
+    premiership seasons agree with the club's won Grand Finals shown in the Premierships section.
+  - **Awards & honours** - Brownlow Medallists, and Coleman Medal / Norm Smith / All-Australian /
+    Rising Star and similar national honours, won by a player *while at this club*. Each honour is
+    attributed to the club the player represented in the award season, so an honour earned at
+    another club is never shown.
+- The existing Premierships, Coaches, games and goalkicking leaders, best-and-fairest, captains
+  and season-history sections are unchanged.
+- No schema change, no migration, no new index, no cached or materialised data. Every section is
+  a focused club-scoped query over existing canonical tables.
+
 ### Public UI - club coaching records and premierships on club pages (AFLDB-ISSUE-148) - 7 September 2026
 
 - Every public AFL club page now has a **Premierships** section: one row per premiership the club

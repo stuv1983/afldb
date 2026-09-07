@@ -634,6 +634,133 @@ export async function getClubCaptains(clubId: number) {
   `;
 }
 
+const CLUB_LINEAGE_IDS = (clubId: number) => sql`
+  SELECT id FROM clubs
+   WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
+`;
+
+export type ClubBrownlowMedallistRow = {
+  season: number;
+  playerId: number;
+  playerSlug: string;
+  playerName: string;
+  votes: number;
+  /** The name the club traded under that season. */
+  identityName: string;
+};
+
+/**
+ * Brownlow Medallists won while at this club, across every era of it,
+ * newest first (AFLDB-ISSUE-149).
+ *
+ * Starts from real winner rows — `brownlow_season_votes.is_winner`, the
+ * authoritative winner flag, never vote rank. The club is the one the
+ * player represented that season, resolved by the SAME convention the
+ * public H2H club-Brownlow history uses (`brownlowAttribution()` /
+ * `getClubBrownlowHistory` in `src/db/queries/club-comparison.ts`, itself
+ * following AFLDB-ISSUE-118 §W.4):
+ *
+ *   - `brownlow_season_votes.club_id` when populated — but it is NULL for
+ *     every winner row in the canonical data (all 112 of them), so it is
+ *     COALESCEd, never inner-joined;
+ *   - otherwise `player_season_stats.primary_club_id` for the player's
+ *     season, and only when `club_count = 1`, so the club is a recorded
+ *     fact rather than a guess. A winner who genuinely split the season
+ *     across two clubs with no explicit `club_id` is left unattributed
+ *     and omitted, never forced onto one club. (Read-only evidence shows
+ *     all 112 winner rows resolve to exactly one same-season club, so in
+ *     the current canonical data this omits nothing.)
+ *
+ * `career overlap`, `player_clubs` whole-career membership and display
+ * name are never used. The resolved season club is filtered to the
+ * requested club's organization lineage, so a medal won at another club
+ * never appears here. `is_winner` yields one row per co-winner in a tied
+ * year. Sourced from `brownlow_season_votes`, not `award_winners`,
+ * matching the rest of the site.
+ */
+export async function getClubBrownlowMedallists(
+  clubId: number,
+): Promise<ClubBrownlowMedallistRow[]> {
+  return sql<ClubBrownlowMedallistRow[]>`
+    WITH winners AS (
+      SELECT bsv.season,
+             bsv.player_id,
+             bsv.votes,
+             COALESCE(
+               bsv.club_id,
+               CASE WHEN pss.club_count = 1 THEN pss.primary_club_id END
+             ) AS attributed_club_id
+        FROM brownlow_season_votes bsv
+        LEFT JOIN player_season_stats pss
+          ON pss.player_id = bsv.player_id AND pss.season = bsv.season
+       WHERE bsv.is_winner = true
+    )
+    SELECT w.season,
+           w.player_id AS "playerId", p.slug AS "playerSlug",
+           p.display_name AS "playerName",
+           w.votes,
+           c.name AS "identityName"
+      FROM winners w
+      JOIN players p ON p.id = w.player_id
+      JOIN clubs c   ON c.id = w.attributed_club_id
+     WHERE w.attributed_club_id IN (${CLUB_LINEAGE_IDS(clubId)})
+     ORDER BY w.season DESC, p.display_name
+  `;
+}
+
+export type ClubHonourRow = {
+  id: number;
+  awardSlug: string;
+  awardName: string;
+  season: number | null;
+  playerId: number | null;
+  playerSlug: string | null;
+  playerName: string;
+  linkStatus: string;
+  /** The name the club traded under that season, null if unresolved. */
+  identityName: string | null;
+};
+
+/**
+ * National individual honours won while at this club — Coleman, Norm
+ * Smith, All-Australian, Rising Star, Leigh Matthews Trophy and the like
+ * — across every era of the club, newest first (AFLDB-ISSUE-149).
+ *
+ * Club attribution is `award_winners.club_id`, the club the player
+ * represented in the award season, filtered to the club's lineage: an
+ * award won at another club is not shown. Restricted to
+ * `awards.category = 'award'` (the national-award family). The Brownlow
+ * Medal is excluded here because it has its own section
+ * ({@link getClubBrownlowMedallists}); club best-and-fairest awards are a
+ * different category with their own section ({@link getClubBestAndFairest}).
+ *
+ * Unlinked winner rows keep the source spelling and render without a
+ * link, the same rule the rest of this module follows.
+ *
+ * `honour_team_members` (AFL/VFL Team of the Century and similar) is
+ * deliberately NOT a source: it carries only `club_name_raw` with no
+ * `club_id` and no season, so a member cannot be proven to have earned
+ * the honour while at this club. `player_achievements` is empty in the
+ * canonical data and contributes nothing.
+ */
+export async function getClubHonours(clubId: number): Promise<ClubHonourRow[]> {
+  return sql<ClubHonourRow[]>`
+    SELECT w.id, a.slug AS "awardSlug", a.name AS "awardName", w.season,
+           w.player_id AS "playerId", p.slug AS "playerSlug",
+           COALESCE(p.display_name, w.player_name_raw) AS "playerName",
+           w.link_status_value::text AS "linkStatus",
+           c.name AS "identityName"
+      FROM award_winners w
+      JOIN awards a ON a.id = w.award_id
+      LEFT JOIN players p ON p.id = w.player_id
+      LEFT JOIN clubs c   ON c.id = w.club_id
+     WHERE a.category = 'award'
+       AND a.slug <> 'brownlow-medal'
+       AND w.club_id IN (${CLUB_LINEAGE_IDS(clubId)})
+     ORDER BY w.season DESC NULLS LAST, a.name, "playerName"
+  `;
+}
+
 /**
  * Deduplicated per request.
  *

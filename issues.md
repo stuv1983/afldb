@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`.
+**Open issues:** 11 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`.
 
 <!-- 2026-09-07 (ISSUE-146 closeout): `AFLDB-ISSUE-146` (`code_test_db` as a second explicitly
      supported disposable full-rebuild target) is **Resolved — 2026-09-07**. Merged to `main`
@@ -199,6 +199,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-144` | Medium | Public UI / club history / database queries | **OPEN — IMPLEMENTATION COMPLETE; READY FOR USER GIT CLOSEOUT. Stages 0-10 complete (11 stages total) on `codex/issue-144` (worktree `D:\dev\afldb-issue-144`); the `/clubs/compare` surface is fully built — the route (`src/app/clubs/compare/page.tsx` + `state.ts`, `src/lib/club-comparison-url.ts`) over the Stage 1-6 query surface, and the Stage 8 presentation (`src/components/ClubComparisonView.tsx` plus `ClubComparisonControls` / `ClubComparisonSeason` / `ClubComparisonHeadToHead` / `ClubComparisonPlayers` / `ClubComparisonBrownlow` / `ClubComparisonTrends` and `src/lib/club-comparison-format.ts`) — and Stage 9 made it public: `Compare clubs →` on `/clubs`, a seeded `Compare with another club →` on every club page (organisation slug from `current_identity`), and the BASE `/clubs/compare` in sitemap segment 0 with no pair/season/filter/page permutation. Stage 9 also fixed two acceptance defects: a 360px page-wide horizontal overflow (`.grid-shrink > * { min-width: 0 }` on the four `.grid-panels` grids holding tables) and an h2→h4 heading jump in the club Brownlow history panel. 172 tests pass: 68 integration query, 28 integration route-state/metadata/budget, 14 database-free URL, 35 database-free presentation/accessibility (`tests/club-comparison-view.test.ts`), 4 real-state render tests and 23 SEO tests; production `npm run build` exit 0; 18 Playwright ISSUE-144 checks pass on the standalone build in both desktop and mobile projects; a scripted five-state accessibility audit reports no problems and the responsive sweep is clean at 360/390/768/1280/1600 px.** A new AFL-only public `/clubs/compare` surface: selected-season comparison (record, ladder, scoring, team metrics with runtime coverage denominators, player leaders, Brownlow), complete head-to-head history (meetings, records, streaks, venues, leaders, match-scoped Brownlow coverage) and connected club history (players who represented both organisations, direction, intervening clubs, club-attributed Brownlow). Contract: the approved V1.7 runbook `AFLDB-ISSUE-144.md` at the repository root — **season-generic**, with no hard-coded year, supported-season list, historical cutoff, metric-year branch or club mapping; seasons come from canonical `seasons` rows and provisionality/coverage from `seasons.status` and `stat_availability.coverage` at request time. Aggregation grain: organisation -> selected-season identity -> match/club -> player-stat sum -> average of eligible team-match totals; `club_organization_relations` is context only and never merges statistics. Stage 0 re-verified every load-bearing schema semantic against the migrations with no contradiction. The approved runbook is now **V1.7**: decade/era H2H breakdowns, period-score rivalry records and coverage-aware H2H player averages (minimum 5 recorded H2H games for the specific metric) were promoted out of deferred enrichment into V1 as the new **Stage 6 — Extended rivalry analytics**, so the plan is now eleven stages (Stage 0 through Stage 10) and the former Stages 6-9 are renumbered 7-10. Read-only supporting evidence is persisted as `ISSUE-144-EXTENDED-RIVALRY-EVIDENCE.sql` / `.txt`. Planned key files: `src/db/queries/club-comparison.ts`, `src/app/clubs/compare/page.tsx`, `src/components/ClubComparisonView.tsx`, `tests/integration/club-comparison.test.ts`, `tests/club-comparison.test.ts`. **No migration, no index, no materialization, no persistent cache, no public API.** | **READY FOR USER GIT CLOSEOUT**: Stage 10 re-proved the baseline (`npm test -- tests/club-comparison.test.ts tests/club-comparison-view.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-route.test.ts tests/integration/club-comparison-view.test.ts tests/seo.test.ts` — 172 passed), `npx tsc --noEmit` and `npm run build`; then add the single Unreleased CHANGELOG entry and prepare (do not perform) the user's Git close-out. **Outstanding, and the only unresolved acceptance prerequisite:** the supported-Linux route recheck deferred from Stages 5, 7 and 8 still cannot be taken — `codex/issue-144` exists only in the Windows worktree and putting it on the Linux dev host is a user-controlled Git operation. Exact command once it is there: `npm test -- tests/integration/club-comparison-route.test.ts -t "route budget"` (Adelaide/Brisbane Lions and Carlton/Collingwood, warm median under 1.5 s). The full `npx playwright test tests/e2e/journeys.spec.ts tests/e2e/seo.spec.ts` run should also be repeated there: 20 PRE-EXISTING, dataset-dependent failures in unrelated player/records/Brownlow journeys occur on this workstation because its application database carries the pre-ISSUE-136/137 entity numbering those tests hard-code, and none of them touches ISSUE-144. |
 | `AFLDB-ISSUE-146` | Medium | Rebuild tooling / Database (test, rehearsal) | **OPEN — IMPLEMENTED 2026-09-07 on `claude/issue-146` (worktree `D:\dev\afldb-issue-146`), uncommitted; local validation passed; the first real `code_test_db` rebuild has NOT been run.** `npm run db:test:rebuild` gains an explicit `--target <database>` restricted to an allowlist of exactly `afldb_test` (still the default) and the new disposable full-rebuild rehearsal database `code_test_db`, which runs the identical stage graph through its own dedicated `AFLDB_CODE_TEST_DATABASE_URL` / `AFLDB_CODE_TEST_IMPORT_DATABASE_URL` and matching `db:migrate:code-test` / `db:privileges:code-test` scripts. `--acknowledge-destroy` must name the selected database exactly; dev/prod/`*pre_rebuild*`/arbitrary `*_test` names are refused by name before any DSN is read, and a DSN naming any database other than the selected target is refused. Key files: `tools/db/rebuild-test.ts`, `tools/db/migrate.ts`, `tools/db/privileges.ts`, `package.json`, `docs/deployment.md` §6a, `tests/db-test-rebuild.test.ts`. | **Operator:** review + commit the branch; create `code_test_db` (owned by `afldb_owner`, with `afldb_import` connect) on the rehearsal host and set the two `AFLDB_CODE_TEST_*` variables; then run the first real rehearsal: `npm run db:test:rebuild -- --target code_test_db --acknowledge-destroy code_test_db` (dry-run first with `--plan`). Resolve once the rehearsal passes its final validation. |
 | `AFLDB-ISSUE-147` | Medium | Public UI / navigation IA / responsive layout | **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data via an operator SSH tunnel; awaiting operator commit / merge / deploy.** Branch `claude/issue-147-ui`, worktree `D:\dev\afldb-issue-147-ui`. Full authenticated rendered audit of the public site (27 routes × 7 widths, 320–1440) found page-level responsive discipline sound (zero document-level horizontal overflow anywhere), with three concentrated defects: **P0** the phone nav was a smaller, independently hand-kept IA than the masthead — Clubs, Venues, Coaches, Brownlow, Awards, Draft and Match Search were unreachable from the phone chrome (same gap under `/aflw`; the home "Browse the record" grid was a third drifting list, already missing Coaches); **P1** a 641–~890 px masthead-nav overflow band; **P1** dense tables scroll inside `.table-wrap` with no cue that off-screen columns / sort headers exist. Fix (navigation + responsive CSS + tests only; **no migration**, schema, query, route, privilege or deployment change): new canonical `src/lib/site-nav-model.ts` (one `PRIMARY_NAV`, derived `QUICK_TABS` incl. Clubs, derived `BROWSE_SECTIONS` incl. Coaches); `TabBar` gains a "More" bottom sheet (`role="dialog"`, focus-trapped, Escape/backdrop/link/`popstate` close, `aria-current`) listing the **whole** active primary set; masthead nav wraps cleanly at 641–1080 px; `.table-wrap` gets a CSS-only theme-aware directional scroll shadow (`--edge-shadow`, self-hiding, no markup change); new committed `tests/e2e/responsive-nav.spec.ts` derives nav parity from the rendered masthead so a future one-sided addition fails; `tests/e2e/journeys.spec.ts` nav tests de-skipped on mobile via a `reachPrimary()` helper + a new "clubs is reachable" test. Validation: `tsc`/`eslint`/`npm run build` PASS; `responsive-nav.spec.ts` 32/32; journeys nav tests 10/10 on Desktop + Pixel 7; full viewport audit 200/200, zero overflow, zero 4xx/5xx; before/after screenshots in `artifacts/issue-147/` (gitignored). | **Operator:** review + commit `claude/issue-147-ui`; delete the audit scaffolding (`playwright.responsive.config.ts`, `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/`, `tests/nl-ui/.auth/`) or keep `playwright.responsive.config.ts` if you want the re-runnable audit; merge; deploy to DEV via `deploy/sync-dev.ps1` and smoke the phone nav + `/clubs` on a real device; then Resolve. Standard `npm run test:e2e` on the Linux dev host confirms the gate-off path for the new spec. |
+| `AFLDB-ISSUE-149` | Low | Public UI / club pages / database queries | **OPEN — IMPLEMENTATION COMPLETE; `tsc`, focused vitest and `npm run build` all NOT yet operator-run. Stays Open until merged and verified on DEV.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`), bootstrapped from merged `main` after ISSUE-148. SIX new public AFL club-page sections, all lineage-scoped by `clubs.organization_id`, all from existing canonical tables, **no migration**, ISSUE-148's Premierships / Coaches preserved. **(1) Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`): a `club_matches` CTE orients every lineage match to the club's perspective; six deterministic single-row picks — biggest win/loss margin, the club's OWN highest/lowest score, highest/lowest COMBINED match score; ties `match_date DESC, match_id DESC`. `src/components/ClubMatchRecords.tsx`. **(2) Record crowds** — `getClubCrowdRecords(clubId)`: same CTE + `attendance IS NOT NULL`; highest home-and-away / finals (`is_finals_series IS TRUE`) / Grand Final (`round_type='grand_final'`) crowd + Top 5; `attendance DESC, match_date DESC, match_id DESC`; null attendance never shown as 0. `src/components/ClubCrowdRecords.tsx`. **(3) Players** — `getClubPlayers(clubId)`: full `player_clubs` set summed by `organization_id`, one row per player, this club's games/goals only, not truncated. `src/components/ClubPlayers.tsx` (`SortableTable` in a `defaultOpen={false}` `CollapsibleTable`). **(4) Premiership players** — `getClubPremiershipPlayers(clubId)`: `player_club_season_stats.is_premier` in lineage, `season DESC, games DESC`. `src/components/ClubPremiershipPlayers.tsx`. **(5) Awards & honours** — `getClubBrownlowMedallists(clubId)` (`brownlow_season_votes` `is_winner` + linked + `club_id` in lineage, per ISSUE-118 §W.4) and `getClubHonours(clubId)` (`award_winners`, `awards.category='award'`, `slug<>'brownlow-medal'`, `club_id` in lineage) in `src/db/queries/awards.ts`; `src/components/ClubHonours.tsx`. Page wiring in `src/app/clubs/[slug]/page.tsx` (6 queries into the existing `Promise.all`; 5 section blocks, each omitted when empty). **Most Games / Most Goals / Captains from the brief were already on the page** (Games leaders / Goalkicking leaders / Captains — preserved). **Unsupported attribution omitted + reported:** `honour_team_members` (only `club_name_raw`, no `club_id`/season), `player_achievements` (0 rows), null-`club_id` Brownlow winners. Tests: `tests/integration/club-{match-records,crowd-records,players,premiership-players,honours}.test.ts` (new — record/crowd values re-derived from raw scorelines; club-specificity + no other-club leakage; honour attribution; premiership-season cross-check vs `club_seasons.is_premier` AND `getClubPremierships`), `tests/club-records-sections.test.ts` (new — component render). One Unreleased `CHANGELOG.md` entry. **Validation:** NONE run yet. | **Operator:** `npx tsc --noEmit`; `npx vitest run tests/club-records-sections.test.ts`; with `AFLDB_TEST_DATABASE_URL`=`afldb_test`, `npx vitest run tests/integration/club-match-records.test.ts tests/integration/club-crowd-records.test.ts tests/integration/club-players.test.ts tests/integration/club-premiership-players.test.ts tests/integration/club-honours.test.ts`; then `npm run build`. On green: commit on `fable/issue-149-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond`, a historical club (`/clubs/footscray` or `/clubs/western-bulldogs`) and a young club (`/clubs/gold-coast`), Resolve. |
 | `AFLDB-ISSUE-148` | Low | Public UI / club pages / database queries | **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; Premierships section added the same day (same issue, operator request), implemented + `tsc`-checked, its integration suite written but NOT yet operator-run. Awaiting operator commit / merge / DEV deployment / browser smoke.** Branch `fable/issue-148-coach-club-records` (worktree `D:\dev\afldb-issue-148-coach-club-records`). Public club pages showed players and season history but never the club's coaches or a premiership list. **(1) Coaching:** `getClubCoachRecords(clubId)` in `src/db/queries/coaches.ts` (lineage-scoped by `organization_id`, exactly like `getClubTotals` / `getClubLeaders`; W/D/L from `matches.winner_club_id`; draw-weighted win % `(W + D/2)/G` matching `/records/coaches`; one row per coach, separate tenures combined), `src/components/ClubCoachRecords.tsx` (Coach · **Span** · Games · W · D · L · Win % — "Span" because the value is `formatSpan(firstSeason, lastSeason)`, a first/last range; coach names link to player / `/coaches/[slug]-id`), pushed after Captains, omitted when empty. **(2) Premierships:** `getClubPremierships(clubId)` in `src/db/queries/clubs.ts` — one row per **won Grand Final** (`m.round_type = 'grand_final'`, the canonical predicate `getCoachCareer` / Grid Solver use — never every final, never a Wildcard Final; a drawn GF has a null winner so the replay is taken), opponent resolved home-or-away as the non-winner, score from the winner's perspective, venue via `COALESCE(v.canonical_name, m.venue_raw)` + `v.slug`, crowd = `m.attendance` (null, never zero-filled), lineage-scoped so Footscray/Western Bulldogs share 1954+2016; `src/components/ClubPremierships.tsx` (Year · Opponent · Score · Venue · Date · Crowd; opponent → `clubPath`, venue → `venuePath`; `formatDate` / `formatAttendance`), pushed **first**, omitted when empty. **No migration**, no schema/route/privilege change. Tests: `tests/integration/club-coach-records.test.ts`, `tests/club-coach-records.test.ts`, `tests/integration/club-premierships.test.ts` (new), `tests/club-premierships.test.ts` (new). `CHANGELOG.md` — one `Unreleased` entry (both sections). **Validation:** coaching — operator-run against `afldb_test` via SSH tunnel: `tests/club-coach-records.test.ts` 8/8 PASS, `tests/integration/club-coach-records.test.ts` 9/9 PASS, `npx tsc --noEmit` PASS, `npm run build` PASS. Premierships — `npx tsc --noEmit` self-checked; its integration suite NOT yet operator-run. No migration. | **Operator:** run `npx vitest run tests/club-premierships.test.ts` and, with `AFLDB_TEST_DATABASE_URL` = `afldb_test`, `npx vitest run tests/integration/club-premierships.test.ts`; `npx tsc --noEmit`. On green, commit on `fable/issue-148-coach-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond` + one historical club (both sections) and Resolve. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
@@ -19246,3 +19247,193 @@ tests/integration/club-coach-records.test.ts` and `npx tsc --noEmit` are enough.
   exist (AFLDB-ISSUE-118 §W.4); the coach links reuse them unchanged. The Premierships section
   reuses `clubPath` / `venuePath` / `formatDate` / `formatAttendance` and the canonical
   `round_type = 'grand_final'` predicate — no new helper or definition.
+
+---
+
+## AFLDB-ISSUE-149 — Expand club pages with historical records and player honours
+
+- **Status:** **OPEN — IMPLEMENTATION COMPLETE, all focused validation GREEN (operator, 2026-09-07):
+  `tests/club-records-sections.test.ts` 14/14, the ISSUE-149 integration set 32/32 (incl. the
+  corrected `club-honours.test.ts`), `npx tsc --noEmit` PASS, `npm run build` PASS, no migration.
+  Awaiting operator commit / merge / DEV deployment / browser smoke.**
+  Branch `fable/issue-149-club-records`, worktree `D:\dev\afldb-issue-149`. Stays Open until merged
+  and verified on DEV.
+- **Severity / Area:** Low / Public UI — club pages; database queries.
+- **Reported:** 2026-09-07 (operator request — every public AFL club page should expose the
+  historical club records, attendance records, complete player history, premiership players and
+  club-attributed individual honours AFLDB already holds).
+- **Claims no migration number.** No schema, route, privilege or deployment change. Every section
+  is a focused club-scoped query over existing canonical tables (`matches`, `venues`,
+  `player_clubs`, `player_club_season_stats`, `brownlow_season_votes`, `award_winners`, `awards`).
+- **Depends on AFLDB-ISSUE-148** (merged): the Premierships and Coaches sections it added are
+  preserved unchanged, and this issue reuses its conventions — lineage scope by
+  `clubs.organization_id` (`LINEAGE_IDS`), the canonical Grand Final predicate
+  `m.round_type = 'grand_final'`, `is_finals_series` for the finals-series concept,
+  `CollapsibleTable` / `SortableTable` / `ReorderableSections`, and
+  `clubPath` / `venuePath` / `playerPath` / `seasonPath` / `formatDate` / `formatAttendance` /
+  `formatSpan` / `formatNumber`.
+
+### Problem
+
+The public club page (`/clubs/[slug]`) showed players/goalkicking leaders, best-and-fairest,
+captains, season history and (from ISSUE-148) premierships and coaches, but not the club's match
+records, its record crowds, its complete historical playing list, its premiership players, or the
+Brownlow / national honours won by its players while at the club — all of which AFLDB already
+holds in canonical form.
+
+### Change
+
+Data-access additions + five presentational components + club-page wiring + tests. No behavioural
+change to any other path. **Six new club-page sections**, each lineage-scoped by
+`organization_id`, each pushed into the existing `ReorderableSections` list and omitted when
+empty:
+
+- **Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`). A `club_matches`
+  CTE orients every lineage match to the club's perspective (`club_score` / `opponent_score` /
+  `opponent_id` regardless of home/away); six single-row picks: `biggest_win` / `biggest_loss`
+  (largest winning / losing margin), `highest_score` / `lowest_score` (the club's own score, NOT
+  the combined total), `highest_scoring_match` / `lowest_scoring_match` (combined score of both
+  sides, NOT the club's own). `matches.home_score` / `away_score` are `NOT NULL`, so there is no
+  unrecorded-score case. Ties broken deterministically `match_date DESC, match_id DESC` — one row
+  per record, never an unbounded tie set. `src/components/ClubMatchRecords.tsx` (plain table:
+  Record · Score · Opponent · Season · Date · Venue · Crowd; score always `clubScore–opponentScore`;
+  opponent → `clubPath`, venue → `venuePath`, season → `seasonPath`, crowd → `formatAttendance`).
+- **Record crowds** — `getClubCrowdRecords(clubId)` (`src/db/queries/clubs.ts`). Same `club_matches`
+  CTE with `attendance IS NOT NULL`; returns `{ records, top }` — one row each for highest
+  home-and-away (`round_type = 'home_and_away'`), highest finals (`is_finals_series IS TRUE`) and
+  highest Grand Final (`round_type = 'grand_final'`) crowd, plus the five largest crowds at any
+  match. Order `attendance DESC, match_date DESC, match_id DESC`. Null attendance never appears and
+  is never shown as zero. `src/components/ClubCrowdRecords.tsx` (two tables inside one
+  `CollapsibleTable`).
+- **Players (complete list)** — `getClubPlayers(clubId)` (`src/db/queries/clubs.ts`). The full
+  `player_clubs` set for the lineage, summed by `organization_id` (one row per player, this club's
+  games/goals only), ordered `games DESC, goals DESC, display_name, id`. Not truncated.
+  `src/components/ClubPlayers.tsx` — `SortableTable` (Player · Years · Games · Goals) inside a
+  `CollapsibleTable` with `defaultOpen={false}`, because for an old club this runs to many
+  hundreds of rows; `formatSpan` renders `1998` for a single season and `1990–2000` for a range.
+- **Premiership players** — `getClubPremiershipPlayers(clubId)` (`src/db/queries/clubs.ts`). From
+  `player_club_season_stats` where `is_premier = true` and `club_id` in the lineage; ordered
+  `season DESC, games DESC, display_name, player_id`. `player_id` is `NOT NULL` so every row
+  links. `src/components/ClubPremiershipPlayers.tsx` — one `SortableTable` (Season · Player ·
+  Games · Finals · Goals), default sort season desc, so a season's players stay contiguous
+  (a de-facto grouping) with no page heading-level jump.
+- **Awards & honours** — `getClubBrownlowMedallists(clubId)` and `getClubHonours(clubId)`
+  (`src/db/queries/awards.ts`). Brownlow: real winner rows (`brownlow_season_votes.is_winner`),
+  club attributed by the player's **same-season club** — `player_season_stats.primary_club_id`
+  when `club_count = 1`, exactly as `brownlowAttribution()` / `getClubBrownlowHistory` in
+  `src/db/queries/club-comparison.ts` do (AFLDB-ISSUE-118 §W.4). `brownlow_season_votes.club_id`
+  is **NULL for all 112 winner rows in `afldb_test`** so it is COALESCEd, never used as the
+  attribution source; the resolved season club is then filtered to the lineage. Sourced from
+  `brownlow_season_votes` not `award_winners`; a co-won medal returns a row per winner; a winner
+  who split the season across two clubs with no explicit `club_id` is left unattributed and
+  omitted rather than forced. National
+  honours: `award_winners` where `awards.category = 'award'`, `slug <> 'brownlow-medal'` and
+  `club_id` in the lineage — Coleman, Norm Smith, All-Australian, Rising Star, Leigh Matthews
+  Trophy and the like, each attributed to the club the player represented that season.
+  `src/components/ClubHonours.tsx` (Brownlow table + a `SortableTable` of national honours;
+  unlinked winners render as plain text — national award winners are almost always linked).
+- **`src/app/clubs/[slug]/page.tsx`.** Six queries added to the existing `Promise.all`; five
+  section blocks pushed in — Club records + Record crowds after Premierships; Players +
+  Premiership players after the goalkicking leaders; Awards & honours after Captains — each
+  guarded on its data being non-empty (same pattern as best-and-fairest / captains / coaches).
+
+### Critical attribution rules honoured
+
+- **Every statistic is club-specific.** Games / goals / records / crowds are bounded to the
+  club's lineage; a player's other-club games never contribute (proved in
+  `tests/integration/club-players.test.ts`).
+- **Every honour is proven earned at this club.** National honours are filtered on
+  `award_winners.club_id` (the season-club attribution column, which is populated). Brownlow
+  medallists are attributed by the player's same-season club (`player_season_stats.primary_club_id`
+  where `club_count = 1`) because `brownlow_season_votes.club_id` is NULL for every winner row.
+  Never career overlap, `player_clubs` whole-career membership or display name. A medal or award
+  won at another club does not appear (proved in `tests/integration/club-honours.test.ts` against
+  an independent `player_club_season_stats` oracle).
+- **Premiership players agree with premiership years.** The set of premiership seasons from
+  `player_club_season_stats.is_premier` is cross-checked in
+  `tests/integration/club-premiership-players.test.ts` against both `club_seasons.is_premier` and
+  `getClubPremierships` (won Grand Finals); a disagreement fails the test rather than being
+  hidden.
+
+### Unsupported attribution — deliberately omitted
+
+- **`honour_team_members`** (AFL/VFL Team of the Century and similar). It carries only
+  `club_name_raw` — no `club_id`, no season — so a member cannot be proven to have earned the
+  honour while at this club. Not shown; reported here rather than guessed.
+- **`player_achievements`** (first-kick-goal etc., migration 053). Zero rows in the canonical
+  data, so nothing to show.
+- **Brownlow winners whose season club cannot be resolved.** `brownlow_season_votes.club_id` is
+  NULL for every winner row, so the season club comes from `player_season_stats.primary_club_id`
+  and only when `club_count = 1`. A winner who split the season across two clubs with no explicit
+  `club_id` would be omitted rather than forced onto one club — in `afldb_test` this is zero rows
+  (all 112 winner rows resolve to exactly one same-season club).
+
+### Tests — written, NOT yet operator-run
+
+- `tests/integration/club-match-records.test.ts` — record values / orientation re-derived from raw
+  `home_score` / `away_score` for the whole lineage; determinism; renamed-club parity; unknown id.
+- `tests/integration/club-crowd-records.test.ts` — the three records equal the raw attendance
+  maxima; Top 5 ordering + determinism; null attendance never leaks; club can be home or away;
+  renamed-club parity; unknown id.
+- `tests/integration/club-players.test.ts` — one row per player; totals equal summed `player_clubs`
+  for the lineage; another club's games do not leak (multi-club player); default order; first/last
+  season; renamed-club parity; unknown id.
+- `tests/integration/club-premiership-players.test.ts` — every row `is_premier` for a lineage
+  club; premiership-season set agrees with `club_seasons.is_premier` and `getClubPremierships`;
+  multi-premiership player once per season; newest-first; non-premiership row excluded; unknown id.
+- `tests/integration/club-honours.test.ts` — every Brownlow row is a genuine `is_winner` row
+  attributed to the player's same-season club (checked against `player_club_season_stats`, an
+  independent table from the implementation's `player_season_stats.primary_club_id`) and that club
+  is in the lineage; the seven known Richmond medallists (Martin 2017, Cotchin 2012, Stewart 1971,
+  Wright 1954 + 1952, Morris 1948, Judkins 1930) are all present; a Brownlow whose same-season club
+  is outside the lineage is absent; co-winners of a tied year are separate rows; renamed-club
+  lineage parity; unknown id → `[]`. National honours: `category = 'award'`, not the Brownlow,
+  `award_winners.club_id` in the lineage; an away-club award is absent; ordering; renamed-club
+  parity; unknown id.
+- `tests/club-records-sections.test.ts` — `renderToStaticMarkup` of all five components: column
+  headings, score orientation (`clubScore–opponentScore`, never reversed), player / club / venue
+  links, single-season year vs range, null crowd / null goals → not-recorded marker (never 0),
+  empty list → renders nothing.
+
+### Brownlow attribution correction (2026-09-07)
+
+The first cut of `getClubBrownlowMedallists` inner-joined `brownlow_season_votes.club_id` to
+attribute a winner to a club. Operator read-only evidence against `afldb_test` proved that column
+is unusable for this:
+
+- `is_winner` rows = **112**; rows with a non-null `club_id` = **0**; distinct attributed clubs = **0**.
+- Same-season attribution through `player_club_season_stats` (join on `player_id` + `season`):
+  **112 / 112** uniquely attributed, **0** with no same-season club, **0** ambiguous.
+- Truth check — the resulting Richmond winners are Martin 2017 (36), Cotchin 2012 (26),
+  Stewart 1971 (21), Wright 1954 (29), Wright 1952 (21), Morris 1948 (24), Judkins 1930 (4).
+
+`getClubBrownlowMedallists` now attributes the winner by the player's same-season club using
+`player_season_stats.primary_club_id` (only when `club_count = 1`), COALESCEd behind the always-null
+`brownlow_season_votes.club_id` — the identical convention already shipped in
+`brownlowAttribution()` / `getClubBrownlowHistory` (`src/db/queries/club-comparison.ts`, following
+AFLDB-ISSUE-118 §W.4) and displayed on the public `/brownlow` page's Club column
+(`getBrownlowWinners`, `src/db/queries/brownlow.ts`). No competing definition was introduced. The
+`link_status_value` filter was dropped to match those Brownlow queries, none of which filter on it.
+`tests/integration/club-honours.test.ts`'s Brownlow block was rewritten to prove the semantic
+against `player_club_season_stats` (a different table from the implementation) rather than the
+removed `brownlow_season_votes.club_id`.
+
+### Validation — GREEN (operator, 2026-09-07, post-correction)
+
+- `npx tsc --noEmit` — PASS.
+- Focused vitest (no DB): `npx vitest run tests/club-records-sections.test.ts` — 14/14 PASS.
+- Focused vitest (DB, `AFLDB_TEST_DATABASE_URL` = `afldb_test`):
+  `npx vitest run tests/integration/club-match-records.test.ts tests/integration/club-crowd-records.test.ts tests/integration/club-players.test.ts tests/integration/club-premiership-players.test.ts tests/integration/club-honours.test.ts`
+  — 32/32 PASS (the rewritten `club-honours` Brownlow block included).
+- `npm run build` (`DATABASE_URL = AFLDB_TEST_DATABASE_URL`) — PASS.
+- No migration required.
+- Still outstanding: operator commit / merge / DEV deployment / browser smoke.
+
+### Follow-up
+
+- None planned. If the operator wants the honours list broadened (e.g. state-league awards where a
+  provable club attribution exists) or the complete-players list paginated rather than
+  default-collapsed, raise a separate issue.
+- Data-quality watch: `tests/integration/club-premiership-players.test.ts` will fail if
+  `player_club_season_stats.is_premier` and the won-Grand-Final record ever disagree for a season
+  both cover — that is intentional (surface, do not hide).

@@ -4,20 +4,34 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ClubCoachRecords } from '@/components/ClubCoachRecords';
+import { ClubCrowdRecords } from '@/components/ClubCrowdRecords';
+import { ClubHonours } from '@/components/ClubHonours';
+import { ClubMatchRecords } from '@/components/ClubMatchRecords';
+import { ClubPlayers } from '@/components/ClubPlayers';
 import { ClubPremierships } from '@/components/ClubPremierships';
+import { ClubPremiershipPlayers } from '@/components/ClubPremiershipPlayers';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
 import { UnmatchedPlayer } from '@/components/UnmatchedPlayer';
-import { getClubBestAndFairest, getClubCaptains } from '@/db/queries/awards';
+import {
+  getClubBestAndFairest,
+  getClubBrownlowMedallists,
+  getClubCaptains,
+  getClubHonours,
+} from '@/db/queries/awards';
 import {
   getClub,
+  getClubCrowdRecords,
   getClubEraTotals,
   getClubGoalkickers,
   getClubLeaders,
   getClubLineage,
+  getClubMatchRecords,
+  getClubPlayers,
   getClubPremierships,
+  getClubPremiershipPlayers,
   getClubRelations,
   getClubSeasons,
   getClubTotals,
@@ -100,6 +114,8 @@ export default async function ClubPage({
   const [
     totals, eraTotals, seasons, leaders, goalkickers, lineage, relations,
     bestAndFairest, captains, coachRecords, premierships,
+    matchRecords, crowdRecords, clubPlayers, premiershipPlayers,
+    brownlowMedallists, honours,
   ] = await Promise.all([
     getClubTotals(club.id),
     getClubEraTotals(club.id),
@@ -112,6 +128,12 @@ export default async function ClubPage({
     getClubCaptains(club.id),
     getClubCoachRecords(club.id),
     getClubPremierships(club.id),
+    getClubMatchRecords(club.id),
+    getClubCrowdRecords(club.id),
+    getClubPlayers(club.id),
+    getClubPremiershipPlayers(club.id),
+    getClubBrownlowMedallists(club.id),
+    getClubHonours(club.id),
   ]);
 
   const winRate = totals.played > 0
@@ -133,6 +155,35 @@ export default async function ClubPage({
       node: (
         <ClubPremierships
           premierships={premierships}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (matchRecords.length > 0) {
+    sections.push({
+      id: 'club-records',
+      label: 'Club records',
+      node: (
+        <ClubMatchRecords
+          records={matchRecords}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (crowdRecords.records.length > 0 || crowdRecords.top.length > 0) {
+    sections.push({
+      id: 'record-crowds',
+      label: 'Record crowds',
+      node: (
+        <ClubCrowdRecords
+          records={crowdRecords.records}
+          top={crowdRecords.top}
           clubRecordName={clubRecordName}
           hasLineage={hasLineage}
         />
@@ -227,6 +278,34 @@ export default async function ClubPage({
       </section>
     ),
   });
+
+  if (clubPlayers.length > 0) {
+    sections.push({
+      id: 'players',
+      label: 'Players',
+      node: (
+        <ClubPlayers
+          players={clubPlayers}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
+
+  if (premiershipPlayers.length > 0) {
+    sections.push({
+      id: 'premiership-players',
+      label: 'Premiership players',
+      node: (
+        <ClubPremiershipPlayers
+          players={premiershipPlayers}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
+      ),
+    });
+  }
 
   if (bestAndFairest.length > 0) {
     sections.push({
@@ -327,6 +406,21 @@ export default async function ClubPage({
           </div>
           </CollapsibleTable>
         </section>
+      ),
+    });
+  }
+
+  if (brownlowMedallists.length > 0 || honours.length > 0) {
+    sections.push({
+      id: 'honours',
+      label: 'Awards & honours',
+      node: (
+        <ClubHonours
+          brownlow={brownlowMedallists}
+          honours={honours}
+          clubRecordName={clubRecordName}
+          hasLineage={hasLineage}
+        />
       ),
     });
   }
