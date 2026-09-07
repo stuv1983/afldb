@@ -288,4 +288,3 @@ export function collectMigrationSources(repoRoot: string): CollectedMigrationSou
   if (!sources.includes(base)) sources.push(base);
   return { sources, current, base, baseRef };
 }
-

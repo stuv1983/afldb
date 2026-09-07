@@ -685,35 +685,25 @@ authority to protect, but it is not stateless:
   discarded, and it is a recorded decision, not an omission;
 * the current season, which is **re-acquired** by a settle run (§9), not copied.
 
-**Before the first DEV promotion**, take the same mandatory backup (§4) and the same
+**Before every DEV promotion**, take the same mandatory backup (§4) and the same
 pre-cutover snapshot (§5). The relaxations above concern identity gates, not evidence: a DEV
 database is still restored into a *new* candidate and swapped by rename, never restored over.
 
-**Two conditions specific to `afldb_dev` today.** Neither is a relaxation and neither has a
-flag; both are stated here because a DEV operator meets them and a production operator does
-not.
+**Historical DEV reconciliation (completed 2026-09-06).** These were conditions of the first
+`afldb_dev` promotion, not assumptions for a future run:
 
-* **The id lineage really does change.** `afldb_dev` is the pre-rebuild bootstrap database, so
-  a candidate restored from a rebuilt `afldb_test` does **not** share its player or match ids.
-  §7.4c and §7.4d are therefore mandatory reading for a DEV promotion rather than a rare case:
-  expect the `restored` phase to report a lineage change and to refuse until every
-  lineage-bound column is either evidenced or covered by a declared historical-only
-  disposition. As the contract stands, `player_link_resolutions` and `data_edits` are declared
-  (§7.4d) and everything else must be evidenced. Production has never met this because its
-  candidate is a rebuild of its own lineage.
-* **Migration parity refuses at `pre-cutover`, truthfully.** `afldb_dev`'s ledger carries
-  `079_access_code_delete.sql`, which is committed only on the unmerged branch
-  `claude/issue-116` and which **cannot merge at that number** — `main` owns a different
-  `079_nl_search_log_head_to_head_grain.sql`, applied everywhere including production. The
-  gate reports `UNKNOWN 079_access_code_delete.sql`: the live database is ahead of every
-  tracked checkout by a migration no checkout can reproduce, which is exactly what that gate
-  exists to say. Do not delete the ledger row, do not reverse the migration and do not
-  special-case the checker. The promotion **is** the reconciliation: the candidate is built
-  from this checkout's migrations, so `restored`, `candidate` and `production` all read parity
-  clean and the orphan row is gone at the swap. The `pre-cutover` phase still writes its
-  snapshot, which is what the later phases compare against; record the refusal and its reason
-  in the promotion record before continuing. (The branch must claim the next free migration
-  number before it can ever merge — `091` as this checkout stands.)
+* The old bootstrap database did not share the rebuilt candidate's player or match ids. The
+  completed promotion exercised §7.4c/§7.4d: `player_link_resolutions` and `data_edits` were
+  withheld under the tracked DEV-only historical disposition, and every other lineage-bound
+  column still required evidence. Current `afldb_dev` is the promoted rebuilt lineage; a future
+  promotion must let the `restored` gate measure lineage again rather than assume either outcome.
+* The replaced database's ledger carried the obsolete branch-only name
+  `079_access_code_delete.sql`, while main owned `079_nl_search_log_head_to_head_grain.sql` and
+  the reconciled access-code migration was pending as `091_access_code_delete.sql`. The truthful
+  pre-cutover parity refusal was recorded, and the candidate swap removed the orphan ledger row.
+  `091_access_code_delete.sql` is now on main (provenance commit `0378180`); the stale
+  `claude/issue-116` refs were removed. Do not reserve or renumber either migration from this
+  historical note, and never weaken parity checks to accommodate an obsolete ledger name.
 
 ```bash
 # DEV: streamanator — the same five phases, with the environment stated every time

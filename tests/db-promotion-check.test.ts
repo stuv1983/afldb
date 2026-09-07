@@ -6,7 +6,7 @@
  * argument and database-name rules are pinned so no phase can be pointed at the wrong
  * database; and the checker's source is asserted to carry no write path.
  */
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -656,6 +656,24 @@ describe('reinstatement order and generated SQL', () => {
       ]);
       expect(readFileSync(join(dir, 'promotion-swap.sql'), 'utf8'))
         .toContain('RENAME TO "afldb_dev_pre_rebuild_20260906-112500"');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses every plan destination before writing any partial plan', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-promotion-plan-'));
+    const sentinel = join(dir, 'promotion-rollback.sql');
+    try {
+      writeFileSync(sentinel, 'operator-owned sentinel\n', 'utf8');
+      expect(() => writePlan({
+        environment: 'dev', plan: true, checklist: false, allowFixtureIdentities: false,
+        dsnEnv: 'AFLDB_OWNER_DATABASE_URL', database: 'afldb_dev_candidate_20260906-112500',
+        oldDatabase: 'afldb_dev', preCutoverDump: '/home/arm/example.dump',
+        rebuiltDump: '/home/arm/rebuilt.dump', planDir: dir,
+      })).toThrow(/refusing to write a partial plan/);
+      expect(readdirSync(dir)).toEqual(['promotion-rollback.sql']);
+      expect(readFileSync(sentinel, 'utf8')).toBe('operator-owned sentinel\n');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Post-ISSUE-139 workflow hardening - Stage 7 - 7 September 2026
+
+- Made promotion-plan output fail before writing any file when any of its six destinations
+  already exists, preventing a later collision from leaving a misleading partial plan. Added a
+  DB-free regression that preserves the existing operator-owned file and proves no sibling plan
+  files are created.
+- Updated the DEV promotion record to distinguish the completed `079`/`091` migration
+  reconciliation and lineage replacement from conditions a future promotion should assume.
+- Fixed merge-readiness staged/unstaged reporting: the first porcelain status line lost its leading
+  column to a trim, so an unstaged-only path was counted as staged. READY/BLOCKED was unaffected; the
+  counts and path lines now match `git status --porcelain`, with a regression pinning the case.
+
 ### Post-ISSUE-139 workflow hardening - Stage 6 - 7 September 2026
 
 - Added explicit implementation/merge/read-only preflight modes, a fail-closed issue-worktree

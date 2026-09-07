@@ -83,6 +83,13 @@ function gitText(root: string, args: readonly string[]): string {
   return result.stdout.trim();
 }
 
+/** Porcelain status keeps its two-column prefix; trimming would misclassify the first line. */
+function gitStatusLines(root: string): string[] {
+  const result = runGit(root, ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all']);
+  if (result.status !== 0) throw new Error(result.stderr.trim() || 'git status failed');
+  return result.stdout.split(/\r?\n/).filter(Boolean);
+}
+
 function normalPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\.\//, '');
 }
@@ -169,8 +176,7 @@ export function runMergeReadiness(argv: readonly string[], cwd = process.cwd()):
       `current branch: ${branch || '<detached>'}`,
       branch === 'main' || branch === 'master' ? ['Run this from the issue branch before merging into main.'] : []);
 
-    const statusLines = gitText(root, ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all'])
-      .split(/\r?\n/).filter(Boolean);
+    const statusLines = gitStatusLines(root);
     const staged = statusLines.filter((line) => line.slice(0, 2) !== '??' && line[0] !== ' ');
     const unstaged = statusLines.filter((line) => line.slice(0, 2) !== '??' && line[1] !== ' ');
     const untracked = statusLines.filter((line) => line.startsWith('??'));
@@ -209,9 +215,9 @@ export function runMergeReadiness(argv: readonly string[], cwd = process.cwd()):
     if (!mainPath || !existsSync(mainPath)) {
       report.add('FAIL', 'main worktree is available', ['No accessible worktree on refs/heads/main was found.']);
     } else {
-      const mainDirty = gitText(mainPath, ['-c', 'core.quotepath=false', 'status', '--porcelain=v1', '--untracked-files=all']);
-      report.add(mainDirty ? 'FAIL' : 'PASS', `main worktree is clean: ${mainPath}`,
-        mainDirty ? mainDirty.split(/\r?\n/).map((line) => `path: ${line}`) : []);
+      const mainDirty = gitStatusLines(mainPath);
+      report.add(mainDirty.length ? 'FAIL' : 'PASS', `main worktree is clean: ${mainPath}`,
+        mainDirty.map((line) => `path: ${line}`));
     }
 
     const collected = collectMigrationSources(root);

@@ -17141,6 +17141,242 @@ Recommended next model:
 
 Stage 6 complete. Start a fresh chat for Stage 7 using the persisted handoff.
 
+## Stage 7 handoff
+
+Status:
+- **COMPLETE - 7 September 2026.**
+
+Objective:
+- Final cross-stage release/readiness acceptance for the complete Post-ISSUE-139 workflow
+  hardening. No new hardening stage, settle optimisation, deployment or database work was begun.
+
+Branch:
+- `codex/workflow-hardening`
+
+Base/current main:
+- `71f0563` (`71f05638b6f1fdb2669396d89fdd44568df0496d`)
+
+Commits under review:
+- `c4d285e` - hardening implementation for Stages 1-6.
+- `537acfc` - current main merged into the hardening branch.
+- Stage 7 leaves bounded local acceptance changes for the operator to review and commit. Stage 7 ran
+  across two sessions: the first drafted this handoff with the promotion-plan fix; the second re-ran
+  every validation on the final tree, found and fixed the merge-readiness count misreport below, and
+  finalised this record. No session committed, pushed or merged anything.
+
+Stage 7 bounded acceptance fixes:
+- `tools/db/promotion-check.ts`: plan generation previously checked each destination only while
+  writing it. If a later file (for example `promotion-rollback.sql`) already existed, earlier files
+  could be created before the refusal, leaving a misleading partial operator plan. `writePlan()` now
+  resolves and checks all six destinations first, then creates/writes only when none exists.
+- `tests/db-promotion-check.test.ts`: added a DB-free regression with the last destination pre-existing;
+  the operator-owned sentinel remains byte-identical and no sibling plan file is created.
+- `tools/dev/merge-readiness.ts`: running the checker on the real dirty Stage 7 tree printed
+  `staged: 1; unstaged: 5` while `git status --porcelain` showed nothing staged. The shared `gitText()`
+  helper trims the whole porcelain output, which strips the leading space from the first status line, so
+  an unstaged-only first path was counted as staged. Both the issue-worktree and main-worktree status
+  reads now go through an untrimmed `gitStatusLines()`. READY/BLOCKED was never affected; the
+  staged/unstaged evidence an operator reads was, which is why the fix was required before certifying
+  the checker. Rerun on the same tree: `staged: 0; unstaged: 8; untracked: 0`.
+- `tests/workflow-preflight.test.ts`: added a regression with one unstaged-only modification that pins
+  `staged: 0; unstaged: 1; untracked: 0` and the ` M src/change.txt` path line (24/24 after the fix).
+- `docs/production-promotion.md`: the DEV section still described the already-completed first
+  promotion's lineage change and obsolete branch-only `079_access_code_delete.sql` as current
+  conditions, and still said the branch needed to claim `091`. It now records those as completed
+  history: main owns `079_nl_search_log_head_to_head_grain.sql`, the access-code migration was
+  reconciled onto main as `091_access_code_delete.sql` by `0378180`, the stale ISSUE-116 refs were
+  removed, and future runs must measure current lineage/parity rather than reuse that history.
+- `tools/db/migration-safety.ts`: removed the pre-existing diff-check-only extra blank line at EOF.
+- `CHANGELOG.md`: recorded the two retained Stage 7 corrections under `Unreleased`.
+- No new tracked issue was created: both acceptance findings were bounded defects in this existing
+  hardening record and were fixed immediately. `IssuesIndex.md` remains unchanged.
+
+Cross-stage acceptance:
+- **PASS - preflight modes.** `implementation`, `merge`, `read-only`, `rebuild`, `promotion` and
+  `deploy` share one parser/default contract. Implementation blocks main and requires a linked
+  worktree; merge requires clean primary main; read-only permits inspection and downgrades dirt/
+  staleness findings without bypassing operational modes. The workflow suite passed on the final
+  merged branch.
+- **PASS - migration collision/checksum scanner.** Current/unmerged refs and linked worktrees are
+  scanned by number, name and canonical-LF content; base gaps and database checksums have distinct
+  verdicts. The real read-only merge check reported collision/checksum parity PASS against
+  `refs/remotes/origin/main`, including the reconciled `079`/`091` state.
+- **PASS - migration runner safeguards.** Local name collisions are checked before connection;
+  shared DEV/PROD applies require cross-ref/base safety; `--allow-branch-local` is DEV-only and
+  cannot relax test or production. Test remains the disposable branch-migration target.
+- **PASS - promotion-plan validation.** Arguments bind environment/database names and absolute Linux
+  paths; SQL identifiers/literals and shell paths are quoted; generated swap/rollback SQL is
+  hyphen-safe; the assembled plan is validated before output. Stage 7 also made the six-file
+  destination check all-or-nothing. Promotion suite: 83/83 PASS.
+- **PASS - promotion FK/truncate/restore ordering.** One transaction enforces DROP -> grouped
+  TRUNCATE -> ADD for rebuilt referrers, refuses DELETE/CASCADE substitution, restores public and
+  `staging_aflw` tables in explicit FK order, preserves Gridley through stable source identity, and
+  omits historical-only DEV ledgers from restore/remap/sequence writes while auditing the gap.
+- **PASS - DEV deploy readiness.** The deploy payload has one post-restart readiness loop (120 s /
+  2 s defaults), requires the HTTP/JSON health contract, preserves the ISSUE-107 build header gate,
+  stops on definitive service failure and bounds diagnostics. Simulated Bash: 18/18 PASS;
+  PowerShell payload integration: 14 assertions PASS; no SSH ran.
+- **PASS - dirty-server classification.** Tracked and unknown paths block; the narrow known artifact
+  set warns and is listed; `-AllowDirtyServer` explicitly lists/bypasses only blockers; no clean,
+  reset or artifact deletion exists. Covered by the same 18-case shell suite.
+- **PASS - settle monitoring.** The scheduled launcher prints the exact launcher/PID, process,
+  same-role database and journal watches, terminal markers, a 10-minute no-progress threshold and
+  duration context before acquisition. Shell syntax and current-season structural tests passed.
+- **PASS - bounded canonical savepoint lifecycle.** Every invited canonical unit creates an explicit
+  anchor around the existing driver savepoint, releases on success, and rolls back/releases on a
+  caught unit failure; cleanup failure still escapes. Final DB-free structural coverage passed.
+  The retained Stage 5 PostgreSQL result remains the semantic proof: 64 passed / 1 skipped in
+  `tests/integration/settle-afltables.test.ts`, including whole-family rollback and continuation.
+- **PASS - issue-worktree bootstrap.** Fetches exact `origin/main`, requires clean primary main,
+  refuses existing branch/path/worktree reuse, copies only an explicitly named same-issue handoff,
+  and has no cleanup path. Disposable Git fixtures are removed after each workflow test.
+- **PASS - merge readiness.** The actual clean branch check was READY, main/origin matched, the branch
+  was ahead 2/behind 0, main was clean and migration safety passed. Declaring all 25 expected files
+  reduced warnings from 2 to 1 with 0 unexpected files. This handoff adds the documented strict
+  metadata so the operator can use `--runbook issues.md` after committing Stage 7. The final session
+  corrected the staged/unstaged count misreport (bounded fixes above); on the dirty Stage 7 tree every
+  non-dirt check passed and the report ended `BLOCKED (1 blocker(s), 0 warning(s))`, as it should.
+- **PASS - documentation/runbook lifecycle.** `CLAUDE.md` exposes the short lifecycle;
+  `docs/development/WORKFLOW.md` owns bootstrap/preflight/validation/readiness/operator merge/DEV
+  deploy/smoke/close and the optional metadata contract; deployment docs require monitoring before
+  long settle work. Production promotion remains separate, candidate-based, backup-gated and
+  explicitly operator controlled.
+
+Merge readiness:
+- Required clean-state command:
+  - `npm.cmd run merge:ready`
+  - **READY: 0 blockers, 2 warnings.** Branch PASS; clean issue/main worktrees PASS; local main equals
+    recorded origin/main at `71f05638...`; ahead 2/behind 0; migration collision/checksum parity PASS.
+    Warnings were optional issue/runbook metadata and absent expected-file classification.
+- Declared-scope command:
+  - `npm.cmd run merge:ready -- --expected-file CHANGELOG.md --expected-file CLAUDE.md --expected-file deploy/afldb-settle-afltables.sh --expected-file deploy/sync-dev-remote.sh --expected-file deploy/sync-dev.ps1 --expected-file docs/deployment.md --expected-file docs/development/WORKFLOW.md --expected-file docs/production-promotion.md --expected-file issues.md --expected-file package.json --expected-file src/lib/acquisition/canonical-apply.ts --expected-file src/lib/acquisition/settle-afltables.ts --expected-file tests/current-season-import.test.ts --expected-file tests/db-promotion-check.test.ts --expected-file tests/sync-dev-remote.test.sh --expected-file tests/sync-dev-static.test.ps1 --expected-file tests/workflow-preflight.test.ts --expected-file tools/db/migrate.ts --expected-file tools/db/migration-safety.ts --expected-file tools/db/promotion-check.ts --expected-file tools/db/promotion-inventory.ts --expected-file tools/dev/bootstrap-worktree.ts --expected-file tools/dev/merge-readiness.ts --expected-file tools/dev/preflight-core.ts --expected-file tools/dev/preflight.ts`
+  - **READY: 0 blockers, 1 warning.** `changed: 25; expected rules: 25; unexpected: 0` PASS. The only
+    remaining warning was optional runbook metadata.
+- Final-tree command (second session, uncommitted Stage 7 files present):
+  - `npx tsx tools/dev/merge-readiness.ts --runbook issues.md`
+  - **BLOCKED: 1 blocker, 0 warnings.** The only FAIL is `issue worktree is clean` with
+    `staged: 0; unstaged: 8; untracked: 0` naming exactly the eight Stage 7 files listed under file scope.
+    Branch, main/origin equality, ahead 2/behind 0, clean main worktree, migration parity, runbook
+    readiness (`status: ready`, 0 hard blockers), recorded validation and the 25-file scope all PASS.
+    This is the checker working as designed; the operator commit is what turns it READY.
+- Metadata disposition: the initial two warnings were acceptable optional-metadata warnings, not
+  blockers and not checker defects. Because this durable Stage 7 handoff is the existing hardening
+  runbook, the strict JSON block below now records ready status, zero blockers, the 25-file scope and
+  final validation. After the operator commits these Stage 7 changes,
+  `npm run merge:ready -- --runbook issues.md` is the intended warning-free path. The checker was not
+  weakened. It correctly blocks while this handoff is still an uncommitted working-tree change.
+- Database migration parity remains intentionally INFO/not checked by `merge:ready`; operational
+  database parity belongs to the deploy/rebuild/promotion preflight and no database was in scope here.
+
+Validation:
+Final-tree results (second session, Git Bash on the workstation, after the main merge and both bounded
+fixes; earlier-session results that these supersede are not repeated):
+- `npx vitest run tests/workflow-preflight.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts tests/settle-season-revalidation.test.ts tests/admin-current-season-settle.test.ts`
+  - **PASS:** 5 files; 464 passed, 0 skipped; 14.63 s. Covers workflow/preflight/bootstrap/readiness,
+    migration safety, promotion plan/FK/truncate rules (83/83 including the new partial-plan
+    regression), canonical savepoint structure and settle revalidation/admin integration without a
+    database. The first session's "460 passed, 4 skipped" was the same set under PowerShell, where the
+    four `sh`-gated launcher cases in `current-season-import` skip; under Git Bash they ran and passed.
+- `npx vitest run tests/workflow-preflight.test.ts` (after the merge-readiness fix)
+  - **PASS:** 24/24, including the new unstaged-only regression.
+- `bash tests/sync-dev-remote.test.sh`
+  - **PASS:** 18 passed, 0 failed.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\sync-dev-static.test.ps1`
+  - **PASS:** 14 assertions; three `-WhatIf` payload generations only; no SSH.
+- `bash -n deploy/sync-dev-remote.sh tests/sync-dev-remote.test.sh deploy/afldb-settle-afltables.sh`
+  - **PASS:** exit 0; all three shell files parsed.
+- PowerShell `Parser::ParseFile` over `deploy/sync-dev.ps1` and `tests/sync-dev-static.test.ps1`.
+  - **PASS:** 2 files; 0 parse errors.
+- `npm run typecheck` (run before and again after the merge-readiness fix)
+  - **PASS:** Next route types generated; `tsc --noEmit` exit 0 both times.
+- `./node_modules/.bin/eslint` over the 13 touched TypeScript files (tools/db migrate, migration-safety,
+  promotion-check, promotion-inventory; tools/dev bootstrap-worktree, merge-readiness, preflight-core,
+  preflight; canonical-apply, settle-afltables; the three touched test files), then again over
+  `tools/dev/merge-readiness.ts` and `tests/workflow-preflight.test.ts` after the fix.
+  - **PASS:** exit 0; no findings.
+- `git ls-files --eol` over all 25 hardening files plus a 3-byte BOM probe.
+  - **PASS:** the 3 shell files are LF in the working tree; the other 22 are CRLF; index is LF
+    throughout; no UTF-8 BOM.
+- `git diff --check main -- <the 25 expected files>` and `git diff --check` on the working tree.
+  - **PASS:** exit 0 for both.
+- Conflict-marker grep (`^(<<<<<<<|=======|>>>>>>>)`) over the 25 files.
+  - **PASS:** no matches.
+- Conflict-marker, temporary-artifact and Stage 7 secret-pattern audits.
+  - **PASS:** no conflict markers; no `.stage4`/`.stage5`, `afldb-workflow-*`, test-result or Playwright
+    artifacts; no Stage 7 credential/DSN literal. The full branch's one
+    `postgresql://user:secret@host/db` string is a deliberate synthetic parser-rejection fixture.
+- Tier 2 code graph project `D-dev-afldb-workflow-hardening` was current at generation
+  `2026-09-07T02:50:16Z`. Direct source inspection covered graph-excluded deploy files, changed
+  metadata and the relevant parser-partial tagged-SQL lines. Graph coverage remains best-effort.
+- The first sandboxed `npm run merge:ready` attempt hit the already documented TSX
+  `uv_os_get_passwd` / `ENOMEM` startup fault before application code. The same required read-only
+  command passed outside that restricted sandbox; this is not a hardening failure.
+
+File scope:
+- Expected and present: exactly the 25 files in the machine-readable block below and in the Stage 7
+  operator prompt. `git diff --name-status 71f0563` contains no other hardening file.
+- Unexpected: none.
+- The ISSUE-144 rivalry-explorer files are inherited through current main commit `71f0563` and are
+  therefore absent from the hardening diff against main. They were not reviewed or changed as Stage 7
+  hardening scope.
+- Stage 7 local files for operator review (eight, all already inside the declared 25-file scope):
+  `CHANGELOG.md`, `docs/production-promotion.md`, `issues.md`, `tests/db-promotion-check.test.ts`,
+  `tests/workflow-preflight.test.ts`, `tools/db/migration-safety.ts`, `tools/db/promotion-check.ts` and
+  `tools/dev/merge-readiness.ts`.
+- Provenance re-verified on the final tree: `0378180` is an ancestor of main, the migrations directory
+  holds `079_nl_search_log_head_to_head_grain.sql` and `091_access_code_delete.sql`, and the only
+  `issue-116` ref left is the unrelated `claude/issue-116-query-builder` branch in its own worktree.
+  The migration scanner still reads every registered worktree and unmerged ref, and reported parity.
+
+Safety:
+- Systems touched: this local worktree only; read-only Git inspection; DB-free tests; disposable
+  temporary Git fixtures created by the workflow suite and removed by it.
+- Systems not touched: production, DEV databases, TEST databases, retained databases, remote hosts,
+  SSH, services, systemd, health endpoints and deployment targets.
+- No migration, SQL, database write/reset/drop, service operation, deployment, branch push, merge to
+  main, commit, checkout, reset, stash or destructive worktree operation ran.
+- No credential or real DSN was printed. No temporary fixture/artifact remains.
+
+Remaining limitations:
+- Stage 5 fresh settle improved from approximately 3:49:00 to **1:57:19.272** but remains
+  sequential-round-trip dominated. Further performance optimisation is explicitly deferred to a
+  separate future task and is not a release blocker for this hardening.
+- `merge:ready` deliberately does not fetch and does not contact a database. Bootstrap owns remote
+  freshness; operational preflight owns applied database parity.
+- Linux remains authoritative for the first real DEV deploy/readiness observation; simulated Bash
+  and PowerShell acceptance is green, and no deploy was performed merely to test it.
+- `merge:ready --runbook PATH` reads the first `afldb-merge-readiness` block in that file. After this
+  branch merges, `issues.md` will carry this hardening block with `status: ready`; it describes this
+  branch only. Future issues must keep their block in their own `AFLDB-ISSUE-NNN.md` runbook and use
+  `--issue NNN`, never `--runbook issues.md`. No checker change was made for this; it is a usage rule.
+- Database migration parity was not part of this read-only merge acceptance; `merge:ready` reports it
+  as INFO by design and the DEV deploy preflight (`--mode deploy`) is where it is proven.
+- Stage 7 stayed on Windows with DB-free suites. The retained Stage 5 PostgreSQL settle result and the
+  Stage 3/6 simulated deploy suites were not re-executed against a host or database here.
+
+Release recommendation:
+- **READY TO MERGE**, after the operator reviews and commits the bounded Stage 7 files above.
+
+Exact operator next action:
+1. Review this Stage 7 handoff and the eight Stage 7 local files.
+2. Commit the Stage 7 acceptance changes, then run
+   `npm run merge:ready -- --runbook issues.md` and require warning-free `READY`.
+3. Push `codex/workflow-hardening`.
+4. Merge it into `main`.
+5. Update local `main`.
+6. Deploy hardened `main` to DEV through `deploy/sync-dev.ps1`, then smoke the affected workflow.
+7. Later create `code_test_db` and perform a full fresh rebuild rehearsal as a separate task.
+
+Recommended next model:
+- No further hardening stage. No model recommendation is needed unless the operator opens a separate
+  follow-up task.
+
+<!-- afldb-merge-readiness
+{"status":"ready","hardBlockers":[],"expectedFiles":["CHANGELOG.md","CLAUDE.md","deploy/afldb-settle-afltables.sh","deploy/sync-dev-remote.sh","deploy/sync-dev.ps1","docs/deployment.md","docs/development/WORKFLOW.md","docs/production-promotion.md","issues.md","package.json","src/lib/acquisition/canonical-apply.ts","src/lib/acquisition/settle-afltables.ts","tests/current-season-import.test.ts","tests/db-promotion-check.test.ts","tests/sync-dev-remote.test.sh","tests/sync-dev-static.test.ps1","tests/workflow-preflight.test.ts","tools/db/migrate.ts","tools/db/migration-safety.ts","tools/db/promotion-check.ts","tools/db/promotion-inventory.ts","tools/dev/bootstrap-worktree.ts","tools/dev/merge-readiness.ts","tools/dev/preflight-core.ts","tools/dev/preflight.ts"],"validation":["npx vitest run tests/workflow-preflight.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts tests/settle-season-revalidation.test.ts tests/admin-current-season-settle.test.ts - PASS: 5 files, 464 passed, 0 skipped","npx vitest run tests/workflow-preflight.test.ts after the merge-readiness fix - PASS: 24/24","bash tests/sync-dev-remote.test.sh - PASS: 18 passed, 0 failed","PowerShell tests/sync-dev-static.test.ps1 - PASS: 14 assertions","npm run typecheck - PASS (before and after the merge-readiness fix)","touched-file ESLint - PASS","shell/PowerShell syntax, EOL/BOM, git diff --check, conflict-marker and artifact audits - PASS"]}
+-->
+
+Stage 7 complete. Workflow hardening is ready for operator merge.
+
 ### Exact next action as recorded at Phase 4C (2026-09-06) — superseded by Phase 4C′ below
 
 1. Resolve `AFLDB-ISSUE-142` — (A) decide `player_match_period_stats` in the contract or register it by

@@ -325,6 +325,18 @@ describe('merge readiness report', () => {
     expect(run.stdout).toContain('Merge readiness: BLOCKED');
   });
 
+  it('does not count an unstaged-only first path as staged', () => {
+    const fixture = makeRepository();
+    addFeature(fixture.main, fixture.target);
+    commitReadyFeature(fixture.target);
+    writeFileSync(join(fixture.target, 'src', 'change.txt'), 'modified\n');
+    const run = tool(fixture.target, readinessCli, '--issue', '145');
+    expect(run.status).toBe(1);
+    expect(run.stdout).toContain('staged: 0; unstaged: 1; untracked: 0');
+    expect(run.stdout).toContain('path:  M src/change.txt');
+    expect(run.stdout).toContain('Merge readiness: BLOCKED');
+  });
+
   it('blocks and lists untracked files', () => {
     const fixture = makeRepository();
     addFeature(fixture.main, fixture.target);

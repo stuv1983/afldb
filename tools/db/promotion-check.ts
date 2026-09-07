@@ -947,11 +947,16 @@ export function writePlan(opts: Options): string[] {
     ['promotion-swap.sql', swapSql(input)],
     ['promotion-rollback.sql', rollbackSql(input)],
   ] as const;
+  const paths = files.map(([name, content]) => ({ name, content, path: join(dir, name) }));
+  const existing = paths.filter(({ path }) => existsSync(path));
+  if (existing.length > 0) {
+    throw new PromotionRefused(
+      `${existing.map(({ path }) => path).join(', ')} already exists; refusing to write a partial plan.`,
+    );
+  }
   mkdirSync(dir, { recursive: true });
   const written: string[] = [];
-  for (const [name, content] of files) {
-    const path = join(dir, name);
-    if (existsSync(path)) throw new PromotionRefused(`${path} already exists; refusing to overwrite a plan file.`);
+  for (const { content, path } of paths) {
     writeFileSync(path, content, { encoding: 'utf8', mode: 0o600 });
     written.push(path);
   }
