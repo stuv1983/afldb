@@ -24,6 +24,8 @@ import {
   historicalOnlyTables,
   isHistoricalOnlyColumn,
   judgeLineage,
+  judgeStagedSourceRows,
+  judgeStagingLeftover,
   type TableTreatment,
   DERIVED_FOOTBALL_TABLES,
   EMAIL_BEARING_TABLES,
@@ -63,7 +65,19 @@ import {
   resyncIdentitySql,
   rollbackSql,
   swapSql,
+  STAGING_SCHEMA,
+  isStagedLineageColumn,
+  isStagedReinstatement,
+  plannedReinstateOrder,
+  promoteStagedSql,
+  reinstateGroups,
   stableLineageTargetForFootballRef,
+  stageSql,
+  stagedCopyRedirect,
+  stagedLineageColumns,
+  stagedPlanProblems,
+  stagedReinstateTables,
+  stagedReinstatementProblems,
   tablesWithTreatment,
   truncateSql,
   truncatedPublicTables,
@@ -183,6 +197,8 @@ function generatedPlanArtifacts(environment: 'prod' | 'dev' = 'prod') {
     reinstate: reinstatePlan(input),
     resyncIdentity: resyncIdentitySql(environment),
     auditMarker: auditMarkerSql(input),
+    stage: stageSql(environment),
+    promoteStaged: promoteStagedSql(environment),
   };
 }
 
@@ -468,7 +484,11 @@ describe('reinstatement order and generated SQL', () => {
   it('emits one single-transaction data-only pg_restore per reinstated table, in order, plus the AFLW schema', () => {
     const plan = reinstatePlan({ candidate: 'afldb_prod_candidate_x', oldDatabase: 'afldb_prod', preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump' });
     const publicTables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
-    expect(publicTables).toEqual(reinstatedPublicTables());
+    // AFLDB-ISSUE-151: the staged tables have no plain restore line; every other reinstated
+    // table does, in the plan's order (direct, then the staged tables' dependants).
+    const groups = reinstateGroups();
+    expect(publicTables).toEqual([...groups.direct, ...groups.dependants]);
+    expect([...publicTables, ...groups.staged].sort()).toEqual([...reinstatedPublicTables()].sort());
     // AFLDB-ISSUE-139 Phase 4E-2: `--schema=staging_aflw` alone restores in TOC (alphabetical)
     // order and the single transaction dies on fixtures -> seasons. One line per table, in
     // the contract's FK order, and every table of migration 025's schema is listed exactly once.
@@ -491,7 +511,9 @@ describe('reinstatement order and generated SQL', () => {
     const declaredDependencies = (schemaContract.tableDependencies ?? [])
       .flatMap((dependency) => dependency.dependsOn.map((parent) => `${dependency.table}->${parent}`));
     expect([...declaredDependencies].sort()).toEqual([...new Set(migrationDependencies)].sort());
-    expect((plan.match(/--single-transaction/g) ?? []).length).toBe(publicTables.length + schemaTables.length);
+    // …plus one single-transaction load per staged table (AFLDB-ISSUE-151).
+    expect((plan.match(/--single-transaction/g) ?? []).length)
+      .toBe(publicTables.length + schemaTables.length + groups.staged.length);
     expect(plan).toContain('--data-only');
     expect(plan).toContain('privileges.sql');
     expect(plan).toContain('--phase candidate');
@@ -504,11 +526,16 @@ describe('reinstatement order and generated SQL', () => {
       preCutoverDump: '/backups/pre.dump', rebuiltDump: '/backups/rebuilt.dump',
     });
     const tables = [...plan.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]);
-    expect(tables).toContain('external_grid_sources');
+    // AFLDB-ISSUE-151: external_grid_sources is STAGED, never plainly restored into public;
+    // its two dependants are restored only after the promotion, in FK order.
+    expect(tables).not.toContain('external_grid_sources');
     expect(tables).toContain('external_grids');
     expect(tables).toContain('external_grid_axes');
-    expect(tables.indexOf('external_grids')).toBeGreaterThan(tables.indexOf('external_grid_sources'));
     expect(tables.indexOf('external_grid_axes')).toBeGreaterThan(tables.indexOf('external_grids'));
+    const promote = plan.indexOf('-f promotion-promote-staged.sql');
+    expect(promote).toBeGreaterThan(0);
+    expect(plan.indexOf('--exit-on-error --table=external_grids ')).toBeGreaterThan(promote);
+    expect(plan.indexOf('--table=external_grid_sources -f - ')).toBeLessThan(promote);
   });
 
   it('validates the complete generated plan before it can be written', () => {
@@ -607,8 +634,12 @@ describe('reinstatement order and generated SQL', () => {
     expect(dev).toContain('--environment dev');
     expect(dev).not.toContain('afldb-prod');
     // Same contract, same order: dev is a name shape, not a different plan — except for the
-    // tables AFLDB-ISSUE-143 withholds there, which the dev list itself accounts for.
-    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
+    // tables AFLDB-ISSUE-143 withholds there, which the dev list itself accounts for, and the
+    // staged tables (AFLDB-ISSUE-151), which have no plain restore line in either environment.
+    const devGroups = reinstateGroups('dev');
+    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]))
+      .toEqual([...devGroups.direct, ...devGroups.dependants]);
+    expect(devGroups.staged).toEqual(reinstateGroups('prod').staged);
   });
 
   it('names the environment in the audit marker, defaulting to production', () => {
@@ -650,8 +681,8 @@ describe('reinstatement order and generated SQL', () => {
         rebuiltDump: '/home/arm/rebuilt.dump', planDir: dir,
       });
       expect(files.map((file) => file.split(/[\\/]/).at(-1))).toEqual([
-        'promotion-truncate.sql', 'promotion-resync-identity.sql',
-        'promotion-audit-marker.sql', 'promotion-reinstate.sh',
+        'promotion-truncate.sql', 'promotion-stage.sql', 'promotion-promote-staged.sql',
+        'promotion-resync-identity.sql', 'promotion-audit-marker.sql', 'promotion-reinstate.sh',
         'promotion-swap.sql', 'promotion-rollback.sql',
       ]);
       expect(readFileSync(join(dir, 'promotion-swap.sql'), 'utf8'))
@@ -1065,9 +1096,15 @@ describe('lineage-safe reinstatement', () => {
         rows: [{ rowId: 5, oldValue: 41 }], remap,
       }],
     });
-    expect(sql).toContain('UPDATE "public"."external_grid_sources" SET "ingest_source_id" = 903'
+    // AFLDB-ISSUE-151: the column is NOT NULL against an immediate FK, so the UPDATE lands
+    // in the staging copy the plan restores the table into — never in public, where the
+    // rows are not yet (and where the old integer could never have been inserted).
+    expect(sql).toContain('UPDATE "promotion_staging"."external_grid_sources" SET "ingest_source_id" = 903'
       + ' WHERE "id" = 5 AND "ingest_source_id" = 41;');
+    expect(sql).not.toContain('UPDATE "public"."external_grid_sources"');
+    expect(sql).toContain('STAGED (AFLDB-ISSUE-151)');
     expect(sql).toContain('--   41 -> gridley -> 903');
+    expect(sql).toContain('FROM "promotion_staging"."external_grid_sources" t');
     expect(sql).not.toMatch(/\b(?:80|7)\b/);
   });
 
@@ -1403,8 +1440,11 @@ describe('historical-only / recorded-gap disposition', () => {
     expect(dev).toContain('afldb_dev_pre_rebuild_<stamp>');
     expect(dev).toContain('expects 0 rows');
     expect(dev).toContain('Nothing is deleted');
-    // Every other reinstated table is untouched, in the same order.
-    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1])).toEqual(reinstatedPublicTables('dev'));
+    // Every other reinstated table is untouched, in the same order (the staged tables of
+    // AFLDB-ISSUE-151 have no plain restore line in either environment).
+    const devGroups = reinstateGroups('dev');
+    expect([...dev.matchAll(/--exit-on-error --table=([a-z_]+)/g)].map((m) => m[1]))
+      .toEqual([...devGroups.direct, ...devGroups.dependants]);
     expect(reinstatedPublicTables('dev').length).toBe(reinstatedPublicTables('prod').length - 2);
   });
 
@@ -1502,6 +1542,390 @@ describe('historical-only / recorded-gap disposition', () => {
     expect(gate).toMatch(/unresolvedTotal === 0 \? 'WARN' : 'FAIL'/);
     expect(gate).toContain('const unresolvedTotal = judgement.refusedTotal;');
     expect(gate).toContain('historicalOnlyFor(t, environment)');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-151. Met on the first production promotion (stamp 20260907-234124): the old
+ * database's external_grid_sources row 1 carried ingest_source_id 57 (sources 57 = gridley),
+ * the rebuilt candidate's gridley row is sources 7 and its id 57 does not exist. The remap
+ * of AFLDB-ISSUE-142 resolved it correctly (57 -> gridley -> 7) but the plan restored the
+ * table straight into public FIRST, where the NOT NULL immediate FK refuses 57 before any
+ * UPDATE can run. The fix: such a table is STAGED — restored into promotion_staging with no
+ * constraints, remapped there by the evidenced file, then promoted under the FK with its ids
+ * preserved. These tests hold the plan to that shape and to everything it must not do.
+ */
+describe('staged reinstatement of NOT NULL lineage-bound references', () => {
+  const PLAN_INPUT = {
+    candidate: 'afldb_prod_candidate_20260907-234124', oldDatabase: 'afldb_prod',
+    preCutoverDump: '/home/arm/backups/afldb/pre.dump', rebuiltDump: '/home/arm/afldb_test_rebuilt.dump',
+  } as const;
+  const gridSources = contractByName('external_grid_sources')!;
+
+  /** The exact production case, resolved the way --phase restored resolves it. */
+  function productionCaseRemap() {
+    return resolveLineageRemap({
+      entity: 'sources', rule: 'source_key', referencedIds: [57],
+      replacedIdentities: [{ id: 57, identity: 'gridley' }],
+      candidateIdentities: [{ id: 7, identity: 'gridley' }],
+    });
+  }
+  function productionCasePlan(remap = productionCaseRemap()) {
+    return {
+      table: 'external_grid_sources', column: 'ingest_source_id', entity: 'sources',
+      rule: 'source_key' as const, remediation: gridSources.lineageRefs![0].remediation,
+      rows: [{ rowId: 1, oldValue: 57 }], remap,
+    };
+  }
+
+  it('stages exactly the tables the contract makes stageable — decided by shape, not by name', () => {
+    expect(isStagedReinstatement(gridSources)).toBe(true);
+    expect(stagedLineageColumns(gridSources)).toEqual([
+      { column: 'ingest_source_id', references: 'sources', identity: 'source_key' },
+    ]);
+    for (const environment of ENVIRONMENTS) {
+      expect(stagedReinstateTables(environment).map((t) => t.name)).toEqual(['external_grid_sources']);
+      expect(isStagedLineageColumn('external_grid_sources', 'ingest_source_id', environment)).toBe(true);
+      // Neither another column of the same table nor a lineage-bound column elsewhere.
+      expect(isStagedLineageColumn('external_grid_sources', 'code', environment)).toBe(false);
+      expect(isStagedLineageColumn('player_link_resolutions', 'player_id', environment)).toBe(false);
+      expect(isStagedLineageColumn('data_edits', 'row_id', environment)).toBe(false);
+    }
+    // The nullable exception path (§7.4) and the NOT NULL refusal path (§7.4b, import_batch_id)
+    // are untouched: neither shape is staged.
+    for (const t of publicContractTables()) {
+      for (const ref of t.footballRefs ?? []) {
+        const stable = stableLineageTargetForFootballRef(t, ref.column, ref.references);
+        const staged = stagedLineageColumns(t).some((c) => c.column === ref.column);
+        expect(staged, `${t.name}.${ref.column}`).toBe(!ref.nullable && stable !== undefined);
+      }
+    }
+    expect(stagedLineageColumns(contractByName('data_submissions')!)).toEqual([]);
+    expect(stagedLineageColumns(contractByName('player_link_resolutions')!)).toEqual([]);
+    expect(stagedLineageColumns(contractByName('external_grids')!)).toEqual([]);
+  });
+
+  it('is a property of the reference, proven on synthetic tables', () => {
+    const base = {
+      schema: 'public' as const, subsystem: 's', category: 'operations' as const, productionOnly: true,
+      treatment: 'reinstate' as const, compare: 'equal' as const, order: 20, note: 'n',
+    };
+    const notNullStable: TableTreatment = {
+      ...base, name: 'synthetic_a',
+      footballRefs: [{ column: 'source_id', references: 'sources', nullable: false, remediation: 'r' }],
+      lineageRefs: [{ column: 'source_id', targets: [{ entity: 'sources', identity: 'source_key' }], remediation: 'r' }],
+    };
+    const nullableStable: TableTreatment = { ...notNullStable, name: 'synthetic_b',
+      footballRefs: [{ column: 'source_id', references: 'sources', nullable: true }] };
+    const notNullNoIdentity: TableTreatment = { ...notNullStable, name: 'synthetic_c',
+      lineageRefs: [{ column: 'source_id', targets: [{ entity: 'sources', identity: 'none' }], remediation: 'r' }] };
+    const notNullNoLineage: TableTreatment = { ...notNullStable, name: 'synthetic_d', lineageRefs: undefined };
+    const reset: TableTreatment = { ...notNullStable, name: 'synthetic_e', treatment: 'reset', lineageRefs: undefined };
+    expect(isStagedReinstatement(notNullStable)).toBe(true);
+    expect(isStagedReinstatement(nullableStable)).toBe(false);
+    expect(isStagedReinstatement(notNullNoIdentity)).toBe(false);
+    expect(isStagedReinstatement(notNullNoLineage)).toBe(false);
+    expect(isStagedReinstatement(reset)).toBe(false);
+    expect(stagedReinstatementProblems(notNullStable)).toEqual([]);
+    // A polymorphic column cannot be promoted by the generic INSERT … SELECT *, so the contract
+    // refuses to stage it rather than generating a plan that only looks safe.
+    const polymorphic: TableTreatment = { ...notNullStable, name: 'synthetic_f',
+      lineageRefs: [{ column: 'source_id', kindColumn: 'kind',
+        targets: [{ kind: 'x', entity: 'sources', identity: 'source_key' }], remediation: 'r' }] };
+    expect(stagedReinstatementProblems(polymorphic)).toEqual([
+      'stages polymorphic column source_id, which the staged promotion does not support',
+    ]);
+    expect(promotionContractProblems([...PROMOTION_CONTRACT, polymorphic])).toContain(
+      'public.synthetic_f stages polymorphic column source_id, which the staged promotion does not support',
+    );
+  });
+
+  it('splits the restore into direct, staged and dependants, and the planned order is still FK-safe', () => {
+    for (const environment of ENVIRONMENTS) {
+      const groups = reinstateGroups(environment);
+      expect(groups.staged).toEqual(['external_grid_sources']);
+      expect(groups.dependants).toEqual(['external_grids', 'external_grid_axes']);
+      expect(groups.direct).not.toContain('external_grid_sources');
+      expect(groups.direct).not.toContain('external_grids');
+      expect(groups.direct).not.toContain('external_grid_axes');
+      const planned = plannedReinstateOrder(environment);
+      expect([...planned].sort()).toEqual([...reinstatedPublicTables(environment)].sort());
+      expect(planned.indexOf('external_grids')).toBeGreaterThan(planned.indexOf('external_grid_sources'));
+      expect(planned.indexOf('external_grid_axes')).toBeGreaterThan(planned.indexOf('external_grids'));
+      for (const t of publicContractTables()) {
+        if (!planned.includes(t.name)) continue;
+        for (const parent of t.restoreAfter ?? []) {
+          expect(planned.indexOf(parent), `${t.name} after ${parent}`).toBeLessThan(planned.indexOf(t.name));
+        }
+      }
+    }
+    expect(promotionContractProblems()).toEqual([]);
+  });
+
+  it('resolves the production case through sources.key and writes the UPDATE into the staging copy', () => {
+    const remap = productionCaseRemap();
+    expect(remap.mapped).toEqual([{ oldId: 57, identity: 'gridley', newId: 7 }]);
+    expect(remap.unresolved).toEqual([]);
+    expect(remap.unchanged).toBe(0);
+    const sql = lineageRemapSql({ candidate: PLAN_INPUT.candidate, oldDatabase: 'afldb_prod', environment: 'prod',
+      plans: [productionCasePlan(remap)] });
+    expect(sql).toContain('--   57 -> gridley -> 7');
+    expect(sql).toContain('UPDATE "promotion_staging"."external_grid_sources" SET "ingest_source_id" = 7'
+      + ' WHERE "id" = 1 AND "ingest_source_id" = 57;');
+    // The row keeps its own id (the guard is on id = 1), and nothing is written in public.
+    expect(sql).not.toMatch(/UPDATE "public"\."external_grid_sources"/);
+    expect(sql).not.toMatch(/\b(DELETE|INSERT|TRUNCATE|ALTER|DROP)\b/);
+    // Never by name: the display name of the source appears nowhere in the file.
+    expect(sql).not.toMatch(/Gridley/);
+    expect(sql).toContain('FROM "promotion_staging"."external_grid_sources" t');
+    expect(sql).toContain('NOT IN (SELECT id FROM (VALUES (7, \'gridley\')');
+    expect(lineageRemapProblems(sql, [productionCasePlan(remap)], 'prod')).toEqual([]);
+  });
+
+  it('still fails closed when the stable identity cannot be evidenced, and never fabricates the row', () => {
+    const absent = resolveLineageRemap({
+      entity: 'sources', rule: 'source_key', referencedIds: [57],
+      replacedIdentities: [{ id: 57, identity: 'gridley' }],
+      candidateIdentities: [],
+    });
+    expect(absent.unresolved).toEqual([{ oldId: 57, reason: 'identity_absent_in_candidate', identity: 'gridley' }]);
+    for (const environment of ENVIRONMENTS) {
+      expect(judgeLineage({ environment, columns: [
+        { table: 'external_grid_sources', column: 'ingest_source_id', unresolved: 1 },
+      ] }).verdict).toBe('FAIL');
+    }
+    const sql = lineageRemapSql({ candidate: PLAN_INPUT.candidate, oldDatabase: 'afldb_prod', environment: 'prod',
+      plans: [productionCasePlan(absent)] });
+    expect(sql.split('\n').filter((l) => l.startsWith('UPDATE'))).toHaveLength(0);
+    expect(sql).toContain('-- UNRESOLVED external_grid_sources.ingest_source_id = 57 (identity_absent_in_candidate, identity gridley)');
+    expect(sql).not.toMatch(/INSERT/);
+    // And the promotion refuses the unsettled integer before any INSERT, naming the rule.
+    const promote = promoteStagedSql('prod');
+    expect(promote).toContain("external_grid_sources.ingest_source_id still carries the replaced database''s id(s)");
+    expect(promote).toContain('never insert a sources row');
+    expect(promote.indexOf('RAISE EXCEPTION')).toBeLessThan(promote.indexOf('INSERT INTO "public"."external_grid_sources"'));
+  });
+
+  it('refuses a remap that writes a staged column in public instead of the staging copy', () => {
+    const plans = [productionCasePlan()];
+    const good = lineageRemapSql({ candidate: 'c', oldDatabase: 'o', environment: 'prod', plans });
+    const bad = good.replace('UPDATE "promotion_staging"."external_grid_sources"', 'UPDATE "public"."external_grid_sources"');
+    expect(bad).not.toBe(good);
+    expect(lineageRemapProblems(bad, plans, 'prod')).toEqual([
+      'staged table external_grid_sources receives a generated remap write in public instead of promotion_staging',
+    ]);
+  });
+
+  it('the generated plan never plainly restores the staged table, and orders stage -> remap -> promote -> dependants', () => {
+    for (const environment of ENVIRONMENTS) {
+      const plan = reinstatePlan({ ...PLAN_INPUT, environment });
+      expect(plan).not.toMatch(/--exit-on-error --table=external_grid_sources(\s|$)/);
+      const at = (needle: string) => { const i = plan.indexOf(needle); expect(i, needle).toBeGreaterThanOrEqual(0); return i; };
+      const groups = reinstateGroups(environment);
+      const lastDirect = plan.lastIndexOf(`--exit-on-error --table=${groups.direct.at(-1)} `);
+      const stage = at('-f promotion-stage.sql');
+      const restore = at('--table=external_grid_sources -f - \'/home/arm/backups/afldb/pre.dump\'');
+      const redirect = at(`| sed -e '${stagedCopyRedirect('external_grid_sources')}' > promotion-stage-external_grid_sources.sql`);
+      const guard = at("grep -q '^COPY promotion_staging.external_grid_sources (' promotion-stage-external_grid_sources.sql");
+      const load = at('--single-transaction -f promotion-stage-external_grid_sources.sql');
+      const remap = at('-f "$LINEAGE_REMAP_SQL"');
+      const promote = at('-f promotion-promote-staged.sql');
+      const grids = at('--exit-on-error --table=external_grids ');
+      const axes = at('--exit-on-error --table=external_grid_axes ');
+      const aflw = at('--schema=staging_aflw --table=seasons');
+      const resync = at('-f promotion-resync-identity.sql');
+      expect([lastDirect, stage, restore, redirect, guard, load, remap, promote, grids, axes, aflw, resync])
+        .toEqual([lastDirect, stage, restore, redirect, guard, load, remap, promote, grids, axes, aflw, resync].slice().sort((a, b) => a - b));
+      expect(plan).toContain('LINEAGE_REMAP_SQL is the file --phase restored wrote through --lineage-remap-out');
+      expect(plan).toContain('AFLDB-ISSUE-151');
+      // The staged restore is the only line of its kind, and it is the redirected script that is loaded.
+      expect((plan.match(/--table=external_grid_sources -f - /g) ?? []).length).toBe(1);
+      expect((plan.match(/-f promotion-promote-staged\.sql/g) ?? []).length).toBe(1);
+      expect(plan).not.toMatch(/postgres(ql)?:\/\//);
+    }
+  });
+
+  it('the staging and promotion SQL preserve ids, keep the FK in force and leave nothing behind', () => {
+    const stage = stageSql();
+    expect(stage).toContain('CREATE SCHEMA "promotion_staging";');
+    expect(stage).toContain('CREATE TABLE "promotion_staging"."external_grid_sources" (LIKE "public"."external_grid_sources");');
+    expect(stage).not.toMatch(/INCLUDING/);
+    expect(stage).toMatch(/^BEGIN;/m);
+    expect(stage).toMatch(/^COMMIT;/m);
+    const promote = promoteStagedSql();
+    expect(promote).toContain('INSERT INTO "public"."external_grid_sources" OVERRIDING SYSTEM VALUE'
+      + ' SELECT * FROM "promotion_staging"."external_grid_sources" ORDER BY "id";');
+    expect(promote).toContain('DROP TABLE "promotion_staging"."external_grid_sources";');
+    expect(promote).toContain('DROP SCHEMA "promotion_staging";');
+    expect(promote).toContain('is empty: the staged restore (plan step 2b) did not run');
+    // Refuses BEFORE the INSERT, in the same transaction, and touches nothing else.
+    expect(promote.indexOf('RAISE EXCEPTION')).toBeLessThan(promote.indexOf('INSERT INTO'));
+    expect(promote).not.toMatch(/\b(UPDATE|DELETE|TRUNCATE|CASCADE)\b/);
+    for (const text of [stage, promote, reinstatePlan(PLAN_INPUT)]) {
+      expect(text).not.toMatch(/session_replication_role|DISABLE TRIGGER|DROP CONSTRAINT|SET CONSTRAINTS|DEFERRABLE|NOT VALID|--disable-triggers|--superuser/i);
+      expect(text).not.toMatch(/INSERT INTO "public"\."sources"/);
+    }
+    // The identity sequence of the promoted table is still re-synced afterwards.
+    expect(resyncIdentitySql()).toContain("'external_grid_sources'");
+    expect(stagedPlanProblems(generatedPlanArtifacts('prod'))).toEqual([]);
+    expect(stagedPlanProblems(generatedPlanArtifacts('dev'), 'dev')).toEqual([]);
+  });
+
+  it('the plan validator refuses the unsafe plain restore, a misordered lifecycle and a constraint bypass', () => {
+    const good = generatedPlanArtifacts('prod');
+    const restoreLine = 'pg_restore --dbname="$CANDIDATE_DSN" --data-only --no-owner --no-privileges \\\n'
+      + "           --single-transaction --exit-on-error --table=external_grid_sources '/backups/pre.dump'\n";
+    // The pre-fix shape: a plain restore of the staged table before anything else.
+    const plain = { ...good, reinstate: good.reinstate.replace('psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-stage.sql', `${restoreLine}psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-stage.sql`) };
+    expect(stagedPlanProblems(plain)).toContain('staged table external_grid_sources receives a plain pg_restore into public');
+    expect(promotionPlanProblems(plain)).toContain('public restore order differs from the prod contract');
+    // Promotion before the remap: the old integer would meet the FK.
+    const remapLine = 'psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f "$LINEAGE_REMAP_SQL"';
+    const promoteLine = 'psql "$CANDIDATE_DSN" -v ON_ERROR_STOP=1 -f promotion-promote-staged.sql';
+    const swapped = { ...good, reinstate: good.reinstate.replace(remapLine, '@@R@@').replace(promoteLine, remapLine).replace('@@R@@', promoteLine) };
+    expect(stagedPlanProblems(swapped)).toContain('staged lifecycle is not ordered direct restores -> stage -> remap -> promote -> dependants');
+    // A dependant restored before the promotion, and the remap dropped altogether.
+    const early = { ...good, reinstate: good.reinstate.replace(promoteLine, '@@P@@').replace(/pg_restore[^\n]*\n[^\n]*--table=external_grids '[^\n]*\n/, (m) => `${m}${promoteLine}\n`).replace('@@P@@\n', '') };
+    expect(stagedPlanProblems(early)).toContain('staged lifecycle is not ordered direct restores -> stage -> remap -> promote -> dependants');
+    const noRemap = { ...good, reinstate: good.reinstate.replace(remapLine, '') };
+    expect(stagedPlanProblems(noRemap)).toContain('plan must apply the lineage remap exactly once');
+    // Every constraint bypass is refused wherever it appears.
+    for (const bypass of ['SET session_replication_role = replica;', 'ALTER TABLE "public"."external_grid_sources" DISABLE TRIGGER ALL;',
+      'ALTER TABLE "public"."external_grid_sources" DROP CONSTRAINT "external_grid_sources_ingest_source_id_fkey";',
+      'SET CONSTRAINTS ALL DEFERRED;']) {
+      expect(stagedPlanProblems({ ...good, stage: `${good.stage}${bypass}\n` }), bypass).toContain('stage bypasses or weakens a constraint');
+      expect(stagedPlanProblems({ ...good, promoteStaged: `${good.promoteStaged}${bypass}\n` }), bypass).toContain('promoteStaged bypasses or weakens a constraint');
+    }
+    expect(stagedPlanProblems({ ...good, reinstate: `${good.reinstate}pg_restore --disable-triggers …\n` })).toContain('reinstate bypasses or weakens a constraint');
+    // The promotion must keep the ids and drop the staging copy; the redirect must be present.
+    const noOverride = { ...good, promoteStaged: good.promoteStaged.replace(' OVERRIDING SYSTEM VALUE', '') };
+    expect(stagedPlanProblems(noOverride)).toContain('promotion-promote-staged.sql does not promote external_grid_sources with its ids preserved');
+    const noRedirect = { ...good, reinstate: good.reinstate.replace(stagedCopyRedirect('external_grid_sources'), 's/x/y/') };
+    expect(stagedPlanProblems(noRedirect)).toContain('staged table external_grid_sources restore does not redirect its COPY to promotion_staging');
+    const cascade = { ...good, promoteStaged: good.promoteStaged.replace('DROP SCHEMA "promotion_staging";', 'DROP SCHEMA "promotion_staging" CASCADE;') };
+    expect(stagedPlanProblems(cascade)).toContain('staged lifecycle uses CASCADE');
+    expect(() => assertPromotionPlanCoherent(plain)).toThrow(PromotionRefused);
+  });
+
+  it('the COPY redirect is anchored to the dump header and is the only edit of the restore stream', () => {
+    expect(stagedCopyRedirect('external_grid_sources'))
+      .toBe('s/^COPY public\\.external_grid_sources (/COPY promotion_staging.external_grid_sources (/');
+    expect(STAGING_SCHEMA).toBe('promotion_staging');
+    expect(() => stagedCopyRedirect('Bad Name')).toThrow(PromotionRefused);
+  });
+
+  it('encodes the invariant that a staged table holds rows: judged at pre-cutover, refused at promotion', () => {
+    // The promotion cannot tell "restored zero rows" from "the staged restore never ran", so
+    // an empty staging copy always refuses (detection of a failed staged restore is kept).
+    const promote = promoteStagedSql();
+    expect(promote).toContain('IF staged_rows = 0 THEN');
+    expect(promote).toContain('is empty: the staged restore (plan step 2b) did not run or restored nothing');
+    expect(promote).toContain('an empty copy is never a legitimate state');
+    // ...and the ambiguity is settled BEFORE any plan exists: the pre-cutover inventory must
+    // show rows in every staged table of the environment, or the phase refuses.
+    for (const environment of ENVIRONMENTS) {
+      const staged = stagedReinstateTables(environment).map((t) => t.name);
+      expect(staged).toEqual(['external_grid_sources']);
+      const ok = judgeStagedSourceRows({ 'public.external_grid_sources': 1, 'public.external_grids': 0 }, environment);
+      expect(ok).toEqual({ populated: [{ table: 'external_grid_sources', rows: 1 }], empty: [], missing: [], verdict: 'PASS' });
+      const empty = judgeStagedSourceRows({ 'public.external_grid_sources': 0 }, environment);
+      expect(empty.verdict).toBe('FAIL');
+      expect(empty.empty).toEqual(['external_grid_sources']);
+      const absent = judgeStagedSourceRows({ 'public.external_grids': 3 }, environment);
+      expect(absent.verdict).toBe('FAIL');
+      expect(absent.missing).toEqual(['external_grid_sources']);
+      // Only a staged table is judged: a non-staged reinstated table at 0 is not this gate's business.
+      expect(judgeStagedSourceRows({ 'public.external_grid_sources': 2, 'public.auth_users': 0 }, environment).verdict).toBe('PASS');
+    }
+    // The checker applies it at exactly the pre-cutover phase, from the inventory it already took.
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    expect(source).toContain("if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);");
+    expect(isStagedReinstatement(gridSources)).toBe(true);
+  });
+
+  it('an interrupted staged reinstatement fails closed: the leftover schema is refused everywhere and never reused', () => {
+    // The generated files never adopt or silently remove an existing staging schema.
+    const stage = stageSql();
+    const promote = promoteStagedSql();
+    expect(stage).toContain('CREATE SCHEMA "promotion_staging";');
+    expect(stage).not.toMatch(/IF\s+NOT\s+EXISTS|IF\s+EXISTS|DROP\s+SCHEMA|DROP\s+TABLE/i);
+    expect(stage).toContain('never reuse it');
+    expect(promote).not.toMatch(/IF\s+EXISTS|IF\s+NOT\s+EXISTS|CREATE\s+SCHEMA/i);
+    expect((promote.match(/DROP SCHEMA/g) ?? []).length).toBe(1);
+    for (const environment of ENVIRONMENTS) {
+      expect(reinstatePlan({ ...PLAN_INPUT, environment })).not.toMatch(/DROP\s+SCHEMA|IF\s+NOT\s+EXISTS/i);
+    }
+    // The plan validator refuses every shape that would reuse or quietly clean up a leftover.
+    const good = generatedPlanArtifacts('prod');
+    expect(stagedPlanProblems(good)).toEqual([]);
+    const adopt = { ...good, stage: good.stage.replace('CREATE SCHEMA "promotion_staging";', 'CREATE SCHEMA IF NOT EXISTS "promotion_staging";') };
+    expect(stagedPlanProblems(adopt)).toContain('stage silently reuses or removes a leftover staging schema');
+    expect(stagedPlanProblems(adopt)).toContain('promotion-stage.sql does not create the staging schema');
+    const preDrop = { ...good, stage: good.stage.replace('BEGIN;', 'BEGIN;\nDROP SCHEMA "promotion_staging";') };
+    expect(stagedPlanProblems(preDrop)).toContain('a leftover staging schema is dropped outside promotion-promote-staged.sql');
+    const preDropIfExists = { ...good, stage: good.stage.replace('BEGIN;', 'BEGIN;\nDROP SCHEMA IF EXISTS "promotion_staging" CASCADE;') };
+    expect(stagedPlanProblems(preDropIfExists)).toEqual(expect.arrayContaining([
+      'staged lifecycle uses CASCADE',
+      'stage silently reuses or removes a leftover staging schema',
+      'a leftover staging schema is dropped outside promotion-promote-staged.sql',
+    ]));
+    const planDrop = { ...good, reinstate: good.reinstate.replace('-f promotion-stage.sql', '-c \'DROP SCHEMA promotion_staging\'\npsql "$CANDIDATE_DSN" -f promotion-stage.sql') };
+    expect(stagedPlanProblems(planDrop)).toContain('a leftover staging schema is dropped outside promotion-promote-staged.sql');
+    const lenientPromote = { ...good, promoteStaged: good.promoteStaged.replace('DROP SCHEMA "promotion_staging";', 'DROP SCHEMA IF EXISTS "promotion_staging";') };
+    expect(stagedPlanProblems(lenientPromote)).toEqual(expect.arrayContaining([
+      'promoteStaged silently reuses or removes a leftover staging schema',
+      'promotion-promote-staged.sql does not drop the staging schema',
+    ]));
+    for (const bad of [adopt, preDrop, planDrop, lenientPromote]) expect(() => assertPromotionPlanCoherent(bad)).toThrow(PromotionRefused);
+    // The checker refuses a leftover at EVERY phase, before the phase-specific gates, and its
+    // verdict tells the operator to inspect first, never reuse, and drop only by hand.
+    expect(judgeStagingLeftover(null)).toEqual({ verdict: 'PASS', lines: ['schema promotion_staging is absent'] });
+    const bare = judgeStagingLeftover([]);
+    expect(bare.verdict).toBe('FAIL');
+    expect(bare.lines.join('\n')).toContain('it holds no tables');
+    const left = judgeStagingLeftover([{ table: 'external_grid_sources', rows: 1 }]);
+    expect(left.verdict).toBe('FAIL');
+    const text = left.lines.join('\n');
+    for (const needle of ['did not finish', 'promotion_staging.external_grid_sources', '1 row(s)', 'Inspect it before anything else',
+      'Never reuse it', 'nothing generated drops it', 'Drop it by hand', 'regenerate the plan']) {
+      expect(text, needle).toContain(needle);
+    }
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    const leftoverCall = source.indexOf('await gateStagingLeftover(conn.q, report);');
+    expect(leftoverCall).toBeGreaterThan(source.indexOf('await gateClassification(conn.q, report);'));
+    expect(leftoverCall).toBeLessThan(source.indexOf("old = await openReadOnly(withDatabase(baseDsn, opts.oldDatabase!), 'old');"));
+    expect(source.slice(leftoverCall - 200, leftoverCall)).not.toMatch(/if \(phase/);
+    expect(source).not.toMatch(/DROP SCHEMA/);
+    // And the operator documentation requires the inspection before any cleanup or retry.
+    const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
+    for (const needle of ['inspect it, never reuse it', 'Interrupted staged reinstatement', 'refuses at every phase',
+      'after the inspection is recorded', 'CREATE SCHEMA` refuses']) {
+      expect(doc, needle).toContain(needle);
+    }
+  });
+
+  it('every operator surface now says the same thing about the staged table', () => {
+    const checklist = ACCEPTANCE_CHECKLIST.join('\n');
+    for (const needle of ['AFLDB-ISSUE-151', 'promotion_staging', 'external_grid_sources.ingest_source_id',
+      'No sources row inserted', 'no constraint dropped or deferred']) {
+      expect(checklist, needle).toContain(needle);
+    }
+    expect(checklist).not.toMatch(/settled BEFORE its restore lines/);
+    expect(gridSources.footballRefs![0].remediation).toContain('STAGES this table');
+    expect(gridSources.lineageRefs![0].remediation).toContain('STAGED copy');
+    expect(gridSources.lineageRefs![0].remediation).not.toMatch(/after reinstatement/);
+    const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
+    expect(source).toContain("the plan STAGES ${t.name} (AFLDB-ISSUE-151)");
+    expect(source).not.toMatch(/apply it after reinstate, before acceptance/);
+    expect(source).not.toMatch(/run it on the candidate AFTER the reinstate/);
+    // A shared lineage still writes the remap file, as an explicit no-op, so the plan's fixed
+    // remap step always has its file — and still through the one write site.
+    expect(source).toContain('writeRemap([], true)');
+    expect(source).toContain('an explicit no-op (shared lineage, no UPDATE)');
+    const doc = readFileSync(join(REPO, 'docs', 'production-promotion.md'), 'utf8');
+    for (const needle of ['AFLDB-ISSUE-151', 'promotion_staging', 'promotion-stage.sql', 'promotion-promote-staged.sql']) {
+      expect(doc, needle).toContain(needle);
+    }
   });
 });
 

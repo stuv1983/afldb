@@ -7,7 +7,25 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`.
+**Open issues:** 13 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`.
+
+<!-- 2026-09-08 (ISSUE-151 allocated + implemented): `AFLDB-ISSUE-151` is now ALLOCATED and Open —
+     **Fix production promotion lineage/FK sequencing for `external_grid_sources`**, on branch
+     `sonnet/issue-151-promotion-lineage-fk` (worktree `D:\dev\afldb-issue-151`), from `main` @
+     `88ca994`. Found by the first REAL production promotion (stamp `20260907-234124`, candidate
+     `afldb_prod_candidate_20260907-234124`, paused at the restored gate): the generated plan
+     plainly `pg_restore`d `external_grid_sources` (row id 1, `ingest_source_id = 57`) into a
+     candidate whose gridley `sources` row is id 7 and whose id 57 does not exist, so the NOT NULL
+     immediate FK refuses BEFORE the AFLDB-ISSUE-142 remap (57 -> gridley -> 7, correctly
+     evidenced) could run. Fix in the tracked tooling, no migration: the contract now STAGES any
+     reinstated table carrying a NOT NULL football reference with a stable lineage identity —
+     restored into `promotion_staging.<t>` (LIKE copy, no FK), remapped THERE by the
+     `--lineage-remap-out` file at a fixed plan step, then promoted into public under the FK
+     with `OVERRIDING SYSTEM VALUE` (ids preserved), dependants (`external_grids`,
+     `external_grid_axes`) restored after. Two new generated files (`promotion-stage.sql`,
+     `promotion-promote-staged.sql`); the plan validator refuses the old plain restore and every
+     constraint bypass. 94/94 in `tests/db-promotion-check.test.ts`, `tsc` + `eslint` clean.
+     Next free issue ID is `AFLDB-ISSUE-152`. -->
 
 <!-- 2026-09-07 (ISSUE-150 allocated + implemented): `AFLDB-ISSUE-150` is now ALLOCATED and Open —
      **Expand AFL venue pages with historical venue records and statistics** — on branch
@@ -212,6 +230,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-147` | Medium | Public UI / navigation IA / responsive layout | **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data via an operator SSH tunnel; awaiting operator commit / merge / deploy.** Branch `claude/issue-147-ui`, worktree `D:\dev\afldb-issue-147-ui`. Full authenticated rendered audit of the public site (27 routes × 7 widths, 320–1440) found page-level responsive discipline sound (zero document-level horizontal overflow anywhere), with three concentrated defects: **P0** the phone nav was a smaller, independently hand-kept IA than the masthead — Clubs, Venues, Coaches, Brownlow, Awards, Draft and Match Search were unreachable from the phone chrome (same gap under `/aflw`; the home "Browse the record" grid was a third drifting list, already missing Coaches); **P1** a 641–~890 px masthead-nav overflow band; **P1** dense tables scroll inside `.table-wrap` with no cue that off-screen columns / sort headers exist. Fix (navigation + responsive CSS + tests only; **no migration**, schema, query, route, privilege or deployment change): new canonical `src/lib/site-nav-model.ts` (one `PRIMARY_NAV`, derived `QUICK_TABS` incl. Clubs, derived `BROWSE_SECTIONS` incl. Coaches); `TabBar` gains a "More" bottom sheet (`role="dialog"`, focus-trapped, Escape/backdrop/link/`popstate` close, `aria-current`) listing the **whole** active primary set; masthead nav wraps cleanly at 641–1080 px; `.table-wrap` gets a CSS-only theme-aware directional scroll shadow (`--edge-shadow`, self-hiding, no markup change); new committed `tests/e2e/responsive-nav.spec.ts` derives nav parity from the rendered masthead so a future one-sided addition fails; `tests/e2e/journeys.spec.ts` nav tests de-skipped on mobile via a `reachPrimary()` helper + a new "clubs is reachable" test. Validation: `tsc`/`eslint`/`npm run build` PASS; `responsive-nav.spec.ts` 32/32; journeys nav tests 10/10 on Desktop + Pixel 7; full viewport audit 200/200, zero overflow, zero 4xx/5xx; before/after screenshots in `artifacts/issue-147/` (gitignored). | **Operator:** review + commit `claude/issue-147-ui`; delete the audit scaffolding (`playwright.responsive.config.ts`, `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/`, `tests/nl-ui/.auth/`) or keep `playwright.responsive.config.ts` if you want the re-runnable audit; merge; deploy to DEV via `deploy/sync-dev.ps1` and smoke the phone nav + `/clubs` on a real device; then Resolve. Standard `npm run test:e2e` on the Linux dev host confirms the gate-off path for the new spec. |
 | `AFLDB-ISSUE-149` | Low | Public UI / club pages / database queries | **OPEN — IMPLEMENTATION COMPLETE; `tsc`, focused vitest and `npm run build` all NOT yet operator-run. Stays Open until merged and verified on DEV.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`), bootstrapped from merged `main` after ISSUE-148. SIX new public AFL club-page sections, all lineage-scoped by `clubs.organization_id`, all from existing canonical tables, **no migration**, ISSUE-148's Premierships / Coaches preserved. **(1) Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`): a `club_matches` CTE orients every lineage match to the club's perspective; six deterministic single-row picks — biggest win/loss margin, the club's OWN highest/lowest score, highest/lowest COMBINED match score; ties `match_date DESC, match_id DESC`. `src/components/ClubMatchRecords.tsx`. **(2) Record crowds** — `getClubCrowdRecords(clubId)`: same CTE + `attendance IS NOT NULL`; highest home-and-away / finals (`is_finals_series IS TRUE`) / Grand Final (`round_type='grand_final'`) crowd + Top 5; `attendance DESC, match_date DESC, match_id DESC`; null attendance never shown as 0. `src/components/ClubCrowdRecords.tsx`. **(3) Players** — `getClubPlayers(clubId)`: full `player_clubs` set summed by `organization_id`, one row per player, this club's games/goals only, not truncated. `src/components/ClubPlayers.tsx` (`SortableTable` in a `defaultOpen={false}` `CollapsibleTable`). **(4) Premiership players** — `getClubPremiershipPlayers(clubId)`: `player_club_season_stats.is_premier` in lineage, `season DESC, games DESC`. `src/components/ClubPremiershipPlayers.tsx`. **(5) Awards & honours** — `getClubBrownlowMedallists(clubId)` (`brownlow_season_votes` `is_winner` + linked + `club_id` in lineage, per ISSUE-118 §W.4) and `getClubHonours(clubId)` (`award_winners`, `awards.category='award'`, `slug<>'brownlow-medal'`, `club_id` in lineage) in `src/db/queries/awards.ts`; `src/components/ClubHonours.tsx`. Page wiring in `src/app/clubs/[slug]/page.tsx` (6 queries into the existing `Promise.all`; 5 section blocks, each omitted when empty). **Most Games / Most Goals / Captains from the brief were already on the page** (Games leaders / Goalkicking leaders / Captains — preserved). **Unsupported attribution omitted + reported:** `honour_team_members` (only `club_name_raw`, no `club_id`/season), `player_achievements` (0 rows), null-`club_id` Brownlow winners. Tests: `tests/integration/club-{match-records,crowd-records,players,premiership-players,honours}.test.ts` (new — record/crowd values re-derived from raw scorelines; club-specificity + no other-club leakage; honour attribution; premiership-season cross-check vs `club_seasons.is_premier` AND `getClubPremierships`), `tests/club-records-sections.test.ts` (new — component render). One Unreleased `CHANGELOG.md` entry. **Validation:** NONE run yet. | **Operator:** `npx tsc --noEmit`; `npx vitest run tests/club-records-sections.test.ts`; with `AFLDB_TEST_DATABASE_URL`=`afldb_test`, `npx vitest run tests/integration/club-match-records.test.ts tests/integration/club-crowd-records.test.ts tests/integration/club-players.test.ts tests/integration/club-premiership-players.test.ts tests/integration/club-honours.test.ts`; then `npm run build`. On green: commit on `fable/issue-149-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond`, a historical club (`/clubs/footscray` or `/clubs/western-bulldogs`) and a young club (`/clubs/gold-coast`), Resolve. |
 | `AFLDB-ISSUE-150` | Low | Public UI / venue pages / database queries | **OPEN — IMPLEMENTATION COMPLETE. On the implementation workstation (a tunnel to `afldb_test` was up): `npx tsc --noEmit` PASS; `npx eslint` 0 errors (one pre-existing-style `_total` warning); `tests/venue-records-sections.test.ts` 12/12 (no DB); `tests/integration/venue-records.test.ts` 15/15 against `afldb_test` (truth re-derived from raw `matches` / `player_match_stats`). NOT run: `ISSUE-150-venue-evidence.sql` eyeball spot-check (no `psql` here), `npm run build`, DEV deploy + browser smoke.** Branch `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), from merged `main` @ `00eea34` after ISSUE-149. `/venues/[slug]` rebuilt from a "most recent 50 matches" list into a historical record page — **no migration**, no schema / index / route-privilege / deploy change; one new server-rendered route `/venues/[slug]/matches`. Five venue-scoped (`matches.venue_id`) typed query functions in `src/db/queries/venues.ts`, run in parallel, each mirroring `ISSUE-150-venue-evidence.sql` (the semantic contract): `getVenueOverview` (total matches, recorded-attendance coverage, first + most recent linked match); `getVenueClubRecords` (W-D-L + win % `wins/games*100` — a draw is NOT half a win — for every historical club identity, grouped on the raw `clubs.id` from the match so Footscray ≠ Western Bulldogs; `games DESC, wins DESC, name, id`); `getVenueRecords` (highest / lowest **recorded** attendance — NULL never wins, a genuine recorded 0 is a valid minimum — highest single-team score, biggest winning margin; every ORDER BY ends on a unique column); `getVenuePlayerLeaders` (top 5 for games / goals / marks / kicks / handballs in one round trip — `games` counts `player_match_stats` rows; the stat boards `SUM` only `WHERE <stat> IS NOT NULL`, never COALESCE a NULL to 0, carry `recordedGames`, and the marks/kicks/handballs boards are headed "Recorded"; ranked `value DESC, player_id`); `getVenueMatches` (`match_date DESC, id DESC`, `count(*) OVER ()` + empty-page fallback — the 50-row ceiling removed). Components `src/components/Venue{Records,ClubRecords,PlayerLeaders,MatchHistory}.tsx` (server, omit when empty). `src/app/venues/[slug]/page.tsx` rewritten (keeps `revalidate=86400` + `generateStaticParams`; Overview → Venue records → Club records → Player leaders → 10-match preview → link to full log); new `src/app/venues/[slug]/matches/page.tsx` (`force-dynamic`, `?page=` 100/page, `<Pagination>`, `noindex` on filtered views) — the exact `/players/[slug]/matches` split. Not in `sitemap.ts`. Key files: `src/db/queries/venues.ts`, the four new components, both venue pages, `tests/venue-records-sections.test.ts` (new), `tests/integration/venue-records.test.ts` (new), `CHANGELOG.md`, `ISSUE-150-venue-evidence.sql`, `ISSUE-150-OPERATOR-VALIDATION.md`. | **Operator:** run `ISSUE-150-venue-evidence.sql` against `afldb_test` and eyeball the implementation output for MCG, a low-volume ground, first/latest match, W-D-L, win %, highest/lowest recorded attendance, highest score, biggest margin, each top-5 board (commands + captured smoke numbers in `ISSUE-150-OPERATOR-VALIDATION.md`); `npm run build` with a real `DATABASE_URL`. On green: commit on `sonnet/issue-150-venue-records`, merge, deploy to DEV, eyeball `/venues/melbourne-cricket-ground`, a low-volume ground and `/venues/melbourne-cricket-ground/matches` paging on desktop + narrow mobile, Resolve. |
+| `AFLDB-ISSUE-151` | High | Production promotion tooling / `tools/db/promotion-*` / Grid Solver corpus | **OPEN — IMPLEMENTATION COMPLETE, awaiting review, merge and the resumed promotion.** Branch `sonnet/issue-151-promotion-lineage-fk` (worktree `D:\dev\afldb-issue-151`), from `main` @ `88ca994`. Found by the first real production promotion (stamp `20260907-234124`, paused with the candidate restored and the source/pre-cutover/restored gates green): the generated `promotion-reinstate.sh` plainly `pg_restore`d `external_grid_sources` (id 1, `ingest_source_id = 57`; old `sources` 57 = gridley) into a candidate whose gridley row is `sources` 7 and whose id 57 does not exist, so the NOT NULL immediate FK `external_grid_sources_ingest_source_id_fkey` refuses before the correctly evidenced AFLDB-ISSUE-142 remap (57 -> gridley -> 7) could run; the inventory remediation, the restored-phase output, the transcript and the checklist contradicted each other on WHEN that remap runs. **Fix (tracked tooling only, no migration):** the contract STAGES any reinstated table with a NOT NULL football reference that has a stable lineage identity (`isStagedReinstatement`, decided by shape, today exactly `external_grid_sources`): `promotion-stage.sql` creates `promotion_staging.<t>` (`LIKE` copy — no identity/key/FK); the transcript restores the table through `pg_restore -f - | sed` (COPY header redirected to the staging copy, `grep`-guarded) and `psql --single-transaction`; the `--lineage-remap-out` file (now written on a shared lineage too, as an explicit no-op) targets the staging relation and runs at fixed step 2c; `promotion-promote-staged.sql` refuses any unsettled reference before its `INSERT … OVERRIDING SYSTEM VALUE SELECT * … ORDER BY id` (ids preserved, FK enforced on insert) and drops the schema without CASCADE; `external_grids` and `external_grid_axes` restore after (2e). `promotionPlanProblems` now refuses a plain restore of a staged table, a misordered stage/remap/promote/dependants lifecycle and every constraint bypass (`session_replication_role`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, `SET CONSTRAINTS`, `DEFERRABLE`, `NOT VALID`, `--disable-triggers`). Nullable §7.4 path and NOT NULL §7.4b `import_batch_id` decision untouched. **Hardening (2026-09-08 review):** (1) zero staged rows is never a legitimate state the promotion can distinguish from a skipped restore, so the invariant is asserted early — `--phase pre-cutover` gate `Staged tables hold rows in the replaced database` (`judgeStagedSourceRows`) refuses an empty/absent staged table before any plan exists, and the promote file keeps its empty-copy refusal; (2) an interrupted staged reinstatement fails closed — every checker phase runs `No leftover promotion_staging schema` (`judgeStagingLeftover`, FAIL with inspect-first instructions), `stagedPlanProblems` refuses `CREATE SCHEMA IF NOT EXISTS`, `DROP SCHEMA/TABLE IF EXISTS` and any `DROP SCHEMA` outside `promotion-promote-staged.sql`, and docs §7.2 'Interrupted staged reinstatement' requires inspection + a recorded finding before any hand drop or retry (§10 says the schema is never cleanup). **Validation:** `tests/db-promotion-check.test.ts` 96/96 (13 new), `tests/workflow-preflight.test.ts` 24/24, `tsc --noEmit` clean, `eslint` clean; generated artefacts for the real stamp inspected. NOT run: the DB rehearsal (`ISSUE-151-staged-reinstate-rehearsal.sh`) — the workstation has PostgreSQL client tools but no server. Key files: `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`, `tests/db-promotion-check.test.ts`, `docs/production-promotion.md` (§1, §6, §7, §7.2, §7.4b, §7.4c), `ISSUE-151-staged-reinstate-rehearsal.sh`, `CHANGELOG.md`. | **Operator:** run `bash ISSUE-151-staged-reinstate-rehearsal.sh <DEV maintenance DSN>` on streamanator (throwaway DBs, refuses afldb-prod); review; commit on the branch; `npm run merge:ready -- --issue 151`; merge; deploy the checkout to the prod host. Then, on afldb-prod, in the SAME plan directory: move the paused `promotion-*.sql`/`.sh` and the old `--lineage-remap-out` file aside (the generator refuses to overwrite), regenerate with `--plan` for stamp `20260907-234124`, re-run `--phase restored … --lineage-remap-out <new file>` (the remap now targets `promotion_staging`), read all eight files + the remap, and only then resume at step 1 of the new transcript. Resolve after `--phase candidate` passes with `external_grid_sources` = 1 row on `ingest_source_id` 7. |
 | `AFLDB-ISSUE-148` | Low | Public UI / club pages / database queries | **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; Premierships section added the same day (same issue, operator request), implemented + `tsc`-checked, its integration suite written but NOT yet operator-run. Awaiting operator commit / merge / DEV deployment / browser smoke.** Branch `fable/issue-148-coach-club-records` (worktree `D:\dev\afldb-issue-148-coach-club-records`). Public club pages showed players and season history but never the club's coaches or a premiership list. **(1) Coaching:** `getClubCoachRecords(clubId)` in `src/db/queries/coaches.ts` (lineage-scoped by `organization_id`, exactly like `getClubTotals` / `getClubLeaders`; W/D/L from `matches.winner_club_id`; draw-weighted win % `(W + D/2)/G` matching `/records/coaches`; one row per coach, separate tenures combined), `src/components/ClubCoachRecords.tsx` (Coach · **Span** · Games · W · D · L · Win % — "Span" because the value is `formatSpan(firstSeason, lastSeason)`, a first/last range; coach names link to player / `/coaches/[slug]-id`), pushed after Captains, omitted when empty. **(2) Premierships:** `getClubPremierships(clubId)` in `src/db/queries/clubs.ts` — one row per **won Grand Final** (`m.round_type = 'grand_final'`, the canonical predicate `getCoachCareer` / Grid Solver use — never every final, never a Wildcard Final; a drawn GF has a null winner so the replay is taken), opponent resolved home-or-away as the non-winner, score from the winner's perspective, venue via `COALESCE(v.canonical_name, m.venue_raw)` + `v.slug`, crowd = `m.attendance` (null, never zero-filled), lineage-scoped so Footscray/Western Bulldogs share 1954+2016; `src/components/ClubPremierships.tsx` (Year · Opponent · Score · Venue · Date · Crowd; opponent → `clubPath`, venue → `venuePath`; `formatDate` / `formatAttendance`), pushed **first**, omitted when empty. **No migration**, no schema/route/privilege change. Tests: `tests/integration/club-coach-records.test.ts`, `tests/club-coach-records.test.ts`, `tests/integration/club-premierships.test.ts` (new), `tests/club-premierships.test.ts` (new). `CHANGELOG.md` — one `Unreleased` entry (both sections). **Validation:** coaching — operator-run against `afldb_test` via SSH tunnel: `tests/club-coach-records.test.ts` 8/8 PASS, `tests/integration/club-coach-records.test.ts` 9/9 PASS, `npx tsc --noEmit` PASS, `npm run build` PASS. Premierships — `npx tsc --noEmit` self-checked; its integration suite NOT yet operator-run. No migration. | **Operator:** run `npx vitest run tests/club-premierships.test.ts` and, with `AFLDB_TEST_DATABASE_URL` = `afldb_test`, `npx vitest run tests/integration/club-premierships.test.ts`; `npx tsc --noEmit`. On green, commit on `fable/issue-148-coach-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond` + one historical club (both sections) and Resolve. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
@@ -19611,3 +19630,148 @@ against `afldb_test` before considering any index — do not add one speculative
 - A "sort by any column" affordance on the club-records and player-leaders tables (currently
   fixed deterministic order) could be added with `SortableTable`, as the club page does — not
   done here to keep client state minimal.
+
+---
+
+## AFLDB-ISSUE-151 — Fix production promotion lineage/FK sequencing for `external_grid_sources`
+
+- **Status:** **OPEN — IMPLEMENTATION COMPLETE, awaiting review, merge and the resumed
+  production promotion.** Branch `sonnet/issue-151-promotion-lineage-fk`, worktree
+  `D:\dev\afldb-issue-151`, from `main` @ `88ca994`. No migration. Stays Open until the
+  regenerated plan has carried the paused promotion of stamp `20260907-234124` through
+  `--phase candidate`.
+- **Severity / Area:** High / Production promotion tooling (`tools/db/promotion-inventory.ts`,
+  `tools/db/promotion-check.ts`), Grid Solver corpus (migration 080).
+- **Reported:** 2026-09-08, from the first real production promotion under
+  `docs/production-promotion.md` (AFLDB-ISSUE-125 tooling). Target revision `88ca994`, stamp
+  `20260907-234124`, candidate `afldb_prod_candidate_20260907-234124` restored from the rebuilt
+  `afldb_test` dump; source, pre-cutover and restored gates green; promotion **paused** before
+  truncation/reinstatement. The candidate and its artefacts on the prod host are paused evidence
+  and were not touched by this issue.
+
+### Evidence
+
+The restored-phase checker proved a lineage change for `sources` and resolved it correctly:
+
+| | `external_grid_sources` | `sources` |
+|---|---|---|
+| old production | id 1, `ingest_source_id = 57` | id 57 = `gridley` |
+| candidate | (truncated by the plan, then reinstated) | id 7 = `gridley`; **id 57 does not exist** |
+
+The evidenced remap (`--lineage-remap-out`) was `UPDATE public.external_grid_sources SET
+ingest_source_id = 7 WHERE id = 1 AND ingest_source_id = 57;`. But the candidate FK
+`external_grid_sources_ingest_source_id_fkey` is immediate and the column is NOT NULL, and the
+generated `promotion-reinstate.sh` did, in this order: (1) truncate the corpus tables, (2)
+`pg_restore --data-only --table=external_grid_sources` — which presents `ingest_source_id = 57`
+to the FK and must fail — and only (3) after the reinstate, the remap. The operator guidance
+also contradicted itself: the inventory remediation said "resolve BEFORE the reinstate", the
+checker output said "apply it after reinstate, before acceptance", the checklist said "settled
+BEFORE its restore lines", and the transcript did none of it.
+
+### Root cause
+
+A generator defect, not a data defect. The contract knew both facts — the reference is NOT NULL
+(`footballRefs.nullable: false`) and remappable through `sources.key`
+(`lineageRefs … identity: 'source_key'`) — but nothing combined them: `reinstatePlan` emitted the
+same plain per-table `pg_restore` line for every reinstated table, and the remap file was
+designed (AFLDB-ISSUE-142) for columns that are either nullable or not FK-enforced, where an
+UPDATE after the restore is sound. For a NOT NULL immediate FK the old integer meets the
+constraint inside the restore transaction, before any UPDATE can run.
+
+### Fix
+
+General to the class, decided by shape and never by table name:
+
+- **Contract** (`promotion-inventory.ts`): `stagedLineageColumns()` / `isStagedReinstatement()` —
+  a reinstated public table is *staged* when it carries a NOT NULL football reference that has a
+  stable lineage identity. `reinstateGroups()` splits the reinstatement into `direct`, `staged`
+  and `dependants` (tables whose `restoreAfter` chain reaches a staged table);
+  `plannedReinstateOrder()` is validated against the same FK dependencies as the contract order.
+  `stagedReinstatementProblems()` refuses a staged polymorphic column or one with no identity.
+  Today exactly `external_grid_sources` is staged; `data_submissions.import_batch_id` (nullable,
+  §7.4 path) and `external_grids.import_batch_id` (NOT NULL, no identity, §7.4b operator decision)
+  are unchanged.
+- **Generated files:** `promotion-stage.sql` (`CREATE SCHEMA promotion_staging; CREATE TABLE
+  promotion_staging.<t> (LIKE public.<t>)` — columns only, no identity/key/FK) and
+  `promotion-promote-staged.sql` (per staged table: refuse an empty copy or any row whose
+  reference still points at an id absent from the candidate, then `INSERT INTO public.<t>
+  OVERRIDING SYSTEM VALUE SELECT * FROM promotion_staging.<t> ORDER BY id`, `DROP TABLE`; finally
+  `DROP SCHEMA` without CASCADE; one transaction).
+- **Transcript** (`promotion-reinstate.sh`): step 2 restores the direct tables; **2b** runs
+  `promotion-stage.sql`, then per staged table `pg_restore --data-only --table=<t> -f - | sed
+  's/^COPY public\.<t> (/COPY promotion_staging.<t> (/' > promotion-stage-<t>.sql`, a `grep -q`
+  guard that the redirect applied, and `psql --single-transaction -f` of that file; **2c** runs
+  `psql -f "$LINEAGE_REMAP_SQL"` once; **2d** runs `promotion-promote-staged.sql`; **2e** restores
+  the dependants (`external_grids`, `external_grid_axes`); then `staging_aflw` as before.
+- **Remap file** (`lineageRemapSql`): a staged column's UPDATE and verification query target
+  `promotion_staging.<t>`; `lineageRemapProblems` refuses a public write for a staged column. The
+  header states the fixed step. `--phase restored` now writes the file on a shared lineage too, as
+  an explicit no-op with no UPDATE, so step 2c always has its file (`writeRemap`, still the one
+  write site).
+- **Validator** (`stagedPlanProblems`, folded into `promotionPlanProblems`): refuses a plain
+  `--exit-on-error --table=<staged>` line, a lifecycle not ordered direct → stage → remap →
+  promote → dependants (→ schemas), a missing redirect/guard/load, a promotion without
+  `OVERRIDING SYSTEM VALUE`, CASCADE, and any constraint bypass (`session_replication_role`,
+  `DISABLE TRIGGER`, `DROP CONSTRAINT`, `SET CONSTRAINTS`, `DEFERRABLE`, `NOT VALID`,
+  `--disable-triggers`, `--superuser`) in the transcript, stage or promotion files.
+- **Operator guidance reconciled:** inventory remediations (both), the dangling-reference and
+  lineage gate output in `promotion-check.ts`, the acceptance checklist, and
+  `docs/production-promotion.md` §1 (contract row), §6 (`--lineage-remap-out` no longer optional;
+  the probe list), §7 (eight files; validator scope), §7.2 (the staged lifecycle, 2–2e), §7.4b and
+  §7.4c (when the remap runs, and where a staged UPDATE lands).
+
+Why it is FK-safe: the FK never sees the old integer. Rows wait in a relation with no
+constraint, are updated there by the evidenced per-row UPDATE (guarded by row id and old value),
+and the only INSERT into `public` carries the candidate's id and is checked by the FK on
+insertion. Nothing is deferred, disabled, dropped or validated later; no `sources` row is
+inserted; the dumped `external_grid_sources.id` is preserved (so `external_grids.source_id`
+lands on the same id); the identity sequence is re-synced by the existing step 3.
+
+Rejected: drop-FK / restore / UPDATE / re-add (the §7.4 nullable shape — works, but manipulates
+the constraint on the candidate and needs the constraint definition the DB-free generator cannot
+read); `DEFERRABLE` + one psql transaction (an ALTER of the live FK, hard to revert atomically);
+a BEFORE INSERT remap trigger (invisible mutation inside the restore); resolving by key at run
+time from a staged copy of old `sources` (duplicates the checker's evidence with a second
+mechanism).
+
+### Validation
+
+- `tests/db-promotion-check.test.ts`: **94/94** (83 before; 11 new under "staged reinstatement of
+  NOT NULL lineage-bound references"; six existing plan-shape expectations updated). New coverage:
+  staging decided by shape on synthetic tables (NOT NULL + stable → staged; nullable → not;
+  no identity → not; reset → not; polymorphic → contract refusal); the exact 57 → gridley → 7
+  case with `external_grid_sources.id = 1` preserved and the UPDATE in `promotion_staging`; no
+  name matching; unresolved identity still `FAIL`s `judgeLineage` in both environments and the
+  promotion refuses before its INSERT; remap-file public-write refusal; full transcript ordering
+  in both environments; stage/promote SQL invariants; the validator refusing the pre-fix plain
+  restore, a swapped remap/promote, an early dependant, a dropped remap step, every bypass, a
+  missing `OVERRIDING SYSTEM VALUE`, a missing redirect and CASCADE; every operator surface
+  agreeing (contract text, checker source, checklist, doc).
+- `tests/workflow-preflight.test.ts` 24/24 (imports the contract).
+- `npx tsc --noEmit` clean; `npx eslint` on the three files clean.
+- Generated artefacts for the real stamp inspected end to end (transcript, stage, promote).
+- **NOT run:** the database rehearsal. The workstation has PostgreSQL 16 client tools only
+  (`initdb` refuses: no server `share/`), so `ISSUE-151-staged-reinstate-rehearsal.sh` — which
+  reproduces the exact case on two throwaway `*_test` databases, shows the pre-fix plain restore
+  refusing on the FK, the promotion refusing when run before the remap, and the full 2b–2e
+  sequence succeeding with the FK validated and no staging schema left — is handed to the
+  operator to run on streamanator (it refuses the production host).
+
+### Operator action to resume the paused production promotion
+
+After review, merge to `main`, and deploy of the checkout to the prod host:
+
+1. On afldb-prod, in `~/backups/afldb/promotion-20260907-234124/`, move the paused generated
+   files aside (`promotion-*.sql`, `promotion-reinstate.sh`) and the old `--lineage-remap-out`
+   file — the generator and the checker refuse to overwrite.
+2. Regenerate: `npm run db:promotion:check -- --plan --database afldb_prod_candidate_20260907-234124
+   --old-database afldb_prod --pre-cutover-dump <pre-cutover dump> --rebuilt-dump <rebuilt dump>
+   --plan-dir ~/backups/afldb/promotion-20260907-234124` (eight files).
+3. Re-run `npm run db:promotion:check -- --phase restored --database afldb_prod_candidate_20260907-234124
+   --old-database afldb_prod --lineage-remap-out ~/backups/afldb/promotion-lineage-20260907-234124.sql`
+   — required: the remap now targets `promotion_staging.external_grid_sources`. Read it: one
+   UPDATE, `57 -> gridley -> 7`, `WHERE "id" = 1 AND "ingest_source_id" = 57`.
+4. Read all eight files, export `LINEAGE_REMAP_SQL`, and resume at step 1 of the new transcript.
+   `external_grids.import_batch_id` (§7.4b) is still the operator's separate decision before 2e.
+5. Resolve after `--phase candidate` passes with `external_grid_sources` at 1 row on
+   `ingest_source_id` 7 and `promotion_staging` absent.
