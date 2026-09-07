@@ -340,6 +340,77 @@ export async function getClubGoalkickers(clubId: number, limit = 15) {
   return clubLeaders(clubId, 'goals', limit);
 }
 
+export type ClubPremiershipRow = {
+  matchId: number;
+  year: number;
+  matchDate: Date | null;
+  /** matches.attendance — null where the crowd was never recorded, never zero-filled. */
+  crowd: number | null;
+  /** The premiership club's Grand Final score. */
+  clubScore: number;
+  /** The beaten club's Grand Final score. */
+  opponentScore: number;
+  opponentId: number;
+  opponentName: string;
+  opponentSlug: string;
+  venueId: number | null;
+  /** Canonical venue name, or the raw match venue string when unlinked. */
+  venueName: string;
+  /** Non-null only when the venue resolves to a canonical /venues/[slug] page. */
+  venueSlug: string | null;
+};
+
+/**
+ * Every VFL/AFL premiership this club has won — one row per won Grand
+ * Final, newest first (AFLDB-ISSUE-148).
+ *
+ * A premiership is a Grand Final that the club won:
+ * `matches.round_type = 'grand_final'` (the canonical predicate
+ * {@link getCoachCareer} and the Grid Solver's `grand_final_*` builders
+ * use — NOT every final, and never a Wildcard Final, which is
+ * `round_type = 'wildcard_final'`) with `winner_club_id` in the club's
+ * lineage. A drawn Grand Final has a null `winner_club_id`, so it is
+ * excluded here and the following week's replay — which has a winner — is
+ * the premiership row.
+ *
+ * Lineage-scoped by `organization_id` via {@link LINEAGE_IDS}, exactly
+ * like {@link getClubTotals} and {@link getClubLeaders}: /clubs/footscray
+ * and /clubs/western-bulldogs are one club, so both list 1954 and 2016.
+ * The rows are derived from canonical `matches` — there is no hand-kept
+ * list of premiership years — and the count matches the `is_premier`
+ * figure in the page's headline totals.
+ *
+ * Opponent, score, venue and crowd are read straight off the Grand Final
+ * match: the opponent is whichever club was not the winner (home or
+ * away), and the score is shown from the winner's perspective. A club
+ * with no premierships returns `[]`.
+ */
+export async function getClubPremierships(clubId: number): Promise<ClubPremiershipRow[]> {
+  return sql<ClubPremiershipRow[]>`
+    SELECT m.id      AS "matchId",
+           m.season  AS year,
+           m.match_date AS "matchDate",
+           m.attendance AS crowd,
+           CASE WHEN m.home_club_id = m.winner_club_id THEN m.home_score ELSE m.away_score END AS "clubScore",
+           CASE WHEN m.home_club_id = m.winner_club_id THEN m.away_score ELSE m.home_score END AS "opponentScore",
+           opp.id   AS "opponentId",
+           opp.name AS "opponentName",
+           opp.slug AS "opponentSlug",
+           m.venue_id AS "venueId",
+           COALESCE(v.canonical_name, m.venue_raw) AS "venueName",
+           v.slug   AS "venueSlug"
+      FROM matches m
+      JOIN clubs opp ON opp.id = CASE
+             WHEN m.home_club_id = m.winner_club_id THEN m.away_club_id
+             ELSE m.home_club_id
+           END
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE m.round_type = 'grand_final'
+       AND m.winner_club_id IN (${LINEAGE_IDS(clubId)})
+     ORDER BY m.season DESC, m.match_date DESC
+  `;
+}
+
 /**
  * Deduplicated per request.
  *
