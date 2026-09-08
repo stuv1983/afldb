@@ -35,6 +35,7 @@ import {
   type NlClubSeasonCondition,
   type NlCompareOp,
   type NlDeclineReason,
+  type NlHavingMetric,
   type NlMatchScope,
   type NlMatchType,
   type NlMetricCondition,
@@ -958,17 +959,32 @@ function extractResultFilter(text: string): { text: string; resultFilter?: NlQue
   return { text: stripMatch(text, match[0]), resultFilter: 'won', consumed: [match[0]] };
 }
 
-function extractHavingClause(text: string): {
+/**
+ * A grouped team-result threshold ("teams with more than 2 wins against
+ * Richmond") counts, per club organization, the matches in scope that
+ * satisfy a per-match result predicate, then thresholds that count.
+ *
+ * `games` is the un-predicated member of the same family -- every match
+ * in scope counts -- and it is admitted ONLY when the question named a
+ * club subject. That word alone is genuinely ambiguous: "players with
+ * more than 200 games" is a career column over the SAME vocabulary, and
+ * reading it as a grouped club count would answer a different question.
+ * The result words carry no such ambiguity, so they need no subject.
+ */
+function extractHavingClause(text: string, clubSubject: boolean): {
   text: string;
-  havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
+  havingClause?: { metric: NlHavingMetric; op: NlCompareOp; value: number };
   consumed: string[];
 } {
-  const words: [RegExp, 'wins' | 'losses' | 'draws'][] = [
+  const words: [RegExp, NlHavingMetric][] = [
     [/\bdraws?\b/, 'draws'],
     [/\bwins?\b/, 'wins'],
     [/\blosses?\b/, 'losses'],
     [/\b(?:lose|lost)\b/, 'losses'],
-    [/\b(?:win|won)\b/, 'wins']
+    [/\b(?:win|won)\b/, 'wins'],
+    // Last, so a result word still governs when both are present:
+    // "teams with more than 2 wins in games against Carlton" counts wins.
+    ...(clubSubject ? [[/\bgames?\b/, 'games'] as [RegExp, NlHavingMetric]] : []),
   ];
   let working = text;
   for (const [re, metric] of words) {
@@ -1025,7 +1041,7 @@ function extractHavingClause(text: string): {
 
 function extractMatchFilter(
   text: string,
-  resultMetric: 'wins' | 'losses' | 'draws' | undefined,
+  resultMetric: NlHavingMetric | undefined,
 ): {
   text: string;
   matchFilter?: { metric: 'win_margin' | 'loss_margin'; op: NlCompareOp; value: number };
@@ -1400,6 +1416,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (boundary) consumedTokens.push(...boundaryResult.consumed);
 
   // 8. Aggregation.
+  // Probed BEFORE extractAggregation, which consumes the "<subject>
+  // with" cue outright -- by the time CLUB_SUBJECT_LEADING is tested at
+  // step 10.5 the leading "teams"/"clubs"/"sides" word is already gone.
+  // Only extractHavingClause reads this, to disambiguate "games".
+  const clubSubjectCue = CLUB_SUBJECT_LEADING.test(text.trim());
+
   const aggResult = extractAggregation(text);
   text = aggResult.text;
   consumedTokens.push(...aggResult.consumed);
@@ -1408,7 +1430,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = streakResult.text;
   consumedTokens.push(...streakResult.consumed);
 
-  const havingResult = extractHavingClause(text);
+  const havingResult = extractHavingClause(text, clubSubjectCue);
   text = havingResult.text;
   consumedTokens.push(...havingResult.consumed);
 

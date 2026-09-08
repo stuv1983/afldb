@@ -808,6 +808,74 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     });
   });
 
+  describe('AFLDB-ISSUE-110 D: grouped "games" thresholds', () => {
+    // The whole user_grouped_thresholds "N games against <club>" family
+    // was unanswerable while its wins/losses siblings answered: "games"
+    // was not a grouped result metric, so the question fell through to a
+    // player_career games column still carrying opponent scope, and the
+    // career backstop refused it. games is the un-predicated member of
+    // the same organization-level family.
+    it.each([
+      ['more than', 'gt'],
+      ['at least', 'gte'],
+      ['at most', 'lte'],
+    ] as const)('maps grouped "%s 2 games against Richmond"', async (words, op) => {
+      const p = await plan(`teams with ${words} 2 games against Richmond`);
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBeNull();
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(p.havingClause).toEqual({ metric: 'games', op, value: 2 });
+      expect(p.careerConditions).toEqual([]);
+      expect(p.scope.clubAgainst?.slug).toBe('richmond');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it.each([
+      ['wins', 'gt', 'more than'],
+      ['wins', 'gte', 'at least'],
+      ['wins', 'lte', 'at most'],
+      ['losses', 'gt', 'more than'],
+      ['losses', 'gte', 'at least'],
+      ['losses', 'lte', 'at most'],
+    ] as const)('leaves grouped %s (%s) untouched', async (metric, op, words) => {
+      const p = await plan(`teams with ${words} 2 ${metric} against Richmond`);
+      expect(p.grain).toBe('team_match');
+      expect(p.havingClause).toEqual({ metric, op, value: 2 });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a club subject is what admits the word: a player subject keeps the career column', async () => {
+      // "games" names a career column over the SAME vocabulary. Without
+      // the subject gate this question would silently become a grouped
+      // club count -- a different question with a different answer.
+      const p = await plan('players with more than 200 games');
+      expect(p.grain).toBe('player_career');
+      expect(p.havingClause).toBeUndefined();
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'games', op: 'gt', value: 200 },
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a result word still governs when both are present', async () => {
+      const p = await plan('teams with more than 2 wins in games against Carlton');
+      expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 2 });
+    });
+
+    it('a margin filter cannot attach to a games count', () => {
+      // win_margin/loss_margin must count the result they filter; games
+      // counts every match, so the combination fails closed.
+      const raw = {
+        v: 1 as const, grain: 'team_match' as const, metric: null, agg: { kind: 'list' as const },
+        scope: {}, careerConditions: [], careerPredicates: [], clubSeasonConditions: [],
+        havingClause: { metric: 'games' as const, op: 'gt' as const, value: 2 },
+        matchFilter: { metric: 'win_margin' as const, op: 'gt' as const, value: 50 },
+        tiePolicy: 'all' as const, limit: 100,
+      };
+      expect(validatePlan(raw)).toHaveProperty('error');
+    });
+  });
+
   describe('AFLDB-ISSUE-110 C: two-club wins/losses-against head-to-head', () => {
     it.each([
       'Richmond wins against Carlton',

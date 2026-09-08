@@ -301,8 +301,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    plan description. Each now refuses. The career compiler emits its
  *    generic club filter on the same ownership rule, so a club can no
  *    longer reach SQL as nothing at all.
+ * 34: 'games' joins wins/losses/draws as a grouped team-result metric
+ *    (AFLDB-ISSUE-110). "teams with more than 2 games against Richmond"
+ *    parsed as a player_career games column carrying opponent scope,
+ *    which the career backstop then refused -- the whole family was
+ *    unanswerable while its wins/losses siblings answered. The word is
+ *    admitted as a grouped metric only behind an explicit club subject,
+ *    so "players with more than 200 games" keeps its career reading.
  */
-export const PARSER_VERSION = 33;
+export const PARSER_VERSION = 34;
 
 // ------------------------------------------------------------------ grain
 
@@ -798,6 +805,15 @@ export type NlAggregation =
 
 // -------------------------------------------------------------------- plan
 
+/**
+ * The metrics a grouped team-result threshold can count per club
+ * organization. 'games' is the un-predicated member: every match in
+ * scope counts.
+ */
+export type NlHavingMetric = 'wins' | 'losses' | 'draws' | 'games';
+
+export const NL_HAVING_METRICS: readonly NlHavingMetric[] = ['wins', 'losses', 'draws', 'games'];
+
 export type NlQueryPlan = {
   v: 1;
   grain: NlGrain;
@@ -834,8 +850,12 @@ export type NlQueryPlan = {
   resultFilter?: 'won';
   /** player_game only: restrict player_match_stats to career_game_no = 1. */
   debutGame?: boolean;
-  /** team_match grouped-list only: count qualifying results per organization. */
-  havingClause?: { metric: 'wins' | 'losses' | 'draws'; op: NlCompareOp; value: number };
+  /**
+   * team_match grouped-list only: count qualifying results per organization.
+   * 'games' counts every match in scope (no result predicate); the result
+   * metrics count only the matches the club won, lost or drew.
+   */
+  havingClause?: { metric: NlHavingMetric; op: NlCompareOp; value: number };
   /** team_match grouped-list only: filter each result before it is counted. */
   matchFilter?: { metric: 'win_margin' | 'loss_margin'; op: NlCompareOp; value: number };
   boundary?: NlBoundary;
@@ -1072,7 +1092,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     if (raw.metric !== null || raw.agg.kind !== 'list') {
       return { error: 'A grouped team-result question must be an unranked club list.' };
     }
-    if (!['wins', 'losses', 'draws'].includes(raw.havingClause.metric)) {
+    if (!NL_HAVING_METRICS.includes(raw.havingClause.metric)) {
       return { error: `Unknown grouped result metric "${raw.havingClause.metric}".` };
     }
     if (!compareOps.includes(raw.havingClause.op)) return { error: 'Unknown grouped result comparison.' };

@@ -2204,10 +2204,147 @@ session. `tests/e2e` needs a running server.
 No migration, schema, privilege, route, unit-file or deployment change. Nothing was committed,
 pushed, merged or deployed.
 
-### Exact next action
+### Exact next action (superseded by the 2026-09-08 UI acceptance pass below)
 
 **Operator gate:** run the realistic UI corpus (1,440) and the decline corpus (60) against DEV
 with a run tag (`npm run nl:ui`, then inspect `nl_search_log` by that tag), confirm no new
 refusal or regression against the recorded expectations, and ISSUE-110 resolves. Every other
 recorded gate is green. The 22,607-search stress run remains incomplete and is not a resolution
 gate.
+
+---
+
+## 2026-09-08 UI acceptance pass 1, and the one family it failed (parser v34)
+
+### What the run measured
+
+Rendered, realistic UI acceptance against DEV at `c8b1ac7`:
+
+```text
+1435 / 1435 observed
+1409 pass
+  26 fail
+   0 unscored / absent / HTTP errors / page errors
+   0 client-side errors / hydration errors / metamorphic disagreements
+```
+
+All 26 failures are one family, `user_grouped_thresholds`, and one question shape:
+`teams with {more than | at least | at most} 2 games against <club>` across Richmond,
+Carlton, Collingwood, Essendon, Geelong, Hawthorn, Melbourne, North Melbourne and St Kilda.
+The corpus expects `plan`; DEV rendered `unanswerable`. The corresponding wins/losses
+grouped-threshold variants passed. The corpus rows carry the `having` tag, so the corpus
+already recorded the intended contract; no expectation was changed.
+
+### First wrong layer: the parser
+
+Reproduced through parser -> `validatePlan`:
+
+```text
+teams with more than 2 games against Richmond
+  grain          player_career          (expected team_match)
+  havingClause   undefined              (expected { metric: 'games', op: 'gt', value: 2 })
+  careerConditions [{ kind: 'column', column: 'games', op: 'gt', value: 2 }]
+  scope.clubAgainst richmond
+  validatePlan   error: A career question cannot be scoped to a venue, opponent,
+                 match type, or round.
+```
+
+`extractHavingClause` recognised only `wins`/`losses`/`draws`, so `games` was never a grouped
+team-result metric. The question therefore routed to `player_career` (grain election reaches
+`havingClause || teamMetric` first and fell through), `extractCareerConditions` claimed
+`more than 2 games` as a career column, and the plan reached validation carrying opponent
+scope that the career compiler cannot consume. **The refusal was correct for the plan it was
+given** — the career backstop added in v30 did exactly its job. The defect is one layer
+earlier: the plan itself was the wrong shape. `validatePlan`, `execute` and `answer` were
+never reached with a well-formed plan, so no later layer is implicated.
+
+### The fix
+
+`games` is admitted as the **un-predicated member of the existing grouped team-result
+family** — the same organization-level group-and-threshold contract as wins/losses/draws,
+with no per-match result predicate, because every match already inside the scope counts.
+
+1. `src/search/nl/plan.ts` — `NlHavingMetric` (`'wins' | 'losses' | 'draws' | 'games'`) and
+   `NL_HAVING_METRICS` are declared once and drive both the `NlQueryPlan.havingClause` type
+   and `validatePlan`'s membership test, which was a hand-written literal array. Every other
+   grouped-threshold rule is untouched: still team_match only, still an unranked club list,
+   still integer thresholds, still no period split and no score checkpoint.
+2. `src/search/nl/parser.ts` — `extractHavingClause` takes a `clubSubject` flag and appends
+   `/\bgames?\b/` **last**, so a result word still governs when both are present
+   (`teams with more than 2 wins in games against Carlton` still counts wins). The flag is
+   `CLUB_SUBJECT_LEADING` probed **before** `extractAggregation`, which consumes the
+   `<subject> with` cue outright — by the time the existing `clubSubjectPresent` is computed
+   at step 10.5 the leading `teams`/`clubs`/`sides` word is already gone, which is why that
+   variable could not be reused. `extractMatchFilter`'s parameter type widens to
+   `NlHavingMetric`; its guard already requires wins/losses, so a games count still cannot
+   carry a margin filter.
+3. `src/db/queries/nl/team-match.ts` — in `answerTeamAggregate` and
+   `answerTeamAggregateDrilldown`, the result-clause chain ended in a bare `else` for draws.
+   It is now exhaustive (`wins` / `losses` / `draws`), and `games` adds no clause at all.
+   Left as it was, the new metric would have silently counted drawn matches.
+
+The gate is the subject word because `games` is genuinely ambiguous over the same
+vocabulary: `players with more than 200 games` is a career column, and reading it as a
+grouped club count would confidently answer a different question. `wins`/`losses`/`draws`
+carry no such ambiguity, so they keep working with no subject at all.
+
+Nothing query-specific was added: no club list, no literal question text, no `clubAgainst`
+requirement. Organization-lineage opponent semantics (`GROUP BY cl.organization_id` over the
+`SIDES` CTE), the grouping and the parameterised SQL are unchanged. `PARSER_VERSION` 33 -> 34.
+
+### Tests added (existing suites extended; no new file)
+
+- `tests/nl-semantic-mapping.test.ts` — `AFLDB-ISSUE-110 D`: gt/gte/lte for
+  `teams with … 2 games against Richmond` (grain, metric, agg, `havingClause`, empty
+  `careerConditions`, opponent scope, `validatePlan` clean); all six wins/losses
+  operator/metric combinations still green; `players with more than 200 games` still a career
+  column; a result word still governs when both words are present; a margin filter beside a
+  games count still refuses.
+- `tests/integration/nl-answers-team-club.test.ts` — DB-backed: gt/gte/lte grouped games
+  counts checked against independently hand-written SQL over the same lineage grouping, and a
+  guard proving a games count is not read as a draws count.
+
+The three new DB-free operator cases were **proved failing at `c8b1ac7` before the fix**
+(`expected 'player_career' to be 'team_match'`), then green after it.
+
+### Validation (2026-09-08 pass 2, operator-authorised)
+
+- `npx tsc --noEmit` — PASS.
+- Focused NL suites (`nl-plan`, `nl-parser`, `nl-describe`, `nl-semantic-mapping`,
+  `query-intent`, `nl-audit-acceptance`, `qualifying-matches-gate`) — 446/446.
+- DB-free repo suite — 3,430 passed / 3 failed / 14 skipped. All three failures were re-run
+  at `c8b1ac7` with the fix reverted and fail identically:
+  `finals-semantics-contract.test.ts` (the known Windows CRLF contract-test artefact),
+  `fitzroy-core-import.test.ts`, and `reference-data.test.ts`'s post-045 unregistered-table
+  list, which the ISSUE-151 merge's `external_grid_axes` / `external_grid_sources` /
+  `external_grids` tables broke. None is this issue's.
+- `eslint` on the five changed files — no new problem (the four `no-explicit-any` errors in
+  `plan.ts` are pre-existing, at lines untouched by this pass).
+- **NOT run: the DB-backed integration suite.** `AFLDB_TEST_DATABASE_URL` points at
+  `127.0.0.1:5432`, nothing is listening on this workstation, and BatchMode ssh to the
+  `afldb_test` host is refused, so the tunnel is an operator step. The new integration cases
+  are committed but unexecuted.
+- **NOT re-run: the 1,435-question realistic UI corpus**, by instruction.
+
+### Files changed in this pass
+
+- `src/search/nl/parser.ts` — subject probe, `games` in `extractHavingClause`,
+  `extractMatchFilter` parameter type.
+- `src/search/nl/plan.ts` — `NlHavingMetric` / `NL_HAVING_METRICS`, `havingClause` type,
+  validation membership test, `PARSER_VERSION` 34 with its history entry.
+- `src/db/queries/nl/team-match.ts` — exhaustive result-clause chain at both grouped sites.
+- `tests/nl-semantic-mapping.test.ts`, `tests/integration/nl-answers-team-club.test.ts` —
+  regressions above.
+- `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this runbook — tracking.
+
+No migration, schema, privilege, route, unit-file or deployment change.
+
+### Exact next action
+
+1. Open a tunnel to the `afldb_test` host and run
+   `npx vitest run tests/integration/nl-answers-team-club.test.ts`.
+2. Redeploy DEV at this commit and re-run **only the 26 previously failing questions**.
+3. Then re-run the realistic UI (1,440) and decline (60) corpora against DEV with a run tag,
+   confirm no new refusal or regression, and ISSUE-110 resolves.
+
+**ISSUE-110 stays OPEN.** The 60-question decline gate remains pending.

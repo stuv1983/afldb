@@ -15,6 +15,27 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - "teams with N games against <club>" is answerable (AFLDB-ISSUE-110) - 8 September 2026
+
+- `games` joins `wins`, `losses` and `draws` as a grouped team-result metric. A rendered UI
+  acceptance run over the 1,440-question realistic corpus left exactly one failing family:
+  every `teams with {more than|at least|at most} 2 games against <club>` question came back
+  unanswerable while its wins/losses siblings answered. The word was not a grouped metric, so
+  the question fell through to a `player_career` games column that still carried the opponent
+  scope, and the career backstop correctly refused it - the refusal was honest, the routing
+  was not.
+- `games` is the un-predicated member of the same organization-level family: every match
+  already inside the scope counts, where the result metrics count only the matches the club
+  won, lost or drew. The grouping, the organization-lineage opponent semantics and the
+  parameterised SQL are unchanged; the result-clause chain in `src/db/queries/nl/team-match.ts`
+  is now exhaustive rather than ending in a bare `else` for draws, which would otherwise have
+  counted drawn matches for the new metric.
+- The word is admitted only behind an explicit club subject (`teams`/`clubs`/`sides`), probed
+  before `extractAggregation` consumes the `<subject> with` cue. `games` names a career column
+  over the same vocabulary, so `players with more than 200 games` keeps its career reading; a
+  result word still governs when both are present. A margin filter still cannot attach to a
+  games count. Parser version 33 -> 34.
+
 ### Natural-language search - a career question may only keep the scope something consumes (AFLDB-ISSUE-110) - 8 September 2026
 
 - A career-grain plan carrying a season range or a club now has to prove that something
