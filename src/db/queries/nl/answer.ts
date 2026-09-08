@@ -127,11 +127,16 @@ export async function answerNlQuestion(
 
     const validated = validatePlan(parsed.plan);
     if ('error' in validated) {
-      // The parser's own plan failed defence-in-depth validation --
-      // in practice always an era-coverage rejection ("tackles weren't
-      // recorded before 1987"), the only rejection validatePlan can
-      // reach from a plan the parser itself produced -- which is a
-      // genuine, useful answer in its own right, not a bug to hide.
+      // The parser's own plan failed defence-in-depth validation -- an
+      // era-coverage rejection ("tackles weren't recorded before 1987"),
+      // or a career plan carrying a season range or a club that no
+      // predicate owns and no compiler emits (AFLDB-ISSUE-110 findings A
+      // and B: "players with at least 3 grand finals since 2000",
+      // "Carlton players who debuted since 2000"). Each is a genuine,
+      // useful refusal in its own right, not a bug to hide. All of them
+      // log as 'coverage_unavailable': failure_reason is a
+      // CHECK-constrained taxonomy in migration 047, so a finer label
+      // would be a migration, not a code change.
       log({
         outcome: 'unanswerable', failureReason: 'coverage_unavailable',
         grain: parsed.plan.grain, metric: parsed.plan.metric, plan: parsed.plan,

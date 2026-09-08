@@ -248,9 +248,13 @@ const COMPARE_SQL = {
 async function answerTeamAggregate(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayload> {
   const having = plan.havingClause!;
   const clauses = scopeClauses(plan.scope);
+  // 'games' is deliberately un-predicated: every match already inside
+  // the scope counts, so no result clause is added. Written as an
+  // exhaustive if/else rather than a trailing `else` for draws, which
+  // would silently have swallowed any metric added later.
   if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
   else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
-  else clauses.push(sql`t.winner_club_id IS NULL`);
+  else if (having.metric === 'draws') clauses.push(sql`t.winner_club_id IS NULL`);
 
   if (plan.matchFilter) {
     const filterValue = metricValueExpr(plan.matchFilter.metric);
@@ -288,9 +292,13 @@ export async function answerTeamAggregateDrilldown(
 ): Promise<{ rows: NlTeamMatchRow[]; total: number }> {
   const having = plan.havingClause!;
   const clauses = scopeClauses(plan.scope);
+  // 'games' is deliberately un-predicated: every match already inside
+  // the scope counts, so no result clause is added. Written as an
+  // exhaustive if/else rather than a trailing `else` for draws, which
+  // would silently have swallowed any metric added later.
   if (having.metric === 'wins') clauses.push(sql`t.winner_club_id = t.club_id`);
   else if (having.metric === 'losses') clauses.push(sql`t.winner_club_id IS NOT NULL AND t.winner_club_id <> t.club_id`);
-  else clauses.push(sql`t.winner_club_id IS NULL`);
+  else if (having.metric === 'draws') clauses.push(sql`t.winner_club_id IS NULL`);
 
   if (plan.matchFilter) {
     const filterValue = metricValueExpr(plan.matchFilter.metric);

@@ -15,6 +15,55 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - "teams with N games against <club>" is answerable (AFLDB-ISSUE-110) - 8 September 2026
+
+- `games` joins `wins`, `losses` and `draws` as a grouped team-result metric. A rendered UI
+  acceptance run over the 1,440-question realistic corpus left exactly one failing family:
+  every `teams with {more than|at least|at most} 2 games against <club>` question came back
+  unanswerable while its wins/losses siblings answered. The word was not a grouped metric, so
+  the question fell through to a `player_career` games column that still carried the opponent
+  scope, and the career backstop correctly refused it - the refusal was honest, the routing
+  was not.
+- `games` is the un-predicated member of the same organization-level family: every match
+  already inside the scope counts, where the result metrics count only the matches the club
+  won, lost or drew. The grouping, the organization-lineage opponent semantics and the
+  parameterised SQL are unchanged; the result-clause chain in `src/db/queries/nl/team-match.ts`
+  is now exhaustive rather than ending in a bare `else` for draws, which would otherwise have
+  counted drawn matches for the new metric.
+- The word is admitted only behind an explicit club subject (`teams`/`clubs`/`sides`), probed
+  before `extractAggregation` consumes the `<subject> with` cue. `games` names a career column
+  over the same vocabulary, so `players with more than 200 games` keeps its career reading; a
+  result word still governs when both are present. A margin filter still cannot attach to a
+  games count. Parser version 33 -> 34.
+
+### Natural-language search - a career question may only keep the scope something consumes (AFLDB-ISSUE-110) - 8 September 2026
+
+- A career-grain plan carrying a season range or a club now has to prove that something
+  actually reads it. Until now the presence of any career predicate exempted the plan from
+  both career-grain backstops, but a grid builder consumes only its own parameters, so
+  `players with at least 3 grand finals since 2000` counted grand finals over whole careers
+  and `Carlton players who debuted since 2000` listed every club's debutants - each with the
+  discarded scope still shown in the "what AFLDB decided you meant" panel.
+- Ownership is now declared per builder in `src/search/nl/plan.ts`: the season range survives
+  only for `debuted_between` / `first_kick_goal_between`, the club only for
+  `first_kick_goal_for_club`, and the career compiler emits its generic club filter on the same
+  test rather than on "no predicates at all". Anything unowned refuses:
+  `A career question cannot be restricted to a season range.` or the new
+  `This kind of career question cannot be limited to one club.` A club beside a club-blind
+  predicate is deliberately declined rather than folded into a played-for-club reading, because
+  "Carlton players who played in 3 grand finals" has two plausible meanings that return
+  different players.
+- Unaffected: club-scoped career totals and thresholds (`most games for Geelong`,
+  `players with at least 200 games for Collingwood`), debut windows
+  (`players who debuted in the 1990s`), scoped achievements
+  (`players who kicked a goal with their first kick for Carlton in the 1940s`) and every
+  question in the two realistic UI corpora - all 1,495 were re-parsed and re-validated, and
+  none is affected by the new rule.
+- The plan trace also stopped calling a scoped total a single-match search: a `player_game`
+  plan in `sum` mode (`most goals for Geelong`) now reads "Searched for the highest total
+  goals", matching the answer text below it.
+- `PARSER_VERSION` 32 -> 33. No migration, schema, privilege, route or deployment change.
+
 ### Production promotion - staged reinstatement of NOT NULL lineage-bound references (AFLDB-ISSUE-151) - 8 September 2026
 
 - The generated promotion plan (`npm run db:promotion:check -- --plan`) no longer restores a

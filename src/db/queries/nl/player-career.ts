@@ -4,6 +4,7 @@ import { sql } from '@/db/client';
 import { compileAxis } from '@/db/queries/grid-solver';
 import { GRID_STATS } from '@/search/grid-solver-spec';
 import {
+  careerPredicatesOwnClubFor,
   NL_AWARDS,
   NL_CAREER_COLUMNS,
   NL_METRICS,
@@ -143,7 +144,15 @@ function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   // An ambiguous surname ("Ablett most goals") -- ranks across every
   // plausible candidate instead of declining. See NlMatchScope.playerIdIn.
   if (plan.scope.playerIdIn) clauses.push(sql`p.id = ANY(${plan.scope.playerIdIn})`);
-  if (plan.scope.clubFor && plan.careerPredicates.length === 0) {
+  // The generic club filter, emitted unless a predicate already carries the
+  // club as a builder parameter (first_kick_goal_for_club scopes the FEAT to
+  // the club, which implies playing for it -- repeating it here would state
+  // the same fact twice). Keyed on ownership rather than on "no predicates
+  // at all": under the old count-based guard a plan mixing a club with a
+  // club-blind predicate reached SQL with no club constraint whatsoever.
+  // validatePlan now refuses that combination, and this is the second half
+  // of the same invariant (AFLDB-ISSUE-110 finding B).
+  if (plan.scope.clubFor && !careerPredicatesOwnClubFor(plan.careerPredicates)) {
     clauses.push(sql`EXISTS (
       SELECT 1 FROM player_match_stats pms
       JOIN clubs pcl ON pcl.id = pms.club_id

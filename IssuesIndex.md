@@ -7,7 +7,7 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-08
-**Open issues:** 13 tracked here — `AFLDB-ISSUE-110`, `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`.
+**Open issues:** 12 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`.
 
 <!-- UPDATE 2026-09-08 (ISSUE-151 allocated + implemented): `AFLDB-ISSUE-151` is now ALLOCATED and
      Open — **Fix production promotion lineage/FK sequencing for `external_grid_sources`**, on
@@ -919,7 +919,16 @@ closure boundary, and the unrelated query-builder timing regression remains with
      green on the canonical `afldb_test` rebuild with the ISSUE-136 fold (V12 105 passed / 0 failed;
      V13 idempotent, fingerprints unchanged). Committed on `claude/issue-113`, not merged, not
      deployed. Production remediation → `AFLDB-ISSUE-137`. -->
-| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, **merged into dev 2026-08-31**; parser v32 with the ranked-career season-bound fail-closed validator revision. Standing evidence: focused parser/validator **182/182**; expanded focused **345/345**; complete DB-free ISSUE-110 matrix **14 suites, 733/733**; typecheck passed; **authoritative post-final-revision operator DB gate 2 files, 46/46 in 20.65 s, started 18:52:45** (`nl-answers-game-season` 24/24; `nl-semantic-mapping` 22/22) — do not mistake the earlier 17:47 46/46 run for this gate. **Latest independent review verdict: REVISE — NOT READY FOR LARGE-SCALE VALIDATION**, two unresolved HIGH findings recorded as next work: **(A) career-predicate season ownership** — a career predicate can exist without consuming `seasonMin`/`seasonMax`, so e.g. `players with at least 3 grand finals since 2000` silently ignores the requested period; replace the blanket career-predicate exemption with explicit period ownership (only predicates that actually consume the relevant bounds may permit them). **(B) `clubFor` ownership with career predicates** — e.g. `Carlton players who debuted since 2000`: `clubFor` can be carried in the plan while execution bypasses the generic club filter merely because `careerPredicates` exist; allow the bypass only when a predicate explicitly owns the relevant club semantics, otherwise reject or correctly compile the club constraint. Durable record: `issues/open/AFLDB-ISSUE-110.md`. **Both findings independently adjudicated CONFIRMED 2026-08-31** by direct source inspection during the full-codebase review (exact code paths in the runbook's 2026-08-31 adjudication section: `plan.ts:1158`/`plan.ts:1197-1202` blanket `careerPredicates` exemptions + `player-career.ts:146` club-filter bypass). **Next action: fix findings A and B fail-closed, then a fresh independent re-review.** No 480, 1,435/1,440, 100k, telemetry reset, or other large-scale validation before APPROVE; the 22,607-search run remains incomplete. |
+<!-- RETIRED 2026-09-08 — `AFLDB-ISSUE-110` (Problem Search semantic triage and
+     club-career games) is **Resolved** and is NO LONGER an open issue. All acceptance
+     gates green on `opus/issue-110-semantic-closeout` at `165313f`: DB-backed
+     `nl-answers-team-club` 26/26; DEV redeploy; the 26 previously failing grouped-`games`
+     questions 26/26 rendered; realistic UI corpus 1,435/1,435; decline corpus 60/60; zero
+     HTTP/page/client/hydration/metamorphic errors throughout. Parser v33 -> v34 (`games`
+     admitted as the un-predicated grouped team-result metric behind an explicit club
+     subject). No migration/schema/privilege/route/deploy change; NL corpus unchanged;
+     production untouched. Authoritative records: the `AFLDB-ISSUE-110` entry in `issues.md`
+     (Resolution — 2026-09-08) and `issues/closed/AFLDB-ISSUE-110.md`. -->
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-114` (ladder witness `manifest_sha256` was the pre-ISSUE-108 CRLF hash) is **Resolved** and is NO LONGER an open issue. Contract literal repaired to the canonical LF hash `604a8a16…8d3f`, value-asserted in `tests/db-test-rebuild.test.ts`; operator run `npm test -- tests/db-test-rebuild.test.ts` = **214 passed, 0 failed**. Authoritative record: the `AFLDB-ISSUE-114` entry in `issues.md` (Resolution, 2026-08-30). -->
 <!-- RETIRED 2026-08-30 — `AFLDB-ISSUE-115` (Data QA multi-domain composable queries) is **Resolved**
      and is NO LONGER an open issue. Stages 0–8 complete on worktree `D:\dev\afldb-issue-115` /

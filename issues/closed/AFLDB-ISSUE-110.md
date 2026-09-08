@@ -1,10 +1,11 @@
 # AFLDB-ISSUE-110 — Problem Search semantic triage and club-career games
 
-- **Status:** Open
+- **Status:** Resolved — 2026-09-08
 - **Severity:** Medium
 - **Area:** Natural-language search / deterministic semantics
 - **Found:** 2026-08-30
-- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate
+- **Resolved:** 2026-09-08
+- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate → 33 career-predicate field ownership (findings A and B) → 34 grouped-games team-result metric (final)
 - **Evidence export:** `artifacts/issue-110/problem-search/afldb-nl-problems-30d-2026-08-29.csv`
 - **Codebase-memory project:** `D-dev-afldb-issue-110`
 - **Latest checked graph generation:** `2026-08-30T01:26:53Z` (`full`, recording complete)
@@ -2070,3 +2071,335 @@ red tests; `players who kicked a goal with their first kick for Carlton in the 1
 
 Verdicts: **A CONFIRMED, B CONFIRMED.** The recorded next action (fix A and B fail-closed,
 then fresh independent re-review) stands unchanged.
+## 2026-09-08 Findings A and B fixed fail-closed (parser v33)
+
+Session: `opus/issue-110-semantic-closeout`, worktree `D:\dev\afldb-issue-110`, from merged
+`main` `a6b1689`. The database was treated as **strictly read-only** for the whole session: no
+INSERT/UPDATE/DELETE/TRUNCATE, no migration, no rebuild, no importer, no telemetry write, and
+nothing touched outside `afldb_test`.
+
+### Ledger reconciliation against current `main`
+
+Three recorded items moved before any code was written:
+
+| Recorded item | State on `a6b1689` |
+|---|---|
+| `CURRENT_WRONG_ANSWER` / WRONG_SCOPE — club-scoped career threshold projects whole-career `games` | **Already fixed.** `projectedGames()` (`src/db/queries/nl/player-career.ts`) club-scopes the rendered `games` for any plan carrying `clubFor`. Re-proved read-only against `afldb_test`: `players with exactly 200 games for Collingwood` renders Josh Fraser at **200** (career 218); `most games for Geelong` renders Tom Hawkins at **359**. Population counts have moved with the data since 2026-08-29 (`>= 200` is now **40**, `> 200` **39**, `= 200` still Josh Fraser alone; Scott Pendlebury now leads on 442). |
+| `most games in a game` — retained unsafe collision | **Now a safe decline**: `"games" is not a recognised statistic for this kind of question.` Reclassified `CORRECT_DECLINE`. |
+| Findings A and B (2026-08-31 adjudication) | **Reproduced exactly**, and the only current defects ISSUE-110 still owned. Probe output: A → `preds=[grand_finals_played_min] scope={"seasonMin":2000} validate=OK`; B → `preds=[debuted_between] scope={clubFor:carlton, seasonMin:2000} validate=OK`. |
+
+The remaining `NEEDS_SEMANTIC_DECISION` families were re-checked only as far as closeout
+requires, and every one is a safe decline on current `main`: `geelong collingwood 1990` and
+`collingwood v geelong 1990` → `unrecognised`; `richmond first grand final` →
+`low_confidence`; `most points` / `most points in a game` → `unrecognised` with `points`
+reported unsupported. The `Unclear goal/handball numeric wording` family could not be replayed
+verbatim — `artifacts/issue-110/problem-search/afldb-nl-problems-30d-2026-08-29.csv` is not
+present in this worktree — so it stays classified as recorded, undecided, and declining.
+
+### The fix
+
+The invariant the adjudication required, implemented literally: a career plan may keep a field
+only if something **provably consumes** it.
+
+- `src/search/nl/plan.ts` declares ownership once, per builder, beside `PARSER_VERSION`:
+  `NL_CAREER_SEASON_OWNING_BUILDERS` (`debuted_between`, `first_kick_goal_between`),
+  `NL_CAREER_CLUB_OWNING_BUILDERS` (`first_kick_goal_for_club`), with the two predicates
+  `careerPredicatesOwnSeasonRange()` / `careerPredicatesOwnClubFor()`.
+- The season gate no longer exempts a plan for having any predicate: it exempts only a plan
+  whose predicates own the range. (former `plan.ts:1197-1202`)
+- A new gate refuses `clubFor` on a career plan whose predicates do not own the club, with the
+  message `This kind of career question cannot be limited to one club.` The predicate-free club
+  path — the supported-metric gate and the "no match or season scope" gate — is untouched.
+  (former `plan.ts:1158`)
+- `src/db/queries/nl/player-career.ts` emits its generic club `EXISTS` filter on the same
+  ownership test instead of `careerPredicates.length === 0`, so the validator and the compiler
+  cannot drift and a club can never again reach SQL as nothing at all. (former
+  `player-career.ts:146`)
+- `src/db/queries/nl/answer.ts`'s comment claiming era coverage is the only parser-reachable
+  `validatePlan` rejection is corrected, and records why all such rejections still log as
+  `coverage_unavailable` (migration 047 CHECK-constrains the taxonomy; a finer label would be a
+  migration, not a code change).
+
+Measured behaviour (real parser, DB-backed directory, read-only):
+
+| Question | Before | After |
+|---|---|---|
+| `players with at least 3 grand finals since 2000` | answered whole-career GF counts | `A career question cannot be restricted to a season range.` |
+| `Carlton players who debuted since 2000` | listed every club's debutants, Games column club-scoped to 0 | `This kind of career question cannot be limited to one club.` |
+| `Carlton players who played in at least 3 grand finals` | all clubs | same club refusal |
+| `players who debuted in the 1990s` | valid | valid — 938 players |
+| `players who kicked a goal with their first kick for Carlton in the 1940s` | valid | valid |
+| `players with at least 3 grand finals` | valid | valid |
+
+### Semantic decision S1 — the club fold is deliberately NOT taken
+
+A club beside a club-blind career predicate is refused, not folded into a `played_for_club` or
+`debut_club` predicate. `Carlton players who played in 3 grand finals` reads equally as "played
+for Carlton and played 3 grand finals anywhere" and "played 3 grand finals for Carlton"; the two
+return different players, the second is unexpressible for `grand_finals_played_min`,
+`match_event_min` and `matchup_played_min`, and the parser's own settled reading for the one
+club-scoped achievement builder it has (`first_kick_goal_for_club`: "means players who did it
+FOR Carlton, not players who did it anywhere and later happened to play there") is the
+achievement-scoped one. `debuted_between` is the one case where the tight reading IS expressible
+(`debut_club`), and it was still not taken: choosing between "players at Carlton who debuted
+since 2000" and "players who debuted for Carlton since 2000" without evidence is exactly the
+guess this issue exists to stop. A future issue may add the fold with an agreed reading; until
+then the decline is the decision, not an oversight.
+
+### Second defect of the same family, found and fixed
+
+`describePlan`'s grain label called a `player_game`/`mode: 'sum'` plan a *single-match* search.
+That is the scoped-total shape ISSUE-110's own v29/v30 work introduced, so `most goals for
+Geelong` was explained as "Searched for the highest single-match goals" above an answer that
+correctly read "Total across N games in scope". The explain trace is the panel that tells the
+reader which question was answered — the same surface that made findings A and B dangerous — so
+the label is now mode-aware ("Searched for the highest total goals" / "Ranked total goals, the
+top 5"); `mode: 'single'` wording is unchanged.
+
+### Tests added (existing suites extended; no new file)
+
+- `tests/nl-semantic-mapping.test.ts` — `AFLDB-ISSUE-110 closeout: a career predicate must OWN
+  the scope it keeps`: 3 red controls (both findings plus the club-with-no-season variant) and
+  3 green controls, all end to end from the question.
+- `tests/nl-plan.test.ts` — `career predicate field ownership` under the existing career-grain
+  backstop block: 5 direct `validatePlan` cases including "the predicate-free club and
+  predicate-only shapes are exactly as they were"; plus a `describePlan` case pinning the
+  scoped-total wording.
+- `tests/integration/nl-answers.test.ts` — two read-only DB tests: the rendered Games column
+  equals club appearances for every row of a club-scoped threshold (with a non-vacuity check
+  that some qualifier's club total is below their career total), and the compiler keeps the club
+  filter when a career predicate is present (asserting the validator's refusal in the same test).
+
+### Validation (2026-09-08, operator-authorised, database read-only)
+
+| Gate | Result |
+|---|---|
+| `npx vitest run tests/nl-parser tests/nl-plan tests/nl-describe tests/nl-semantic-mapping tests/nl-regression-corpus tests/nl-audit-acceptance tests/query-intent` | **593/593 PASS** |
+| Whole DB-free repository suite (`tests/`, excluding `integration`/`e2e`/`nl-ui`) | **3,419 passed, 14 skipped, 2 failed** — both pre-existing, reproduced on clean `main` `a6b1689`: `reference-data.test.ts` §H12 (expected list predates the migration-080 Gridley trio) and `finals-semantics-contract.test.ts` (known Windows `autocrlf` CRLF artefact) |
+| `tests/integration/nl-answers.test.ts` | **28/28 PASS** (2 new) |
+| `nl-answers-team-club`, `nl-answer-boundary` (telemetry sink mocked), `nl-vocab`, `grid-solver-investigation`, `venue-records`, `query-builder`, `player-matching`, `player-honours`, `player-family-and-coaching`, `player-compare`, `db-health`, `datasets`, `after-siren`, `import-role-parity`, and 8 `club-*` suites | **PASS** |
+| `tests/integration/grid-solver.test.ts` | 2 failed — **identical on clean `main`** (oracle counts 283/3658 vs live 282/3644: `afldb_test` data drift) |
+| `tests/integration/club-comparison*.test.ts` | 26 failed — **identical on clean `main`** (same drift) |
+| `tests/integration/gridley-corpus.test.ts` | 4 failed — **identical on clean `main`** (ISSUE-118, corpus load unrun) |
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | 284 problems (194 errors, 90 warnings) — **identical count on clean `main`**; `eslint` over the six changed files reports only pre-existing `as any` / `_t` findings on untouched lines |
+| `npm run build` | **PASS** (standalone bundle written) |
+| Realistic corpora, parsed + validated read-only through the real DB-backed context | 1,435 + 60 questions, **1,495 plans, 86 validation refusals, 0 affected by the new ownership rule** — the fix removes no realistic corpus answer |
+
+NOT run, and why: every write-performing integration suite (`nl-semantic-mapping`,
+`nl-answers-game-season`, `nl-search-telemetry-clear`, `settle-afltables`, `awards-reload-links`,
+`data-editor`, `privileges`, and the rest) and the rendered `nl:ui` / `nl:stress` corpora, all of
+which insert or delete rows (the corpora write `nl_search_log`) — out of scope for a read-only
+session. `tests/e2e` needs a running server.
+
+### Files changed in this pass
+
+- `src/search/nl/plan.ts` — ownership catalogue + predicates, both career gates, mode-aware
+  describe label, `PARSER_VERSION` 33 with its history entry.
+- `src/db/queries/nl/player-career.ts` — generic club filter keyed on ownership.
+- `src/db/queries/nl/answer.ts` — corrected comment on parser-reachable validation rejections.
+- `tests/nl-semantic-mapping.test.ts`, `tests/nl-plan.test.ts`,
+  `tests/integration/nl-answers.test.ts` — regressions above.
+- `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this runbook — tracking.
+
+No migration, schema, privilege, route, unit-file or deployment change. Nothing was committed,
+pushed, merged or deployed.
+
+### Exact next action (superseded by the 2026-09-08 UI acceptance pass below)
+
+**Operator gate:** run the realistic UI corpus (1,440) and the decline corpus (60) against DEV
+with a run tag (`npm run nl:ui`, then inspect `nl_search_log` by that tag), confirm no new
+refusal or regression against the recorded expectations, and ISSUE-110 resolves. Every other
+recorded gate is green. The 22,607-search stress run remains incomplete and is not a resolution
+gate.
+
+---
+
+## 2026-09-08 UI acceptance pass 1, and the one family it failed (parser v34)
+
+### What the run measured
+
+Rendered, realistic UI acceptance against DEV at `c8b1ac7`:
+
+```text
+1435 / 1435 observed
+1409 pass
+  26 fail
+   0 unscored / absent / HTTP errors / page errors
+   0 client-side errors / hydration errors / metamorphic disagreements
+```
+
+All 26 failures are one family, `user_grouped_thresholds`, and one question shape:
+`teams with {more than | at least | at most} 2 games against <club>` across Richmond,
+Carlton, Collingwood, Essendon, Geelong, Hawthorn, Melbourne, North Melbourne and St Kilda.
+The corpus expects `plan`; DEV rendered `unanswerable`. The corresponding wins/losses
+grouped-threshold variants passed. The corpus rows carry the `having` tag, so the corpus
+already recorded the intended contract; no expectation was changed.
+
+### First wrong layer: the parser
+
+Reproduced through parser -> `validatePlan`:
+
+```text
+teams with more than 2 games against Richmond
+  grain          player_career          (expected team_match)
+  havingClause   undefined              (expected { metric: 'games', op: 'gt', value: 2 })
+  careerConditions [{ kind: 'column', column: 'games', op: 'gt', value: 2 }]
+  scope.clubAgainst richmond
+  validatePlan   error: A career question cannot be scoped to a venue, opponent,
+                 match type, or round.
+```
+
+`extractHavingClause` recognised only `wins`/`losses`/`draws`, so `games` was never a grouped
+team-result metric. The question therefore routed to `player_career` (grain election reaches
+`havingClause || teamMetric` first and fell through), `extractCareerConditions` claimed
+`more than 2 games` as a career column, and the plan reached validation carrying opponent
+scope that the career compiler cannot consume. **The refusal was correct for the plan it was
+given** — the career backstop added in v30 did exactly its job. The defect is one layer
+earlier: the plan itself was the wrong shape. `validatePlan`, `execute` and `answer` were
+never reached with a well-formed plan, so no later layer is implicated.
+
+### The fix
+
+`games` is admitted as the **un-predicated member of the existing grouped team-result
+family** — the same organization-level group-and-threshold contract as wins/losses/draws,
+with no per-match result predicate, because every match already inside the scope counts.
+
+1. `src/search/nl/plan.ts` — `NlHavingMetric` (`'wins' | 'losses' | 'draws' | 'games'`) and
+   `NL_HAVING_METRICS` are declared once and drive both the `NlQueryPlan.havingClause` type
+   and `validatePlan`'s membership test, which was a hand-written literal array. Every other
+   grouped-threshold rule is untouched: still team_match only, still an unranked club list,
+   still integer thresholds, still no period split and no score checkpoint.
+2. `src/search/nl/parser.ts` — `extractHavingClause` takes a `clubSubject` flag and appends
+   `/\bgames?\b/` **last**, so a result word still governs when both are present
+   (`teams with more than 2 wins in games against Carlton` still counts wins). The flag is
+   `CLUB_SUBJECT_LEADING` probed **before** `extractAggregation`, which consumes the
+   `<subject> with` cue outright — by the time the existing `clubSubjectPresent` is computed
+   at step 10.5 the leading `teams`/`clubs`/`sides` word is already gone, which is why that
+   variable could not be reused. `extractMatchFilter`'s parameter type widens to
+   `NlHavingMetric`; its guard already requires wins/losses, so a games count still cannot
+   carry a margin filter.
+3. `src/db/queries/nl/team-match.ts` — in `answerTeamAggregate` and
+   `answerTeamAggregateDrilldown`, the result-clause chain ended in a bare `else` for draws.
+   It is now exhaustive (`wins` / `losses` / `draws`), and `games` adds no clause at all.
+   Left as it was, the new metric would have silently counted drawn matches.
+
+The gate is the subject word because `games` is genuinely ambiguous over the same
+vocabulary: `players with more than 200 games` is a career column, and reading it as a
+grouped club count would confidently answer a different question. `wins`/`losses`/`draws`
+carry no such ambiguity, so they keep working with no subject at all.
+
+Nothing query-specific was added: no club list, no literal question text, no `clubAgainst`
+requirement. Organization-lineage opponent semantics (`GROUP BY cl.organization_id` over the
+`SIDES` CTE), the grouping and the parameterised SQL are unchanged. `PARSER_VERSION` 33 -> 34.
+
+### Tests added (existing suites extended; no new file)
+
+- `tests/nl-semantic-mapping.test.ts` — `AFLDB-ISSUE-110 D`: gt/gte/lte for
+  `teams with … 2 games against Richmond` (grain, metric, agg, `havingClause`, empty
+  `careerConditions`, opponent scope, `validatePlan` clean); all six wins/losses
+  operator/metric combinations still green; `players with more than 200 games` still a career
+  column; a result word still governs when both words are present; a margin filter beside a
+  games count still refuses.
+- `tests/integration/nl-answers-team-club.test.ts` — DB-backed: gt/gte/lte grouped games
+  counts checked against independently hand-written SQL over the same lineage grouping, and a
+  guard proving a games count is not read as a draws count.
+
+The three new DB-free operator cases were **proved failing at `c8b1ac7` before the fix**
+(`expected 'player_career' to be 'team_match'`), then green after it.
+
+### Validation (2026-09-08 pass 2, operator-authorised)
+
+- `npx tsc --noEmit` — PASS.
+- Focused NL suites (`nl-plan`, `nl-parser`, `nl-describe`, `nl-semantic-mapping`,
+  `query-intent`, `nl-audit-acceptance`, `qualifying-matches-gate`) — 446/446.
+- DB-free repo suite — 3,430 passed / 3 failed / 14 skipped. All three failures were re-run
+  at `c8b1ac7` with the fix reverted and fail identically:
+  `finals-semantics-contract.test.ts` (the known Windows CRLF contract-test artefact),
+  `fitzroy-core-import.test.ts`, and `reference-data.test.ts`'s post-045 unregistered-table
+  list, which the ISSUE-151 merge's `external_grid_axes` / `external_grid_sources` /
+  `external_grids` tables broke. None is this issue's.
+- `eslint` on the five changed files — no new problem (the four `no-explicit-any` errors in
+  `plan.ts` are pre-existing, at lines untouched by this pass).
+- **NOT run: the DB-backed integration suite.** `AFLDB_TEST_DATABASE_URL` points at
+  `127.0.0.1:5432`, nothing is listening on this workstation, and BatchMode ssh to the
+  `afldb_test` host is refused, so the tunnel is an operator step. The new integration cases
+  are committed but unexecuted.
+- **NOT re-run: the 1,435-question realistic UI corpus**, by instruction.
+
+### Files changed in this pass
+
+- `src/search/nl/parser.ts` — subject probe, `games` in `extractHavingClause`,
+  `extractMatchFilter` parameter type.
+- `src/search/nl/plan.ts` — `NlHavingMetric` / `NL_HAVING_METRICS`, `havingClause` type,
+  validation membership test, `PARSER_VERSION` 34 with its history entry.
+- `src/db/queries/nl/team-match.ts` — exhaustive result-clause chain at both grouped sites.
+- `tests/nl-semantic-mapping.test.ts`, `tests/integration/nl-answers-team-club.test.ts` —
+  regressions above.
+- `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this runbook — tracking.
+
+No migration, schema, privilege, route, unit-file or deployment change.
+
+### Exact next action
+
+1. Open a tunnel to the `afldb_test` host and run
+   `npx vitest run tests/integration/nl-answers-team-club.test.ts`.
+2. Redeploy DEV at this commit and re-run **only the 26 previously failing questions**.
+3. Then re-run the realistic UI (1,440) and decline (60) corpora against DEV with a run tag,
+   confirm no new refusal or regression, and ISSUE-110 resolves.
+
+**ISSUE-110 stays OPEN.** The 60-question decline gate remains pending.
+
+---
+
+## 2026-09-08 final acceptance — RESOLVED (parser v34)
+
+Every resolution gate recorded above is now green. Final operator evidence, 2026-09-08,
+`opus/issue-110-semantic-closeout` at `165313f`:
+
+### 1. DB-backed integration
+
+`npx vitest run tests/integration/nl-answers-team-club.test.ts` — **26 / 26 PASS**
+(grouped-`games` gt/gte/lte against independently hand-written lineage SQL, plus the
+games-is-not-draws guard; the `lte` witness now derives its threshold and opponent from
+independent SQL, so all three operators have a genuine non-empty witness).
+
+### 2. DEV deployment
+
+`opus/issue-110-semantic-closeout` deployed to DEV at `165313f`.
+Health: `status=ok`, `database=ok`.
+
+### 3. Targeted rendered regression — the 26 previously failing questions
+
+Rendered against DEV: **26 / 26 PASS**. answered 26, unanswerable 0, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+Every `teams with {more than | at least | at most} 2 games against <club>` question across
+Richmond, Carlton, Collingwood, Essendon, Geelong, Hawthorn, Melbourne, North Melbourne and
+St Kilda now renders a `plan`, matching the corpus's recorded `having` expectation.
+
+### 4. Authoritative realistic rendered corpus
+
+**1,435 / 1,435 observed — 1,435 PASS / 0 FAIL / 0 unscored.**
+answered 1,435, unanswerable 0, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+(UI acceptance pass 1 stood at 1,409 pass / 26 fail; the v34 parser fix closes the one
+failing family with no regression anywhere else in the corpus.)
+
+### 5. Authoritative decline rendered corpus
+
+**60 / 60 observed — 60 PASS / 0 FAIL / 0 unscored.**
+answered 0, unanswerable 60, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+The 60-question decline gate — the last item outstanding — is passed: every question that
+must decline still declines.
+
+### Disposition
+
+All acceptance gates green. Findings A and B (career-predicate field ownership, parser v33)
+and finding D (grouped-`games` team-result metric, parser v34) are fixed fail-closed. No
+production code changed in this closeout pass; the NL corpus was not modified; production was
+not touched. **ISSUE-110 is Resolved (2026-09-08).** Runbook moved to
+`issues/closed/AFLDB-ISSUE-110.md`; removed from `IssuesIndex.md` and the `issues.md` Open
+Issues table; `CHANGELOG.md` already carries both `Unreleased` entries from the
+implementation passes and needs no further change.
+

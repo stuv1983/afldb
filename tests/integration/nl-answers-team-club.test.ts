@@ -267,6 +267,95 @@ describe('team_match matches hand-written SQL', () => {
     expect(actual.total).toBe(expected.length);
   });
 
+  it.each([
+    ['gt', '>'],
+    ['gte', '>='],
+    ['lte', '<='],
+  ] as const)('counts every match in scope for a grouped games threshold (%s)', async (op, sqlOp) => {
+    // AFLDB-ISSUE-110: 'games' is the un-predicated member of the
+    // grouped-threshold family -- no result clause at all -- and it must
+    // still group by organization lineage, exactly as wins/losses do.
+    // Both the threshold and the witness opponent are derived from the data
+    // rather than fixed, so each operator has a genuine non-empty witness.
+    // A fixed `2` only witnesses gt/gte: no two organizations in the corpus
+    // have met as few as twice, so `<= 2` is legitimately empty for every
+    // opponent and would assert nothing about grouping.
+    const [{ smallest }] = await sql<{ smallest: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT min(games)::int AS smallest FROM (
+        SELECT count(*) AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      ) pairs
+    `;
+    // `<=` needs a threshold the sparsest pairing can reach; `>`/`>=` are
+    // satisfied by every pairing at the same value, so one value serves both.
+    const threshold = op === 'lte' ? smallest : 2;
+    const [opponent] = await sql<{ organizationId: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      ), pairs AS (
+        SELECT opp.organization_id AS opponent_org, count(*)::int AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      )
+      SELECT opponent_org AS "organizationId"
+        FROM pairs
+       WHERE games ${sql.unsafe(sqlOp)} ${threshold}
+       GROUP BY opponent_org
+       ORDER BY count(*) DESC, opponent_org
+       LIMIT 1
+    `;
+    expect(opponent).toBeDefined();
+    const actual = await teamAggregate({
+      havingClause: { metric: 'games', op, value: threshold },
+      scope: { clubAgainst: { organizationId: opponent.organizationId, slug: 'x', name: 'x' } },
+    }, 1000);
+    const expected = await sql<{ organizationId: number; value: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      )
+      SELECT own.organization_id AS "organizationId", count(*)::int AS value
+        FROM sides s
+        JOIN clubs own ON own.id = s.club_id
+        JOIN clubs opp ON opp.id = s.opponent_id
+       WHERE opp.organization_id = ${opponent.organizationId}
+       GROUP BY own.organization_id
+      HAVING count(*) ${sql.unsafe(sqlOp)} ${threshold}
+       ORDER BY value DESC, own.organization_id
+    `;
+    expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
+      .toEqual(new Map(expected.map((r) => [r.organizationId, r.value])));
+    expect(actual.total).toBe(expected.length);
+    expect(actual.rows.length).toBeGreaterThan(0);
+  });
+
+  it('a grouped games count is not silently read as a draws count', async () => {
+    // The result-clause chain used to end in a bare `else` for draws, so
+    // any metric added beside it would have counted drawn matches.
+    const games = await teamAggregate({ havingClause: { metric: 'games', op: 'gte', value: 1 } });
+    const draws = await teamAggregate({ havingClause: { metric: 'draws', op: 'gte', value: 1 } });
+    const [{ total }] = await sql<{ total: number }[]>`
+      SELECT count(*)::int AS total FROM matches m WHERE m.winner_club_id IS NULL
+    `;
+    const gamesTotal = games.rows.reduce((sum, r) => sum + r.value, 0);
+    const drawsTotal = draws.rows.reduce((sum, r) => sum + r.value, 0);
+    expect(drawsTotal).toBe(total * 2);
+    expect(gamesTotal).toBeGreaterThan(drawsTotal);
+  });
+
   it('filters 100-point losses before grouping and applying the requested count threshold', async () => {
     const actual = await teamAggregate({
       havingClause: { metric: 'losses', op: 'gte', value: 5 },
