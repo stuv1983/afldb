@@ -275,22 +275,52 @@ describe('team_match matches hand-written SQL', () => {
     // AFLDB-ISSUE-110: 'games' is the un-predicated member of the
     // grouped-threshold family -- no result clause at all -- and it must
     // still group by organization lineage, exactly as wins/losses do.
-    const [opponent] = await sql<{ organizationId: number }[]>`
+    // Both the threshold and the witness opponent are derived from the data
+    // rather than fixed, so each operator has a genuine non-empty witness.
+    // A fixed `2` only witnesses gt/gte: no two organizations in the corpus
+    // have met as few as twice, so `<= 2` is legitimately empty for every
+    // opponent and would assert nothing about grouping.
+    const [{ smallest }] = await sql<{ smallest: number }[]>`
       WITH sides AS (
         SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
         UNION ALL
         SELECT m.away_club_id, m.home_club_id FROM matches m
       )
-      SELECT opp.organization_id AS "organizationId"
-        FROM sides s JOIN clubs opp ON opp.id = s.opponent_id
-       GROUP BY opp.organization_id
-       ORDER BY count(*) DESC, opp.organization_id
+      SELECT min(games)::int AS smallest FROM (
+        SELECT count(*) AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      ) pairs
+    `;
+    // `<=` needs a threshold the sparsest pairing can reach; `>`/`>=` are
+    // satisfied by every pairing at the same value, so one value serves both.
+    const threshold = op === 'lte' ? smallest : 2;
+    const [opponent] = await sql<{ organizationId: number }[]>`
+      WITH sides AS (
+        SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
+        UNION ALL
+        SELECT m.away_club_id, m.home_club_id FROM matches m
+      ), pairs AS (
+        SELECT opp.organization_id AS opponent_org, count(*)::int AS games
+          FROM sides s
+          JOIN clubs own ON own.id = s.club_id
+          JOIN clubs opp ON opp.id = s.opponent_id
+         GROUP BY opp.organization_id, own.organization_id
+      )
+      SELECT opponent_org AS "organizationId"
+        FROM pairs
+       WHERE games ${sql.unsafe(sqlOp)} ${threshold}
+       GROUP BY opponent_org
+       ORDER BY count(*) DESC, opponent_org
        LIMIT 1
     `;
+    expect(opponent).toBeDefined();
     const actual = await teamAggregate({
-      havingClause: { metric: 'games', op, value: 2 },
+      havingClause: { metric: 'games', op, value: threshold },
       scope: { clubAgainst: { organizationId: opponent.organizationId, slug: 'x', name: 'x' } },
-    });
+    }, 1000);
     const expected = await sql<{ organizationId: number; value: number }[]>`
       WITH sides AS (
         SELECT m.home_club_id AS club_id, m.away_club_id AS opponent_id FROM matches m
@@ -303,7 +333,7 @@ describe('team_match matches hand-written SQL', () => {
         JOIN clubs opp ON opp.id = s.opponent_id
        WHERE opp.organization_id = ${opponent.organizationId}
        GROUP BY own.organization_id
-      HAVING count(*) ${sql.unsafe(sqlOp)} 2
+      HAVING count(*) ${sql.unsafe(sqlOp)} ${threshold}
        ORDER BY value DESC, own.organization_id
     `;
     expect(new Map(actual.rows.map((r) => [r.organizationId, r.value])))
