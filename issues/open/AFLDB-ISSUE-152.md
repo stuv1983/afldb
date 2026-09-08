@@ -681,6 +681,7 @@ header). A database rebuilt from tracked sources therefore has none. This is a
 | **M4** | `after_siren_kicks.shot_detail` was never queried. D5's exclusion of it rests on "no natural question", not on evidence. | D5, B11 |
 | **M5** | Combined career games per family — the metric `/records/family` actually orders by — was not measured; §3.5 ranks by member count. | C1, D6, ISSUE-153 |
 | **M6** | League-wide coaching threshold counts (§1.1–§1.3 are `LIMIT 25`). Club-scoped thresholds (§1.4/§7.2) **are** exhaustive; league-wide ones are witnesses only. | A5, A7, corpus |
+| **M7** | ~~Unresolved `club_id` / `opponent_club_id` on `after_siren_kicks` was never counted, so §15.6's exclusion caveat rested on an assumption.~~ **CLOSED 2026-09-08** by the §15.19 read-only query (operator decision D16): `club_unresolved = 0`, `opponent_unresolved = 0`, `events = 126`. Every curated event has both club ids resolved, so the caveat was dead code and was not implemented. See §16.2. | B, §15.6 |
 
 ---
 
@@ -1887,3 +1888,1146 @@ finished and validated. It does **not** mean shipped: the rendered/browser run,
 Phases C–F have not started. **AFLDB-ISSUE-152 therefore stays OPEN.**
 
 Phase C is **not** started and is not to be started on this instruction.
+
+---
+
+## 15. Phase C — after-the-siren implementation plan (PLAN ONLY, NOT IMPLEMENTED)
+
+**Status: PLAN — IMPLEMENTED 2026-09-08. See §16 for what actually happened,
+including the three deviations from this section and the measured M7 result that
+retired one of its behaviours.** Phase B is complete and is not reopened.
+Nothing here is Phase D/E/F work, and nothing here is deployed.
+
+Binding inputs, all already decided and not re-litigated below: **D4** (finals
+scope only over premiership-season rows carrying `match_id`; round-level scope
+declines; canonical match properties require `match_id`), **D5** (misses exposed
+explicitly as `kick_scored='none'`; behinds and goals exposed distinctly;
+`shot_detail` not exposed; siren subtype not exposed), **D10** as written in
+**§7.1** (the match-link ownership boundary and its two hard limits).
+
+### 15.1 Exact `NlQueryPlan` / grain fields
+
+**One new grain.** `NlGrain` gains a tenth member:
+
+```ts
+  /**
+   * A curated, cited kick after the siren (migration 089,
+   * AFLDB-ISSUE-118 §23.33). An EVENT grain, not a person grain and not a
+   * statistic grain: AFLDB has no play-by-play data and never recomputes
+   * one of these from scores or player_match_stats.
+   */
+  | 'after_siren';
+```
+
+**One new typed descriptor**, carried the way `achievementSummary`,
+`headToHead` and `streakDefinition` already are — a single object, so
+`validatePlan`'s "fields its compiler cannot honour" list stays a flat
+enumeration and no dimension can be added without appearing here:
+
+```ts
+export type NlAfterSirenSubject = 'event' | 'player';
+export type NlAfterSirenScored = 'goal' | 'behind' | 'none';
+export type NlAfterSirenEffect = 'won' | 'drew' | 'none';
+export type NlAfterSirenKickerResult = 'win' | 'draw' | 'loss';
+export type NlAfterSirenOccurrence = 'first' | 'most_recent';
+
+export type NlAfterSiren = {
+  /**
+   * What the rows ARE. 'event' returns the curated events themselves;
+   * 'player' aggregates them per kicker and requires a trusted player
+   * link. The two answer different questions and have different payloads.
+   */
+  subject: NlAfterSirenSubject;
+  /**
+   * after_siren_kicks.kick_scored — what the kick REGISTERED.
+   * undefined means ANY kick, INCLUDING a miss: "kicks after the siren"
+   * is 126 events, not the 101 that scored something.
+   */
+  kickScored?: NlAfterSirenScored;
+  /**
+   * after_siren_kicks.kick_effect — what the kick did to the RESULT.
+   * Independent of kickScored and ANDed with it: "a goal after the siren"
+   * is kickScored alone, "a goal after the siren TO WIN" is both.
+   */
+  kickEffect?: NlAfterSirenEffect;
+  /**
+   * after_siren_kicks.kicker_result — the match result from the kicker's
+   * side. Independent of kickEffect: one measured event is
+   * (none, none, WIN). Never inferred from matches.winner_club_id.
+   */
+  kickerResult?: NlAfterSirenKickerResult;
+  /**
+   * "the first" / "the most recent". Match-linked only (D10 limit 1) —
+   * see afterSirenRequiresMatchLink below.
+   */
+  occurrence?: NlAfterSirenOccurrence;
+};
+```
+
+and on `NlQueryPlan`:
+
+```ts
+  /** after_siren only: which events, aggregated which way. */
+  afterSiren?: NlAfterSiren;
+```
+
+**No new `NlAggregation` member.** `earliest`/`latest` are *not* added to the
+shared aggregation union — that union is exhaustively switched by every grain and
+widening it for one grain invites silent gaps elsewhere. The precedent is
+`NL_ACHIEVEMENT_SUMMARY_KINDS`, which already carries `'earliest' | 'latest'` as
+a *descriptor* value with a plain aggregation. `occurrence` follows it, and an
+occurrence answer is a one-row `list`.
+
+**One new metric,** deliberately singular:
+
+```ts
+  after_siren: {
+    /**
+     * A COUNT of after-siren events in the filtered set. There is exactly
+     * one metric here on purpose: every distinction ("goals", "behinds",
+     * "misses", "game winners", "winning goals") is a typed DIMENSION on
+     * NlAfterSiren, not a second metric name. Two spellings of one question
+     * is the ISSUE-110 failure this grain must not reintroduce.
+     */
+    siren_kicks: columnMetric('siren_kicks', 'Kicks after the siren', 'siren_kicks'),
+  },
+```
+
+**`siren_kicks`, NOT `kicks` — this naming is load-bearing.** `NL_COVERAGE` is
+keyed by metric name and already holds
+`kicks: { firstSeason: 1965, note: 'Kicks were not recorded before 1965.' }` for
+the player-statistic column. A metric literally named `kicks` would inherit that
+1965 floor and **decline every after-the-siren question about 1913–1964** — 
+including the measured first event, Billy Schmidt 1913 (§2.8). The rename removes
+the collision; the grain-first branch below removes it a second time.
+
+**Coverage.** A new `NL_COVERAGE` entry plus a grain-first branch in
+`coverageFor`, mirroring the coaching one exactly (a metric-less `list`/`count`
+plan must still get the floor):
+
+```ts
+  siren_kicks: {
+    firstSeason: 1913,
+    note: 'AFLDB\'s after-the-siren record begins in 1913.',
+    grains: ['after_siren'],
+  },
+```
+
+```ts
+  if (grain === 'after_siren') return NL_COVERAGE.siren_kicks ?? null;
+```
+
+1913 is the measured first season (§0.2). It is a **floor and nothing more**: it
+says a 1900 after-siren question has no answer, and makes **no** completeness
+claim for any season after it. See §15.18 for the permanent caveat that carries
+the rest of that honesty into the rendered answer.
+
+**Fields this grain refuses BY NAME** in `validatePlan` (the ISSUE-110
+discarded-scope rule; each is listed rather than left to a general check):
+`coach`, `coachQualifier`, `scope.matchup`, `scope.venue`, `scope.roundNumber`,
+`scope.playerIdIn`, `careerConditions`, `careerPredicates`,
+`clubSeasonConditions`, `achievementSummary`, `headToHead`, `streakDefinition`,
+`periodSplit`, `scoreCheckpoint`, `resultFilter`, `debutGame`, `havingClause`,
+`matchFilter`, `boundary`, `mode`.
+
+**Fields it consumes:** `player`, `scope.clubFor`, `scope.clubAgainst`,
+`scope.seasonMin`, `scope.seasonMax`, `scope.matchType`, `metric`, `agg`,
+`metricCondition`, `afterSiren`, `tiePolicy`, `limit`.
+
+**The D10 boundary as one exported function**, so the rule lives in exactly one
+place and both `validatePlan` and the compiler read it:
+
+```ts
+/**
+ * D10 (§7.1) limit 2, and limit 1. TRUE when the question needs something
+ * `matches` owns — finals/round_type, canonical date, canonical match
+ * identity — or needs a deterministic chronology, which `after_siren_kicks`
+ * alone cannot provide: round_raw is free text ('GF', 'round 1', 'round 3'
+ * all occur on non-premiership rows) and gives no within-season order.
+ *
+ * A match-unlinked row is EXCLUDED from these answers and included in
+ * every other one. `premiership_season` alone is never the gate.
+ */
+export function afterSirenRequiresMatchLink(plan: NlQueryPlan): boolean {
+  return plan.scope.matchType !== undefined
+    || plan.afterSiren?.occurrence !== undefined;
+}
+```
+
+**Hand-maintained lists that must gain the grain.** `GRAIN_LABEL`,
+`GRAIN_SUBJECT` and `TIE_ENTITY` in `describe.ts` are `Record<NlGrain, string>`
+and so are compiler-enforced (`tsc` fails without them):
+`after_siren: 'after the siren'` / `'kick'` / `'kick'`. The `grains` array inside
+`validatePlan` is **not** compiler-enforced — a plain literal array. Omitting
+`'after_siren'` there fails closed (every plan rejected as an unknown grain)
+rather than opening a hole, and `tests/nl-plan.test.ts` catches it, but it is
+named here because it is the one addition `tsc` will not find.
+
+### 15.2 Answer payload shape
+
+Two payload variants plus reuse of the existing `count`, because an event list
+and a player leaderboard are genuinely different shapes:
+
+```ts
+  | { kind: 'after_siren_event'; lead: NlAfterSirenEventRow | null; rows: NlAfterSirenEventRow[]; total: number }
+  | { kind: 'after_siren_player'; lead: NlAfterSirenPlayerRow | null; rows: NlAfterSirenPlayerRow[]; total: number }
+```
+
+```ts
+/**
+ * One curated after-siren event. Match-owned fields (matchId, matchDate,
+ * roundType) are NULL for a match-unlinked row and are never filled from
+ * after_siren_kicks — season and round_raw are that row's own facts and
+ * are not a substitute for a canonical match (D10 §7.1).
+ */
+export type NlAfterSirenEventRow = {
+  eventId: number;
+  season: number;
+  /** The source's own round string, verbatim. Displayed as recorded, never parsed. */
+  roundRaw: string;
+  competition: string;
+  premiershipSeason: boolean;
+  /** NULL when the source's kicker never linked to a player (6 of 126 measured). */
+  playerId: number | null;
+  playerSlug: string | null;
+  /** Always present: the source's own spelling, shown when playerId is null. */
+  playerName: string;
+  clubName: string;
+  clubSlug: string | null;
+  opponentName: string;
+  opponentSlug: string | null;
+  kickScored: 'goal' | 'behind' | 'none';
+  kickEffect: 'won' | 'drew' | 'none';
+  kickerResult: 'win' | 'draw' | 'loss';
+  /**
+   * RENDERING ONLY (see §15.18 and the D13 confirmation in §15.21): fed to
+   * the existing afterSirenEventLabel so the NL answer words an event the
+   * same way every other AFLDB surface does. Not a parser dimension, not a
+   * plan field, not filterable.
+   */
+  siren: 'final' | 'end_of_regulation' | 'end_of_extra_time';
+  matchId: number | null;
+  matchDate: Date | null;
+  roundType: string | null;
+  /** false when the source row carried no reference (1 of 126 measured). */
+  cited: boolean;
+  value: number | null;
+};
+
+/** One kicker, aggregated over the filtered events. Trusted link only. */
+export type NlAfterSirenPlayerRow = {
+  playerId: number; slug: string; displayName: string;
+  /** The count of qualifying events. Measured ceiling is 2. */
+  value: number;
+  firstSeason: number; lastSeason: number;
+  /** The clubs the player kicked for WITHIN the filtered set, not their career clubs. */
+  clubNames: string | null;
+};
+```
+
+`shot_detail`, `supergoal_scoring`, `kicker_score_raw`, `opponent_score_raw`,
+`kicker_points`, `opponent_points`, `link_status_value`, `candidate_count`,
+`source_id`, `source_record_id` and `notes` are **not** selected and **not**
+rendered. D5 excludes `shot_detail`; the rest are provenance or verbatim source
+figures (one 1944 row's goals.behinds does not add to its stated points — 089's
+own comment) that a natural-language answer must not present as a computed fact.
+
+`describeAnswer`'s `compatible` check gains the two exceptions, exactly as
+`coach_record`/`count` did:
+
+```ts
+    || (plan.grain === 'after_siren'
+        && (payload.kind === 'after_siren_event' || payload.kind === 'after_siren_player'
+            || payload.kind === 'count'))
+```
+
+`payloadTotal` in `answer.ts` gains both new kinds.
+
+### 15.3 Compiler / query ownership
+
+**New file `src/db/queries/nl/after-siren.ts`**, exporting
+`answerAfterSiren(plan, limit)`, wired into `execute.ts`'s switch (which is
+exhaustive over `NlGrain`, so `tsc` demands the case).
+
+It is **not** a second derivation of the existing read model, but nor is it a
+parameterised copy of it: `getAfterSirenRecords` in `src/db/queries/after-siren.ts`
+is the Records board, whose five-CTE first/last-attempt/first/last-goal shape
+answers a different question. What the NL compiler **shares verbatim** with it,
+and must not re-decide:
+
+- the trusted-link rule (`player_id IS NOT NULL`, and — because
+  `after_siren_kicks_link_ck` already binds them —
+  `link_status_value IN ('unique','resolved')` stated explicitly anyway);
+- `COALESCE(cl.name, a.club_name_raw)` / `COALESCE(op.name, a.opponent_name_raw)`
+  club naming, and the `clubSlug`/`opponentSlug` null-when-unresolved convention;
+- `LEFT JOIN matches m ON m.id = a.match_id` as the ONLY route to a canonical
+  match property.
+
+**Ownership, encoded structurally rather than by convention:**
+
+- The base relation is `after_siren_kicks a`, alone. Every dimension, the season,
+  both raw club names, the competition, the `premiership_season` flag and the
+  citation come from it and from nothing else.
+- `matches` is joined `LEFT` and is used **only to project** `match_date` and
+  `round_type`. When `afterSirenRequiresMatchLink(plan)` is true — and only then
+  — the compiler additionally emits `a.match_id IS NOT NULL`, promoting the join
+  to an effective inner join and excluding unlinked rows.
+- `a.premiership_season` is emitted as a filter **only** when the question asks
+  for a canonical match property (i.e. together with `matchType`). It is never
+  emitted merely to make a match link likely. D10 is explicit that `match_id`
+  must not be required because an event is premiership-season, and the converse
+  discipline applies here.
+- **`round_raw` is never read as a filter, by any code path in this compiler.**
+  It is projected for display and nothing else. The witness is §2.6's Kerry Good,
+  1980, `round_raw = 'GF'`, North Melbourne v Collingwood, **Escort
+  Championships, `premiership_season = false`** — any round- or finals-shaped
+  filter that reads `round_raw` returns that row as a Grand Final. This is why
+  D4 makes round-level scope decline and why finals scope goes through
+  `matches.round_type` / `matches.is_finals_series`.
+- All SQL is parameterised. Every enum value reaching SQL is bound, and is one of
+  the closed union members above, never text from the question. Metric lookup
+  goes through a closed `switch` in the compiler, the same discipline
+  `coach-record.ts` applies.
+
+Four query shapes, one per plan shape:
+
+| Plan | SQL |
+|---|---|
+| `subject:'event'`, `agg:'list'` | event rows, `ORDER BY a.season DESC, a.id DESC` (the order `getPlayerAfterSirenEvents` already uses), `LIMIT` |
+| `subject:'event'`, `agg:'count'` | `count(*)` over the filtered events → `{kind:'count'}` |
+| `subject:'event'`, `occurrence` | one event row, `ORDER BY m.match_date ASC|DESC, a.id ASC|DESC`, `LIMIT 1`, match-linked only |
+| `subject:'player'`, `agg` max/min/top_n/list/count | group by `a.player_id`, `count(*) AS value`, `rank() OVER (ORDER BY value DESC|ASC)` with no `PARTITION BY`, every row at the lead rank returned |
+
+### 15.4 Parser vocabulary and precedence
+
+**Cue gate**, mirroring `COACH_CUE_RE` — nothing in the after-siren vocabulary is
+tried until this matches, because `goals`, `behinds`, `points`, `won` and `drew`
+all name other things:
+
+```ts
+export const AFTER_SIREN_CUE_RE =
+  /\bafter the siren\b|\bafter-the-siren\b|\bpost[- ]siren\b|\bon the siren\b|\bas the siren (?:sounded|went)\b|\bsiren\b/;
+```
+
+The bare `\bsiren\b` alternative is last and is safe: no other AFLDB concept in
+the vocabulary uses the word, and the same shape already works for `\bcoach\b`.
+
+**Dimension vocabulary**, tried only once the cue has matched:
+
+```ts
+export const AFTER_SIREN_SCORED_WORDS: [RegExp, 'goal' | 'behind' | 'none'][] = [
+  [/\bgoals?\b|\bmajors?\b|\bsnags?\b|\bsausages?\b/, 'goal'],
+  [/\bbehinds?\b|\bminors?\b|\bpoints?\b/, 'behind'],
+  [/\bmiss(?:ed|es|ing)?\b|\bfell short\b|\bout on the full\b|\bsprayed\b|\bfailed to score\b|\bdid ?n.?t score\b/, 'none'],
+];
+
+export const AFTER_SIREN_EFFECT_WORDS: [RegExp, 'won' | 'drew' | 'none'][] = [
+  [/\bto win\b|\bwinner\b|\bgame[- ]winner\b|\bmatch[- ]winner\b|\bwinning\b|\bto snatch (?:the )?(?:win|victory)\b|\bto steal (?:the )?(?:win|victory)\b/, 'won'],
+  [/\bto draw\b|\bto tie\b|\bto level (?:the )?(?:scores?|match|game)?\b|\bfor a draw\b/, 'drew'],
+];
+
+export const AFTER_SIREN_RESULT_WORDS: [RegExp, 'win' | 'draw' | 'loss'][] = [
+  [/\band (?:still )?won\b|\bin a win\b|\bwon anyway\b|\band (?:their|his) (?:side|team) won\b/, 'win'],
+  [/\band (?:still )?lost\b|\bin a loss\b|\bin a losing\b|\band (?:their|his) (?:side|team) lost\b/, 'loss'],
+  [/\bin a draw\b|\band drew\b|\bin a drawn (?:match|game)\b/, 'draw'],
+];
+
+export const AFTER_SIREN_OCCURRENCE_WORDS: [RegExp, 'first' | 'most_recent'][] = [
+  [/\bmost recent\b|\blatest\b|\bthe last\b|\bwhen was the last\b|\bmost recently\b/, 'most_recent'],
+  [/\bfirst\b|\bearliest\b|\bwhen was the first\b/, 'first'],
+];
+```
+
+**Order within each list matters** and follows the `COACH_METRIC_WORDS`
+precedent: `to win` before the bare `winning`; the multi-word miss idioms before
+the bare `missed`.
+
+**`AFTER_SIREN_RESULT_WORDS` is tried BEFORE `AFTER_SIREN_EFFECT_WORDS`**, so
+"missed after the siren and lost" reads `kickerResult='loss'` and does not have
+"lost" mistaken for anything else; and "and won" is not read as `kickEffect='won'`
+— the two are semantically different and §2.1's `(none, none, win)` event proves
+it. Whichever list matches first claims and strips its phrase.
+
+**Placement in `parseNlQuestion`: a new step 5d, immediately after Phase B's
+step 5c (coaching) and before match-type extraction.** The constraints:
+
+- **After season extraction**, so a year is never read as a dimension token.
+- **Before `extractPlayerMetric` / `extractCareerConditions` / `extractTeamMetric`
+  / the club-season extractors.** This is *the* critical precedence rule of
+  Phase C: `goals` must be claimed as the `kickScored` dimension and never as the
+  `player_match_stats` goals metric, or "who has kicked the most goals after the
+  siren" answers with a career-goals leaderboard. The block therefore suppresses
+  those extractors for the rest of the parse exactly as `coachReading` does
+  (`playerMetricResult`/`teamMetricResult`/`clubSeasonCuePresent` short-circuit).
+- **Before, but not consuming, `extractMatchType`.** Unlike coaching — where
+  "finals" and "grand finals" were coaching *metrics* — here finals is genuine
+  match SCOPE (D4). The after-siren block must therefore **leave** "finals" /
+  "grand final" in the text for `extractMatchType` to claim as `scope.matchType`.
+  This is an explicit inversion of the Phase B rule and is called out because
+  copying Phase B verbatim would break D4.
+- **Player mention resolution is untouched.** See §15.5.
+
+**Mutual exclusion.** If `COACH_CUE_RE` and `AFTER_SIREN_CUE_RE` both fire, the
+question declines (`status:'none'`, reason `'unrecognised'`) with the note
+"AFLDB cannot combine a coaching question with an after-the-siren question."
+Fail closed; neither grain owns the other's fields.
+
+**Subject election** (`event` vs `player`), decided in the block and asserted by
+test:
+
+- `subject = 'player'` when the aggregation resolves to `max`/`min`/`top_n`, or a
+  `metricCondition` was consumed, or an explicit player-subject cue is present
+  (`which player`, `who has kicked the most`, `players who`).
+- `subject = 'event'` otherwise — including a named `player` with a `list`
+  aggregation ("Barry Hall's goals after the siren" is his events, not a
+  one-row leaderboard), every `count`, and every `occurrence`.
+
+**Structural gate.** `structuralOk` for this grain is
+`afterSiren !== undefined` — the cue matched and a descriptor was built. A bare
+"siren" with nothing else still declines through the ordinary confidence gate.
+
+### 15.5 Player resolution behaviour
+
+- **No new directory.** Unlike coaching — where 18 of 386 people have no player
+  row and the identity spaces differ — an after-siren kicker **is** a player.
+  Resolution goes through the existing `ctx.resolvePlayer` path, unchanged.
+- **`scope.playerIdIn` is REFUSED for this grain.** The ambiguous-surname
+  ranking path (parser v9) exists so a real tie decides between candidates. Here
+  the measured metric ceiling is **2** and *every* superlative is already a tie
+  (§7.3), so ranking across an ambiguous surname over a 126-row curated list
+  would present a coin flip as a record. Fail closed; the question declines.
+- **A resolved player with no after-siren row is an honest EMPTY result**, not a
+  decline: "No after-the-siren kick recorded for <name>." AFLDB knows the player
+  and knows the curated list; the answer is nobody.
+- **The 6 unlinked source kickers are never reachable by a player mention.** A
+  question naming one resolves through `players` and finds either nothing or a
+  different person. Those rows remain valid **event** evidence and appear in
+  every `subject:'event'` answer under their source spelling
+  (`player_name_raw`), unlinked and unlinkable — the §15.18 caveat says so.
+- A `player` plus `subject:'player'` is refused: a leaderboard of one is not a
+  ranking. A named player takes `subject:'event'`.
+
+### 15.6 Club / opponent lineage handling
+
+- `scope.clubFor` = the **kicker's** club. `scope.clubAgainst` = the **opponent**.
+  Both may be present at once ("Fremantle goals after the siren against
+  Richmond").
+- Both fold the full `organization_id` lineage, exactly as the club page and
+  `coach-record.ts` do:
+
+```sql
+  a.club_id IN (SELECT id FROM clubs WHERE organization_id = $org)
+  a.opponent_club_id IN (SELECT id FROM clubs WHERE organization_id = $org)
+```
+
+- **The lineage witness is measured and must be a test**: §2.5's four goals
+  against the Richmond organization include **Bill Wood, Footscray, 1946**
+  (event 16, match 4486). A raw `club_id` comparison would drop it. "Against the
+  Western Bulldogs" must likewise reach the Footscray era, and nothing of
+  Fitzroy's ever reaches Brisbane Lions — a merger is a different organisation.
+- `scope.matchup` is **refused**: a curated event names one side as the kicker,
+  and a symmetric two-club reading is not a thing this table owns.
+- **Rows with an unresolved club.** `club_id` and `opponent_club_id` are
+  nullable. A club-scoped answer counts only rows whose club id resolved, and if
+  any in-scope row did not, the caveat says how many were excluded. **The number
+  of such rows is not measured** — see gap **M7** in §15.20; the pre-implementation
+  addendum query in §15.19 must be run before this behaviour is finalised.
+
+### 15.7 Linked versus unlinked row rules (D10, §7.1, encoded)
+
+`afterSirenRequiresMatchLink()` is the whole rule. The table below is its
+contract, and `tests/nl-plan.test.ts` asserts every row of it:
+
+| Semantics | needs `match_id` | needs trusted player link |
+|---|---|---|
+| event `list` | no | no |
+| event `count` | no | no |
+| club / opponent totals | no | no |
+| `kickScored` / `kickEffect` / `kickerResult` filters | no | no |
+| season scope, `premiership_season` flag | no | no |
+| player ranking / player count / `metricCondition` | no | **yes** |
+| a named player's events | no | **yes** (the mention resolves to a player id) |
+| finals / `round_type` scope (D4) | **yes** | no |
+| `occurrence` first / most recent (D10 limit 1) | **yes** | no |
+| canonical match date, venue, a `/matches/[id]` link | **yes** | no |
+
+Two consequences stated so they cannot be quietly softened later:
+
+1. **`match_id` is never required because a row is premiership-season.** The four
+   2026 premiership rows with no match link (Zurhaar, Moore ×2, Membrey; §2.6,
+   §7.4) are counted, listed, attributed to their clubs and their kickers, and
+   classified on all three dimensions — everything except ordering and finals.
+2. **When a match link IS required, the exclusion is stated, not silent.** The
+   answer's caveat names how many recorded kicks were left out and why.
+
+### 15.8 Finals handling
+
+- `scope.matchType` is accepted and compiled from **`matches` only**:
+  `'finals'` → `m.is_finals_series`; a literal round type → `m.round_type = $t`.
+  `round_raw` is not consulted. `a.premiership_season` is emitted alongside as a
+  belt-and-braces filter that makes the query self-evidently right (089's
+  `after_siren_kicks_match_ck` already implies it).
+- Any `matchType` — including `'home_and_away'` — sets
+  `afterSirenRequiresMatchLink`, because `round_type` is a `matches` column.
+- `scope.roundNumber` **declines** (D4): "AFLDB records an after-the-siren kick's
+  round only as the source wrote it, so a round-number question cannot be
+  answered." The Kerry Good 1980 `'GF'` row is why.
+- **"After the siren in a Grand Final" returns an honest EMPTY result.** §2.7 is
+  exhaustive: 8 premiership finals events, all match-linked — EF Shuey 2017; QF
+  Smith 2016, King 1994, Brownless 1994; PF Lockett 1996, Ablett 1994, Buckenara
+  1987; SF Jesaulenko 1972 — and **no VFL/AFL Grand Final after-siren event
+  exists**. Returning the 1980 Escort Championships row instead is the single
+  most likely wrong answer in this family and gets its own test.
+
+### 15.9 Earliest / latest handling
+
+- `occurrence` sets `afterSirenRequiresMatchLink` (D10 limit 1). The compiler
+  orders by `m.match_date`, tie-broken by `a.id`, and takes one row.
+- **No `season` + `round_raw` ordering is implemented, and none is proposed.**
+  `round_raw` is free text — `'GF'`, `'round 1'`, `'round 3'` all occur — and
+  gives no within-season order. The operator's D10 limit 1 requires a proven
+  deterministic total ordering independent of `matches` before this changes;
+  none is proven, so this stays match-linked.
+- **The answer says so.** "Ordered by match date, so only the 116 after-the-siren
+  kicks linked to a canonical match are considered; 10 recorded kicks have no
+  match link and cannot be placed in order." (Counts computed at answer time from
+  the filtered set, not hard-coded.)
+- Measured witnesses (§2.8): first = event 1, Billy Schmidt, St Kilda v Carlton,
+  1913-08-02, match 1313. Most recent = event 121, Nasiah Wanganeen-Milera,
+  St Kilda v Melbourne, 2025-07-27, match 16792. The four 2026 unlinked rows
+  **must not** win "most recent" — its own test.
+
+### 15.10 Ranking, count and list semantics
+
+- **Every superlative in this family is a tie.** §7.3 is exhaustive: max kicks 2,
+  max goals 2, max winning kicks 2. `tiePolicy` is `'all'` and the ranked query
+  uses `rank()` with no `PARTITION BY`, returning every row at the lead rank —
+  the same shape every other grain uses. A "most goals after the siren" answer
+  that names one player is wrong by construction.
+  - "most goals after the siren" → **Barry Hall (1001) and Gary Rohan (4742)**,
+    2 each (§2.4).
+  - "most kicks after the siren" → **nine** players tied on 2: Hall, Rohan,
+    Mundy, Riewoldt, Blight, Kernahan, Hawkins, McGovern, Johnson (§2.4).
+- **`min` is REFUSED** for this grain: the set is *defined* by having at least one
+  after-siren kick, so "fewest kicks after the siren" has no answer that means
+  anything. Declines rather than returning everyone on 1. (Operator confirmation
+  D15, §15.21.)
+- `count`: over `subject:'event'`, the number of events; over `subject:'player'`,
+  the number of distinct trusted-linked kickers.
+- `list` over `subject:'event'`: ordered `season DESC, id DESC`, capped at
+  `NL_LIMITS.maxListRows` (100). The whole family is 126 rows, so a list is
+  genuinely bounded and the "showing N of M" line will rarely fire.
+- `metricCondition` on `siren_kicks` requires `subject:'player'` and `agg:'list'`
+  — the same rule `player_game`/`player_season` already enforce. Because the
+  ceiling is 2, **"3 or more goals after the siren" is an honest empty result,
+  not a decline**: the question is well-formed and the answer is nobody.
+
+### 15.11 Goals versus behinds versus misses
+
+- `kickScored` carries three distinct values that are never collapsed:
+  `goal` | `behind` | `none`.
+- **Absent `kickScored` means ANY kick, including a miss.** "Kicks after the
+  siren" is 126 events, not the 101 that registered a score. Easy to get wrong,
+  so it is asserted.
+- **"Missed after the siren" is fixed to `kick_scored='none'` only.** A behind is
+  colloquially also a miss, and 089's own comment records that a behind that left
+  the kicker's side behind is `('behind','none')`. One reading is chosen — the
+  column's own meaning, "the shot registered nothing" — and the rendered
+  interpretation states which was answered, so a reader can see it. "Kicked a
+  behind after the siren" reaches the behind reading through the behind/point
+  vocabulary.
+- Witnesses: `none/none` → event 125 (Dylan Moore 2026, unlinked) and, for a
+  match-linked substitute, David King 1994 QF (event 48) and Alex Jesaulenko
+  1972 SF (event 27) from §2.7. `behind/none` → event 126 (Tim Membrey 2026,
+  unlinked); 21 premiership rows exist (§2.1).
+
+### 15.12 `kick_effect` — won / drew / none
+
+- `kickEffect` is what the kick did to the **result**, and is ANDed with
+  `kickScored`, never merged into it.
+- `'won'` **includes a winning behind** — 5 premiership + 1 non-premiership rows
+  (§2.1). Match-linked witnesses: Michael Walters 2019 (event 103, match 15495)
+  and Tony Lockett 1996 PF (event 51, match 11171).
+- `'drew'` levelled the scores; witness Tom Hawkins 2017 (event 94, match 15114).
+- `'none'` changed nothing, including a behind that left the side behind or level.
+- **The binding distinction, with numbers.** Derived from §2.1 (exhaustive over
+  126 events; the integration test re-proves each with its own hand-written SQL
+  rather than pinning this arithmetic):
+
+  | Reading | dimensions | all rows | premiership only |
+  |---|---|---|---|
+  | goal after the siren | `kickScored='goal'` | **71** | 67 |
+  | goal after the siren **to win** | `kickScored='goal' AND kickEffect='won'` | **62** | 59 |
+  | won a game with a kick after the siren | `kickEffect='won'` | 68 | 64 |
+  | missed after the siren | `kickScored='none'` | 25 | 25 |
+  | missed after the siren **and lost** | `kickScored='none' AND kickerResult='loss'` | 18 | 18 |
+
+  The first two rows must return different numbers, and a test asserts the
+  inequality directly.
+- **The existing `after_siren_winner` grid builder is NOT wired in Phase C, and
+  that is deliberate.** It compiles to
+  `premiership_season AND kick_scored IN ('goal','behind') AND kick_effect='won'
+  AND siren IN ('final','end_of_extra_time')` at `player_career` grain — i.e.
+  precisely the *third* row of that table, "won a game with a kick after the
+  siren", including a winning behind and premiership-only. It must never answer
+  "kicked a goal after the siren" (67 vs 64, different populations). The
+  `after_siren` grain answers that question with the right dimensions and the
+  right caveats, and two routes to one question is exactly the collision F3
+  warns about. The builder is left untouched and unreferenced. (Operator
+  confirmation D14, §15.21.)
+
+### 15.13 `kicker_result` semantics
+
+- The match result **from the kicker's side**, read from the source's own final
+  score at import time. Never inferred here from `matches.winner_club_id`, from
+  `scores`, or from `player_match_stats` — the "no inferred facts" rule.
+- **Independent of `kickEffect`, with an exhaustive witness**: §2.1 row 7 is
+  premiership, `kick_scored='none'`, `kick_effect='none'`, **`kicker_result='win'`**
+  — a player who scored nothing after the siren and whose side won anyway. So
+  "missed after the siren and lost" (18) is strictly narrower than "missed after
+  the siren" (25), and the two must never compile to the same predicate.
+- The `none/none` group splits 18 loss / 6 draw / 1 win, all measured.
+
+### 15.14 Explicit decline cases
+
+Each declines, or emits a plan that `validatePlan` refuses. Each gets a corpus
+row and an acceptance-test entry.
+
+| # | Form | Why |
+|---|---|---|
+| C-D1 | "after-siren goals in round 1" | round-level scope declines (D4); `round_raw` is free text |
+| C-D2 | "goals after the siren at the MCG" | venue is a `matches` property not exposed for this grain |
+| C-D3 | "Richmond v Carlton after the siren" | `scope.matchup` not owned |
+| C-D4 | "which coach won most games on a goal after the siren" | coaching cue + siren cue; fail closed |
+| C-D5 | "fewest kicks after the siren" | `min` refused — the set is defined by having ≥1 |
+| C-D6 | "goals after the siren in 1900" | coverage floor 1913 |
+| C-D7 | "most after-siren goals in a season" | no per-season after-siren grain (the coaching `inOneSeason` rule) |
+| C-D8 | "after the siren in extra time" / "before extra time" | siren subtype not exposed (D5); single witnesses, nothing rankable |
+| C-D9 | "who kicked it out on the full after the siren" / "who fell short" | `shot_detail` not exposed (D5) |
+| C-D10 | "how much did they win by after the siren" | verbatim source scores, not a computed fact |
+| C-D11 | "after the siren in the NAB Cup" | competition-name filtering not exposed; only the `premiership_season` flag |
+| C-D12 | "Ablett after the siren" (ambiguous surname) | `scope.playerIdIn` refused; every superlative is already a tie |
+| C-D13 | "300-game players who kicked a goal after the siren" | cross-grain career predicate; not owned by this grain |
+| C-D14 | "was it a supergoal after the siren" | `supergoal_scoring` not exposed |
+| C-D15 | "did the siren sound before the kick" | out of family |
+
+**Not a decline** — supported, and included as a positive combination test:
+"who has kicked the most goals after the siren for Richmond in the finals since
+2000" (finals ⇒ match-linked, club lineage, season range, player subject).
+
+### 15.15 Red-before-green test matrix
+
+Existing suites are extended; **one** new file is created, because no existing
+suite is a sensible semantic home for a DB-backed after-siren comparison.
+
+| Suite | What it covers |
+|---|---|
+| `tests/nl-parser.test.ts` | cue gating, dimension vocabulary and its order, metric-extractor suppression, subject election, occurrence words, coach/siren mutual exclusion, every §15.14 decline |
+| `tests/nl-plan.test.ts` | `validatePlan` ownership — every refused field by name; the §15.7 table; `afterSirenRequiresMatchLink` derivation; `min` refused; metric/agg/threshold combinations; `siren_kicks` vs `kicks` coverage non-collision |
+| `tests/nl-describe.test.ts` | headline and interpretation for all four shapes; tie wording; the three caveats; that "goal after the siren" and "goal after the siren to win" produce different sentences |
+| `tests/nl-audit-acceptance.test.ts` | a new `describe` block in the Phase B coaching style: supported forms → intended plan; §15.14 forms → decline or failed validation |
+| `tests/nl-ui-corpus.test.ts` | shape assertions for the two new CSVs |
+| `tests/integration/nl-answers-after-siren.test.ts` | **NEW.** DB-backed, every assertion compared against independently hand-written SQL |
+| `tests/integration/database.test.ts` | `after_siren: true` added to `SUPPORTED_NL_GRAINS` |
+
+**The genuine red-before-green sequence.** Each step must be *observed* failing
+before the code that makes it pass is written:
+
+- **R0 — the current-behaviour probe, first, before any edit.** Run
+  "who has kicked the most goals after the siren", "how many goals after the
+  siren have there been" and "goal after the siren to win" through the current
+  parser and record the verbatim outcome. If any **answers** — most plausibly by
+  claiming `goals` as the `player_match_stats` metric and ranking career goals
+  while "after the siren" survives only as leftover tokens under the confidence
+  gate — that is a **live false-answer defect** and is recorded as a new Finding
+  (the F2 analogue for this family), with the failing assertion written first.
+  If all three decline, the tests assert the decline first and are flipped when
+  the grain lands. **This probe is not optional and its result is not assumed
+  here.**
+- **R1** — `after_siren` added to `SUPPORTED_NL_GRAINS` ⇒ `database.test.ts`
+  fails against `afldb_test` ⇒ migration 093 written ⇒ passes. This is the F5
+  mechanism working as designed (§15.20).
+- **R2** — parser tests for each vocabulary form, written before the vocabulary.
+- **R3** — the two inequality tests (goal ≠ goal-to-win; miss ≠ miss-and-lost),
+  written before the dimensions exist.
+- **R4** — the Grand Final empty-result test, written before finals scope exists;
+  it must fail loudly if the Kerry Good 1980 row is ever returned.
+- **R5** — the "most recent" test, written before `occurrence` exists; must
+  return event 121 and never a 2026 unlinked row.
+- **R6** — the tie tests (Hall + Rohan; the nine on 2), written before ranking.
+- **R7** — the parity test against `getAfterSirenRecords`, written before the
+  compiler: for every player, the NL compiler's unfiltered per-player count must
+  equal that function's `attempts`, and its `kickScored='goal'` count must equal
+  `goals`. Two independent code paths agreeing on the overlapping question.
+
+### 15.16 DB-backed hand-written-SQL witnesses
+
+All from `ISSUE-152-nl-evidence-output.txt` (`afldb_test`, 2026-09-08,
+read-only). The integration suite re-derives every count with its own SQL; the
+numbers below are the expected values, not the source of truth.
+
+| Question | Expected | Evidence |
+|---|---|---|
+| most goals after the siren | Barry Hall (1001) **and** Gary Rohan (4742), 2 each, tied | §2.4, §7.3 |
+| most kicks after the siren | nine players tied on 2 | §2.4 |
+| 3+ goals after the siren | **empty** (ceiling is 2) | §7.3 |
+| goals after the siren against Richmond | 4 — Bill Wood 1946 Footscray (16/4486), Karmichael Hunt 2012 (82/14091), David Mundy 2017 (92/15065), Noah Anderson 2022 (113/16122) | §2.5 |
+| after the siren in a Grand Final | **empty**, never Kerry Good 1980 | §2.7, §2.6 |
+| after the siren in finals | 8 events, all match-linked | §2.7 |
+| the first kick after the siren | event 1, Billy Schmidt, 1913-08-02, match 1313 | §2.8 |
+| the most recent goal after the siren | event 121, Nasiah Wanganeen-Milera, 2025-07-27, match 16792 — **not** a 2026 row | §2.8 vs §7.4 |
+| how many kicks after the siren | 126 total; 121 premiership; 116 match-linked; 120 trusted-linked kickers | §0.1, §2.2, §2.3 |
+| behind after the siren that won | Michael Walters 2019 (103/15495), 6 rows | §7.4, §2.1 |
+| behind after the siren that drew | Tom Hawkins 2017 (94/15114), 3 premiership rows | §7.4 |
+| goal after the siren vs goal to win | 71 vs 62 (67 vs 59 premiership) | §2.1 |
+| missed after the siren vs missed and lost | 25 vs 18 | §2.1 |
+| missed after the siren and still won | 1 event | §2.1 |
+| kicks not linked to a player | 6 of 126 (5 cited, 1 uncited) | §2.3 |
+
+Four of the six `(kick_scored, kick_effect)` witnesses in §7.4 are 2026 rows with
+`match_id` NULL, so any test needing a match link takes the linked substitutes
+named above — the point §5.3.B already makes.
+
+### 15.17 Corpus additions (additive only)
+
+Two new CSVs, same five columns and naming convention as Phase B's:
+
+- `tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-<date>.csv` — ~80
+  realistic questions, `expected_status=plan`, categories `siren_event_list`,
+  `siren_player_rank`, `siren_club_scope`, `siren_opponent_scope`,
+  `siren_finals`, `siren_occurrence`, `siren_count`, `siren_effect`,
+  `siren_result`, `siren_miss`.
+- `tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-<date>.csv` —
+  ~25 declines, at least one per §15.14 row plus phrasing variants.
+
+The 1,435-row realistic and 60-row decline gates are **untouched** and are
+re-asserted siren-free, the same assertion Phase B added for coaching.
+
+### 15.18 Renderer wording
+
+Two new tables in `NlAnswerSection.tsx`, following `CoachRecordTable`'s shape
+including its `rows.length <= 1` suppression:
+
+- **`AfterSirenEventTable`** — Season | Round (as recorded) | Player | Club |
+  Opponent | What happened | Match.
+  - "What happened" is the **existing** `afterSirenEventLabel`
+    (`src/lib/after-siren-format.ts`), so an NL answer words an event exactly as
+    the profile and records pages already do — "Goal after the siren to win",
+    "Behind after the siren to draw", "Missed after the siren", "Missed before
+    extra time".
+  - Player: `playerPath` when `playerId` is non-null; otherwise the source
+    spelling as **plain muted text**, never a link.
+  - Match: `matchPath` only when `matchId` is non-null; an unlinked row shows
+    "—" and **no fabricated date**.
+  - Round shows `round_raw` verbatim under a header that says "as recorded", so
+    a `'GF'` on a non-premiership row cannot read as a Grand Final.
+- **`AfterSirenPlayerTable`** — Player | Kicks after the siren | Seasons | Clubs.
+
+Headlines and interpretations (`describe.ts`), for the four shapes:
+
+- player ranking — "Barry Hall and Gary Rohan — 2 goals after the siren (tied)"
+- event count — "71 kicks after the siren"
+- event list — "4 goals after the siren against Richmond"
+- occurrence — "Billy Schmidt — St Kilda v Carlton, 2 August 1913"
+
+**The interpretation must name every applied dimension in words**, so that
+"a goal after the siren" and "a goal after the siren to win" are visibly
+different answers on the page:
+
+- `kickScored`: "that kicked a goal" / "that kicked a behind" / "that scored
+  nothing"
+- `kickEffect`: "and won the match" / "and levelled the scores" / "which did not
+  change the result"
+- `kickerResult`: "in a match their side won / drew / lost"
+
+Three caveats:
+
+1. **Always, on every after-siren answer:** "AFLDB's after-the-siren record is a
+   curated, cited list of individual events, not a systematic record of every
+   kick after every siren." The 1913 floor alone would imply a completeness this
+   family does not have. (Operator confirmation D12, §15.21.)
+2. **Player-subject answers:** "N of the M recorded kicks are not linked to a
+   player and are not counted here." (6 of 126 measured.)
+3. **Match-link-required answers:** "Only the N kicks linked to a canonical match
+   can be ordered / scoped to finals; M recorded kicks have no match link."
+
+Both counts are computed from the filtered set at answer time, never hard-coded.
+Nothing exposes `shot_detail`, `supergoal_scoring` or the verbatim source scores,
+and `siren` appears only inside `afterSirenEventLabel`'s existing sentence.
+
+### 15.19 Pre-implementation measurement addendum (must run before §15.6 is final)
+
+One read-only query, to close gap **M7**. It is the only measurement Phase C
+needs that the Stage-0 pack did not take:
+
+```sql
+SELECT count(*) FILTER (WHERE club_id IS NULL)          AS club_unresolved,
+       count(*) FILTER (WHERE opponent_club_id IS NULL) AS opponent_unresolved,
+       count(*)                                          AS events
+  FROM after_siren_kicks;
+```
+
+If either count is zero, §15.6's exclusion caveat is dead code and is dropped. If
+not, the caveat ships and the excluded rows are named in the test matrix.
+
+### 15.20 Schema and telemetry implications — the F5 analogue
+
+**Migration 093 is expected to be REQUIRED, and the requirement is proven by a
+failing test, not assumed.**
+
+`nl_search_log.grain`'s CHECK currently lists nine grains (046 → 055 → 079 →
+092). `after_siren` is the tenth. `logNlSearch` schedules its INSERT via
+`after()` and deliberately swallows failures so telemetry can never break a
+search — so without 093, **every after-siren answer renders correctly, HTTP 200,
+right rows, right wording, while its telemetry row is rejected and dropped with
+only a `console.error`.** That is exactly F5, and exactly what 055, 079 and 092
+each repaired for an earlier grain.
+
+Phase B's fix makes this self-detecting: `tests/integration/database.test.ts`
+drives its accepted list from `Record<NlGrain, true>`, so adding
+`after_siren: true` **fails the test first** (step R1). The migration is then
+written, and only then does the test pass — genuine red-before-green for the
+schema change, which is why the "no migration unless implementation proves one is
+required" rule is satisfied rather than bypassed.
+
+- File: `src/db/migrations/093_nl_search_log_after_siren_grain.sql`.
+  **093 is free** — no `09[3-9]` migration exists on any local or remote branch
+  (checked 2026-09-08). The migration naming/collision/checksum contract (36/36)
+  re-checks this and must be run.
+- Forward-only and **strictly widening**: all nine existing grains retained
+  verbatim; the CHECK is not weakened, not dropped, not made `NOT VALID`; no
+  existing row can fail the new predicate; `logNlSearch` unchanged.
+- The contract test additionally keeps its "an unsupported grain is still
+  REJECTED" assertion, so widening cannot become a formality, and gains
+  `expect(inserted).toContain('after_siren')` beside `coach_record` so reverting
+  093 fails by name.
+- **Deploy ordering: 093 must reach `afldb_dev` and production BEFORE the code**,
+  or it reproduces the silent-drop window it fixes. It joins 092 in the same
+  ordering constraint — both migrations before the ISSUE-152 code.
+
+**No other schema change.** `after_siren_kicks` (089) already carries every
+column this grain reads; `SELECT afldb_meta.grant_app_read('after_siren_kicks')`
+is already in 089, so the app-read fail-closed rule is satisfied and no
+privileges change is needed. **No index change**: `ix_after_siren_kicks_effect`
+is partial on `WHERE premiership_season` and will not serve a non-premiership
+query, which over 126 rows is irrelevant — stated here so nobody adds one.
+
+**Measurement gap M7** (unresolved club ids, §15.19) is added to the §5.3.G gap
+list.
+
+### 15.21 `PARSER_VERSION` bump point
+
+**One bump, 35 → 36**, in the single commit that lands the behavioural wiring —
+the vocabulary, the grain election and the plan emission together. Not in a
+test-only commit, not in the migration-only commit, and not twice. A new entry is
+added to the `PARSER_VERSION` doc block in `plan.ts`, in the style of 35, saying
+exactly what version 36 covers: the tenth grain, the three independent typed
+dimensions, the match-link boundary, and the metric-extractor precedence change
+that stops "goals after the siren" being read as a career-goals ranking.
+
+### 15.22 Files this phase touches
+
+| File | Change |
+|---|---|
+| `src/search/nl/plan.ts` | grain, `NlAfterSiren`, plan field, `NL_METRICS.after_siren`, coverage entry + grain branch, `afterSirenRequiresMatchLink`, `validatePlan` block, `PARSER_VERSION` 36 |
+| `src/search/nl/vocab.ts` | `AFTER_SIREN_CUE_RE` and the four word lists |
+| `src/search/nl/parser.ts` | step 5d, extractor suppression, subject election, structural gate, mutual exclusion |
+| `src/search/nl/answer-types.ts` | two row types, two payload variants |
+| `src/search/nl/describe.ts` | grain label maps, `compatible` exceptions, four describe shapes, three caveats |
+| `src/db/queries/nl/after-siren.ts` | **new** — the compiler |
+| `src/db/queries/nl/execute.ts` | dispatch case |
+| `src/db/queries/nl/answer.ts` | `payloadTotal` cases |
+| `src/components/NlAnswerSection.tsx` | two tables |
+| `src/db/migrations/093_nl_search_log_after_siren_grain.sql` | **new** — after R1 fails |
+| `tests/*` | the §15.15 matrix |
+| `tests/nl-ui/corpora/*after-siren*.csv` | **new** — two corpora |
+| `issues/open/AFLDB-ISSUE-152.md`, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md`, `docs/search.md` | tracking |
+
+Not touched: `src/db/queries/after-siren.ts`, `src/lib/after-siren-format.ts`,
+`src/db/queries/grid-solver.ts` (the `after_siren_winner` builder), migration 089,
+the coaching implementation, the 1,435/60 corpora, and the four external
+`afldb_test` snapshot-drift assertions in `tests/integration/database.test.ts`.
+
+### 15.23 Operator decisions still required before Phase C is implemented
+
+| # | Decision | Recommendation |
+|---|---|---|
+| **D12** | The 1913 coverage floor **plus** a permanent "curated, cited list, not a systematic record" caveat on every after-siren answer. A floor alone implies a completeness this family does not have. | **Approve both.** |
+| **D13** | D5 says the siren subtype is not exposed. Reading: not a parser dimension, not filterable, not a plan field — but `siren` **is** selected and passed to the existing `afterSirenEventLabel` so an NL answer words an event exactly as the rest of the site does. | **Confirm this reading.** The alternative is a second, divergent wording for the same event. |
+| **D14** | The `after_siren_winner` grid builder is deliberately **not** wired in Phase C, leaving one route to the question. | **Confirm.** Two routes to one question is the F3 collision. |
+| **D15** | `min` aggregation refused for this grain ("fewest kicks after the siren"). | **Approve the refusal.** |
+| **D16** | The §15.19 addendum query (unresolved `club_id` / `opponent_club_id`, gap M7) must be run against `afldb_test` before §15.6's lineage semantics are final. Read-only, operator-executed. | **Authorise the run.** |
+| **D17** | Migration **093** authorised as Phase C work, on the same terms 092 was authorised for Phase B, and applied to `afldb_dev`/production **before** the code. | **Authorise.** |
+| **D18** | The four 2026 rows may be an `afldb_test` artefact (its `matches` evidence stops in 2025). No test pins a 2026 row's *presence*; the "most recent must not be an unlinked row" test is robust either way. | **Confirm** that this is acceptable, or say the 2026 rows are to be treated as real. |
+| **D19** | If the **R0 probe** shows the current parser *answers* an after-siren question with a career-goals ranking, that is a live false-answer defect. Is it recorded as a new Finding on ISSUE-152 (the F2 analogue) and fixed inside Phase C, or split out? | **Record it on ISSUE-152 and fix it in Phase C** — the grain is the fix. |
+
+### 15.24 Stop condition
+
+~~This section is a plan. Nothing is implemented, no test is written, no
+migration exists, `PARSER_VERSION` is still 35, and no deployment is proposed.~~
+
+**SUPERSEDED 2026-09-08.** D12–D19 were answered (D12 approved, D13 confirmed,
+D14 confirmed, D15 approved, D16 authorised, D17 authorised, D18 confirmed, D19
+recorded-and-fixed-here — though its condition did not fire, see §16.1), the
+operator authorised implementation, and Phase C is implemented at
+`PARSER_VERSION` 36 with migration 093. It is **not committed and not
+deployed**. See §16.
+
+---
+
+## 16. Phase C — IMPLEMENTED 2026-09-08
+
+**Status: IMPLEMENTED, focused validation green, NOT deployed, NOT committed.**
+The operator approved §15 with decisions **D12–D19** (§15.23) and authorised
+implementation in a fixed order. Everything below is what actually happened,
+including the two places the plan was not followed and why.
+
+`PARSER_VERSION` 35 → **36**, once, in the behavioural wiring.
+
+### 16.1 R0 — the pre-implementation probe (D19 does NOT fire)
+
+Run **before any edit**, through the current parser (v35) with a DB-free
+context. All eight probes **declined**. No live false-answer defect exists, so
+**D19's condition does not fire** and no F2-analogue finding is recorded.
+
+| Question | Result | Consumed | Unsupported |
+|---|---|---|---|
+| Who has kicked the most goals after the siren? | `none` / low_confidence 0.40 | `most`, `goals` | `after siren` |
+| how many goals after the siren have there been | `none` / low_confidence 0.22 | `how`, `many`, `goals` | `after siren there been` |
+| goal after the siren to win | `none` / low_confidence 0.15 | `win` | `goal after siren` |
+| most kicks after the siren | `none` / low_confidence 0.40 | `most`, `kicks` | `after siren` |
+| when was the first goal after the siren | `none` / low_confidence 0.05 | `goal` | `when first after siren` |
+| Barry Hall's goals after the siren | `none` / low_confidence 0.05 | `goals` | `barry hall after siren` |
+| missed after the siren and lost | `none` / **unrecognised** 0.00 | — | `missed after siren lost` |
+| goals after the siren for Richmond | `none` / low_confidence 0.40 | `richmond`, `goals` | `after siren` |
+
+**The hazard §15.4 names is nonetheless confirmed, and is only masked.** The
+player-metric extractor DID claim `goals`/`kicks` — see the `consumed` column —
+and the wrong answer was suppressed solely by the 0.35 unresolved penalty on the
+leftover `after siren` tokens. The moment a cue consumes those tokens that
+penalty disappears. The step-5d precedence rule is therefore load-bearing, not
+tidiness, and `tests/nl-parser.test.ts` asserts it directly ("goals is claimed
+as the kickScored dimension, never as the career goals metric").
+
+### 16.2 M7 — the §15.19 measurement (D16), and the caveat it retires
+
+Read-only against `afldb_test`, 2026-09-08:
+
+```
+club_unresolved | opponent_unresolved | events
+              0 |                   0 |    126
+```
+
+**Both counts are zero.** Every one of the 126 curated events has a resolved
+`club_id` and a resolved `opponent_club_id`. Per §15.19's own instruction, the
+§15.6 "rows with an unresolved club are excluded and the caveat says how many"
+behaviour is **dead code and was not implemented**. Gap **M7** is closed as
+measured, not carried.
+
+The two exclusions that ARE real were measured at the same time and are wired:
+**6 of 126** events have no trusted player link, **10 of 126** have no canonical
+match. Both are computed at answer time from the filtered set (never
+hard-coded) and surface as caveats only when non-zero.
+
+### 16.3 Files changed
+
+| File | Change |
+|---|---|
+| `src/search/nl/plan.ts` | tenth grain `after_siren`; `NlAfterSiren` + its five closed unions and their runtime lists; `NlQueryPlan.afterSiren`; `NL_METRICS.after_siren.siren_kicks`; `NL_COVERAGE.siren_kicks` (1913) + the grain-first branch in `nlCoverageFor`; exported `afterSirenRequiresMatchLink`; the `validatePlan` ownership block; the grain added to the three `Record<NlGrain, …>` maps and to the literal `grains` array; `PARSER_VERSION` 35 → 36 with a new doc entry |
+| `src/search/nl/vocab.ts` | `AFTER_SIREN_CUE_RE`, `AFTER_SIREN_SCORED_WORDS`, `AFTER_SIREN_EFFECT_WORDS`, `AFTER_SIREN_RESULT_WORDS`, `AFTER_SIREN_OCCURRENCE_WORDS`, `AFTER_SIREN_KICK_NOUN_RE`, `AFTER_SIREN_PLAYER_SUBJECT_RE` |
+| `src/search/nl/parser.ts` | step 5d; extractor suppression (team metric, career conditions, first-kick achievement, club-season, player metric); subject election; the after-siren aggregation default; the per-season refusal; the structural gate; coach/siren mutual exclusion |
+| `src/search/nl/answer-types.ts` | `NlAfterSirenEventRow`, `NlAfterSirenPlayerRow`, `NlAfterSirenExclusions`, two payload variants |
+| `src/search/nl/describe.ts` | `compatible` exceptions; four describe shapes; grain-aware `count` wording; exported `answerCaveats` |
+| `src/db/queries/nl/after-siren.ts` | **new** — the compiler |
+| `src/db/queries/nl/execute.ts` | dispatch case |
+| `src/db/queries/nl/answer.ts` | `payloadTotal` cases; caveats wired into `buildAnswer` |
+| `src/components/NlAnswerSection.tsx` | `AfterSirenEventTable`, `AfterSirenPlayerTable` |
+| `src/db/migrations/093_nl_search_log_after_siren_grain.sql` | **new** |
+| `tests/nl-parser.test.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-ui-corpus.test.ts`, `tests/integration/database.test.ts` | Phase C coverage |
+| `tests/integration/nl-answers-after-siren.test.ts` | **new** — 20 DB-backed comparisons |
+| `tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv` | **new** — 93 rows |
+| `tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv` | **new** — 27 rows |
+
+Not touched, exactly as §15.22 requires: `src/db/queries/after-siren.ts`,
+`src/lib/after-siren-format.ts`, the `after_siren_winner` grid builder,
+migration 089, the Phase B coaching implementation, the 1,435/60 corpora, and
+the four external `afldb_test` snapshot-drift assertions.
+
+### 16.4 Supported after-the-siren question families
+
+| Family | Example | Plan |
+|---|---|---|
+| event list | "goals after the siren" | `event`, `kickScored:'goal'`, `list` |
+| any kick | "kicks after the siren" | `event`, no `kickScored` — 126 events, misses included |
+| event count | "how many goals after the siren" | `event`, `count` |
+| kicker ranking | "who has kicked the most goals after the siren" | `player`, `kickScored:'goal'`, `max` |
+| top N kickers | "top 5 players by goals after the siren" | `player`, `top_n` |
+| threshold | "3 or more goals after the siren" | `player`, `list` + `metricCondition` |
+| effect | "goals after the siren to win" / "to draw" | `kickScored` **and** `kickEffect` |
+| kicker result | "missed after the siren and lost" | `kickScored:'none'` + `kickerResult:'loss'` |
+| miss | "missed after the siren" | `kickScored:'none'` only |
+| club lineage | "goals after the siren for Richmond" | `scope.clubFor`, organization-folded |
+| opponent lineage | "goals after the siren against Richmond" | `scope.clubAgainst`, organization-folded |
+| finals | "goals after the siren in the finals" | `scope.matchType`, match-linked only |
+| occurrence | "the first / most recent goal after the siren" | `occurrence`, match-linked only |
+| named player | "Barry Hall's goals after the siren" | `player` + `event` subject |
+| combined | "most goals after the siren for Richmond in the finals since 2000" | all of the above at once |
+
+### 16.5 Explicit declines
+
+Every §15.14 row declines, or emits a plan its own validator refuses. Measured
+outcomes:
+
+| # | Form | How it fails |
+|---|---|---|
+| C-D1 | "goals after the siren in round 1" | validation: fields the compiler cannot honour (`roundNumber`) |
+| C-D2 | "goals after the siren at the MCG" | validation: venue not owned |
+| C-D3 | "Richmond v Carlton after the siren" | validation: `matchup` not owned |
+| C-D4 | "which coach won most games on a goal after the siren" | parser: `unrecognised`, mutual exclusion |
+| C-D5 | "fewest kicks after the siren" | validation: "there is no fewest to rank" (D15) |
+| C-D6 | "goals after the siren in 1900" | validation: 1913 coverage floor |
+| C-D7 | "most goals after the siren in a season" | parser: `unrecognised`, no per-season grain |
+| C-D8 | "goals after the siren in extra time" | parser: leftover `extra time` |
+| C-D9 | "who kicked it out on the full after the siren" | parser: leftover `it out full` |
+| C-D10 | "how much did they win by after the siren" | parser: leftover `how much they win` |
+| C-D11 | "goals after the siren in the NAB Cup" | parser: leftover `nab cup` |
+| C-D12 | ambiguous surname | `scope.playerIdIn` refused by name |
+| C-D13 | "300 game players who kicked a goal after the siren" | parser: leftover `game` |
+| C-D14 | "was it a supergoal after the siren" | parser: leftover |
+| C-D15 | "did the siren sound before the kick" | parser: leftover `sound before` |
+
+A bare "siren" also declines: the structural gate requires a dimension, a
+subject noun, a scope or a player, so the cue alone never returns the whole
+curated list.
+
+### 16.6 Red-before-green proof
+
+Each step was **observed** failing before the code that makes it pass existed.
+
+| Step | Red | Green |
+|---|---|---|
+| **R1** telemetry | `after_siren` added to the type-derived `SUPPORTED_NL_GRAINS`; `afldb_test` rejected it — `new row for relation "nl_search_log" violates check constraint "nl_search_log_grain_check"` | migration 093 written and applied → passes, and `expect(inserted).toContain('after_siren')` names it |
+| **R2** vocabulary | 14 parser assertions failing | step 5d |
+| **R3** inequalities | goal ≠ goal-to-win, miss ≠ miss-and-lost, failing at both the wording and the SQL layer | typed dimensions |
+| **R4** Grand Final | empty-result assertion failing | finals scope via `matches.round_type` |
+| **R5** most recent | occurrence assertion failing | `occurrence` + match-link boundary |
+| **R6** ties | Hall/Rohan and the nine-on-2 assertions failing | `rank()` with no `PARTITION BY` |
+| **R7** parity | parity against `getAfterSirenRecords` failing | the compiler |
+| plan ownership | 20 `nl-plan` assertions failing | the `validatePlan` block |
+| describe | 11 `nl-describe`/acceptance assertions failing | the four describe shapes + `answerCaveats` |
+
+**46 assertions were observed red across five suites before implementation
+began.**
+
+### 16.7 Validation
+
+| Gate | Result |
+|---|---|
+| `tests/nl-parser.test.ts` | **218 passed** |
+| `tests/nl-plan.test.ts` | **129 passed** |
+| `tests/nl-describe.test.ts` | **43 passed** |
+| `tests/nl-audit-acceptance.test.ts` | passed |
+| `tests/nl-ui-corpus.test.ts` | **35 passed** |
+| `tests/query-intent.test.ts`, `tests/migration-checksum.test.ts` | passed |
+| DB-free NL total | **490 passed / 490** |
+| `tests/integration/nl-answers-after-siren.test.ts` | **20 passed** (new) |
+| `tests/integration/nl-answers-coaching.test.ts` + 5 other NL integration suites | **86 passed, 3 skipped** — Phase B coaching still green |
+| `tests/integration/database.test.ts` — telemetry grain contract | **passed** after 093 |
+| `npx tsc --noEmit` | clean |
+| `eslint` on every changed file | no new errors; 4 `no-explicit-any` errors in `plan.ts` are **pre-existing** (present at `HEAD`, on the 13 live-only career stats), and the `_total`/`_rnk` unused-var warnings match `coach-record.ts`'s existing pattern |
+
+`tests/integration/database.test.ts` still reports the **same four**
+snapshot-drift failures documented in **§14.4.1** (694,445 vs 685,471 and its
+three dependent counts). They are external, pre-existing, and were not
+investigated or edited under this phase.
+
+### 16.8 DB-backed integration results
+
+All 20 assertions compare the compiler against **independently hand-written
+SQL**; every §15.16 witness was re-measured and matched exactly.
+
+| Question | Measured | Matches §15.16 |
+|---|---|---|
+| most goals after the siren | **Barry Hall and Gary Rohan**, 2 each | yes |
+| most kicks after the siren | **nine** tied on 2: Hall, Johnson, Mundy, Rohan, Riewoldt, Blight, McGovern, Kernahan, Hawkins | yes |
+| 3+ goals after the siren | **empty** (ceiling 2) | yes |
+| goals after the siren against the Richmond lineage | **4** — Bill Wood 1946 **Footscray** (event 16, match 4486), Karmichael Hunt 2012, David Mundy 2017, Noah Anderson 2022 | yes |
+| after the siren in a Grand Final | **empty**; the `round_raw = 'GF'` non-premiership row is asserted absent | yes |
+| after the siren in finals | **8**, all match-linked | yes |
+| first kick after the siren | event **1**, Billy Schmidt, 1913, match 1313 | yes |
+| most recent kick | event **121**, Nasiah Wanganeen-Milera, 2025, match 16792 — never an unlinked later row | yes |
+| total events | **126**; 6 with no player link, 10 with no match link | yes |
+| goal vs goal-to-win | asserted strictly different, both against hand-written SQL | yes |
+| miss vs miss-and-lost | asserted strictly different | yes |
+| missed and still won | > 0 (the `(none, none, win)` witness) | yes |
+| R7 parity | per-player kicks == `getAfterSirenRecords().attempts` and goals == `.goals` for **every** player, and the NL total equals the board's row count | new |
+
+### 16.9 Corpus additions (additive only)
+
+- `afldb-ui-questions-after-siren-v1-20260908.csv` — **93** rows across all ten
+  §15.17 categories.
+- `afldb-ui-questions-after-siren-decline-v1-20260908.csv` — **27** rows across
+  all fourteen §15.14 decline families.
+
+Every one of the 120 rows was executed through the **real** club/player
+directory against `afldb_test` and behaves exactly as declared: 93 produce a
+validated `after_siren` plan, 27 decline. The 1,435-row realistic gate, the
+60-row decline gate and both Phase B coaching corpora are untouched and are
+asserted siren-free.
+
+### 16.10 Deviations from §15, and why
+
+Three, all narrowing rather than widening.
+
+1. **`out on the full` and `fell short` are NOT in `AFTER_SIREN_SCORED_WORDS`,
+   though §15.4 lists them.** §15.4 and §15.14 C-D9 contradict each other: the
+   vocabulary would map both phrases to `kick_scored='none'`, while C-D9
+   requires them to decline because `shot_detail` is not exposed (D5). Resolved
+   in favour of the **decline**, because mapping a shot_detail phrase to the
+   coarser "registered nothing" answers a narrower question than the reader
+   asked. Left unmatched, the words survive as leftover tokens and the ordinary
+   confidence gate declines — the same fail-closed mechanism every other
+   unsupported term uses. `sprayed`, `missed`, `failed to score` and `didn't
+   score` are kept: none names a shot_detail value.
+
+2. **The §15.6 unresolved-club caveat was not implemented.** M7 measured zero
+   unresolved club ids and zero unresolved opponent ids, and §15.19 says
+   explicitly that in that case the caveat is dead code and is dropped.
+
+3. **Two small vocabulary/parser additions §15.4 did not anticipate**, both
+   found by executing the corpus rather than by inspection, and both fixing a
+   question the engine understood completely and then declined:
+   - `AFTER_SIREN_KICK_NOUN_RE` (`kicks`/`attempts`/`shots`), consumed with no
+     dimension set. Without it "kicks after the siren" left its own subject noun
+     as an unexplained leftover. It is consumed a second time after a dimension
+     word claims the first pass, so "kicks after the siren that missed" works.
+   - The hyphenated compounds `match-winning` / `game-winning` are listed WHOLE
+     in `AFTER_SIREN_EFFECT_WORDS`, before the bare `winning`. A hyphenated form
+     is ONE token to `meaningfulTokens`, so consuming half of it left the whole
+     compound counted as a leftover.
+
+   A fourth candidate was deliberately NOT added: "every goal after the siren"
+   still declines on the leftover word `every`, because making `every` an
+   aggregation cue would change behaviour for all ten grains and is outside this
+   phase. Those phrasings were removed from the corpus rather than forced.
+
+### 16.11 Migration 093
+
+`src/db/migrations/093_nl_search_log_after_siren_grain.sql` — forward-only,
+strictly widening. All nine grains 092 accepted are retained verbatim; the
+CHECK is not weakened, dropped without replacement, or made `NOT VALID`; no
+existing row can fail the new predicate. No other schema, data, privilege or
+index change. Applied to `afldb_test` on 2026-09-08 (93 files, 92 previously
+applied, 1 applied in 240 ms); the migration naming/collision/checksum contract
+passes.
+
+**Deploy ordering, unchanged from §15.20: 093 must reach `afldb_dev` and
+production BEFORE the Phase C code**, or it reproduces the silent
+telemetry-drop window it exists to close. It joins 092 under that constraint —
+both migrations before the ISSUE-152 code.
+
+### 16.12 Phase C — TECHNICALLY COMPLETE 2026-09-08
+
+Implemented, focused validation green, **not committed, not deployed, no
+rendered/browser run, no `npm run build`, no `nl:stress` sweep**. Phases D–F are
+untouched and have not started. ISSUE-152 stays **OPEN**.

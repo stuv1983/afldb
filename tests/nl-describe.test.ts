@@ -16,8 +16,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
+import { answerCaveats, dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
+  NlAfterSirenEventRow, NlAfterSirenPlayerRow,
   NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
@@ -500,5 +501,173 @@ describe('coaching answers', () => {
       { kind: 'coach_record', lead: row, rows: [row], total: 1 },
     );
     expect(interpretation).toContain(', 2017');
+  });
+});
+
+// ------------------------------- after the siren (AFLDB-ISSUE-152 Phase C)
+
+function sirenPlanFor(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return plan({
+    grain: 'after_siren',
+    metric: 'siren_kicks',
+    mode: undefined,
+    agg: { kind: 'list' },
+    afterSiren: { subject: 'event' },
+    ...overrides,
+  });
+}
+
+function sirenEvent(overrides: Partial<NlAfterSirenEventRow> = {}): NlAfterSirenEventRow {
+  return {
+    eventId: 121,
+    season: 2025,
+    roundRaw: 'round 19',
+    competition: 'AFL',
+    premiershipSeason: true,
+    playerId: 5000,
+    playerSlug: 'nasiah-wanganeen-milera',
+    playerName: 'Nasiah Wanganeen-Milera',
+    clubName: 'St Kilda',
+    clubSlug: 'st-kilda',
+    opponentName: 'Melbourne',
+    opponentSlug: 'melbourne',
+    kickScored: 'goal',
+    kickEffect: 'won',
+    kickerResult: 'win',
+    siren: 'final',
+    matchId: 16792,
+    matchDate: new Date('2025-07-27T00:00:00Z'),
+    roundType: 'home_and_away',
+    cited: true,
+    value: null,
+    ...overrides,
+  };
+}
+
+function sirenPlayer(overrides: Partial<NlAfterSirenPlayerRow> = {}): NlAfterSirenPlayerRow {
+  return {
+    playerId: 1001, slug: 'barry-hall', displayName: 'Barry Hall',
+    value: 2, firstSeason: 2004, lastSeason: 2011, clubNames: 'Sydney, Western Bulldogs',
+    ...overrides,
+  };
+}
+
+const NO_EXCLUSIONS = { noPlayerLink: 0, noMatchLink: 0 };
+
+describe('after-the-siren answers (AFLDB-ISSUE-152 Phase C)', () => {
+  it('names every holder of a tied record rather than one of them', () => {
+    const rows = [sirenPlayer(), sirenPlayer({ playerId: 4742, slug: 'gary-rohan', displayName: 'Gary Rohan' })];
+    const { headline } = describeAnswer(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player', kickScored: 'goal' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 2, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline).toContain('Barry Hall and Gary Rohan');
+    expect(headline).toContain('(tied)');
+    expect(headline).toContain('2');
+  });
+
+  /**
+   * §15.12's binding distinction, in the reader's own words: 71 goals
+   * after the siren and 62 goals after the siren TO WIN are different
+   * populations, so they must not produce the same sentence.
+   */
+  it('"a goal after the siren" and "a goal after the siren to win" read differently', () => {
+    const rows = [sirenEvent()];
+    const goal = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'goal' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 71, excluded: NO_EXCLUSIONS },
+    );
+    const toWin = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'goal', kickEffect: 'won' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 62, excluded: NO_EXCLUSIONS },
+    );
+    expect(goal.interpretation).not.toBe(toWin.interpretation);
+    expect(toWin.interpretation).toContain('won the match');
+    expect(goal.interpretation).not.toContain('won the match');
+  });
+
+  it('a miss and a miss-and-lost read differently', () => {
+    const rows = [sirenEvent({ kickScored: 'none', kickEffect: 'none', kickerResult: 'loss' })];
+    const missed = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'none' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 25, excluded: NO_EXCLUSIONS },
+    );
+    const andLost = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'none', kickerResult: 'loss' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 18, excluded: NO_EXCLUSIONS },
+    );
+    expect(missed.interpretation).not.toBe(andLost.interpretation);
+    expect(andLost.interpretation).toContain('lost');
+  });
+
+  it('an occurrence answer names the event, not a count', () => {
+    const row = sirenEvent({
+      eventId: 1, season: 1913, playerId: 2, playerSlug: 'billy-schmidt', playerName: 'Billy Schmidt',
+      clubName: 'St Kilda', opponentName: 'Carlton', matchId: 1313,
+      matchDate: new Date('1913-08-02T00:00:00Z'),
+    });
+    const { headline } = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', occurrence: 'first' } }),
+      { kind: 'after_siren_event', lead: row, rows: [row], total: 1, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline).toContain('Billy Schmidt');
+    expect(headline).toContain('1913');
+  });
+
+  it('an event count is worded as kicks, never as coaches', () => {
+    const { headline } = describeAnswer(
+      sirenPlanFor({ agg: { kind: 'count' }, afterSiren: { subject: 'event', kickScored: 'goal' } }),
+      { kind: 'count', value: 71 },
+    );
+    expect(headline).toContain('71');
+    expect(headline).not.toContain('coach');
+  });
+
+  it('an empty result is honest, not a decline', () => {
+    const { headline } = describeAnswer(
+      sirenPlanFor({ scope: { matchType: 'grand_final' } }),
+      { kind: 'after_siren_event', lead: null, rows: [], total: 0, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline.toLowerCase()).toContain('no');
+  });
+
+  it('always carries the curated-list caveat (D12)', () => {
+    const rows = [sirenEvent()];
+    const caveats = answerCaveats(
+      sirenPlanFor(),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 126, excluded: NO_EXCLUSIONS },
+    );
+    expect(caveats.join(' ')).toContain('curated');
+    expect(caveats.join(' ')).toContain('not a systematic record');
+  });
+
+  it('names the excluded unlinked rows, and only when there are any', () => {
+    const rows = [sirenPlayer()];
+    const withExclusions = answerCaveats(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 1, excluded: { noPlayerLink: 6, noMatchLink: 0 } },
+    );
+    expect(withExclusions.join(' ')).toContain('6');
+    expect(withExclusions.join(' ')).toContain('not linked to a player');
+
+    const none = answerCaveats(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 1, excluded: NO_EXCLUSIONS },
+    );
+    expect(none.join(' ')).not.toContain('not linked to a player');
+  });
+
+  it('says what a match-link-required answer left out', () => {
+    const rows = [sirenEvent()];
+    const caveats = answerCaveats(
+      sirenPlanFor({ afterSiren: { subject: 'event', occurrence: 'most_recent' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 1, excluded: { noPlayerLink: 0, noMatchLink: 10 } },
+    );
+    expect(caveats.join(' ')).toContain('10');
+    expect(caveats.join(' ')).toContain('no match link');
+  });
+
+  it('carries no after-siren caveat on any other grain', () => {
+    expect(answerCaveats(plan(), { kind: 'count', value: 1 })).toEqual([]);
   });
 });

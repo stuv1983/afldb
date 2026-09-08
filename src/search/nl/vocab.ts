@@ -306,6 +306,104 @@ export const COACHED_BY_RE = /\bcoached by\b|\bplayed under\b|\bunder coach\b/;
  */
 export const PREMIERSHIP_COACH_RE = /\bpremiership[- ]winning coach(?:es)?\b|\bpremiership coach(?:es)?\b/;
 
+// ------------------------------------------------------- after the siren
+
+/**
+ * The after-the-siren cue gate (AFLDB-ISSUE-152 Phase C), mirroring
+ * COACH_CUE_RE. NOTHING in the after-siren vocabulary below is tried
+ * until this matches, because "goals", "behinds", "points", "won" and
+ * "drew" all name other things in this engine.
+ *
+ * The bare `\bsiren\b` alternative is last and is safe: no other AFLDB
+ * concept in the vocabulary uses the word, and the same shape already
+ * works for the bare `\bcoach\b` above.
+ */
+export const AFTER_SIREN_CUE_RE =
+  /\bafter the siren\b|\bafter-the-siren\b|\bpost[- ]siren\b|\bon the siren\b|\bas the siren (?:sounded|went)\b|\bsiren\b/;
+
+/**
+ * after_siren_kicks.kick_scored -- what the kick REGISTERED. Order
+ * matters, following the COACH_METRIC_WORDS precedent: the multi-word
+ * miss idioms before the bare "missed".
+ *
+ * "Missed after the siren" is fixed to kick_scored='none' only. A behind
+ * is colloquially also a miss, but the column's own meaning is "the shot
+ * registered nothing", and the rendered interpretation states which
+ * reading was answered so a reader can see it. "Kicked a behind after the
+ * siren" reaches the behind reading through the behind/point vocabulary.
+ */
+export const AFTER_SIREN_SCORED_WORDS: [RegExp, 'goal' | 'behind' | 'none'][] = [
+  [/\bgoals?\b|\bmajors?\b|\bsnags?\b|\bsausages?\b/, 'goal'],
+  [/\bbehinds?\b|\bminors?\b|\bpoints?\b/, 'behind'],
+  // DELIBERATELY NOT HERE: "out on the full", "fell short", "hit the
+  // post". Each names a shot_detail value, which D5 does not expose, and
+  // mapping one to the coarser kick_scored='none' would answer a
+  // narrower question than the reader asked. Left unmatched, the words
+  // survive as leftover tokens and the question declines -- the same
+  // fail-closed mechanism every other unsupported term uses.
+  [/\bmiss(?:ed|es|ing)?\b|\bsprayed\b|\bfailed to score\b|\bdid ?n.?t score\b/, 'none'],
+];
+
+/**
+ * after_siren_kicks.kick_effect -- what the kick did to the RESULT.
+ * Independent of the scored dimension and ANDed with it. "to win" before
+ * the bare "winning", the same longest-phrase-first ordering the coaching
+ * metric list uses.
+ */
+export const AFTER_SIREN_EFFECT_WORDS: [RegExp, 'won' | 'drew'][] = [
+  // The hyphenated compounds are listed WHOLE and before the bare
+  // "winning". A token like "match-winning" is one token to
+  // meaningfulTokens, so consuming only the "winning" half leaves the
+  // whole compound counted as an unexplained leftover and declines a
+  // question the engine understood completely.
+  [/\b(?:game|match)[- ]winning\b|\bto win\b|\bgame[- ]winner\b|\bmatch[- ]winner\b|\bwinners?\b|\bwinning\b|\bto snatch (?:the )?(?:win|victory)\b|\bto steal (?:the )?(?:win|victory)\b/, 'won'],
+  [/\bto draw\b|\bto tie\b|\bto level (?:the )?(?:scores?|match|game)?\b|\bfor a draw\b/, 'drew'],
+];
+
+/**
+ * after_siren_kicks.kicker_result -- the match result from the KICKER's
+ * side, read from the source's own final score at import time and never
+ * inferred here from matches.winner_club_id.
+ *
+ * Tried BEFORE AFTER_SIREN_EFFECT_WORDS, so "missed after the siren and
+ * lost" reads kickerResult='loss' and "and won" is not mistaken for
+ * kickEffect='won'. The two are semantically different and the measured
+ * (none, none, win) event proves it: a player who scored nothing after
+ * the siren whose side won anyway.
+ */
+export const AFTER_SIREN_RESULT_WORDS: [RegExp, 'win' | 'draw' | 'loss'][] = [
+  [/\band (?:still )?won\b|\bin a win\b|\bwon anyway\b|\band (?:their|his) (?:side|team) won\b/, 'win'],
+  [/\band (?:still )?lost\b|\bin a loss\b|\bin a losing\b|\band (?:their|his) (?:side|team) lost\b/, 'loss'],
+  [/\bin a draw\b|\band drew\b|\bin a drawn (?:match|game)\b/, 'draw'],
+];
+
+/**
+ * "the first" / "the most recent". Match-linked only (D10 limit 1):
+ * round_raw is free text and gives no within-season order, so the
+ * compiler orders by matches.match_date or declines the row.
+ */
+export const AFTER_SIREN_OCCURRENCE_WORDS: [RegExp, 'first' | 'most_recent'][] = [
+  [/\bmost recent(?:ly)?\b|\blatest\b|\bthe last\b|\bwhen was the last\b/, 'most_recent'],
+  [/\bfirst\b|\bearliest\b|\bwhen was the first\b/, 'first'],
+];
+
+/**
+ * An explicit PLAYER-subject cue: the question asks who, not which kicks.
+ * A ranking aggregation and a metric threshold elect the player subject
+ * on their own; this list catches the shapes that name the subject
+ * without ranking words of their own.
+ */
+export const AFTER_SIREN_PLAYER_SUBJECT_RE =
+  /\bwhich players?\b|\bwhat players?\b|\bplayers? who\b|\bwho has kicked\b|\bwho kicked\b|\bwho has\b/;
+
+/**
+ * The grain's own subject noun, consumed with no dimension set: "kicks
+ * after the siren" is EVERY event, including the misses, not only the
+ * ones that scored. Without this the word survives as a leftover token
+ * and declines a question the engine understood completely.
+ */
+export const AFTER_SIREN_KICK_NOUN_RE = /\bkicks?\b|\battempts?\b|\bshots?\b/;
+
 /**
  * coach_record ranking words, tried ONLY once COACH_CUE_RE has matched.
  * Order matters: "grand finals" must be claimed before the bare "finals",

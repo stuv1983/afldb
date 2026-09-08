@@ -44,6 +44,9 @@ const COACHES: NlCoachDirectoryEntry[] = [
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
   'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
+  // AFLDB-ISSUE-152 Phase C: the measured joint holder of "most goals
+  // after the siren" (2, tied with Gary Rohan).
+  'barry hall': [{ ref: { id: 1001, slug: 'barry-hall', name: 'Barry Hall' }, score: 1000 }],
 };
 
 function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
@@ -1364,5 +1367,153 @@ describe('coaching questions (AFLDB-ISSUE-152 Phase B)', () => {
       expect(p.grain).toBe('player_career');
       expect(p.metric).toBe('premierships');
     });
+  });
+});
+
+describe('after-the-siren questions (AFLDB-ISSUE-152 Phase C)', () => {
+  it('the cue is required: "most goals" alone is still a career-goals ranking', async () => {
+    const p = await plan('most goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('goals');
+  });
+
+  /**
+   * R0/§15.4's load-bearing precedence rule. Before Phase C the metric
+   * extractor claimed "goals" and only the confidence gate's unresolved
+   * penalty on the leftover "after siren" tokens stopped a career-goals
+   * leaderboard being returned. Once the cue consumes those tokens the
+   * penalty is gone, so "goals" MUST be claimed as the kickScored
+   * dimension first.
+   */
+  it('"goals" is claimed as the kickScored dimension, never as the career goals metric', async () => {
+    const p = await plan('who has kicked the most goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.metric).toBe('siren_kicks');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a bare "kicks after the siren" carries NO kickScored: any kick, including a miss', async () => {
+    const p = await plan('most kicks after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren?.kickScored).toBeUndefined();
+    expect(p.afterSiren?.subject).toBe('player');
+  });
+
+  it('a goal after the siren and a goal after the siren TO WIN are different plans', async () => {
+    const goal = await plan('goals after the siren');
+    const toWin = await plan('goals after the siren to win');
+    expect(goal.afterSiren).toEqual({ subject: 'event', kickScored: 'goal' });
+    expect(toWin.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', kickEffect: 'won' });
+  });
+
+  it('"to draw" is the drew effect, distinct from the drawn-match result', async () => {
+    const p = await plan('behinds after the siren to draw');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'behind', kickEffect: 'drew' });
+  });
+
+  it('the kicker result is read BEFORE the effect, so "and lost" is never an effect', async () => {
+    const p = await plan('missed after the siren and lost');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'loss' });
+    expect(p.afterSiren?.kickEffect).toBeUndefined();
+  });
+
+  it('"and won" is the kicker result, not the winning-kick effect', async () => {
+    const p = await plan('missed after the siren and won');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'win' });
+  });
+
+  it('occurrence words elect first / most recent, at event subject', async () => {
+    const first = await plan('the first goal after the siren');
+    expect(first.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'first' });
+    expect(first.agg).toEqual({ kind: 'list' });
+
+    const latest = await plan('the most recent goal after the siren');
+    expect(latest.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'most_recent' });
+  });
+
+  it('a count cue is an event count, never a player leaderboard', async () => {
+    const p = await plan('how many goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(p.afterSiren?.subject).toBe('event');
+  });
+
+  it('an unranked question is an event list, not a rank-one leader', async () => {
+    const p = await plan('goals after the siren for richmond');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+  });
+
+  it('the opponent role is the kicked-against club', async () => {
+    const p = await plan('goals after the siren against richmond');
+    expect(p.scope.clubAgainst?.name).toBe('Richmond');
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a named player takes the event subject: his events, not a leaderboard of one', async () => {
+    const p = await plan('barry hall goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.player?.id).toBe(1001);
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  /**
+   * The explicit inversion of the Phase B rule: for coaching, "finals" was
+   * a METRIC and had to be claimed before extractMatchType. Here finals is
+   * genuine match SCOPE (D4), so the after-siren block must LEAVE it.
+   */
+  it('leaves "finals" for match-type extraction rather than claiming it', async () => {
+    const p = await plan('goals after the siren in the finals');
+    expect(p.grain).toBe('after_siren');
+    expect(p.scope.matchType).toBe('finals');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('combines finals, club lineage and a season range at player subject', async () => {
+    const p = await plan('who has kicked the most goals after the siren for richmond in the finals since 2000');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.matchType).toBe('finals');
+    expect(p.scope.seasonMin).toBe(2000);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coaching cue and a siren cue together fail closed', async () => {
+    const parsed = await parse('which coach won most games on a goal after the siren');
+    expect(parsed.status).toBe('none');
+    if (parsed.status === 'none') expect(parsed.reason).toBe('unrecognised');
+  });
+
+  it('a bare "siren" with nothing else declines', async () => {
+    const parsed = await parse('siren');
+    expect(parsed.status).toBe('none');
+  });
+
+  // ------------------------------------------------- §15.14 decline table
+
+  it.each([
+    ['C-D1  round scope', 'goals after the siren in round 1'],
+    ['C-D2  venue', 'goals after the siren at the mcg'],
+    ['C-D3  matchup', 'richmond v carlton after the siren'],
+    ['C-D4  coach + siren', 'which coach won most games on a goal after the siren'],
+    ['C-D5  min', 'fewest kicks after the siren'],
+    ['C-D6  coverage floor', 'goals after the siren in 1900'],
+    ['C-D7  per-season grain', 'most goals after the siren in a season'],
+    ['C-D8  siren subtype', 'goals after the siren in extra time'],
+    ['C-D9  shot detail', 'who kicked it out on the full after the siren'],
+    ['C-D10 source scores', 'how much did they win by after the siren'],
+    ['C-D11 competition name', 'goals after the siren in the nab cup'],
+    ['C-D13 cross-grain', '300 game players who kicked a goal after the siren'],
+    ['C-D14 supergoal', 'was it a supergoal after the siren'],
+    ['C-D15 out of family', 'did the siren sound before the kick'],
+  ])('%s declines or fails validation', async (_label, question) => {
+    const parsed = await parse(question);
+    if (parsed.status !== 'plan') return;
+    expect(validatePlan(parsed.plan), question).toHaveProperty('error');
   });
 });

@@ -6,7 +6,9 @@ import {
   clubPath, coachProfilePath, formatDate, formatNumber, formatPercentage, formatRoundShort, formatSpan,
   matchPath, playerPath, seasonPath,
 } from '@/lib/format';
+import { afterSirenEventLabel } from '@/lib/after-siren-format';
 import type {
+  NlAfterSirenEventRow, NlAfterSirenPlayerRow,
   NlAnswer, NlClubSeasonRow, NlCoachRecordRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow,
   NlPlayerSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
@@ -90,6 +92,10 @@ function renderPayload(answer: NlAnswer) {
       return <ClubSeasonTable rows={payload.rows} total={payload.total} />;
     case 'coach_record':
       return <CoachRecordTable rows={payload.rows} total={payload.total} />;
+    case 'after_siren_event':
+      return <AfterSirenEventTable rows={payload.rows} total={payload.total} />;
+    case 'after_siren_player':
+      return <AfterSirenPlayerTable rows={payload.rows} total={payload.total} />;
     case 'count':
       return <p>{formatNumber(payload.value)}</p>;
     case 'achievement_summary':
@@ -482,6 +488,125 @@ function CoachRecordTable({ rows, total }: { rows: NlCoachRecordRow[]; total: nu
                   <td className="num nowrap">{r.wins}–{r.draws}–{r.losses}</td>
                   <td className="num">{formatPercentage(r.winPct)}</td>
                   {showValue && <td className="num">{r.value === null ? '—' : formatNumber(r.value)}</td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+
+/**
+ * The curated after-siren events themselves.
+ *
+ * Three rules the table exists to keep:
+ *
+ *  - "What happened" is the EXISTING afterSirenEventLabel, so an NL answer
+ *    words an event exactly as the profile and records pages already do,
+ *    rather than inventing a second wording for the same fact.
+ *  - The round is the source's own string under a header that says "as
+ *    recorded", because a 'GF' on a non-premiership row (Kerry Good, 1980,
+ *    Escort Championships) must not read as a Grand Final.
+ *  - A row with no player link shows the source's spelling as plain muted
+ *    text and is NEVER a link; a row with no match link shows an em dash
+ *    and no fabricated date.
+ */
+function AfterSirenEventTable({ rows, total }: { rows: NlAfterSirenEventRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching kick" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Season</th>
+                <th scope="col">Round (as recorded)</th>
+                <th scope="col">Player</th>
+                <th scope="col">Club</th>
+                <th scope="col">Opponent</th>
+                <th scope="col">What happened</th>
+                <th scope="col">Match</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.eventId}>
+                  <td className="nowrap">{r.season}</td>
+                  <td className="muted nowrap">{r.roundRaw}</td>
+                  <td className="wide">
+                    {r.playerId !== null && r.playerSlug !== null
+                      ? <Link href={playerPath(r.playerSlug, r.playerId)}>{r.playerName}</Link>
+                      : <span className="muted">{r.playerName}</span>}
+                  </td>
+                  <td>
+                    {r.clubSlug ? <Link href={clubPath(r.clubSlug)}>{r.clubName}</Link> : r.clubName}
+                  </td>
+                  <td>
+                    {r.opponentSlug ? <Link href={clubPath(r.opponentSlug)}>{r.opponentName}</Link> : r.opponentName}
+                  </td>
+                  <td>{afterSirenEventLabel(r)}</td>
+                  <td className="nowrap">
+                    {r.matchId !== null
+                      ? (
+                        <Link href={matchPath(r.matchId)}>
+                          {formatDate(r.matchDate) || r.season}
+                        </Link>
+                      )
+                      : <span className="muted">&mdash;</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * The kicker leaderboard. The seasons column is a SPAN across the filtered
+ * events, and the clubs are the ones the player kicked for WITHIN that set
+ * -- not their career clubs.
+ */
+function AfterSirenPlayerTable({ rows, total }: { rows: NlAfterSirenPlayerRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching player" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                <th scope="col" className="num">Kicks after the siren</th>
+                <th scope="col">Seasons</th>
+                <th scope="col">Clubs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.playerId}>
+                  <td className="wide">
+                    <Link href={playerPath(r.slug, r.playerId)}>{r.displayName}</Link>
+                  </td>
+                  <td className="num">{formatNumber(r.value)}</td>
+                  <td className="muted nowrap">{formatSpan(r.firstSeason, r.lastSeason)}</td>
+                  <td className="muted">{r.clubNames ?? '\u2014'}</td>
                 </tr>
               ))}
             </tbody>

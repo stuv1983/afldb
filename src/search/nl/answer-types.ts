@@ -139,6 +139,76 @@ export type NlCoachRecordRow = {
   value: number | null;
 };
 
+/**
+ * One curated after-siren event (migration 089). Match-owned fields
+ * (matchId, matchDate, roundType) are NULL for a match-unlinked row and
+ * are NEVER filled from after_siren_kicks -- season and roundRaw are that
+ * row's own facts and are not a substitute for a canonical match
+ * (AFLDB-ISSUE-152 D10, §7.1).
+ *
+ * shot_detail, supergoal_scoring, the verbatim source scores, the link
+ * provenance and the source notes are deliberately absent: D5 excludes
+ * shot_detail, and the rest are provenance or verbatim source figures
+ * (one 1944 row's goals.behinds does not add to its stated points -- 089's
+ * own comment) that a natural-language answer must not present as a
+ * computed fact.
+ */
+export type NlAfterSirenEventRow = {
+  eventId: number;
+  season: number;
+  /** The source's own round string, verbatim. Displayed as recorded, never parsed. */
+  roundRaw: string;
+  competition: string;
+  premiershipSeason: boolean;
+  /** NULL when the source's kicker never linked to a player (6 of 126 measured). */
+  playerId: number | null;
+  playerSlug: string | null;
+  /** Always present: the source's own spelling, shown when playerId is null. */
+  playerName: string;
+  clubName: string;
+  clubSlug: string | null;
+  opponentName: string;
+  opponentSlug: string | null;
+  kickScored: 'goal' | 'behind' | 'none';
+  kickEffect: 'won' | 'drew' | 'none';
+  kickerResult: 'win' | 'draw' | 'loss';
+  /**
+   * RENDERING ONLY (operator decision D13): fed to the existing
+   * afterSirenEventLabel so an NL answer words an event the same way every
+   * other AFLDB surface does. Not a parser dimension, not a plan field,
+   * not filterable.
+   */
+  siren: 'final' | 'end_of_regulation' | 'end_of_extra_time';
+  matchId: number | null;
+  matchDate: Date | null;
+  roundType: string | null;
+  /** false when the source row carried no reference (1 of 126 measured). */
+  cited: boolean;
+  value: number | null;
+};
+
+/** One kicker, aggregated over the filtered events. Trusted link only. */
+export type NlAfterSirenPlayerRow = {
+  playerId: number; slug: string; displayName: string;
+  /** The count of qualifying events. Measured ceiling is 2. */
+  value: number;
+  firstSeason: number; lastSeason: number;
+  /** The clubs the player kicked for WITHIN the filtered set, not their career clubs. */
+  clubNames: string | null;
+};
+
+/**
+ * What the ownership rules left out of THIS answer, counted over the same
+ * filtered set at answer time rather than hard-coded. Both are zero for
+ * most answers; describe.ts words a caveat only when one is not.
+ */
+export type NlAfterSirenExclusions = {
+  /** Events whose kicker never linked to a player, excluded from a player-subject answer. */
+  noPlayerLink: number;
+  /** Events with no canonical match, excluded when the question needs one (D10). */
+  noMatchLink: number;
+};
+
 export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
@@ -149,6 +219,16 @@ export type NlAnswerPayload =
   | { kind: 'team_streak'; lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
   | { kind: 'coach_record'; lead: NlCoachRecordRow | null; rows: NlCoachRecordRow[]; total: number }
+  | {
+      kind: 'after_siren_event';
+      lead: NlAfterSirenEventRow | null; rows: NlAfterSirenEventRow[]; total: number;
+      excluded: NlAfterSirenExclusions;
+    }
+  | {
+      kind: 'after_siren_player';
+      lead: NlAfterSirenPlayerRow | null; rows: NlAfterSirenPlayerRow[]; total: number;
+      excluded: NlAfterSirenExclusions;
+    }
   | { kind: 'count'; value: number }
   | {
       kind: 'achievement_summary';

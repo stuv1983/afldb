@@ -7,9 +7,12 @@
  * Split out of db/queries/nl/answer.ts so the wording rules -- above all
  * the tie handling below -- can be unit-tested without a database.
  */
-import { coachWinPctQualifierNote, NL_METRICS, type NlQueryPlan } from '@/search/nl/plan';
+import {
+  afterSirenRequiresMatchLink, coachWinPctQualifierNote, NL_METRICS, type NlQueryPlan,
+} from '@/search/nl/plan';
 import type {
-  NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAfterSirenEventRow, NlAfterSirenPlayerRow, NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow,
+  NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
@@ -70,7 +73,12 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     // "How many coaches has Richmond had" is answered as a count, not as
     // a row list -- the one shape whose payload kind is deliberately not
     // its grain's name.
-    || (plan.grain === 'coach_record' && payload.kind === 'count');
+    || (plan.grain === 'coach_record' && payload.kind === 'count')
+    // Two payload shapes plus the shared count, because an event list and
+    // a kicker leaderboard are genuinely different answers.
+    || (plan.grain === 'after_siren'
+        && (payload.kind === 'after_siren_event' || payload.kind === 'after_siren_player'
+            || payload.kind === 'count'));
   if (!compatible) {
     throw new Error(`NL payload kind "${payload.kind}" is incompatible with plan grain "${plan.grain}".`);
   }
@@ -104,7 +112,21 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   if (payload.kind === 'coach_record') {
     return describeCoachRecordAnswer(plan, payload.lead, payload.rows, payload.total);
   }
+  if (payload.kind === 'after_siren_event') {
+    return describeAfterSirenEventAnswer(plan, payload.lead, payload.total);
+  }
+  if (payload.kind === 'after_siren_player') {
+    return describeAfterSirenPlayerAnswer(plan, payload.lead, payload.rows, payload.total);
+  }
   if (payload.kind === 'count') {
+    // The one payload kind two grains share, so it must ask which one it
+    // is answering for: "71 kicks after the siren" is not "71 coaches".
+    if (plan.grain === 'after_siren') {
+      return {
+        headline: `${payload.value.toLocaleString('en-AU')} ${payload.value === 1 ? 'kick' : 'kicks'} after the siren`,
+        interpretation: `${afterSirenReading(plan)}${afterSirenScopeSuffix(plan)}.`,
+      };
+    }
     return {
       headline: `${payload.value.toLocaleString('en-AU')} ${payload.value === 1 ? 'coach' : 'coaches'}`,
       interpretation: `${coachSubject(plan)}${coachSeasonSuffix(plan)}.`,
@@ -467,6 +489,151 @@ function describeCoachRecordAnswer(
     headline: `${subject} \u2014 ${value} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: `${ranked} ${where}.${qualifier}`,
   };
+}
+
+
+// ------------------------------------------------------- after the siren
+
+/**
+ * The applied dimensions, in words, so "a goal after the siren" and "a
+ * goal after the siren to win" are visibly different answers on the page
+ * -- 71 events and 62 events, and the reader must be able to see which
+ * one they were given.
+ *
+ * An ABSENT kickScored is stated out loud too: "kicks after the siren" is
+ * every recorded event including the misses, which is easy to read as
+ * only the ones that scored.
+ */
+function afterSirenReading(plan: NlQueryPlan): string {
+  const siren = plan.afterSiren;
+  const parts: string[] = [];
+  parts.push(
+    siren?.kickScored === 'goal' ? 'Kicks after the siren that kicked a goal'
+      : siren?.kickScored === 'behind' ? 'Kicks after the siren that kicked a behind'
+      : siren?.kickScored === 'none' ? 'Kicks after the siren that scored nothing'
+      : 'Every recorded kick after the siren, including the misses',
+  );
+  if (siren?.kickEffect === 'won') parts.push('and won the match');
+  if (siren?.kickEffect === 'drew') parts.push('and levelled the scores');
+  if (siren?.kickEffect === 'none') parts.push('which did not change the result');
+  if (siren?.kickerResult) {
+    const word = siren.kickerResult === 'win' ? 'won' : siren.kickerResult === 'draw' ? 'drew' : 'lost';
+    parts.push(`in a match their side ${word}`);
+  }
+  return parts.join(' ');
+}
+
+function afterSirenScopeSuffix(plan: NlQueryPlan): string {
+  const bits: string[] = [];
+  if (plan.player) bits.push(`by ${plan.player.name}`);
+  if (plan.scope.clubFor) bits.push(`for ${plan.scope.clubFor.name}`);
+  if (plan.scope.clubAgainst) bits.push(`against ${plan.scope.clubAgainst.name}`);
+  if (plan.scope.matchType) bits.push(`in ${plan.scope.matchType.replace(/_/g, ' ')} matches`);
+  const { seasonMin, seasonMax } = plan.scope;
+  if (seasonMin !== undefined && seasonMin === seasonMax) bits.push(`in ${seasonMin}`);
+  else if (seasonMin !== undefined && seasonMax !== undefined) bits.push(`, ${seasonMin}\u2013${seasonMax}`);
+  else if (seasonMin !== undefined) bits.push(`from ${seasonMin}`);
+  else if (seasonMax !== undefined) bits.push(`up to ${seasonMax}`);
+  return bits.length > 0 ? `, ${bits.join(' ')}` : '';
+}
+
+function afterSirenEventSubject(row: NlAfterSirenEventRow): string {
+  return `${row.playerName} \u2014 ${row.clubName} v ${row.opponentName}, ${row.season}`;
+}
+
+function describeAfterSirenEventAnswer(
+  plan: NlQueryPlan,
+  lead: NlAfterSirenEventRow | null,
+  total: number,
+): { headline: string; interpretation: string } {
+  const reading = `${afterSirenReading(plan)}${afterSirenScopeSuffix(plan)}.`;
+  // An empty result is an HONEST ANSWER, not a decline: "after the siren
+  // in a Grand Final" has no rows because no VFL/AFL Grand Final
+  // after-siren event exists, which is a fact worth stating plainly.
+  if (!lead) return { headline: 'No recorded kick after the siren matches', interpretation: reading };
+
+  if (plan.afterSiren?.occurrence) {
+    const when = plan.afterSiren.occurrence === 'first' ? 'The first' : 'The most recent';
+    return {
+      headline: afterSirenEventSubject(lead),
+      interpretation: `${when} of them. ${reading}`,
+    };
+  }
+  return {
+    headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'kick' : 'kicks'} after the siren`,
+    interpretation: reading,
+  };
+}
+
+function describeAfterSirenPlayerAnswer(
+  plan: NlQueryPlan,
+  lead: NlAfterSirenPlayerRow | null,
+  rows: NlAfterSirenPlayerRow[],
+  total: number,
+): { headline: string; interpretation: string } {
+  const reading = `${afterSirenReading(plan)}${afterSirenScopeSuffix(plan)}.`;
+  if (!lead) return { headline: 'No player matches', interpretation: reading };
+
+  // A threshold lists every qualifier; it never ranks one. The measured
+  // ceiling is 2, so "3 or more goals after the siren" is an honest empty
+  // result rather than a decline -- the question is well formed and the
+  // answer is nobody.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player qualifies' : 'players qualify'}`,
+      interpretation: `${reading} Counted ${bound} per player.`,
+    };
+  }
+
+  // Every superlative in this family is a tie -- the measured maxima are
+  // 2 kicks, 2 goals and 2 winning kicks -- so an answer that names one
+  // player is wrong by construction.
+  const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
+  const { subject, tied } = tiedSubject(labels);
+  const noun = lead.value === 1 ? 'kick' : 'kicks';
+  return {
+    headline: `${subject} \u2014 ${lead.value.toLocaleString('en-AU')} ${noun} after the siren${tied ? ' (tied)' : ''}`,
+    interpretation: plan.agg.kind === 'top_n' ? `Top ${plan.agg.n}. ${reading}` : reading,
+  };
+}
+
+/**
+ * Caveats an answer must carry that come from the ANSWER rather than from
+ * the parse -- what the ownership rules excluded, counted over the same
+ * filtered set at answer time and never hard-coded.
+ *
+ * Returns [] for every other grain, so answer.ts can call it
+ * unconditionally.
+ */
+export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): string[] {
+  if (plan.grain !== 'after_siren') return [];
+  const caveats: string[] = [
+    // ALWAYS, on every after-siren answer (operator decision D12). The 1913
+    // coverage floor alone would imply a completeness this family does not
+    // have: it is a curated list of individual events, not a sweep of every
+    // siren ever sounded.
+    'AFLDB\'s after-the-siren record is a curated, cited list of individual events, '
+    + 'not a systematic record of every kick after every siren.',
+  ];
+  const excluded = payload.kind === 'after_siren_event' || payload.kind === 'after_siren_player'
+    ? payload.excluded
+    : null;
+  if (!excluded) return caveats;
+
+  if (plan.afterSiren?.subject === 'player' && excluded.noPlayerLink > 0) {
+    caveats.push(
+      `${excluded.noPlayerLink.toLocaleString('en-AU')} of the recorded kicks in scope `
+      + 'are not linked to a player and are not counted here.',
+    );
+  }
+  if (afterSirenRequiresMatchLink(plan) && excluded.noMatchLink > 0) {
+    caveats.push(
+      `${excluded.noMatchLink.toLocaleString('en-AU')} recorded ${excluded.noMatchLink === 1 ? 'kick has' : 'kicks have'} `
+      + 'no match link, so they cannot be ordered or scoped to a match type and are left out.',
+    );
+  }
+  return caveats;
 }
 
 function describePlayerCareerAnswer(

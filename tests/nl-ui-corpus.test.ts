@@ -131,6 +131,61 @@ describe('readUiCorpus', () => {
       expect(categories.has(family), family).toBe(true);
     }
   });
+
+  it('leaves every earlier gate free of after-the-siren questions', () => {
+    // AFLDB-ISSUE-152 Phase C is ADDITIVE in exactly the way Phase B was:
+    // the tenth grain cannot flip an existing row, because no question in
+    // the 1,435/60 gates or in the Phase B coaching corpora mentions the
+    // siren. Asserted rather than assumed.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id).not.toMatch(/siren/i);
+    }
+  });
+
+  it('reads the Phase C after-the-siren corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(93);
+    expect(declines).toHaveLength(27);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase C row is an after-the-siren question; none belongs in
+    // another file. "misses before extra time" is the one decline whose
+    // subject is the siren without the word -- it is the end-of-regulation
+    // subtype, which D5 does not expose.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/siren|extra time/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every B-row family of the coverage matrix is represented.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'siren_event_list', 'siren_player_rank', 'siren_club_scope', 'siren_opponent_scope',
+      'siren_finals', 'siren_occurrence', 'siren_count', 'siren_effect', 'siren_result',
+      'siren_miss',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    // Every §15.14 decline family has at least one row, so a phrasing that
+    // starts answering one of them fails the sweep by name.
+    const declineFamilies = new Set(declines.map((row) => row.category));
+    for (const family of [
+      'siren_decline_round', 'siren_decline_venue', 'siren_decline_matchup', 'siren_decline_coach',
+      'siren_decline_min', 'siren_decline_coverage', 'siren_decline_per_season',
+      'siren_decline_siren_subtype', 'siren_decline_shot_detail', 'siren_decline_source_score',
+      'siren_decline_competition', 'siren_decline_cross_grain', 'siren_decline_supergoal',
+      'siren_decline_out_of_family',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+  });
 });
 
 // -------------------------------------------------------------------- cores

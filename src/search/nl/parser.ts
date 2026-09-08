@@ -29,6 +29,12 @@ import {
   PARSER_VERSION,
   type NlAchievementKey,
   type NlAchievementSummaryKind,
+  type NlAfterSiren,
+  type NlAfterSirenEffect,
+  type NlAfterSirenKickerResult,
+  type NlAfterSirenOccurrence,
+  type NlAfterSirenScored,
+  type NlAfterSirenSubject,
   type NlAggregation,
   type NlBoundary,
   type NlCareerColumn,
@@ -56,6 +62,8 @@ import {
   ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
+  AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
   FIRST_KICK_GOAL_RE,
   DECADE_RE,
@@ -1501,6 +1509,106 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // 5d. After the siren (AFLDB-ISSUE-152 Phase C). Placed AFTER season
+  // extraction, so a year is never read as a dimension token, and BEFORE
+  // every metric extractor -- THE critical precedence rule of this phase.
+  // "goals" must be claimed as the kickScored dimension and never as the
+  // player_match_stats goals metric, or "who has kicked the most goals
+  // after the siren" answers with a career-goals leaderboard. Before this
+  // block existed the metric extractor DID claim the word, and only the
+  // confidence gate's penalty on the leftover "after siren" tokens stopped
+  // the wrong answer being returned (the R0 probe, recorded on the issue).
+  //
+  // Deliberately BEFORE, but NOT consuming, extractMatchType. This is an
+  // explicit inversion of the Phase B coaching rule: there "finals" and
+  // "grand finals" were coaching METRICS and had to be claimed first; here
+  // finals is genuine match SCOPE (D4), so the words are left for
+  // extractMatchType to claim as scope.matchType.
+  let afterSirenReading = false;
+  let sirenScored: NlAfterSirenScored | undefined;
+  let sirenEffect: NlAfterSirenEffect | undefined;
+  let sirenKickerResult: NlAfterSirenKickerResult | undefined;
+  let sirenOccurrence: NlAfterSirenOccurrence | undefined;
+  let sirenCondition: NlMetricCondition | undefined;
+  let sirenNounConsumed = false;
+  if (AFTER_SIREN_CUE_RE.test(text)) {
+    // Fail closed: neither grain owns the other's fields, and a coaching
+    // record scoped to after-the-siren kicks is not a question either
+    // compiler can answer.
+    if (coachReading !== null) {
+      report.notes.push('AFLDB cannot combine a coaching question with an after-the-siren question.');
+      report.unsupportedTerms.push('after the siren');
+      return { status: 'none', reason: 'unrecognised', report };
+    }
+    afterSirenReading = true;
+    for (let cue = AFTER_SIREN_CUE_RE.exec(text); cue !== null; cue = AFTER_SIREN_CUE_RE.exec(text)) {
+      consumedTokens.push(cue[0]);
+      text = stripMatch(text, cue[0]);
+    }
+
+    // Occurrence first, so "most recent" is claimed as ONE phrase before
+    // aggregation extraction can read its bare "most" as a superlative.
+    for (const [re, value] of AFTER_SIREN_OCCURRENCE_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenOccurrence = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+
+    // The kicker's match RESULT before the kick's EFFECT: "missed after
+    // the siren and lost" is kickerResult='loss', and "and won" is not
+    // kickEffect='won'. The two are semantically different and the
+    // measured (none, none, win) event proves it.
+    for (const [re, value] of AFTER_SIREN_RESULT_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenKickerResult = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+    for (const [re, value] of AFTER_SIREN_EFFECT_WORDS) {
+      const match = re.exec(text);
+      if (!match) continue;
+      sirenEffect = value;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      break;
+    }
+
+    // What the kick registered, and any threshold governing it. The
+    // threshold reuses extractCoachMetric's comparator/number lookback
+    // rather than a second copy of it -- the noun here plays exactly the
+    // role a coaching metric word plays there. An ABSENT kickScored means
+    // any kick, INCLUDING a miss: "kicks after the siren" is every event,
+    // not only the ones that scored.
+    let scoredWord: [RegExp, NlAfterSirenScored] | undefined;
+    for (const entry of AFTER_SIREN_SCORED_WORDS) {
+      if (entry[0].test(text)) { scoredWord = entry; break; }
+    }
+    const nounRe = scoredWord?.[0] ?? AFTER_SIREN_KICK_NOUN_RE;
+    if (scoredWord || AFTER_SIREN_KICK_NOUN_RE.test(text)) {
+      const noun = extractCoachMetric(text, [[nounRe, 'siren_kicks']]);
+      text = noun.text;
+      consumedTokens.push(...noun.consumed);
+      sirenScored = scoredWord?.[1];
+      sirenCondition = noun.condition;
+      sirenNounConsumed = true;
+    }
+    // The subject noun again, when a dimension word claimed the first
+    // pass: "kicks after the siren that missed" names both, and the
+    // unclaimed "kicks" would otherwise survive as an unexplained
+    // leftover and decline a question the engine understood completely.
+    const bareNoun = AFTER_SIREN_KICK_NOUN_RE.exec(text);
+    if (bareNoun) {
+      consumedTokens.push(bareNoun[0]);
+      text = stripMatch(text, bareNoun[0]);
+      sirenNounConsumed = true;
+    }
+  }
+
   // A team-scoring word anywhere in the question means a bare "grand
   // final"/"finals" can only be scope, never the player_career metric --
   // see extractMatchType. Peeked before extraction so the decision is made
@@ -1524,7 +1632,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // the whole span first is also what keeps "first" away from the boundary
   // logic further down. See FIRST_KICK_GOAL_RE for the phrases this
   // deliberately does NOT match ("first goal", "debut goal", ...).
-  const achievementResult = extractFirstKickGoal(text);
+  // Suppressed for an after-siren question: the after_siren grain carries
+  // no careerPredicates, so a consumed achievement phrase would be dropped
+  // on the way to the plan -- the ISSUE-110 silent-scope defect. Left in
+  // the text it becomes a leftover token and the question declines, which
+  // is the honest outcome.
+  const achievementResult = afterSirenReading
+    ? { text, consumed: [] as string[], achievementKey: undefined, summaryKind: undefined, negatedAchievement: false }
+    : extractFirstKickGoal(text);
   text = achievementResult.text;
   consumedTokens.push(...achievementResult.consumed);
   if (achievementResult.negatedAchievement) {
@@ -1634,7 +1749,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   consumedTokens.push(...scoreCheckpointResult.consumed);
 
   const teamMetricResult: { text: string; metric?: string; consumed: string[] } =
-    coachReading === 'coach_record' ? { text, consumed: [] } : extractTeamMetric(text);
+    coachReading === 'coach_record' || afterSirenReading ? { text, consumed: [] } : extractTeamMetric(text);
   // Do NOT update text with teamMetricResult.text here.
   // The match is stripped at step 11 instead to allow career conditions
   // to see unstripped words if they overlap.
@@ -1642,7 +1757,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
 
   // 10. Career conditions (numeric thresholds/negatives on career columns).
-  const careerResult = extractCareerConditions(text);
+  // Suppressed for an after-siren question for the same reason step 5a is:
+  // the grain carries no careerConditions or careerPredicates, so anything
+  // claimed here would be silently discarded rather than answered.
+  const careerResult = afterSirenReading
+    ? { text, conditions: [] as NlCareerCondition[], predicates: [] as GridAxisState[], consumed: [] as string[] }
+    : extractCareerConditions(text);
   text = careerResult.text;
   consumedTokens.push(...careerResult.consumed);
 
@@ -1698,7 +1818,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // consuming; the guarded extraction below still does the real work.
   const seasonWorded = inOneSeason || seasons.seasonMin !== undefined || seasons.seasonMax !== undefined;
   const clubSeasonMetricWordPresent = CLUB_SEASON_METRIC_WORDS.some(([re]) => re.test(text));
-  const clubSeasonCuePresent = coachReading === null && (clubSubjectPresent
+  const clubSeasonCuePresent = coachReading === null && !afterSirenReading && (clubSubjectPresent
     || clubSeasonConditionResult.conditions.length > 0
     || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded));
 
@@ -1717,7 +1837,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // Set when a comparator/number was consumed with the metric word; grain
   // election below decides which typed representation honours it.
   let pendingMetricCondition: NlMetricCondition | undefined;
-  if (coachReading === 'coach_record') {
+  if (coachReading === 'coach_record' || afterSirenReading) {
     playerMetricResult = { text, consumed: [] };
   } else if (teamMetricResult.metric) {
     // Strip the matched word from the CURRENT text, not
@@ -1957,6 +2077,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   } else if (coachReading === 'coach_record') {
     grain = 'coach_record';
     metric = coachMetric ?? null;
+  } else if (afterSirenReading) {
+    // One metric on purpose: every distinction is a typed DIMENSION, never
+    // a second metric name (the ISSUE-110 two-spellings-of-one-question
+    // failure this grain must not reintroduce).
+    grain = 'after_siren';
+    metric = 'siren_kicks';
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
@@ -2102,6 +2228,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (grain === 'coach_record' && inOneSeason) {
     report.confidence = 1;
     report.notes.push('A coaching record is totalled across the seasons asked for; per-season coaching splits are not supported.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // The same rule for the same reason (§15.14 C-D7): after-siren events are
+  // counted across the seasons in scope, and there is no per-season
+  // after-siren grain. "most goals after the siren in a season" would
+  // otherwise answer the all-time count under a question that asked for a
+  // single year.
+  if (grain === 'after_siren' && inOneSeason) {
+    report.confidence = 1;
+    report.notes.push('After-the-siren kicks are counted across the seasons asked for; there is no per-season after-the-siren record.');
     return { status: 'none', reason: 'unrecognised', report };
   }
 
@@ -2385,6 +2522,34 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // maxListRows(100). "players WHO PLAYED on anzac day" is the shape:
   // AGG_WORDS reads "who played" as the "who played the most..." idiom,
   // but with no stat named the honest reading is the full list.
+  /**
+   * Subject election (§15.4), decided here because it is the first point
+   * where BOTH the dimensions (step 5d) and the aggregation (step 8) are
+   * known.
+   *
+   * 'player' when the question ranks, thresholds, or explicitly names the
+   * kickers as its subject; 'event' otherwise -- including every count,
+   * every occurrence, and a NAMED player, whose after-siren record is
+   * their list of kicks, not a leaderboard of one.
+   */
+  const sirenSubject: NlAfterSirenSubject = player
+    ? 'event'
+    : (resolvedAgg?.kind === 'max' || resolvedAgg?.kind === 'min' || resolvedAgg?.kind === 'top_n')
+      || sirenCondition !== undefined
+      || (sirenOccurrence === undefined && AFTER_SIREN_PLAYER_SUBJECT_RE.test(normalised))
+    ? 'player'
+    : 'event';
+
+  const afterSiren: NlAfterSiren | undefined = afterSirenReading
+    ? {
+      subject: sirenSubject,
+      ...(sirenScored !== undefined ? { kickScored: sirenScored } : {}),
+      ...(sirenEffect !== undefined ? { kickEffect: sirenEffect } : {}),
+      ...(sirenKickerResult !== undefined ? { kickerResult: sirenKickerResult } : {}),
+      ...(sirenOccurrence !== undefined ? { occurrence: sirenOccurrence } : {}),
+    }
+    : undefined;
+
   const agg: NlAggregation = headToHead
     ? { kind: 'count' }
     : havingResult.havingClause
@@ -2404,10 +2569,25 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     : grain === 'coach_record' && metric === null
       && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
     ? { kind: 'list' }
+    // An after-siren question with no ranking cue is the qualifying EVENT
+    // LIST, not a rank-one leader: "goals after the siren for Richmond" is
+    // every one of them. A threshold is likewise a list of qualifying
+    // kickers. A min cue is deliberately left alone so validatePlan can
+    // refuse it honestly (D15) rather than have it silently become a list.
+    : grain === 'after_siren'
+    ? (resolvedAgg?.kind === 'count'
+        ? { kind: 'count' }
+        : sirenCondition !== undefined
+        ? { kind: 'list' }
+        : resolvedAgg && resolvedAgg.kind !== 'list'
+        ? resolvedAgg
+        : { kind: 'list' })
     : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
     ? { kind: 'list' }
     : resolvedAgg ?? (structureOnly ? { kind: 'list' } : { kind: 'max' });
+
+  if (afterSirenReading && sirenCondition !== undefined) metricCondition = sirenCondition;
 
   const plan: NlQueryPlan = {
     v: 1,
@@ -2427,6 +2607,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       : {}),
     ...(headToHead ? { headToHead } : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),
+    ...(afterSiren ? { afterSiren } : {}),
     ...(periodSplitResult.periodSplit ? { periodSplit: periodSplitResult.periodSplit } : {}),
     ...(scoreCheckpointResult.scoreCheckpoint ? { scoreCheckpoint: scoreCheckpointResult.scoreCheckpoint } : {}),
     ...(resultFilterResult.resultFilter ? { resultFilter: resultFilterResult.resultFilter } : {}),
@@ -2464,6 +2645,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     : grain === 'team_match' ? !!metric || !!havingResult.havingClause
     : grain === 'team_streak' ? !!streakResult.streakDefinition
     : grain === 'coach_record' ? (metric !== null || !!coach || !!scope.clubFor)
+    // The cue alone is not a question. A bare "siren" carries no
+    // dimension, no subject noun, no scope and no player, and declines
+    // rather than returning the whole curated list.
+    : grain === 'after_siren' ? (
+      !!afterSiren && (
+        sirenScored !== undefined || sirenEffect !== undefined || sirenKickerResult !== undefined
+        || sirenOccurrence !== undefined || sirenNounConsumed || !!player
+        || !!scope.clubFor || !!scope.clubAgainst || scope.matchType !== undefined
+        || scope.seasonMin !== undefined || scope.seasonMax !== undefined
+      )
+    )
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)

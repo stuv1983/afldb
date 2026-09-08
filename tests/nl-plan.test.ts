@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  afterSirenRequiresMatchLink,
   decodePlanToken,
   describePlan,
   encodePlanToken,
@@ -702,5 +703,152 @@ describe('describePlan: coaching', () => {
       metric: 'win_pct', agg: { kind: 'max' }, coachQualifier: { minGames: 100 },
     })) as NlQueryPlan);
     expect(lines.some((line) => line.includes('minimum 100 games coached'))).toBe(true);
+  });
+});
+
+// ------------------------------- after the siren (AFLDB-ISSUE-152 Phase C)
+
+/**
+ * The after_siren grain's ownership contract. Every field it refuses is
+ * refused BY NAME (the ISSUE-110 discarded-scope rule), and the
+ * match-link boundary is D10/§7.1 encoded as one exported predicate that
+ * both validatePlan and the compiler read.
+ */
+function sirenPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return basePlan({
+    grain: 'after_siren',
+    metric: 'siren_kicks',
+    agg: { kind: 'list' },
+    afterSiren: { subject: 'event' },
+    ...overrides,
+  });
+}
+
+describe('validatePlan — after_siren (AFLDB-ISSUE-152 Phase C)', () => {
+  it('accepts the plain event list', () => {
+    expect(validatePlan(sirenPlan())).not.toHaveProperty('error');
+  });
+
+  it('requires the typed descriptor: the grain cannot be reached without one', () => {
+    const { afterSiren: _omitted, ...rest } = sirenPlan();
+    expect(validatePlan(rest as NlQueryPlan)).toHaveProperty('error');
+  });
+
+  it('refuses the descriptor on any other grain', () => {
+    expect(validatePlan(basePlan({ afterSiren: { subject: 'event' } }))).toHaveProperty('error');
+  });
+
+  it('refuses "siren_kicks" as a metric for any other grain', () => {
+    expect(validatePlan(basePlan({ metric: 'siren_kicks' }))).toHaveProperty('error');
+  });
+
+  it.each([
+    ['coach', { coach: { id: 1, slug: 'x', name: 'X', playerId: null, playerSlug: null } }],
+    ['coachQualifier', { coachQualifier: { minGames: 50 } }],
+    ['scope.matchup', { scope: { matchup: {
+      clubA: { organizationId: 1, slug: 'a', name: 'A' }, clubB: { organizationId: 2, slug: 'b', name: 'B' },
+    } } }],
+    ['scope.venue', { scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }],
+    ['scope.roundNumber', { scope: { roundNumber: 1 } }],
+    ['scope.playerIdIn', { scope: { playerIdIn: [1, 2] } }],
+    ['careerConditions', { careerConditions: [{ kind: 'column', column: 'games', op: 'gte', value: 1 }] }],
+    ['careerPredicates', { careerPredicates: [{ builder: 'premiership_coach', params: {} }] }],
+    ['clubSeasonConditions', { clubSeasonConditions: [{ kind: 'premier' }] }],
+    ['achievementSummary', { achievementSummary: { achievementKey: 'first_kick_goal', kind: 'by_club' } }],
+    ['headToHead', { headToHead: { kind: 'record' } }],
+    ['streakDefinition', { streakDefinition: { kind: 'win' } }],
+    ['periodSplit', { periodSplit: 'Q1' }],
+    ['scoreCheckpoint', { scoreCheckpoint: 'HT' }],
+    ['resultFilter', { resultFilter: 'won' }],
+    ['debutGame', { debutGame: true }],
+    ['havingClause', { havingClause: { metric: 'wins', op: 'gte', value: 1 } }],
+    ['matchFilter', { matchFilter: { metric: 'win_margin', op: 'gte', value: 1 } }],
+    ['boundary', { boundary: { event: 'debut', where: 'grand_final' } }],
+    ['mode', { mode: 'single' }],
+  ] as [string, Partial<NlQueryPlan>][])('refuses %s by name', (_label, overrides) => {
+    expect(validatePlan(sirenPlan(overrides))).toHaveProperty('error');
+  });
+
+  it('refuses min: the set is DEFINED by having at least one after-siren kick (D15)', () => {
+    expect(validatePlan(sirenPlan({
+      agg: { kind: 'min' }, afterSiren: { subject: 'player' },
+    }))).toHaveProperty('error');
+  });
+
+  it('accepts max/top_n at player subject, and refuses a player ranking at event subject', () => {
+    expect(validatePlan(sirenPlan({
+      agg: { kind: 'max' }, afterSiren: { subject: 'player', kickScored: 'goal' },
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(sirenPlan({ agg: { kind: 'max' } }))).toHaveProperty('error');
+  });
+
+  it('a named player takes the event subject; a leaderboard of one is refused', () => {
+    const named = { id: 1001, slug: 'barry-hall', name: 'Barry Hall' };
+    expect(validatePlan(sirenPlan({ player: named }))).not.toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      player: named, agg: { kind: 'max' }, afterSiren: { subject: 'player' },
+    }))).toHaveProperty('error');
+  });
+
+  it('a threshold requires the player subject and a list', () => {
+    expect(validatePlan(sirenPlan({
+      afterSiren: { subject: 'player', kickScored: 'goal' }, metricCondition: { op: 'gte', value: 3 },
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      metricCondition: { op: 'gte', value: 3 },
+    }))).toHaveProperty('error');
+  });
+
+  it('refuses an unknown dimension value', () => {
+    expect(validatePlan(sirenPlan({
+      afterSiren: { subject: 'event', kickScored: 'point' as never },
+    }))).toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      afterSiren: { subject: 'event', kickEffect: 'lost' as never },
+    }))).toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      afterSiren: { subject: 'event', kickerResult: 'won' as never },
+    }))).toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      afterSiren: { subject: 'event', occurrence: 'oldest' as never },
+    }))).toHaveProperty('error');
+  });
+
+  it('applies the 1913 coverage floor, and does NOT inherit the 1965 "kicks" floor', () => {
+    // The measured first event is Billy Schmidt, 1913 -- a metric literally
+    // named `kicks` would decline every question about 1913-1964.
+    expect(validatePlan(sirenPlan({
+      scope: { seasonMin: 1930, seasonMax: 1930 },
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(sirenPlan({
+      scope: { seasonMin: 1900, seasonMax: 1900 },
+    }))).toHaveProperty('error');
+  });
+});
+
+describe('afterSirenRequiresMatchLink (D10 §7.1)', () => {
+  it.each([
+    ['event list', {}, false],
+    ['event count', { agg: { kind: 'count' } }, false],
+    ['club scope', { scope: { clubFor: { organizationId: 1, slug: 'r', name: 'R' } } }, false],
+    ['opponent scope', { scope: { clubAgainst: { organizationId: 1, slug: 'r', name: 'R' } } }, false],
+    ['season scope', { scope: { seasonMin: 2000 } }, false],
+    ['kickScored', { afterSiren: { subject: 'event', kickScored: 'goal' } }, false],
+    ['kickEffect', { afterSiren: { subject: 'event', kickEffect: 'won' } }, false],
+    ['kickerResult', { afterSiren: { subject: 'event', kickerResult: 'loss' } }, false],
+    ['player ranking', { agg: { kind: 'max' }, afterSiren: { subject: 'player' } }, false],
+    ['finals scope', { scope: { matchType: 'finals' } }, true],
+    ['home_and_away scope', { scope: { matchType: 'home_and_away' } }, true],
+    ['occurrence first', { afterSiren: { subject: 'event', occurrence: 'first' } }, true],
+    ['occurrence most_recent', { afterSiren: { subject: 'event', occurrence: 'most_recent' } }, true],
+  ] as [string, Partial<NlQueryPlan>, boolean][])('%s requires a match link: %s', (_label, overrides, expected) => {
+    expect(afterSirenRequiresMatchLink(sirenPlan(overrides))).toBe(expected);
+  });
+
+  it('premiership_season alone never requires a match link', () => {
+    // The four 2026 premiership rows with no match link are counted,
+    // listed, attributed and classified -- everything except ordering and
+    // finals.
+    expect(afterSirenRequiresMatchLink(sirenPlan({ scope: { seasonMin: 2026 } }))).toBe(false);
   });
 });

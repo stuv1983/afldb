@@ -270,3 +270,104 @@ describe('NL coaching acceptance (AFLDB-ISSUE-152 Phase B)', () => {
     }
   });
 });
+
+// ------------------------------ after the siren (AFLDB-ISSUE-152 Phase C)
+
+const sirenPlayers: Record<string, { id: number; slug: string; name: string }[]> = {
+  'barry hall': [{ id: 1001, slug: 'barry-hall', name: 'Barry Hall' }],
+  'gary rohan': [{ id: 4742, slug: 'gary-rohan', name: 'Gary Rohan' }],
+};
+
+const sirenCtx: NlParseContext = {
+  clubs,
+  venues,
+  coaches,
+  resolvePlayer: async (name: string) => (sirenPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+};
+
+const sirenQuestions: [string, Record<string, unknown>][] = [
+  ['who has kicked the most goals after the siren', {
+    grain: 'after_siren', metric: 'siren_kicks', agg: { kind: 'max' },
+    afterSiren: { subject: 'player', kickScored: 'goal' },
+  }],
+  ['most kicks after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'player' },
+  }],
+  ['goals after the siren to win', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'goal', kickEffect: 'won' },
+  }],
+  ['behinds after the siren to draw', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'behind', kickEffect: 'drew' },
+  }],
+  ['missed after the siren and lost', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'none', kickerResult: 'loss' },
+  }],
+  ['how many kicks after the siren', { grain: 'after_siren', agg: { kind: 'count' } }],
+  ['the first kick after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'event', occurrence: 'first' },
+  }],
+  ['the most recent goal after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'goal', occurrence: 'most_recent' },
+  }],
+  ['goals after the siren against Richmond', {
+    grain: 'after_siren', scope: { clubAgainst: { slug: 'richmond' } },
+  }],
+  ['goals after the siren for Geelong', {
+    grain: 'after_siren', scope: { clubFor: { slug: 'geelong' } },
+  }],
+  ['after the siren in the finals', { grain: 'after_siren', scope: { matchType: 'finals' } }],
+  ['Barry Hall goals after the siren', {
+    grain: 'after_siren', player: { id: 1001 }, afterSiren: { subject: 'event', kickScored: 'goal' },
+  }],
+  ['who has kicked the most goals after the siren for Richmond in the finals since 2000', {
+    grain: 'after_siren', afterSiren: { subject: 'player', kickScored: 'goal' },
+    scope: { clubFor: { slug: 'richmond' }, matchType: 'finals', seasonMin: 2000 },
+  }],
+];
+
+/** Every §15.14 form: a decline, or a plan its own validator refuses. */
+const sirenDeclines = [
+  'goals after the siren in round 1',
+  'goals after the siren at the MCG',
+  'Richmond v Carlton after the siren',
+  'which coach won most games on a goal after the siren',
+  'fewest kicks after the siren',
+  'goals after the siren in 1900',
+  'most goals after the siren in a season',
+  'goals after the siren in extra time',
+  'who kicked it out on the full after the siren',
+  'how much did they win by after the siren',
+  'goals after the siren in the NAB Cup',
+  '300 game players who kicked a goal after the siren',
+  'was it a supergoal after the siren',
+  'did the siren sound before the kick',
+];
+
+describe('NL after-the-siren acceptance (AFLDB-ISSUE-152 Phase C)', () => {
+  it('parses every supported after-the-siren family to the intended plan', async () => {
+    for (const [question, expected] of sirenQuestions) {
+      const parsed = await parseNlQuestion(question, sirenCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported after-the-siren form', async () => {
+    for (const question of sirenDeclines) {
+      const parsed = await parseNlQuestion(question, sirenCtx);
+      if (parsed.status !== 'plan') continue;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
+  });
+
+  /**
+   * The 1,435-row realistic and 60-row decline gates are untouched by this
+   * phase, exactly as Phase B asserted for coaching: no existing corpus
+   * question mentions the siren, so none of them can change meaning.
+   */
+  it('no existing audit-corpus question mentions the siren', () => {
+    expect(questions.filter((q) => /siren/i.test(q))).toEqual([]);
+  });
+});

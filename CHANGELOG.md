@@ -15,6 +15,49 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - after-the-siren questions are answerable (AFLDB-ISSUE-152 Phase C) - 8 September 2026
+
+- AFLDB has held a curated, cited list of kicks after the siren since migration 089 - 126 events
+  from 1913 onward, each classified on three independent axes. The natural-language engine could
+  not reach any of it: "who has kicked the most goals after the siren" declined, and the only
+  reason it declined rather than answering wrongly was that the leftover words "after siren"
+  dragged confidence below the gate. The metric extractor had already claimed "goals" as the
+  career-goals statistic. A tenth grain, `after_siren`, now owns the family, and the parser claims
+  the siren vocabulary BEFORE any metric extractor so that reading can never surface.
+- The three dimensions stay independent and are never merged. What the kick REGISTERED
+  (goal / behind / nothing), what it did to the RESULT (won / drew / nothing), and the match result
+  from the KICKER's side are separate typed fields, ANDed. "A goal after the siren" and "a goal
+  after the siren to win" are different populations, and the answer text names every applied
+  dimension so a reader can see which question was answered. One measured event is a kick that
+  scored nothing, changed nothing, and whose side won anyway - which is why the third axis exists.
+- An absent outcome means EVERY kick, misses included: "kicks after the siren" is all 126 events,
+  not only the ones that scored.
+- Every superlative in this family is a tie. The measured ceiling is two, so "most goals after the
+  siren" names Barry Hall AND Gary Rohan, and "most kicks after the siren" names nine players.
+  An answer that named one of them would be wrong by construction.
+- A kick with no canonical match link is counted, listed, attributed to its club and its kicker,
+  and classified on all three axes. It is excluded only from the two things `matches` owns:
+  ordering ("the first", "the most recent") and finals scope. The answer says how many were left
+  out and why, rather than dropping them silently.
+- Finals scope reads `matches.round_type`, never the source's own round text. One 1980 event is
+  recorded with the round "GF" in a non-premiership Escort Championships match, and a round-shaped
+  filter over that text would return it as a Grand Final. "After the siren in a Grand Final" is an
+  honest empty result: no VFL/AFL Grand Final after-siren event exists.
+- Every after-the-siren answer carries a permanent caveat that this is a curated, cited list of
+  individual events, not a systematic record of every kick after every siren. A coverage floor
+  alone would have implied a completeness the family does not have.
+- Declines are explicit rather than approximate: a round number, a venue, a two-club matchup, a
+  per-season split, the siren subtype, the shot detail, the verbatim source scores, the competition
+  name, and "fewest kicks after the siren" - which has no meaningful answer, because the set is
+  defined by having at least one.
+- Migration `093_nl_search_log_after_siren_grain.sql` extends the telemetry grain constraint, which
+  is the fourth time that constraint has had to catch up with the grain vocabulary. Without it every
+  after-the-siren answer would render correctly while its telemetry row was rejected and dropped in
+  silence. The requirement was proven by a failing test before the migration was written, and the
+  migration must reach each database before the code that needs it.
+- `PARSER_VERSION` 35 -> 36.
+
+
 ### Natural-language search - coaching questions are answerable, and the false coaching decline is gone (AFLDB-ISSUE-152) - 8 September 2026
 
 - AFLDB has held canonical coaching data since migration 087: 386 coaches and 32,034

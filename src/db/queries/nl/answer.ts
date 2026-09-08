@@ -16,7 +16,7 @@ import {
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import { parseNlQuestion } from '@/search/nl/parser';
-import { describeAnswer } from '@/search/nl/describe';
+import { answerCaveats, describeAnswer } from '@/search/nl/describe';
 import type { NlAnswer, NlAnswerPayload } from '@/search/nl/answer-types';
 
 /**
@@ -191,6 +191,7 @@ function payloadTotal(payload: NlAnswerPayload): number {
     case 'player_game': case 'player_career': case 'player_season':
     case 'team_match': case 'team_aggregate': case 'club_season': case 'team_streak':
     case 'coach_record':
+    case 'after_siren_event': case 'after_siren_player':
       return payload.total;
     case 'head_to_head':
       return payload.row ? 1 : 0;
@@ -227,7 +228,10 @@ function buildAnswer(
   return {
     headline,
     interpretation,
-    caveats: notes,
+    // Parse-time caveats ("Reading 'won' as premierships") plus the ones
+    // only the ANSWER knows: what an ownership rule excluded from THIS
+    // filtered set, counted at answer time rather than hard-coded.
+    caveats: [...notes, ...answerCaveats(plan, payload)],
     coverageNote,
     explain: describePlan(plan),
     planToken: encodePlanToken(plan),

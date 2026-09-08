@@ -315,8 +315,23 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    whose stated reason -- that AFLDB holds no coaching data -- stopped
  *    being true at migration 087 and had been declining every coaching
  *    question with an untrue explanation ever since.
+ * 36: after the siren becomes answerable (AFLDB-ISSUE-152 Phase C). A
+ *    tenth grain, after_siren, over the curated after_siren_kicks event
+ *    list (migration 089) -- the first EVENT grain in this vocabulary,
+ *    neither a person nor a per-match statistic. Three INDEPENDENT typed
+ *    dimensions (what the kick registered, what it did to the result,
+ *    and the match result from the kicker's side) rather than one
+ *    collapsed metric, so "a goal after the siren" (71) and "a goal
+ *    after the siren to win" (62) can never compile to the same
+ *    predicate. A match-link boundary (afterSirenRequiresMatchLink)
+ *    decides which semantics a row with no canonical match may answer.
+ *    And the precedence change this family needs above all: the siren
+ *    dimension vocabulary claims "goals"/"kicks" BEFORE the player-metric
+ *    extractor, so "who has kicked the most goals after the siren" can
+ *    never be read as a career-goals leaderboard with "after the siren"
+ *    discarded.
  */
-export const PARSER_VERSION = 35;
+export const PARSER_VERSION = 36;
 
 // ------------------------------------------------------------------ grain
 
@@ -338,7 +353,66 @@ export type NlGrain =
    * that is not a player: 18 of 386 coaches have no player row at all, so
    * nothing about a coaching answer can be expressed as an NlPlayerRef.
    */
-  | 'coach_record';
+  | 'coach_record'
+  /**
+   * A curated, cited kick after the siren (migration 089,
+   * AFLDB-ISSUE-118 §23.33). An EVENT grain, not a person grain and not a
+   * statistic grain: AFLDB has no play-by-play data and never recomputes
+   * one of these from scores or player_match_stats.
+   */
+  | 'after_siren';
+
+// ------------------------------------------------------------ after siren
+
+export type NlAfterSirenSubject = 'event' | 'player';
+export type NlAfterSirenScored = 'goal' | 'behind' | 'none';
+export type NlAfterSirenEffect = 'won' | 'drew' | 'none';
+export type NlAfterSirenKickerResult = 'win' | 'draw' | 'loss';
+export type NlAfterSirenOccurrence = 'first' | 'most_recent';
+
+export const NL_AFTER_SIREN_SUBJECTS: readonly NlAfterSirenSubject[] = ['event', 'player'];
+export const NL_AFTER_SIREN_SCORED: readonly NlAfterSirenScored[] = ['goal', 'behind', 'none'];
+export const NL_AFTER_SIREN_EFFECTS: readonly NlAfterSirenEffect[] = ['won', 'drew', 'none'];
+export const NL_AFTER_SIREN_RESULTS: readonly NlAfterSirenKickerResult[] = ['win', 'draw', 'loss'];
+export const NL_AFTER_SIREN_OCCURRENCES: readonly NlAfterSirenOccurrence[] = ['first', 'most_recent'];
+
+/**
+ * The after_siren descriptor, carried the way achievementSummary,
+ * headToHead and streakDefinition already are -- a single object, so
+ * validatePlan's "fields its compiler cannot honour" list stays a flat
+ * enumeration and no dimension can be added without appearing here.
+ */
+export type NlAfterSiren = {
+  /**
+   * What the rows ARE. 'event' returns the curated events themselves;
+   * 'player' aggregates them per kicker and requires a trusted player
+   * link. The two answer different questions and have different payloads.
+   */
+  subject: NlAfterSirenSubject;
+  /**
+   * after_siren_kicks.kick_scored -- what the kick REGISTERED.
+   * undefined means ANY kick, INCLUDING a miss: "kicks after the siren"
+   * is 126 events, not the 101 that scored something.
+   */
+  kickScored?: NlAfterSirenScored;
+  /**
+   * after_siren_kicks.kick_effect -- what the kick did to the RESULT.
+   * Independent of kickScored and ANDed with it: "a goal after the siren"
+   * is kickScored alone, "a goal after the siren TO WIN" is both.
+   */
+  kickEffect?: NlAfterSirenEffect;
+  /**
+   * after_siren_kicks.kicker_result -- the match result from the kicker's
+   * side. Independent of kickEffect: one measured event is
+   * (none, none, WIN). Never inferred from matches.winner_club_id.
+   */
+  kickerResult?: NlAfterSirenKickerResult;
+  /**
+   * "the first" / "the most recent". Match-linked only (D10 limit 1) --
+   * see afterSirenRequiresMatchLink below.
+   */
+  occurrence?: NlAfterSirenOccurrence;
+};
 
 // ----------------------------------------------------------- achievements
 
@@ -700,6 +774,22 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     /** (W + D/2) / G * 100, the site convention. Qualifier-gated -- see NL_COACH_WIN_PCT. */
     win_pct: columnMetric('win_pct', 'Win percentage', 'win_pct'),
   },
+  after_siren: {
+    /**
+     * A COUNT of after-siren events in the filtered set. There is exactly
+     * one metric here on purpose: every distinction ("goals", "behinds",
+     * "misses", "game winners", "winning goals") is a typed DIMENSION on
+     * NlAfterSiren, not a second metric name. Two spellings of one question
+     * is the ISSUE-110 failure this grain must not reintroduce.
+     *
+     * `siren_kicks`, NOT `kicks` -- the naming is load-bearing. NL_COVERAGE
+     * is keyed by metric name and already holds a 1965 floor for the
+     * player-statistic column `kicks`; a metric of that name would inherit
+     * it and decline every after-the-siren question about 1913-1964,
+     * including the measured first event (Billy Schmidt, 1913).
+     */
+    siren_kicks: columnMetric('siren_kicks', 'Kicks after the siren', 'siren_kicks'),
+  },
 };
 
 /**
@@ -777,6 +867,17 @@ export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
     note: 'AFLDB\'s coaching records begin in 1902.',
     grains: ['coach_record'],
   },
+  // The after-the-siren FLOOR, and deliberately nothing more. 1913 is the
+  // measured first event (Billy Schmidt, St Kilda v Carlton, 1913-08-02):
+  // it says a 1900 after-siren question has no answer, and makes NO
+  // completeness claim for any season after it. The permanent "curated,
+  // cited list" caveat in describe.ts carries the rest of that honesty
+  // into the rendered answer (operator decision D12).
+  siren_kicks: {
+    firstSeason: 1913,
+    note: 'AFLDB\'s after-the-siren record begins in 1913.',
+    grains: ['after_siren'],
+  },
   behinds: { firstSeason: 1965, note: 'Behinds were not recorded before 1965.' },
   kicks: { firstSeason: 1965, note: 'Kicks were not recorded before 1965.' },
   handballs: { firstSeason: 1965, note: 'Handballs were not recorded before 1965.' },
@@ -832,6 +933,9 @@ export function nlCoverageFor(grain: NlGrain, metric: string | null): NlCoverage
   // refused. Keyed under 'games' in the table above so the rule has a
   // single home, and reached from here for every coach_record plan.
   if (grain === 'coach_record') return NL_COVERAGE.games ?? null;
+  // Same rule for the same reason: a metric-less after-siren list or count
+  // ("after the siren in 1900") must still meet the 1913 floor.
+  if (grain === 'after_siren') return NL_COVERAGE.siren_kicks ?? null;
   if (!metric) return null;
   const coverage = NL_COVERAGE[metric];
   if (!coverage) return null;
@@ -948,6 +1052,8 @@ export type NlQueryPlan = {
   headToHead?: NlHeadToHead;
   /** team_streak only: whether the streak is of wins or losses. */
   streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
+  /** after_siren only: which curated events, aggregated which way. */
+  afterSiren?: NlAfterSiren;
   periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
   /** team_match only: cumulative score checkpoint. */
   scoreCheckpoint?: 'QT' | 'HT' | '3QT';
@@ -1100,6 +1206,27 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 }
 
 /**
+ * D10 (§7.1) limit 2, and limit 1. TRUE when the question needs something
+ * `matches` owns -- finals/round_type, canonical date, canonical match
+ * identity -- or needs a deterministic chronology, which `after_siren_kicks`
+ * alone cannot provide: round_raw is free text ('GF', 'round 1', 'round 3'
+ * all occur on non-premiership rows) and gives no within-season order.
+ *
+ * A match-unlinked row is EXCLUDED from these answers and included in
+ * every other one. `premiership_season` alone is NEVER the gate: the four
+ * 2026 premiership rows with no match link are counted, listed, attributed
+ * to their clubs and their kickers, and classified on all three
+ * dimensions -- everything except ordering and finals.
+ *
+ * Exported so the rule lives in exactly one place and both validatePlan
+ * and db/queries/nl/after-siren.ts read the same predicate.
+ */
+export function afterSirenRequiresMatchLink(plan: NlQueryPlan): boolean {
+  return plan.scope.matchType !== undefined
+    || plan.afterSiren?.occurrence !== undefined;
+}
+
+/**
  * Full structural and semantic validation of a plan, run regardless of
  * where the plan came from -- defence in depth even for a plan the
  * parser itself just built, and the ONLY gate a future non-deterministic
@@ -1110,7 +1237,10 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record'];
+  // NOT compiler-enforced -- a plain literal array. Omitting a grain here
+  // fails CLOSED (every plan of that grain rejected as unknown) rather than
+  // opening a hole, and tests/nl-plan.test.ts catches it.
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record', 'after_siren'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
 
   if (raw.grain === 'head_to_head') {
@@ -1220,6 +1350,71 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     return { error: 'A coach reference only applies to a coaching question.' };
   }
 
+  // An after-the-siren answer is compiled from after_siren_kicks alone and
+  // consumes a deliberately narrow set of fields. Everything else is
+  // refused BY NAME rather than dropped on the way to SQL -- the ISSUE-110
+  // discarded-scope rule, which is why each field is listed here instead
+  // of being left to a general "unknown extras" check.
+  if (raw.grain === 'after_siren') {
+    const siren = raw.afterSiren;
+    if (!siren) return { error: 'An after-the-siren question must say which events it means.' };
+    if (
+      raw.coach || raw.coachQualifier || raw.scope.matchup || raw.scope.venue
+      || raw.scope.roundNumber !== undefined || raw.scope.playerIdIn
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
+      || raw.clubSeasonConditions.length > 0 || raw.achievementSummary || raw.headToHead
+      || raw.streakDefinition || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter
+      || raw.debutGame || raw.havingClause || raw.matchFilter || raw.boundary || raw.mode !== undefined
+    ) {
+      return { error: 'An after-the-siren question contains fields its compiler cannot honour.' };
+    }
+    if (!NL_AFTER_SIREN_SUBJECTS.includes(siren.subject)) {
+      return { error: 'An after-the-siren question must be about the kicks or about the kickers.' };
+    }
+    if (siren.kickScored !== undefined && !NL_AFTER_SIREN_SCORED.includes(siren.kickScored)) {
+      return { error: `Unknown after-the-siren outcome "${siren.kickScored}".` };
+    }
+    if (siren.kickEffect !== undefined && !NL_AFTER_SIREN_EFFECTS.includes(siren.kickEffect)) {
+      return { error: `Unknown after-the-siren effect "${siren.kickEffect}".` };
+    }
+    if (siren.kickerResult !== undefined && !NL_AFTER_SIREN_RESULTS.includes(siren.kickerResult)) {
+      return { error: `Unknown after-the-siren match result "${siren.kickerResult}".` };
+    }
+    if (siren.occurrence !== undefined && !NL_AFTER_SIREN_OCCURRENCES.includes(siren.occurrence)) {
+      return { error: `Unknown after-the-siren occurrence "${siren.occurrence}".` };
+    }
+    if (raw.metric !== null && !isNlMetric('after_siren', raw.metric)) {
+      return { error: `"${raw.metric}" is not a recognised after-the-siren statistic.` };
+    }
+    // "Fewest kicks after the siren" has no answer that means anything: the
+    // set is DEFINED by having at least one, so a min ranking returns
+    // everyone on 1 and presents it as a record (operator decision D15).
+    if (raw.agg.kind === 'min') {
+      return { error: 'Every player in AFLDB\'s after-the-siren record has at least one, so there is no "fewest" to rank.' };
+    }
+    if (!['max', 'top_n', 'list', 'count'].includes(raw.agg.kind)) {
+      return { error: 'An after-the-siren question cannot be answered that way.' };
+    }
+    // A ranking is a leaderboard OF KICKERS. The events themselves are not
+    // ranked against each other -- there is no per-event value to rank by.
+    if ((raw.agg.kind === 'max' || raw.agg.kind === 'top_n') && siren.subject !== 'player') {
+      return { error: 'Ranking after-the-siren kicks means ranking the players who kicked them.' };
+    }
+    // A leaderboard of one is not a ranking.
+    if (raw.player && siren.subject !== 'event') {
+      return { error: 'One named player\'s after-the-siren record is their list of kicks, not a ranking.' };
+    }
+    // The ambiguous-surname ranking path exists so a real tie decides
+    // between candidates. Here the measured metric ceiling is 2 and every
+    // superlative is ALREADY a tie, so ranking across an ambiguous surname
+    // over a 126-row curated list would present a coin flip as a record.
+    if (siren.occurrence !== undefined && siren.subject !== 'event') {
+      return { error: 'The first and most recent after-the-siren kicks are events, not a player ranking.' };
+    }
+  } else if (raw.afterSiren) {
+    return { error: 'An after-the-siren descriptor only applies to an after-the-siren question.' };
+  }
+
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }
@@ -1236,8 +1431,19 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // what keeps a parsed threshold from validating and then silently
   // disappearing downstream -- the ISSUE-110 answered_caveat defect.
   if (raw.metricCondition !== undefined) {
-    if (raw.grain !== 'player_game' && raw.grain !== 'player_season' && raw.grain !== 'coach_record') {
+    if (
+      raw.grain !== 'player_game' && raw.grain !== 'player_season' && raw.grain !== 'coach_record'
+      && raw.grain !== 'after_siren'
+    ) {
       return { error: 'This statistic cannot currently be filtered by that threshold.' };
+    }
+    // "3 or more goals after the siren" counts EVENTS PER KICKER, so it is
+    // a player-subject question. Against the event rows there is nothing
+    // per-row to threshold. (The measured ceiling is 2, which makes this an
+    // honest EMPTY result rather than a decline -- the question is
+    // well-formed and the answer is nobody.)
+    if (raw.grain === 'after_siren' && raw.afterSiren?.subject !== 'player') {
+      return { error: 'An after-the-siren threshold counts kicks per player.' };
     }
     if (!COMPARE_OPS.includes(raw.metricCondition.op)) return { error: 'Unknown comparison.' };
     if (!Number.isFinite(raw.metricCondition.value) || raw.metricCondition.value < 0) {
@@ -1587,6 +1793,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   achievement_summary: 'achievement',
   head_to_head: 'head-to-head',
   coach_record: 'coaching',
+  after_siren: 'after the siren',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -1600,6 +1807,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   achievement_summary: 'group',
   head_to_head: 'matchup',
   coach_record: 'coach',
+  after_siren: 'kick',
 };
 
 const TIE_ENTITY: Record<NlGrain, string> = {
@@ -1612,6 +1820,7 @@ const TIE_ENTITY: Record<NlGrain, string> = {
   achievement_summary: 'group',
   head_to_head: 'matchup',
   coach_record: 'coach',
+  after_siren: 'kick',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {
