@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext } from '@/search/nl/parser';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const clubs: NlClubDirectoryEntry[] = [
   { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
@@ -191,5 +191,82 @@ describe('NL full-audit acceptance corpus', () => {
 
     const debutSeason = await parseNlQuestion('most goals in a debut season', ctx);
     if (debutSeason.status === 'plan') expect(debutSeason.plan.debutGame).toBeUndefined();
+  });
+});
+
+// ------------------------------------- coaching (AFLDB-ISSUE-152 Phase B)
+
+/** The measured coaches used as witnesses in the issue's evidence pack. */
+const coaches: NlCoachDirectoryEntry[] = [
+  { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick', names: ['damien hardwick', 'hardwick'] },
+  { id: 1, slug: 'mick-malthouse', name: 'Mick Malthouse', playerId: 9635, playerSlug: 'mick-malthouse', names: ['mick malthouse', 'malthouse'] },
+  { id: 2, slug: 'jock-mchale', name: 'Jock McHale', playerId: 910, playerSlug: 'jock-mchale', names: ['jock mchale', 'mchale'] },
+  { id: 152, slug: 'cliff-rankin', name: 'Cliff Rankin', playerId: null, playerSlug: null, names: ['cliff rankin', 'rankin'] },
+  { id: 285, slug: 'jack-titus', name: 'Jack Titus', playerId: 800, playerSlug: 'jack-titus', names: ['jack titus', 'titus'] },
+  // Both Pannams coached Richmond, so the bare surname is deliberately no alias.
+  { id: 160, slug: 'albert-pannam', name: 'Albert Pannam', playerId: 700, playerSlug: 'albert-pannam', names: ['albert pannam'] },
+  { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
+];
+
+const coachCtx: NlParseContext = { clubs, venues, coaches, resolvePlayer: async () => [] };
+
+const coachingQuestions: [string, Record<string, unknown>][] = [
+  ['who coached Richmond', { grain: 'coach_record', metric: null, agg: { kind: 'list' }, scope: { clubFor: { slug: 'richmond' } } }],
+  ['how many coaches has Richmond had', { grain: 'coach_record', agg: { kind: 'count' } }],
+  ['Damien Hardwick coaching record', { grain: 'coach_record', coach: { id: 17 } }],
+  ['Damien Hardwick coaching record at Richmond', { grain: 'coach_record', coach: { id: 17 }, scope: { clubFor: { slug: 'richmond' } } }],
+  ['which coach has coached the most games', { grain: 'coach_record', metric: 'games', agg: { kind: 'max' } }],
+  ['which coach has the most wins', { grain: 'coach_record', metric: 'wins', agg: { kind: 'max' } }],
+  ['coaches with the most premierships', { grain: 'coach_record', metric: 'premierships', agg: { kind: 'max' } }],
+  ['which coach has coached the most grand finals', { grain: 'coach_record', metric: 'grand_finals', agg: { kind: 'max' } }],
+  ['top 5 coaches by premierships', { grain: 'coach_record', metric: 'premierships', agg: { kind: 'top_n', n: 5 } }],
+  ['best coaching win percentage', { grain: 'coach_record', metric: 'win_pct', coachQualifier: { minGames: 50 } }],
+  ['coaches with at least 100 games best win percentage', { grain: 'coach_record', metric: 'win_pct', coachQualifier: { minGames: 100 } }],
+  ['Richmond coaches with 100+ wins', { grain: 'coach_record', metric: 'wins', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 100 } }],
+  ['coaches who have coached more than one club', { grain: 'coach_record', metric: 'organizations', metricCondition: { op: 'gt', value: 1 } }],
+  ['who coached Richmond in 2017', { grain: 'coach_record', scope: { clubFor: { slug: 'richmond' }, seasonMin: 2017, seasonMax: 2017 } }],
+  ['players coached by Damien Hardwick', { grain: 'player_career', careerPredicates: [{ builder: 'coached_by', params: { coach: '17' } }] }],
+  ['premiership coaches', { grain: 'player_career', careerPredicates: [{ builder: 'premiership_coach', params: {} }] }],
+];
+
+/** Every form of §13.15 that must land on a decline or an honest refusal, never on an answer. */
+const coachingDeclines = [
+  'who coached Carlton in 1899',
+  'Pannam coaching record',
+  'Smith coaching record',
+  'who coached Richmond in 1899',
+  'Richmond players coached by Damien Hardwick',
+  'players who later coached Richmond',
+  'who was Richmond\'s assistant coach in 2017',
+  'who was the caretaker coach of Carlton',
+  'which coach won the most coaching awards',
+  'why was Damien Hardwick sacked',
+  'what was Damien Hardwick\'s coaching salary',
+  'who coached Victoria in a state game',
+  'Damien Hardwick record against Alastair Clarkson',
+  'was every club\'s coach recorded in 1940',
+  'best coaching win percentage of any coach ever no minimum',
+  'most wins in a season by a coach',
+];
+
+describe('NL coaching acceptance (AFLDB-ISSUE-152 Phase B)', () => {
+  it('parses every supported coaching family to the intended plan', async () => {
+    for (const [question, expected] of coachingQuestions) {
+      const parsed = await parseNlQuestion(question, coachCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported coaching form rather than answering a narrower question', async () => {
+    for (const question of coachingDeclines) {
+      const parsed = await parseNlQuestion(question, coachCtx);
+      if (parsed.status !== 'plan') continue;
+      // A plan that validates would be an ANSWER to a question AFLDB
+      // cannot answer; a plan that fails validation is an honest refusal.
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
   });
 });

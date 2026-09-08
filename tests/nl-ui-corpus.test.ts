@@ -91,6 +91,46 @@ describe('readUiCorpus', () => {
     expect(cases).toHaveLength(1435);
     expect(cases.filter((row) => /\bmost games in a game\b/i.test(row.question))).toEqual([]);
   });
+
+  it('leaves the two pre-Phase-B gates untouched and free of coaching questions', () => {
+    // AFLDB-ISSUE-152 Phase B is ADDITIVE: removing the false coaching
+    // decline cannot flip an existing row, because neither gate contains a
+    // single coaching question. Asserted rather than assumed.
+    const realistic = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv');
+    expect(realistic).toHaveLength(1435);
+    expect(declines).toHaveLength(60);
+    for (const row of [...realistic, ...declines]) {
+      expect(row.question, row.id).not.toMatch(/\bcoach(es|ed|ing)?\b/i);
+    }
+  });
+
+  it('reads the Phase B coaching corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(99);
+    expect(declines).toHaveLength(25);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase B row is a coaching question; none belongs in another file.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/coach|played under|premiership coaches/i);
+    }
+    // Ids are unique across both files, so a sweep cannot overwrite one row
+    // with another's observation.
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every A-row family of the coverage matrix is represented.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'coaching_club_coaches', 'coaching_career', 'coaching_at_club', 'coaching_club_ranking',
+      'coaching_league_ranking', 'coaching_win_pct', 'coaching_threshold', 'coaching_season',
+      'coaching_multi_club', 'coaching_premierships', 'coaching_players_coached',
+      'coaching_premiership_coach',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+  });
 });
 
 // -------------------------------------------------------------------- cores

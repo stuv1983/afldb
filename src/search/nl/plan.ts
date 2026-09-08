@@ -308,8 +308,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    unanswerable while its wins/losses siblings answered. The word is
  *    admitted as a grouped metric only behind an explicit club subject,
  *    so "players with more than 200 games" keeps its career reading.
+ * 35: coaching becomes answerable (AFLDB-ISSUE-152 Phase B). A new
+ *    coach_record grain over match_coaches, a coach reference distinct
+ *    from any player reference (18 of 386 coaches have no player row at
+ *    all), and the removal of the UNANSWERABLE_TOPICS 'coaching' rule,
+ *    whose stated reason -- that AFLDB holds no coaching data -- stopped
+ *    being true at migration 087 and had been declining every coaching
+ *    question with an untrue explanation ever since.
  */
-export const PARSER_VERSION = 34;
+export const PARSER_VERSION = 35;
 
 // ------------------------------------------------------------------ grain
 
@@ -324,7 +331,14 @@ export type NlGrain =
    * distributed", which is a group-and-count no player-row grain can
    * express.
    */
-  | 'achievement_summary';
+  | 'achievement_summary'
+  /**
+   * A coach's record, derived from match_coaches joined to matches
+   * (AFLDB-ISSUE-152 Phase B). The first person-grain in this vocabulary
+   * that is not a player: 18 of 386 coaches have no player row at all, so
+   * nothing about a coaching answer can be expressed as an NlPlayerRef.
+   */
+  | 'coach_record';
 
 // ----------------------------------------------------------- achievements
 
@@ -377,6 +391,24 @@ export type NlHeadToHead = {
 // ---------------------------------------------------------------- entities
 
 export type NlPlayerRef = { id: number; slug: string; name: string };
+/**
+ * A `coaches` row. Deliberately NOT an NlPlayerRef: 368 of 386 coaches are
+ * uniquely linked to a player and 18 have no player row at all, so a
+ * player-shaped reference is structurally blind to 4.7% of coaches. The
+ * same human's playing games and coached games are also different numbers
+ * (Mick Malthouse: 174 played, 718 coached) -- the grain, not the name,
+ * decides which is meant.
+ */
+export type NlCoachRef = {
+  /** coaches.id. */
+  id: number;
+  /** coachSlug(display_name) -- derived; `coaches` stores no slug. */
+  slug: string;
+  name: string;
+  /** Non-null only for a 'unique' link (coaches_link_ck, migration 087). */
+  playerId: number | null;
+  playerSlug: string | null;
+};
 /** organizationId is club_organizations.id (lineage-level), the same id space grid-solver club params use. */
 export type NlClubRef = { organizationId: number; slug: string; name: string };
 export type NlVenueRef = { id: number; slug: string; name: string };
@@ -646,7 +678,53 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     percentage: columnMetric('percentage', 'Percentage', 'percentage'),
   },
   team_streak: {},
+  /**
+   * Coaching aggregates over match_coaches JOIN matches. Every `column`
+   * value here is a MARKER for db/queries/nl/coach-record.ts, not literal
+   * SQL -- the same convention the 13 live_only career stats above already
+   * use. coaches.source_games_coached is evidence only (migration 087) and
+   * is read by none of them.
+   */
+  coach_record: {
+    games: columnMetric('games', 'Games coached', 'games'),
+    wins: columnMetric('wins', 'Wins', 'wins'),
+    draws: columnMetric('draws', 'Draws', 'draws'),
+    losses: columnMetric('losses', 'Losses', 'losses'),
+    finals: columnMetric('finals', 'Finals coached', 'finals'),
+    grand_finals: columnMetric('grand_finals', 'Grand Finals coached', 'grand_finals'),
+    premierships: columnMetric('premierships', 'Premierships', 'premierships'),
+    /** count(DISTINCT m.season) -- seasons in charge, NOT a tenure length: Jack Titus coached Richmond in 1937 and 1965. */
+    seasons: columnMetric('seasons', 'Seasons in charge', 'seasons'),
+    /** count(DISTINCT organization_id): lineage-level clubs, never raw club identities (AFLDB-ISSUE-152 D2). */
+    organizations: columnMetric('organizations', 'Clubs coached', 'organizations'),
+    /** (W + D/2) / G * 100, the site convention. Qualifier-gated -- see NL_COACH_WIN_PCT. */
+    win_pct: columnMetric('win_pct', 'Win percentage', 'win_pct'),
+  },
 };
+
+/**
+ * The win-percentage board's qualifier, matching /records/coaches
+ * (getCoachRecordsByWinPct's minGames = 50). Stated in the answer and in
+ * describePlan rather than left implicit: at 50+ games the leader is Cliff
+ * Rankin at 78.95% from 57 games, an answer that reads as wrong to anyone
+ * expecting Jock McHale unless the qualifier is said out loud. The formula
+ * counts a draw as half a win -- George Angus is 41 W / 2 D / 60 g = 70.00,
+ * where a plain W/G would print 68.33.
+ */
+export const NL_COACH_WIN_PCT = {
+  defaultMinGames: 50,
+  formulaNote: 'Win percentage counts a draw as half a win — (wins + draws ÷ 2) ÷ games.',
+} as const;
+
+/**
+ * The one sentence pair a win-percentage coaching answer must always
+ * carry, in the interpretation the reader sees AND in the plan trace.
+ * Exported from here so both callers read the same string.
+ */
+export function coachWinPctQualifierNote(aggKind: NlAggregation['kind'], minGames: number): string {
+  const lead = aggKind === 'min' ? 'Lowest' : 'Best';
+  return `${lead} coaching win percentage, minimum ${minGames} games coached. ${NL_COACH_WIN_PCT.formulaNote}`;
+}
 
 export function isNlMetric(grain: NlGrain, metric: string): boolean {
   if (grain === 'team_streak') return false;
@@ -683,6 +761,22 @@ export type NlCoverage = {
 };
 
 export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
+  // The coaching coverage FLOOR, and deliberately nothing more. AFLDB's
+  // earliest match_coaches row is season 1902 (measured 2026-09-08,
+  // exhaustive), so a coaching question about 1901 has no answer and says
+  // so. No upper bound is encoded: pinning one would hard-code a last
+  // season that becomes wrong the moment the next season's matches load,
+  // and an empty future-season result is a genuine empty result, not a
+  // coverage refusal (operator decision, AFLDB-ISSUE-152 §13.17b).
+  //
+  // This says ONLY that AFLDB does not answer coaching-season questions
+  // before 1902. It makes NO claim that every season from 1902 onward is
+  // completely recorded -- that is measurement gap M1, not evidence.
+  games: {
+    firstSeason: 1902,
+    note: 'AFLDB\'s coaching records begin in 1902.',
+    grains: ['coach_record'],
+  },
   behinds: { firstSeason: 1965, note: 'Behinds were not recorded before 1965.' },
   kicks: { firstSeason: 1965, note: 'Kicks were not recorded before 1965.' },
   handballs: { firstSeason: 1965, note: 'Handballs were not recorded before 1965.' },
@@ -733,6 +827,11 @@ export const BROWNLOW_GAME_VOTE_NOTE = NL_COVERAGE.brownlow_votes!.note;
 
 /** The coverage rule for a metric, but only where it actually applies. */
 export function nlCoverageFor(grain: NlGrain, metric: string | null): NlCoverage | null {
+  // The coaching floor is a property of the GRAIN, not of one metric: "who
+  // coached Carlton in 1899" carries no metric at all and must still be
+  // refused. Keyed under 'games' in the table above so the rule has a
+  // single home, and reached from here for every coach_record plan.
+  if (grain === 'coach_record') return NL_COVERAGE.games ?? null;
   if (!metric) return null;
   const coverage = NL_COVERAGE[metric];
   if (!coverage) return null;
@@ -824,6 +923,12 @@ export type NlQueryPlan = {
   agg: NlAggregation;
   /** The question's subject player, e.g. "dusty's highest disposal game". */
   player?: NlPlayerRef;
+  /**
+   * coach_record only, and mutually exclusive with `player`: the question's
+   * subject coach. A coaching question carries this and never `player`,
+   * because the two identity spaces are not the same set (see NlCoachRef).
+   */
+  coach?: NlCoachRef;
   scope: NlMatchScope;
   /**
    * player_game/player_season only: qualify the selected metric against a
@@ -850,6 +955,15 @@ export type NlQueryPlan = {
   resultFilter?: 'won';
   /** player_game only: restrict player_match_stats to career_game_no = 1. */
   debutGame?: boolean;
+  /**
+   * coach_record win_pct only: the games-coached floor the ranking is
+   * qualified at. A win-percentage ranking with no qualifier is refused
+   * rather than answered from a one-game sample (the measured minimum IS
+   * one game), so a win_pct max/min/top_n plan must carry this; the parser
+   * sets NL_COACH_WIN_PCT.defaultMinGames unless the reader named their own
+   * minimum, and whichever number applies is always stated in the answer.
+   */
+  coachQualifier?: { minGames: number };
   /**
    * team_match grouped-list only: count qualifying results per organization.
    * 'games' counts every match in scope (no result predicate); the result
@@ -996,7 +1110,7 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head'];
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
 
   if (raw.grain === 'head_to_head') {
@@ -1048,6 +1162,64 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     return { error: 'An achievement summary only applies to an achievement-summary question.' };
   }
 
+  // A coaching answer is compiled from match_coaches JOIN matches and
+  // consumes a deliberately narrow set of fields: the coach, the club
+  // lineage, a season range, a metric and how to aggregate it. Everything
+  // else is refused BY NAME rather than dropped on the way to SQL -- the
+  // ISSUE-110 discarded-scope rule, which is why each field is listed here
+  // instead of being left to a general "unknown extras" check.
+  if (raw.grain === 'coach_record') {
+    const coachRefErr = validateRef(raw.coach, 'id', 'Coach');
+    if (coachRefErr) return coachRefErr;
+    if (
+      raw.player || raw.scope.playerIdIn || raw.scope.clubAgainst || raw.scope.matchup
+      || raw.scope.venue || raw.scope.matchType !== undefined || raw.scope.roundNumber !== undefined
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
+      || raw.clubSeasonConditions.length > 0 || raw.achievementSummary || raw.headToHead
+      || raw.streakDefinition || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter
+      || raw.debutGame || raw.havingClause || raw.matchFilter || raw.boundary || raw.mode !== undefined
+    ) {
+      return { error: 'A coaching question contains fields its compiler cannot honour.' };
+    }
+    if (raw.metric !== null && !isNlMetric('coach_record', raw.metric)) {
+      return { error: `"${raw.metric}" is not a recognised coaching statistic.` };
+    }
+    if (!['max', 'min', 'top_n', 'list', 'count'].includes(raw.agg.kind)) {
+      return { error: 'A coaching question cannot be answered that way.' };
+    }
+    // No metric is legal for exactly the two shapes that do not rank:
+    // "who coached Richmond" (list) and "how many coaches has Richmond
+    // had" (count). A max/min/top_n with nothing to rank by is not a
+    // question this grain can answer.
+    if (raw.metric === null && raw.agg.kind !== 'list' && raw.agg.kind !== 'count') {
+      return { error: 'A coaching ranking needs a statistic to rank by.' };
+    }
+    // No coach, no club and no metric is not a coaching question at all,
+    // it is the bare word "coaching".
+    if (raw.metric === null && !raw.coach && !raw.scope.clubFor) {
+      return { error: 'A coaching question needs a coach, a club, or a statistic.' };
+    }
+    // A threshold qualifies the plan's OWN selected metric, so a threshold
+    // with no metric has nothing to qualify and must not reach SQL as a
+    // filter on some default column.
+    if (raw.metricCondition !== undefined && raw.metric === null) {
+      return { error: 'A coaching threshold needs a statistic to qualify.' };
+    }
+    if (raw.coachQualifier !== undefined
+      && (!Number.isInteger(raw.coachQualifier.minGames) || raw.coachQualifier.minGames < 1)) {
+      return { error: 'A coaching qualifier must be a positive number of games.' };
+    }
+    // Win percentage is qualifier-gated: the measured minimum across all
+    // coaches is ONE game, so an unqualified "best win percentage ever"
+    // ranks a 1-game sample and presents it as a record. It refuses
+    // instead. See NL_COACH_WIN_PCT.
+    if (raw.metric === 'win_pct' && ['max', 'min', 'top_n'].includes(raw.agg.kind) && !raw.coachQualifier) {
+      return { error: 'A best-win-percentage question needs a minimum number of games coached.' };
+    }
+  } else if (raw.coach || raw.coachQualifier) {
+    return { error: 'A coach reference only applies to a coaching question.' };
+  }
+
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }
@@ -1064,7 +1236,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // what keeps a parsed threshold from validating and then silently
   // disappearing downstream -- the ISSUE-110 answered_caveat defect.
   if (raw.metricCondition !== undefined) {
-    if (raw.grain !== 'player_game' && raw.grain !== 'player_season') {
+    if (raw.grain !== 'player_game' && raw.grain !== 'player_season' && raw.grain !== 'coach_record') {
       return { error: 'This statistic cannot currently be filtered by that threshold.' };
     }
     if (!COMPARE_OPS.includes(raw.metricCondition.op)) return { error: 'Unknown comparison.' };
@@ -1414,6 +1586,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'achievement',
   head_to_head: 'head-to-head',
+  coach_record: 'coaching',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -1426,6 +1599,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'group',
   head_to_head: 'matchup',
+  coach_record: 'coach',
 };
 
 const TIE_ENTITY: Record<NlGrain, string> = {
@@ -1437,6 +1611,7 @@ const TIE_ENTITY: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'group',
   head_to_head: 'matchup',
+  coach_record: 'coach',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {
@@ -1492,6 +1667,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
   }
 
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);
+  if (plan.coach) lines.push(`Coach: ${plan.coach.name}.`);
   if (plan.scope.clubFor) lines.push(`Club: ${plan.scope.clubFor.name}.`);
   if (plan.scope.clubAgainst) lines.push(`Opponent: ${plan.scope.clubAgainst.name}.`);
   if (plan.scope.matchup) lines.push(`Matchup: ${plan.scope.matchup.clubA.name} v ${plan.scope.matchup.clubB.name}.`);
@@ -1530,6 +1706,12 @@ export function describePlan(plan: NlQueryPlan): string[] {
   if (plan.scoreCheckpoint) lines.push(`Score checkpoint: ${plan.scoreCheckpoint}.`);
   if (plan.resultFilter === 'won') lines.push('Final result: selected club won the match.');
   if (plan.debutGame) lines.push("Match boundary: each player's debut game.");
+  // The qualifier is never left implicit: a win-percentage board without
+  // it reads as wrong to anyone who expects the all-time great rather than
+  // the 57-game leader it actually names.
+  if (plan.grain === 'coach_record' && plan.metric === 'win_pct' && plan.coachQualifier) {
+    lines.push(coachWinPctQualifierNote(plan.agg.kind, plan.coachQualifier.minGames));
+  }
   if (!plan.havingClause && plan.agg.kind !== 'list' && plan.agg.kind !== 'count') {
     const entity = TIE_ENTITY[plan.grain];
     lines.push(plan.tiePolicy === 'all'

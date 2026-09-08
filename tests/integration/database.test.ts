@@ -32,6 +32,7 @@ const SUPPORTED_NL_GRAINS = {
   team_streak: true,
   head_to_head: true,
   achievement_summary: true,
+  coach_record: true,
 } satisfies Record<NlGrain, true>;
 
 afterAll(async () => {
@@ -88,7 +89,7 @@ describe('schema', () => {
     expect(row.c).toBe('nic naitanui');
   });
 
-  it('accepts every supported NL telemetry grain including head_to_head', async () => {
+  it('accepts every supported NL telemetry grain and rejects an unsupported one', async () => {
     const grains = Object.keys(SUPPORTED_NL_GRAINS) as NlGrain[];
     const inserted: NlGrain[] = [];
 
@@ -112,7 +113,21 @@ describe('schema', () => {
     ).rejects.toThrow('accepted NL grain rows');
 
     expect(inserted.sort()).toEqual([...grains].sort());
+    // Every grain added since 046 first wrote the constraint has drifted
+    // from it, and each drift needed its own repair: 055 for
+    // achievement_summary, 079 for team_streak and head_to_head, 092 for
+    // coach_record. The two most recent stay named here so reverting either
+    // migration fails this test by name, not just by list length.
     expect(inserted).toContain('head_to_head');
+    expect(inserted).toContain('coach_record');
+
+    // Widening the CHECK must not have turned it into a formality: a grain
+    // no NlGrain value names is still refused by the database.
+    const unsupported = `not_a_grain_${Math.random().toString(36).slice(2, 10)}`;
+    await expectRejected((tx) => tx`
+      INSERT INTO nl_search_log (question, outcome, grain, result_count, duration_ms)
+      VALUES ('NL grain schema contract: unsupported', 'answered', ${unsupported}, 1, 0)
+    `);
   });
 
   it('refuses a match whose margin disagrees with its scores', async () => {

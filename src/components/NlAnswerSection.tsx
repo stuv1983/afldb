@@ -3,12 +3,12 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { NlAnswerFeedback } from '@/components/NlAnswerFeedback';
 import {
-  clubPath, formatDate, formatNumber, formatPercentage, formatRoundShort, formatSpan,
+  clubPath, coachProfilePath, formatDate, formatNumber, formatPercentage, formatRoundShort, formatSpan,
   matchPath, playerPath, seasonPath,
 } from '@/lib/format';
 import type {
-  NlAnswer, NlClubSeasonRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
-  NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
+  NlAnswer, NlClubSeasonRow, NlCoachRecordRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow,
+  NlPlayerSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 import { getQualifyingMatchesHref } from '@/search/nl/qualifying-matches-href';
 
@@ -88,6 +88,8 @@ function renderPayload(answer: NlAnswer) {
       return <TeamStreakTable rows={payload.rows} total={payload.total} />;
     case 'club_season':
       return <ClubSeasonTable rows={payload.rows} total={payload.total} />;
+    case 'coach_record':
+      return <CoachRecordTable rows={payload.rows} total={payload.total} />;
     case 'count':
       return <p>{formatNumber(payload.value)}</p>;
     case 'achievement_summary':
@@ -429,6 +431,57 @@ function TeamMatchTable({ rows, total }: { rows: NlTeamMatchRow[]; total: number
                     {' '}
                     <span className="muted">{formatDate(r.matchDate)}</span>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * A coaching record. The seasons column shows the SPAN with the count of
+ * seasons in charge beside it: Jack Titus coached Richmond in 1937 and
+ * 1965, and "1937-1965" alone would read as a 28-year tenure he never had.
+ */
+function CoachRecordTable({ rows, total }: { rows: NlCoachRecordRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  const showValue = rows[0]?.value !== null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching coach" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Coach</th>
+                <th scope="col">Seasons</th>
+                <th scope="col" className="num">In charge</th>
+                <th scope="col" className="num">Games</th>
+                <th scope="col" className="num">W–D–L</th>
+                <th scope="col" className="num">Win %</th>
+                {showValue && <th scope="col" className="num">Value</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.coachId}>
+                  <td className="wide">
+                    <Link href={coachProfilePath(r)}>{r.displayName}</Link>
+                  </td>
+                  <td className="muted nowrap">{formatSpan(r.firstSeason, r.lastSeason)}</td>
+                  <td className="num">{formatNumber(r.seasons)}</td>
+                  <td className="num">{formatNumber(r.games)}</td>
+                  <td className="num nowrap">{r.wins}–{r.draws}–{r.losses}</td>
+                  <td className="num">{formatPercentage(r.winPct)}</td>
+                  {showValue && <td className="num">{r.value === null ? '—' : formatNumber(r.value)}</td>}
                 </tr>
               ))}
             </tbody>

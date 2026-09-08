@@ -212,6 +212,21 @@ export function coachPath(slug: string, id: number): string {
   return `/coaches/${slug}-${id}`;
 }
 
+/**
+ * Where a coach's name should link. A coach who also played resolves to
+ * their PLAYER profile: /coaches/[slug]-id permanently redirects a linked
+ * coach there, so linking one to the coach route ships a guaranteed
+ * redirect. A coach-only person -- 18 of AFLDB's 386 coaches never played
+ * -- has no player page at all and must never be given a /players href.
+ */
+export function coachProfilePath(coach: {
+  slug: string; coachId: number; playerId: number | null; playerSlug: string | null;
+}): string {
+  return coach.playerId !== null && coach.playerSlug !== null
+    ? playerPath(coach.playerSlug, coach.playerId)
+    : coachPath(coach.slug, coach.coachId);
+}
+
 export function awardSeasonPath(slug: string, season: number): string {
   return `/awards/${slug}/${season}`;
 }

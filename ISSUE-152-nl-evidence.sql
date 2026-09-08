@@ -997,7 +997,7 @@ SELECT min(kicks)::int AS min_kicks,
 SELECT DISTINCT ON (kick_scored, kick_effect)
        kick_scored,
        kick_effect,
-       id AS event_id,
+       a.id AS event_id,
        season,
        COALESCE(p.display_name, a.player_name_raw) AS player,
        club_name_raw,
@@ -1006,7 +1006,7 @@ SELECT DISTINCT ON (kick_scored, kick_effect)
        match_id
   FROM after_siren_kicks a
   LEFT JOIN players p ON p.id = a.player_id
- ORDER BY kick_scored, kick_effect, season DESC, id DESC;
+ ORDER BY kick_scored, kick_effect, season DESC, a.id DESC;
 
 \echo ''
 \echo '=== 7.5 Exact positive witnesses for every relationship enum ==='

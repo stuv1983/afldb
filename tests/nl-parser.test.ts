@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
 import { NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
@@ -26,6 +26,21 @@ const VENUES: NlVenueDirectoryEntry[] = [
   { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
 ];
 
+/**
+ * A stand-in for buildCoachDirectory's 386 rows, including the two
+ * measured surname collisions that must NOT resolve: Albert Pannam and
+ * Charlie Pannam both coached Richmond, and Len Smith and Norm Smith both
+ * coached, so neither surname is an alias here -- exactly as the real
+ * directory builder leaves them out.
+ */
+const COACHES: NlCoachDirectoryEntry[] = [
+  { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick', names: ['damien hardwick', 'hardwick'] },
+  { id: 1, slug: 'mick-malthouse', name: 'Mick Malthouse', playerId: 9635, playerSlug: 'mick-malthouse', names: ['mick malthouse', 'malthouse'] },
+  { id: 152, slug: 'cliff-rankin', name: 'Cliff Rankin', playerId: null, playerSlug: null, names: ['cliff rankin', 'rankin'] },
+  { id: 160, slug: 'albert-pannam', name: 'Albert Pannam', playerId: 700, playerSlug: 'albert-pannam', names: ['albert pannam'] },
+  { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
+];
+
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
   'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
@@ -35,7 +50,7 @@ function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
   return Promise.resolve(PLAYERS[name.toLowerCase()] ?? []);
 }
 
-const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, coaches: COACHES, resolvePlayer: fakeResolvePlayer };
 
 async function parse(question: string): Promise<NlParse> {
   return parseNlQuestion(question, ctx);
@@ -523,13 +538,13 @@ describe('12. aggregate-vs-single scope for a named player', () => {
 });
 
 describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
-  it('coaching questions are declined', async () => {
+  it('coaching questions are no longer declined as unsupported (AFLDB-ISSUE-152 F2)', async () => {
+    // The old rule claimed AFLDB held no coaching data at all, which
+    // stopped being true at migration 087. It is deleted, not softened.
     const result = await parse('who coached richmond to the 2017 premiership');
-    expect(result.status).toBe('unanswerable');
-    if (result.status === 'unanswerable') {
-      expect(result.topic).toBe('coaching');
-      expect(result.reason).toMatch(/coaching data/i);
-    }
+    expect(result.status).not.toBe('unanswerable');
+    expect(result.status).toBe('plan');
+    if (result.status === 'plan') expect(result.plan.grain).toBe('coach_record');
   });
 
   it('streak questions are parsed', async () => {
@@ -1174,5 +1189,180 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
     const p = await plan('players who debuted in a grand final');
     expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
     expect(p.careerPredicates).toEqual([]);
+  });
+});
+
+// ------------------------------------------------- coaching (ISSUE-152 B)
+
+describe('coaching questions (AFLDB-ISSUE-152 Phase B)', () => {
+  it('a coach cue elects the coach_record grain, and an unranked club question is a list', async () => {
+    const p = await plan('who coached richmond');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBeNull();
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"how many coaches has richmond had" is a count, not a ranking', async () => {
+    const p = await plan('how many coaches has richmond had');
+    expect(p.grain).toBe('coach_record');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coach name resolves from the coach directory, never as a player', async () => {
+    const p = await plan('damien hardwick coaching record');
+    expect(p.grain).toBe('coach_record');
+    expect(p.coach).toEqual({
+      id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick',
+    });
+    expect(p.player).toBeUndefined();
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a whole career and a record at one club are different plans', async () => {
+    const career = await plan('damien hardwick coaching record');
+    const atClub = await plan('damien hardwick coaching record at richmond');
+    expect(career.scope.clubFor).toBeUndefined();
+    expect(atClub.scope.clubFor?.name).toBe('Richmond');
+    expect(atClub.coach?.id).toBe(17);
+  });
+
+  it('a coach-only person carries no player link', async () => {
+    const p = await plan('cliff rankin coaching record');
+    expect(p.coach?.playerId).toBeNull();
+    expect(p.coach?.playerSlug).toBeNull();
+  });
+
+  it('"players coached by X" is a player question, answered by the coached_by predicate', async () => {
+    const p = await plan('players coached by damien hardwick');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'coached_by', params: { coach: '17' } });
+    expect(p.coach).toBeUndefined();
+  });
+
+  it('"premiership coaches" is a player predicate, NOT the coach-grain premierships metric', async () => {
+    const p = await plan('premiership coaches');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'premiership_coach', params: {} });
+  });
+
+  it('"coaches with the most premierships" is the coach-grain metric, NOT the player predicate', async () => {
+    // D3: the two questions have different answers and must not collapse.
+    const p = await plan('coaches with the most premierships');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('premierships');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerPredicates).toEqual([]);
+  });
+
+  it('reads each coaching metric word behind the cue', async () => {
+    expect((await plan('which coach has coached the most games')).metric).toBe('games');
+    expect((await plan('which coach has the most wins')).metric).toBe('wins');
+    expect((await plan('which coach has coached the most grand finals')).metric).toBe('grand_finals');
+    expect((await plan('which coach has coached the most finals')).metric).toBe('finals');
+    expect((await plan('which coach has the most seasons in charge')).metric).toBe('seasons');
+  });
+
+  it('a coaching threshold becomes the grain\'s own metricCondition and lists qualifiers', async () => {
+    const p = await plan('richmond coaches with 100+ wins');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('wins');
+    expect(p.metricCondition).toEqual({ op: 'gte', value: 100 });
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toEqual([]);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"coached more than one club" counts organizations, not raw club identities', async () => {
+    const p = await plan('coaches who have coached more than one club');
+    expect(p.metric).toBe('organizations');
+    expect(p.metricCondition).toEqual({ op: 'gt', value: 1 });
+  });
+
+  it('a top-N count belongs to the aggregation, never to the metric', async () => {
+    const p = await plan('top 5 coaches by premierships');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.metricCondition).toBeUndefined();
+  });
+
+  it('a win-percentage ranking carries the 50-game qualifier by default', async () => {
+    const p = await plan('best coaching win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 50 });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a reader-stated minimum is honoured instead of the default', async () => {
+    const p = await plan('coaches with at least 100 games best win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 100 });
+  });
+
+  it('"no minimum" refuses rather than ranking a one-game sample', async () => {
+    const p = await plan('best coaching win percentage no minimum');
+    expect(p.coachQualifier).toBeUndefined();
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('a season before 1902 is refused by the coaching coverage floor', async () => {
+    const p = await plan('who coached carlton in 1899');
+    const validated = validatePlan(p);
+    expect(validated).toHaveProperty('error');
+    if ('error' in validated) expect(validated.error).toMatch(/coaching records begin in 1902/);
+  });
+
+  it('a season inside coverage is answered, and a future season is left to the empty result', async () => {
+    expect(validatePlan(await plan('who coached richmond in 2017'))).not.toHaveProperty('error');
+    expect(validatePlan(await plan('who coached richmond in 2030'))).not.toHaveProperty('error');
+  });
+
+  it('an ambiguous coach surname declines rather than picking one of two real people', async () => {
+    const result = await parse('pannam coaching record');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('a per-season coaching split declines rather than answering the all-time total', async () => {
+    const result = await parse('most wins in a season by a coach');
+    expect(result.status).toBe('none');
+    expect(result.report.notes.join(' ')).toMatch(/per-season coaching splits/);
+  });
+
+  it('"Richmond players coached by X" declines: no builder owns the club (ISSUE-110 ownership)', async () => {
+    const p = await plan('richmond players coached by damien hardwick');
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('an absent coach directory declines rather than half-resolving a coaching question', async () => {
+    const noCoaches: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+    const result = await parseNlQuestion('damien hardwick coaching record', noCoaches);
+    expect(result.status).not.toBe('plan');
+  });
+
+  describe('no coach cue: every pre-Phase-B reading is unchanged', () => {
+    it('"most wins" stays a career question', async () => {
+      const p = await plan('most wins');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most games" stays a career question', async () => {
+      const p = await plan('most games');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+    });
+
+    it('"richmond most wins in a season" stays a club-season question', async () => {
+      const p = await plan('richmond most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most premierships" stays a career question', async () => {
+      const p = await plan('most premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('premierships');
+    });
   });
 });

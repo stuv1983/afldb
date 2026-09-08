@@ -98,6 +98,47 @@ export type NlAchievementGroupRow = {
   href: string | null;
 };
 
+/**
+ * One coach's record over the matches in scope, mirroring
+ * ClubCoachRecordRow (db/queries/coaches.ts) plus `coachOnly` and the
+ * plan's ranked value.
+ *
+ * `slug` is derived with coachSlug: `coaches` stores none. `coachOnly`
+ * decides the link -- a coach who also played resolves to their PLAYER
+ * page, because /coaches/[slug]-id permanently redirects a linked coach
+ * there, and a coach-only person must never be given a /players href.
+ *
+ * `firstSeason`-`lastSeason` is a SPAN, not a tenure: Jack Titus coached
+ * Richmond in 1937 and again in 1965, which is 3 seasons in charge across
+ * a 28-year span. `seasons` is the number that must be rendered beside it.
+ */
+export type NlCoachRecordRow = {
+  coachId: number;
+  slug: string;
+  displayName: string;
+  /** True when no player links to this coach (coaches_link_ck, migration 087). */
+  coachOnly: boolean;
+  playerId: number | null;
+  playerSlug: string | null;
+  firstSeason: number;
+  lastSeason: number;
+  /** Distinct seasons in charge, tenure gaps not counted. */
+  seasons: number;
+  /** Distinct club ORGANIZATIONS coached, never raw club identities. */
+  organizations: number;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  finals: number;
+  grandFinals: number;
+  premierships: number;
+  /** From `round(...)::numeric`, so postgres.js returns this as a string, never a number. */
+  winPct: string;
+  /** The plan's ranked/thresholded metric, or null for an unranked list. */
+  value: number | null;
+};
+
 export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
@@ -107,6 +148,7 @@ export type NlAnswerPayload =
   | { kind: 'head_to_head'; row: NlHeadToHeadRow | null }
   | { kind: 'team_streak'; lead: NlTeamStreakRow | null; rows: NlTeamStreakRow[]; total: number }
   | { kind: 'club_season'; lead: NlClubSeasonRow | null; rows: NlClubSeasonRow[]; total: number }
+  | { kind: 'coach_record'; lead: NlCoachRecordRow | null; rows: NlCoachRecordRow[]; total: number }
   | { kind: 'count'; value: number }
   | {
       kind: 'achievement_summary';

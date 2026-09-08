@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import { dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
-  NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
 import type { NlQueryPlan } from '../src/search/nl/plan';
@@ -387,5 +387,118 @@ describe('metric-threshold answers (AFLDB-ISSUE-110)', () => {
       headline: '3 qualifying player-seasons',
       interpretation: 'Season goals at most 10.',
     });
+  });
+});
+
+// -------------------------------------- coaching (AFLDB-ISSUE-152 Phase B)
+
+function coachRow(overrides: Partial<NlCoachRecordRow> = {}): NlCoachRecordRow {
+  return {
+    coachId: 17, slug: 'damien-hardwick', displayName: 'Damien Hardwick',
+    coachOnly: false, playerId: 900, playerSlug: 'damien-hardwick',
+    firstSeason: 2010, lastSeason: 2023, seasons: 14, organizations: 1,
+    games: 307, wins: 170, draws: 6, losses: 131,
+    finals: 26, grandFinals: 3, premierships: 3,
+    winPct: '56.35', value: null,
+    ...overrides,
+  };
+}
+
+const HARDWICK_REF = { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick' };
+const RICHMOND_REF = { organizationId: 1, slug: 'richmond', name: 'Richmond' };
+
+function coachPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return plan({ grain: 'coach_record', metric: null, mode: undefined, agg: { kind: 'list' }, limit: 100, ...overrides });
+}
+
+describe('coaching answers', () => {
+  it('a whole career and a record at one club do not produce the same sentence', () => {
+    const row = coachRow();
+    const career = describeAnswer(
+      coachPlan({ coach: HARDWICK_REF }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    const atClub = describeAnswer(
+      coachPlan({ coach: HARDWICK_REF, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(career.interpretation).not.toBe(atClub.interpretation);
+    expect(career.interpretation).toContain('whole coaching career, across every club');
+    expect(atClub.interpretation).toContain("Damien Hardwick's record at Richmond only");
+  });
+
+  it('renders a split stint as seasons in charge, never as a continuous tenure', () => {
+    // Jack Titus coached Richmond in 1937 and again in 1965.
+    const row = coachRow({
+      coachId: 285, slug: 'jack-titus', displayName: 'Jack Titus',
+      firstSeason: 1937, lastSeason: 1965, seasons: 3, games: 17, wins: 5, draws: 0, losses: 12, winPct: '29.41',
+    });
+    const { interpretation } = describeAnswer(
+      coachPlan({ coach: { id: 285, slug: 'jack-titus', name: 'Jack Titus', playerId: null, playerSlug: null }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(interpretation).toContain('3 seasons in charge, 1937\u20131965');
+    expect(interpretation).not.toMatch(/coached from 1937 to 1965/);
+  });
+
+  it('names every coach tied at the lead value', () => {
+    const rows = [
+      coachRow({ coachId: 367, displayName: 'Max Hislop', value: 1 }),
+      coachRow({ coachId: 370, displayName: 'Verdun Howell', value: 1 }),
+    ];
+    const { headline } = describeAnswer(
+      coachPlan({ metric: 'games', agg: { kind: 'min' }, limit: 25, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 2 },
+    );
+    expect(headline).toContain('Max Hislop and Verdun Howell');
+    expect(headline).toContain('(tied)');
+  });
+
+  it('states the qualifier verbatim on every win-percentage answer', () => {
+    const row = coachRow({ coachId: 152, displayName: 'Cliff Rankin', coachOnly: true, playerId: null, playerSlug: null, games: 57, wins: 45, draws: 0, losses: 12, winPct: '78.95', value: 78.9473 });
+    const { headline, interpretation } = describeAnswer(
+      coachPlan({ metric: 'win_pct', agg: { kind: 'max' }, limit: 25, coachQualifier: { minGames: 50 } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(headline).toContain('78.95%');
+    expect(interpretation).toContain(
+      'Best coaching win percentage, minimum 50 games coached. '
+      + 'Win percentage counts a draw as half a win — (wins + draws ÷ 2) ÷ games.',
+    );
+  });
+
+  it('a club list is a count, and a threshold is a qualifying set', () => {
+    const rows = [coachRow(), coachRow({ coachId: 5, displayName: 'Tom Hafey' })];
+    const list = describeAnswer(
+      coachPlan({ scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 42 },
+    );
+    expect(list.headline).toBe('42 coaches');
+    expect(list.interpretation).toBe('Every coach of Richmond.');
+
+    const thresholded = describeAnswer(
+      coachPlan({ metric: 'wins', metricCondition: { op: 'gte', value: 100 }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 3 },
+    );
+    expect(thresholded.headline).toBe('3 coaches qualify');
+    expect(thresholded.interpretation).toContain('with wins at least 100');
+  });
+
+  it('answers a count question with the count itself', () => {
+    const { headline, interpretation } = describeAnswer(
+      coachPlan({ agg: { kind: 'count' }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'count', value: 42 },
+    );
+    expect(headline).toBe('42 coaches');
+    expect(interpretation).toBe('Every coach of Richmond.');
+  });
+
+  it('says a season scope out loud rather than answering a wider question silently', () => {
+    const row = coachRow();
+    const { interpretation } = describeAnswer(
+      coachPlan({ scope: { clubFor: RICHMOND_REF, seasonMin: 2017, seasonMax: 2017 }, coach: HARDWICK_REF }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(interpretation).toContain(', 2017');
   });
 });

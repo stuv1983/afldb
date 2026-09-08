@@ -7,9 +7,9 @@
  * Split out of db/queries/nl/answer.ts so the wording rules -- above all
  * the tie handling below -- can be unit-tested without a database.
  */
-import type { NlQueryPlan } from '@/search/nl/plan';
+import { coachWinPctQualifierNote, NL_METRICS, type NlQueryPlan } from '@/search/nl/plan';
 import type {
-  NlAnswerPayload, NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
@@ -66,7 +66,11 @@ export function dedupeByIdentity<T extends { value: number | null }>(
 
 export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { headline: string; interpretation: string } {
   const compatible = payload.kind === plan.grain
-    || (plan.grain === 'team_match' && payload.kind === 'team_aggregate');
+    || (plan.grain === 'team_match' && payload.kind === 'team_aggregate')
+    // "How many coaches has Richmond had" is answered as a count, not as
+    // a row list -- the one shape whose payload kind is deliberately not
+    // its grain's name.
+    || (plan.grain === 'coach_record' && payload.kind === 'count');
   if (!compatible) {
     throw new Error(`NL payload kind "${payload.kind}" is incompatible with plan grain "${plan.grain}".`);
   }
@@ -96,6 +100,15 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   }
   if (payload.kind === 'achievement_summary') {
     return describeAchievementSummaryAnswer(payload);
+  }
+  if (payload.kind === 'coach_record') {
+    return describeCoachRecordAnswer(plan, payload.lead, payload.rows, payload.total);
+  }
+  if (payload.kind === 'count') {
+    return {
+      headline: `${payload.value.toLocaleString('en-AU')} ${payload.value === 1 ? 'coach' : 'coaches'}`,
+      interpretation: `${coachSubject(plan)}${coachSeasonSuffix(plan)}.`,
+    };
   }
   return { headline: 'Results', interpretation: '' };
 }
@@ -353,6 +366,106 @@ function describePlayerSeasonAnswer(
     interpretation: plan.agg.kind === 'top_n'
       ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} player-seasons by ${metricLabel}.`
       : `${rankWord(plan)} single season by ${metricLabel}.`,
+  };
+}
+
+// -------------------------------------------------------------- coaching
+
+/**
+ * Which of the four coaching questions was answered, said out loud. A
+ * whole coaching career and a record at one club are different numbers for
+ * the same person -- Damien Hardwick coached 307 games at Richmond and
+ * more than that in total -- so "Damien Hardwick's coaching record" and
+ * "Damien Hardwick's record at Richmond" must never produce the same
+ * sentence.
+ */
+function coachSubject(plan: NlQueryPlan): string {
+  if (plan.coach && plan.scope.clubFor) return `${plan.coach.name}'s record at ${plan.scope.clubFor.name} only`;
+  if (plan.coach) return `${plan.coach.name}'s whole coaching career, across every club`;
+  if (plan.scope.clubFor) return `Every coach of ${plan.scope.clubFor.name}`;
+  return 'Every coach recorded';
+}
+
+function coachSeasonSuffix(plan: NlQueryPlan): string {
+  const { seasonMin, seasonMax } = plan.scope;
+  if (seasonMin === undefined && seasonMax === undefined) return '';
+  if (seasonMin !== undefined && seasonMin === seasonMax) return `, ${seasonMin}`;
+  if (seasonMin !== undefined && seasonMax !== undefined) return `, ${seasonMin}\u2013${seasonMax}`;
+  return seasonMin !== undefined ? `, from ${seasonMin}` : `, up to ${seasonMax}`;
+}
+
+function coachMetricLabel(metric: string): string {
+  return (NL_METRICS.coach_record[metric]?.label ?? metric).toLowerCase();
+}
+
+function coachMetricValue(metric: string, value: number): string {
+  return metric === 'win_pct' ? `${value.toFixed(2)}%` : value.toLocaleString('en-AU');
+}
+
+/**
+ * A tenure is never rendered as a continuous run. Jack Titus coached
+ * Richmond in 1937 and again in 1965: "coached from 1937 to 1965" would be
+ * a 28-year fiction. The span is shown with the seasons count beside it,
+ * and the words are "seasons in charge".
+ */
+function coachTenure(row: NlCoachRecordRow): string {
+  const seasons = `${row.seasons.toLocaleString('en-AU')} ${row.seasons === 1 ? 'season' : 'seasons'} in charge`;
+  return `${seasons}, ${row.firstSeason}\u2013${row.lastSeason}`;
+}
+
+/** "Damien Hardwick — 307 games, 170-6-131", the record itself as the headline. */
+function coachRecordHeadline(row: NlCoachRecordRow): string {
+  const record = `${row.wins}\u2013${row.draws}\u2013${row.losses}`;
+  return `${row.displayName} \u2014 ${row.games.toLocaleString('en-AU')} games, ${record}`;
+}
+
+function describeCoachRecordAnswer(
+  plan: NlQueryPlan,
+  lead: NlCoachRecordRow | null,
+  rows: NlCoachRecordRow[],
+  total: number,
+): { headline: string; interpretation: string } {
+  const where = `${coachSubject(plan)}${coachSeasonSuffix(plan)}`;
+  if (!lead) return { headline: 'No matching coaching record found', interpretation: `${where}.` };
+
+  // No metric named: the qualifying set IS the answer. One named coach
+  // gets their record; a club gets the roll of everyone who has coached it.
+  if (!plan.metric) {
+    if (plan.coach) {
+      return { headline: coachRecordHeadline(lead), interpretation: `${where}: ${coachTenure(lead)}.` };
+    }
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'coach' : 'coaches'}`,
+      interpretation: `${where}.`,
+    };
+  }
+
+  const metricLabel = coachMetricLabel(plan.metric);
+
+  // A threshold lists every qualifier; it never ranks one.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'coach qualifies' : 'coaches qualify'}`,
+      interpretation: `${where}, with ${metricLabel} ${bound}.`,
+    };
+  }
+
+  const labels = dedupeByIdentity(rows, lead.value, (r) => r.coachId, (r) => r.displayName);
+  const { subject, tied } = tiedSubject(labels);
+  const value = coachMetricValue(plan.metric, lead.value ?? 0);
+  // The win-percentage qualifier is never left implicit: without it the
+  // board reads as wrong to anyone expecting an all-time great rather than
+  // the 57-game leader it actually names.
+  const qualifier = plan.metric === 'win_pct' && plan.coachQualifier
+    ? ` ${coachWinPctQualifierNote(plan.agg.kind, plan.coachQualifier.minGames)}`
+    : '';
+  const ranked = plan.agg.kind === 'top_n'
+    ? `Top ${plan.agg.n} by coaching ${metricLabel}.`
+    : `${rankWord(plan)} coaching ${metricLabel}.`;
+  return {
+    headline: `${subject} \u2014 ${value} ${metricLabel}${tied ? ' (tied)' : ''}`,
+    interpretation: `${ranked} ${where}.${qualifier}`,
   };
 }
 

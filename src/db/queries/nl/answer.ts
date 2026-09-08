@@ -190,6 +190,7 @@ function payloadTotal(payload: NlAnswerPayload): number {
   switch (payload.kind) {
     case 'player_game': case 'player_career': case 'player_season':
     case 'team_match': case 'team_aggregate': case 'club_season': case 'team_streak':
+    case 'coach_record':
       return payload.total;
     case 'head_to_head':
       return payload.row ? 1 : 0;

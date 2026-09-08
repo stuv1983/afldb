@@ -15,6 +15,61 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - coaching questions are answerable, and the false coaching decline is gone (AFLDB-ISSUE-152) - 8 September 2026
+
+- AFLDB has held canonical coaching data since migration 087: 386 coaches and 32,034
+  `match_coaches` rows spanning 1902-2025. The natural-language engine nonetheless declined
+  every question containing the word "coach" with the stated reason "AFLDB has no coaching data
+  at all - no coach, no coach-per-club-season, nothing." That sentence had been untrue since the
+  data landed, and it was the first rule the parser consulted, so no coaching question could
+  reach anything downstream. The rule is deleted in the same change that makes coaching
+  answerable - never softened while still refusing.
+- A new `coach_record` grain answers a coach's record from `match_coaches` joined to
+  `matches`, the same canonical per-match assignment `/coaches` and `/records/coaches`
+  already read. `coaches.source_games_coached` remains evidence only and is read nowhere.
+  Supported: who has coached a club, how many coaches a club has had, a coach's whole career, a
+  coach's record at one club, club and league rankings by games/wins/draws/losses/finals/grand
+  finals/premierships/seasons in charge/clubs coached, thresholds on any of them, season-scoped
+  coaching, plus the two player-grain readings - "players coached by X" and "premiership
+  coaches" - through the Grid Solver's existing coaching builders.
+- A coach reference is deliberately distinct from a player reference. 368 of the 386 coaches are
+  uniquely linked to a player and 18 have no player row at all, so a player-shaped reference is
+  structurally blind to 4.7% of coaches; and for the same human the two numbers differ (Mick
+  Malthouse: 174 games played, 718 coached). A coach's name resolves in the coach directory only
+  under a coaching cue, so "most games" keeps its career reading. A surname shared by two
+  coaches - Pannam, Smith - is not an alias at all and declines rather than guessing.
+- Club scope folds the `organization_id` lineage exactly as the club page does: Footscray-era
+  coaching counts towards Western Bulldogs, and nothing of Fitzroy's reaches Brisbane Lions.
+  "Coached more than one club" counts organizations, never raw club identities.
+- Win percentage is the site's draw-weighted `(W + D/2) / G`, never `W / G`, and a
+  win-percentage ranking always states its qualifier - 50 games coached by default, or the
+  reader's own minimum - because at 50+ games the leader is Cliff Rankin at 78.95% from 57
+  games. A ranking with no qualifier at all is refused rather than answered from a one-game
+  sample.
+- A tenure is never rendered as a continuous run: Jack Titus coached Richmond in 1937 and again
+  in 1965, so a row shows the season span with the count of seasons in charge beside it.
+- Coaching coverage is a floor at 1902 and nothing more. A question about 1899 is refused with
+  that reason; a question about a season AFTER the last recorded one is a genuine empty result,
+  not a refusal, so no last season is hard-coded. The floor makes no claim that every season
+  from 1902 onward is completely recorded.
+- Coaching questions Phase B does not support - assistant/caretaker roles, coach-versus-coach
+  head-to-head, coaching awards, tenure reasons, contracts, salaries, state or other-competition
+  coaching, per-season coaching splits, and "Richmond players coached by X" (no builder owns the
+  club) - now decline through the ordinary path, which says the question was not understood
+  rather than claiming data that exists does not. Parser version 34 -> 35.
+- Phase B needs one migration, `092_nl_search_log_coach_record_grain.sql`, because the ninth
+  supported NL grain exposed schema drift in migration 079: `nl_search_log.grain`'s CHECK
+  constraint still listed the eight grains that existed when 079 was written, so a
+  `coach_record` telemetry row was rejected by the database. `logNlSearch` deliberately
+  swallows an INSERT failure so telemetry can never turn a correct answer into a failed search,
+  which meant coaching questions would have answered correctly while every coaching row was
+  dropped from the search log in silence - the same failure 055 and 079 each repaired for an
+  earlier grain. 092 is forward-only and strictly widening: all eight existing grains are kept
+  verbatim, the constraint is not weakened, and `logNlSearch` is unchanged. It must be applied
+  before the code reaches an environment. The contract test now drives its accepted list from
+  the `NlGrain` type and also proves an unsupported grain is still rejected, so the tenth grain
+  fails a test instead of silently losing its telemetry.
+
 ### Natural-language search - "teams with N games against <club>" is answerable (AFLDB-ISSUE-110) - 8 September 2026
 
 - `games` joins `wins`, `losses` and `draws` as a grouped team-result metric. A rendered UI

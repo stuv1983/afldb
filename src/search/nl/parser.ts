@@ -23,6 +23,7 @@ import {
   isNlCareerColumn,
   isNlMetric,
   NL_ACHIEVEMENTS,
+  NL_COACH_WIN_PCT,
   NL_CONFIDENCE,
   NL_LIMITS,
   PARSER_VERSION,
@@ -33,6 +34,7 @@ import {
   type NlCareerColumn,
   type NlCareerCondition,
   type NlClubSeasonCondition,
+  type NlCoachRef,
   type NlCompareOp,
   type NlDeclineReason,
   type NlHavingMetric,
@@ -47,13 +49,14 @@ import {
 import type { GridAxisState } from '@/search/grid-solver-spec';
 import { extractHeadToHeadCue } from '@/search/nl/semantic-intents';
 import {
-  findClub, findVenue, stripMatch,
-  type NlClubDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
+  findClub, findCoach, findVenue, stripMatch,
+  type NlClubDirectoryEntry, type NlCoachDirectoryEntry, type NlEntityMatch, type NlVenueDirectoryEntry,
 } from '@/search/nl/entities';
 import {
   ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
   FIRST_KICK_GOAL_RE,
   DECADE_RE,
   MATCH_EVENT_WORDS, RIVALRY_WORDS,
@@ -80,6 +83,13 @@ export type NlPlayerCandidate = {
 export type NlParseContext = {
   clubs: NlClubDirectoryEntry[];
   venues: NlVenueDirectoryEntry[];
+  /**
+   * Optional, defaulting to none: every existing caller and test builds
+   * this context as an object literal, and an ABSENT coach directory must
+   * decline a coaching question rather than answer it from a half-resolved
+   * identity. Production wires it in buildNlParseContext.
+   */
+  coaches?: NlCoachDirectoryEntry[];
   /** The one async dependency. Delegates to searchPlayers in production; tests inject a fake. */
   resolvePlayer: (name: string) => Promise<NlPlayerCandidate[]>;
 };
@@ -1151,6 +1161,101 @@ function extractPlayerMetricThreshold(text: string): {
   return { text: stripped, metric, condition: { op, value }, consumed };
 }
 
+// ------------------------------------------------------------ coach metric
+
+/**
+ * A coaching metric word, with any comparator/number governing it consumed
+ * ATOMICALLY in the same step -- "more than 200 games", "100+ wins", "at
+ * least 3 premierships". The atomic consumption is what keeps a coaching
+ * threshold away from extractCareerConditions, which would claim it as a
+ * PLAYER career condition that no coaching plan can carry.
+ *
+ * Number lookback follows extractPlayerMetricThreshold's discipline
+ * exactly: a 24-character window clipped at the nearest preceding clause
+ * boundary, so one clause's number search can never see the previous
+ * clause's token. No number means no threshold -- the word is then simply
+ * the ranking subject ("most premierships"), which is a legitimate and
+ * different question.
+ */
+/** The 'games' entry of COACH_METRIC_WORDS, on its own: the win-percentage qualifier is always a games count. */
+const COACH_GAMES_WORDS: [RegExp, string][] = COACH_METRIC_WORDS.filter(([, metric]) => metric === 'games');
+
+function extractCoachMetric(text: string, words: [RegExp, string][] = COACH_METRIC_WORDS): {
+  text: string; metric?: string; condition?: NlMetricCondition; consumed: string[];
+} {
+  let found: { match: RegExpExecArray; metric: string } | null = null;
+  for (const [re, metric] of words) {
+    const match = re.exec(text);
+    if (match) { found = { match, metric }; break; }
+  }
+  if (!found) return { text, consumed: [] };
+  const { match, metric } = found;
+  const idx = match.index;
+
+  const outerStart = Math.max(0, idx - 24);
+  const priorText = text.slice(outerStart, idx);
+  const lastAnd = priorText.toLowerCase().lastIndexOf(' and ');
+  const lastComma = priorText.lastIndexOf(',');
+  const boundaryEnd = Math.max(lastAnd >= 0 ? lastAnd + 5 : -1, lastComma >= 0 ? lastComma + 1 : -1);
+  // A Top-N phrase's own count belongs to the AGGREGATION, not to this
+  // metric: "top 5 coaches by premierships" asks for five coaches, not for
+  // coaches with 5+ premierships. Aggregation is extracted several steps
+  // later, so that number is still sitting in the text here and the window
+  // is clipped past it -- the same reason the clause-boundary clip above
+  // exists, applied to a different neighbour.
+  const topPhrase = /\btop\s+(?:\d{1,3}|[a-z]+)\b/g;
+  let topEnd = -1;
+  for (let m = topPhrase.exec(priorText); m !== null; m = topPhrase.exec(priorText)) {
+    topEnd = m.index + m[0].length;
+  }
+  const clipEnd = Math.max(boundaryEnd, topEnd);
+  const windowStart = clipEnd >= 0 ? outerStart + clipEnd : outerStart;
+  const window = text.slice(windowStart, idx + match[0].length);
+
+  let op: NlCompareOp = 'gte';
+  let value: number | null = null;
+  const spans: { start: number; end: number; text: string }[] = [
+    { start: idx, end: idx + match[0].length, text: match[0] },
+  ];
+  const spanFrom = (m: RegExpExecArray, source = m[0]) => ({
+    start: windowStart + m.index,
+    end: windowStart + m.index + m[0].length,
+    text: source,
+  });
+
+  const plus = NUMBER_PLUS_RE.exec(window);
+  if (plus) {
+    value = Number(plus[1]);
+    spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
+  } else {
+    for (const [opRe, opKind] of COMPARE_OP_WORDS) {
+      const opMatch = opRe.exec(window);
+      if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
+    }
+    const digits = /\b(\d{1,4})\b/.exec(window);
+    if (digits) {
+      value = Number(digits[1]);
+      spans.push(spanFrom(digits, digits[1]));
+    } else {
+      for (const [word, n] of Object.entries(NUMBER_WORDS)) {
+        const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
+        if (wordMatch) { value = n; spans.push(spanFrom(wordMatch)); break; }
+      }
+    }
+  }
+  if (value === null) {
+    return { text: stripMatch(text, match[0]), metric, consumed: [match[0]] };
+  }
+
+  const consumed = spans.map((span) => span.text);
+  const stripped = spans
+    .sort((a, b) => b.start - a.start)
+    .reduce((t, span) => `${t.slice(0, span.start)} ${t.slice(span.end)}`, text)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { text: stripped, metric, condition: { op, value }, consumed };
+}
+
 // ---------------------------------------------------------- player mention
 
 /** "by a/an/the <words> player" names a generic player from a club, not a specific person -- must be read before candidate player-name scanning. */
@@ -1318,6 +1423,84 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = seasons.text;
   consumedTokens.push(...seasons.consumed);
 
+  // 5c. Coaching. Placed AFTER season extraction, so a year can never be
+  // read as a coaching threshold's number, and BEFORE match-type
+  // extraction, because "grand finals" and "finals" are coaching METRICS
+  // ("which coach has coached the most grand finals") and extractMatchType
+  // would otherwise consume them as match scope, leaving the coaching
+  // question with a scope its compiler refuses.
+  //
+  // Three readings share one cue. "coached by X" / "played under X" and
+  // "premiership coach(es)" are questions about PLAYERS, answered at
+  // player_career grain through the grid solver's own coaching builders;
+  // everything else is a question about a coach's record. Deciding here,
+  // before the player-name scan, is what keeps a coach's name out of
+  // resolvePlayer: 368 of 386 coaches share a name with a player row, and
+  // resolving "damien hardwick" as a PLAYER for a coaching question would
+  // answer with his 207 playing games instead of his 307 coached ones.
+  let coachReading: 'coach_record' | 'coached_by' | 'premiership_coach' | null = null;
+  let coach: NlCoachRef | undefined;
+  let coachMetric: string | undefined;
+  let coachCondition: NlMetricCondition | undefined;
+  let coachQualifierMinGames: number | undefined;
+  let coachQualifierRefused = false;
+  if (COACH_CUE_RE.test(text) || COACHED_BY_RE.test(text)) {
+    const coachedBy = COACHED_BY_RE.exec(text);
+    const premiershipCoach = PREMIERSHIP_COACH_RE.exec(text);
+    const cue = COACH_CUE_RE.exec(text);
+    const phrase = coachedBy ?? premiershipCoach ?? cue!;
+    coachReading = coachedBy ? 'coached_by' : premiershipCoach ? 'premiership_coach' : 'coach_record';
+    consumedTokens.push(phrase[0]);
+    text = stripMatch(text, phrase[0]);
+    for (let cueLeft = COACH_CUE_RE.exec(text); cueLeft !== null; cueLeft = COACH_CUE_RE.exec(text)) {
+      consumedTokens.push(cueLeft[0]);
+      text = stripMatch(text, cueLeft[0]);
+    }
+
+    // The coach directory, never searchPlayers. An absent directory (a
+    // caller that did not build one) resolves nothing, which declines.
+    if (coachReading !== 'premiership_coach') {
+      const coachMatch = findCoach(text, ctx.coaches ?? []);
+      if (coachMatch) {
+        coach = {
+          id: coachMatch.entity.id,
+          slug: coachMatch.entity.slug,
+          name: coachMatch.entity.name,
+          playerId: coachMatch.entity.playerId,
+          playerSlug: coachMatch.entity.playerSlug,
+        };
+        text = stripMatch(text, coachMatch.matchedText);
+        consumedTokens.push(coachMatch.matchedText);
+        report.entityResolution.push({
+          mention: coachMatch.matchedText, resolvedTo: coachMatch.entity.name, certainty: 1,
+        });
+      }
+    }
+
+    if (coachReading === 'coach_record') {
+      if (COACH_WIN_PCT_RE.test(text)) {
+        const noQualifier = COACH_NO_QUALIFIER_RE.exec(text);
+        if (noQualifier) {
+          coachQualifierRefused = true;
+          consumedTokens.push(noQualifier[0]);
+          text = stripMatch(text, noQualifier[0]);
+        } else {
+          const qualifier = extractCoachMetric(text, COACH_GAMES_WORDS);
+          if (qualifier.condition && (qualifier.condition.op === 'gte' || qualifier.condition.op === 'gt')) {
+            coachQualifierMinGames = qualifier.condition.value;
+            text = qualifier.text;
+            consumedTokens.push(...qualifier.consumed);
+          }
+        }
+      }
+      const coachMetricResult = extractCoachMetric(text);
+      text = coachMetricResult.text;
+      consumedTokens.push(...coachMetricResult.consumed);
+      coachMetric = coachMetricResult.metric;
+      coachCondition = coachMetricResult.condition;
+    }
+  }
+
   // A team-scoring word anywhere in the question means a bare "grand
   // final"/"finals" can only be scope, never the player_career metric --
   // see extractMatchType. Peeked before extraction so the decision is made
@@ -1450,7 +1633,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = scoreCheckpointResult.text;
   consumedTokens.push(...scoreCheckpointResult.consumed);
 
-  const teamMetricResult = extractTeamMetric(text);
+  const teamMetricResult: { text: string; metric?: string; consumed: string[] } =
+    coachReading === 'coach_record' ? { text, consumed: [] } : extractTeamMetric(text);
   // Do NOT update text with teamMetricResult.text here.
   // The match is stripped at step 11 instead to allow career conditions
   // to see unstripped words if they overlap.
@@ -1514,9 +1698,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // consuming; the guarded extraction below still does the real work.
   const seasonWorded = inOneSeason || seasons.seasonMin !== undefined || seasons.seasonMax !== undefined;
   const clubSeasonMetricWordPresent = CLUB_SEASON_METRIC_WORDS.some(([re]) => re.test(text));
-  const clubSeasonCuePresent = clubSubjectPresent
+  const clubSeasonCuePresent = coachReading === null && (clubSubjectPresent
     || clubSeasonConditionResult.conditions.length > 0
-    || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded);
+    || (!!clubFor && !teamMetricResult.metric && clubSeasonMetricWordPresent && seasonWorded));
 
   let clubSeasonMetricResult: { text: string; metric?: string; consumed: string[] } = { text, consumed: [] };
   if (clubSeasonCuePresent && !teamMetricResult.metric) {
@@ -1533,7 +1717,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // Set when a comparator/number was consumed with the metric word; grain
   // election below decides which typed representation honours it.
   let pendingMetricCondition: NlMetricCondition | undefined;
-  if (teamMetricResult.metric) {
+  if (coachReading === 'coach_record') {
+    playerMetricResult = { text, consumed: [] };
+  } else if (teamMetricResult.metric) {
     // Strip the matched word from the CURRENT text, not
     // teamMetricResult.text -- that snapshot was computed back at step 9,
     // before extractCareerConditions/extractClubSeasonConditions (steps
@@ -1768,6 +1954,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'achievement_summary';
   } else if (headToHead) {
     grain = 'head_to_head';
+  } else if (coachReading === 'coach_record') {
+    grain = 'coach_record';
+    metric = coachMetric ?? null;
   } else if (achievementResult.achievementKey) {
     grain = 'player_career';
   } else if (streakResult.streakDefinition) {
@@ -1905,6 +2094,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   if (grain === 'player_game' && mode === undefined) mode = inOneGame ? 'single' : 'sum';
 
+  // A coaching record is TOTALLED across the seasons in scope; there is no
+  // per-season coaching grain. "most wins in a season by a coach" would
+  // otherwise consume "in a season" and answer the all-time total under a
+  // question that asked for a single year -- the ISSUE-110 silently
+  // discarded-scope failure. It declines instead.
+  if (grain === 'coach_record' && inOneSeason) {
+    report.confidence = 1;
+    report.notes.push('A coaching record is totalled across the seasons asked for; per-season coaching splits are not supported.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
   // --------------------------------------- typed metric-threshold routing
   //
   // AFLDB-ISSUE-110 workstream B. Two producers feed this:
@@ -1928,6 +2128,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   //     STAYS on the plan so validatePlan refuses it honestly -- a parsed
   //     threshold must never silently disappear.
   let metricCondition = pendingMetricCondition;
+  if (grain === 'coach_record') metricCondition = coachCondition;
   const soleCareerCondition = careerResult.conditions.length === 1 && careerResult.conditions[0].kind === 'column'
     ? careerResult.conditions[0]
     : null;
@@ -2082,7 +2283,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     scope.matchType ??= 'home_and_away';
   }
 
-  const careerConditions = grain === 'player_career' ? careerResult.conditions : [];
+  const careerConditions = grain === 'player_career' || grain === 'coach_record'
+    ? careerResult.conditions : [];
 
   // A career predicate reuses the grid solver's builder catalogue, which
   // is where every boolean/categorical career question already lives --
@@ -2099,7 +2301,18 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // means players who did it FOR Carlton, not players who did it anywhere
   // and later happened to play there, and "in the 1940s" means the feat
   // happened then, which is not always the season they debuted.
-  const careerPredicates: GridAxisState[] = grain === 'player_career' ? [...careerResult.predicates] : [];
+  const careerPredicates: GridAxisState[] = grain === 'player_career' || grain === 'coach_record'
+    ? [...careerResult.predicates] : [];
+  // The two PLAYER-grain coaching readings. coached_by takes the coach as
+  // its only parameter and owns no club or season, so a plan that also
+  // carries either fails the ISSUE-110 ownership gate and declines --
+  // which is the honest outcome until a coached_club builder exists.
+  if (grain === 'player_career' && coachReading === 'coached_by' && coach) {
+    careerPredicates.push({ builder: 'coached_by', params: { coach: String(coach.id) } });
+  }
+  if (grain === 'player_career' && coachReading === 'premiership_coach') {
+    careerPredicates.push({ builder: 'premiership_coach', params: {} });
+  }
   if (grain === 'player_career' && achievementResult.achievementKey) {
     if (clubFor) {
       careerPredicates.push({ builder: 'first_kick_goal_for_club', params: { club: String(clubFor.entity.organizationId) } });
@@ -2182,8 +2395,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // leader is exactly the shape the threshold exists to prevent. A
     // min/top_n alongside a threshold is left alone for validatePlan to
     // refuse honestly.
-    : metricCondition && (grain === 'player_game' || grain === 'player_season')
+    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record')
       && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'list')
+    ? { kind: 'list' }
+    // "who coached Richmond" names no statistic, so there is nothing to
+    // rank: the qualifying set IS the answer, and 42 coaches is a list,
+    // not a leader. A count cue ("how many coaches") keeps its own shape.
+    : grain === 'coach_record' && metric === null
+      && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
     ? { kind: 'list' }
     : resolvedAgg && (resolvedAgg.kind === 'max' || resolvedAgg.kind === 'min')
       && metric === null && structureOnly
@@ -2197,6 +2416,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(grain === 'player_game' ? { mode } : {}),
     agg,
     ...(player ? { player } : {}),
+    ...(coach && grain === 'coach_record' ? { coach } : {}),
     scope,
     ...(metricCondition ? { metricCondition } : {}),
     careerConditions,
@@ -2214,6 +2434,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     ...(havingResult.havingClause ? { havingClause: havingResult.havingClause } : {}),
     ...(matchFilterResult.matchFilter ? { matchFilter: matchFilterResult.matchFilter } : {}),
     ...(boundary ? { boundary } : {}),
+    // The win-percentage qualifier, applied only where it means something:
+    // a ranking. A thresholded LIST of win percentages is already
+    // qualified by its own threshold. Absent when the reader explicitly
+    // asked for no minimum, so validatePlan refuses rather than ranking a
+    // one-game sample.
+    ...(grain === 'coach_record' && metric === 'win_pct' && !coachQualifierRefused
+      && (agg.kind === 'max' || agg.kind === 'min' || agg.kind === 'top_n')
+      ? { coachQualifier: { minGames: coachQualifierMinGames ?? NL_COACH_WIN_PCT.defaultMinGames } }
+      : {}),
     tiePolicy: 'all',
     limit: agg.kind === 'top_n' || agg.kind === 'list' ? 100 : 25,
   };
@@ -2234,6 +2463,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const structuralOk = grain === 'head_to_head' ? !!headToHead && !!scope.matchup
     : grain === 'team_match' ? !!metric || !!havingResult.havingClause
     : grain === 'team_streak' ? !!streakResult.streakDefinition
+    : grain === 'coach_record' ? (metric !== null || !!coach || !!scope.clubFor)
     : grain === 'club_season' ? clubSeasonCuePresent
     : grain === 'achievement_summary' ? true
     : grain === 'player_career' ? (metric !== null || careerConditions.length > 0 || careerPredicates.length > 0 || boundary !== undefined)

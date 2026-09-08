@@ -574,3 +574,133 @@ describe('plan token round-trip', () => {
     expect(decodePlanToken('')).toBeNull();
   });
 });
+
+// ------------------------------------- coach_record (AFLDB-ISSUE-152 B)
+
+const HARDWICK = { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick' };
+const RICHMOND = { organizationId: 1, slug: 'richmond', name: 'Richmond' };
+
+function coachPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return basePlan({ grain: 'coach_record', metric: null, agg: { kind: 'list' }, limit: 100, ...overrides });
+}
+
+describe('validatePlan: coach_record', () => {
+  it('accepts the four whole-vs-scoped shapes plus a league ranking', () => {
+    const shapes: [string, Partial<NlQueryPlan>][] = [
+      ['a coach\'s whole career', { coach: HARDWICK }],
+      ['a coach at one organization', { coach: HARDWICK, scope: { clubFor: RICHMOND } }],
+      ['every coach of an organization', { scope: { clubFor: RICHMOND } }],
+      ['a league-wide ranking', { metric: 'games', agg: { kind: 'max' } }],
+      ['a count of a club\'s coaches', { scope: { clubFor: RICHMOND }, agg: { kind: 'count' } }],
+    ];
+    for (const [label, shape] of shapes) {
+      expect(validatePlan(coachPlan(shape)), label).not.toHaveProperty('error');
+    }
+  });
+
+  it('accepts every coaching metric and refuses one from another grain', () => {
+    for (const metric of ['games', 'wins', 'draws', 'losses', 'finals', 'grand_finals', 'premierships', 'seasons', 'organizations']) {
+      expect(validatePlan(coachPlan({ metric, agg: { kind: 'max' } })), metric).not.toHaveProperty('error');
+    }
+    expect(validatePlan(coachPlan({ metric: 'disposals', agg: { kind: 'max' } }))).toHaveProperty('error');
+  });
+
+  it.each([
+    ['player', { player: { id: 1, slug: 'p', name: 'P' } }],
+    ['playerIdIn', { scope: { playerIdIn: [1, 2] } }],
+    ['clubAgainst', { scope: { clubAgainst: RICHMOND } }],
+    ['matchup', { scope: { matchup: { clubA: RICHMOND, clubB: { organizationId: 2, slug: 'carlton', name: 'Carlton' } } } }],
+    ['venue', { scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }],
+    ['matchType', { scope: { matchType: 'finals' as const } }],
+    ['roundNumber', { scope: { roundNumber: 5 } }],
+    ['careerConditions', { careerConditions: [{ kind: 'column' as const, column: 'games' as const, op: 'gte' as const, value: 100 }] }],
+    ['careerPredicates', { careerPredicates: [{ builder: 'premiership_coach', params: {} }] }],
+    ['clubSeasonConditions', { clubSeasonConditions: [{ kind: 'premier' as const }] }],
+    ['achievementSummary', { achievementSummary: { achievementKey: 'first_kick_goal' as const, kind: 'by_club' as const } }],
+    ['headToHead', { headToHead: { kind: 'record' as const } }],
+    ['streakDefinition', { streakDefinition: { kind: 'win' as const } }],
+    ['periodSplit', { periodSplit: 'Q1' as const }],
+    ['scoreCheckpoint', { scoreCheckpoint: 'HT' as const }],
+    ['resultFilter', { resultFilter: 'won' as const }],
+    ['debutGame', { debutGame: true }],
+    ['havingClause', { havingClause: { metric: 'wins' as const, op: 'gte' as const, value: 3 } }],
+    ['matchFilter', { matchFilter: { metric: 'win_margin' as const, op: 'gt' as const, value: 50 } }],
+    ['boundary', { boundary: { event: 'debut' as const, where: 'grand_final' as const } }],
+    ['mode', { mode: 'single' as const }],
+  ] as [string, Partial<NlQueryPlan>][])('refuses a coaching plan carrying %s', (_label, shape) => {
+    expect(validatePlan(coachPlan({ coach: HARDWICK, ...shape }))).toHaveProperty('error');
+  });
+
+  it('allows no metric only for a list or a count', () => {
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND } }))).not.toHaveProperty('error');
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND }, agg: { kind: 'count' } }))).not.toHaveProperty('error');
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND }, agg: { kind: 'max' } }))).toHaveProperty('error');
+    expect(validatePlan(coachPlan({ coach: HARDWICK, agg: { kind: 'top_n', n: 3 } }))).toHaveProperty('error');
+  });
+
+  it('refuses a bare coaching question with no coach, club or statistic', () => {
+    expect(validatePlan(coachPlan({}))).toHaveProperty('error');
+  });
+
+  it('refuses a threshold with nothing to qualify, and accepts one on a real metric', () => {
+    expect(validatePlan(coachPlan({ metricCondition: { op: 'gte', value: 100 } }))).toHaveProperty('error');
+    expect(validatePlan(coachPlan({ metric: 'wins', metricCondition: { op: 'gte', value: 100 } })))
+      .not.toHaveProperty('error');
+  });
+
+  it('a threshold lists qualifiers rather than ranking one', () => {
+    expect(validatePlan(coachPlan({ metric: 'wins', agg: { kind: 'max' }, metricCondition: { op: 'gte', value: 100 } })))
+      .toHaveProperty('error');
+  });
+
+  it('refuses a win-percentage ranking with no games qualifier, and accepts one with', () => {
+    expect(validatePlan(coachPlan({ metric: 'win_pct', agg: { kind: 'max' } }))).toHaveProperty('error');
+    expect(validatePlan(coachPlan({ metric: 'win_pct', agg: { kind: 'top_n', n: 10 } }))).toHaveProperty('error');
+    expect(validatePlan(coachPlan({ metric: 'win_pct', agg: { kind: 'max' }, coachQualifier: { minGames: 50 } })))
+      .not.toHaveProperty('error');
+    expect(validatePlan(coachPlan({ metric: 'win_pct', agg: { kind: 'max' }, coachQualifier: { minGames: 0 } })))
+      .toHaveProperty('error');
+  });
+
+  it('refuses a coach reference or a coaching qualifier on any other grain', () => {
+    expect(validatePlan(basePlan({ coach: HARDWICK }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({ coachQualifier: { minGames: 50 } }))).toHaveProperty('error');
+  });
+
+  it('refuses a coach and a player in the same plan', () => {
+    expect(validatePlan(coachPlan({ coach: HARDWICK, player: { id: 1, slug: 'p', name: 'P' } })))
+      .toHaveProperty('error');
+  });
+
+  it('refuses a season below the 1902 coaching floor whatever the metric', () => {
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND, seasonMin: 1901, seasonMax: 1901 } })))
+      .toHaveProperty('error');
+    expect(validatePlan(coachPlan({ metric: 'wins', agg: { kind: 'max' }, scope: { seasonMin: 1899, seasonMax: 1901 } })))
+      .toHaveProperty('error');
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND, seasonMin: 1902, seasonMax: 1902 } })))
+      .not.toHaveProperty('error');
+    // No upper bound is encoded: a future season is an empty result, not a refusal.
+    expect(validatePlan(coachPlan({ scope: { clubFor: RICHMOND, seasonMin: 2030, seasonMax: 2030 } })))
+      .not.toHaveProperty('error');
+  });
+});
+
+describe('describePlan: coaching', () => {
+  it('names the coach and states the win-percentage qualifier verbatim', () => {
+    const lines = describePlan(validatePlan(coachPlan({
+      coach: HARDWICK, metric: 'win_pct', agg: { kind: 'max' }, coachQualifier: { minGames: 50 },
+    })) as NlQueryPlan);
+    expect(lines).toContain('Coach: Damien Hardwick.');
+    expect(lines).toContain(
+      'Best coaching win percentage, minimum 50 games coached. '
+      + 'Win percentage counts a draw as half a win — (wins + draws ÷ 2) ÷ games.',
+    );
+  });
+
+  it('echoes a reader-stated minimum rather than the default', () => {
+    const lines = describePlan(validatePlan(coachPlan({
+      metric: 'win_pct', agg: { kind: 'max' }, coachQualifier: { minGames: 100 },
+    })) as NlQueryPlan);
+    expect(lines.some((line) => line.includes('minimum 100 games coached'))).toBe(true);
+  });
+});

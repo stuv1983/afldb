@@ -281,6 +281,65 @@ export const CLUB_SEASON_METRIC_WORDS: [RegExp, 'wins' | 'losses' | 'draws' | 'p
 ];
 
 /**
+ * Any coaching cue, and the gate for COACH_METRIC_WORDS below. Nothing in
+ * the coaching vocabulary is tried until this matches, for exactly the
+ * reason CLUB_SEASON_METRIC_WORDS is gated: "games", "wins", "losses" and
+ * "premierships" all name player and club statistics too, and the cue is
+ * what says which of them the reader meant.
+ */
+export const COACH_CUE_RE = /\bcoach(?:es|ed|ing)?\b|\bcoaching record\b|\bin charge of\b|\bat the helm\b/;
+
+/**
+ * The PLAYER-grain readings of a coaching cue: "players coached by X",
+ * "who did X coach", "played under X". These are questions about players,
+ * answered at player_career grain through the coached_by career predicate
+ * -- not questions about a coach's record.
+ */
+export const COACHED_BY_RE = /\bcoached by\b|\bplayed under\b|\bunder coach\b/;
+
+/**
+ * "premiership coach(es)" as a PLAYER-grain predicate: which PLAYERS went
+ * on to coach a premiership side. Deliberately distinct from the
+ * coach-grain `premierships` metric ("coaches with the most
+ * premierships"), which ranks coaches by flags won -- the two questions
+ * have different answers and must not collapse into one.
+ */
+export const PREMIERSHIP_COACH_RE = /\bpremiership[- ]winning coach(?:es)?\b|\bpremiership coach(?:es)?\b/;
+
+/**
+ * coach_record ranking words, tried ONLY once COACH_CUE_RE has matched.
+ * Order matters: "grand finals" must be claimed before the bare "finals",
+ * and the win-percentage phrases before the bare "win".
+ */
+export const COACH_WIN_PCT_RE = /\bwin (?:percentage|pct|rate)\b|\bwinning percentage\b|\bwin ?%/;
+
+export const COACH_METRIC_WORDS: [RegExp, string][] = [
+  [COACH_WIN_PCT_RE, 'win_pct'],
+  [/\bpremierships?\b|\bflags?\b/, 'premierships'],
+  [/\bgrand finals?\b/, 'grand_finals'],
+  [/\bfinals?\b/, 'finals'],
+  [/\bwins?\b|\bvictories\b/, 'wins'],
+  [/\blosses\b|\bdefeats\b/, 'losses'],
+  [/\bdraws?\b/, 'draws'],
+  // "seasons in charge" is claimed as one phrase: the bare word alone
+  // leaves "in charge" behind as a leftover token, which declines a
+  // question the engine understood completely.
+  [/\bseasons? in charge\b|\byears in charge\b|\bseasons?\b/, 'seasons'],
+  // Lineage-level clubs (AFLDB-ISSUE-152 D2): "coached more than one club"
+  // counts ORGANIZATIONS, never raw historical club identities -- Denis
+  // Pagan and Terry Wallace each show 2 organizations across 3 identities.
+  [/\bclubs?\b/, 'organizations'],
+  [/\bgames?\b|\bmatches\b/, 'games'],
+];
+
+/**
+ * An explicit refusal of the win-percentage qualifier ("no minimum", "any
+ * number of games"). The measured minimum across all coaches is ONE game,
+ * so this is refused rather than answered from a one-game sample.
+ */
+export const COACH_NO_QUALIFIER_RE = /\bno minimum\b|\bwithout a minimum\b|\bany number of games\b|\bno qualifier\b/;
+
+/**
  * club_season boolean conditions -- "fewest wins BY A PREMIER", "worst
  * team to MAKE FINALS". Each reads one already-computed club_seasons
  * column (is_premier / wooden_spoon / finals_played); unlike the metric
@@ -877,11 +936,6 @@ export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
     re: /\b(?:r50s?|rebound[- ]?(?:fifties|50s?))\b/,
     topic: 'rebound 50s',
     reason: 'Rebound 50s are not tracked as a supported AFLDB natural-language statistic.',
-  },
-  {
-    re: /\bcoach(?:es|ed|ing)?\b/,
-    topic: 'coaching',
-    reason: 'AFLDB has no coaching data at all -- no coach, no coach-per-club-season, nothing.',
   },
   {
     // Bare \bfantasy\b, not "fantasy points": readers ask for a "fantasy
