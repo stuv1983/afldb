@@ -7,6 +7,7 @@
  * Split out of db/queries/nl/answer.ts so the wording rules -- above all
  * the tie handling below -- can be unit-tested without a database.
  */
+import { GRID_BUILDERS } from '@/search/grid-solver-spec';
 import {
   afterSirenRequiresMatchLink, coachWinPctQualifierNote, NL_METRICS, type NlQueryPlan,
 } from '@/search/nl/plan';
@@ -636,6 +637,20 @@ export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): stri
   return caveats;
 }
 
+/**
+ * The one boundary a first-kick-goal answer must state in its own
+ * sentence (AFLDB-ISSUE-152 §17.6): the record is a curated, cited list,
+ * and NL counts only the rows linked to a canonical player, so the answer
+ * is deliberately a subset of what /records/first-kick-goal displays.
+ * Not an answerCaveats entry -- that helper is after-siren only.
+ */
+function curatedRecordNote(plan: NlQueryPlan): string {
+  const curated = plan.careerPredicates.some((axis) => axis.builder.startsWith('first_kick_goal'));
+  return curated
+    ? ' AFLDB\'s first-kick-goal record is a curated, cited list; rows it has not linked to a player are not counted.'
+    : '';
+}
+
 function describePlayerCareerAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerCareerRow | null,
@@ -643,6 +658,21 @@ function describePlayerCareerAnswer(
   total: number,
 ): { headline: string; interpretation: string } {
   if (!plan.metric || lead === null || lead.value === null) {
+    // AFLDB-ISSUE-152 Phase E (E-D1). "did Dustin Martin kick a goal with
+    // his first kick" is a yes/no question about ONE player, and "1 player
+    // matches" / "0 players match" is a poor way to answer it. Gated
+    // narrowly to a pinned player with conditions and no ranking metric,
+    // so every unpinned list keeps the count wording it has always had.
+    if (plan.player && !plan.metric && plan.careerPredicates.length > 0) {
+      const conditions = plan.careerPredicates
+        .map((axis) => GRID_BUILDERS[axis.builder]?.label ?? axis.builder)
+        .join('; ');
+      return {
+        headline: `${plan.player.name} — ${total > 0 ? 'yes' : 'no'}`,
+        interpretation: `${plan.player.name} ${total > 0 ? 'meets' : 'does not meet'} `
+          + `every condition asked for: ${conditions}.${curatedRecordNote(plan)}`,
+      };
+    }
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
       interpretation: plan.scope.clubFor

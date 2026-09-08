@@ -893,6 +893,101 @@ export const ACHIEVEMENT_SUMMARY_CUES: [RegExp, string][] = [
   [/\bmost\s+recent\b|\blatest\b|\bmost\s+recently\b|\blast\s+player\b/, 'latest'],
 ];
 
+/**
+ * AFLDB-ISSUE-152 Phase E (E7). "a goal with EACH of their first three
+ * kicks" -- the multi-kick subtype recorded in
+ * player_achievements.consecutive_goal_kicks (migration 053, `smallint NOT
+ * NULL DEFAULT 1 CHECK (>= 1)`), which FIRST_KICK_GOAL_RE cannot match
+ * because the numeral and "each of" sit between "first" and "kicks".
+ *
+ * Tried BEFORE FIRST_KICK_GOAL_RE and consuming the whole span, because it
+ * subsumes it: any of "goal", "kick" or the numeral left in the text is
+ * handed straight to the metric extractors, which read "goals" as the
+ * ranking subject -- the same reason step 5a exists at all.
+ *
+ * The count is a capture group per branch (a JS alternation cannot share
+ * one), resolved by readFirstKickCount. An out-of-range count is NOT
+ * clamped: N = 0, N = -2 and N = 40 are questions this data cannot answer,
+ * and the parser refuses them by name rather than sending an
+ * always-empty predicate to SQL.
+ */
+const FIRST_KICK_COUNT = String.raw`(-?\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)`;
+
+export const FIRST_KICK_CONSECUTIVE_RE = new RegExp([
+  // "kicked a goal with each of their first three kicks", "goals with their first 3 kicks"
+  String.raw`(?:kick(?:ed|s)?|scor(?:ed|es)?|boot(?:ed|s)?|slott(?:ed|s)?|got|goaled)?\s*(?:a\s+)?goals?\s+(?:with|from|off|on)\s+(?:each\s+of\s+)?(?:their|his|her|the|a)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+  // "their first three kicks were all goals"
+  String.raw`(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks\s+(?:were|was)\s+(?:all\s+)?goals?`,
+  // "goaled with each of their first three kicks" -- verb form, no article
+  String.raw`goal(?:ed|ing)\s+(?:with|from|off)\s+(?:each\s+of\s+)?(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+  // "scored with each of their first three kicks" -- no "goal" word at all
+  String.raw`scor(?:ed|es|ing)\s+(?:with|from|off)\s+(?:each\s+of\s+)?(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+].map((source) => `(?:${source})`).join('|'));
+
+/**
+ * The upper bound on N. The source legend's observed maximum is a single
+ * digit (6 on the loaded curated extract), so a two-digit request is not a
+ * narrower question, it is a misunderstanding of the record.
+ */
+export const FIRST_KICK_CONSECUTIVE_MAX = 10;
+
+/** The captured count, as digits or a number word. Null when neither. */
+export function readFirstKickCount(token: string): number | null {
+  if (/^-?\d+$/.test(token)) return Number(token);
+  return NUMBER_WORDS[token] ?? null;
+}
+
+/**
+ * AFLDB-ISSUE-152 Phase E (E8). "whose first-kick goal was their only
+ * career goal" -- player_achievements.no_further_career_goals.
+ *
+ * Consulted ONLY once the achievement phrase has already matched, exactly
+ * like ACHIEVEMENT_SUMMARY_CUES, so a loose phrase can never elect the
+ * family on its own. Consumed inside step 5a, which is the whole point:
+ * left in the text, the tail's "goal" is read by extractPlayerMetric as
+ * the ranking subject -- a silent misread rather than a decline.
+ *
+ * Goal-level only. "never kicked the ball again" is a different, kick-level
+ * claim (no_further_career_kicks) that AFLDB does not answer, and it must
+ * not be folded in here -- see FIRST_KICK_NO_FURTHER_KICKS_CUES.
+ */
+/**
+ * The relation that ties a negation-form E8 cue back to the achievement
+ * phrase: "never kicked another goal AFTER THEIR first-kick goal".
+ *
+ * By the time these cues run, the achievement span itself has already been
+ * consumed, so what the connective governs is gone and only the connective
+ * and its determiner survive. That remnant is part of the same claim, not
+ * a leftover the question failed to express, so the cue must take it --
+ * otherwise a fully supported wording declines on an unsupported "after".
+ *
+ * A determiner is REQUIRED, which is what keeps this narrow: "after their"
+ * is the remnant of a consumed noun phrase, while "after 1950" or "after
+ * round 12" is a scope clause with its own owner, and neither can match.
+ */
+const AFTER_THE_ACHIEVEMENT = String.raw`(?:\s+(?:after|following|since)\s+(?:that|this|it|their|his|her|the)\b(?:\s+(?:goals?|one|kicks?))?)?`;
+
+export const FIRST_KICK_ONLY_GOAL_CUES: RegExp[] = [
+  /\b(?:was|were|is|being)\s+(?:their|his|her)?\s*only\s+(?:ever\s+|career\s+)?goals?\b/,
+  /\bonly\s+(?:career\s+|ever\s+)?goals?\s+(?:of|in)\s+(?:their|his|her|the)?\s*(?:whole\s+|entire\s+)?career\b/,
+  /\btheir\s+only\s+(?:ever\s+|career\s+)?goals?\b/,
+  new RegExp(String.raw`\bnever\s+(?:kicked|booted|slotted|scored)\s+another\s+goal\b${AFTER_THE_ACHIEVEMENT}`),
+  new RegExp(String.raw`\bnever\s+(?:goaled|scored)\s+again\b${AFTER_THE_ACHIEVEMENT}`),
+];
+
+/**
+ * The kick-level claim (`no_further_career_kicks`), deliberately NOT
+ * supported (E9). Recognised only so the question declines by name instead
+ * of losing its tail to the metric extractors and answering the goal-level
+ * question it did not ask.
+ */
+export const FIRST_KICK_NO_FURTHER_KICKS_CUES: RegExp[] = [
+  /\bnever\s+(?:kicked|touched)\s+(?:the\s+)?(?:ball|footy|football)\s+again\b/,
+  /\bnever\s+(?:had\s+)?another\s+kick\b/,
+  /\bnever\s+kicked\s+again\b/,
+  /\bno\s+further\s+(?:career\s+)?kicks\b/,
+];
+
 // ------------------------------------------------------------------ nicknames
 
 /** Seed vocabulary; grown from real search-log usage (db/queries/nl/log.ts, phase F). */

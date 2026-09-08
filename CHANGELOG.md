@@ -15,6 +15,38 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - the first-kick-goal record answers its last two questions (AFLDB-ISSUE-152 Phase E) - 9 September 2026
+
+- AFLDB's curated first-kick-goal record has been searchable in plain English for a while: who did it,
+  who did it for a club, who did it in a decade, the first and most recent, and the by-club/by-decade
+  summaries. Two things it records were unreachable. "Players who kicked a goal with each of their
+  first three kicks" and "players whose first-kick goal was their only career goal" now answer, using
+  two conditions the database has always held and the search engine could never ask for. No new data,
+  no new query and no schema change - the wiring was the gap.
+- The second one was not a decline before it was a MISREAD. "Whose first-kick goal was their only career
+  goal" left the word "goal" sitting in the question after the rest had been understood, and the ranking
+  logic picked it up: the site would confidently return a career-goals leaderboard under a question about
+  players who kicked exactly one goal. That reading is now impossible.
+- "Never" is read as part of the claim, not as a reversal of it. "Players who never kicked another goal
+  after their first-kick goal" is the same question as "whose first-kick goal was their only career
+  goal", and both answer. Asking for the opposite of the record - "players who never kicked a goal with
+  their first kick" - still declines, because the record lists who DID it and nothing else.
+- Only career GOALS and never kicking again are different claims, and the site now says so out loud.
+  AFLDB records whether a player ever kicked another goal (23 players did not); whether they ever kicked
+  the football again is a different, kick-level fact it does not answer (4 rows carry it, and they are
+  a different set). Asking the second gets a named explanation, not a silent answer to the first.
+- Three questions that cannot be answered now say so by name rather than trailing off into a low-confidence
+  decline: a club-by-club or decade-by-decade SUMMARY cannot also be narrowed to the multi-kick or
+  only-career-goal subset (the summary counts every holder); a streak length outside 1-10 kicks is outside
+  what the record holds; and the kick-level claim above. Each explains itself in a sentence.
+- Asking about one player gets a yes or a no. "Did Dustin Martin kick a goal with his first kick" used to
+  answer "0 players match". It now answers with the player's name, yes or no, and names the conditions
+  that were checked. List questions are unchanged.
+- The answer counts only players AFLDB has linked to a person. The record board at /records/first-kick-goal
+  lists unlinked rows too, so a search answer is deliberately a slightly smaller set - 330 of 334 on the
+  reference data - and the answer text says so rather than quietly absorbing the difference.
+- Search behaviour version 37. Answers already given are unaffected; no page, board or import changed.
+
 ### Natural-language search - after-the-siren questions are answerable (AFLDB-ISSUE-152 Phase C) - 8 September 2026
 
 - AFLDB has held a curated, cited list of kicks after the siren since migration 089 - 126 events

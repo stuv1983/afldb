@@ -671,3 +671,82 @@ describe('after-the-siren answers (AFLDB-ISSUE-152 Phase C)', () => {
     expect(answerCaveats(plan(), { kind: 'count', value: 1 })).toEqual([]);
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase E, decision E-D1. "did Dustin Martin kick a goal
+ * with his first kick" is a yes/no question about ONE player, and the
+ * no-metric branch answered it with "1 player matches" / "0 players
+ * match". The wording is gated narrowly -- a pinned player, conditions,
+ * and no ranking metric -- so every unpinned list keeps the count.
+ */
+describe('a pinned player answering a condition question (AFLDB-ISSUE-152 Phase E)', () => {
+  const martin = { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' };
+  const firstKick = { builder: 'first_kick_goal_player', params: {} };
+
+  function pinned(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      player: martin, careerPredicates: [firstKick], ...overrides,
+    });
+  }
+
+  it('answers yes, and names the condition it answered', () => {
+    const rows = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: null })];
+    const { headline, interpretation } = describeAnswer(
+      pinned(), { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Dustin Martin — yes');
+    expect(interpretation).toContain('Goal with their first VFL/AFL kick');
+  });
+
+  it('answers no on an empty result rather than "0 players match"', () => {
+    const { headline, interpretation } = describeAnswer(
+      pinned(), { kind: 'player_career', lead: null, rows: [], total: 0 },
+    );
+    expect(headline).toBe('Dustin Martin — no');
+    expect(interpretation).toContain('does not meet');
+  });
+
+  it('names both conditions when the question composed them', () => {
+    const { interpretation } = describeAnswer(
+      pinned({
+        careerPredicates: [firstKick, { builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } }],
+      }),
+      { kind: 'player_career', lead: null, rows: [], total: 0 },
+    );
+    expect(interpretation).toContain('Goal with each of their first X kicks');
+  });
+
+  // §17.6: the NL answer is a SUBSET of /records/first-kick-goal, which
+  // lists unlinked rows too. Said once, in the answer, rather than left
+  // for the reader to discover.
+  it('states the curated, linked-only boundary on this family only', () => {
+    const curated = describeAnswer(
+      pinned(), { kind: 'player_career', lead: null, rows: [], total: 0 },
+    ).interpretation;
+    expect(curated).toContain('curated');
+    expect(curated).toContain('not counted');
+
+    const other = describeAnswer(
+      pinned({ careerPredicates: [{ builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } }] }),
+      { kind: 'player_career', lead: null, rows: [], total: 0 },
+    ).interpretation;
+    expect(other).not.toContain('curated');
+  });
+
+  it('leaves an unpinned list on the count wording it has always had', () => {
+    const rows = [careerRow({ value: null })];
+    expect(describeAnswer(
+      pinned({ player: undefined }), { kind: 'player_career', lead: rows[0], rows, total: 320 },
+    ).headline).toBe('320 players match');
+  });
+
+  it('leaves a ranked answer for one player alone', () => {
+    // The gate requires no metric: a pinned player WITH a ranking metric
+    // is still "Dustin Martin — 4 goals", not a yes/no.
+    const rows = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: 4 })];
+    expect(describeAnswer(
+      pinned({ metric: 'goals' }), { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    ).headline).toBe('Dustin Martin — 4 goals');
+  });
+});

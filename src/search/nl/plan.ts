@@ -330,8 +330,22 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    extractor, so "who has kicked the most goals after the siren" can
  *    never be read as a career-goals leaderboard with "after the siren"
  *    discarded.
+ * 37: the first-kick-goal family closes its two gaps (AFLDB-ISSUE-152
+ *    Phase E). No grain, no builder and no SQL: "a goal with each of
+ *    their first three kicks" and "whose first-kick goal was their only
+ *    career goal" now emit first_kick_goal_consecutive_min and
+ *    first_kick_goal_only_career_goal, two builders the grid solver has
+ *    always had and the parser could never reach. The second was not a
+ *    decline before it was a MISREAD: the tail "only career goal" was
+ *    left in the text, where extractPlayerMetric read "goal" as the
+ *    ranking subject. The negation exemption widens by one -- an E8 cue
+ *    owns its own "never", as clubs_without already did -- while the
+ *    kick-level claim (no_further_career_kicks) is refused by name so the
+ *    two can never be conflated, and a modifier that reaches the summary
+ *    grain or an out-of-range N declines rather than answering the wider
+ *    question.
  */
-export const PARSER_VERSION = 36;
+export const PARSER_VERSION = 37;
 
 // ------------------------------------------------------------------ grain
 

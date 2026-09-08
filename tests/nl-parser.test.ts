@@ -1517,3 +1517,182 @@ describe('after-the-siren questions (AFLDB-ISSUE-152 Phase C)', () => {
     expect(validatePlan(parsed.plan), question).toHaveProperty('error');
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase E: the first-kick-goal family closes its two gaps.
+ *
+ * E1-E6 already worked and are covered by §14/§15 above; nothing here
+ * re-tests them except where a Phase E wording has to leave them alone.
+ * What is new is E7 ("a goal with each of their first three kicks") and
+ * E8 ("whose first-kick goal was their only career goal") -- two builders
+ * the grid solver has always had and the parser could never reach.
+ *
+ * E8 was not a decline before it was a MISREAD: the tail "only career
+ * goal" survived step 5a, and extractPlayerMetric read "goal" as the
+ * question's ranking subject. `metric === null` is therefore asserted on
+ * every E8 wording, not just the predicate.
+ */
+describe('first-kick-goal closure (AFLDB-ISSUE-152 Phase E)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------ E7 (R1)
+
+  describe('E7 — a goal with each of their first N kicks', () => {
+    it.each([
+      ['word numeral', 'players who kicked a goal with each of their first three kicks', '3'],
+      ['bare numeral', 'players who kicked goals with their first 3 kicks', '3'],
+      ['each of the', 'players who kicked a goal with each of the first two kicks', '2'],
+      ['verb form', 'players who goaled with each of their first four kicks', '4'],
+      ['scored form', 'players who scored with each of their first six kicks', '6'],
+      ['subject form', 'players whose first three kicks were all goals', '3'],
+    ])('%s -> first_kick_goal_consecutive_min with the exact bound', async (_label, question, kicks) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ kicks });
+      // The whole span is consumed, so neither "goal" nor "kicks" nor the
+      // numeral survives for the metric extractors to claim.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // E-D3: the column is NOT NULL DEFAULT 1 CHECK (>= 1), so ">= 1" is
+    // exactly the whole family. N = 1 must therefore produce the plain
+    // builder, whose label reads correctly, not a redundant bound.
+    it('N = 1 is the plain family, not a consecutive bound', async () => {
+      const p = await plan('players who kicked a goal with their first one kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+
+    it('leaves the base wording exactly as it was', async () => {
+      const p = await plan('players who kicked a goal with their first kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+  });
+
+  // ------------------------------------------------------------ E8 (R2)
+
+  describe('E8 — the first-kick goal was their only career goal', () => {
+    it.each([
+      'players whose first-kick goal was their only career goal',
+      'players whose first kick goal was their only goal',
+      'players who kicked a goal with their first kick and never kicked another goal',
+      'players who goaled with their first kick and never scored again',
+    ])('%s -> first_kick_goal_only_career_goal, with no metric misread', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+      // The defect this closes: "goal" left in the text became the ranking
+      // subject and the question answered a career-goals leaderboard.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The cue owns its own negation, exactly as clubs_without does. Without
+    // this the existing guard would read "never kicked another goal" as a
+    // polarity inversion of the whole family and decline a question the
+    // engine now answers exactly.
+    it('the E8 cue owns the negation it contains', async () => {
+      const p = await plan('players who never kicked another goal after their first-kick goal');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+    });
+  });
+
+  // -------------------------------------------------- composition (R3)
+
+  describe('composition with the scoped builders', () => {
+    it('club + E7 -> the club is owned by first_kick_goal_for_club', async () => {
+      const p = await plan('carlton players who kicked a goal with each of their first three kicks');
+      expect(builders(p)).toEqual(['first_kick_goal_for_club', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params.club).toBe('2');
+      expect(p.careerPredicates[1].params.kicks).toBe('3');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('season range + E7 -> the range is owned by first_kick_goal_between', async () => {
+      const p = await plan('players who kicked a goal with each of their first two kicks in the 1940s');
+      expect(builders(p)).toEqual(['first_kick_goal_between', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '1940', to: '1949' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('club + season + E8 -> all three, in a stable order', async () => {
+      const p = await plan('carlton players since 2000 whose first-kick goal was their only career goal');
+      expect(builders(p)).toEqual([
+        'first_kick_goal_for_club', 'first_kick_goal_between', 'first_kick_goal_only_career_goal',
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player keeps the pin and the modifier together', async () => {
+      const p = await plan('did dustin martin kick a goal with each of his first two kicks');
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------ the decline table (R4)
+
+  describe('§17.7 declines', () => {
+    it.each([
+      ['E-DEC-1  kick-level (E9)', 'players who never kicked the ball again after their first-kick goal'],
+      ['E-DEC-1b kick-level (E9)', 'players with a first-kick goal who never had another kick'],
+      ['E-DEC-3  polarity inversion', 'players who never kicked a goal with each of their first three kicks'],
+      ['E-DEC-4  summary + E7', 'which club has had the most players goal with each of their first three kicks'],
+      ['E-DEC-5  summary + E8', 'by decade players whose first-kick goal was their only career goal'],
+      ['E-DEC-8  N = 0', 'players who kicked a goal with each of their first 0 kicks'],
+      ['E-DEC-8b N negative', 'players who kicked a goal with each of their first -2 kicks'],
+      ['E-DEC-8c N absurd', 'players who kicked a goal with each of their first 40 kicks'],
+      ['E-DEC-2  kickless matches (E9)', 'kickless matches before a first kick'],
+      ['E-DEC-9  bare decade', 'players who kicked a goal with each of their first three kicks this decade'],
+    ])('%s declines rather than answering something narrower', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+    it.each([
+      ['E-DEC-6  venue', 'players who kicked a goal with each of their first three kicks at the mcg'],
+      ['E-DEC-6b opponent', 'players who kicked a goal with each of their first three kicks against collingwood'],
+      ['E-DEC-6c match type', 'players who kicked a goal with each of their first three kicks in a grand final'],
+      ['E-DEC-10 club + decade + venue', 'carlton players who kicked a goal with their first kick in the 1940s at the mcg'],
+    ])('%s is rejected rather than silently unscoped', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    // E-DEC-2 and E-DEC-11 are not this family and have no vocabulary of
+    // their own. What matters is only that neither can reach a
+    // first-kick-goal builder; whatever else the parser makes of them is
+    // pre-existing behaviour this phase does not change.
+    it.each([
+      ['E-DEC-2b kickless matches', 'players who did not record a kick in their first two games'],
+      ['E-DEC-11 kicks before first goal', 'how many kicks did dustin martin have before his first goal'],
+    ])('%s never reaches this family', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(builders(parsed.plan).filter((b) => b.startsWith('first_kick_goal')), question).toEqual([]);
+    });
+  });
+
+  // ------------------------------------------------------------ boundaries
+
+  it('the after-siren suppression still wins over step 5a', async () => {
+    // "the first kick after the siren" contains this family's noun and is
+    // a corpus row of Phase C's own. The siren reading must keep it.
+    const p = await plan('the first kick after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(builders(p)).toEqual([]);
+  });
+
+  it('leaves the summary grain untouched when no modifier is present', async () => {
+    const p = await plan('first kick goal players by decade');
+    expect(p.grain).toBe('achievement_summary');
+    expect(p.achievementSummary?.kind).toBe('by_decade');
+  });
+});

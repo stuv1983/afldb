@@ -186,6 +186,65 @@ describe('readUiCorpus', () => {
       expect(declineFamilies.has(family), family).toBe(true);
     }
   });
+
+  it('leaves the pre-Phase-E gates free of first-kick-goal wording', () => {
+    // AFLDB-ISSUE-152 Phase E is ADDITIVE for the same reason B and C
+    // were: no question in the 1,435/60 gates or in the Phase B/C corpora
+    // asks about a first kick as a GOAL, so no existing row can change
+    // meaning. The one row that mentions a first kick at all --
+    // "the first kick after the siren" -- belongs to the siren grain,
+    // which suppresses this family outright, and is asserted as such in
+    // tests/nl-parser.test.ts rather than excluded silently here.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id).not.toMatch(/first[- ]kick/i);
+    }
+    const siren = [
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of siren.filter((r) => /first[- ]kick/i.test(r.question))) {
+      expect(row.question, row.id).toMatch(/siren/i);
+    }
+  });
+
+  it('reads the Phase E first-kick-goal corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(20);
+    expect(declines).toHaveLength(6);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase E row is a first-kick question; none belongs in another
+    // file, and none of them mentions the siren.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/first[- ](?:kick|two|three|four|six)|first \d/i);
+      expect(row.question, row.id).not.toMatch(/siren/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every §17.16 family is represented, so a wording that starts
+    // answering one of them fails the sweep by name.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'fkg_holder_list', 'fkg_named_player', 'fkg_club_scope', 'fkg_season_scope',
+      'fkg_consecutive', 'fkg_only_goal', 'fkg_composition', 'fkg_summary',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    const declineFamilies = new Set(declines.map((row) => row.category));
+    for (const family of [
+      'fkg_decline_no_further_kicks', 'fkg_decline_kickless', 'fkg_decline_negated',
+      'fkg_decline_summary_modifier', 'fkg_decline_scope', 'fkg_decline_range',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+  });
 });
 
 // -------------------------------------------------------------------- cores

@@ -9,7 +9,7 @@
 | Base SHA | `c2761e64e9089f9e38572145e67a6ab2fee0fe12` (`Merge branch 'opus/issue-110-semantic-closeout'`) |
 | Base freshness | `main` is AT that SHA — it has not advanced. `git merge-base HEAD main` = the same commit. |
 | Parser baseline | `PARSER_VERSION` **34** (`src/search/nl/plan.ts:312`). **Not incremented by Stage 0.** |
-| Status | **OPEN — STAGE 0 COMPLETE; PHASE B TECHNICALLY COMPLETE 2026-09-08 (all gates run, F5 CLOSED); PHASES C–F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 requires DB-backed verification; D6/D8 deferred to AFLDB-ISSUE-153. Phase B implementation recorded at **§14**; its last two blocked gates were executed on 2026-09-08 and both passed (§14.4). The issue stays OPEN for Phases C–F and for the un-run rendered/browser and deploy steps only. |
+| Status | **OPEN — STAGE 0 COMPLETE; PHASE B TECHNICALLY COMPLETE 2026-09-08 (all gates run, F5 CLOSED); PHASES C–F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 requires DB-backed verification; D6/D8 deferred to AFLDB-ISSUE-153. Phase B implementation recorded at **§14**; its last two blocked gates were executed on 2026-09-08 and both passed (§14.4). Phase C implementation is recorded at **§16**. The **Phase E plan is at §17 — PLAN ONLY, NOT IMPLEMENTED**, blocked on operator decision **E-D2** (the D11 loader gate). The issue stays OPEN for Phases D–F and for the un-run rendered/browser and deploy steps only. |
 | Migration | **One — `092_nl_search_log_coach_record_grain.sql` (Phase B, F5).** Stage 0's "none proposed" is superseded by implementation evidence (§14.6): the ninth `NlGrain` cannot be admitted without extending the `nl_search_log.grain` CHECK. Applied to `afldb_test` and verified 2026-09-08. |
 | Found | 2026-09-08 |
 | Evidence executed | 2026-09-08, `afldb_test` over the operator's `55432` tunnel, read-only, `ROLLBACK`. Production untouched. |
@@ -323,10 +323,10 @@ required column is present.
 | E3 | Season/decade-scoped first-kick goals | **SUPPORTED** | `first_kick_goal_between` | no | — | 5.5 |
 | E4 | First / most recent first-kick goal | **SUPPORTED** | `achievement_summary` `earliest`/`latest` | no | — | 5.3 |
 | E5 | By club / decade / season / clubs-without | **SUPPORTED** | `achievement_summary` | no | — | 5.1 |
-| E6 | First-kick goal by `<player>` | GAP-SAFE | `player` + achievement predicate | no | E | 5.1 |
-| E7 | Goal with each of first N kicks | GAP-SAFE | reuse `first_kick_goal_consecutive_min` | no | E | 5.2 |
-| E8 | First-kick goal was their only career goal | GAP-SAFE | reuse `first_kick_goal_only_career_goal` | no | E | 5.2 |
-| E9 | `no_further_career_kicks`, `kickless_matches_before_first_kick` | DECLINE | — | no | — | 5.2 |
+| E6 | First-kick goal by `<player>` | **SUPPORTED** | `player` pin ANDed with `first_kick_goal_player` (`player-career.ts:143`); corrected in place per **E-D6** — see §17.1. **Both residuals CLOSED by Phase E (§18):** DB-proven (W2/W3) and the yes/no headline shipped (**E-D1**) | no | — | 5.1 |
+| E7 | Goal with each of first N kicks | **SUPPORTED** (Phase E, §18) | `first_kick_goal_consecutive_min`, reused unchanged; parser emits it from `FIRST_KICK_CONSECUTIVE_RE` | no | — | 5.2 |
+| E8 | First-kick goal was their only career goal | **SUPPORTED** (Phase E, §18) | `first_kick_goal_only_career_goal`, reused unchanged; the cue owns its own negation | no | — | 5.2 |
+| E9 | `no_further_career_kicks`, `kickless_matches_before_first_kick` | DECLINE | now declined **by name**, not by leftover token (§18.5) | no | — | 5.2 |
 | X1 | Players who later coached club X | GAP-DECIDE (**D9**) | cross-grain composition | no | F | 6.1, 6.2 |
 | X2 | Premiership players who became coaches | GAP-DECIDE (**D9**) | cross-grain composition | no | F | 6.3 |
 | X3 | Father–son players who became coaches | GAP-DECIDE (**D9**) | cross-grain composition | no | F | 6.3 |
@@ -914,6 +914,11 @@ touch neither table.
 ## 9. Recommended implementation order
 
 Phase A (this document) is complete pending operator answers to §7.
+
+> **Progress 2026-09-09.** **B — DONE** (committed `e8f5f67`, §14). **C — DONE**
+> (committed `47a645f`, §16). **E — DONE** (technically complete, uncommitted,
+> §18). **D and F have NOT started**, and **G** has not run for any phase: no
+> rendered/browser acceptance and no `nl:stress` has been executed for B, C or E.
 
 | Phase | Content | Gate |
 |---|---|---|
@@ -3031,3 +3036,698 @@ both migrations before the ISSUE-152 code.
 Implemented, focused validation green, **not committed, not deployed, no
 rendered/browser run, no `npm run build`, no `nl:stress` sweep**. Phases D–F are
 untouched and have not started. ISSUE-152 stays **OPEN**.
+---
+
+## 17. Phase E — first-kick-goal closure implementation plan (SUPERSEDED BY §18)
+
+> **Status 2026-09-09: this plan has been IMPLEMENTED and is retained as the
+> design record only.** What was actually built, where it deviated, and the
+> validation that accepted it are in **§18**. Read §18 first; where the two
+> disagree, §18 is authoritative.
+
+
+Phase E is **gap closure over an already-supported family**, not a redesign. It
+adds **no grain, no compiler, no query file and no SQL**: every fact it exposes
+is already implemented, parameterised, lineage-correct and grid-tested. The work
+is parser wiring, ownership, declines, wording and — the expensive half — the
+**D11 DB-backed acceptance** the family has never had (**F4**).
+
+### 17.1 Already supported — must NOT be re-implemented
+
+Verified in code, not assumed. Nothing below is touched except where §17.2 says so.
+
+| # | Subfamily | Where it already lives | Regression proof today |
+|---|---|---|---|
+| E1 | "who kicked a goal with their first kick" | `FIRST_KICK_GOAL_RE` (`vocab.ts:857`) -> `extractFirstKickGoal` (`parser.ts:388`) -> `NL_ACHIEVEMENTS.first_kick_goal.builder` (`plan.ts:428`) -> `first_kick_goal_player` (`grid-solver.ts:992`) | `nl-parser.test.ts` §14 |
+| E2 | club-scoped | `parser.ts:2455` pushes `first_kick_goal_for_club` (`grid-solver.ts:1017`, lineage by `organization_id`) | `nl-parser.test.ts` §14, `nl-plan.test.ts:251` |
+| E3 | season/decade-scoped | `parser.ts:2458` pushes `first_kick_goal_between` (`grid-solver.ts:1027`) | `nl-parser.test.ts` §14, `nl-plan.test.ts:229` |
+| E4 | earliest / most recent | `ACHIEVEMENT_SUMMARY_CUES` (`vocab.ts:884`) `earliest`/`latest` -> `achievement_summary` | `nl-parser.test.ts` §14 |
+| E5 | by club / decade / season / clubs-without | same cue list -> `achievement-summary.ts` | `nl-parser.test.ts` §14/§15 |
+| **E6** | **first-kick goal by `<player>`** | **already works end to end**: `parser.ts` pins `plan.player`, `validatePlan` accepts it, and `conditionsWhere` (`player-career.ts:143`) ANDs `p.id = ${plan.player.id}` with `compileAxis` (`player-career.ts:213`). The file's own comment records the bug that made it so ("did Dustin Martin kick a goal with his first kick" once listed every holder). | `nl-parser.test.ts:1035` "a named player stays pinned to the plan" |
+
+**Correction to §5.1.** E6 is marked GAP-SAFE in the coverage matrix. On the
+code as it stands that is **wrong**: the semantic path exists and is tested. E6's
+only genuine deficits are (a) it has never been proven against data (**F4**), and
+(b) its *answer wording* is a bare list headline (§17.12, decision **E-D1**).
+Phase E therefore **does not add a second E6 path**; it proves the existing one
+and, if E-D1 is approved, improves only the rendered sentence.
+
+### 17.2 What is actually missing
+
+| # | Missing | Cause | Fix |
+|---|---|---|---|
+| **E7** | "kicked a goal with each of their first three kicks" | `FIRST_KICK_GOAL_RE` cannot match the phrase (the numeral and "each of" sit between "first" and "kicks"), and nothing in the NL layer emits `first_kick_goal_consecutive_min` | new vocabulary + one `careerPredicates.push` |
+| **E8** | "whose first-kick goal was their only career goal" | the phrase *is* matched, but the tail ("only career goal") is left in the text, where `extractPlayerMetric`/`extractCareerConditions` (`parser.ts:1084`, `:606`) read "goal" as the ranking subject — a silent misread, not a decline; and nothing emits `first_kick_goal_only_career_goal` | new cue consumed inside step 5a + one push |
+| E6r | E6 residuals | §17.1 | proof (§17.10) + wording (E-D1) |
+| **E9** | `no_further_career_kicks`, `kickless_matches_before_first_kick` | deliberate | stays declined, and is now **explicitly** declined (§17.7) |
+
+Everything else in family E stays exactly as it is.
+
+### 17.3 Exact reuse inventory
+
+No new SQL is written in Phase E. The four artefacts below are consumed verbatim:
+
+| Reused | Path | Role in Phase E |
+|---|---|---|
+| `first_kick_goal_consecutive_min` | `grid-solver.ts:1001` — `consecutive_goal_kicks >= $kicks`, linked rows only | the E7 predicate |
+| `first_kick_goal_only_career_goal` | `grid-solver.ts:996` — `no_further_career_goals`, linked rows only | the E8 predicate |
+| `first_kick_goal_player` / `_for_club` / `_between` | `grid-solver.ts:992/1017/1027` | unchanged; E7/E8 AND with the scoped two |
+| `compileAxis` via `answerPlayerCareer` | `player-career.ts:213` | the only execution path; no new compiler |
+| `listFirstKickGoals` (`feature: 'multi-kick' | 'only-career-goal'`) and `getFirstKickGoalSummary` (`multiKick`, `onlyCareerGoal`) | `player-achievements.ts:67-70`, `:120-121` | the **independent oracle** for §17.10 parity — the public board already answers E7/E8 with the same two conditions (`consecutive_goal_kicks > 1`, `no_further_career_goals`) |
+
+Semantics are taken from the column comments in migration 053, not inferred:
+`consecutive_goal_kicks` is `smallint NOT NULL DEFAULT 1 CHECK (>= 1)` and means
+"a goal with EACH of their first n kicks"; `no_further_career_goals` means "never
+scored another **goal**" (checkable, and checked by the importer);
+`no_further_career_kicks` is a different, kick-level claim (E9).
+
+Because the column is `NOT NULL` with a `>= 1` CHECK there is **no NULL trap**:
+`consecutive_goal_kicks >= 1` is exactly the whole family, which is why N = 1
+maps to the plain builder rather than the consecutive one (**E-D3**).
+
+### 17.4 Parser wording additions
+
+All of it lands in **step 5a** (`parser.ts:1626-1651`) — ahead of every metric,
+threshold, grain and boundary cue, for the reason already documented there — and
+inside `extractFirstKickGoal`, which grows two optional modifiers alongside
+`summaryKind`.
+
+**New in `vocab.ts`:**
+
+1. `FIRST_KICK_CONSECUTIVE_RE` — tried **before** `FIRST_KICK_GOAL_RE`, because it
+   subsumes it. Shapes: "goal with each of their first three kicks", "goals with
+   their first 3 kicks", "kicked goals with his first two kicks", "goal with each
+   of the first N kicks", "first three kicks were all goals". The count is a
+   capture group resolved through `NUMBER_WORDS` (`vocab.ts:21`) or a bare
+   numeral, the same lookback discipline `extractPlayerMetricThreshold` uses.
+2. `FIRST_KICK_ONLY_GOAL_CUES` — consulted **only after** `FIRST_KICK_GOAL_RE`
+   matched, exactly like `ACHIEVEMENT_SUMMARY_CUES`, so a loose phrase can never
+   elect the family on its own. Shapes: "was their only career goal", "only goal
+   of their career", "only ever goal", "never kicked another goal", "never scored
+   again", "and never goaled again".
+
+**Precedence and suppression (each one is a test in §17.9):**
+
+- `FIRST_KICK_CONSECUTIVE_RE` before `FIRST_KICK_GOAL_RE`; the whole span is
+  consumed, so no numeral, "goal" or "kick" survives for the metric extractors.
+- The E8 cue is consumed **inside** step 5a, before `extractPlayerMetric` (1084),
+  `extractPlayerMetricThreshold` (1110) and `extractCareerConditions` (1763) run —
+  this is the whole point of E8 (§17.2).
+- **Negation ownership.** `extractFirstKickGoal`'s negation guard currently
+  declines any "never/not/without" governing the phrase, exempting only
+  `clubs_without`. The E8 cue joins that exemption on the same principle — *the
+  cue owns the negation* — but **only** for the goal-level wordings. A kick-level
+  negation ("never kicked the ball again") is E9 and must still decline (§17.7).
+- **Mutual exclusion with summaries.** If a summary cue is present, the E7/E8
+  modifier is **not consumed and no achievementKey is returned**: `achievement_summary`
+  carries no `careerPredicates`, so a consumed modifier would be dropped on the way
+  to SQL — the ISSUE-110 defect. Leaving the span unconsumed makes it a leftover
+  token and the question declines, which is the honest outcome. (Same shape as the
+  after-siren suppression at `parser.ts:1640`.)
+- **Mutual exclusion with after-siren**, unchanged: `afterSirenReading` already
+  suppresses the whole of step 5a.
+
+**Plan assembly** (`parser.ts:2453-2470`), inside the existing
+`grain === 'player_career' && achievementResult.achievementKey` block, after the
+`for_club` / `between` pushes and before the bare-builder fallback:
+
+```
+if (achievementResult.consecutiveKicks !== undefined && achievementResult.consecutiveKicks >= 2) {
+  careerPredicates.push({ builder: 'first_kick_goal_consecutive_min',
+                          params: { kicks: String(achievementResult.consecutiveKicks) } });
+}
+if (achievementResult.onlyCareerGoal) {
+  careerPredicates.push({ builder: 'first_kick_goal_only_career_goal', params: {} });
+}
+```
+
+The existing `careerPredicates.length === 0` fallback then supplies the bare
+`first_kick_goal_player` only when nothing scoped it — unchanged, and correct for
+N = 1 (E-D3).
+
+### 17.5 Ownership and validation rules
+
+- **No new owning builders.** `first_kick_goal_consecutive_min` and
+  `first_kick_goal_only_career_goal` take no club and no season, so neither joins
+  `NL_CAREER_SEASON_OWNING_BUILDERS` / `NL_CAREER_CLUB_OWNING_BUILDERS`
+  (`plan.ts:1151-1158`). Those two lists are **not edited**.
+- **Composition is safe and is the intended shape.** "Carlton players who kicked a
+  goal with each of their first three kicks" emits `first_kick_goal_for_club` **and**
+  `first_kick_goal_consecutive_min`; the club is then owned by the first, the
+  ISSUE-110 gate at `plan.ts:1631` passes, and `answerPlayerCareer` ANDs both
+  fragments. This is exact, not approximate: `player_achievements` holds one
+  first-kick-goal row per person for this source (`player_achievements_source_uq`
+  on `(source_id, source_record_id)`, one manifest id per player), so two `IN`
+  subqueries over the same row cannot combine different rows. **A post-load
+  assertion proves it** (§17.9, R6) rather than leaving it as an argument.
+- **Without a scoped builder the existing gates already fail closed**: a club with
+  only the E7/E8 predicate hits "This kind of career question cannot be limited to
+  one club"; a season range hits "A career question cannot be restricted to a
+  season range"; venue/opponent/match type hit `plan.ts:1581`. No new validation is
+  needed for any of these — but each gets a Phase E test, because the combination
+  is new.
+- **N bounds.** Non-integer, `< 1`, or `> NL_LIMITS`-scale absurdities (a cap of
+  **10** is proposed; the source legend's observed maximum is a single digit) are
+  refused at parse time rather than sent to SQL as an always-empty predicate.
+  `requireInt` (`grid-solver.ts`) is the second line of defence.
+- `maxCareerPredicates` (8) is untouched; the largest Phase E plan carries 3.
+
+### 17.6 Identity and link boundaries
+
+- **Linked rows only.** All five builders require `player_id IS NOT NULL AND
+  link_status_value IN ('unique','resolved')`. NL never reports an unlinked
+  achievement row as a player, and never converts a `player_name_clean` into an
+  identity. Unchanged from E1–E5.
+- **The public board is wider.** `/records/first-kick-goal` lists unlinked rows
+  too (`getFirstKickGoalSummary` returns `linked`/`unlinked` separately). The NL
+  answer is therefore a **subset** of the board by design; §17.10's parity
+  witnesses compare NL against the board **filtered to linked rows**, and the
+  divergence is stated in the caveat (§17.12), never silently absorbed.
+- **No play-by-play inference.** The claim is curated and unrecomputable; nothing
+  in Phase E derives it from `player_match_stats`, `matches` or scores.
+- **Club lineage** stays `organization_id` via `first_kick_goal_for_club`; the
+  achievement's own club and season are used, never the player's debut club or
+  debut season (`grid-solver.ts:1017,1027` comments).
+- **Coaches and players stay distinct**: Phase E touches neither.
+
+### 17.7 Explicit decline cases
+
+| ID | Question shape | Why it declines | Mechanism |
+|---|---|---|---|
+| E-DEC-1 | "players who never kicked the ball again after their first-kick goal" | `no_further_career_kicks` (E9) — kick-level, not goal-level | kick-level negation is excluded from the E8 cue; leftover token |
+| E-DEC-2 | "players who did not record a kick in their first two games" | `kickless_matches_before_first_kick` (E9) | no vocabulary; unrecognised |
+| E-DEC-3 | "players who never kicked a goal with their first kick" | polarity inversion of the whole family | existing negation guard (`parser.ts:421`) |
+| E-DEC-4 | "which club has had the most players goal with each of their first three kicks" | summary grain cannot carry the modifier | §17.4 suppression -> leftover token |
+| E-DEC-5 | "by decade, players whose first-kick goal was their only career goal" | same | same |
+| E-DEC-6 | "goal with each of their first three kicks at the MCG / against Collingwood / in a grand final" | no builder consumes venue, opponent or match type | `plan.ts:1581` |
+| E-DEC-7 | "goal with each of their first three kicks since 2000" **with no season-owning builder** | season unowned | `plan.ts:1679` (the emitted plan does own it via `_between`, so this case is constructed in the test rather than typed) |
+| E-DEC-8 | "goal with each of their first 0 / -2 / 40 kicks" | out of range | §17.5 N bounds |
+| E-DEC-9 | "players who kicked a goal with their first kick this decade" | existing bare-decade rule | already tested (`nl-parser.test.ts:1074`); re-asserted with the E7 wording |
+| E-DEC-10 | "who kicked a goal with their first kick for Carlton in the 1940s at the MCG" | venue | `plan.ts:1581` |
+| E-DEC-11 | "how many kicks did X have before his first goal" | not this family; no coverage | unrecognised |
+
+### 17.8 Ownership/validation additions summary
+
+None to `validatePlan` are *expected*. Phase E asserts the existing gates against
+the new shapes; if an assertion proves a gate is missing, the fix is a named
+refusal in the same style, recorded as a deviation.
+
+### 17.9 Red-before-green test matrix
+
+Existing suites only; no new unit-test file. Each row must be **observed failing**
+before its implementation exists.
+
+| Step | Suite | Red assertion |
+|---|---|---|
+| R1 | `tests/nl-parser.test.ts` (extend §14/§15) | E7 wordings produce `careerPredicates = ['first_kick_goal_consecutive_min']` with the exact bound `kicks`; word-numerals and numerals both |
+| R2 | `tests/nl-parser.test.ts` | E8 wordings produce `['first_kick_goal_only_career_goal']` **and** `metric === null` — the metric-misread guard (§17.2) |
+| R3 | `tests/nl-parser.test.ts` | composition: club -> `[for_club, consecutive_min]`; season -> `[between, consecutive_min]`; club+season+E8 -> all three, in a stable order |
+| R4 | `tests/nl-parser.test.ts` | every §17.7 decline: E-DEC-1..11 |
+| R5 | `tests/nl-plan.test.ts` | `validatePlan` accepts the three composed shapes and refuses the unowned-club / unowned-season / venue / opponent / match-type variants by name |
+| R6 | `tests/integration/nl-answers-first-kick-goal.test.ts` (**new**, Phase B/C precedent) | one-row-per-player invariant (§17.5) asserted directly against `player_achievements` |
+| R7 | same | the §17.10 witnesses, each against independently hand-written SQL |
+| R8 | same | **parity** with `listFirstKickGoals`/`getFirstKickGoalSummary` filtered to linked rows |
+| R9 | `tests/nl-describe.test.ts` | E7/E8 plan-description lines; and, if **E-D1** is approved, the yes/no wording |
+| R10 | `tests/nl-audit-acceptance.test.ts` | a Phase E `describe` block: supported forms -> intended plan; §17.7 forms -> decline or failed validation |
+| R11 | `tests/nl-ui-corpus.test.ts` | the two new corpora read with the expected shape; earlier gates asserted free of first-kick-goal wording |
+
+`tests/integration/first-kick-goal-reload-links.test.ts` is **not modified**: it
+becomes runnable as a side effect of the D11 load (§17.10) and is run as a
+control.
+
+### 17.10 The D11 `afldb_test` gate — operator-run, and what it changes
+
+**Nothing in Phase E may be accepted on parser/plan proof alone.** The loader is
+**not** run without explicit operator authorisation.
+
+**Prerequisites the operator must satisfy first:**
+
+1. **The curated extract is absent from this worktree.** `data/records/first-kick-goal.csv`
+   is gitignored (`.gitignore:77` re-includes only the tracked manifest), and a
+   worktree carries no untracked files. Only `data/records/first-kick-goal-ids.csv`
+   (334 records: `fkg-001`..) is present. The operator either copies the curated
+   extract into `data/records/` here, or points `AFLDB_FIRST_KICK_GOAL_CSV` at the
+   main checkout's copy.
+2. **The DSN must be set explicitly.** The importer reads
+   `AFLDB_IMPORT_DATABASE_URL` and its `loadEnv` is setdefault — an exported value
+   wins over `.env`, and this worktree's `.env` points that variable at
+   `afldb_dev`. It must be exported to the **`afldb_test`** DSN (tunnelled port),
+   or the load lands in the wrong database.
+
+**Commands, in order:**
+
+```
+npm run records:first-kick-goal -- --check          # parse + legend decode, no DB
+npm run records:first-kick-goal                     # resolve + report, writes NOTHING
+npm run records:first-kick-goal -- --apply          # one transaction
+```
+
+**What `--apply` changes in `afldb_test`:** inserts ~334 `player_achievements`
+rows with `achievement_type='first_kick_goal'` and `source_id` =
+`wikipedia_first_kick_goal`, keyed by `source_record_id`; one `import_batches` row;
+possibly `data_issues` rows where the legend disagrees with `player_career_stats`.
+It is keyed and non-destructive (ISSUE-078) and touches no other table.
+
+**Known side effects, declared in advance:**
+
+- `tests/integration/first-kick-goal-reload-links.test.ts` currently cannot run
+  (`takeSourceLinked` throws "no spare source-linked first_kick_goal row in
+  afldb_test"). After the load it runs, and it needs the **same** extract and
+  manifest on disk. It is run as a control, unmodified.
+- The four external `afldb_test` snapshot-drift assertions in
+  `tests/integration/database.test.ts` (§14.4.1, §16.7) are **not touched, not
+  investigated and not edited**. They are expected to keep failing exactly as
+  before; Phase E must not change their counts, and that is asserted by
+  re-running the suite and comparing the same four failures.
+
+**M-E1 — the post-load measurement (the §15.19 analogue).** The E7/E8 populations
+are unknown: the legend markers live only in the gitignored extract, so no count
+can be stated before the load. Immediately after `--apply`, read-only:
+
+```sql
+SELECT count(*) AS total,
+       count(*) FILTER (WHERE player_id IS NOT NULL
+                          AND link_status_value IN ('unique','resolved')) AS linked,
+       count(*) FILTER (WHERE consecutive_goal_kicks > 1)  AS multi_kick,
+       max(consecutive_goal_kicks)                          AS max_consecutive,
+       count(*) FILTER (WHERE no_further_career_goals)      AS only_career_goal,
+       count(*) FILTER (WHERE no_further_career_kicks)      AS no_further_kicks,
+       min(season), max(season)
+  FROM player_achievements WHERE achievement_type = 'first_kick_goal';
+```
+
+The corpus thresholds and the §17.11 witnesses are finalised from these numbers,
+never from the source's prose. **A zero or tiny population is a valid outcome**:
+an empty result asserted against hand-written SQL is still a DB-backed witness
+(the Phase C "3+ goals after the siren -> empty" precedent), and if
+`max_consecutive` is 2 then "first three kicks" is a **measured empty**, which the
+corpus must state rather than imply.
+
+### 17.11 DB-backed hand-written-SQL witnesses
+
+Every one is compared against SQL written independently of the compiler.
+
+| # | Question | Witness |
+|---|---|---|
+| W1 | "players who kicked a goal with their first kick" | count == linked total from M-E1 |
+| W2 | "did `<player>` kick a goal with his first kick" (a known holder) | exactly that player, 1 row |
+| W3 | same, for a non-holder | 0 rows, and the plan still carries the player pin |
+| W4 | "Carlton players who kicked a goal with their first kick" | == `listFirstKickGoals({club:'carlton'})` filtered to linked |
+| W5 | "...in the 1940s" | == season BETWEEN 1940 AND 1949, linked |
+| W6 | **E7** "goal with each of their first two kicks" | == `consecutive_goal_kicks >= 2`, linked; and == `listFirstKickGoals({feature:'multi-kick'})` linked-filtered |
+| W7 | **E7** with N = max+1 from M-E1 | measured empty |
+| W8 | **E8** "first-kick goal was their only career goal" | == `no_further_career_goals`, linked; and == `listFirstKickGoals({feature:'only-career-goal'})` linked-filtered |
+| W9 | **composition** E7 + club | == the single ANDed hand-written query; proves §17.5 |
+| W10 | **composition** E8 + season range | same |
+| W11 | E8 vs E9 inequality | `no_further_career_goals` set ≠ `no_further_career_kicks` set, asserted strictly (or, if M-E1 shows them equal on this data, asserted as an equality **with the reason recorded**, never as a semantic claim) |
+| W12 | parity | NL total for E7/E8 == `getFirstKickGoalSummary().multiKick` / `.onlyCareerGoal` **minus unlinked**, computed from the same query |
+| W13 | linked-only boundary | at least one unlinked row exists and is absent from every NL answer (if M-E1 shows `unlinked = 0`, this is recorded as unprovable on this data, not silently dropped) |
+
+### 17.12 Renderer and interpretation wording
+
+- **Plan description** needs no new machinery: `describePlan` already renders
+  `Condition: ${GRID_BUILDERS[axis.builder].label}` (`plan.ts:1904`), giving
+  "Condition: Goal with each of their first X kicks." and "Condition: First-kick
+  goal was their only career goal." The literal `X` matches the existing NL
+  precedent (`grand_finals_played_min` renders "Played in X+ Grand Finals" today).
+  **Recommendation: keep the precedent; do not add parameter interpolation in
+  Phase E** (decision **E-D5**).
+- **Answer wording (E-D1).** `describePlayerCareerAnswer`'s no-metric branch
+  (`describe.ts:643`) renders "0 players match" / "1 player matches". For "did
+  `<player>` kick a goal with his first kick" that is a poor sentence, and it is
+  the only real E6 deficit. Proposed, **gated narrowly** to
+  `plan.player && !plan.metric && plan.careerPredicates.length > 0`: headline
+  "`<Player>` — yes" / "`<Player>` — no", interpretation naming the conditions.
+  The one existing assertion on that wording (`nl-describe.test.ts:253`,
+  "320 players match") is an unpinned plan and is unaffected.
+- **Caveat.** No `answerCaveats` entry is added (that helper is after-siren only).
+  The curated/linked-only boundary is instead stated in the E6/E7/E8
+  interpretation sentence, once, in the site's own language: the record is a
+  curated list, and unlinked rows are not counted.
+- Nothing in `/records/first-kick-goal`, `player-achievements.ts` or
+  `NlAnswerSection.tsx` changes.
+
+### 17.13 `PARSER_VERSION`
+
+**Yes — 36 -> 37, exactly once.** Behavioural parser semantics change: two new
+vocabulary families, two new emitted predicates, a widened negation exemption and
+new declines. The bump lands with a new entry in the `plan.ts` history comment.
+No second bump within Phase E.
+
+### 17.14 Telemetry and schema
+
+**No migration is expected, and none will be written unless implementation proves
+one is required.** Phase E adds:
+
+- **no new grain** — `player_career` and `achievement_summary` both predate the
+  `nl_search_log_grain_check` CHECK as widened by 093, so the 092/093 failure mode
+  does not recur;
+- **no new metric value** and **no new `failure_reason`** — declines use the
+  existing unrecognised / low-confidence / validation paths.
+
+Proof rather than assertion: `tests/integration/database.test.ts`'s type-derived
+grain contract test is run against `afldb_test` as part of acceptance. If it, or
+a telemetry insert, proves a constraint blocks Phase E, the response is the F5
+pattern — one forward-only, strictly widening migration **094**, with the deploy
+ordering note.
+
+### 17.15 Files this phase touches
+
+| File | Change |
+|---|---|
+| `src/search/nl/vocab.ts` | `FIRST_KICK_CONSECUTIVE_RE`, `FIRST_KICK_ONLY_GOAL_CUES` |
+| `src/search/nl/parser.ts` | step 5a modifiers in `extractFirstKickGoal`; two `careerPredicates.push` calls; summary/after-siren suppression; N bounds; decline notes |
+| `src/search/nl/plan.ts` | `PARSER_VERSION` 36 -> 37 + history entry. **No** change to `NL_ACHIEVEMENTS`, the grain union, the owning-builder lists, or `validatePlan` unless §17.8 fires |
+| `src/search/nl/describe.ts` | only if **E-D1** is approved |
+| `tests/nl-parser.test.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-ui-corpus.test.ts` | Phase E coverage |
+| `tests/integration/nl-answers-first-kick-goal.test.ts` | **new** — the §17.11 witnesses |
+| `tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-<date>.csv` | **new**, ~18 rows |
+| `tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-<date>.csv` | **new**, ~6 rows (one per §17.7 family) |
+| `issues/open/AFLDB-ISSUE-152.md`, `IssuesIndex.md`, `CHANGELOG.md` | tracking |
+
+Explicitly **not** touched: `src/db/queries/grid-solver.ts`, the five builders,
+`src/db/queries/nl/achievement-summary.ts`, `src/db/queries/player-achievements.ts`,
+`src/app/records/first-kick-goal/page.tsx`, `tools/records/import-first-kick-goal.ts`,
+migration 053, the Phase B and Phase C implementations, the 1,435/60 corpora, the
+coaching and after-siren corpora, and the four external snapshot-drift assertions.
+
+### 17.16 Corpus additions (additive only)
+
+Per §10: ~15-20 realistic, ~5 declines. Categories: `fkg_holder_list`,
+`fkg_named_player`, `fkg_club_scope`, `fkg_season_scope`, `fkg_consecutive`,
+`fkg_only_goal`, `fkg_composition`, `fkg_summary` (existing E4/E5 shapes, as
+control rows); declines: `fkg_decline_no_further_kicks`,
+`fkg_decline_kickless`, `fkg_decline_negated`, `fkg_decline_summary_modifier`,
+`fkg_decline_scope`, `fkg_decline_range`. Every row executed against `afldb_test`
+after the load, and the earlier gates asserted free of first-kick-goal wording, in
+the `nl-ui-corpus.test.ts` style Phase C established.
+
+### 17.17 Operator decisions still required
+
+| ID | Decision | Recommendation |
+|---|---|---|
+| **E-D1** | Yes/no answer wording for a named-player predicate question (§17.12) | **Approve**, gated to `player && !metric && careerPredicates.length > 0` |
+| **E-D2** | Authorise the loader, and supply the curated extract location + the `afldb_test` DSN (§17.10) | required before any acceptance; Phase E cannot be accepted without it |
+| **E-D3** | N = 1 ("a goal with their first one kick") maps to `first_kick_goal_player`, not `consecutive_min` | **Approve** — the two are provably identical (`NOT NULL DEFAULT 1`, `CHECK >= 1`) and the plain label reads correctly |
+| **E-D4** | Allow E7/E8 to compose with club/season (§17.5) | **Approve** — the ownership rule is satisfied by the scoped builder, and the one-row-per-player invariant is asserted (R6) |
+| **E-D5** | Interpolate parameters into predicate description lines | **Decline for Phase E** — precedent is label-only; record as a separate cosmetic follow-up if wanted |
+| **E-D6** | Whether E6's status correction (§17.1) should also correct the §5.1 matrix row in place | **Approve** — the matrix is evidence and should not carry a known-wrong status |
+
+### 17.18 Stop condition
+
+Phase E is complete when: R1-R11 were observed red then green; the §17.11
+witnesses pass against a loaded `afldb_test`; the Phase B and Phase C suites, the
+1,435/60 gates and `first-kick-goal-reload-links.test.ts` are still green; the
+four snapshot-drift failures are unchanged; `tsc --noEmit` is clean; and this
+section is superseded by a `§18 Phase E — IMPLEMENTED` record. Phases D, F and G
+remain untouched.
+
+---
+
+## 18. Phase E — IMPLEMENTED 2026-09-09
+
+**Status: IMPLEMENTED, non-DB gate green, D11 DB-backed acceptance green, NOT
+deployed, NOT committed at the time of writing.** The operator authorised the
+loader (**E-D2**) and answered **E-D1 – E-D6**; everything below is what actually
+happened, including the places the plan was not followed and why.
+
+`PARSER_VERSION` 36 → **37**, once, in the behavioural wiring, with the history
+entry in `plan.ts`. No second bump.
+
+Phase E built **no new grain, no new builder, no new query file, no SQL and no
+migration**. Every fact it now exposes was already implemented, parameterised,
+lineage-correct and grid-tested; the work was parser ownership, declines, one
+wording gate, and the DB-backed proof the family had never had (**F4**).
+
+### 18.1 Operator decisions, as answered
+
+| ID | Answer | Where it landed |
+|---|---|---|
+| **E-D1** | **APPROVED** | `describe.ts:665-675` — yes/no headline gated to `plan.player && !plan.metric && plan.careerPredicates.length > 0`. Every unpinned list keeps the "N players match" wording it has always had |
+| **E-D2** | **AUTHORISED** — loader run against `afldb_test` (§18.2) | the D11 gate is satisfied; Phase E is accepted on data, not on parse shapes |
+| **E-D3** | **APPROVED** | N = 1 maps to `first_kick_goal_player`, not `consecutive_min` — `consecutive_goal_kicks` is `NOT NULL DEFAULT 1 CHECK (>= 1)`, so the two are provably the same set and the plain label reads correctly |
+| **E-D4** | **APPROVED** | E7/E8 compose with club and season; the scoped builder owns the club/season and the one-row-per-player invariant is asserted directly (R6) |
+| **E-D5** | **DECLINED for Phase E** | `plan.ts:1919` still renders `Condition: ${GRID_BUILDERS[...].label}` — label only, no parameter interpolation. Matches the `grand_finals_played_min` precedent. A cosmetic follow-up if ever wanted |
+| **E-D6** | **APPROVED** | the §5.1 matrix row for E6 was corrected in place; E7/E8/E9 are now updated there too |
+
+### 18.2 The D11 load — authorisation, source, and what it reported
+
+Operator-run against `afldb_test` over the `55432` tunnel, with
+`AFLDB_IMPORT_DATABASE_URL` exported explicitly (the worktree `.env` points that
+variable at `afldb_dev`, and the importer's `loadEnv` is setdefault).
+
+**Curated loader source path actually used — recorded because §17.10 left it
+open:**
+
+```
+D:\dev\afldb\data\records\first-kick-goal.csv
+```
+
+i.e. the **main checkout's** copy. The extract is gitignored (`.gitignore:77`
+re-includes only the tracked manifest) and a worktree carries no untracked files,
+so `D:\dev\afldb-issue-152\data\records\` holds only the tracked
+`first-kick-goal-ids.csv` (334 records, `fkg-001`..). No copy of the extract was
+made into this worktree and none is committed.
+
+**Apply result — `import_batches` batch 230:**
+
+```
+334 updated / 0 inserted / 0 deleted
+```
+
+Recorded exactly as reported. These are the counters of a **keyed reconcile over
+an already-present population**, not a first insert into an empty table
+(ISSUE-078 makes the loader keyed and non-destructive, so a re-apply reports
+updates and no inserts). The provenance of the pre-existing rows was not
+established in this session and is **not** claimed here; what matters for
+acceptance is the post-load population, which was measured directly (§18.3) and
+is asserted as a fixture contract by the integration suite. Nothing outside
+`player_achievements` / `import_batches` / `data_issues` was touched.
+
+### 18.3 M-E1 — the post-load measurement
+
+Read-only against `afldb_test`, the §17.10 query. **These are the numbers the
+corpus thresholds and the §17.11 witnesses were finalised from — never the
+source's prose.**
+
+| total | linked | multi-kick | max consecutive | only-career-goal | no-further-kicks | seasons |
+|---|---|---|---|---|---|---|
+| **334** | **330** | **44** | **6** | **23** | **4** | **1911–2026** |
+
+Consequences, each of which changed a test or a corpus row:
+
+- **`max_consecutive = 6`**, so "first three kicks" is a real, non-empty
+  population and not the measured-empty case §17.10 warned about. The E7 suite
+  runs N ∈ {2, 3, 4, 6} and asserts each is non-empty; **N = 7** is the W7
+  measured empty.
+- **`linked = 330` of 334**, so **4 unlinked rows exist** and W13 is provable on
+  this data rather than being recorded as unprovable. The NL answer is a strict
+  subset of `/records/first-kick-goal`, by design.
+- **`only_career_goal = 23` vs `no_further_kicks = 4`** — the two sets are
+  measurably different, so W11 asserts the E8/E9 inequality **strictly**. The
+  fallback in §17.11 (assert equality with the reason recorded) did not fire.
+- **`max(season) = 2026`** — the extract carries a current-season row. Nothing in
+  the parser or the builders depends on the range; it is recorded because the
+  fixture contract pins it.
+
+### 18.4 Files changed
+
+| File | Change |
+|---|---|
+| `src/search/nl/vocab.ts` | `FIRST_KICK_CONSECUTIVE_RE`, `FIRST_KICK_CONSECUTIVE_MAX = 10`, `FIRST_KICK_ONLY_GOAL_CUES` (five shapes; the two negation forms also consume the `after their <achievement>` relation — §18.6), `FIRST_KICK_NO_FURTHER_KICKS_CUES` (E9, recognised only in order to decline by name) |
+| `src/search/nl/parser.ts` | `extractFirstKickGoal` grows `consecutiveKicks` / `onlyCareerGoal` alongside `summaryKind`, plus the three fail-closed flags; two `careerPredicates.push` calls; the negation exemption widened by one; the four named refusals |
+| `src/search/nl/plan.ts` | `PARSER_VERSION` 36 → 37 + history entry. **No** change to `NL_ACHIEVEMENTS`, the grain union, `NL_CAREER_SEASON_OWNING_BUILDERS`, `NL_CAREER_CLUB_OWNING_BUILDERS` or `validatePlan` |
+| `src/search/nl/describe.ts` | E-D1 yes/no branch + the curated/linked-only note |
+| `tests/nl-parser.test.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-ui-corpus.test.ts` | Phase E coverage |
+| `tests/integration/nl-answers-first-kick-goal.test.ts` | **new** — the §17.11 witnesses |
+| `tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv` | **new**, 20 rows |
+| `tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv` | **new**, 6 rows |
+| `issues/open/AFLDB-ISSUE-152.md`, `IssuesIndex.md`, `issues.md`, `CHANGELOG.md` | tracking |
+
+Untouched exactly as §17.15 required: `src/db/queries/grid-solver.ts` and all five
+builders, `src/db/queries/nl/achievement-summary.ts`,
+`src/db/queries/player-achievements.ts`, `src/app/records/first-kick-goal/page.tsx`,
+`tools/records/import-first-kick-goal.ts`, migration 053, the Phase B and Phase C
+implementations, the 1,435/60 corpora, the coaching and after-siren corpora, and
+`tests/integration/first-kick-goal-reload-links.test.ts`.
+
+### 18.5 The three deliberate fail-closed deviations from §17.4 — and why
+
+§17.4 specified that a modifier the plan cannot carry should be **left
+unconsumed**, becoming a leftover token so the question declines on the
+unresolved-token penalty. **That was not built, deliberately, in three places.**
+Each one instead **consumes the span and returns a named refusal**
+(`parser.ts:1725-1755`), because the leftover words in this family are literally
+`goal` and `kick` — both `METRIC_WORDS`.
+
+This is the Phase C **R0** lesson applied in advance: there, the metric extractor
+*did* claim `goals`/`kicks` and the wrong answer was suppressed **only** by the
+0.35 unresolved-token penalty. Leaving a first-kick-goal tail in the text bets the
+decline on that same penalty. A cue that consumes the span removes the penalty and
+hands `goal`/`kick` straight to `extractPlayerMetric` — the question would then be
+answered confidently as a career-goals or career-kicks leaderboard. Declining by
+name is the only outcome that cannot bleed.
+
+| Deviation | Trigger | Flag | What the user is told |
+|---|---|---|---|
+| **E9** (E-DEC-1) | a kick-level negation — "never kicked the ball again", "never had another kick", "no further kicks" — checked **before** the E8 cue so the two claims can never be conflated | `kickLevelResidual` | "AFLDB records whether a first-kick goal was a player's only career GOAL, not whether they ever kicked the football again." |
+| **E-DEC-4 / E-DEC-5** | an E7 or E8 modifier arriving with an `achievement_summary` cue ("which club has had the most players goal with each of their first three kicks", "by decade, players whose first-kick goal was their only career goal") | `modifierWithSummary` | "A summary of the first-kick-goal record counts every holder; it cannot also be narrowed to the multi-kick or only-career-goal subset." |
+| **E-DEC-8** | N outside `[1, FIRST_KICK_CONSECUTIVE_MAX]` — 0, negative, 40 | `countOutOfRange` | "A first-kick goal streak is counted from 1 to 10 kicks; that number is outside what this record holds." |
+
+`achievement_summary` carries no `careerPredicates`, so the E-DEC-4/5 case is the
+ISSUE-110 silent-scope shape: a consumed modifier would be dropped on the way to
+SQL and the wider summary returned as though it had been narrowed. Refusing is the
+honest outcome.
+
+**A fourth guard, not a deviation but new**, sits in plan assembly
+(`parser.ts:2349-2360`): if grain election lands anywhere other than
+`player_career` while an E7/E8 modifier is present, the question declines with
+"That first-kick-goal detail can only narrow a list of players." `careerPredicates`
+exist only at `player_career` grain, so any other grain would carry the words as
+consumed and the condition nowhere — the same ISSUE-110 shape, caught one stage
+later.
+
+**Negation ownership** widened by exactly one: an E8 cue owns its own "never",
+as `clubs_without` already did (`parser.ts:486-492`). Everything else governed by
+"never / not / didn't / without" still hits the existing polarity guard and
+declines (E-DEC-3).
+
+### 18.6 One extraction correction found by the acceptance gate
+
+`players who never kicked another goal after their first-kick goal` planned as
+`none (ambiguous)`. Cause: `FIRST_KICK_GOAL_RE` consumes the achievement span
+first, which is the noun phrase the `after` relation governs; the E8 cue then
+matched only `never kicked another goal` and left the orphaned connective behind.
+`their` is a stopword, `after` is not, so a fully supported wording declined on an
+unsupported token **after** E8 had already claimed the semantics.
+
+Fixed in `vocab.ts` by giving the two negation-form cues an optional trailing
+relation clause, so the cue claims the whole supported wording. **A determiner
+after the connective is required**, which is what keeps it narrow: `after their` /
+`after that` is the remnant of a consumed noun phrase, while `after 1950` or
+`after round 12` is a scope clause with its own owner and cannot match. No new
+builder, grain, SQL or version bump; E9's earlier position is unchanged, so
+E-DEC-1 still declines by name.
+
+### 18.7 Corrections to §17
+
+- **`listFirstKickGoals` does not exist.** §17.3 and §17.11 (W4, W6, W8) name it;
+  the real export is **`getFirstKickGoalList`**
+  (`src/db/queries/player-achievements.ts:53`), consumed by
+  `src/app/records/first-kick-goal/page.tsx:17,90`. The integration suite imports
+  the correct name; the plan text was wrong, not the code.
+  `getFirstKickGoalSummary` was named correctly.
+- **E6 was never a gap** (§17.1's own correction), and both of its residuals are
+  now closed: DB-proven by W2/W3, and the headline wording shipped under E-D1.
+- **§15.6-style caveat machinery was not needed.** The curated/linked-only
+  boundary is stated in the E6/E7/E8 interpretation sentence, once, as §17.12
+  specified. No `answerCaveats` entry was added.
+
+### 18.8 Red-before-green proof
+
+The five NL suites were run against pre-Phase-E source **`47a645f`** (Phase C
+head) with the Phase E tests in place:
+
+```
+21 failed / 427 passed
+  tests/nl-parser.test.ts          16 Phase E failures
+  tests/nl-describe.test.ts         4 Phase E failures
+  tests/nl-audit-acceptance.test.ts 1 Phase E failure
+  tests/nl-plan.test.ts           136/136 still green
+```
+
+`nl-plan.test.ts` staying fully green is the expected and desired result: Phase E
+adds **no** validation rule. Its Phase E assertions exercise gates that already
+existed (`plan.ts:1581`, `:1631`, `:1679`) against new shapes, so they pass both
+before and after — they are regression pins, not red-before-green rows. §17.8 is
+therefore satisfied as written: no `validatePlan` change was required.
+
+R6–R8 were red by construction — the suite could not run at all before the D11
+load.
+
+### 18.9 Validation
+
+**Non-DB gate, 2026-09-09 — 485/485 PASS:**
+
+| Suite | Result |
+|---|---|
+| `tests/nl-parser.test.ts` | **253/253 PASS** |
+| `tests/nl-plan.test.ts` | **136/136 PASS** |
+| `tests/nl-describe.test.ts` | **49/49 PASS** |
+| `tests/nl-audit-acceptance.test.ts` | **10/10 PASS** |
+| `tests/nl-ui-corpus.test.ts` | **37/37 PASS** |
+| **total** | **485/485 PASS** |
+| `npx tsc --noEmit` | **clean** |
+
+**DB-backed Phase E acceptance (D11), against the loaded 334-row `afldb_test`
+population:**
+
+| Suite | Result |
+|---|---|
+| `tests/integration/nl-answers-first-kick-goal.test.ts` | **20/20 PASS in 1.499s** |
+
+This is the authoritative Phase E proof: W1–W13 and R6–R8, each answer compared
+against **independently hand-written SQL**, and — where the public board answers
+the same question — against `getFirstKickGoalList` / `getFirstKickGoalSummary`
+filtered to linked rows. Two code paths agreeing is evidence; one code path
+agreeing with itself is not.
+
+### 18.10 ISSUE-078 reload regression — recorded separately, and why
+
+`tests/integration/first-kick-goal-reload-links.test.ts` was invoked jointly and
+produced **11 Windows timeout failures**. **Classified as the already-proven
+Windows runtime pathology, NOT a Phase E regression**, and recorded as a separate
+validation:
+
+- the same characteristic **~90–230 s importer child-process stalls**, with the
+  spelling-correction case at **~181 s** again;
+- the authoritative earlier **Linux** run of this exact reload suite:
+  **16/16 PASS in 53.94 s**;
+- Phase E touches **none** of what this suite exercises — not the importer, not
+  the reload harness, not the manifest/rekey logic, not the player-link queries,
+  not the ISSUE-078 implementation. §18.4 lists the changed files;
+- **no test timeout was increased and no importer or reload behaviour was
+  modified** to make it pass.
+
+The two validations therefore stand apart and must not be merged in any summary:
+
+1. **Phase E DB-backed NL semantics — 20/20 PASS on Windows** (authoritative).
+2. **ISSUE-078 reload regression — Linux 16/16 PASS is authoritative; Windows
+   execution is non-authoritative** under the established runtime pathology.
+
+### 18.11 Corpus additions (additive only)
+
+| Corpus | Rows |
+|---|---|
+| `afldb-ui-questions-first-kick-goal-v1-20260908.csv` | **20** realistic |
+| `afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv` | **6** declines, one per §17.7 family |
+
+The pre-Phase-E gates are **unchanged**: **1,435** realistic and **60** decline,
+plus the Phase B coaching and Phase C after-siren corpora, all asserted free of
+first-kick-goal wording by `nl-ui-corpus.test.ts:190`. The expansion is purely
+additive, exactly as Phases B and C were.
+
+### 18.12 Telemetry and schema — no migration
+
+**None required, and none written.** §17.14's expectation held: Phase E adds no
+grain (`player_career` and `achievement_summary` both predate the
+`nl_search_log_grain_check` CHECK as widened by 092/093), no new metric value and
+no new `failure_reason` — every decline uses the existing unrecognised path. The
+092/093 failure mode does not recur, and **094 was not needed**.
+
+### 18.13 Phase E — TECHNICALLY COMPLETE 2026-09-09; what remains
+
+§17.18's stop condition is met: R1–R11 observed red then green (R5 as a pin, §18.8),
+the §17.11 witnesses pass against a loaded `afldb_test`, the Phase B/C suites and
+the 1,435/60 gates are still green, `tsc --noEmit` is clean, and §17 is superseded
+by this section.
+
+**NOT done, and not in Phase E's scope:** commit; rendered/browser run of the two
+new corpora; `npm run build`; `nl:stress`; deploy. At deploy time migrations **092
+AND 093 must still both reach `afldb_dev` and production BEFORE the code** — Phase
+E adds no third migration but does not retire that ordering requirement.
+
+**The four external `tests/integration/database.test.ts` dataset-count failures**
+(§14.4.1, §16.7) remain out of scope, uninvestigated and unedited.
+
+**Phases D, F and G remain untouched and are NOT started.**

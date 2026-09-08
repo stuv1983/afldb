@@ -852,3 +852,72 @@ describe('afterSirenRequiresMatchLink (D10 §7.1)', () => {
     expect(afterSirenRequiresMatchLink(sirenPlan({ scope: { seasonMin: 2026 } }))).toBe(false);
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase E. The two modifier builders take neither a club
+ * nor a season, so neither joins the owning-builder lists: composed with a
+ * scoped builder the scope stays owned by that one, and alone they own
+ * nothing at all. No new validation rule was written for this phase -- the
+ * assertions below prove the EXISTING gates already fail closed on shapes
+ * that had never reached them before.
+ */
+describe('first-kick-goal modifiers and ownership (AFLDB-ISSUE-152 Phase E)', () => {
+  const carlton = { organizationId: 2, slug: 'carlton', name: 'Carlton' };
+  const listPlan = { metric: null, agg: { kind: 'list' } } as const;
+  const consecutive = { builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } };
+  const onlyGoal = { builder: 'first_kick_goal_only_career_goal', params: {} };
+  const forClub = { builder: 'first_kick_goal_for_club', params: { club: '2' } };
+  const between = { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } };
+
+  it('accepts each modifier on its own', () => {
+    expect('error' in validatePlan(basePlan({ ...listPlan, careerPredicates: [consecutive] }))).toBe(false);
+    expect('error' in validatePlan(basePlan({ ...listPlan, careerPredicates: [onlyGoal] }))).toBe(false);
+  });
+
+  it('accepts the three composed shapes', () => {
+    expect('error' in validatePlan(basePlan({
+      ...listPlan, careerPredicates: [forClub, consecutive], scope: { clubFor: carlton },
+    }))).toBe(false);
+    expect('error' in validatePlan(basePlan({
+      ...listPlan, careerPredicates: [between, consecutive], scope: { seasonMin: 1940, seasonMax: 1949 },
+    }))).toBe(false);
+    expect('error' in validatePlan(basePlan({
+      ...listPlan,
+      careerPredicates: [forClub, between, onlyGoal],
+      scope: { clubFor: carlton, seasonMin: 1940, seasonMax: 1949 },
+    }))).toBe(false);
+  });
+
+  // E-DEC-7 is constructed here rather than typed: a real question naming a
+  // season range emits first_kick_goal_between, which owns it. The plan that
+  // must still fail closed is the one where nothing does.
+  it('refuses a club or a season range that no modifier owns, by name', () => {
+    expect(validatePlan(basePlan({
+      ...listPlan, careerPredicates: [consecutive], scope: { clubFor: carlton },
+    }))).toEqual({ error: 'This kind of career question cannot be limited to one club.' });
+    expect(validatePlan(basePlan({
+      ...listPlan, careerPredicates: [onlyGoal], scope: { seasonMin: 2000 },
+    }))).toEqual({ error: 'A career question cannot be restricted to a season range.' });
+  });
+
+  it.each([
+    ['venue', { venue: { id: 1, slug: 'mcg', name: 'Melbourne Cricket Ground' } }],
+    ['opponent', { clubAgainst: { organizationId: 3, slug: 'collingwood', name: 'Collingwood' } }],
+    ['match type', { matchType: 'grand_final' as const }],
+  ])('refuses %s scope no predicate can see', (_label, scope) => {
+    expect(validatePlan(basePlan({
+      ...listPlan, careerPredicates: [consecutive], scope,
+    }))).toEqual({ error: 'This kind of question cannot be scoped to a venue, opponent, or match type.' });
+  });
+
+  // E-D5: the precedent is label-only (grand_finals_played_min renders
+  // "Played in X+ Grand Finals" today), and Phase E keeps it rather than
+  // adding parameter interpolation to one builder in isolation.
+  it('describes each modifier by its builder label', () => {
+    const lines = describePlan(basePlan({
+      ...listPlan, careerPredicates: [consecutive, onlyGoal],
+    }));
+    expect(lines).toContain('Condition: Goal with each of their first X kicks.');
+    expect(lines).toContain('Condition: First-kick goal was their only career goal.');
+  });
+});

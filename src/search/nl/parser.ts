@@ -65,7 +65,8 @@ import {
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
-  FIRST_KICK_GOAL_RE,
+  FIRST_KICK_CONSECUTIVE_MAX, FIRST_KICK_CONSECUTIVE_RE, FIRST_KICK_GOAL_RE,
+  FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
   DECADE_RE,
   MATCH_EVENT_WORDS, RIVALRY_WORDS,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
@@ -387,18 +388,48 @@ function extractAward(text: string): { text: string; awardKey?: 'all_australian'
  * matched, so the deliberately broad cue phrases ("which club", "by
  * decade") cannot elect the summary grain on their own.
  */
-function extractFirstKickGoal(text: string): {
+type FirstKickGoalExtraction = {
   text: string;
   achievementKey?: NlAchievementKey;
   summaryKind?: NlAchievementSummaryKind;
   negatedAchievement?: boolean;
+  /** E7: the bound for first_kick_goal_consecutive_min. Only ever >= 2. */
+  consecutiveKicks?: number;
+  /** E8: first_kick_goal_only_career_goal. */
+  onlyCareerGoal?: boolean;
+  /** E-DEC-8: an N outside [1, FIRST_KICK_CONSECUTIVE_MAX]. */
+  countOutOfRange?: boolean;
+  /** E-DEC-4/5: an E7/E8 modifier the summary grain cannot carry. */
+  modifierWithSummary?: boolean;
+  /** E-DEC-1: the kick-level claim (E9), never folded into the E8 cue. */
+  kickLevelResidual?: boolean;
   consumed: string[];
-} {
-  const match = FIRST_KICK_GOAL_RE.exec(text);
+};
+
+function extractFirstKickGoal(text: string): FirstKickGoalExtraction {
+  // E7 is tried FIRST because it subsumes the base phrase: "a goal with
+  // each of their first three kicks" contains no "first kick" for
+  // FIRST_KICK_GOAL_RE to match, and a partial match here would strand
+  // the numeral and the plural "kicks" for the metric extractors.
+  const consecutive = FIRST_KICK_CONSECUTIVE_RE.exec(text);
+  const match = consecutive ?? FIRST_KICK_GOAL_RE.exec(text);
   if (!match) return { text, consumed: [] };
 
   const consumed = [match[0]];
   let remaining = stripMatch(text, match[0]);
+
+  let consecutiveKicks: number | undefined;
+  if (consecutive) {
+    const captured = consecutive.slice(1).find((group) => group !== undefined);
+    const count = captured === undefined ? null : readFirstKickCount(captured);
+    if (count === null || count < 1 || count > FIRST_KICK_CONSECUTIVE_MAX) {
+      return { text: remaining, countOutOfRange: true, consumed };
+    }
+    // E-D3. N = 1 IS the plain family: the column is NOT NULL DEFAULT 1
+    // with a CHECK (>= 1), so `consecutive_goal_kicks >= 1` is every row
+    // the base builder already returns, and its label reads correctly.
+    if (count >= 2) consecutiveKicks = count;
+  }
 
   let summaryKind: NlAchievementSummaryKind | undefined;
   for (const [re, kind] of ACHIEVEMENT_SUMMARY_CUES) {
@@ -411,21 +442,64 @@ function extractFirstKickGoal(text: string): {
     }
   }
 
+  // E9, checked BEFORE the goal-level cue so the two can never be
+  // conflated: no_further_career_kicks is a kick-level claim AFLDB does
+  // not expose, and "never kicked the ball again" is not a longer way of
+  // saying "never kicked another goal".
+  for (const re of FIRST_KICK_NO_FURTHER_KICKS_CUES) {
+    const cueMatch = re.exec(remaining);
+    if (cueMatch) {
+      consumed.push(cueMatch[0]);
+      return { text: stripMatch(remaining, cueMatch[0]), kickLevelResidual: true, consumed };
+    }
+  }
+
+  // E8. Consumed here, ahead of extractPlayerMetric and
+  // extractCareerConditions, which is the entire defect this closes: the
+  // tail's "goal" was being read as the question's ranking subject.
+  let onlyCareerGoal = false;
+  for (const re of FIRST_KICK_ONLY_GOAL_CUES) {
+    const cueMatch = re.exec(remaining);
+    if (cueMatch) {
+      onlyCareerGoal = true;
+      consumed.push(cueMatch[0]);
+      remaining = stripMatch(remaining, cueMatch[0]);
+      break;
+    }
+  }
+
+  // achievement_summary carries no careerPredicates, so a modifier that
+  // reached that grain would be dropped on the way to SQL -- the
+  // ISSUE-110 silent-scope defect. Declining by name is the honest
+  // outcome, and is preferred to leaving the span as a leftover token
+  // because those leftovers are "goal" and "kick": both METRIC_WORDS.
+  if (summaryKind && (consecutiveKicks !== undefined || onlyCareerGoal)) {
+    return { text: remaining, modifierWithSummary: true, consumed };
+  }
+
   // A negation governing the phrase itself ("players who NEVER kicked a
   // goal with their first kick") inverts the question into one this
   // engine cannot answer -- the achievement table records who DID it, and
   // "never" is a stopword, so without this check the polarity-inverted
-  // list would have executed at full confidence. The one negated shape
-  // that IS supported is "which clubs have never had one", where the
-  // clubs_without cue owns the negation. Anything else declines.
+  // list would have executed at full confidence. The negated shapes that
+  // ARE supported are the ones whose own cue owns the negation: "which
+  // clubs have never had one", and E8's "never kicked another goal".
+  // Anything else declines.
   const before = text.slice(0, match.index);
   const negatedAchievement = /\b(?:never|not|didn'?t|hasn'?t|hadn'?t|haven'?t|without)\b[^.,;?]*$/.test(before)
-    && summaryKind !== 'clubs_without';
+    && summaryKind !== 'clubs_without' && !onlyCareerGoal;
   if (negatedAchievement) {
     return { text: remaining, negatedAchievement, consumed };
   }
 
-  return { text: remaining, achievementKey: 'first_kick_goal', summaryKind, consumed };
+  return {
+    text: remaining,
+    achievementKey: 'first_kick_goal',
+    summaryKind,
+    ...(consecutiveKicks !== undefined ? { consecutiveKicks } : {}),
+    ...(onlyCareerGoal ? { onlyCareerGoal } : {}),
+    consumed,
+  };
 }
 
 // ------------------------------------------- marquee matches & rivalries
@@ -1637,8 +1711,8 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // on the way to the plan -- the ISSUE-110 silent-scope defect. Left in
   // the text it becomes a leftover token and the question declines, which
   // is the honest outcome.
-  const achievementResult = afterSirenReading
-    ? { text, consumed: [] as string[], achievementKey: undefined, summaryKind: undefined, negatedAchievement: false }
+  const achievementResult: FirstKickGoalExtraction = afterSirenReading
+    ? { text, consumed: [] }
     : extractFirstKickGoal(text);
   text = achievementResult.text;
   consumedTokens.push(...achievementResult.consumed);
@@ -1648,6 +1722,36 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // no structure downstream, so this declines as unrecognised; the note
     // tells the reader (and the search log) why.
     notes.push('Questions about players who did not achieve this are not supported.');
+  }
+  // AFLDB-ISSUE-152 Phase E. Three named refusals, each returned here for
+  // the reason the coaching and after-siren per-season gates are: the
+  // question was UNDERSTOOD and cannot be answered, so a named decline
+  // beats a leftover token -- especially when the leftover words would be
+  // "goal" and "kick", which the metric extractors would then read as the
+  // ranking subject and answer a different question confidently.
+  if (achievementResult.kickLevelResidual) {
+    report.confidence = 1;
+    report.notes.push(
+      'AFLDB records whether a first-kick goal was a player\'s only career GOAL, '
+      + 'not whether they ever kicked the football again.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (achievementResult.countOutOfRange) {
+    report.confidence = 1;
+    report.notes.push(
+      `A first-kick goal streak is counted from 1 to ${FIRST_KICK_CONSECUTIVE_MAX} kicks; `
+      + 'that number is outside what this record holds.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (achievementResult.modifierWithSummary) {
+    report.confidence = 1;
+    report.notes.push(
+      'A summary of the first-kick-goal record counts every holder; it cannot also be '
+      + 'narrowed to the multi-kick or only-career-goal subset.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
   }
 
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
@@ -2242,6 +2346,19 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     return { status: 'none', reason: 'unrecognised', report };
   }
 
+  // AFLDB-ISSUE-152 Phase E. The E7/E8 modifiers are careerPredicates, and
+  // careerPredicates only exist at player_career grain. Any other grain
+  // would carry the words as consumed and the CONDITION nowhere -- the
+  // ISSUE-110 silent-scope shape -- so the question declines instead.
+  if (
+    grain !== 'player_career'
+    && (achievementResult.consecutiveKicks !== undefined || achievementResult.onlyCareerGoal)
+  ) {
+    report.confidence = 1;
+    report.notes.push('That first-kick-goal detail can only narrow a list of players.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
   // --------------------------------------- typed metric-threshold routing
   //
   // AFLDB-ISSUE-110 workstream B. Two producers feed this:
@@ -2462,6 +2579,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
           to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
         },
       });
+    }
+    // AFLDB-ISSUE-152 Phase E. Neither modifier takes a club or a season,
+    // so neither joins the owning-builder lists: composed with a scoped
+    // builder the club/season stays owned by that one, and the two IN
+    // subqueries cannot combine different rows because player_achievements
+    // holds exactly one first-kick-goal row per person for this source
+    // (player_achievements_source_uq over the tracked manifest).
+    if (achievementResult.consecutiveKicks !== undefined) {
+      careerPredicates.push({
+        builder: 'first_kick_goal_consecutive_min',
+        params: { kicks: String(achievementResult.consecutiveKicks) },
+      });
+    }
+    if (achievementResult.onlyCareerGoal) {
+      careerPredicates.push({ builder: 'first_kick_goal_only_career_goal', params: {} });
     }
     // The bare achievement predicate is only needed when nothing scoped
     // it: each scoped builder already implies it.

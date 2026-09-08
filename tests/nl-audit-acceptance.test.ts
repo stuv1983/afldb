@@ -371,3 +371,97 @@ describe('NL after-the-siren acceptance (AFLDB-ISSUE-152 Phase C)', () => {
     expect(questions.filter((q) => /siren/i.test(q))).toEqual([]);
   });
 });
+
+// ------------------------ first-kick-goal closure (AFLDB-ISSUE-152 Phase E)
+
+const fkgPlayers: Record<string, { id: number; slug: string; name: string }[]> = {
+  'dustin martin': [{ id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }],
+};
+
+const fkgCtx: NlParseContext = {
+  clubs,
+  venues,
+  coaches,
+  resolvePlayer: async (name: string) => (fkgPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+};
+
+/** Every supported Phase E form, with the plan it must produce. */
+const fkgQuestions: [string, Record<string, unknown>][] = [
+  ['players who kicked a goal with each of their first three kicks', {
+    grain: 'player_career', metric: null,
+    careerPredicates: [{ builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } }],
+  }],
+  ['players who kicked goals with their first 2 kicks', {
+    grain: 'player_career',
+    careerPredicates: [{ builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } }],
+  }],
+  ['players whose first-kick goal was their only career goal', {
+    grain: 'player_career', metric: null,
+    careerPredicates: [{ builder: 'first_kick_goal_only_career_goal', params: {} }],
+  }],
+  ['players who goaled with their first kick and never scored again', {
+    grain: 'player_career',
+    careerPredicates: [{ builder: 'first_kick_goal_only_career_goal', params: {} }],
+  }],
+  ['carlton players who kicked a goal with each of their first two kicks', {
+    grain: 'player_career',
+    careerPredicates: [
+      { builder: 'first_kick_goal_for_club', params: { club: '4' } },
+      { builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } },
+    ],
+  }],
+  ['players who kicked a goal with each of their first two kicks in the 1940s', {
+    grain: 'player_career',
+    careerPredicates: [
+      { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } },
+      { builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } },
+    ],
+  }],
+  ['did dustin martin kick a goal with his first kick', {
+    grain: 'player_career', player: { id: 100 },
+    careerPredicates: [{ builder: 'first_kick_goal_player', params: {} }],
+  }],
+];
+
+/** Every §17.7 form: a decline, or a plan its own validator refuses. */
+const fkgDeclines = [
+  'players who never kicked the ball again after their first-kick goal',
+  'kickless matches before a first kick',
+  'players who never kicked a goal with their first kick',
+  'which club has had the most players goal with each of their first three kicks',
+  'by decade players whose first-kick goal was their only career goal',
+  'players who kicked a goal with each of their first three kicks at the mcg',
+  'players who kicked a goal with each of their first three kicks against collingwood',
+  'players who kicked a goal with each of their first 0 kicks',
+  'players who kicked a goal with each of their first 40 kicks',
+  'players who kicked a goal with each of their first three kicks this decade',
+];
+
+describe('NL first-kick-goal acceptance (AFLDB-ISSUE-152 Phase E)', () => {
+  it('parses every supported first-kick-goal family to the intended plan', async () => {
+    for (const [question, expected] of fkgQuestions) {
+      const parsed = await parseNlQuestion(question, fkgCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported first-kick-goal form', async () => {
+    for (const question of fkgDeclines) {
+      const parsed = await parseNlQuestion(question, fkgCtx);
+      if (parsed.status !== 'plan') continue;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
+  });
+
+  /**
+   * Phase E is additive in the way Phases B and C were: the 44-question
+   * audit corpus contains no first-kick-goal wording, so no existing row
+   * can change meaning.
+   */
+  it('no existing audit-corpus question mentions a first kick', () => {
+    expect(questions.filter((q) => /first[- ]kick/i.test(q))).toEqual([]);
+  });
+});
