@@ -7,7 +7,52 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`.
+**Open issues:** 14 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`.
+
+<!-- 2026-09-08 (ISSUE-153 allocated from ISSUE-152 Stage-0 Finding F1): `AFLDB-ISSUE-153` is now
+     ALLOCATED and Open — **Public record pages `/records/father-son` and `/records/family` do not
+     read what their prose says**. Found by the AFLDB-ISSUE-152 Stage-0 inventory and split out by
+     operator decision so it does not sit inside an NL issue: `/records/father-son` ->
+     `getFatherSonRecords` reads `player_relationships WHERE relationship = 'parent_child'` and
+     NEVER touches `father_son_selections`, while the Grid Solver's `father_son_selection` /
+     `father_son_father` builders read that draft-rule table — two different meanings of
+     "father-son" in one product; and `/records/family` -> `getFamilyRecords` groups EVERY
+     relationship type by `family_key` with no `relationship` filter while
+     `src/app/records/family/page.tsx:15,99` states "a linked family of **siblings**", so a family
+     whose only link is a cousin or in-law row is counted and described as siblings. No
+     implementation and no investigation beyond the Stage-0 read; not reproduced against data
+     (`AFLDB-ISSUE-152`'s evidence pack §3.1/§3.2/§4.1 sizes it). ISSUE-152 records this as an
+     EXTERNAL DEPENDENCY only: it repairs neither page, and F1 does NOT block ISSUE-152 Phase B
+     (coaching), Phase C (after-the-siren) or Phase E (first-kick-goal closure) — only the
+     family/father-son NL wording whose meaning depends on it (subfamilies C1, FS1, FS2, FS3, FS6
+     and decisions D6/D8) waits for ISSUE-153. Next free issue ID is `AFLDB-ISSUE-154`. -->
+
+<!-- 2026-09-08 (ISSUE-152 allocated, Stage 0 only): `AFLDB-ISSUE-152` is now ALLOCATED and Open —
+     **Expand deterministic NL Search to newer AFLDB record families**, on branch
+     `opus/issue-152-nl-record-expansion` (worktree `D:\dev\afldb-issue-152`), from merged `main`
+     @ `c2761e6` (the ISSUE-110 semantic-closeout merge; `main` had not advanced). Parser baseline
+     `PARSER_VERSION` 34, deliberately NOT incremented. STAGE 0 = allocation + inventory + proposed
+     semantic contract ONLY: no parser, plan, compiler, corpus, UI or schema change, and no
+     `CHANGELOG` entry, because no behaviour changed. AFLDB has accumulated five public record
+     boards the typed NL layer does not represent (`/records/coaches`, `/records/after-the-siren`,
+     `/records/family`, `/records/father-son`, `/records/first-kick-goal`); only the last is
+     substantially supported. Three findings: (F1) `/records/father-son` reads
+     `player_relationships` `parent_child` and NEVER `father_son_selections`, while the Grid
+     Solver's `father_son_selection` builder reads the draft-rule table — two meanings of one
+     phrase in one product — and `/records/family` groups EVERY relationship type by `family_key`
+     while its prose says siblings; (F2) the NL `UNANSWERABLE_TOPICS` coaching rule
+     (`vocab.ts:882`) declines every coaching question with the now-untrue reason "AFLDB has no
+     coaching data at all", contradicted by migration 087 and five public surfaces; (F3) six
+     implemented, grid-tested builders (`coached_by`, `premiership_coach`, `after_siren_winner`,
+     `father_son_selection`, `father_son_father`, `has_brother`) are unreachable from natural
+     language — the parser can emit only 8 of 179 `GRID_BUILDERS`. Neither rendered corpus
+     (1,435 realistic / 60 decline) contains a coaching, siren, family or father-son question, so
+     the expansion is purely additive to both gates. **Operator decisions 2026-09-08:** Stage 0
+     approved for persistence; F1 is OUT OF ISSUE-152 implementation scope and is tracked as
+     `AFLDB-ISSUE-153`; ISSUE-152 records F1 as an external dependency, repairs neither page, and
+     F1 does NOT block Phase B, Phase C or Phase E — only the family/father-son wording whose
+     meaning depends on it is deferred. Runbook: `issues/open/AFLDB-ISSUE-152.md`.
+     Next free issue ID is `AFLDB-ISSUE-154`. -->
 
 <!-- 2026-09-08 (ISSUE-151 allocated + implemented): `AFLDB-ISSUE-151` is now ALLOCATED and Open —
      **Fix production promotion lineage/FK sequencing for `external_grid_sources`**, on branch
@@ -231,6 +276,8 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-149` | Low | Public UI / club pages / database queries | **OPEN — IMPLEMENTATION COMPLETE; `tsc`, focused vitest and `npm run build` all NOT yet operator-run. Stays Open until merged and verified on DEV.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`), bootstrapped from merged `main` after ISSUE-148. SIX new public AFL club-page sections, all lineage-scoped by `clubs.organization_id`, all from existing canonical tables, **no migration**, ISSUE-148's Premierships / Coaches preserved. **(1) Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`): a `club_matches` CTE orients every lineage match to the club's perspective; six deterministic single-row picks — biggest win/loss margin, the club's OWN highest/lowest score, highest/lowest COMBINED match score; ties `match_date DESC, match_id DESC`. `src/components/ClubMatchRecords.tsx`. **(2) Record crowds** — `getClubCrowdRecords(clubId)`: same CTE + `attendance IS NOT NULL`; highest home-and-away / finals (`is_finals_series IS TRUE`) / Grand Final (`round_type='grand_final'`) crowd + Top 5; `attendance DESC, match_date DESC, match_id DESC`; null attendance never shown as 0. `src/components/ClubCrowdRecords.tsx`. **(3) Players** — `getClubPlayers(clubId)`: full `player_clubs` set summed by `organization_id`, one row per player, this club's games/goals only, not truncated. `src/components/ClubPlayers.tsx` (`SortableTable` in a `defaultOpen={false}` `CollapsibleTable`). **(4) Premiership players** — `getClubPremiershipPlayers(clubId)`: `player_club_season_stats.is_premier` in lineage, `season DESC, games DESC`. `src/components/ClubPremiershipPlayers.tsx`. **(5) Awards & honours** — `getClubBrownlowMedallists(clubId)` (`brownlow_season_votes` `is_winner` + linked + `club_id` in lineage, per ISSUE-118 §W.4) and `getClubHonours(clubId)` (`award_winners`, `awards.category='award'`, `slug<>'brownlow-medal'`, `club_id` in lineage) in `src/db/queries/awards.ts`; `src/components/ClubHonours.tsx`. Page wiring in `src/app/clubs/[slug]/page.tsx` (6 queries into the existing `Promise.all`; 5 section blocks, each omitted when empty). **Most Games / Most Goals / Captains from the brief were already on the page** (Games leaders / Goalkicking leaders / Captains — preserved). **Unsupported attribution omitted + reported:** `honour_team_members` (only `club_name_raw`, no `club_id`/season), `player_achievements` (0 rows), null-`club_id` Brownlow winners. Tests: `tests/integration/club-{match-records,crowd-records,players,premiership-players,honours}.test.ts` (new — record/crowd values re-derived from raw scorelines; club-specificity + no other-club leakage; honour attribution; premiership-season cross-check vs `club_seasons.is_premier` AND `getClubPremierships`), `tests/club-records-sections.test.ts` (new — component render). One Unreleased `CHANGELOG.md` entry. **Validation:** NONE run yet. | **Operator:** `npx tsc --noEmit`; `npx vitest run tests/club-records-sections.test.ts`; with `AFLDB_TEST_DATABASE_URL`=`afldb_test`, `npx vitest run tests/integration/club-match-records.test.ts tests/integration/club-crowd-records.test.ts tests/integration/club-players.test.ts tests/integration/club-premiership-players.test.ts tests/integration/club-honours.test.ts`; then `npm run build`. On green: commit on `fable/issue-149-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond`, a historical club (`/clubs/footscray` or `/clubs/western-bulldogs`) and a young club (`/clubs/gold-coast`), Resolve. |
 | `AFLDB-ISSUE-150` | Low | Public UI / venue pages / database queries | **OPEN — IMPLEMENTATION COMPLETE. On the implementation workstation (a tunnel to `afldb_test` was up): `npx tsc --noEmit` PASS; `npx eslint` 0 errors (one pre-existing-style `_total` warning); `tests/venue-records-sections.test.ts` 12/12 (no DB); `tests/integration/venue-records.test.ts` 15/15 against `afldb_test` (truth re-derived from raw `matches` / `player_match_stats`). NOT run: `ISSUE-150-venue-evidence.sql` eyeball spot-check (no `psql` here), `npm run build`, DEV deploy + browser smoke.** Branch `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), from merged `main` @ `00eea34` after ISSUE-149. `/venues/[slug]` rebuilt from a "most recent 50 matches" list into a historical record page — **no migration**, no schema / index / route-privilege / deploy change; one new server-rendered route `/venues/[slug]/matches`. Five venue-scoped (`matches.venue_id`) typed query functions in `src/db/queries/venues.ts`, run in parallel, each mirroring `ISSUE-150-venue-evidence.sql` (the semantic contract): `getVenueOverview` (total matches, recorded-attendance coverage, first + most recent linked match); `getVenueClubRecords` (W-D-L + win % `wins/games*100` — a draw is NOT half a win — for every historical club identity, grouped on the raw `clubs.id` from the match so Footscray ≠ Western Bulldogs; `games DESC, wins DESC, name, id`); `getVenueRecords` (highest / lowest **recorded** attendance — NULL never wins, a genuine recorded 0 is a valid minimum — highest single-team score, biggest winning margin; every ORDER BY ends on a unique column); `getVenuePlayerLeaders` (top 5 for games / goals / marks / kicks / handballs in one round trip — `games` counts `player_match_stats` rows; the stat boards `SUM` only `WHERE <stat> IS NOT NULL`, never COALESCE a NULL to 0, carry `recordedGames`, and the marks/kicks/handballs boards are headed "Recorded"; ranked `value DESC, player_id`); `getVenueMatches` (`match_date DESC, id DESC`, `count(*) OVER ()` + empty-page fallback — the 50-row ceiling removed). Components `src/components/Venue{Records,ClubRecords,PlayerLeaders,MatchHistory}.tsx` (server, omit when empty). `src/app/venues/[slug]/page.tsx` rewritten (keeps `revalidate=86400` + `generateStaticParams`; Overview → Venue records → Club records → Player leaders → 10-match preview → link to full log); new `src/app/venues/[slug]/matches/page.tsx` (`force-dynamic`, `?page=` 100/page, `<Pagination>`, `noindex` on filtered views) — the exact `/players/[slug]/matches` split. Not in `sitemap.ts`. Key files: `src/db/queries/venues.ts`, the four new components, both venue pages, `tests/venue-records-sections.test.ts` (new), `tests/integration/venue-records.test.ts` (new), `CHANGELOG.md`, `ISSUE-150-venue-evidence.sql`, `ISSUE-150-OPERATOR-VALIDATION.md`. | **Operator:** run `ISSUE-150-venue-evidence.sql` against `afldb_test` and eyeball the implementation output for MCG, a low-volume ground, first/latest match, W-D-L, win %, highest/lowest recorded attendance, highest score, biggest margin, each top-5 board (commands + captured smoke numbers in `ISSUE-150-OPERATOR-VALIDATION.md`); `npm run build` with a real `DATABASE_URL`. On green: commit on `sonnet/issue-150-venue-records`, merge, deploy to DEV, eyeball `/venues/melbourne-cricket-ground`, a low-volume ground and `/venues/melbourne-cricket-ground/matches` paging on desktop + narrow mobile, Resolve. |
 | `AFLDB-ISSUE-151` | High | Production promotion tooling / `tools/db/promotion-*` / Grid Solver corpus | **OPEN — IMPLEMENTATION COMPLETE, awaiting review, merge and the resumed promotion.** Branch `sonnet/issue-151-promotion-lineage-fk` (worktree `D:\dev\afldb-issue-151`), from `main` @ `88ca994`. Found by the first real production promotion (stamp `20260907-234124`, paused with the candidate restored and the source/pre-cutover/restored gates green): the generated `promotion-reinstate.sh` plainly `pg_restore`d `external_grid_sources` (id 1, `ingest_source_id = 57`; old `sources` 57 = gridley) into a candidate whose gridley row is `sources` 7 and whose id 57 does not exist, so the NOT NULL immediate FK `external_grid_sources_ingest_source_id_fkey` refuses before the correctly evidenced AFLDB-ISSUE-142 remap (57 -> gridley -> 7) could run; the inventory remediation, the restored-phase output, the transcript and the checklist contradicted each other on WHEN that remap runs. **Fix (tracked tooling only, no migration):** the contract STAGES any reinstated table with a NOT NULL football reference that has a stable lineage identity (`isStagedReinstatement`, decided by shape, today exactly `external_grid_sources`): `promotion-stage.sql` creates `promotion_staging.<t>` (`LIKE` copy — no identity/key/FK); the transcript restores the table through `pg_restore -f - | sed` (COPY header redirected to the staging copy, `grep`-guarded) and `psql --single-transaction`; the `--lineage-remap-out` file (now written on a shared lineage too, as an explicit no-op) targets the staging relation and runs at fixed step 2c; `promotion-promote-staged.sql` refuses any unsettled reference before its `INSERT … OVERRIDING SYSTEM VALUE SELECT * … ORDER BY id` (ids preserved, FK enforced on insert) and drops the schema without CASCADE; `external_grids` and `external_grid_axes` restore after (2e). `promotionPlanProblems` now refuses a plain restore of a staged table, a misordered stage/remap/promote/dependants lifecycle and every constraint bypass (`session_replication_role`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, `SET CONSTRAINTS`, `DEFERRABLE`, `NOT VALID`, `--disable-triggers`). Nullable §7.4 path and NOT NULL §7.4b `import_batch_id` decision untouched. **Hardening (2026-09-08 review):** (1) zero staged rows is never a legitimate state the promotion can distinguish from a skipped restore, so the invariant is asserted early — `--phase pre-cutover` gate `Staged tables hold rows in the replaced database` (`judgeStagedSourceRows`) refuses an empty/absent staged table before any plan exists, and the promote file keeps its empty-copy refusal; (2) an interrupted staged reinstatement fails closed — every checker phase runs `No leftover promotion_staging schema` (`judgeStagingLeftover`, FAIL with inspect-first instructions), `stagedPlanProblems` refuses `CREATE SCHEMA IF NOT EXISTS`, `DROP SCHEMA/TABLE IF EXISTS` and any `DROP SCHEMA` outside `promotion-promote-staged.sql`, and docs §7.2 'Interrupted staged reinstatement' requires inspection + a recorded finding before any hand drop or retry (§10 says the schema is never cleanup). **Validation:** `tests/db-promotion-check.test.ts` 96/96 (13 new), `tests/workflow-preflight.test.ts` 24/24, `tsc --noEmit` clean, `eslint` clean; generated artefacts for the real stamp inspected. NOT run: the DB rehearsal (`ISSUE-151-staged-reinstate-rehearsal.sh`) — the workstation has PostgreSQL client tools but no server. Key files: `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`, `tests/db-promotion-check.test.ts`, `docs/production-promotion.md` (§1, §6, §7, §7.2, §7.4b, §7.4c), `ISSUE-151-staged-reinstate-rehearsal.sh`, `CHANGELOG.md`. | **Operator:** run `bash ISSUE-151-staged-reinstate-rehearsal.sh <DEV maintenance DSN>` on streamanator (throwaway DBs, refuses afldb-prod); review; commit on the branch; `npm run merge:ready -- --issue 151`; merge; deploy the checkout to the prod host. Then, on afldb-prod, in the SAME plan directory: move the paused `promotion-*.sql`/`.sh` and the old `--lineage-remap-out` file aside (the generator refuses to overwrite), regenerate with `--plan` for stamp `20260907-234124`, re-run `--phase restored … --lineage-remap-out <new file>` (the remap now targets `promotion_staging`), read all eight files + the remap, and only then resume at step 1 of the new transcript. Resolve after `--phase candidate` passes with `external_grid_sources` = 1 row on `ingest_source_id` 7. |
+| `AFLDB-ISSUE-153` | Low | Public UI / record pages / database queries | **OPEN — NOT INVESTIGATED BEYOND THE STAGE-0 READ. No implementation.** Split out of `AFLDB-ISSUE-152` Stage-0 Finding F1 by operator decision 2026-09-08 so a public-UI defect does not sit inside an NL issue. Two public record pages do not read what their prose says. **(1)** `/records/father-son` → `getFatherSonRecords` (`src/db/queries/family-records.ts:130`) reads `player_relationships WHERE relationship = 'parent_child'` and **never touches `father_son_selections`** — so AFLDB's public "father-son" board is a parent–child board, while the Grid Solver's `father_son_selection` / `father_son_father` builders (`src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts:1279`) read the actual AFL father–son draft-rule table. Two different meanings of the same phrase in one product, over two different tables. **(2)** `/records/family` → `getFamilyRecords` (`src/db/queries/family-records.ts:39`) groups **every** `relationship_type` by `family_key` with **no `relationship` filter**, while `src/app/records/family/page.tsx:15,99` states "Combined career VFL/AFL games by a linked family of **siblings**" and "A family is a set of players AFLDB has linked as **siblings**" — a family whose only link is a cousin, in-law or spouse row is counted and described as siblings. Not reproduced against data; `AFLDB-ISSUE-152`'s evidence pack sizes it (§3.1 relationship types + link completeness, §3.2 labels, §4.1 father-son coverage). The decision is a **semantic** one — whether each page's prose is corrected to match its query, or its query narrowed to match its prose, or the boards split — and it is not obviously a code-only fix. **`AFLDB-ISSUE-152` depends on this** for family/father-son NL wording (subfamilies C1, FS1–FS3, FS6, decisions D6/D8) but is **not blocked** by it for Phases B, C or E. Key files: `src/db/queries/family-records.ts`, `src/app/records/family/page.tsx`, `src/app/records/father-son/page.tsx`, `src/db/queries/grid-solver.ts`. | **Operator:** decide the intended semantics of each board — correct the prose, narrow the query, or split father-son selections onto their own board — then allocate a branch/worktree and implement. Run `ISSUE-152-nl-evidence.sql` §3.1/§3.2/§4.1 against `afldb_test` first to size how many families and selections each reading actually changes. |
+| `AFLDB-ISSUE-152` | Medium | Natural-language search / semantic coverage / `src/search/nl/*` | **OPEN — STAGE 0 (allocation + inventory) COMPLETE. No implementation, no behaviour change, no `CHANGELOG` entry.** Branch `opus/issue-152-nl-record-expansion` (worktree `D:\dev\afldb-issue-152`), from merged `main` @ `c2761e6` (ISSUE-110 semantic closeout; `main` had not advanced). `PARSER_VERSION` 34, deliberately NOT incremented. AFLDB has five public record boards the typed NL layer does not represent — `/records/coaches`, `/records/after-the-siren`, `/records/family`, `/records/father-son`, `/records/first-kick-goal` — of which only first-kick-goal is substantially supported (list, club scope, season/decade scope, and the six `achievement_summary` kinds). The eight classic `RECORD_CATEGORIES` are already covered by existing grains; no other post-NL-design record family exists. **Findings: (F1)** `/records/father-son` → `getFatherSonRecords` reads `player_relationships WHERE relationship = 'parent_child'` and **never touches `father_son_selections`**, while the Grid Solver's `father_son_selection`/`father_son_father` builders read the actual draft-rule table — two different meanings of "father-son" in one product; and `/records/family` → `getFamilyRecords` groups **every** relationship type by `family_key` with no `relationship` filter while the page prose says "a linked family of **siblings**". Public-UI truthfulness. **Operator decision 2026-09-08: OUT OF ISSUE-152 SCOPE, tracked as `AFLDB-ISSUE-153`.** ISSUE-152 records it as an external dependency, repairs neither page, and F1 does **not** block Phase B, Phase C or Phase E; only the family/father-son wording whose meaning depends on it (subfamilies C1, FS1–FS3, FS6, decisions D6/D8) is deferred until ISSUE-153 semantics are settled. **(F2)** `UNANSWERABLE_TOPICS` (`src/search/nl/vocab.ts:882`) declines every question matching `/\bcoach(es\|ed\|ing)?\b/` with the reason "AFLDB has no coaching data at all -- no coach, no coach-per-club-season, nothing" — untrue since migration 087 (`coaches` + `match_coaches`) and contradicted by five public surfaces; it fires before entity extraction so it also swallows any future support. **(F3)** six implemented, grid-tested builders (`coached_by`, `premiership_coach`, `after_siren_winner`, `father_son_selection`, `father_son_father`, `has_brother`) are unreachable from natural language: the parser emits only 8 of 179 `GRID_BUILDERS`, so much of the work is wiring, not new SQL. `src/db/queries/coaches.ts` already implements the whole coaching answer surface, `organization_id`-lineage-correct, on the site's draw-weighted `(W + D/2)/G` convention, deriving everything from `match_coaches ⋈ matches` and never from `coaches.source_games_coached`. Proposed: two new grains (`coach_record` with a `NlCoachRef` distinct from `NlPlayerRef` — coach-only people have `player_id` NULL and names collide with players; `after_siren` keeping `kick_scored`/`kick_effect`/`kicker_result`/`siren` distinct), one provisional (`family`), four small new builders, and eight existing builders wired to vocabulary. Neither rendered corpus (1,435 realistic / 60 decline) contains a coaching, siren, family or father-son question, so the expansion is **purely additive** to both gates and no existing expectation changes. Evidence pack `ISSUE-152-nl-evidence.sql` (1,032 lines, 41 labelled query sections) inspected and verified read-only (`BEGIN TRANSACTION READ ONLY`, zero DML, `ROLLBACK`) and its schema contract checked against migrations 006/053/087/088/089 — **not executed** (no `.env` and no `afldb_test` tunnel in this worktree). No threshold is asserted anywhere in the runbook. Key files: `issues/open/AFLDB-ISSUE-152.md` (runbook + coverage matrix), `ISSUE-152-nl-evidence.sql`. | **Operator:** (1) run `ISSUE-152-nl-evidence.sql` against `afldb_test` READ ONLY (never production) and keep the output as `ISSUE-152-nl-evidence-output.txt` — it settles decisions D3/D5/D7 and supplies every test witness; (2) answer §7 decisions **D1–D5, D7, D9** (D6 and D8 are deferred to `AFLDB-ISSUE-153`). Then Phase B (coaching) may start — it carries the only active untruth (F2) and its SQL already exists — followed by Phase C and Phase E, none of which depend on ISSUE-153. Phase D's F1-dependent subfamilies wait for ISSUE-153; C2/C3/C4/FS4 do not and may proceed. |
 | `AFLDB-ISSUE-148` | Low | Public UI / club pages / database queries | **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; Premierships section added the same day (same issue, operator request), implemented + `tsc`-checked, its integration suite written but NOT yet operator-run. Awaiting operator commit / merge / DEV deployment / browser smoke.** Branch `fable/issue-148-coach-club-records` (worktree `D:\dev\afldb-issue-148-coach-club-records`). Public club pages showed players and season history but never the club's coaches or a premiership list. **(1) Coaching:** `getClubCoachRecords(clubId)` in `src/db/queries/coaches.ts` (lineage-scoped by `organization_id`, exactly like `getClubTotals` / `getClubLeaders`; W/D/L from `matches.winner_club_id`; draw-weighted win % `(W + D/2)/G` matching `/records/coaches`; one row per coach, separate tenures combined), `src/components/ClubCoachRecords.tsx` (Coach · **Span** · Games · W · D · L · Win % — "Span" because the value is `formatSpan(firstSeason, lastSeason)`, a first/last range; coach names link to player / `/coaches/[slug]-id`), pushed after Captains, omitted when empty. **(2) Premierships:** `getClubPremierships(clubId)` in `src/db/queries/clubs.ts` — one row per **won Grand Final** (`m.round_type = 'grand_final'`, the canonical predicate `getCoachCareer` / Grid Solver use — never every final, never a Wildcard Final; a drawn GF has a null winner so the replay is taken), opponent resolved home-or-away as the non-winner, score from the winner's perspective, venue via `COALESCE(v.canonical_name, m.venue_raw)` + `v.slug`, crowd = `m.attendance` (null, never zero-filled), lineage-scoped so Footscray/Western Bulldogs share 1954+2016; `src/components/ClubPremierships.tsx` (Year · Opponent · Score · Venue · Date · Crowd; opponent → `clubPath`, venue → `venuePath`; `formatDate` / `formatAttendance`), pushed **first**, omitted when empty. **No migration**, no schema/route/privilege change. Tests: `tests/integration/club-coach-records.test.ts`, `tests/club-coach-records.test.ts`, `tests/integration/club-premierships.test.ts` (new), `tests/club-premierships.test.ts` (new). `CHANGELOG.md` — one `Unreleased` entry (both sections). **Validation:** coaching — operator-run against `afldb_test` via SSH tunnel: `tests/club-coach-records.test.ts` 8/8 PASS, `tests/integration/club-coach-records.test.ts` 9/9 PASS, `npx tsc --noEmit` PASS, `npm run build` PASS. Premierships — `npx tsc --noEmit` self-checked; its integration suite NOT yet operator-run. No migration. | **Operator:** run `npx vitest run tests/club-premierships.test.ts` and, with `AFLDB_TEST_DATABASE_URL` = `afldb_test`, `npx vitest run tests/integration/club-premierships.test.ts`; `npx tsc --noEmit`. On green, commit on `fable/issue-148-coach-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond` + one historical club (both sections) and Resolve. |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
@@ -19927,3 +19974,389 @@ After review, merge to `main`, and deploy of the checkout to the prod host:
    `external_grids.import_batch_id` (§7.4b) is still the operator's separate decision before 2e.
 5. Resolve after `--phase candidate` passes with `external_grid_sources` at 1 row on
    `ingest_source_id` 7 and `promotion_staging` absent.
+
+---
+
+## AFLDB-ISSUE-152 — Expand deterministic NL Search to newer AFLDB record families
+
+- **Status:** **OPEN — STAGE 0 (allocation + inventory) COMPLETE; awaiting operator
+  review of the proposed semantic contract.** No implementation. No parser, plan,
+  compiler, corpus, UI or schema change; no `CHANGELOG` entry, because no behaviour
+  changed. Branch `opus/issue-152-nl-record-expansion`, worktree
+  `D:\dev\afldb-issue-152`, from merged `main` @ `c2761e6`
+  ("Merge branch 'opus/issue-110-semantic-closeout'"; `main` had **not** advanced —
+  `git merge-base HEAD main` is the same commit). **No migration proposed:** Stage 0
+  found no canonical-data gap requiring schema change.
+- **Severity / Area:** Medium / Natural-language search semantic coverage
+  (`src/search/nl/parser.ts`, `plan.ts`, `vocab.ts`, `src/db/queries/nl/*`,
+  `src/components/NlAnswerSection.tsx`).
+- **Parser baseline:** `PARSER_VERSION` **34** (`src/search/nl/plan.ts:312`),
+  deliberately **not** incremented by Stage 0.
+- **Reported:** 2026-09-08. AFLDB has accumulated substantially more canonical/public
+  data than the original NL semantic surface represents. **AFLDB-ISSUE-110 is Resolved
+  and merged and is not reopened, amended or extended by this issue.**
+- **Runbook:** `issues/open/AFLDB-ISSUE-152.md` — full coverage matrix (49 numbered
+  subfamilies), per-family detail, proposed grains, decisions D1–D9, phasing, corpus
+  growth estimate.
+
+### Scope boundary
+
+Stage 0 compares the canonical/public AFLDB data surface against the typed
+deterministic NL layer and identifies truthful missing semantic domains. It does not
+add regex patches for example questions, and it stops at the Stage-0 stop condition.
+
+### Evidence pack
+
+`ISSUE-152-nl-evidence.sql` (worktree root, 1,032 lines, 41 labelled query sections).
+
+- **Inspected:** yes.
+- **Executed against `afldb_test`:** **no — operator gate.** This worktree has no
+  `.env` (only `.env.example`), so no `AFLDB_TEST_DATABASE_URL`; `psql` is not on
+  `PATH` (the PostgreSQL 16 client exists at
+  `C:\Program Files\PostgreSQL\16\bin\psql.exe`); and `afldb_test` is reached only
+  through the operator's `55432` SSH tunnel, which was not up. Nothing in the
+  inventory depends on that output.
+- **Read-only re-verified by inspection:** opens `BEGIN TRANSACTION READ ONLY`,
+  contains **zero** `INSERT`/`UPDATE`/`DELETE`/`DROP`/`ALTER`/`CREATE`/`TRUNCATE`/
+  `GRANT`/`REVOKE`/`COPY` statements, closes with `ROLLBACK`.
+- **Schema contract checked** against this worktree's migrations — `coaches` +
+  `match_coaches` (087), `after_siren_kicks` (089), `player_relationships` +
+  `father_son_selections` (006, link CHECKs 088), `player_achievements` (053) — and
+  **all match**, including the nullable link columns and the `relationship_type` enum.
+- Section 7 exists to derive thresholds from the data rather than assert them (the
+  ISSUE-110 lesson). **No threshold is asserted as returning rows anywhere in this
+  issue or its runbook.**
+
+### What the NL layer supports today
+
+Eight grains — `player_career`, `player_game`, `player_season`, `team_match`,
+`club_season`, `team_streak`, `head_to_head`, `achievement_summary` — each with
+exactly one compiler (`src/db/queries/nl/execute.ts`), one `NlAnswerPayload` variant,
+one `describe*Answer` branch and one table component. `validatePlan` is exhaustive,
+per-grain and fail-closed (~80 refusals), and since v33 a scope field no builder owns
+fails closed rather than being silently dropped.
+
+**There is no person grain that is not a player.** Every existing grain that names a
+person names a `players` row.
+
+**First-kick goal is already substantially supported:** `FIRST_KICK_GOAL_RE`
+(`vocab.ts:700`), `extractFirstKickGoal` (`parser.ts:372`), the `achievement_summary`
+grain and its six kinds (`by_club`, `by_decade`, `by_season`, `clubs_without`,
+`earliest`, `latest`), the `first_kick_goal_for_club` / `first_kick_goal_between`
+scoped builders, and explicit negation handling. Most of the brief's section-E
+questions already answer.
+
+The eight classic `RECORD_CATEGORIES` (`src/db/queries/records.ts:55`) are already
+covered by existing grains. The five *new* public record boards are exactly the
+families below; no other post-NL-design canonical/public record family was found.
+
+### Findings
+
+**F1 — two public record pages do not read what their prose says.**
+`/records/father-son` → `getFatherSonRecords` reads
+`player_relationships WHERE relationship = 'parent_child'` and **never touches
+`father_son_selections`**, while the Grid Solver's `father_son_selection` /
+`father_son_father` builders read that draft-rule table — two different meanings of
+"father-son" in one product. `/records/family` → `getFamilyRecords` groups **every**
+relationship type by `family_key` with **no `relationship` filter**, while
+`src/app/records/family/page.tsx:15,99` states "Combined career VFL/AFL games by a
+linked family of **siblings**" and "A family is a set of players AFLDB has linked as
+**siblings**". Neither is an NL bug and ISSUE-152 repairs neither page.
+**Operator decision 2026-09-08: F1 is OUT OF ISSUE-152 IMPLEMENTATION SCOPE and is
+tracked separately as `AFLDB-ISSUE-153`.** ISSUE-152 records it as an **external
+dependency** only. F1 does **not** block Phase B (coaching), Phase C
+(after-the-siren) or Phase E (first-kick-goal closure) — none of those touches
+`player_relationships`, `father_son_selections` or either page. Only NL wording whose
+meaning depends on F1 is deferred until ISSUE-153 semantics are settled: subfamilies
+**C1**, **FS1**, **FS2**, **FS3**, **FS6** and decisions **D6** / **D8**. The
+family/father-son subfamilies that do **not** depend on F1 — **C2** (`has_brother`,
+label-backed), **C3** / **C4** (typed `parent_child` and per-player) and **FS4**
+(`father_son_father`) — may proceed, provided their rendered wording names the
+relationship type explicitly rather than the contested word "father-son".
+
+**F2 — the NL coaching decline states something untrue.** `UNANSWERABLE_TOPICS`
+(`src/search/nl/vocab.ts:882-884`) declines every question matching
+`/\bcoach(?:es|ed|ing)?\b/` with the reason *"AFLDB has no coaching data at all -- no
+coach, no coach-per-club-season, nothing."* That was true when written; since
+migration **087** AFLDB has `coaches` (one row per person, with a `player_id` seam and
+`link_status_value`) and `match_coaches` (the per-match assignment), exposed at
+`/coaches`, `/coaches/[slug]`, `/records/coaches`, the club page and the player page.
+The rule fires **before** entity extraction, so it also swallows any future coaching
+support. Fixed in Phase B as coaching support lands — never by softening the wording
+while still declining.
+
+**F3 — six implemented, grid-tested builders are unreachable from natural language.**
+`NlQueryPlan.careerPredicates` is `GridAxisState[]` compiled by the grid solver's
+`compileAxis`, and `GRID_BUILDERS` holds 179 builders — but the parser can emit only
+**eight**: `debuted_between`, `first_kick_goal_for_club`, `first_kick_goal_between`,
+`first_kick_goal_player`, `match_event_min`, `matchup_played_min`,
+`grand_finals_played_min`, `prelim_finals_played_min`. `coached_by`,
+`premiership_coach`, `after_siren_winner`, `father_son_selection`,
+`father_son_father` and `has_brother` are already implemented, parameterised,
+lineage-correct and grid-tested, and cannot be reached from a question. Much of
+ISSUE-152 is therefore parser wiring, not new SQL. Not a defect; a wiring gap.
+
+### Canonical data families and their true grain
+
+| Family | Table(s) | Grain | Public UI | NL today | Grid Solver today |
+|---|---|---|---|---|---|
+| Coaching | `coaches`, `match_coaches` (087) | one row per (match, club) | `/coaches`, `/coaches/[slug]`, `/records/coaches`, club page, player page | **declined, falsely (F2)** | `coached_by`, `premiership_coach` |
+| After-the-siren | `after_siren_kicks` (089) | one curated cited event | `/records/after-the-siren`, player page | none | `after_siren_winner` |
+| Family | `player_relationships` (006) | one relationship row | `/records/family` | none | `has_brother` |
+| Father–son (draft rule) | `father_son_selections` (006/088) | one selection | **none** (see F1) | none | `father_son_selection`, `father_son_father` |
+| Parent–child pairs | `player_relationships` | one relationship row | `/records/father-son` (see F1) | none | none |
+| First-kick goal | `player_achievements` (053) | one curated achievement | `/records/first-kick-goal` | **substantially supported** | 5 builders |
+
+Schema facts that constrain the semantics:
+
+- `match_coaches.club_id → clubs(id)` is the **raw historical identity**; club scope
+  must fold via `clubs.organization_id`, exactly as `getClubCoachRecords` already does.
+- `coaches.source_games_coached` is **evidence only** (stated in the 087 header) and
+  is never an answer total; games/W-D-L/finals/premierships derive from
+  `match_coaches ⋈ matches`.
+- `coaches_link_ck` forces `player_id IS NOT NULL ⟺ link_status_value = 'unique'`;
+  coach-only people carry no `players` row and must never be given a `/players` href.
+- `after_siren_kicks` carries four independent typed dimensions — `kick_scored`
+  (goal/behind/none), `kick_effect` (won/drew/none), `kicker_result` (win/draw/loss),
+  `siren` (final/end_of_regulation/end_of_extra_time) — plus `premiership_season`, and
+  `after_siren_kicks_match_ck` guarantees `match_id IS NULL` for every
+  non-premiership row. "Goal after the siren" is **not** "goal after the siren to win".
+- `player_relationships` has a nullable player id on **both** sides and an 8-member
+  `relationship_type` enum. `relationship_label` carries the finer wording: the
+  `has_brother` builder proves the stored labels include `'brothers'` and
+  `'twin brothers'`, so sex-specific "brothers" wording **is** supported by the data —
+  through the label only, never inferred from `sibling`.
+- `father_son_selections` carries two **independent** link statuses; an unlinked
+  father name must never become a canonical player identity.
+- `player_achievements` first-kick-goal carries `consecutive_goal_kicks`,
+  `no_further_career_goals`, `no_further_career_kicks` and
+  `kickless_matches_before_first_kick`.
+
+`src/db/queries/coaches.ts` already implements the entire coaching answer surface —
+`getCoachRecordsByGames`, `getCoachRecordsByWinPct(minGames)`,
+`getClubCoachRecords(clubId)` (by `organization_id` lineage, that club only),
+`getCoachCareer` / `getPlayerCoachingCareer`, `getCoachOptions` — on the site's
+draw-weighted `(W + D/2) / G * 100` convention. An NL coach compiler is a
+parameterised generalisation of these, not new semantics.
+
+### Proposed semantic contract
+
+Two new grains, one provisional:
+
+- **`coach_record`** — the person grain that is **not** a player. Carries an
+  `NlCoachRef` distinct from `NlPlayerRef` (coach names collide with player names —
+  Barassi, Williams, Hardwick — and coach-only people have no player identity), an
+  owned `clubFor` (organization) and owned season range, metrics
+  `games`/`wins`/`losses`/`draws`/`finals`/`grand_finals`/`premierships`/`seasons`
+  (+`win_pct`, decision D1), and a `metricCondition` for thresholds.
+- **`after_siren`** — the curated event grain, keeping the four dimensions distinct,
+  with `clubFor`/`clubAgainst` by lineage, season scope, and
+  `earliest`/`latest` aggregations.
+- **`family`** — provisional, blocked on decision D6.
+
+Reuse rather than duplicate: `coached_by`, `premiership_coach`, `after_siren_winner`,
+`father_son_selection`, `father_son_father`, `has_brother`,
+`first_kick_goal_consecutive_min`, `first_kick_goal_only_career_goal` — **eight
+existing builders to wire to vocabulary.** Genuinely new builders needed, each
+mirroring an existing shape: `coached_club(org)`,
+`father_son_selection_for_club(org)`, `father_son_selection_between(from,to)` and, if
+D6 lands, `has_relative(relationship)`.
+
+Any new season/club-owning builder must be registered in
+`NL_CAREER_SEASON_OWNING_BUILDERS` / `NL_CAREER_CLUB_OWNING_BUILDERS`, and each new
+grain must own its `clubFor`/`seasonMin`/`seasonMax` explicitly in `validatePlan` —
+the v33 ownership rule. A field nothing owns fails closed.
+
+Recommended for exclusion: `no_further_career_kicks` and
+`kickless_matches_before_first_kick`; father-son `selection_pick`/`rule` detail;
+after-siren `shot_detail` and `siren` subtype (misses themselves stay);
+`spouse`/`in_law`/`other` relationships; and the "later coached" temporal reading,
+which is not stored and must not be implied. **No whole family is excluded.**
+
+### Decisions requiring operator approval
+
+**D1** coach win-percentage ranking and its minimum-games qualifier (recommend yes,
+reusing `(W+D/2)/G` and the 50 games `/records/coaches` already states). **D2**
+"coached more than one club" by `organization_id` (recommended) or raw `clubs.id`.
+**D3** whether "coaches with premierships" is coach grain (including coach-only
+people) rather than the existing player-grain `premiership_coach`. **D4** whether an
+after-siren question may be finals-scoped (recommend yes, over `premiership_season`
+rows only; round scope declines). **D5** whether misses / `shot_detail` / `siren`
+subtype are exposed (recommend misses only). **D6** what "biggest football families"
+means — **deferred to `AFLDB-ISSUE-153`**. **D7** which relationship enum members get
+NL wording (recommend `sibling` + `parent_child`; others only with real linked
+witnesses). **D8** how bare "father-son" resolves — **deferred to
+`AFLDB-ISSUE-153`**; until settled the bare phrase stays unrecognised rather than
+being bound to either reading. **D9** cross-domain
+composition: defer to Phase F, "also" reading only, decline "later".
+
+### Regression gates
+
+`tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv` (1,435 rows)
+and `.../afldb-ui-questions-60-real-user-decline-v3-20260822.csv` (60 rows) both
+remain gates and are **unmodified by Stage 0**. Neither contains a single question
+matching `coach`, `siren`, `father`, `brother`, `sibling`, `famil` or `relative`, so
+the ISSUE-152 families are **purely additive** and removing the F2 coaching decline
+cannot flip an existing row. Test homes to extend, never replace:
+`tests/nl-parser.test.ts`, `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`,
+`tests/nl-audit-acceptance.test.ts`, `tests/integration/nl-answers*.test.ts`,
+`tests/nl-ui/nl-stress.spec.ts`.
+
+### Recommended implementation order
+
+**B coaching** (five public surfaces, an active untruth, SQL already written) →
+**C after-the-siren** (self-contained, one table, no identity seam) →
+**E first-kick-goal closure** (three wordings over existing builders; may fold into B
+or C) → **D family / father-son** (F1-dependent subfamilies blocked on `AFLDB-ISSUE-153`; C2/C3/C4/FS4 are not) → **F cross-domain** (only
+after B–D are green) → **G expanded corpus + rendered DEV acceptance**. B first is
+not negotiable; E before D is defensible and cheaper. Each phase increments
+`PARSER_VERSION` once from 34, documents the bump in the `plan.ts` history comment,
+and ships red-before-green semantic tests, `validatePlan` ownership tests, a DB-backed
+comparison against independently hand-written SQL, and witnesses derived from the
+evidence output rather than guessed.
+
+Estimated corpus growth: ~225–305 realistic and ~70–85 decline/control cases across
+all phases, additive to the existing gates. Control cases must include pre-1923
+coaching coverage refusals, the coach/player identity collision, unlinked-side
+refusals, "goal after the siren" vs "to win", the father-son ambiguity (D8) and
+"later coached" (D9).
+
+### Validation
+
+Stage 0 is inventory only, so there is nothing to test. Structural claims above are
+code- and schema-derived from this worktree at `c2761e6`. **Not run:** the evidence
+pack against `afldb_test` (operator gate above); no test, build, typecheck, migration
+or deployment command was executed, and none is warranted by a no-behaviour-change
+stage.
+
+### Next action
+
+1. **Operator:** run `ISSUE-152-nl-evidence.sql` against `afldb_test` READ ONLY
+   (never production), keeping the output as `ISSUE-152-nl-evidence-output.txt`. It
+   settles D3, D5 and D7 and supplies every test witness.
+2. **Operator:** answer decisions **D1–D5, D7 and D9**. **D6 and D8 are deferred to
+   `AFLDB-ISSUE-153`** and are not a precondition for Phases B, C or E.
+3. Then Phase B (coaching) may begin, followed by Phase C and Phase E — none of the
+   three depends on `AFLDB-ISSUE-153`. Phase D's F1-dependent subfamilies (C1,
+   FS1–FS3, FS6) wait for ISSUE-153; C2/C3/C4/FS4 do not.
+
+---
+
+## AFLDB-ISSUE-153 — `/records/father-son` and `/records/family` do not read what their prose says
+
+- **Status:** **OPEN — NOT INVESTIGATED BEYOND THE STAGE-0 READ.** No implementation,
+  no branch, no worktree. Split out of `AFLDB-ISSUE-152` Stage-0 Finding **F1** by
+  operator decision on 2026-09-08, so that a public-UI semantic defect is not carried
+  inside a natural-language-search issue.
+- **Severity / Area:** Low / Public UI — record pages and their database queries
+  (`src/app/records/family/page.tsx`, `src/app/records/father-son/page.tsx`,
+  `src/db/queries/family-records.ts`).
+- **Reported:** 2026-09-08, by the `AFLDB-ISSUE-152` Stage-0 inventory at `main`
+  @ `c2761e6`, while comparing the canonical/public AFLDB data surface with the typed
+  deterministic NL layer. Found by code reading, **not** reproduced against data.
+
+### Evidence
+
+**(1) `/records/father-son` is a parent–child board, not a father–son-selection board.**
+
+`getFatherSonRecords` (`src/db/queries/family-records.ts:130`) reads:
+
+```sql
+FROM player_relationships r
+WHERE r.relationship = 'parent_child'
+```
+
+It **never touches `father_son_selections`**, and reads father/son from
+`person_a_role` / `person_b_role`. Meanwhile the Grid Solver's builders
+`father_son_selection` and `father_son_father`
+(`src/db/queries/grid-solver.ts:1279-1286`, catalogued in
+`src/search/grid-solver-spec.ts`) read the actual AFL father–son **draft rule** from
+`father_son_selections` (migration 006, link CHECKs 088), with its `draft_year`,
+`rule`, `club_id`, `selection_pick` and two independent link statuses.
+
+So one product carries two different meanings of the phrase "father-son", over two
+different tables, with no cross-reference between them. A player selected under the
+father–son rule whose relationship row is absent does not appear on the public board;
+a parent–child pair with no father–son selection does.
+
+**(2) `/records/family` describes as siblings a set it does not filter to siblings.**
+
+`getFamilyRecords` (`src/db/queries/family-records.ts:39`) unions
+`person_a_player_id` and `person_b_player_id` over `player_relationships`
+`WHERE family_key IS NOT NULL`, groups by `family_key`, and applies **no
+`relationship` filter at all**. The page states
+(`src/app/records/family/page.tsx:15,99`):
+
+> "Combined career VFL/AFL games by a linked family of **siblings**"
+> "A family is a set of players AFLDB has linked as **siblings**"
+
+`relationship_type` (migration 006) has eight members — `parent_child`, `sibling`,
+`grandparent_grandchild`, `aunt_uncle_niece_nephew`, `cousin`, `spouse`, `in_law`,
+`other`. A family whose only linking row is a cousin, in-law or spouse relationship is
+therefore counted, ranked and described as siblings.
+
+Note this is not the same rule the Grid Solver applies: `has_brother`
+(`src/db/queries/grid-solver.ts:1291`) is explicit — `relationship = 'sibling'` **and**
+`relationship_label IN ('brothers', 'twin brothers')` **and** the other side linked
+with `player_career_stats.games > 0`. The stricter, evidenced reading already exists in
+the codebase.
+
+### Not yet established
+
+Neither defect has been sized against data. `AFLDB-ISSUE-152`'s evidence pack
+`ISSUE-152-nl-evidence.sql` measures exactly this, read-only:
+
+- **§3.1** relationship types and link completeness — how many rows per enum member;
+- **§3.2** relationship labels — what wording the data actually supports;
+- **§3.5** largest fully linked families by `family_key`;
+- **§4.1** father-son selection coverage and link statuses.
+
+Until that runs it is unknown how many families or board rows either reading changes.
+It may be few; that does not make the prose true.
+
+### Why this is a semantic decision, not a code fix
+
+Each board has at least three defensible resolutions, and they produce different public
+pages:
+
+1. correct the prose to match the query (the family board becomes "linked football
+   families", the father-son board becomes "fathers and sons who both played");
+2. narrow the query to match the prose (filter `relationship = 'sibling'`, and rebuild
+   the father-son board on `father_son_selections`);
+3. split the boards, so `father_son_selections` gets its own board beside the
+   parent–child one, and the family board states which relationship types it counts.
+
+Option 2 for the father-son board changes which people appear, and would need the
+unlinked-father rule decided (`father_link_status`), since an unlinked father name must
+never become a canonical player identity. Option 3 adds a route.
+
+### Relationship to AFLDB-ISSUE-152
+
+`AFLDB-ISSUE-152` (NL record-family expansion) records this as an **external
+dependency** and repairs neither page. By the same operator decision:
+
+- ISSUE-153 does **not** block ISSUE-152 **Phase B** (coaching), **Phase C**
+  (after-the-siren) or **Phase E** (first-kick-goal closure) — none of the three
+  touches `player_relationships`, `father_son_selections` or either page.
+- ISSUE-152 defers only the NL wording whose meaning depends on this issue:
+  subfamilies **C1** (biggest football families), **FS1**–**FS3** and **FS6**
+  (father-son selections and their club/year scoping), and decisions **D6** and **D8**.
+- ISSUE-152 subfamilies **C2** (`has_brother`), **C3** / **C4** (typed `parent_child`
+  and per-player) and **FS4** (`father_son_father`) do **not** depend on this issue and
+  may proceed, provided their rendered wording names the relationship type explicitly
+  rather than the contested word "father-son".
+- Whatever ISSUE-153 settles becomes the wording ISSUE-152 must follow. NL must not
+  ship a third reading.
+
+### Validation
+
+None. Nothing has been implemented, and no test, build, query or deployment command has
+been run for this issue.
+
+### Next action
+
+**Operator:** decide the intended semantics of each board (the three options above),
+sizing the choice first by running `ISSUE-152-nl-evidence.sql` §3.1, §3.2, §3.5 and
+§4.1 against `afldb_test` READ ONLY. Then allocate a branch and worktree and implement.
+Resolve only when both pages' prose and queries agree and the boards have been eyeballed
+on DEV.
