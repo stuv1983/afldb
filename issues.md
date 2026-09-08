@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 13 tracked here — `AFLDB-ISSUE-110`, `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`.
+**Open issues:** 12 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`.
 
 <!-- 2026-09-08 (ISSUE-151 allocated + implemented): `AFLDB-ISSUE-151` is now ALLOCATED and Open —
      **Fix production promotion lineage/FK sequencing for `external_grid_sources`**, on branch
@@ -323,7 +323,17 @@ created, reopened, resolved, or materially reclassified.
      inspection only; no settle triggered, no cadence altered, no row written, `AFLDB-ISSUE-137`
      untouched. Authoritative records: the `AFLDB-ISSUE-123` entry below (Resolution, 2026-09-04)
      and `issues/closed/AFLDB-ISSUE-123.md`. -->
-| `AFLDB-ISSUE-110` | Medium | Natural-language search / deterministic semantics | NL semantic-mapping fixes, merged into dev 2026-08-31. **Findings A and B are FIXED fail-closed on `opus/issue-110-semantic-closeout` (from `main` `a6b1689`), parser v32 -> v33.** Both blanket `careerPredicates.length === 0` exemptions are replaced by explicit per-builder ownership (`NL_CAREER_SEASON_OWNING_BUILDERS` = `debuted_between` / `first_kick_goal_between`; `NL_CAREER_CLUB_OWNING_BUILDERS` = `first_kick_goal_for_club`), and `player-career.ts`'s generic club filter is keyed on the same test, so `players with at least 3 grand finals since 2000` and `Carlton players who debuted since 2000` now refuse instead of answering a wider question. Semantic decision S1: a club beside a club-blind predicate is deliberately NOT folded into `played_for_club`/`debut_club` (two readings, different answers) - it declines. Ledger reconciliation: the recorded `CURRENT_WRONG_ANSWER` club-scoped `Games` projection was ALREADY fixed on `main` (`projectedGames()`; re-proved read-only - Josh Fraser renders 200, Tom Hawkins 359) and `most games in a game` now refuses, so both are historical. One further defect of the same family found and fixed: `describePlan` called a `player_game`/`sum` scoped total a *single-match* search. No migration, schema, privilege, route or deploy change. **Validation 2026-09-08 (database strictly read-only):** focused NL 593/593; DB-free repo suite 3,419 passed / 2 failed, both reproduced on clean `main`; read-only integration `nl-answers` 28/28 plus 13 further suites green (`grid-solver` 2, `club-comparison` 26, `gridley-corpus` 4 fail identically on clean `main` - afldb_test data drift / ISSUE-118); typecheck, build PASS; eslint adds no new problem; both realistic corpora (1,495 questions) re-parsed and re-validated read-only with **zero** affected by the new rule. **UI acceptance pass 1 (DEV, rendered, 1,435/1,435 observed): 1,409 pass / 26 fail, zero HTTP, page, client-side, hydration or metamorphic errors.** All 26 failures were ONE family - `user_grouped_thresholds`, every `teams with (more than / at least / at most) 2 games against <club>` question across nine clubs; the wins/losses siblings all passed. **First wrong layer: the parser.** `games` was not a grouped team-result metric, so the question fell through to a `player_career` games column still carrying `scope.clubAgainst`, and the career backstop refused it (`A career question cannot be scoped to a venue, opponent, match type, or round.`) - an honest refusal of a mis-routed plan, not a validation defect. **FIXED (parser v33 -> v34):** `games` is admitted as the un-predicated member of the grouped family (`NlHavingMetric` in `plan.ts`), gated on an explicit club subject probed before `extractAggregation` consumes the `<subject> with` cue, so `players with more than 200 games` keeps its career reading and a result word still governs when both are present. `team-match.ts`'s result-clause chain is now exhaustive instead of ending in a bare `else` for draws. Organization-lineage opponent semantics, grouping and parameterised SQL unchanged; no migration, schema, privilege, route or deploy change. Regression coverage added for gt/gte/lte in `tests/nl-semantic-mapping.test.ts` (proved failing at `c8b1ac7` before the fix) and DB-backed coverage in `tests/integration/nl-answers-team-club.test.ts`. **Validation 2026-09-08 pass 2:** typecheck PASS; focused NL suites 446/446; DB-free repo suite 3,430 passed / 3 failed, all three reproduced unchanged at `c8b1ac7` (`finals-semantics-contract` Windows CRLF, `fitzroy-core-import`, and `reference-data`'s post-045 unregistered-table list, which the ISSUE-151 merge's `external_grid_*` tables broke - not this issue's); eslint adds no new problem. **Operator DB-backed validation 2026-09-08 (pass 3, tunnel open): `npx vitest run tests/integration/nl-answers-team-club.test.ts` 25 passed / 1 failed, then **26/26 passed** after a test-only correction.** The one failure was the new grouped-`games` `lte` case and was a **test-witness defect, not a product defect**: the implementation's row Map equalled the independently hand-written SQL Map and `total` equalled the expected length, and only `rows.length > 0` failed. The witness picked the most-played opponent organization and asked for `<= 2` games against it, which nothing satisfies - the sparsest organization-versus-organization pairing anywhere in `afldb_test` is **3** matches, so a fixed threshold of 2 makes `<=` legitimately empty for every opponent. No production code changed; the test now derives both the threshold (`min` pairing size for `lte`, 2 for `gt`/`gte`) and the witness opponent from independent SQL, so all three operators have a genuine non-empty witness and all three still assert the exact row Map and `total` against independently written SQL. | **Operator gate: (1) DB-backed integration suite - **DONE 2026-09-08, 26/26**; (2) redeploy DEV at the new commit and re-run ONLY the 26 previously failing questions; (3) then re-run the realistic UI (1,440) + decline (60) corpora against DEV with a run tag (they write `nl_search_log`), confirm no new refusal, then resolve.** The 60-question decline gate remains pending. |
+<!-- RETIRED 2026-09-08 — `AFLDB-ISSUE-110` (Problem Search semantic triage and club-career
+     games) is **Resolved** and is NO LONGER an open issue. Removed from this count and the
+     Open Issues table; runbook moved to `issues/closed/AFLDB-ISSUE-110.md`. All acceptance
+     gates green on `opus/issue-110-semantic-closeout` at `165313f`: DB-backed
+     `tests/integration/nl-answers-team-club.test.ts` 26/26; DEV redeploy (health ok); the 26
+     previously failing grouped-`games` questions 26/26 rendered; realistic UI corpus
+     1,435/1,435; decline corpus 60/60; zero HTTP/page/client/hydration/metamorphic errors
+     throughout. Parser v33 -> v34. No migration/schema/privilege/route/deploy change; NL
+     corpus unchanged; production untouched. `CHANGELOG.md` already carries the two
+     `Unreleased` ISSUE-110 entries. Authoritative records: the `AFLDB-ISSUE-110` entry below
+     (Resolution — 2026-09-08) and `issues/closed/AFLDB-ISSUE-110.md`. -->
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-104` is **Resolved** and is NO LONGER an open issue.
      Closed as **NOT REACHABLE**, not fixed. Re-derived from the current tree, not assumed: a
      SECOND `issue_key` writer now exists (`canonical_apply_failed`, owner `AFLDB-ISSUE-122`,
@@ -11859,10 +11869,11 @@ Removed from `IssuesIndex.md` and the Open Issues table; `CHANGELOG.md` updated 
 
 ## AFLDB-ISSUE-110 — Problem Search semantic triage and club-career games
 
-- **Status:** Open
+- **Status:** Resolved — 2026-09-08
 - **Severity:** Medium
 - **Area:** Natural-language search / deterministic semantics
 - **Found:** 2026-08-30
+- **Resolved:** 2026-09-08
 
 The 2026-08-29 Problem Search export contains 543 data rows, 225 unique exact questions,
 and 22 deduplicated semantic families over 2026-08-22 through 2026-08-29. Systematic replay
@@ -12200,6 +12211,43 @@ operator at that threshold) from independent SQL, so each of `gt`/`gte`/`lte` ha
 non-empty witness and all three remain compared against independently hand-written SQL for
 both the exact row Map and `total`. The answer limit for this case was raised to 1,000 so the
 Map comparison cannot be truncated by paging.
+
+### Resolution — 2026-09-08
+
+All acceptance gates green, on `opus/issue-110-semantic-closeout` at `165313f`.
+
+- **Root cause (final finding D).** `extractHavingClause` recognised only `wins`/`losses`/`draws`,
+  so `games` was never a grouped team-result metric. `teams with more than 2 games against <club>`
+  fell through to a `player_career` games column still carrying `scope.clubAgainst`, and the v30
+  career backstop correctly refused the mis-routed plan. Earlier findings A and B: two blanket
+  `careerPredicates.length === 0` exemptions let a career-grain plan keep a season range or club
+  that no grid builder consumes.
+- **Fix.** Parser v33 -> v34. `games` is admitted as the un-predicated member of the existing
+  grouped team-result family (`NlHavingMetric` / `NL_HAVING_METRICS` in `src/search/nl/plan.ts`),
+  gated on an explicit club subject probed before `extractAggregation` consumes the `<subject>
+  with` cue, so `players with more than 200 games` keeps its career reading and a result word
+  still governs when both are present. `src/db/queries/nl/team-match.ts`'s result-clause chain is
+  now exhaustive rather than ending in a bare `else` for draws. Findings A and B: per-builder
+  ownership (`NL_CAREER_SEASON_OWNING_BUILDERS`, `NL_CAREER_CLUB_OWNING_BUILDERS`) replaces the
+  blanket exemptions, and `player-career.ts`'s generic club filter is keyed on the same test.
+  Organization-lineage opponent semantics, grouping and parameterised SQL unchanged. No
+  migration, schema, privilege, route or deploy change.
+- **Final acceptance evidence (operator, 2026-09-08).**
+  1. DB-backed integration: `npx vitest run tests/integration/nl-answers-team-club.test.ts` — 26/26 PASS.
+  2. DEV deployment: branch deployed at `165313f`; health `status=ok`, `database=ok`.
+  3. Targeted rendered regression: the 26 previously failing grouped-`games` questions — 26/26 PASS
+     (answered 26, unanswerable 0, absent 0; HTTP/page/client/hydration/metamorphic errors all 0).
+  4. Authoritative realistic rendered corpus: 1,435/1,435 observed — 1,435 PASS / 0 FAIL / 0 unscored
+     (answered 1,435, unanswerable 0, absent 0; all error classes 0).
+  5. Authoritative decline rendered corpus: 60/60 observed — 60 PASS / 0 FAIL / 0 unscored
+     (answered 0, unanswerable 60, absent 0; all error classes 0). The 60-question decline gate is passed.
+- **Follow-up.** None for this issue. ISSUE-119 (NL telemetry clear) remains a separate open issue
+  and its "do not invoke a real telemetry reset while ISSUE-110 validation is under review" note is
+  now lifted. The 22,607-search stress run was never a resolution gate and remains optional.
+
+Runbook moved to `issues/closed/AFLDB-ISSUE-110.md`; removed from `IssuesIndex.md` and the Open
+Issues table. `CHANGELOG.md` already carries both `Unreleased` ISSUE-110 entries; no further
+change. No production code changed in this closeout; NL corpus unchanged; production untouched.
 
 ---
 

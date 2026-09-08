@@ -1,10 +1,11 @@
 # AFLDB-ISSUE-110 — Problem Search semantic triage and club-career games
 
-- **Status:** Open
+- **Status:** Resolved — 2026-09-08
 - **Severity:** Medium
 - **Area:** Natural-language search / deterministic semantics
 - **Found:** 2026-08-30
-- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate → 33 career-predicate field ownership (findings A and B)
+- **Resolved:** 2026-09-08
+- **Parser version:** 26 at investigation start → 27 club-career → 28 alias-aware resolution → 29 typed metric thresholds → 30 career-scope backstop → 31 season-scope backstop → 32 generic-season ownership / player-season tie-policy gate → 33 career-predicate field ownership (findings A and B) → 34 grouped-games team-result metric (final)
 - **Evidence export:** `artifacts/issue-110/problem-search/afldb-nl-problems-30d-2026-08-29.csv`
 - **Codebase-memory project:** `D-dev-afldb-issue-110`
 - **Latest checked graph generation:** `2026-08-30T01:26:53Z` (`full`, recording complete)
@@ -2348,3 +2349,57 @@ No migration, schema, privilege, route, unit-file or deployment change.
    confirm no new refusal or regression, and ISSUE-110 resolves.
 
 **ISSUE-110 stays OPEN.** The 60-question decline gate remains pending.
+
+---
+
+## 2026-09-08 final acceptance — RESOLVED (parser v34)
+
+Every resolution gate recorded above is now green. Final operator evidence, 2026-09-08,
+`opus/issue-110-semantic-closeout` at `165313f`:
+
+### 1. DB-backed integration
+
+`npx vitest run tests/integration/nl-answers-team-club.test.ts` — **26 / 26 PASS**
+(grouped-`games` gt/gte/lte against independently hand-written lineage SQL, plus the
+games-is-not-draws guard; the `lte` witness now derives its threshold and opponent from
+independent SQL, so all three operators have a genuine non-empty witness).
+
+### 2. DEV deployment
+
+`opus/issue-110-semantic-closeout` deployed to DEV at `165313f`.
+Health: `status=ok`, `database=ok`.
+
+### 3. Targeted rendered regression — the 26 previously failing questions
+
+Rendered against DEV: **26 / 26 PASS**. answered 26, unanswerable 0, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+Every `teams with {more than | at least | at most} 2 games against <club>` question across
+Richmond, Carlton, Collingwood, Essendon, Geelong, Hawthorn, Melbourne, North Melbourne and
+St Kilda now renders a `plan`, matching the corpus's recorded `having` expectation.
+
+### 4. Authoritative realistic rendered corpus
+
+**1,435 / 1,435 observed — 1,435 PASS / 0 FAIL / 0 unscored.**
+answered 1,435, unanswerable 0, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+(UI acceptance pass 1 stood at 1,409 pass / 26 fail; the v34 parser fix closes the one
+failing family with no regression anywhere else in the corpus.)
+
+### 5. Authoritative decline rendered corpus
+
+**60 / 60 observed — 60 PASS / 0 FAIL / 0 unscored.**
+answered 0, unanswerable 60, absent 0.
+HTTP / page / client-side / hydration / metamorphic errors all 0.
+The 60-question decline gate — the last item outstanding — is passed: every question that
+must decline still declines.
+
+### Disposition
+
+All acceptance gates green. Findings A and B (career-predicate field ownership, parser v33)
+and finding D (grouped-`games` team-result metric, parser v34) are fixed fail-closed. No
+production code changed in this closeout pass; the NL corpus was not modified; production was
+not touched. **ISSUE-110 is Resolved (2026-09-08).** Runbook moved to
+`issues/closed/AFLDB-ISSUE-110.md`; removed from `IssuesIndex.md` and the `issues.md` Open
+Issues table; `CHANGELOG.md` already carries both `Unreleased` entries from the
+implementation passes and needs no further change.
+
