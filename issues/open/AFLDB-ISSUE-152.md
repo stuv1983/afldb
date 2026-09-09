@@ -5905,3 +5905,169 @@ and 093 must reach `afldb_dev` and production BEFORE the code**, and
 
 **ISSUE-152 is NOT resolvable.** No deployment, no merge, no production
 change was made.
+
+---
+
+## 27. Phase F — RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09 (P6 349/349, P4-r1 1,495/1,495)
+
+§26 built Phase F and left the rendered run as its next action. That run has now
+been performed. **The Phase F scope — X1 and X2, with X3 deferred by F-D1 — is
+COMPLETE and GREEN through a real browser against a real production build of this
+branch.**
+
+`PARSER_VERSION` stays **39**. **No migration.** Nothing in `src/` changed during
+acceptance or closeout; the only code edits after `f619de8` are two test-only type
+contracts (`2ec9871`) and one harness `ValidateSet` entry (`5be7511`), both recorded
+in §27.4.
+
+### 27.1 The build, and the discriminator that made P6 admissible
+
+A **fresh production `npm run build` of this branch PASSED** and was served
+standalone on `127.0.0.1:3100`. DEV serves `main` and would have measured the wrong
+code (§19.1); the build was taken after the test type-contract correction of §27.4,
+so the built tree is the tree the sweeps measured.
+
+The **mandatory stale-build discriminator of §26.10(2) was then run and PASSED**:
+
+| | |
+|---|---|
+| Request | `/search?q=players+who+also+coached` on the running server |
+| HTTP status | **200** |
+| Rendered answer | **`365 players match`** |
+
+That is the X1 population §26.6 measured against `afldb_test`, and no pre-Phase-F
+build can produce it — under v38 the same wording declined (§26.1). This check is
+what makes P6 admissible: the first P5 attempt of §24.1 was thrown away for its
+absence, and it is now a standing precondition, not a courtesy.
+
+**D20 also rendered correctly in that same check.** X1 is a 365-row population
+against a 100-row page cap, and the page reported **`Showing 100 of 365`** with the
+answer text explicitly stating that the displayed rows were **not** the whole list.
+The capped-list disclosure contract accepted for Phase D (§22.5, §23.4, §24.6) is
+therefore proved end-to-end for the cross-domain grain as well, from the shared
+`cappedListCaveat` §26.2 extracted for exactly this reason.
+
+### 27.2 P6 — the merged 349-row `next` set, GREEN
+
+| | |
+|---|---|
+| Run tag | `issue152-phasef-p6` |
+| Preserved output | `nl-ui-out-152-phaseg/p6-phase-f-next/` |
+| Corpus | **349** rows — **253** plan / **96** decline |
+| Observed | **349 / 349** |
+| Answered | 253 |
+| Unanswerable | 25 |
+| Absent | 71 |
+| Pass | **349** |
+| Fail | **0** |
+| Unscored | **0** |
+| Rate-limit detections | **0** |
+| `page_error` | **0** |
+| `http_error` | **0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **4 / 4 passed** |
+
+253 + 25 + 71 = 349, and 253 plan / 96 decline is exactly the `PHASE_G_SETS.next`
+shape pinned independently in `build-phase-g-corpora.ts`, `phase-f-corpus.ps1` and
+`tests/nl-ui-corpus.test.ts` (§26.5). Every one of the 30 new cross-domain rows was
+verified against `afldb_test` **before** it was pinned, so a green row here is
+agreement with measured data and not agreement with itself.
+
+### 27.3 P4-r1 — the 1,495-row regression gate, re-run fresh and UNCHANGED
+
+| | |
+|---|---|
+| Run tag | `issue152-phasef-p4r1` |
+| Preserved output | `nl-ui-out-152-phaseg/p4-regression/` |
+| Corpus | **1,495** rows |
+| Observed | **1,495 / 1,495** |
+| Answered / plan | 1,435 |
+| Unanswerable / decline | 60 |
+| Absent | **0** |
+| Pass | **1,495** |
+| Fail | **0** |
+| Unscored | **0** |
+| Rate-limit detections | **0** |
+| `page_error` | **0** |
+| `http_error` | **0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **15 / 15 passed** |
+
+The 1,435 + 60 shape is **identical** to P4-r1 under Phase G (§21.4) and under
+Phase D (§24.4). Since the gate was first measured under Phase G, **six relationship
+builders, two cross-domain builders, two parser versions (37 → 39) and two new plan
+fields have moved no existing answer in either direction.** This is a **fresh** run
+under its own tag against the Phase F build — not a citation of an earlier result.
+
+### 27.4 Two corrections made during acceptance, neither semantic
+
+1. **Test type contracts (`2ec9871`).** `tests/nl-plan.test.ts` asserted the V-rule
+   refusal with the scope literal `matchType: 'final'`, which is not a member of the
+   union; the correct literal is `'finals'`. `tests/nl-ui-corpus.test.ts` typed its
+   local `build()` helper as `'new' | 'current' | 'regression'`, a hand-copied union
+   that the new `next` set falsified; it now imports `PhaseGSetName` from
+   `build-phase-g-corpora.ts` so the set list has exactly one definition. **Both are
+   test-side type corrections. No parser, planner, describe, query or corpus
+   behaviour changed**, and the assertions they carry are unchanged. The production
+   `npm run build` of §27.1 was taken **after** this correction and passed.
+2. **The Phase G PowerShell harness needed `next` in its shared `ValidateSet`
+   (`5be7511`).** `Invoke-PhaseGCorpusBuild` in `tools/issue-152/phase-g-common.ps1`
+   validated `-Set` against `new | current | regression`, so `phase-f-corpus.ps1`
+   could not ask it for the `next` set it defines. One entry was added. **This is a
+   harness-only correction with no semantic change**: the `new` (271) and `current`
+   (319) sets and every guard around them are untouched, and the immutability and
+   pacing contracts of §21 still hold.
+
+### 27.5 Historical evidence does not move
+
+The Phase G P3/P4 and Phase D P5/P4 preserved runs are **untouched**. `next` appends
+to `current` exactly as `current` appended to `new`, so the first 271 rows remain
+byte-for-byte the pinned Phase G file and the first 319 remain the pinned Phase D
+set; every position-based statement in §19.3, §20, §21, §23 and §24 survives
+unchanged. Preserved output stays immutable — a re-run under a claimed `-OutName`
+is refused, not overwritten.
+
+### 27.6 What Phase F closes, and what stays deferred
+
+**Complete and green:** **X1** (played and actually coached, `match_coaches`-backed,
+365 and provably not the 368 identity-only seam) and **X2** (played for and coached
+the same club, 27 — plus the asymmetric and organization-lineage forms), together
+with every refusal F-D2, F-D3 and §26.4 put around them.
+
+**Deferred by decision, and NOT Phase F failures:**
+
+| Item | State |
+|---|---|
+| **X3** (son-side father-son composition) | Deferred to `AFLDB-ISSUE-153` by **F-D1**. Held by a named decline row and by the in-reading father-son refusal (§26.4(2)). |
+| **C1** | Blocked on `AFLDB-ISSUE-153` (F1). Decline row only. |
+| **FS1**, **FS2**, **FS3**, **FS6** | Blocked on `AFLDB-ISSUE-153` (F1). Decline rows only. |
+| **D6**, **D8** | Deferred operator decisions; sit with `AFLDB-ISSUE-153`. |
+
+Every one of those boundaries is held by a **named decline row in the rendered
+corpus**, so each refusal is a measured behaviour and not an absence of coverage.
+None of them was investigated, touched or re-scoped by this phase.
+
+Also unchanged and still a decline: **`Richmond players coached by Damien Hardwick`**
+(§26.8), and the two DB-free failures of §26.9, which remain pre-existing and are
+not Phase F.
+
+### 27.7 Status — Phase F ACCEPTED; ISSUE-152 stays OPEN
+
+**Phase F is ACCEPTED.** Its code, corpus, oracle suite and rendered acceptance are
+complete and green, the working tree is clean, and the branch is **ready to merge as
+a stable checkpoint before `AFLDB-ISSUE-153` begins.**
+
+**ISSUE-152 as a whole is NOT closed and must not be resolved on this evidence.**
+Still outstanding:
+
+- the **blocked Phase D half** — C1, C5/C6, FS1, FS2, FS3, FS6 and the D6/D8
+  decisions — which remain with `AFLDB-ISSUE-153`, and **X3** with them;
+- the **un-run deploy** — migrations **092 and 093 must both reach `afldb_dev` and
+  production BEFORE the code**, or the telemetry grain CHECK drops rows silently
+  while answers render correctly;
+- the decision on whether `nl:stress` runs before deploy — it has still **not** been
+  run for B, C, D, E or F.
+
+No deployment, no merge and no production change was made in this slice.

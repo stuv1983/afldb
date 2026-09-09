@@ -44,6 +44,24 @@ commit.
   a season, venue, opponent, round or match type on one of these questions is refused rather than
   dropped. Father-son selections in combination with coaching are still not supported and are being
   decided separately.
+- These questions have now been asked through a real browser against a real build, and they are
+  green. All 349 questions in the combined new-family set behaved exactly as written down: 253
+  answered, 96 declined, nothing failed, nothing went unscored, and not one page errored or was
+  throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then
+  run again in full. It came back 1,435 answered and 60 declined - its exact previous shape.
+  Another parser version, two more grid builders and a whole new kind of question moved no
+  existing answer in either direction.
+- Before any of that counted, the running site had to prove it was actually serving this change:
+  "players who also coached" had to answer "365 players match" first. A sweep whose numbers look
+  clean but whose build predates the work measures nothing, and that check is now a precondition
+  rather than a courtesy.
+- The same check confirmed the long-list disclosure end to end: 365 people match, a hundred are
+  shown, the page says "Showing 100 of 365", and the answer itself says the displayed rows are not
+  the whole list.
+- No application, parser, planner, query, schema or permission behaviour changed during that
+  acceptance. Two test type contracts were corrected and the sweep harness was taught the name of
+  the new question set; neither changes what AFLDB answers.
 
 ### Natural-language search - football families become answerable, in the half the data can prove (AFLDB-ISSUE-152 Phase D) - 9 September 2026
 
