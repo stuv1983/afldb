@@ -1036,7 +1036,7 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
     expect(validatePlan(x1({ scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }))).toHaveProperty('error');
     expect(validatePlan(x1({ scope: { clubAgainst: COLLINGWOOD } }))).toHaveProperty('error');
     expect(validatePlan(x1({ scope: { roundNumber: 5 } }))).toHaveProperty('error');
-    expect(validatePlan(x1({ scope: { matchType: 'final' } }))).toHaveProperty('error');
+    expect(validatePlan(x1({ scope: { matchType: 'finals' } }))).toHaveProperty('error');
   });
 
   it('V5: the club-scoped and unscoped coaching predicates never coexist', () => {

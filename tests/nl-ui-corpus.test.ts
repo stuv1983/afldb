@@ -13,7 +13,9 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildSet, expectedBatches, PHASE_G_SETS } from '../tools/issue-152/build-phase-g-corpora';
+import {
+  buildSet, expectedBatches, PHASE_G_SETS, type PhaseGSetName,
+} from '../tools/issue-152/build-phase-g-corpora';
 import {
   groupByCore, hydrationByWorker, metamorphicViolations, questionCore, readUiCorpus,
   scoreObservation, summarise,
@@ -361,7 +363,7 @@ describe('readUiCorpus', () => {
  * separate, additive acceptance set.
  */
 describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
-  function build(name: 'new' | 'current' | 'regression') {
+  function build(name: PhaseGSetName) {
     return buildSet(PHASE_G_SETS[name], mkdtempSync(join(tmpdir(), 'afldb-sets-')));
   }
 
