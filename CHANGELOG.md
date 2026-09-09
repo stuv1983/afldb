@@ -882,6 +882,47 @@ commit.
   meant to default to collapsed (a single toggle button), but a CSS rule forced it open regardless
   of that state, so every mobile admin page load showed the full sidebar above the page content.
 
+### Father-son records now say what they are, and the search box can answer them (AFLDB-ISSUE-153 Stages 1-5) - 9 September 2026
+
+- The Father-Son Records page described itself as a board of "father and son pairs". It is not: every
+  row on it is a *selection made under the AFL father-son rule*, and a father and son who both played
+  without such a selection are not on it. The page now says so, names `father_son_selections` as the
+  authority for those selections, explains that the rows it reads are that record's own projection, and
+  says plainly which facts - the selecting club, the draft year, the pick and the draft pathway - live
+  only on the selection record and so are not shown. The board itself was not re-pointed or restructured:
+  the two are the same 127 selections, measured row for row.
+- The Family Records board says a family is a set of players linked as siblings. Its query did not say
+  so, and grouped whatever relationship types happened to carry a family key. It now states siblings
+  explicitly. On today's data this changes nothing - no father-son row carries a family key - which is
+  exactly why it was worth stating before the data can change it.
+- The search box can now be asked about the father-son rule from the selected player's side, not only
+  the father's: "players selected under the father-son rule", "father-son selections", "which players
+  were father-son picks", "father-son sons". The wording has to name the rule, a selection, a draft or a
+  pick, or pair "father-son" with the role - the same test that already applied to the father's side, so
+  neither side is given a wording the other is denied.
+- The bare and collective phrasings still decline, and say why: "father-son players", "father-son pairs",
+  "father-son duos" and "father-son families" are genuinely ambiguous between the draft rule and any
+  father and son who both played, and questions about the second are already answerable in words that
+  cannot be misread ("players whose father also played AFL").
+- Those questions can now be scoped: "Geelong father-son selections" means the club that MADE the
+  selection, counted through the club's whole history - the Kangaroos with North Melbourne, Footscray
+  with the Western Bulldogs - but never folding Fitzroy into Brisbane, which was a merger rather than a
+  rename.
+- A year on a father-son selection question is the DRAFT year, and the answer says "in the 2022 draft"
+  rather than "in 2022", because they are not the same thing and never have been here: of the 99 selected
+  players AFLDB has linked, not one debuted in the season they were drafted. Sixty debuted a year later
+  and thirty-nine two or more years later. A question that mixes a year with a question about playing now
+  declines rather than picking one of the two readings.
+- "Father-son selections by club" and "by draft year" answer as distributions. They count SELECTIONS -
+  all 127 of them - and not the 99 whose selected player AFLDB has linked to a profile, because a
+  selection whose player is unmatched was still a selection the club made. The two counts are not close:
+  they differ for 14 of the 17 clubs, and for Carlton they are 13 and 7. The answer says it is counting
+  selections, and discloses the 99 beside the distribution instead of quietly using it.
+- "Players selected under the father-son rule who also coached" answers, as does the father's side,
+  "players who were father-son fathers and also coached". Both mean the two things are true of the same
+  person; neither claims one came after the other, and "later coached" and "went on to coach" still
+  decline for that reason.
+
 ### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
 
 - AFLDB knows who played and it knows who coached, and until now the search box could not be asked
