@@ -15,6 +15,56 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - football families become answerable, in the half the data can prove (AFLDB-ISSUE-152 Phase D) - 9 September 2026
+
+- AFLDB has recorded who is whose brother, father and son for a long time, and the search box could
+  not be asked about any of it. It can now: "which players had a brother who played AFL", "players
+  whose father also played AFL", "who are Brent Harvey's brothers", "which father-son fathers played
+  the most games". The relationship also composes with a ranking, so "most games by a player with a
+  brother who played AFL" ranks careers within the relationship instead of ignoring one half of the
+  question, and a named player gets a straight yes or no.
+- Direction is read from the recorded roles, never from which side of the row a person happens to
+  sit on. "Players whose father played" and "players whose son played" are two different questions
+  with two different answers, and neither is the other one relabelled.
+- "Brother" continues to mean the recorded brother relationships specifically, not siblings in
+  general - AFLDB also records sisters and unsexed sibling rows, and reading those as brothers would
+  be an invention.
+- A relative AFLDB has not linked to a player is a name in a source, not a person in the database,
+  and it now says so in the answer rather than quietly counting or quietly dropping them. Two
+  relatives who share a name - there are two Gary Abletts, father and son - stay two people.
+- Questions this data cannot honestly answer now decline by name instead of failing as gibberish:
+  sisters, twins, cousins, grandparents, in-laws, mothers and daughters, "family members of X",
+  "related to X", and anything about a football family as a whole. Each says what AFLDB actually
+  holds. Asking about the football families themselves, and about father-son draft selections as
+  such, is still not supported and is being decided separately.
+- Every answer says which relationship it answered. A list that is longer than the hundred rows a
+  page shows now says so in the answer itself - "658 players qualify... it is not the whole list" -
+  rather than leaving the reader to notice the table footer.
+- One question that used to work kept working, and now has a test to keep it that way: Ben Cousins's
+  surname is also a family word, and "most goals by ben cousins" is a goals question.
+- Showing part of a long list is now a stated decision rather than an implicit one. A relationship
+  question that matches more than a page of players reports the true total, shows the same capped
+  table every other list uses, and says in the answer that what is displayed is not the whole list.
+  Nothing is silently cut, and no question is refused merely for having a lot of correct answers.
+- Forty-eight of these questions - twenty-six that should be answered and twenty-two that should be
+  declined - are now part of the browser sweep AFLDB runs before shipping search changes, each one
+  checked against the real database before being written down. They are added alongside the existing
+  271-question and 1,495-question sweeps rather than replacing either, so the earlier results stay
+  exactly as they were recorded.
+- That sweep has now been run through a real browser against a real build, and it is green. All 319
+  questions in the combined set behaved exactly as written down: 238 answered, 81 declined, nothing
+  failed, nothing went unscored, and not one page errored or was throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then run
+  again in full. It came back 1,435 answered and 60 declined - its exact previous shape. Six new
+  relationship builders and another parser version moved no existing answer in either direction.
+- A first attempt at the new sweep was thrown away rather than reported. It had been run against a
+  build that predated the relationship work, so it was asking the new questions of the old search
+  engine: the numbers looked clean and meant nothing. A sweep now has to demonstrate that the build
+  underneath it actually contains the change before any of its results are counted.
+- The questions AFLDB still cannot answer honestly - football families as a whole, and father-son
+  draft selections as such - are unchanged by all of this. They still decline by name, and what they
+  should mean is still being decided.
+
 ### Natural-language search - the new record families pass a full browser sweep, and the existing 1,495-question gate is untouched (AFLDB-ISSUE-152 Phase G) - 9 September 2026
 
 - The coaching, after-the-siren and first-kick-goal questions added over the last three parser

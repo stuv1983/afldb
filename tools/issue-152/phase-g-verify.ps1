@@ -34,9 +34,35 @@
 .PARAMETER SkipTypecheck
     Skips step 1 only. The type-check is the slowest step and is unaffected by
     anything the sweep does.
+
+.PARAMETER Set
+    Which merged corpus to verify.
+
+      new      (default) the pinned Phase G P3 corpus -- 271 = 212 + 59,
+               3 Playwright batches. The accepted historical evidence
+               (AFLDB-ISSUE-152 section 21.3); this is what the script has
+               always checked and its expectations do not move.
+      current  the Phase D acceptance corpus -- 319 = 238 + 81, 4 batches:
+               the same 271 rows in the same order plus the 48 relationship
+               rows. Verify this before .\tools\issue-152\phase-d-corpus.ps1.
+
+    Both sets are pinned INDEPENDENTLY here, in build-phase-g-corpora.ts and
+    in tests/nl-ui-corpus.test.ts, so a corpus edit has to be made three times
+    on purpose before a sweep can quietly change size.
 #>
 [CmdletBinding()]
-param([switch] $SkipTypecheck)
+param(
+    [switch] $SkipTypecheck,
+    [ValidateSet('new', 'current')][string] $Set = 'new'
+)
+
+# The pinned shape of each set, restated here rather than read from the
+# builder: a single source of truth cannot catch an edit made in that source.
+$EXPECTED = @{
+    new     = @{ Rows = 271; Plan = 212; Decline = 59; Batches = 3 }
+    current = @{ Rows = 319; Plan = 238; Decline = 81; Batches = 4 }
+}
+$pins = $EXPECTED[$Set]
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'phase-g-common.ps1')
@@ -98,12 +124,16 @@ try {
     Write-Host '      PASS' -ForegroundColor Green
 
     # ----------------------------------------------------------- 3. corpus
-    Write-Host '[3/5] building the merged 271-row new-family corpus'
-    $corpus = Invoke-PhaseGCorpusBuild -RepoRoot $repoRoot -Set 'new'
-    $ok = ([int]$corpus.rows -eq 271 -and [int]$corpus.plan -eq 212 -and [int]$corpus.decline -eq 59)
+    Write-Host ("[3/5] building the merged {0}-row '{1}' corpus" -f $pins.Rows, $Set)
+    $corpus = Invoke-PhaseGCorpusBuild -RepoRoot $repoRoot -Set $Set
+    $ok = ([int]$corpus.rows -eq $pins.Rows -and [int]$corpus.plan -eq $pins.Plan `
+           -and [int]$corpus.decline -eq $pins.Decline)
     $results += New-PhaseGGate -Name 'merged corpus' -Ok $ok `
         -Detail ("{0} rows, {1} plan, {2} decline" -f $corpus.rows, $corpus.plan, $corpus.decline)
-    if (-not $ok) { throw "Merged corpus is $($corpus.rows)/$($corpus.plan)/$($corpus.decline), expected 271/212/59." }
+    if (-not $ok) {
+        throw ("Merged corpus is $($corpus.rows)/$($corpus.plan)/$($corpus.decline), " +
+               "expected $($pins.Rows)/$($pins.Plan)/$($pins.Decline) for set '$Set'.")
+    }
     Write-Host ("      PASS  {0}" -f $corpus.path) -ForegroundColor Green
 
     $listArguments = @(
@@ -133,6 +163,9 @@ try {
     }
 
     $expectedBatches = [Math]::Ceiling([double]$corpus.rows / 100.0)
+    if ($expectedBatches -ne $pins.Batches) {
+        throw "$($corpus.rows) rows slice into $expectedBatches batches, but set '$Set' is pinned at $($pins.Batches)."
+    }
     $detail = "listed successfully"
     if ($listed.Output -match 'Total:\s+(\d+)\s+test') {
         $listedCount = [int]$Matches[1]
@@ -177,7 +210,11 @@ Write-PhaseGGates -Gates $results
 Assert-PhaseGGates -Gates $results -Context 'Phase G static verification'
 
 Write-Host 'Static verification PASSED. Nothing was navigated, started or written to a database.' -ForegroundColor Green
-Write-Host 'Next: .\tools\issue-152\phase-g-smoke.ps1  (needs the window-1 server)'
+if ($Set -eq 'current') {
+    Write-Host 'Next: .\tools\issue-152\phase-d-corpus.ps1  (needs the window-1 tunnel and window-2 server)'
+} else {
+    Write-Host 'Next: .\tools\issue-152\phase-g-smoke.ps1  (needs the window-1 server)'
+}
     $exitCode = 0
 } catch {
     Write-Host ''

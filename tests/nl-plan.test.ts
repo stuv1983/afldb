@@ -921,3 +921,73 @@ describe('first-kick-goal modifiers and ownership (AFLDB-ISSUE-152 Phase E)', ()
     expect(lines).toContain('Condition: First-kick goal was their only career goal.');
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase D. The two halves of a per-player relationship
+ * question -- the named person and the predicate's bound id -- are one
+ * fact, and a plan carrying only one of them is refused: the reference
+ * alone names somebody the query never uses, and the predicate alone
+ * would answer "brother of 2164" with no way to say whose brothers
+ * those are.
+ */
+describe('validatePlan — family relationships (AFLDB-ISSUE-152 Phase D)', () => {
+  const harvey = { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' };
+  const brotherOf = { builder: 'brother_of_player', params: { player: '2164' } };
+
+  function relationshipPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return basePlan({
+      metric: null,
+      agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'has_brother', params: {} }],
+      ...overrides,
+    });
+  }
+
+  it('accepts each population predicate', () => {
+    for (const builder of ['has_brother', 'has_afl_father', 'has_afl_son', 'has_afl_parent_or_child', 'father_son_father']) {
+      expect(validatePlan(relationshipPlan({ careerPredicates: [{ builder, params: {} }] })), builder)
+        .not.toHaveProperty('error');
+    }
+  });
+
+  it('accepts a per-player question whose halves agree', () => {
+    expect(validatePlan(relationshipPlan({ careerPredicates: [brotherOf], relationshipSubject: harvey })))
+      .not.toHaveProperty('error');
+  });
+
+  it('rejects a per-player predicate with nobody named', () => {
+    expect(validatePlan(relationshipPlan({ careerPredicates: [brotherOf] }))).toHaveProperty('error');
+  });
+
+  it('rejects a named relative with no predicate to use them', () => {
+    expect(validatePlan(relationshipPlan({ relationshipSubject: harvey }))).toHaveProperty('error');
+  });
+
+  it('rejects halves that name different people', () => {
+    expect(validatePlan(relationshipPlan({
+      careerPredicates: [{ builder: 'brother_of_player', params: { player: '9999' } }],
+      relationshipSubject: harvey,
+    }))).toHaveProperty('error');
+  });
+
+  it('rejects a plan that both names a relative and pins a player', () => {
+    expect(validatePlan(relationshipPlan({
+      careerPredicates: [brotherOf],
+      relationshipSubject: harvey,
+      player: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' },
+    }))).toHaveProperty('error');
+  });
+
+  it('rejects a relationship question at any other grain', () => {
+    expect(validatePlan(relationshipPlan({
+      grain: 'player_season', metric: 'goals', careerPredicates: [brotherOf], relationshipSubject: harvey,
+    }))).toHaveProperty('error');
+  });
+
+  it('owns neither a club nor a season, so both are refused', () => {
+    expect(validatePlan(relationshipPlan({
+      scope: { clubFor: { organizationId: 1, slug: 'richmond', name: 'Richmond' } },
+    }))).toHaveProperty('error');
+    expect(validatePlan(relationshipPlan({ scope: { seasonMin: 2000 } }))).toHaveProperty('error');
+  });
+});

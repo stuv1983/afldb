@@ -11,15 +11,16 @@
  * auto-grid modes, and the obscurity star-rating (a precomputed score with no
  * AFLDB equivalent — see GridOrder for the substitute).
  *
- * The catalogue is 137 builders across 12 categories: the original 107
+ * The catalogue is 164 builders across 12 categories: the original 107
  * checked against the reference's afl_grid_criteria.md and verified against
  * live data, plus the 22Under22 builder and the 29 that AFLDB-ISSUE-118's
  * Gridley compatibility corpus required (src/search/gridley-compat.ts maps
- * every stored Gridley criterion onto this catalogue). Family relationships
- * and physical attributes are absent because the data is not there, not
- * because they were skipped (docs/search.md). Derbies have no schema
- * definition either, but the matchup_* builders sidestep that by taking the
- * two clubs as parameters.
+ * every stored Gridley criterion onto this catalogue), then the later
+ * additions each recorded beside the builders themselves -- height and age
+ * on debut, the two coaching builders, the father-son pair, has_brother,
+ * after_siren_winner, and AFLDB-ISSUE-152 Phase D's six relationship
+ * builders. Derbies have no schema definition, but the matchup_* builders
+ * sidestep that by taking the two clubs as parameters.
  *
  * Every builder is a fixed, named SQL shape with typed parameters, so unlike
  * the generic query builder nothing here lets a request choose a column or
@@ -449,6 +450,30 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // normalised Wikipedia football-families export) labelled brothers, both sides
   // linked through an AFL Tables profile path, the brother with a match played.
   has_brother: { key: 'has_brother', label: 'Brother played VFL/AFL', group: 'Biography', params: [] },
+  // AFLDB-ISSUE-152 Phase D (C3/C4). The same tracked player_relationships
+  // export, at its OTHER relationship type: `parent_child`, whose roles are
+  // exhaustively father -> son in this database (measured, §22.1) and are
+  // therefore named explicitly rather than inferred from which column a
+  // person sits in. Every one of these applies has_brother's fail-closed
+  // rule: both sides linked to a canonical player, and -- for the "played"
+  // builders -- the OTHER side having played a VFL/AFL match. An unlinked
+  // side is a NAME in the source, never an identity, and can satisfy none
+  // of them.
+  //
+  // parent_child is NOT the father-son draft rule, whatever the two
+  // populations happen to coincide at today: father_son_selection /
+  // father_son_father above are the rule, these are the relationship.
+  // AFLDB-ISSUE-153 decides what the bare phrase "father-son" means.
+  has_afl_father: { key: 'has_afl_father', label: 'Father played VFL/AFL', group: 'Biography', params: [] },
+  has_afl_son: { key: 'has_afl_son', label: 'Son played VFL/AFL', group: 'Biography', params: [] },
+  has_afl_parent_or_child: { key: 'has_afl_parent_or_child', label: 'Parent or child played VFL/AFL', group: 'Biography', params: [] },
+  // The per-player relationship questions ("who are X's brothers"). The
+  // parameter is a player id, bound exactly the way teammate_of binds one;
+  // the answer is a set of canonical players, so a same-named relative is
+  // still a distinct row and no answer is ever deduplicated by name.
+  brother_of_player: { key: 'brother_of_player', label: 'Brother of…', group: 'Biography', params: [player()] },
+  father_of_player: { key: 'father_of_player', label: 'Father of…', group: 'Biography', params: [player()] },
+  son_of_player: { key: 'son_of_player', label: 'Son of…', group: 'Biography', params: [player()] },
 };
 
 export const GRID_BUILDER_KEYS = Object.keys(GRID_BUILDERS);

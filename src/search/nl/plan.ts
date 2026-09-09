@@ -344,8 +344,30 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    two can never be conflated, and a modifier that reaches the summary
  *    grain or an out-of-range N declines rather than answering the wider
  *    question.
+ * 38: family relationships become answerable, in the half that has a
+ *    witness (AFLDB-ISSUE-152 Phase D). No grain and no migration: six
+ *    new grid builders over player_relationships -- has_afl_father,
+ *    has_afl_son, has_afl_parent_or_child, and the three per-player
+ *    questions brother_of_player / father_of_player / son_of_player --
+ *    joining has_brother and father_son_father, which the parser could
+ *    never reach. Three rules decide what this family may say. Direction
+ *    comes from person_a_role/person_b_role, never from which column a
+ *    person sits in. "Brothers" stays label-backed (`brothers` + `twin
+ *    brothers`), so a bare `relationship = 'sibling'` -- which also holds
+ *    8 sisters and 16 unsexed rows -- is never read as "brother". And a
+ *    named relative is a plan field of its own (relationshipSubject)
+ *    paired with the predicate's bound id, because the person a question
+ *    is ABOUT is not the person it returns.
+ *
+ *    What is deliberately still declined: sisters, twins and cousins
+ *    (expressible in the data, no builder; cousins have no rows at all),
+ *    vague "family"/"related to" wording, the family grain (D6), and
+ *    every bare father-son SELECTION form (D8) -- FS4 answers only when
+ *    the wording explicitly says the FATHER's side, so "father-son
+ *    selections" still declines while "fathers of father-son selections"
+ *    answers. Both deferred decisions belong to AFLDB-ISSUE-153.
  */
-export const PARSER_VERSION = 37;
+export const PARSER_VERSION = 38;
 
 // ------------------------------------------------------------------ grain
 
@@ -1047,6 +1069,18 @@ export type NlQueryPlan = {
    * because the two identity spaces are not the same set (see NlCoachRef).
    */
   coach?: NlCoachRef;
+  /**
+   * player_career only (AFLDB-ISSUE-152 Phase D): the person a per-player
+   * relationship question is ABOUT, when they are not its subject.
+   * "Who are Brent Harvey's brothers" returns players; Brent Harvey is
+   * not one of them, so he cannot be `player` (which pins the answer to
+   * one id) -- he is the parameter of a brother_of_player /
+   * father_of_player / son_of_player predicate, and this is the resolved
+   * reference that predicate's id came from, carried so the answer can
+   * name him. Never a substitute for the parameter: the id reaching SQL
+   * is always the builder's own bound param.
+   */
+  relationshipSubject?: NlPlayerRef;
   scope: NlMatchScope;
   /**
    * player_game/player_season only: qualify the selected metric against a
@@ -1169,6 +1203,40 @@ export const NL_CAREER_SEASON_OWNING_BUILDERS: readonly string[] = [
 export const NL_CAREER_CLUB_OWNING_BUILDERS: readonly string[] = [
   'first_kick_goal_for_club',
 ];
+
+/**
+ * The Phase D relationship builders (AFLDB-ISSUE-152). The first group
+ * asks about a POPULATION ("players whose father also played"); the
+ * second asks about one named person ("who are Brent Harvey's brothers")
+ * and takes their player id as its parameter.
+ *
+ * Neither group owns a club or a season, so neither appears in the two
+ * lists above: "Richmond players with a brother who played" and "players
+ * whose father played, since 2000" both fail the ownership gate and
+ * decline rather than answering with the scope silently discarded
+ * (AFLDB-ISSUE-110 findings A and B).
+ */
+export const NL_RELATIONSHIP_POPULATION_BUILDERS: readonly string[] = [
+  'has_brother',
+  'has_afl_father',
+  'has_afl_son',
+  'has_afl_parent_or_child',
+  'father_son_father',
+];
+
+export const NL_RELATIONSHIP_OF_PLAYER_BUILDERS: readonly string[] = [
+  'brother_of_player',
+  'father_of_player',
+  'son_of_player',
+];
+
+/** True when a plan's predicates include any Phase D relationship question. */
+export function isRelationshipPlan(plan: NlQueryPlan): boolean {
+  return plan.careerPredicates.some(
+    (axis) => NL_RELATIONSHIP_POPULATION_BUILDERS.includes(axis.builder)
+      || NL_RELATIONSHIP_OF_PLAYER_BUILDERS.includes(axis.builder),
+  );
+}
 
 /** True when some predicate consumes the plan's season range as a builder parameter. */
 export function careerPredicatesOwnSeasonRange(predicates: readonly GridAxisState[]): boolean {
@@ -1614,6 +1682,35 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
 
   const playerErr = validateRef(raw.player, 'id', 'Player');
   if (playerErr) return playerErr;
+
+  // AFLDB-ISSUE-152 Phase D. relationshipSubject and the per-player
+  // relationship predicates are two halves of one fact and neither is
+  // valid alone: the reference with no predicate would be a person the
+  // query never uses, and the predicate with no reference would answer
+  // "brother of 2164" with no way to say whose brothers these are. The
+  // id must be the SAME id, so the sentence the reader sees and the id
+  // reaching SQL can never drift apart.
+  const relationshipSubjectErr = validateRef(raw.relationshipSubject, 'id', 'Related player');
+  if (relationshipSubjectErr) return relationshipSubjectErr;
+  const relationshipAxes = raw.careerPredicates.filter(
+    (axis) => NL_RELATIONSHIP_OF_PLAYER_BUILDERS.includes(axis.builder),
+  );
+  if (raw.relationshipSubject) {
+    if (raw.grain !== 'player_career') {
+      return { error: 'A relationship question about one player is answered at career grain.' };
+    }
+    if (relationshipAxes.length !== 1) {
+      return { error: 'A named relative must be the parameter of exactly one relationship question.' };
+    }
+    if (relationshipAxes[0].params.player !== String(raw.relationshipSubject.id)) {
+      return { error: 'The named relative does not match the relationship question\'s player.' };
+    }
+    if (raw.player) {
+      return { error: 'A relationship question cannot both name a relative and pin a player.' };
+    }
+  } else if (relationshipAxes.length > 0) {
+    return { error: 'A relationship question about one player must say who that player is.' };
+  }
 
   if (raw.player && raw.scope.playerIdIn) {
     return { error: 'A plan cannot name one player and a candidate set at the same time.' };

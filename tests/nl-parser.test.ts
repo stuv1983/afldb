@@ -58,6 +58,18 @@ const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   // AFLDB-ISSUE-152 Phase C: the measured joint holder of "most goals
   // after the siren" (2, tied with Gary Rohan).
   'barry hall': [{ ref: { id: 1001, slug: 'barry-hall', name: 'Barry Hall' }, score: 1000 }],
+  // AFLDB-ISSUE-152 Phase D witnesses, with afldb_test's own ids: Brent
+  // Harvey is both a brother (relationship 358, Shane Harvey) and a
+  // father-son father (relationship 112, Cooper Harvey), so one name
+  // exercises every per-player reading.
+  'brent harvey': [{ ref: { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' }, score: 1000 }],
+  'cooper harvey': [{ ref: { id: 3048, slug: 'cooper-harvey', name: 'Cooper Harvey' }, score: 1000 }],
+  'phil krakouer': [{ ref: { id: 10500, slug: 'phil-krakouer', name: 'Phil Krakouer' }, score: 1000 }],
+  // The surname that is also a relationship word. "Most goals by Ben
+  // Cousins" must stay a goals question: PLAYER_NICKNAMES maps "cousins"
+  // to him, and a bare cousin gate would have declined it as a family
+  // question AFLDB cannot answer.
+  'ben cousins': [{ ref: { id: 1500, slug: 'ben-cousins', name: 'Ben Cousins' }, score: 1000 }],
 };
 
 function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
@@ -1705,5 +1717,261 @@ describe('first-kick-goal closure (AFLDB-ISSUE-152 Phase E)', () => {
     const p = await plan('first kick goal players by decade');
     expect(p.grain).toBe('achievement_summary');
     expect(p.achievementSummary?.kind).toBe('by_decade');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase D. Family relationships, in the half of the
+ * family that has a witness in the data.
+ *
+ * Red-before-green: every question below declined before this phase --
+ * recorded in full by the Stage-0 probe, 31 of 31 NONE. The declines at
+ * the end of this block declined then and must keep declining now, which
+ * is the harder half: the supported cues share their words with the
+ * blocked ones ("a twin brother" contains "a brother", "father-son
+ * selections" contains both "father" and "son").
+ */
+describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ C2
+
+  describe('C2 -- a brother who played (has_brother, reused unchanged)', () => {
+    it.each([
+      'which players had a brother who played AFL',
+      'players with a brother who also played VFL/AFL',
+      'which AFL players had brothers who played',
+    ])('%s -> the label-backed has_brother predicate', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(p.metric).toBeNull();
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a career ranking rather than replacing it', async () => {
+      const p = await plan('most games by a player with a brother who played AFL');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player is a pinned yes/no, not a list of his brothers', async () => {
+      const p = await plan('did Dustin Martin have a brother who played AFL');
+      expect(p.player?.id).toBe(100);
+      expect(p.relationshipSubject).toBeUndefined();
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ C3
+
+  describe('C3 -- parent and child, typed by role', () => {
+    it.each([
+      'players who are the parent or child of another AFL player',
+      'which AFL players are a parent and child',
+    ])('%s -> the symmetric predicate', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['has_afl_parent_or_child']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the father direction', async () => {
+      const p = await plan('players whose father also played AFL');
+      expect(builders(p)).toEqual(['has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the son direction', async () => {
+      const p = await plan('players whose son also played AFL');
+      expect(builders(p)).toEqual(['has_afl_son']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the two directions are different predicates, never one', async () => {
+      const father = await plan('players whose father also played AFL');
+      const son = await plan('players whose son also played AFL');
+      expect(builders(father)).not.toEqual(builders(son));
+    });
+  });
+
+  // ------------------------------------------------------------------ C4
+
+  describe('C4 -- the relatives of one named player', () => {
+    it('who are Dustin Martin’s brothers', async () => {
+      const p = await plan("who are Dustin Martin's brothers");
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('100');
+      // The named person is the OBJECT: pinning him would return him, or
+      // nobody, instead of his brothers.
+      expect(p.player).toBeUndefined();
+      expect(p.relationshipSubject?.id).toBe(100);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('brothers of Brent Harvey (the "of" wording)', async () => {
+      const p = await plan('brothers of Brent Harvey');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.name).toBe('Brent Harvey');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Brent Harvey’s son', async () => {
+      const p = await plan("who is Brent Harvey's son");
+      expect(builders(p)).toEqual(['son_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.id).toBe(2164);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Cooper Harvey’s father', async () => {
+      const p = await plan("who is Cooper Harvey's father");
+      expect(builders(p)).toEqual(['father_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('3048');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('an ambiguous name fails closed rather than picking a Gary Ablett', async () => {
+      const parsed = await parse('brothers of Gary Ablett');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a name AFLDB cannot identify fails closed', async () => {
+      const parsed = await parse('brothers of Some Unknown Person');
+      expect(parsed.status).toBe('none');
+    });
+  });
+
+  // ----------------------------------------------------------------- FS4
+
+  describe('FS4 -- fathers of father-son selections (father_son_father, reused)', () => {
+    it.each([
+      'players whose son was selected under the father-son rule',
+      'which players had a son drafted under the father-son rule',
+      'fathers of father-son selections',
+    ])('%s -> father_son_father', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a ranking', async () => {
+      const p = await plan('which father-son fathers played the most games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a father-side ranking with the rule spelled out', async () => {
+      const p = await plan('most games by a father whose son was selected under the father-son rule');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a pinned father-side yes/no', async () => {
+      const p = await plan('did Brent Harvey have a son selected under the father-son rule');
+      expect(p.player?.id).toBe(2164);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // -------------------------------------------- the D8 boundary (blocked)
+
+  describe('the blocked father-son SELECTION forms still decline (D8, ISSUE-153)', () => {
+    it.each([
+      ['FS1 the rule itself', 'players selected under the father-son rule'],
+      ['FS1 the bare phrase', 'father-son selections'],
+      ['FS1 picks', 'which players were father-son picks'],
+      ['FS2 club-scoped', 'geelong father-son selections'],
+      ['FS3 year-scoped', 'father-son selections in 2022'],
+      ['FS6 distribution', 'father-son selections by club'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+    it('an FS4 cue never lends its builder to an FS1 question', async () => {
+      const parsed = await parse('father-son selections');
+      if (parsed.status === 'plan') expect(builders(parsed.plan)).toEqual([]);
+    });
+  });
+
+  // ---------------------------------------------------- out of scope
+
+  describe('the relationship families with no builder decline by name', () => {
+    it.each([
+      ['sisters', 'which players had a sister who played'],
+      ['twins', 'which players had a twin brother who played AFL'],
+      ['cousins', 'which AFL players are cousins'],
+      ['mothers', 'which players had a mother who played'],
+      ['the family grain (D6)', 'biggest football families'],
+      ['the family grain (D6)', 'which family has the most AFL players'],
+      ['C5 families of N', 'families with three AFL players'],
+      ['vague family wording', "who are Dustin Martin's family members"],
+      ['vague relatedness', 'AFL players related to Phil Krakouer'],
+      ['pairings, not players', 'parent and child pairs who both played AFL'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+  });
+
+  // ------------------------------------------- ownership and collisions
+
+  describe('composition beyond the relationship itself', () => {
+    it('a count question counts the qualifying set', async () => {
+      const p = await plan('how many players had a brother who played AFL');
+      expect(p.agg).toEqual({ kind: 'count' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('two relationships compose as two predicates, ANDed', async () => {
+      const p = await plan('players with a brother and a father who played AFL');
+      expect(builders(p)).toEqual(['has_brother', 'has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a career threshold survives alongside a per-player relationship', async () => {
+      // The ISSUE-110 shape: a condition the plan cannot honour must never
+      // be silently dropped. Here it IS honoured, as a career condition.
+      const p = await plan('brothers of Brent Harvey who played 100 games');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 100 }]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  describe('scope this family cannot own is refused, never discarded', () => {
+    it.each([
+      ['a club', 'richmond players with a brother who played'],
+      ['a season range', 'players with a brother who played since 2000'],
+      ['a venue', 'players with a brother who played at the mcg'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    it('a season-grain ranking declines rather than dropping the relationship', async () => {
+      const parsed = await parse('most goals in 2015 by a player with a brother who played');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a surname that is also a relationship word is still a player', async () => {
+      const p = await plan('most goals by ben cousins');
+      expect(p.player?.name).toBe('Ben Cousins');
+      expect(builders(p)).toEqual([]);
+    });
   });
 });

@@ -988,6 +988,155 @@ export const FIRST_KICK_NO_FURTHER_KICKS_CUES: RegExp[] = [
   /\bno\s+further\s+(?:career\s+)?kicks\b/,
 ];
 
+// --------------------------------------------------- family relationships
+
+/**
+ * AFLDB-ISSUE-152 Phase D. player_relationships holds exactly two
+ * relationship types with rows -- `sibling` (498) and `parent_child`
+ * (127) -- so this vocabulary is deliberately narrow, and every word in
+ * it must appear in a genuine RELATIONSHIP FRAME before it counts.
+ *
+ * The frame requirement is not tidiness. "Cousins" is Ben Cousins, whose
+ * surname is also a PLAYER_NICKNAMES key; a bare `\bcousins?\b` gate
+ * would have turned "most goals by ben cousins" into a family question
+ * and declined it. So a relationship word counts only when an article,
+ * possessive, pronoun, copula or "of/who/that" governs it -- "A brother",
+ * "whose father", "are cousins", "brothers of" -- which is exactly how a
+ * reader words the relationship and never how they word a surname.
+ *
+ * The possessive form is checked against the RAW question, not the
+ * canonicalised one: canonicalise strips "'s", and that apostrophe is the
+ * whole difference between "Brent Harvey's son" (who is it?) and "did
+ * Brent Harvey have a son who played" (yes/no).
+ */
+
+/** Words an in-scope or out-of-scope relationship noun may be governed by. */
+const REL_LEAD = String.raw`(?:a|an|the|any|one|two|both|and|or|his|her|their|its|whose|another|other|is|are|was|were|has|have|had|with)`;
+
+/** A relationship noun in a genuine frame: "<lead> brother", "brothers of/who/that". */
+function relationshipFrame(noun: string): RegExp {
+  return new RegExp(String.raw`\b${REL_LEAD}\s+(?:\w+\s+)?${noun}\b|\b${noun}\s+(?:of|who|that)\b`);
+}
+
+/**
+ * The relationship families that must DECLINE, each with the wording the
+ * decline says out loud. Checked before every supported reading, so a
+ * question that names one of these can never fall through to a narrower
+ * one that happens to share a word ("a twin brother" is not "a brother").
+ *
+ * Every entry is an empty set, an unsexed set, or a grain this phase does
+ * not build:
+ *  - sisters (8 rows) and twins (10) are expressible but have no builder;
+ *  - cousin, grandparent, aunt/uncle, spouse and in-law have ZERO rows;
+ *  - mother/daughter cannot exist: parent_child is exhaustively
+ *    father -> son (measured, 127 of 127);
+ *  - "family", "relatives" and "related to" are the family GRAIN (D6) and
+ *    the open question of what a family IS -- AFLDB-ISSUE-153;
+ *  - "pairs" asks for a pairing, which is not a player.
+ */
+export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
+  [relationshipFrame('sisters?'), 'AFLDB records 8 sister relationships and has no way to search them; only brothers are searchable.'],
+  [relationshipFrame('twins?'), 'AFLDB\'s brother record does not separate twins from other brothers, so a twins-only question cannot be answered.'],
+  [relationshipFrame('cousins?'), 'AFLDB holds no cousin relationships at all.'],
+  [relationshipFrame('grand(?:father|mother|son|daughter|parents?|children)'), 'AFLDB holds no grandparent or grandchild relationships at all.'],
+  [relationshipFrame('(?:uncles?|aunts?|aunties?|nephews?|nieces?)'), 'AFLDB holds no uncle, aunt, nephew or niece relationships at all.'],
+  [relationshipFrame('(?:in[- ]laws?|spouses?|wife|wives|husbands?|partners?)'), 'AFLDB holds no spouse or in-law relationships at all.'],
+  [relationshipFrame('(?:mothers?|daughters?)'), 'Every parent-child relationship AFLDB records is a father and a son.'],
+  [relationshipFrame('(?:famil(?:y|ies)|relatives?|family members?)'), 'AFLDB cannot yet answer a question about a football family as a whole.'],
+  [/\brelated to\b/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
+  [relationshipFrame('(?:pairs?|duos?|combinations?)'), 'AFLDB answers relationship questions about players, not about pairings.'],
+];
+
+/**
+ * FS4 -- the FATHER's side of the father-son draft rule, and the only
+ * father-son SELECTION wording Phase D may claim. Every other father-son
+ * form (the selections themselves, by club, by year, by distribution)
+ * stays unrecognised until AFLDB-ISSUE-153 settles what the bare phrase
+ * means (decision D8): those words are left in the text, where they
+ * remain leftover tokens and the question declines exactly as it did
+ * before this phase.
+ *
+ * Each cue therefore has to say the father's side EXPLICITLY -- "fathers
+ * of", "father-son fathers", "whose son was selected", "had a son
+ * drafted" -- and each requires the father-son rule to be named, because
+ * "whose son was drafted" alone is an ordinary draft question this
+ * builder does not answer.
+ */
+export const FATHER_SON_FATHER_CUES: RegExp[] = [
+  /\bfathers? of (?:the )?father[- ]son (?:selections?|picks?|players?|draftees?|recruits?)\b/,
+  /\bfather[- ]son fathers?\b/,
+  /\b(?:whose|who(?:se)? own) sons? (?:was|were) (?:selected|drafted|taken|picked|recruited)(?: under)?(?: the)? father[- ]son(?: rule)?\b/,
+  /\b(?:had|have|has) (?:a |their |his )?sons? (?:selected|drafted|taken|picked|recruited)(?: under)?(?: the)? father[- ]son(?: rule)?\b/,
+  /\bfathers? whose sons? (?:was|were) (?:a )?father[- ]son (?:selections?|picks?)\b/,
+];
+
+/** Any father-son rule wording at all -- the D8 guard. */
+export const FATHER_SON_RULE_RE = /\bfather[- ]son\b/;
+
+/**
+ * The three per-player readings, in the two shapes a reader writes them:
+ * "brothers of Brent Harvey" (canonicalised text) and "Brent Harvey's
+ * son" (RAW question -- see this section's header).
+ */
+export const RELATIONSHIP_OF_PLAYER_RE = /\b(brothers?|fathers?|sons?) of\b/;
+export const RELATIONSHIP_POSSESSIVE_RE = /['’]s\s+(brothers?|fathers?|sons?|sisters?|twins?|cousins?|mothers?|daughters?|famil(?:y|ies)|family members?|relatives?)\b/;
+
+/** The supported population readings, each mapped to the builder it emits. */
+export const RELATIONSHIP_POPULATION_CUES: [RegExp, 'has_brother' | 'has_afl_father' | 'has_afl_son'][] = [
+  [relationshipFrame('brothers?'), 'has_brother'],
+  [relationshipFrame('fathers?'), 'has_afl_father'],
+  [relationshipFrame('sons?'), 'has_afl_son'],
+];
+
+/**
+ * The symmetric parent-or-child reading. Either noun in a frame elects
+ * it, and it is checked BEFORE the directional cues so "the parent or
+ * child of another AFL player" is one symmetric question rather than two
+ * directional ones ANDed into an empty set.
+ */
+export const RELATIONSHIP_SYMMETRIC_CUES: RegExp[] = [
+  relationshipFrame('parents?'),
+  relationshipFrame('child(?:ren)?'),
+];
+
+/**
+ * Words a relationship clause leaves behind once its noun is consumed.
+ * None is a stopword (they are meaningful in other questions), and each
+ * one left in the text would depress the token ratio or, worse, be read
+ * as a failed player-name guess: "VFL/AFL" canonicalises to the bare
+ * token "vfl/" because CONVERSATIONAL_FILLER strips "afl" out of it.
+ */
+export const RELATIONSHIP_CLAUSE_NOISE: RegExp[] = [
+  // Deliberately no trailing \b: the leftover check compares whole
+  // tokens, so the slash has to be consumed WITH the word or the token
+  // "vfl/" is still reported as an unsupported term.
+  /\bvfl\/?/,
+  /\balso\b/,
+  /\banother\b/,
+  /\bboth\b/,
+  // "who ARE Brent Harvey's brothers". Every other copula is a STOPWORDS
+  // entry; this one is not, and left behind it is swallowed into the
+  // candidate player span, where "are dustin martin" resolves to nobody.
+  /\bare\b/,
+];
+
+/**
+ * The extra words an FS4 cue leaves behind ("most games by A FATHER whose
+ * son was selected under the father-son RULE"). Applied only once an FS4
+ * cue has matched -- stripping "selections" or "father-son" on any other
+ * reading would erase the very tokens that keep FS1/FS2/FS3/FS6 declining.
+ */
+export const FATHER_SON_FATHER_NOISE: RegExp[] = [
+  /\bfather[- ]son\b/,
+  /\bfathers?\b/,
+  /\bsons?\b/,
+  /\brules?\b/,
+  /\bselections?\b/,
+  /\bpicks?\b/,
+  /\bdrafted\b/,
+  /\bselected\b/,
+];
+
 // ------------------------------------------------------------------ nicknames
 
 /** Seed vocabulary; grown from real search-log usage (db/queries/nl/log.ts, phase F). */

@@ -9,7 +9,8 @@
  */
 import { GRID_BUILDERS } from '@/search/grid-solver-spec';
 import {
-  afterSirenRequiresMatchLink, coachWinPctQualifierNote, NL_METRICS, type NlQueryPlan,
+  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isRelationshipPlan, NL_METRICS,
+  type NlQueryPlan,
 } from '@/search/nl/plan';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow, NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow,
@@ -608,6 +609,26 @@ function describeAfterSirenPlayerAnswer(
  * unconditionally.
  */
 export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): string[] {
+  // AFLDB-ISSUE-152 Phase D. Two boundaries a relationship answer must
+  // state in its own sentence. The first is always true: the source is a
+  // tracked, cited export in which both sides of a relationship may be
+  // unlinked, and an unlinked side is a NAME, never an identity, so it is
+  // counted nowhere. The second is the list cap, said out loud rather
+  // than left to the table's own footer -- a question that matches 658
+  // players and shows 100 of them must say so in the answer itself.
+  if (isRelationshipPlan(plan)) {
+    const caveats = [
+      'AFLDB\'s family relationships come from a tracked, cited list of football families. '
+      + 'A relative it has not linked to a player is a name only, and is counted nowhere here.',
+    ];
+    if (payload.kind === 'player_career' && plan.metric === null && payload.total > payload.rows.length) {
+      caveats.push(
+        `${payload.total.toLocaleString('en-AU')} players qualify. This answer lists the first `
+        + `${payload.rows.length.toLocaleString('en-AU')} of them, most games first; it is not the whole list.`,
+      );
+    }
+    return caveats;
+  }
   if (plan.grain !== 'after_siren') return [];
   const caveats: string[] = [
     // ALWAYS, on every after-siren answer (operator decision D12). The 1913
@@ -651,6 +672,68 @@ function curatedRecordNote(plan: NlQueryPlan): string {
     : '';
 }
 
+/**
+ * AFLDB-ISSUE-152 Phase D wording (§22.6). A relationship answer names
+ * the relationship, always: "Players meeting every condition asked for"
+ * is true of every career list ever returned and tells a reader nothing
+ * about which relationship they were shown. The phrases below are the
+ * ONLY wording these answers use, and each says which relationship, in
+ * which direction, and -- where the builder requires it -- that the
+ * relative themselves played.
+ *
+ * Deliberately not "family": what a football family IS remains an open
+ * question (AFLDB-ISSUE-153), and the word would claim an answer to it.
+ */
+const RELATIONSHIP_WITH_PHRASE: Record<string, string> = {
+  has_brother: 'a brother who played VFL/AFL',
+  has_afl_father: 'a father who played VFL/AFL',
+  has_afl_son: 'a son who played VFL/AFL',
+  has_afl_parent_or_child: 'a parent or child who played VFL/AFL',
+};
+
+const RELATIONSHIP_OF_NOUN: Record<string, string> = {
+  brother_of_player: 'Brothers',
+  father_of_player: 'Fathers',
+  son_of_player: 'Sons',
+};
+
+/** Yes/no wording for a pinned player, in the same relationship vocabulary. */
+const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = {
+  has_brother: { yes: 'has a brother who played VFL/AFL', no: 'has no recorded brother who played VFL/AFL' },
+  has_afl_father: { yes: 'has a father who played VFL/AFL', no: 'has no recorded father who played VFL/AFL' },
+  has_afl_son: { yes: 'has a son who played VFL/AFL', no: 'has no recorded son who played VFL/AFL' },
+  has_afl_parent_or_child: {
+    yes: 'has a parent or child who played VFL/AFL',
+    no: 'has no recorded parent or child who played VFL/AFL',
+  },
+  father_son_father: {
+    yes: 'had a son selected under the father–son rule',
+    no: 'had no son selected under the father–son rule',
+  },
+};
+
+/**
+ * The answer's subject, as a sentence-leading phrase: "Brothers of Brent
+ * Harvey", "Players with a brother who played VFL/AFL", "Players whose
+ * son was selected under the father-son rule". Null when the plan carries
+ * no relationship, which is every pre-Phase-D answer.
+ */
+function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
+  const ofAxis = plan.careerPredicates.find((axis) => RELATIONSHIP_OF_NOUN[axis.builder]);
+  if (ofAxis && plan.relationshipSubject) {
+    return `${RELATIONSHIP_OF_NOUN[ofAxis.builder]} of ${plan.relationshipSubject.name}`;
+  }
+  const withPhrases = plan.careerPredicates
+    .map((axis) => RELATIONSHIP_WITH_PHRASE[axis.builder])
+    .filter((phrase): phrase is string => phrase !== undefined);
+  const fatherSonFather = plan.careerPredicates.some((axis) => axis.builder === 'father_son_father');
+  const clauses: string[] = [];
+  if (withPhrases.length > 0) clauses.push(`with ${withPhrases.join(' and ')}`);
+  if (fatherSonFather) clauses.push('whose son was selected under the father–son rule');
+  if (clauses.length === 0) return null;
+  return `Players ${clauses.join(', ')}`;
+}
+
 function describePlayerCareerAnswer(
   plan: NlQueryPlan,
   lead: NlPlayerCareerRow | null,
@@ -664,6 +747,19 @@ function describePlayerCareerAnswer(
     // narrowly to a pinned player with conditions and no ranking metric,
     // so every unpinned list keeps the count wording it has always had.
     if (plan.player && !plan.metric && plan.careerPredicates.length > 0) {
+      // AFLDB-ISSUE-152 Phase D: a pinned relationship question answers in
+      // the relationship's own words ("Brent Harvey has a brother who
+      // played VFL/AFL"), not as a list of condition labels.
+      const pinned = plan.careerPredicates
+        .map((axis) => RELATIONSHIP_PINNED_PHRASE[axis.builder])
+        .filter((phrase): phrase is { yes: string; no: string } => phrase !== undefined);
+      if (pinned.length === plan.careerPredicates.length && pinned.length > 0) {
+        const phrase = pinned.map((p) => (total > 0 ? p.yes : p.no)).join(' and ');
+        return {
+          headline: `${plan.player.name} — ${total > 0 ? 'yes' : 'no'}`,
+          interpretation: `${plan.player.name} ${phrase}.`,
+        };
+      }
       const conditions = plan.careerPredicates
         .map((axis) => GRID_BUILDERS[axis.builder]?.label ?? axis.builder)
         .join('; ');
@@ -673,21 +769,32 @@ function describePlayerCareerAnswer(
           + `every condition asked for: ${conditions}.${curatedRecordNote(plan)}`,
       };
     }
+    const relationship = relationshipSubjectPhrase(plan);
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
-      interpretation: plan.scope.clubFor
+      interpretation: relationship
+        ? `${relationship}.`
+        : plan.scope.clubFor
         ? `Players matching every condition for ${plan.scope.clubFor.name}.`
         : 'Players meeting every condition asked for.',
     };
   }
   const metricLabel = plan.metric.replace(/_/g, ' ');
   const clubSuffix = plan.scope.clubFor ? ` for ${plan.scope.clubFor.name}` : '';
+  // AFLDB-ISSUE-152 Phase D. A ranked relationship answer says what it
+  // ranked WITHIN: "Most career games among players with a brother who
+  // played VFL/AFL" is a different record from "most career games", and
+  // the two must never read the same.
+  const relationship = relationshipSubjectPhrase(plan);
+  const among = relationship
+    ? ` among ${relationship.charAt(0).toLowerCase()}${relationship.slice(1)}`
+    : '';
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
   const { subject, tied } = tiedSubject(labels);
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
-      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}${clubSuffix}.`
-      : `${rankWord(plan)} career ${metricLabel}${clubSuffix}.`,
+      ? `Top ${plan.agg.n} ${rankWord(plan).toLowerCase()} by career ${metricLabel}${clubSuffix}${among}.`
+      : `${rankWord(plan)} career ${metricLabel}${clubSuffix}${among}.`,
   };
 }

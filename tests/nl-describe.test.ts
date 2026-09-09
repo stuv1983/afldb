@@ -750,3 +750,148 @@ describe('a pinned player answering a condition question (AFLDB-ISSUE-152 Phase 
     ).headline).toBe('Dustin Martin — 4 goals');
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase D wording. The rule this block exists to hold:
+ * a relationship answer NAMES the relationship. "Players meeting every
+ * condition asked for" is true of every career list ever returned and
+ * tells the reader nothing about which relationship they were shown, so
+ * no Phase D answer may use it.
+ */
+describe('family-relationship answers (AFLDB-ISSUE-152 Phase D)', () => {
+  const harvey = { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' };
+
+  function relationshipPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'has_brother', params: {} }],
+      ...overrides,
+    });
+  }
+
+  const rows = [careerRow({ value: null })];
+  const listPayload = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+
+  it.each([
+    ['has_brother', 'a brother who played VFL/AFL'],
+    ['has_afl_father', 'a father who played VFL/AFL'],
+    ['has_afl_son', 'a son who played VFL/AFL'],
+    ['has_afl_parent_or_child', 'a parent or child who played VFL/AFL'],
+  ])('%s says which relationship it answered', (builder, phrase) => {
+    const { headline, interpretation } = describeAnswer(
+      relationshipPlan({ careerPredicates: [{ builder, params: {} }] }), listPayload,
+    );
+    expect(headline).toBe('658 players match');
+    expect(interpretation).toBe(`Players with ${phrase}.`);
+    expect(interpretation).not.toContain('every condition');
+  });
+
+  it('the father-son father wording names the RULE, not a parent-child link', () => {
+    const { interpretation } = describeAnswer(
+      relationshipPlan({ careerPredicates: [{ builder: 'father_son_father', params: {} }] }), listPayload,
+    );
+    expect(interpretation).toBe('Players whose son was selected under the father–son rule.');
+  });
+
+  it('a per-player answer names the person it is about', () => {
+    const { interpretation } = describeAnswer(
+      relationshipPlan({
+        careerPredicates: [{ builder: 'brother_of_player', params: { player: '2164' } }],
+        relationshipSubject: harvey,
+      }),
+      { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    );
+    expect(interpretation).toBe('Brothers of Brent Harvey.');
+  });
+
+  it('a ranked relationship answer says what it ranked WITHIN', () => {
+    const ranked = [careerRow({ displayName: 'Michael Tuck', value: 426, games: 426 })];
+    const { headline, interpretation } = describeAnswer(
+      relationshipPlan({ metric: 'games', agg: { kind: 'max' } }),
+      { kind: 'player_career', lead: ranked[0], rows: ranked, total: 1 },
+    );
+    expect(headline).toBe('Michael Tuck — 426 games');
+    expect(interpretation).toBe('Highest career games among players with a brother who played VFL/AFL.');
+  });
+
+  it('a pinned player answers yes/no in the relationship’s own words', () => {
+    const pinnedPlan = relationshipPlan({ player: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' } });
+    expect(describeAnswer(pinnedPlan, { kind: 'player_career', lead: null, rows: [], total: 0 }))
+      .toEqual({
+        headline: 'Dustin Martin — no',
+        interpretation: 'Dustin Martin has no recorded brother who played VFL/AFL.',
+      });
+    const hit = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: null })];
+    expect(describeAnswer(pinnedPlan, { kind: 'player_career', lead: hit[0], rows: hit, total: 1 }).interpretation)
+      .toBe('Dustin Martin has a brother who played VFL/AFL.');
+  });
+
+  // --------------------------------------------------------- the caveats
+
+  it('always states the linked-only boundary', () => {
+    const caveats = answerCaveats(relationshipPlan(), listPayload);
+    expect(caveats[0]).toContain('tracked, cited list');
+    expect(caveats[0]).toContain('name only');
+  });
+
+  it('says out loud that an over-cap list is not the whole list', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    const caveats = answerCaveats(relationshipPlan(), capped);
+    expect(caveats.some((c) => c.includes('658 players qualify'))).toBe(true);
+    expect(caveats.some((c) => c.includes('it is not the whole list'))).toBe(true);
+  });
+
+  /**
+   * Operator decision D20, ACCEPTED 2026-09-09: an over-cap relationship
+   * list uses AFLDB's existing capped-list disclosure contract -- true
+   * total, capped table, explicit disclosure -- and never a Phase-D-only
+   * refusal. Silent truncation is the thing prohibited, and these three
+   * assertions are what "not silent" means in code.
+   */
+  it('D20: the headline is the TRUE total, not the number of rows shown', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    expect(rows).toHaveLength(1);
+    // 658 qualified, 1 row is carried in this payload: the headline reports
+    // the qualifying set, so the count is never the page size.
+    expect(describeAnswer(relationshipPlan(), capped).headline).toBe('658 players match');
+  });
+
+  it('D20: the disclosure names BOTH numbers, so the shortfall is visible', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    const disclosure = answerCaveats(relationshipPlan(), capped).find((c) => c.includes('qualify'));
+    expect(disclosure).toBeDefined();
+    expect(disclosure).toContain('658 players qualify');
+    expect(disclosure).toContain(`the first ${rows.length}`);
+    expect(disclosure).toContain('it is not the whole list');
+  });
+
+  it.each([658, 181, 107])(
+    'D20: %i answers with disclosure rather than refusing',
+    (total) => {
+      // The three measured over-cap populations (C2 658, C3 181, FS4 107).
+      // None of them declines: a refusal here would make this one family
+      // behave unlike every other capped list in the engine.
+      const capped = { kind: 'player_career' as const, lead: rows[0], rows, total };
+      const described = describeAnswer(relationshipPlan(), capped);
+      expect(described.headline).toBe(`${total.toLocaleString('en-AU')} players match`);
+      expect(described.interpretation).toBe('Players with a brother who played VFL/AFL.');
+      expect(answerCaveats(relationshipPlan(), capped).some((c) => c.includes(`${total.toLocaleString('en-AU')} players qualify`)))
+        .toBe(true);
+    },
+  );
+
+  it('says nothing about a cap when nothing was capped', () => {
+    const whole = { kind: 'player_career' as const, lead: rows[0], rows, total: 1 };
+    expect(answerCaveats(relationshipPlan(), whole).some((c) => c.includes('qualify'))).toBe(false);
+  });
+
+  it('leaves every other family’s wording untouched', () => {
+    const other = plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } }],
+    });
+    expect(describeAnswer(other, listPayload).interpretation)
+      .toBe('Players meeting every condition asked for.');
+    expect(answerCaveats(other, listPayload)).toEqual([]);
+  });
+});

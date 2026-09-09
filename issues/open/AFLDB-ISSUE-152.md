@@ -9,7 +9,7 @@
 | Base SHA | `c2761e64e9089f9e38572145e67a6ab2fee0fe12` (`Merge branch 'opus/issue-110-semantic-closeout'`) |
 | Base freshness | `main` is AT that SHA — it has not advanced. `git merge-base HEAD main` = the same commit. |
 | Parser baseline | `PARSER_VERSION` **34** (`src/search/nl/plan.ts:312`). **Not incremented by Stage 0.** |
-| Status | **OPEN — STAGE 0 COMPLETE; PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASES D AND F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 SATISFIED by the authorised `afldb_test` load (§18.2); D6/D8 deferred to AFLDB-ISSUE-153. Implementations: **§14** Phase B (`e8f5f67`), **§16** Phase C (`47a645f`), **§18** Phase E (`75d207d`) — §17 is superseded by §18. **§19–§21 record Phase G**: P3-r2 **271/271** and P4-r1 **1,495/1,495**, both with every transport gate at zero (§21.3, §21.4). The issue stays OPEN for **Phase D** (F1-dependent half blocked on AFLDB-ISSUE-153), **Phase F** (gated on B–D), the **uncommitted Phase G working tree**, and the **un-run deploy steps** — migrations **092 and 093 must both reach `afldb_dev` and production BEFORE the code**. |
+| Status | **OPEN — PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASE D (UNBLOCKED HALF: C2/C3/C4/FS4) IMPLEMENTED, RENDERED AND GREEN 2026-09-09 — P5-r2 319/319 AND A FRESH P4-r1 1,495/1,495 (§24), UNCOMMITTED; PHASE F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 SATISFIED by the authorised `afldb_test` load (§18.2); D6/D8 deferred to AFLDB-ISSUE-153. Implementations: **§14** Phase B (`e8f5f67`), **§16** Phase C (`47a645f`), **§18** Phase E (`75d207d`) — §17 is superseded by §18. **§19–§21 record Phase G**: P3-r2 **271/271** and P4-r1 **1,495/1,495**, both with every transport gate at zero (§21.3, §21.4). **§22–§24 record Phase D's unblocked half**: `PARSER_VERSION` 38, six new grid builders, no migration, 67 new DB-free cases and 20 DB-backed ones green, and the rendered acceptance now COMPLETE — **P5-r2 319/319** (238 answered / 21 unanswerable / 60 absent, every transport counter at zero, 4/4 batches) and a **fresh P4-r1 1,495/1,495** (1,435 + 60, unchanged), with **D20 ACCEPTED** as capped-list disclosure. **P5 attempt 1 was INADMISSIBLE** — a stale pre-Phase-D standalone build — and a fresh discriminator proved Phase D rendering before P5-r2 (§24.1, §24.2). Historical Phase G P3/P4 evidence is untouched (§24.5). The issue stays OPEN for the **blocked Phase D half** (C1, C5/C6, FS1–FS3, FS6 and D6/D8, with AFLDB-ISSUE-153), **Phase F** (gated on B–D), the **uncommitted working tree**, and the **un-run deploy steps** — migrations **092 and 093 must both reach `afldb_dev` and production BEFORE the code**. |
 | Migration | **One — `092_nl_search_log_coach_record_grain.sql` (Phase B, F5).** Stage 0's "none proposed" is superseded by implementation evidence (§14.6): the ninth `NlGrain` cannot be admitted without extending the `nl_search_log.grain` CHECK. Applied to `afldb_test` and verified 2026-09-08. |
 | Found | 2026-09-08 |
 | Evidence executed | 2026-09-08, `afldb_test` over the operator's `55432` tunnel, read-only, `ROLLBACK`. Production untouched. |
@@ -4241,3 +4241,717 @@ Phase G:
    production BEFORE the code**; `nl:stress` has not been run.
 5. The four external `tests/integration/database.test.ts` dataset-count failures
    remain out of scope, uninvestigated and unedited.
+
+---
+
+## 22. Phase D — IMPLEMENTED 2026-09-09 (unblocked half only: C2, C3, C4, FS4)
+
+Scope executed exactly as authorised: **C2, C3, C4, FS4**. Untouched and still
+declining: **C1, C5/C6, FS1, FS2, FS3, FS6, D6, D8** — all of which remain with
+`AFLDB-ISSUE-153`.
+
+`PARSER_VERSION` **37 → 38**, one bump, with the plan/version-history entry.
+**No migration.** The design stays at `player_career`; no family grain exists.
+
+### 22.1 The evidence this phase was built on
+
+The read-only evidence run of **2026-09-09 14:08:43** against `afldb_test` as
+`afldb_app` (`default_transaction_read_only=on`, one backend pid start-to-end,
+`ROLLBACK`) — script `ISSUE-152-phase-d-evidence.sql`, transcript
+`nl-ui-out-152-phaseg/evidence/ISSUE-152-phase-d-evidence-afldb_test-20260909-140843.txt`.
+Both are **retained**: the script is the reproducible pack and the transcript is
+the measurement.
+
+The facts the implementation actually rests on:
+
+| Fact | Value | Where it is used |
+|---|---|---|
+| `parent_child` roles, exhaustive | **father → son, 127 of 127** | the role predicates in `has_afl_father` / `has_afl_son` / the three `*_of_player` builders |
+| `sibling` roles | sibling/sibling 321, brother/sibling 74, sibling/brother 69, brother/brother 23, twin/twin 9, sister rows 2 (**neither linked**) | why "brother" stays LABEL-backed and why twins/sisters decline |
+| `has_brother` population | **658**, of whom **0** have zero games | C2 is answerable as-is; no 0-game rows to explain |
+| symmetric parent-or-child | **181** | `has_afl_parent_or_child` |
+| `parent_child` fathers = `father_son_father` | **107 = 107**, overlap 107, neither side exclusive | the measured collapse; why **D8 cannot be decided from data** |
+| linked fathers / selections with a linked father | **107 / 123** | FS4 |
+| unlinked opposite side | present in both directions (Robert Walls → David Walls; Peter Morrison → Shane Morrison) | the fail-closed witnesses |
+| same display name across a linked pair | **4 pairs**, including Gary Ablett **4700/4701** | answers are by id, never by name |
+
+### 22.2 Red before green — the Stage-0 probe, recorded
+
+`tests/tmp-issue152-phase-d-stage0.test.ts` was run against the pre-Phase-D
+parser on **2026-09-09** and printed **31 of 31 NONE**: every C2, C3, C4 and FS4
+wording declined, alongside the blocked controls. The distribution:
+
+- **26** `unrecognised` at confidence 0.00;
+- **1** `ambiguous` at 0.65 (`most games by a player with a brother who played
+  AFL` — the ranking half parsed, the relationship half was a leftover token);
+- **1** `low_confidence` at 0.15 (`father-son selections by club`);
+- the remaining rows were the blocked controls, also `unrecognised`.
+
+Three failure modes were named by that run and each one drove a design decision:
+
+1. `who is Brent Harvey's son` reported the unsupported term **"brent harvey
+   son"** — the relationship noun was being swallowed into the candidate player
+   span, so the noun has to be claimed BEFORE the player scan;
+2. `players with a brother who also played VFL/AFL` reported **"vfl/"** —
+   `CONVERSATIONAL_FILLER` strips `afl` out of `VFL/AFL` and leaves a token that
+   ends in a non-word character;
+3. every blocked father-son form declined on the leftover tokens **"father-son"**
+   and **"selections"**, which is exactly the mechanism Phase D must not disturb.
+
+The probe has served its purpose and is **deleted**; this section is its durable
+record.
+
+### 22.3 Files changed
+
+| File | Change |
+|---|---|
+| `src/search/grid-solver-spec.ts` | six new builders (catalogue **158 → 164**), plus the stale header count/paragraph corrected — it still claimed 137 builders and that family relationships were absent |
+| `src/db/queries/grid-solver.ts` | six new `compileAxis` cases, additive only (69 insertions, 0 deletions) |
+| `src/search/nl/plan.ts` | `relationshipSubject` on the plan; `NL_RELATIONSHIP_POPULATION_BUILDERS` / `NL_RELATIONSHIP_OF_PLAYER_BUILDERS` / `isRelationshipPlan`; the pairing validation; `PARSER_VERSION` 38 + history entry |
+| `src/search/nl/vocab.ts` | the relationship vocabulary: the frame rule, the out-of-scope table, the FS4 cues, the D8 guard, the two noise lists |
+| `src/search/nl/parser.ts` | `extractRelationship` (step 5e) and its four gates: the named declines, the per-player subject requirement, the grain gate, the plan attachment |
+| `src/search/nl/describe.ts` | relationship wording (list, ranked, pinned) and the two answer caveats |
+| `tests/nl-parser.test.ts` | the Phase D block (47 cases) + four fixture players |
+| `tests/nl-plan.test.ts` | the validation block (8 cases) |
+| `tests/nl-describe.test.ts` | the wording block (12 cases) |
+| `tests/grid-solver-spec.test.ts` | catalogue count 158 → 164 |
+| `tests/integration/nl-answers-relationships.test.ts` | **new**: 20 DB-backed cases against hand-written SQL |
+| `tests/tmp-issue152-phase-d-stage0.test.ts` | **deleted** (§22.2) |
+
+### 22.4 The six builders, and the three rules they encode
+
+```
+has_afl_father            person_b (the SON), father linked and played
+has_afl_son               person_a (the FATHER), son linked and played
+has_afl_parent_or_child   either side, the other linked and played  [role-blind]
+brother_of_player(id)     label-backed sibling of the named person
+father_of_player(id)      the named person's father
+son_of_player(id)         the named person's son
+```
+
+1. **Direction is role-typed, never positional.** Every directional builder
+   names `person_a_role = 'father' AND person_b_role = 'son'`. Today this
+   changes nothing (127 of 127 rows are father → son); the day a mother-daughter
+   row is loaded it is the only thing that keeps the answers correct.
+2. **"Brother" stays label-backed** (`brothers` + `twin brothers`), reusing
+   `has_brother` unchanged. `relationship = 'sibling'` also holds sisters and
+   unsexed rows and is never read as "brother".
+3. **An unlinked side is a name, never an identity.** Every builder requires the
+   side it returns to be non-NULL, and every "played" builder requires the OTHER
+   side to have `player_career_stats.games > 0` — the same fail-closed rule
+   `has_brother` already used.
+
+`has_afl_parent_or_child` is deliberately **role-blind**: direction is exactly
+what that question does not ask, and it is the shape whose population (181) was
+measured.
+
+### 22.5 The list-cap contract — inspected, and REUSED, not re-invented
+
+The instruction was to inspect the existing list-cap handling and reuse its
+contract, and not to ship a knowingly truncated complete list. What the
+framework actually has is **explicit over-cap disclosure, not an over-cap
+refusal**:
+
+- `answerList` computes `count(*) OVER ()` **before** `LIMIT`, so `payload.total`
+  is the TRUE size of the qualifying set, never the page size;
+- the headline is that true count — "**658 players match**", not a list;
+- `NlAnswerSection.tsx` prints "**Showing 100 of 658**" under the table and
+  labels it "658 total".
+
+That is the contract every other family in this engine already answers under —
+"who coached Richmond" (42), "players with 200 games" (thousands) — so Phase D
+reuses it rather than inventing a refusal that would make this one family behave
+unlike every other. **Nothing was paginated and nothing returns a silent 100.**
+
+Phase D adds one thing on top, because the instruction's concern is real: an
+answer carrying a relationship predicate now states the cap **in the answer
+itself**, not only in the table footer —
+
+> 658 players qualify. This answer lists the first 100 of them, most games
+> first; it is not the whole list.
+
+— alongside the always-on source boundary:
+
+> AFLDB's family relationships come from a tracked, cited list of football
+> families. A relative it has not linked to a player is a name only, and is
+> counted nowhere here.
+
+**Operator decision D20 — ACCEPTED 2026-09-09.** The operator accepted the
+recommendation: relationship queries whose true result count exceeds 100 use
+AFLDB's **existing capped-list disclosure contract**, not a Phase-D-specific
+refusal.
+
+The accepted contract, in full:
+
+1. the **true total** is computed and reported — `count(*) OVER ()` before
+   `LIMIT`, so it is the size of the qualifying set, never the page size;
+2. the existing **capped table** is rendered;
+3. `Showing 100 of N` is disclosed explicitly, by `NlAnswerSection.tsx`;
+4. the **answer wording itself** states that the displayed rows are not the
+   complete list;
+5. **silent truncation is prohibited.**
+
+No Phase-D-specific refusal is introduced for C2 (658), C3 (181) or FS4 (107)
+merely because their totals exceed the cap. The count IS the answer to "which
+players had a brother who played AFL", and refusing it while disclosing every
+other family's over-cap list would be an inconsistency, not a safety gain.
+
+D20 is held by five assertions in `tests/nl-describe.test.ts` (§23.4): the
+headline is the true total and not the row count; the disclosure names both
+numbers and the phrase "it is not the whole list"; and each of 658, 181 and 107
+answers-with-disclosure rather than declining. The rendered half is covered by
+the eight over-cap rows in the Phase D corpus (§23.1).
+
+### 22.6 Wording
+
+No Phase D answer uses "Players meeting every condition asked for". Every one
+names the relationship:
+
+| Shape | Rendered |
+|---|---|
+| population list | `Players with a brother who played VFL/AFL.` |
+| ” | `Players with a father who played VFL/AFL.` / `… a son who played VFL/AFL.` / `… a parent or child who played VFL/AFL.` |
+| FS4 | `Players whose son was selected under the father–son rule.` |
+| per-player | `Brothers of Brent Harvey.` / `Sons of Brent Harvey.` / `Fathers of Cooper Harvey.` |
+| ranked | `Highest career games among players with a brother who played VFL/AFL.` |
+| pinned yes/no | `Dustin Martin has no recorded brother who played VFL/AFL.` |
+
+"Family" appears in no answer: what a football family IS is precisely what
+`AFLDB-ISSUE-153` has yet to decide, and the word would claim an answer to it.
+"No **recorded** relative" is likewise deliberate — absence in a curated export
+is not absence in life.
+
+### 22.7 What still declines, and how each decline is kept
+
+| Class | Example | Mechanism |
+|---|---|---|
+| FS1/FS2/FS3/FS6 (**D8**) | `father-son selections`, `Geelong father-son selections`, `father-son selections in 2022`, `father-son selections by club` | the **D8 guard**: any father-son wording that is not an explicit FATHER-side FS4 cue stops the extractor dead, consuming nothing, so the pre-existing leftover-token decline stands untouched |
+| C1 / C5 / the family grain (**D6**) | `biggest football families`, `which family has the most AFL players`, `families with three AFL players` | no frame matches, so the extractor never fires and the pre-existing decline stands |
+| sisters, twins, cousins, grandparents, aunts/uncles, spouses/in-laws, mothers/daughters | `which players had a twin brother who played AFL` | named declines, checked BEFORE every supported cue, each stating what the data actually holds |
+| vague family wording | `who are Dustin Martin's family members`, `AFL players related to Phil Krakouer` | named decline; `related to` never broadens into "every relationship type" |
+| pairings | `parent and child pairs who both played AFL` | a pair is not a player; named decline |
+| ambiguous subject | `brothers of Gary Ablett` | fails closed — two real players 10.9 points apart, and answering for the higher-ranked one would silently pick a family member's family |
+| unresolvable subject | `brothers of Some Unknown Person` | fails closed |
+| club scope | `richmond players with a brother who played` | `validatePlan` — no relationship builder owns `clubFor` (the v33 rule) |
+| season scope | `players with a brother who played since 2000` | `validatePlan` — no relationship builder owns a season range |
+| venue / opponent / match type | `players with a brother who played at the mcg` | `validatePlan`'s existing predicate-scope gate |
+| another grain | `most goals in 2015 by a player with a brother who played` | the parser's grain gate: a relationship at any grain but `player_career` would be dropped on the way to SQL (ISSUE-110), so it declines by name |
+
+### 22.8 The one regression the RED tests caught
+
+`Ben Cousins`. `PLAYER_NICKNAMES` maps `cousins` → `ben cousins`, so a bare
+`\bcousins?\b` gate turned **"most goals by ben cousins"** into a family question
+and declined it. This is why every relationship word in this vocabulary requires
+a **frame** — an article, possessive, pronoun, copula, or `of`/`who`/`that` — and
+why `by` is deliberately NOT one of the framing words. The case is now a
+permanent test.
+
+### 22.9 Validation
+
+Everything below was run in this worktree on **2026-09-09**.
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **clean** |
+| `tests/nl-parser.test.ts` | **300/300** (47 new) |
+| `tests/nl-plan.test.ts` | **144/144** (8 new) |
+| `tests/nl-describe.test.ts` | **61/61** (12 new) |
+| `tests/nl-audit-acceptance.test.ts`, `tests/query-intent.test.ts`, `tests/nl-ui-corpus.test.ts`, `tests/gridley-compat.test.ts` | **green, unchanged** |
+| `tests/grid-solver-spec.test.ts` | **16/16** (catalogue 164) |
+| the nine remaining DB-free NL suites (regression corpus, semantic mapping, stress corpora, feedback, search log, h2h describe, expanded-corpus generator) | **485/485** |
+| `tests/integration/nl-answers-relationships.test.ts` | **20/20**, DB-backed against `afldb_test` |
+| `tests/integration/nl-semantic-mapping.test.ts`, `nl-answers.test.ts`, `nl-answer-boundary.test.ts`, `nl-vocab.test.ts` | **61/61** |
+| `tests/integration/nl-answers-{after-siren,coaching,first-kick-goal,game-season,team-club}.test.ts` | **113/113** |
+| `tests/integration/grid-solver.test.ts` | **206/208** — see §22.10 |
+
+The DB-backed suite compares every builder against independently hand-written
+SQL and asserts the measured populations (658 / 181 / 107 / 127) as a fixture
+contract, the role inventory (0 non-father→son rows), both unlinked-side
+witnesses, and the Gary Ablett identity trap.
+
+**Two measured facts that contradicted the test author, not the code:**
+
+1. At PLAYER level the label-backed brother set and the unsexed
+   `relationship = 'sibling'` set are the **same 658 people** — every player
+   reachable through a `siblings`/`twins`-labelled row is already reachable
+   through a `brothers` row, and neither sister row has a linked side. The label
+   restriction is still required (the ROWS differ), so the suite asserts the
+   invariant — brother ⊆ sibling — rather than today's coincidence.
+2. **Gary Ablett Snr has more than one recorded son**, so `son_of_player(4700)`
+   correctly returns two ids. The identity assertion was rewritten to test what
+   actually matters: the same-named son appears as his own id and no two rows
+   collapse together.
+
+### 22.10 Two `tests/integration/grid-solver.test.ts` failures that are NOT Phase D
+
+```
+solves the mapped ISSUE-076 won-final grid ...      expected 282 to be 283
+solves the three ISSUE-103 finals-win cells ...     won_x_games_1: expected 3644 to be 3658
+```
+
+Both are a solver-versus-in-test-oracle disagreement on **won-final eligibility**,
+stable across two consecutive runs. They are **provably not this phase**: the
+Phase D diff adds 69 lines to `src/db/queries/grid-solver.ts` with **zero
+deletions**, and the only deletions in `src/search/grid-solver-spec.ts` are six
+comment lines. No executable line in the finals path was touched.
+
+Not investigated, not edited, and no issue filed without the operator: the
+recommendation is to allocate **`AFLDB-ISSUE-154`** (the next free ID) for a
+solver-versus-oracle disagreement in `won_final` eligibility on `afldb_test`,
+with the two failures above as its evidence.
+
+### 22.11 Deviations from the brief, and why
+
+1. **The over-cap forms answer with disclosure rather than refusing.** The
+   framework has no over-cap refusal to reuse; it has explicit disclosure, and
+   that is what "reuse its contract" resolves to. Recorded as **D20** in §22.5
+   with the one-line reversal if the operator disagrees.
+2. **`parent and child pairs …` declines** rather than answering as C3. A pair
+   is not a player, and the instruction was explicit that Phase D builds no
+   family grain.
+3. **The catalogue header comment was corrected** (it claimed 137 builders when
+   158 existed, and claimed family relationships were absent when `has_brother`
+   had been there since ISSUE-118). `docs/search.md:346` still says 137 and was
+   left alone — a documentation-only drift, outside this phase.
+4. **`/\bare\b/` was added to the relationship clause noise** rather than to
+   `STOPWORDS`. Every other copula is a stopword and this one is not, which is
+   why "who ARE Brent Harvey's brothers" resolved a player called "are dustin
+   martin". Fixing it globally would have been the better fix and a wider blast
+   radius; it is contained to a relationship reading for now and recorded here
+   as a candidate.
+
+### 22.12 What Phase D does NOT do
+
+- No family grain, no `family_key` grouping, no ISSUE-153 semantics.
+- No migration; nothing in the schema changed.
+- **No rendered/browser acceptance yet** — no Phase G re-run, no corpus rows
+  added, no `nl:stress`, no deploy, and nothing committed.
+- The DB-backed suite proves the SQL against `afldb_test`; it does not prove the
+  rendered page. That is the next gate (§22.13).
+
+### 22.13 Proposed rendered Phase D corpus (BUILT — see §23)
+
+Additive only, in the Phase G shape: two new files under
+`tests/nl-ui/corpora/`, merged by `build-phase-g-corpora.ts`, leaving the pinned
+271 and 1,495 untouched until the operator approves the new totals.
+
+`afldb-ui-questions-relationships-v1-<date>.csv` — **26 expected-answer rows**
+
+| Family | Rows |
+|---|---|
+| C2 population | 4 (`which players had a brother who played AFL`, `players with a brother who also played VFL/AFL`, `which AFL players had brothers who played`, `AFL players with a brother who played`) |
+| C2 ranked / pinned | 4 (`most games by a player with a brother who played AFL`, `most goals by a player with a brother who played`, `did Dustin Martin have a brother who played AFL`, `did Brent Harvey have a brother who played AFL`) |
+| C3 symmetric | 3 |
+| C3 directional | 4 (`players whose father also played AFL`, `players whose son also played AFL`, plus one ranked each) |
+| C4 per-player | 6 (Brent Harvey brothers/son, Cooper Harvey father, Gary Ablett **Snr** son with the disambiguated name form, David Cloke's sons, Marcus Ashcroft's son) |
+| FS4 | 5 (`fathers of father-son selections`, `which father-son fathers played the most games`, `most games by a father whose son was selected under the father-son rule`, `players whose son was selected under the father-son rule`, `did Brent Harvey have a son selected under the father-son rule`) |
+
+`afldb-ui-questions-relationships-decline-v1-<date>.csv` — **22 expected-decline
+rows**: the six blocked father-son forms, the three C1/C5 family-grain forms,
+the eight out-of-scope relationship families, the two vague forms, the
+ambiguous-subject form, the pairings form, and the four scope forms (club,
+season, venue, other grain).
+
+Pinned totals after the merge would become **P3 271 → 319** and **P4 1,495
+unchanged**.
+
+**Superseded by §23**, which is what was actually built. Two deviations from
+the proposal above are recorded in §23.2; the counts (26 / 22 / 48) and the
+families are unchanged.
+
+### 22.14 Status
+
+**Phase D (unblocked half) is TECHNICALLY COMPLETE and green at every gate that
+does not need a browser.** ISSUE-152 stays **OPEN** for: the blocked Phase D
+half (C1/FS1–FS3/FS6, with `AFLDB-ISSUE-153`), Phase F, the rendered Phase D
+corpus and Phase G re-run, the uncommitted working tree, and the un-run deploy
+(migrations **092 and 093 must reach `afldb_dev` and production BEFORE the
+code**).
+
+The rendered corpus and its acceptance harness are now built — §23. The
+rendered RUN itself is still outstanding.
+
+---
+
+## 23. Phase D — rendered corpus and acceptance harness BUILT 2026-09-09
+
+The gate §22.12 named as missing. Two additive corpora, one additive runner,
+one additive merged set, and the static pins that hold all of it. **No sweep
+has been run yet**; §23.7 is the exact command that runs it.
+
+### 23.1 The two corpora
+
+Additive only, in the Phase G shape, tracked under `tests/nl-ui/corpora/`:
+
+| File | Rows |
+|---|---|
+| `afldb-ui-questions-relationships-v1-20260909.csv` | **26**, every one `plan` |
+| `afldb-ui-questions-relationships-decline-v1-20260909.csv` | **22**, every one `decline` |
+| | **48** |
+
+Scope is the authorised half and nothing else — **C2, C3, C4, FS4**:
+
+| Category | Rows | What it holds |
+|---|---|---|
+| `rel_brother_population` | 4 | the C2 list, four phrasings including `VFL/AFL` |
+| `rel_brother_ranked` | 2 | C2 composed with a games ranking and a goals ranking |
+| `rel_brother_pinned` | 2 | the pinned yes/no, including the **Ben Cousins** case |
+| `rel_parent_child_symmetric` | 3 | C3 role-blind, list and ranked |
+| `rel_parent_child_directional` | 4 | father and son directions, list and ranked each |
+| `rel_of_player` | 6 | C4: Brent Harvey's brothers (two phrasings) and son, Cooper Harvey's father, Gary Ablett Snr's sons, David Cloke's sons |
+| `rel_father_son_rule` | 5 | FS4 list, ranked, spelled-out and pinned |
+
+The 22 decline rows are **one row per boundary**, each named by its category so
+a phrasing that starts answering one of them fails the sweep by name rather
+than silently: `rel_decline_family_grain` (C1/D6), `rel_decline_family_size`
+(C5/C6), `rel_decline_fs1` / `_fs2` / `_fs3` / `_fs6` (D8, ISSUE-153),
+`rel_decline_vague_family`, `rel_decline_vague_related`, `rel_decline_sister`,
+`_twin`, `_cousin`, `_grandparent`, `_uncle`, `_in_law`, `_mother`,
+`rel_decline_pairing`, `rel_decline_ambiguous_subject`, and the five scopes no
+relationship builder owns — `rel_decline_scope_club`, `_season`, `_venue`,
+`_opponent`, `_match_type`.
+
+**The Ben Cousins regression (§22.8) is preserved as a rendered pair**: the
+plan row `did Ben Cousins have a brother who played AFL` (the surname resolving
+as a player while a relationship cue is present) sits opposite the decline row
+`which AFL players are cousins` (the relationship word itself). The stronger of
+the two is the plan row: it is the only corpus question where the collision and
+a real relationship cue occur together.
+
+### 23.2 Two deviations from the §22.13 proposal
+
+1. **`did Brent Harvey have a brother who played AFL` was replaced by `did Ben
+   Cousins have a brother who played AFL`.** The proposal's Harvey row was a
+   second pinned C2 yes/no; the Cousins row is a pinned C2 yes/no that ALSO
+   carries the §22.8 regression, and Brent Harvey is already pinned by
+   `rel_026`. Coverage is strictly larger for the same row.
+2. **Marcus Ashcroft's son was dropped for a second C3 ranked row.** `sons of
+   Gary Ablett Snr` (2 sons) and `who are David Cloke's sons` (3 sons) already
+   prove the multi-row per-player shape, and the spare row buys the symmetric
+   C3 ranking, which otherwise had none.
+
+Counts and families are otherwise exactly as proposed.
+
+### 23.3 Every row was verified against `afldb_test` BEFORE being pinned
+
+A throwaway DB-backed probe parsed all 48 questions through
+`buildNlParseContext()` + `parseNlQuestion()` + `validatePlan()` and, for each
+plan row, executed the real `executePlan()` and rendered it through
+`describeAnswer()` / `answerCaveats()`. **48 of 48 behaved as the corpus
+claims**, on the same database the sweep server uses. The probe was deleted;
+this is its record.
+
+What it established beyond the plan/decline verdict:
+
+- the three over-cap populations render as measured — **658**, **181**, **107**
+  — each with the D20 disclosure naming both numbers;
+- `sons of Gary Ablett Snr` resolves the **father, id 4700** (2 sons), not the
+  son — the identity trap of §22.9 point 2, now proven in the rendered path;
+- `who are David Cloke's sons` returns **3**;
+- the 22 decline rows split into **17 parser declines** (`status = none`) and
+  **5 `validatePlan` refusals** (club, season, venue, opponent, match type) —
+  both render as not-`answered`, which is what the sweep scores;
+- the two pinned negatives render as an ANSWER, not an empty panel:
+  `Dustin Martin — no` / `Dustin Martin has no recorded brother who played
+  VFL/AFL`. `NlAnswerSection` only takes the `.empty` branch for
+  `payload.kind === 'unanswerable'`, so a zero-row `player_career` still
+  renders the "How was this calculated?" trace the sweep looks for.
+
+### 23.4 D20, in code
+
+`answerCaveats` already implemented the accepted contract (§22.5). What this
+slice adds is the acceptance evidence for it — five assertions in
+`tests/nl-describe.test.ts`:
+
+- the headline is the **true total** and not the number of rows carried
+  (658 reported from a 1-row payload);
+- the disclosure names **both** numbers and the phrase `it is not the whole
+  list`;
+- **658, 181 and 107** each answer-with-disclosure rather than declining, with
+  the relationship named in the interpretation.
+
+Plus the eight over-cap rows in the corpus itself, which prove the same thing
+through the rendered page.
+
+### 23.5 The merged set, and why Phase G could not simply be widened
+
+The accepted Phase G evidence is the historical statement **271 = 212 plan + 59
+decline, green at P3-r2** (§21.3), and §19.3 identifies throttled rows by their
+**position** in that corpus. Both statements stay checkable only while the
+271-row corpus keeps its size AND its row order.
+
+So Phase D **appends** rather than editing:
+
+| Set | Output | Rows | Plan | Decline | Batches |
+|---|---|---|---|---|---|
+| `new` (Phase G P3) | `phase-g-new-family-271.csv` | 271 | 212 | 59 | 3 |
+| **`current` (Phase D)** | `phase-d-current-new-family-319.csv` | **319** | **238** | **81** | **4** |
+| `regression` (Phase G P4) | `phase-g-regression-1495.csv` | 1,495 | 1,435 | 60 | 15 |
+
+`current` lists the six Phase B/C/E sources in the **same order** as `new`, then
+the two relationship corpora. Rows 1–271 of the 319-row file are byte-for-byte
+the 271-row file — checked with `diff` when it was built, and permanently by
+`tests/nl-ui-corpus.test.ts`, which reads both merged files back through
+`readUiCorpus` and compares the prefix. The Phase D rows are 272–319.
+
+**238 = 212 + 26. 81 = 59 + 22. 319 = 271 + 48.**
+
+### 23.6 Files changed
+
+| File | Change |
+|---|---|
+| `tests/nl-ui/corpora/afldb-ui-questions-relationships-v1-20260909.csv` | **new**, 26 plan rows |
+| `tests/nl-ui/corpora/afldb-ui-questions-relationships-decline-v1-20260909.csv` | **new**, 22 decline rows |
+| `tools/issue-152/phase-d-corpus.ps1` | **new**: the Phase D acceptance runner (P5) |
+| `tools/issue-152/build-phase-g-corpora.ts` | the `current` set, `PLAYWRIGHT_BATCH_SIZE` / `expectedBatches`, and a main-module guard so the unit suite can import the set table without writing into the evidence tree |
+| `tools/issue-152/phase-g-common.ps1` | `Invoke-PhaseGCorpusBuild` accepts `current` (one `ValidateSet` entry) |
+| `tools/issue-152/phase-g-verify.ps1` | `-Set new`/`-Set current`, defaulting to `new`; the pinned rows/plan/decline/batches now come from a per-set table |
+| `tools/issue-152/README.md` | the new runner, the third set, the new generated paths |
+| `tests/nl-ui-corpus.test.ts` | the Phase D corpus-shape block and the merged-set pins (§23.8) |
+| `tests/nl-describe.test.ts` | the five D20 assertions (§23.4) |
+
+**Nothing in `src/` changed in this slice.** Parser stays at **v38**, no
+migration, no schema change. The historical Phase G runners, corpora and
+preserved evidence are untouched.
+
+### 23.7 The rendered Phase D acceptance run — NOT YET RUN
+
+Three windows, unchanged from Phase G:
+
+```powershell
+# window 1
+.\tools\issue-152\phase-g-tunnel.ps1
+
+# window 2
+.\tools\issue-152\phase-g-server.ps1
+
+# window 3 -- static first, then the sweep (~12 minutes at 2,200 ms x 1 worker)
+.\tools\issue-152\phase-g-verify.ps1 -Set current
+.\tools\issue-152\phase-d-corpus.ps1
+```
+
+`phase-d-corpus.ps1` keeps every P3 guard for the reason P3 acquired it
+(§19.2): 2,200 ms pacing at **one** worker, `NL_UI_LIMIT` refused rather than
+inherited, a throttled load recorded as `page_error` and failing the gates, and
+an `-OutName` claimed before the run and never overwritten. It adds four
+refusals of its own — a corpus that is not 319/238/81, a corpus that does not
+slice into 4 Playwright batches, the P3/P4 run tags, and a missing tunnel
+(TCP probe; no psql and no database client anywhere in the script).
+
+Run tag **`issue152-phased-p5`**, output preserved at
+`nl-ui-out-152-phaseg/p5-phase-d-current/`. Expected: **319/319 observed, 0
+failures, 0 unscored, 0 metamorphic, 0 rate-limit detections.**
+
+### 23.8 Validation, 2026-09-09
+
+Everything below was run in this worktree.
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **clean** |
+| `tests/nl-parser.test.ts`, `nl-plan.test.ts`, `nl-describe.test.ts`, `nl-audit-acceptance.test.ts`, `query-intent.test.ts`, `grid-solver-spec.test.ts`, `nl-ui-corpus.test.ts` | **627/627** |
+| `tests/nl-regression-corpus.test.ts`, `nl-stress-corpus.test.ts`, `nl-expanded-ui-corpus-generator.test.ts`, `gridley-compat.test.ts` | **232/232** |
+| `tests/integration/nl-answers-relationships.test.ts` | **20/20**, DB-backed against `afldb_test` |
+| `tests/integration/nl-semantic-mapping.test.ts` | **22/22** |
+| `phase-g-verify.ps1 -Set current` | **PASS** — corpus 319/238/81, `playwright --list` enumerated **4** batch tests, `2.2s` rejected |
+| `phase-g-verify.ps1` (default, `new`) | **PASS** — corpus 271/212/59, **3** batches. Unchanged. |
+| `tests/phase-g-preserve-static.test.ps1` | **PASS**, 30 assertions |
+| the 48-row DB-backed corpus probe (§23.3) | **48/48**, then deleted |
+
+The static pins are stated **three times, independently** — in
+`PHASE_G_SETS.current`, in `phase-d-corpus.ps1`, and in
+`tests/nl-ui-corpus.test.ts` — so a corpus edit has to be made three times on
+purpose before a sweep can quietly change size.
+
+`tests/integration/grid-solver.test.ts` still has the **two** finals failures of
+§22.10. They are outside ISSUE-152, were not investigated and were not
+modified, and that suite is **not** claimed green.
+
+### 23.9 Status
+
+Phase D's rendered corpus and acceptance harness are **BUILT and statically
+green**. The rendered RUN is the next action and has not been performed.
+
+ISSUE-152 stays **OPEN** for:
+
+- the **rendered Phase D acceptance run** (§23.7) and the P4 regression re-run;
+- the **blocked Phase D half** — C1, C5/C6, FS1, FS2, FS3, FS6, and the D6/D8
+  decisions — which remain with `AFLDB-ISSUE-153` and are covered here only by
+  decline rows;
+- **Phase F**;
+- the uncommitted working tree;
+- the un-run deploy — migrations **092 and 093 must reach `afldb_dev` and
+  production BEFORE the code**.
+
+No Git write, commit, merge or deploy was performed in this slice.
+
+---
+
+## 24. Phase D — RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09 (P5-r2 319/319, P4-r1 1,495/1,495)
+
+§23 built the Phase D corpus and harness and left the rendered run as the next
+action. It has now been performed. **The unblocked Phase D slice — C2, C3, C4
+and FS4 — is complete and green through a real browser against a real build.**
+
+`PARSER_VERSION` stays **38**. **No migration.** Nothing in `src/` changed
+during acceptance or closeout — the only edits since `50f8c54` that touch
+executable behaviour are the Phase D implementation of §22, which was already
+green before the sweep started.
+
+### 24.1 P5 attempt 1 — INADMISSIBLE, and why it is recorded rather than deleted
+
+The first P5 attempt is **inadmissible evidence and is not counted anywhere**.
+It ran against a **stale, pre-Phase-D standalone build**: the sweep exercised
+the transport correctly, but the code under it did not contain the six new
+relationship builders, so every relationship row measured the old parser.
+
+This is the same class of defect as §19.2 and §19.7 — a run whose transport is
+sound and whose *subject* is wrong — and it is kept for the same reason: a
+Phase G/D run that looks clean is not automatically a run that measured this
+branch. The pre-run discriminator below exists because of it.
+
+### 24.2 The discriminator — Phase D rendering proved BEFORE P5-r2 was started
+
+Before P5-r2 was launched, a **fresh discriminator** was run against the rebuilt
+standalone server to prove the served build actually contained Phase D: a
+relationship question that only the §22 builders can answer was asked through
+the running server and **rendered a Phase D relationship answer**, not the
+pre-Phase-D decline.
+
+That check is what makes P5-r2 admissible. Without it, 319 green rows prove only
+that 319 rows agreed with something.
+
+### 24.3 P5-r2 — the merged 319-row `current` set, GREEN
+
+| | |
+|---|---|
+| Run tag | `issue152-phased-p5r2` |
+| Preserved output | `nl-ui-out-152-phaseg/p5-phase-d-current-r2/` |
+| Observed | **319 / 319** |
+| Answered | 238 |
+| Unanswerable | 21 |
+| Absent | 60 |
+| Pass | **319** |
+| Fail | **0** |
+| Unscored | **0** |
+| Rate-limit detections | **0** |
+| `page_error` | **0** |
+| `http_error` | **0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **4 / 4 passed** |
+
+238 + 21 + 60 = 319, and 238 plan / 81 decline is exactly the pinned
+`PHASE_G_SETS.current` shape asserted independently in three places (§23.7).
+
+### 24.4 P4-r1 — the 1,495-row regression gate, re-run fresh and UNCHANGED
+
+| | |
+|---|---|
+| Run tag | `issue152-phased-p4r1` |
+| Preserved output | `nl-ui-out-152-phaseg/p4-regression-phase-d-r1/` |
+| Observed | **1,495 / 1,495** |
+| Answered | 1,435 |
+| Unanswerable | 60 |
+| Pass | **1,495** |
+| Fail | **0** |
+| Unscored | **0** |
+| Rate-limit detections | **0** |
+| `page_error` | **0** |
+| `http_error` | **0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **15 / 15 passed** |
+
+The 1,435 + 60 shape is **identical** to P4-r1 under Phase G (§21.4). Four
+parser versions, three new grains, a deleted false decline and six new grid
+builders have moved **no** existing answer in either direction.
+
+This is a **fresh** run under its own tag against the Phase D build — not a
+citation of the Phase G result.
+
+### 24.5 Historical Phase G evidence does not move
+
+The Phase G P3 and P4 preserved runs are **untouched**. Phase D appended a
+separate `current` set whose first 271 rows are byte-for-byte the pinned 271-row
+file, so every position-based statement in §19.3, §20 and §21 survives
+unchanged. `phase-g-new-corpus.ps1` still runs exactly the accepted
+271 = 212 + 59 corpus, and `phase-g-verify.ps1` with no `-Set` still reports it.
+
+Preserved output remains immutable: a re-run under an already-claimed `-OutName`
+is refused, not overwritten (`tests/phase-g-preserve-static.test.ps1`).
+
+### 24.6 What this slice does and does not close
+
+**Complete and green:** **C2**, **C3**, **C4**, **FS4**.
+
+**Still incomplete, blocked, or deliberately out of this slice:**
+
+| Item | State |
+|---|---|
+| **C1** | BLOCKED on `AFLDB-ISSUE-153` (F1). Decline row only. |
+| **C5**, **C6** | Out of this slice. Decline rows only. |
+| **FS1**, **FS2**, **FS3**, **FS6** | BLOCKED on `AFLDB-ISSUE-153` (F1). Decline rows only. |
+| **D6**, **D8** | Deferred operator decisions; sit with `AFLDB-ISSUE-153`. |
+| **Phase F** | NOT STARTED. Gated on B–D (§9). |
+
+Every blocked boundary above is held by a **named decline row** in the rendered
+corpus, so the refusal is a measured behaviour and not an absence of coverage.
+
+**D20 is ACCEPTED** (§22.5, §23.4) and its capped-list disclosure contract is
+now proved end-to-end: the eight over-cap rows rendered a true total, the
+existing capped table and explicit "Showing 100 of N" wording, with no
+Phase-D-specific refusal introduced for 658 / 181 / 107.
+
+The **authoritative `afldb_test` evidence of Stage 0 remains the basis** for
+every semantic claim in this issue. The rendered sweep confirms the browser
+agrees with it; it does not replace it.
+
+### 24.7 Closeout validation, 2026-09-09
+
+Non-destructive. Run in this worktree after P5-r2 and P4-r1. **No sweep was
+re-run — no executable behaviour changed during closeout.**
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **clean**, exit 0 |
+| 16 focused DB-free NL suites (parser, plan, describe, audit-acceptance, ui-corpus, regression-corpus, stress-corpus, stress-v2, semantic-mapping, head-to-head-describe, feedback, answer-feedback-boundary, search-log, expanded-ui-corpus-generator, query-intent, admin-nl-search-actions) | **1,107 / 1,107**, 16/16 files |
+| `tests/grid-solver-spec.test.ts` | **16 / 16** |
+| `tests/integration/nl-answers-relationships.test.ts` | **20 / 20**, DB-backed against `afldb_test` |
+| `tests/integration/nl-semantic-mapping.test.ts` | **22 / 22**, DB-backed against `afldb_test` |
+| `phase-g-verify.ps1 -Set current` | **PASS**, all six gates — corpus **319 / 238 / 81**, `playwright --list` enumerated **4** batches, `2.2s` rejected, `2200` accepted |
+| `phase-g-verify.ps1` (default, `new`) | **PASS**, all six gates — corpus **271 / 212 / 59**, **3** batches. **UNCHANGED.** |
+| `tests/phase-g-preserve-static.test.ps1` | **PASS**, 30 assertions |
+| `git diff --check` | **clean** — no whitespace errors, no conflict markers |
+
+The two DB-backed suites were run over the operator's `55432` SSH forward to
+`afldb_test`. Read-only NL answer assertions; production untouched; no
+migration, privilege or state-changing command was issued.
+
+### 24.8 The two `tests/integration/grid-solver.test.ts` failures are still NOT ISSUE-152
+
+Unchanged from §22.10 and §23.8: that suite still has **two** won-final
+failures (282 vs 283, 3,644 vs 3,658). They are **outside ISSUE-152**, were not
+investigated, were not touched during acceptance or closeout, and that suite is
+**not** claimed green. Recommend allocating `AFLDB-ISSUE-154`.
+
+### 24.9 Status
+
+The **unblocked Phase D slice is COMPLETE, RENDERED and GREEN.** Phases B, C, D
+(unblocked half), E and G are all green; the working tree is reviewed and ready
+for the operator to stage.
+
+**ISSUE-152 stays OPEN** for:
+
+- the **blocked Phase D half** — C1, C5/C6, FS1, FS2, FS3, FS6 and the D6/D8
+  decisions — which remain with `AFLDB-ISSUE-153`;
+- **Phase F**, which has not started and is gated on B–D;
+- the **uncommitted working tree** — everything since `50f8c54`;
+- the **un-run deploy** — migrations **092 and 093 must both reach `afldb_dev`
+  and production BEFORE the code**, or the telemetry grain CHECK drops rows
+  silently while answers render correctly;
+- the decision on whether `nl:stress` runs before deploy — it has still NOT been
+  run for B, C, D or E.
+
+**Do not resolve ISSUE-152 on this evidence.** No Git write, commit, merge or
+deploy was performed in this slice.

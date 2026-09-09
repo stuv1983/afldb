@@ -67,6 +67,9 @@ import {
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
   FIRST_KICK_CONSECUTIVE_MAX, FIRST_KICK_CONSECUTIVE_RE, FIRST_KICK_GOAL_RE,
   FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
+  FATHER_SON_FATHER_CUES, FATHER_SON_FATHER_NOISE, FATHER_SON_RULE_RE,
+  RELATIONSHIP_CLAUSE_NOISE, RELATIONSHIP_OF_PLAYER_RE, RELATIONSHIP_OUT_OF_SCOPE,
+  RELATIONSHIP_POPULATION_CUES, RELATIONSHIP_POSSESSIVE_RE, RELATIONSHIP_SYMMETRIC_CUES,
   DECADE_RE,
   MATCH_EVENT_WORDS, RIVALRY_WORDS,
   CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
@@ -500,6 +503,158 @@ function extractFirstKickGoal(text: string): FirstKickGoalExtraction {
     ...(onlyCareerGoal ? { onlyCareerGoal } : {}),
     consumed,
   };
+}
+
+// --------------------------------------------------- family relationships
+
+/** The per-player relationship builders, keyed by the noun the reader used. */
+const RELATIONSHIP_OF_PLAYER_BUILDER: Record<string, 'brother_of_player' | 'father_of_player' | 'son_of_player'> = {
+  brother: 'brother_of_player',
+  brothers: 'brother_of_player',
+  father: 'father_of_player',
+  fathers: 'father_of_player',
+  son: 'son_of_player',
+  sons: 'son_of_player',
+};
+
+/** Possessive nouns that name a family AFLDB cannot answer, with the reason. */
+const RELATIONSHIP_POSSESSIVE_DECLINE: [RegExp, string][] = [
+  [/^sisters?$/, 'AFLDB records 8 sister relationships and has no way to search them; only brothers are searchable.'],
+  [/^twins?$/, 'AFLDB\'s brother record does not separate twins from other brothers, so a twins-only question cannot be answered.'],
+  [/^cousins?$/, 'AFLDB holds no cousin relationships at all.'],
+  [/^(?:mothers?|daughters?)$/, 'Every parent-child relationship AFLDB records is a father and a son.'],
+  [/^(?:famil(?:y|ies)|family members?|relatives?)$/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
+];
+
+type RelationshipExtraction = {
+  text: string;
+  consumed: string[];
+  /** Parameterless population predicates this reading emits. */
+  builders?: string[];
+  /** A per-player reading, awaiting the named person's id at plan assembly. */
+  ofPlayerBuilder?: 'brother_of_player' | 'father_of_player' | 'son_of_player';
+  /** A recognised relationship family this engine cannot answer; the value is the reason to state. */
+  declined?: string;
+};
+
+/**
+ * AFLDB-ISSUE-152 Phase D. Reads a family-relationship question, in the
+ * half of the family that has a witness in the data.
+ *
+ * Order is the whole design, and each step exists to stop the next one
+ * claiming something it must not:
+ *
+ *  1. FS4 first -- the FATHER's side of the father-son draft rule.
+ *  2. Any OTHER father-son wording then stops this extractor dead,
+ *     consuming nothing, so FS1/FS2/FS3/FS6 keep declining on their own
+ *     leftover tokens until AFLDB-ISSUE-153 settles what the bare phrase
+ *     means (D8). Without this step the "father"/"son" cues below would
+ *     read "father-son selections" as a parent-child question and answer
+ *     a different question confidently.
+ *  3. The out-of-scope families, BEFORE the supported ones, because "a
+ *     twin brother" contains "a brother" and "a sister" contains none of
+ *     them but must still decline by name rather than as an unknown word.
+ *  4. The per-player readings, which need the noun claimed before the
+ *     player-name scan runs -- "who is Brent Harvey's son" resolves the
+ *     player only once "son" is out of the way.
+ *  5. The symmetric parent-or-child reading, ahead of the directional
+ *     ones, so "the parent or child of another player" is one question.
+ *  6. The directional population readings.
+ *
+ * `raw` is the reader's original question: canonicalise strips the
+ * possessive that distinguishes "Brent Harvey's son" from "did Brent
+ * Harvey have a son", so that apostrophe has to be read here.
+ */
+function extractRelationship(text: string, raw: string): RelationshipExtraction {
+  const consumed: string[] = [];
+  const finish = (result: Omit<RelationshipExtraction, 'text' | 'consumed'>, remaining: string): RelationshipExtraction => {
+    let cleaned = remaining;
+    for (const noise of RELATIONSHIP_CLAUSE_NOISE) {
+      const match = noise.exec(cleaned);
+      if (!match) continue;
+      // Replaced directly rather than through stripMatch: "vfl/" ends in
+      // a non-word character, so stripMatch's trailing \b would not match
+      // it and the token would survive as an unexplained leftover.
+      consumed.push(match[0]);
+      cleaned = cleaned.replace(noise, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return { text: cleaned, consumed, ...result };
+  };
+
+  // 1. FS4.
+  for (const cue of FATHER_SON_FATHER_CUES) {
+    const match = cue.exec(text);
+    if (!match) continue;
+    consumed.push(match[0]);
+    let remaining = stripMatch(text, match[0]);
+    for (const noise of FATHER_SON_FATHER_NOISE) {
+      const noiseMatch = noise.exec(remaining);
+      if (!noiseMatch) continue;
+      consumed.push(noiseMatch[0]);
+      remaining = stripMatch(remaining, noiseMatch[0]);
+    }
+    return finish({ builders: ['father_son_father'] }, remaining);
+  }
+
+  // 2. The D8 guard.
+  if (FATHER_SON_RULE_RE.test(text)) return { text, consumed: [] };
+
+  // 3. Out of scope, by name.
+  const possessive = RELATIONSHIP_POSSESSIVE_RE.exec(raw.toLowerCase());
+  const possessiveNoun = possessive?.[1];
+  if (possessiveNoun) {
+    for (const [re, reason] of RELATIONSHIP_POSSESSIVE_DECLINE) {
+      if (re.test(possessiveNoun)) return { text, consumed: [], declined: reason };
+    }
+  }
+  for (const [re, reason] of RELATIONSHIP_OUT_OF_SCOPE) {
+    if (re.test(text)) return { text, consumed: [], declined: reason };
+  }
+
+  // 4. The per-player readings.
+  const ofForm = RELATIONSHIP_OF_PLAYER_RE.exec(text);
+  if (ofForm) {
+    consumed.push(ofForm[0]);
+    return finish(
+      { ofPlayerBuilder: RELATIONSHIP_OF_PLAYER_BUILDER[ofForm[1]] },
+      stripMatch(text, ofForm[0]),
+    );
+  }
+  if (possessiveNoun && Object.hasOwn(RELATIONSHIP_OF_PLAYER_BUILDER, possessiveNoun)) {
+    const noun = new RegExp(String.raw`\b${possessiveNoun}\b`).exec(text);
+    if (noun) {
+      consumed.push(noun[0]);
+      return finish(
+        { ofPlayerBuilder: RELATIONSHIP_OF_PLAYER_BUILDER[possessiveNoun] },
+        stripMatch(text, noun[0]),
+      );
+    }
+  }
+
+  // 5. The symmetric reading.
+  if (RELATIONSHIP_SYMMETRIC_CUES.some((cue) => cue.test(text))) {
+    let remaining = text;
+    for (const cue of RELATIONSHIP_SYMMETRIC_CUES) {
+      const match = cue.exec(remaining);
+      if (!match) continue;
+      consumed.push(match[0]);
+      remaining = stripMatch(remaining, match[0]);
+    }
+    return finish({ builders: ['has_afl_parent_or_child'] }, remaining);
+  }
+
+  // 6. The directional population readings.
+  const builders: string[] = [];
+  let remaining = text;
+  for (const [cue, builder] of RELATIONSHIP_POPULATION_CUES) {
+    const match = cue.exec(remaining);
+    if (!match) continue;
+    builders.push(builder);
+    consumed.push(match[0]);
+    remaining = stripMatch(remaining, match[0]);
+  }
+  if (builders.length === 0) return { text, consumed: [] };
+  return finish({ builders }, remaining);
 }
 
 // ------------------------------------------- marquee matches & rivalries
@@ -1754,6 +1909,29 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     return { status: 'none', reason: 'unrecognised', report };
   }
 
+  // 5e. Family relationships (AFLDB-ISSUE-152 Phase D). Placed here, after
+  // the achievement phrase and before every metric extractor and the
+  // player-name scan, for the reason step 5a is: the relationship noun has
+  // to be claimed before "brothers"/"son" can be swallowed into a
+  // candidate player span. "who is Brent Harvey's son" resolved a player
+  // called "brent harvey son" and declined before this ran.
+  //
+  // Suppressed for a coaching or after-siren question, and fails closed
+  // rather than dropping half the reading: neither grain carries
+  // careerPredicates, so a relationship claimed here would be silently
+  // discarded on the way to the plan (the ISSUE-110 defect).
+  const relationshipResult: RelationshipExtraction = coachReading !== null || afterSirenReading
+    ? { text, consumed: [] }
+    : extractRelationship(text, query);
+  text = relationshipResult.text;
+  consumedTokens.push(...relationshipResult.consumed);
+  if (relationshipResult.declined) {
+    report.confidence = 1;
+    report.notes.push(relationshipResult.declined);
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  const relationshipRead = !!relationshipResult.builders || !!relationshipResult.ofPlayerBuilder;
+
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
   // single-game grain cue in one step, so "games" never lingers in the
   // text for the player-name scan to misread.
@@ -2150,6 +2328,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     }
   }
 
+  // AFLDB-ISSUE-152 Phase D. A per-player relationship question is ABOUT
+  // somebody, and fails closed when that somebody is not one certain
+  // person: "brothers of Gary Ablett" names two real players 10.9 points
+  // apart, and answering for whichever ranked first would silently pick a
+  // family member's family. An unresolved or merely plausible mention is
+  // the same refusal -- there is no honest answer to "brothers of" nobody.
+  if (relationshipResult.ofPlayerBuilder
+      && (!player || playerCertainty < 1 || ambiguousCandidateIds !== undefined)) {
+    report.confidence = 1;
+    report.notes.push(
+      player
+        ? 'That name matches more than one player, so AFLDB cannot say whose relatives were asked for.'
+        : 'A question about one player\'s relatives has to name a player AFLDB can identify.',
+    );
+    return { status: 'none', reason: player ? 'ambiguous' : 'unrecognised', report };
+  }
+
   // ---------------------------------------------------------- grain election
 
   let grain: NlQueryPlan['grain'];
@@ -2323,6 +2518,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   }
 
   if (grain === 'player_game' && mode === undefined) mode = inOneGame ? 'single' : 'sum';
+
+  // AFLDB-ISSUE-152 Phase D. A relationship is a fact about a career, and
+  // careerPredicates exist at no other grain. "most goals in 2015 by a
+  // player with a brother who played" elects player_season, where the
+  // relationship would be dropped on the way to SQL and the reader would
+  // be shown a 2015 goalkicking leaderboard under a question about
+  // brothers. Refusing by name is the honest outcome (ISSUE-110).
+  if (relationshipRead && grain !== 'player_career') {
+    report.confidence = 1;
+    report.notes.push(
+      'A family-relationship question is answered across whole careers, '
+      + 'so it cannot also be limited to a single season, game or venue.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
+  }
 
   // A coaching record is TOTALLED across the seasons in scope; there is no
   // per-season coaching grain. "most wins in a season by a coach" would
@@ -2567,6 +2777,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (grain === 'player_career' && coachReading === 'premiership_coach') {
     careerPredicates.push({ builder: 'premiership_coach', params: {} });
   }
+  // AFLDB-ISSUE-152 Phase D. The population readings are parameterless
+  // predicates; the per-player reading takes the resolved person's id as
+  // its parameter and is paired with relationshipSubject on the plan, so
+  // the sentence the reader sees names the same person the SQL binds.
+  // Neither owns a club or a season, so a plan carrying either fails
+  // validatePlan's ownership gate rather than answering unscoped.
+  if (grain === 'player_career' && relationshipResult.builders) {
+    for (const builder of relationshipResult.builders) careerPredicates.push({ builder, params: {} });
+  }
+  if (grain === 'player_career' && relationshipResult.ofPlayerBuilder && player) {
+    careerPredicates.push({
+      builder: relationshipResult.ofPlayerBuilder,
+      params: { player: String(player.id) },
+    });
+  }
   if (grain === 'player_career' && achievementResult.achievementKey) {
     if (clubFor) {
       careerPredicates.push({ builder: 'first_kick_goal_for_club', params: { club: String(clubFor.entity.organizationId) } });
@@ -2721,13 +2946,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   if (afterSirenReading && sirenCondition !== undefined) metricCondition = sirenCondition;
 
+  // AFLDB-ISSUE-152 Phase D. In a per-player relationship question the
+  // named person is the OBJECT, not the subject: Brent Harvey is not one
+  // of Brent Harvey's brothers, and leaving him in `player` would pin the
+  // answer to his own id and return him, or nobody. He moves to
+  // relationshipSubject, where the predicate's bound parameter already
+  // carries his id and the answer can still say whose brothers these are.
+  const relationshipSubject = relationshipResult.ofPlayerBuilder ? player : undefined;
+  const subjectPlayer = relationshipResult.ofPlayerBuilder ? undefined : player;
+
   const plan: NlQueryPlan = {
     v: 1,
     grain,
     metric,
     ...(grain === 'player_game' ? { mode } : {}),
     agg,
-    ...(player ? { player } : {}),
+    ...(subjectPlayer ? { player: subjectPlayer } : {}),
+    ...(relationshipSubject ? { relationshipSubject } : {}),
     ...(coach && grain === 'coach_record' ? { coach } : {}),
     scope,
     ...(metricCondition ? { metricCondition } : {}),

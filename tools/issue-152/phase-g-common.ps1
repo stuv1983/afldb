@@ -496,7 +496,10 @@ function Invoke-PhaseGCorpusBuild {
        repository -- no scratch or temp path is involved. #>
     param(
         [Parameter(Mandatory)][string] $RepoRoot,
-        [Parameter(Mandatory)][ValidateSet('new', 'regression')][string] $Set
+        # 'current' is the AFLDB-ISSUE-152 Phase D set: the pinned 271 plus the
+        # two relationship corpora, 319 rows. 'new' is untouched and still means
+        # exactly the 271 rows Phase G P3-r2 accepted.
+        [Parameter(Mandatory)][ValidateSet('new', 'current', 'regression')][string] $Set
     )
 
     Push-Location $RepoRoot

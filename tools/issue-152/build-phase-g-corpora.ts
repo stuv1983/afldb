@@ -18,6 +18,7 @@
  * so a merge that corrupted a row fails here rather than in the browser.
  *
  *   npx tsx tools/issue-152/build-phase-g-corpora.ts new
+ *   npx tsx tools/issue-152/build-phase-g-corpora.ts current
  *   npx tsx tools/issue-152/build-phase-g-corpora.ts regression
  *   npx tsx tools/issue-152/build-phase-g-corpora.ts all
  *
@@ -39,7 +40,19 @@ export const PHASE_G_ROOT = 'nl-ui-out-152-phaseg';
 const CORPORA_DIR = `${PHASE_G_ROOT}/corpora`;
 const SOURCE_DIR = 'tests/nl-ui/corpora';
 
-export type PhaseGSetName = 'new' | 'regression';
+export type PhaseGSetName = 'new' | 'current' | 'regression';
+
+/**
+ * `tests/nl-ui/nl-stress.spec.ts` slices the corpus into Playwright tests
+ * of this size. Exported so a runner can state up front how many batches
+ * a set should produce: a run that reports a different number read a
+ * different corpus than the one it says it read.
+ */
+export const PLAYWRIGHT_BATCH_SIZE = 100;
+
+export function expectedBatches(rows: number): number {
+  return Math.ceil(rows / PLAYWRIGHT_BATCH_SIZE);
+}
 
 export type PhaseGSet = {
   name: PhaseGSetName;
@@ -75,6 +88,37 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv`,
     ],
     expected: { rows: 271, plan: 212, decline: 59, unknown: 0 },
+  },
+
+  /**
+   * AFLDB-ISSUE-152 Phase D. The CURRENT new-family acceptance set: the
+   * pinned 271 above plus the two additive relationship corpora, 319 rows.
+   *
+   * This is a SEPARATE set, not an edit to `new`. Phase G's accepted
+   * evidence is the historical statement "271 = 212 plan + 59 decline,
+   * green at P3-r2" (§21.3), and that statement stays checkable only
+   * while the corpus it names keeps its size and its row order. Phase D
+   * therefore appends: the six Phase B/C/E sources are listed here in the
+   * SAME order as `new`, so rows 1-271 of this file are byte-for-byte the
+   * rows 1-271 of the 271-row file and §19.3's position-based statements
+   * survive unchanged. The 48 Phase D rows are 272-319.
+   *
+   * 238 plan = 212 + 26. 81 decline = 59 + 22.
+   */
+  current: {
+    name: 'current',
+    output: `${CORPORA_DIR}/phase-d-current-new-family-319.csv`,
+    sources: [
+      `${SOURCE_DIR}/afldb-ui-questions-coaching-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-coaching-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-after-siren-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-after-siren-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-first-kick-goal-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-relationships-v1-20260909.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-relationships-decline-v1-20260909.csv`,
+    ],
+    expected: { rows: 319, plan: 238, decline: 81, unknown: 0 },
   },
 
   /**
@@ -182,11 +226,18 @@ export function buildSet(set: PhaseGSet, outDir?: string): PhaseGBuildResult {
   return { set: set.name, path: outputPath, ...counts, sources: set.sources };
 }
 
-const requested = process.argv[2] ?? 'all';
-const names: PhaseGSetName[] = requested === 'all'
-  ? ['new', 'regression']
-  : requested === 'new' || requested === 'regression'
-    ? [requested]
-    : (() => { throw new Error(`unknown set "${requested}"; expected new, regression or all`); })();
+/**
+ * Only when run as a script. tests/nl-ui-corpus.test.ts imports
+ * PHASE_G_SETS to pin the merged sizes, and an unguarded top-level build
+ * would write into the evidence tree every time the unit suite runs.
+ */
+if (/build-phase-g-corpora/.test(process.argv[1] ?? '')) {
+  const requested = process.argv[2] ?? 'all';
+  const names: PhaseGSetName[] = requested === 'all'
+    ? ['new', 'current', 'regression']
+    : requested === 'new' || requested === 'current' || requested === 'regression'
+      ? [requested]
+      : (() => { throw new Error(`unknown set "${requested}"; expected new, current, regression or all`); })();
 
-for (const name of names) console.log(JSON.stringify(buildSet(PHASE_G_SETS[name])));
+  for (const name of names) console.log(JSON.stringify(buildSet(PHASE_G_SETS[name])));
+}

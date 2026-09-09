@@ -13,6 +13,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { buildSet, expectedBatches, PHASE_G_SETS } from '../tools/issue-152/build-phase-g-corpora';
 import {
   groupByCore, hydrationByWorker, metamorphicViolations, questionCore, readUiCorpus,
   scoreObservation, summarise,
@@ -250,6 +251,154 @@ describe('readUiCorpus', () => {
     ]) {
       expect(declineFamilies.has(family), family).toBe(true);
     }
+  });
+
+  // ------------------------------------------------ Phase D relationships
+
+  const REL_PLAN = 'tests/nl-ui/corpora/afldb-ui-questions-relationships-v1-20260909.csv';
+  const REL_DECLINE = 'tests/nl-ui/corpora/afldb-ui-questions-relationships-decline-v1-20260909.csv';
+
+  it('leaves every pre-Phase-D gate free of relationship wording', () => {
+    // AFLDB-ISSUE-152 Phase D is ADDITIVE in exactly the way B, C and E
+    // were, and here the claim is unusually strong: not one question in
+    // the 1,435/60 gates or in the Phase B/C/E corpora contains ANY
+    // relationship word, so the six new builders cannot change the
+    // meaning of a single existing row. Asserted rather than assumed.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id)
+        .not.toMatch(/\b(brothers?|sisters?|cousins?|twins?|famil(y|ies)|fathers?|mothers?|sons?|daughters?|parents?|uncles?|aunts?|grandfathers?|grandmothers?|related)\b/i);
+    }
+  });
+
+  it('reads the Phase D relationship corpora with the expected shape', () => {
+    const plans = readUiCorpus(REL_PLAN);
+    const declines = readUiCorpus(REL_DECLINE);
+    expect(plans).toHaveLength(26);
+    expect(declines).toHaveLength(22);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase D row is a relationship question; none belongs in
+    // another file, and none of them mentions the siren or a first kick.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id)
+        .toMatch(/\b(brothers?|brother-in-law|sisters?|cousins?|twins?|famil(y|ies)|fathers?|mothers?|sons?|daughters?|parents?|uncles?|grandfathers?|related)\b/i);
+      expect(row.question, row.id).not.toMatch(/siren|first[- ]kick/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // §22 covers the UNBLOCKED half only. Every plan family is one of the
+    // four authorised classes; a fifth would mean the phase grew.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'rel_brother_population', 'rel_brother_ranked', 'rel_brother_pinned',
+      'rel_parent_child_symmetric', 'rel_parent_child_directional',
+      'rel_of_player', 'rel_father_son_rule',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    expect(categories.size).toBe(7);
+  });
+
+  it('keeps a named decline row for every boundary Phase D did NOT cross', () => {
+    // Each of these is a class that must still decline: the blocked
+    // father-son selection forms (D8, ISSUE-153), the family grain (D6),
+    // the relationship types with no witness in the data, the vague
+    // forms, pairings, an ambiguous subject, and the five scopes no
+    // relationship builder owns. One row each, named, so a phrasing that
+    // starts answering one of them fails the sweep BY NAME rather than
+    // silently.
+    const declineFamilies = new Set(readUiCorpus(REL_DECLINE).map((row) => row.category));
+    for (const family of [
+      'rel_decline_family_grain', 'rel_decline_family_size',
+      'rel_decline_fs1', 'rel_decline_fs2', 'rel_decline_fs3', 'rel_decline_fs6',
+      'rel_decline_vague_family', 'rel_decline_vague_related',
+      'rel_decline_sister', 'rel_decline_twin', 'rel_decline_cousin',
+      'rel_decline_grandparent', 'rel_decline_uncle', 'rel_decline_in_law',
+      'rel_decline_mother', 'rel_decline_pairing', 'rel_decline_ambiguous_subject',
+      'rel_decline_scope_club', 'rel_decline_scope_season', 'rel_decline_scope_venue',
+      'rel_decline_scope_opponent', 'rel_decline_scope_match_type',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+    expect(declineFamilies.size).toBe(22);
+  });
+
+  it('keeps the Ben Cousins regression case as a rendered row', () => {
+    // AFLDB-ISSUE-152 §22.8. PLAYER_NICKNAMES maps "cousins" -> "ben
+    // cousins", so an unframed \bcousins?\b gate turned a question ABOUT
+    // Ben Cousins into a question about cousins and declined it. The
+    // corpus carries both halves: the surname resolving as a player next
+    // to a relationship cue (plan), and the relationship word itself
+    // (decline).
+    const cousins = readUiCorpus(REL_PLAN).find((row) => /ben cousins/i.test(row.question));
+    expect(cousins).toBeDefined();
+    expect(cousins!.expectedStatus).toBe('plan');
+    const family = readUiCorpus(REL_DECLINE).find((row) => row.category === 'rel_decline_cousin');
+    expect(family!.expectedStatus).toBe('decline');
+  });
+});
+
+// ------------------------------------------------------- merged sweep sets
+
+/**
+ * The merged corpora the Phase G and Phase D runners actually drive.
+ *
+ * Pinned here rather than only inside build-phase-g-corpora.ts because the
+ * builder asserts what it merged against its own table: if both numbers
+ * lived in one file, editing a corpus and editing the expectation would be
+ * the same edit. The Phase G totals are the ACCEPTED historical evidence
+ * (AFLDB-ISSUE-152 §21) and must not move; the `current` set is Phase D's
+ * separate, additive acceptance set.
+ */
+describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
+  function build(name: 'new' | 'current' | 'regression') {
+    return buildSet(PHASE_G_SETS[name], mkdtempSync(join(tmpdir(), 'afldb-sets-')));
+  }
+
+  it('the accepted Phase G P3 set is still exactly 271 = 212 + 59', () => {
+    const result = build('new');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 271, plan: 212, decline: 59 });
+    expect(expectedBatches(result.rows)).toBe(3);
+  });
+
+  it('the accepted Phase G P4 regression gate is still exactly 1,495', () => {
+    const result = build('regression');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 1495, plan: 1435, decline: 60 });
+  });
+
+  it('the current Phase D set is 319 = 238 plan + 81 decline', () => {
+    const result = build('current');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 319, plan: 238, decline: 81 });
+    // 271 + 48, 212 + 26, 59 + 22 -- the arithmetic stated in the issue.
+    expect(result.rows).toBe(271 + 48);
+    expect(result.plan).toBe(212 + 26);
+    expect(result.decline).toBe(59 + 22);
+    // nl-stress.spec.ts slices at NL_UI_BATCH (default 100), and the Phase D
+    // runner refuses a corpus that does not produce this many batches.
+    expect(expectedBatches(result.rows)).toBe(4);
+  });
+
+  it('the current set APPENDS: its first 271 rows are the P3 corpus, in order', () => {
+    // §19.3 identifies throttled rows by corpus POSITION, so Phase G's
+    // statements stay checkable only while rows 1-271 never move.
+    const phaseG = readUiCorpus(build('new').path);
+    const current = readUiCorpus(build('current').path);
+    expect(current.slice(0, phaseG.length)).toEqual(phaseG);
+    expect(current.slice(phaseG.length)).toHaveLength(48);
+    expect(current.slice(phaseG.length).every((row) => /^rel_/.test(row.id))).toBe(true);
   });
 });
 
