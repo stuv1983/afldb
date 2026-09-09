@@ -5,3 +5,4 @@ fkg_dec_003,fkg_decline_negated,players who never kicked a goal with their first
 fkg_dec_004,fkg_decline_summary_modifier,which club has had the most players goal with each of their first three kicks,decline,"summary,consecutive"
 fkg_dec_005,fkg_decline_scope,players who kicked a goal with each of their first three kicks at the mcg,decline,"venue,unowned"
 fkg_dec_006,fkg_decline_range,players who kicked a goal with each of their first 40 kicks,decline,"range,bounds"
+fkg_dec_007,fkg_decline_ambiguous_player,did gary ablett kick a goal with his first kick,decline,"player,ambiguous"

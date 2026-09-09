@@ -217,7 +217,7 @@ describe('readUiCorpus', () => {
     const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv');
     const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv');
     expect(plans).toHaveLength(20);
-    expect(declines).toHaveLength(6);
+    expect(declines).toHaveLength(7);
     expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
     expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
     // Every Phase E row is a first-kick question; none belongs in another
@@ -241,6 +241,12 @@ describe('readUiCorpus', () => {
     for (const family of [
       'fkg_decline_no_further_kicks', 'fkg_decline_kickless', 'fkg_decline_negated',
       'fkg_decline_summary_modifier', 'fkg_decline_scope', 'fkg_decline_range',
+      // AFLDB-ISSUE-152 Phase G. An unsuffixed "gary ablett" names two
+      // players in afldb_test (4700 and 4701, identical display_name AND
+      // slug), so the shared resolver declines it -- the rule asserted in
+      // tests/nl-semantic-mapping.test.ts, reached here through the
+      // first-kick-goal family. The suffixed form is fkg_005.
+      'fkg_decline_ambiguous_player',
     ]) {
       expect(declineFamilies.has(family), family).toBe(true);
     }

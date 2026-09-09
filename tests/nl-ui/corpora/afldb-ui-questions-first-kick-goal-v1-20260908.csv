@@ -3,7 +3,7 @@ fkg_001,fkg_holder_list,players who kicked a goal with their first kick,plan,"li
 fkg_002,fkg_holder_list,first kick goal players,plan,"list,short"
 fkg_003,fkg_holder_list,how many players have kicked a goal with their first kick,plan,"list,count"
 fkg_004,fkg_named_player,did dustin martin kick a goal with his first kick,plan,"player,yes-no"
-fkg_005,fkg_named_player,did gary ablett kick a goal with his first kick,plan,"player,yes-no"
+fkg_005,fkg_named_player,did gary ablett jr kick a goal with his first kick,plan,"player,yes-no,suffix-alias"
 fkg_006,fkg_club_scope,carlton players who kicked a goal with their first kick,plan,"club,lineage"
 fkg_007,fkg_club_scope,collingwood first kick goal players,plan,"club,short"
 fkg_008,fkg_season_scope,players who kicked a goal with their first kick in the 1940s,plan,"season,decade"

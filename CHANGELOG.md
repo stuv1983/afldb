@@ -15,6 +15,42 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - the new record families pass a full browser sweep, and the existing 1,495-question gate is untouched (AFLDB-ISSUE-152 Phase G) - 9 September 2026
+
+- The coaching, after-the-siren and first-kick-goal questions added over the last three parser
+  versions have now been asked through a real browser against a real build, not just through unit
+  tests. All 271 of them agreed with what they were supposed to do: 212 answered, 59 declined,
+  nothing failed, nothing went unscored, and not one page errored.
+- The 1,495-question regression corpus that guards everything AFLDB could already answer was then
+  re-run in full. It came back 1,435 answered and 60 declined - its exact previous shape. Two new
+  grains, a deleted false decline and three new refusals moved no existing answer in either
+  direction.
+- A sweep can no longer mistake rate limiting for an answer. `/search` limits how many questions one
+  address may ask per minute, and a limited page renders "Too many searches" with no answer section -
+  which looked byte-for-byte identical to a correct decline. A sweep that outran the limiter therefore
+  reported fiction in both directions at once: every throttled real question counted as a failure, and
+  every throttled decline counted as a pass. Throttling is now detected by name and reported as the
+  loud page-level error it is, so a run either measures the search engine or says plainly that it did
+  not.
+- Sweeps can also now pace themselves, and the pacing is validated rather than assumed. A delay
+  written as "2.2s" instead of 2200 would previously have read as not-a-number, silently switched
+  pacing off, and produced exactly the throttled run the setting exists to prevent. It is now
+  rejected outright.
+- Two players are named Gary Ablett, and the tests now say so. Asked about an unsuffixed "Gary
+  Ablett", AFLDB declines rather than guessing which of the two it means - that has been true since
+  the ambiguity rules were written, and it is correct. But a test fixture had long stood in a single
+  invented candidate for that name, which made the bare name look uniquely resolvable to anyone
+  writing tests against it. The fixture now carries both players, the ambiguity contract is asserted
+  directly, and the question that exposed the gap is kept as a permanent decline case.
+- Rendered acceptance is now a repeatable procedure rather than a set of one-off commands: tunnel,
+  server, static verification, a short paced smoke test, then the two sweeps, with status and
+  post-mortem tools alongside. Preserved evidence from a completed run is immutable and a re-run
+  refuses to overwrite it, so a later run can never quietly replace the record it is meant to be
+  compared against.
+- No application, parser, planner, query, schema or permission behaviour changed in this work. The
+  corpus grew by one decline case and one question was rewritten to name a player unambiguously; the
+  strict corpus-size guard that caught the change was kept, not relaxed.
+
 ### Natural-language search - the first-kick-goal record answers its last two questions (AFLDB-ISSUE-152 Phase E) - 9 September 2026
 
 - AFLDB's curated first-kick-goal record has been searchable in plain English for a while: who did it,

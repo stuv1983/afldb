@@ -43,7 +43,18 @@ const COACHES: NlCoachDirectoryEntry[] = [
 
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
-  'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
+  // TWO candidates, because afldb_test holds two: players 4700 and 4701
+  // share the display name "Gary Ablett" AND the slug "gary-ablett", and
+  // the real resolver returns them 10.9 points apart. The single-candidate
+  // stand-in this replaces made an unsuffixed "gary ablett" look uniquely
+  // resolvable to anyone writing a test against it -- which is how the
+  // Phase G corpus came to expect a plan for a question the engine has
+  // declined by design since AFLDB-ISSUE-110. The contract itself is
+  // asserted in tests/nl-semantic-mapping.test.ts.
+  'gary ablett': [
+    { ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000, matchedName: 'Gary Ablett' },
+    { ref: { id: 102, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 990, matchedName: 'Gary Ablett' },
+  ],
   // AFLDB-ISSUE-152 Phase C: the measured joint holder of "most goals
   // after the siren" (2, tied with Gary Rohan).
   'barry hall': [{ ref: { id: 1001, slug: 'barry-hall', name: 'Barry Hall' }, score: 1000 }],

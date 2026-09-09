@@ -9,7 +9,7 @@
 | Base SHA | `c2761e64e9089f9e38572145e67a6ab2fee0fe12` (`Merge branch 'opus/issue-110-semantic-closeout'`) |
 | Base freshness | `main` is AT that SHA — it has not advanced. `git merge-base HEAD main` = the same commit. |
 | Parser baseline | `PARSER_VERSION` **34** (`src/search/nl/plan.ts:312`). **Not incremented by Stage 0.** |
-| Status | **OPEN — STAGE 0 COMPLETE; PHASE B TECHNICALLY COMPLETE 2026-09-08 (all gates run, F5 CLOSED); PHASES C–F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 requires DB-backed verification; D6/D8 deferred to AFLDB-ISSUE-153. Phase B implementation recorded at **§14**; its last two blocked gates were executed on 2026-09-08 and both passed (§14.4). Phase C implementation is recorded at **§16**. The **Phase E plan is at §17 — PLAN ONLY, NOT IMPLEMENTED**, blocked on operator decision **E-D2** (the D11 loader gate). The issue stays OPEN for Phases D–F and for the un-run rendered/browser and deploy steps only. |
+| Status | **OPEN — STAGE 0 COMPLETE; PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASES D AND F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 SATISFIED by the authorised `afldb_test` load (§18.2); D6/D8 deferred to AFLDB-ISSUE-153. Implementations: **§14** Phase B (`e8f5f67`), **§16** Phase C (`47a645f`), **§18** Phase E (`75d207d`) — §17 is superseded by §18. **§19–§21 record Phase G**: P3-r2 **271/271** and P4-r1 **1,495/1,495**, both with every transport gate at zero (§21.3, §21.4). The issue stays OPEN for **Phase D** (F1-dependent half blocked on AFLDB-ISSUE-153), **Phase F** (gated on B–D), the **uncommitted Phase G working tree**, and the **un-run deploy steps** — migrations **092 and 093 must both reach `afldb_dev` and production BEFORE the code**. |
 | Migration | **One — `092_nl_search_log_coach_record_grain.sql` (Phase B, F5).** Stage 0's "none proposed" is superseded by implementation evidence (§14.6): the ninth `NlGrain` cannot be admitted without extending the `nl_search_log.grain` CHECK. Applied to `afldb_test` and verified 2026-09-08. |
 | Found | 2026-09-08 |
 | Evidence executed | 2026-09-08, `afldb_test` over the operator's `55432` tunnel, read-only, `ROLLBACK`. Production untouched. |
@@ -915,10 +915,12 @@ touch neither table.
 
 Phase A (this document) is complete pending operator answers to §7.
 
-> **Progress 2026-09-09.** **B — DONE** (committed `e8f5f67`, §14). **C — DONE**
-> (committed `47a645f`, §16). **E — DONE** (technically complete, uncommitted,
-> §18). **D and F have NOT started**, and **G** has not run for any phase: no
-> rendered/browser acceptance and no `nl:stress` has been executed for B, C or E.
+> **Progress 2026-09-09 (updated at Phase G closeout).** **B — DONE** (committed
+> `e8f5f67`, §14). **C — DONE** (committed `47a645f`, §16). **E — DONE** (committed
+> `75d207d`, §18). **G — DONE and GREEN for B, C and E** (§21): rendered browser
+> acceptance passed at **271/271** (new families) and **1,495/1,495** (the existing
+> gate). **D and F have NOT started.** `nl:stress` has still NOT been run, and
+> nothing has been deployed.
 
 | Phase | Content | Gate |
 |---|---|---|
@@ -3731,3 +3733,511 @@ E adds no third migration but does not retire that ordering requirement.
 (§14.4.1, §16.7) remain out of scope, uninvestigated and unedited.
 
 **Phases D, F and G remain untouched and are NOT started.**
+
+---
+
+## 19. Phase G — P1 PASS, P3 attempt 1 INADMISSIBLE (2026-09-09 local / 2026-09-08Z)
+
+§9 defines Phase G as "New ISSUE-152 corpus; rendered DEV acceptance", gated on
+"1,435 + 60 unchanged and still green", but writes no procedure. This section is
+the procedure, and the record of the first attempt.
+
+### 19.1 What was run
+
+| Step | Command | Result |
+|---|---|---|
+| P1 build gate | `npm run build` (Windows, `AFLDB_BUILD_WORKERS=4`, `DATABASE_URL` -> `afldb_test`) | **PASS** — `next build --webpack` + `prepare-standalone.mjs` |
+| P2 server | `npx next start -p 3100`, `afldb_test` over the 55432 tunnel | served |
+| P3 rendered sweep | `playwright test --config playwright.nl-stress.config.ts --project nl-stress --no-deps`, 270 rows (the six additive corpora merged) | **INADMISSIBLE — see §19.2** |
+| P4 existing gates | 1,435 + 60 | **NOT RUN**, deliberately |
+
+Rendered acceptance runs against a **local production build of this branch**,
+not against DEV: DEV serves `main`, which has no `coach_record` grain, no
+`after_siren` grain and no Phase E wording, so a DEV sweep would measure the
+wrong code. The beta gate is `off` in this worktree, so `auth.setup.ts` is
+skipped with `--no-deps` over a `tests/nl-ui/.auth/state.json` carrying only
+`afldb_consent=declined` (gitignored; no admission is faked, because there is
+nothing to be admitted past).
+
+### 19.2 P3 attempt 1 — transport PASS, semantics INADMISSIBLE
+
+**Reported:** 270/270 observed, 88 pass, 182 fail, outcomes `answered 30`,
+`absent 240`, `unanswerable 0`, `http_error 0`, `page_error 0`, zero client
+errors, zero filler disagreements. Preserved at `nl-ui-out-152-new/`.
+
+**What that run actually established:**
+
+- **Transport and browser execution completed.** 270 navigations, every one
+  HTTP 200, no page error, no console error, no hydration error.
+- **Semantic evidence is INADMISSIBLE.** `/search` enforces a per-IP,
+  **per-process** rate limit of **30 requests / 60 seconds** in front of the NL
+  pipeline (`src/app/search/rate-limit.ts:5`, `new RateLimiter(30, 60_000)`,
+  keyed `ip:${requestIp()}`; AFLDB-ISSUE-120, `CHANGELOG.md:1742`). A limited
+  request renders "Too many searches" **without calling `globalSearch()`** and
+  without writing an `nl_search_log` row.
+- **Exactly 30 requests traversed the NL pipeline** — the limiter's entire
+  budget. `npx next start` is ONE process, so both Playwright workers shared
+  ONE limiter and split it 15/15, which is why the passes are the first 15 rows
+  of each worker's first batch (`coach_001`-`coach_015`,
+  `siren_077`-`siren_091`) rather than any semantic family.
+- **The remaining 240 were rate-limited**, not answered and not declined. The
+  whole run took **26 seconds** (`20:53:07.115Z` -> `~20:53:33`), inside one
+  fixed 60-second window, so the budget never refilled. Throttled rows returned
+  in **77-191 ms** (document byte at ~52 ms) against **207-918 ms** for answered
+  rows — far too fast for even one statement over the 55432 tunnel.
+- **All 58 apparent decline passes are DISCARDED as evidence.** A throttled page
+  carries no answer panel, which is exactly what a correct decline looks like to
+  the harness, so those rows would have "passed" with the database switched off.
+- **Phase G P3 remains UNPROVEN, not failed.** No parser, planner, compiler or
+  renderer defect is implicated, and none was changed.
+
+The adjacent-row proof, same builder, same grain, consecutive requests:
+
+```
+coach_015  "Leigh Matthews coaching record"  answered  207ms  "Leigh Matthews - 461 games, 267-8-186"
+coach_016  "Ron Barassi coaching record"     absent     81ms  (no panel)
+```
+
+### 19.3 What the 30 admissible observations DO prove
+
+- **`coach_record` renders end-to-end** — list ("42 coaches"), count, and career
+  ("Leigh Matthews - 461 games, 267-8-186") shapes.
+- **`after_siren` renders end-to-end** with correct interpretations and real
+  counts — 62 game-winning, 9 levelling, 25 misses, 21 behinds, 18
+  missed-and-lost.
+- **App-role reads on `afldb_test` work for `coaches`, `match_coaches` and
+  `after_siren_kicks`** — the migration 087/089 fail-closed grant hazard is ruled
+  out for those three tables.
+- **First-kick-goal has NO rendered evidence in either direction.** All 20 plan
+  rows sat at corpus positions 245-264, behind the throttle.
+
+### 19.4 Why this was never seen before
+
+The limiter landed on **1 September 2026** (ISSUE-120). The last large UI sweeps
+were **18-19 August 2026**. Phase G is the first `nl:ui` run since, and
+`playwright.nl-stress.config.ts` still describes a 12,000-load run taking "the
+better part of an hour" (~200/min) — 6.7x the limit. Every gate ISSUE-152 has
+passed so far (parser, plan, describe, acceptance, and the DB-backed integration
+suites) calls the engine **in-process** and never traverses HTTP, so none of them
+can meet the limiter.
+
+### 19.5 Harness change — the only edit (2026-09-09)
+
+`tests/nl-ui/nl-stress.spec.ts` — `observe()` now recognises the rendered
+"Too many searches" branch and records it as **`page_error`**, the existing
+crash class, which fails the batch loudly and at once. Scored as `absent` it
+marked every throttled plan row a semantic failure AND every throttled decline
+row a pass — fiction in both directions.
+
+**No new outcome value, no scoring change, no corpus change, no timeout change,
+and no application change.** `scoreObservation` already fails a crash under
+every expectation (`tests/nl-ui-corpus.test.ts:322`), so the consequence is
+pinned by an existing test. `observe()` is not exported and needs a live
+Playwright `Page`, so the DOM detection itself has no isolated unit surface;
+its proof is the re-run.
+
+**The rate limiter was NOT changed, disabled or weakened, and must not be.**
+
+### 19.6 The re-run shape
+
+The deployed runtime shape, so each forked worker holds its own limiter exactly
+as production does: `node deploy/server-cluster.mjs` with `AFLDB_WORKERS=8`
+against `afldb_test`, driven by **one** Playwright worker
+(`NL_UI_WORKERS=1`). The standalone server does not read `.env`, so the
+environment must be exported into the process first. Node's cluster does not
+round-robin on Windows, so worker count carries the margin rather than
+scheduling fairness.
+
+Independent confirmation that a re-run actually reached the pipeline: rows in
+`nl_search_log` tagged `issue152-phaseg-*` should equal the corpus size.
+Attempt 1 should show **30**.
+
+### 19.7 Smoke r1 — INADMISSIBLE infrastructure evidence (2026-09-09)
+
+The first paced smoke run (40 coaching rows, tag `issue152-phaseg-smoke`)
+returned **40/40 HTTP 500**. It is inadmissible, and no semantic conclusion of
+any kind may be drawn from it.
+
+**Root cause — proven, not inferred.** The persisted standalone server log
+carries the exception:
+
+```text
+Error: connect ECONNREFUSED 127.0.0.1:55432
+```
+
+This workstation runs no PostgreSQL server. Every Phase G DSN reaches the
+database through an SSH forward on `127.0.0.1:55432`, and that forward was not
+running. Nothing else was wrong:
+
+| Ruled out | Evidence |
+|---|---|
+| Phase B/C/E semantics | No question reached the parser; the failure precedes `globalSearch()`. |
+| Parser / planner | Same. `/search` with **no** query — `getSiteSettings()` alone — also returned 500. |
+| Rate limiter, pacing | 0 rate-limit detections across all 40 rows; the limiter is in-memory and fails open (`src/app/search/rate-limit.ts`). |
+| Grants on `afldb_test` | No connection was ever established, so no grant was ever exercised. |
+| Standalone runtime | `/` returned 200 — one of 1,472 build-time prerenders. The process, bundle, static assets and module resolution were all healthy. |
+
+**What r1 does establish:** pacing works. 40 observed rows, 0 rate-limit
+detections, 0 `page_error`. That is the entire admissible content of the run.
+
+**What it cannot establish:** anything end-to-end. It wrote **no**
+`nl_search_log` rows, so it has no telemetry provenance either.
+
+**Why `/` looked healthy while every question failed.** `/` is prerendered and
+touches no database; `/search` is `force-dynamic` (`src/app/search/page.tsx`)
+and calls `getSiteSettings()` before any query-specific work. `getSiteSettings`
+swallows only `42P01`, so a dead pool correctly rethrows and renders 500. A
+green `/` proved the server, and nothing about the database.
+
+**Harness changes, so this cannot recur silently (no application code, no DB
+grant, no parser/planner/limiter/pacing change):**
+
+- `tools/issue-152/phase-g-tunnel.ps1` — new. Window 1 holds the forward:
+  `ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:55432:127.0.0.1:5432
+  arm@10.0.40.100`. Local port read from `.env`; no credential read, printed or
+  stored; an occupied port is reported by PID and never terminated.
+- `tools/issue-152/phase-g-server.ps1` — refuses to start unless
+  `127.0.0.1:55432` accepts a connection, with the message *"Phase G PostgreSQL
+  tunnel is not running. Start .\tools\issue-152\phase-g-tunnel.ps1"*. It also
+  now tees the server's stdout and stderr to
+  `nl-ui-out-152-phaseg/server/server-<timestamp>.log` — one file per run,
+  never overwritten, no credential, gitignored. That log is what proved this
+  root cause; before it existed the exception died with the console window.
+- `tools/issue-152/phase-g-diagnose.ps1` — new, read-only. Identifies the
+  process on 3100 by command line, reports the tunnel, probes `/`, `/search`
+  and one coaching question, and prints the log lines those probes produced.
+- `tools/issue-152/phase-g-status.ps1` — new `-- PostgreSQL tunnel 55432 --`
+  block: listening state, owning PID, and a real connect test (an `ssh -L` can
+  hold the socket while the forward behind it is dead).
+
+**The re-run is tagged `issue152-phaseg-smoke-r2`.** r1's tag is retained here
+as the label of an inadmissible run, so a later telemetry query cannot
+accidentally treat the two as one body of evidence.
+
+---
+
+## 20. Phase G — P3 run 1 VALID (269/270); one corpus-contract defect, corrected (2026-09-09)
+
+The first *admissible* P3 run. Unlike attempt 1 (§19.2) nothing was throttled
+and unlike smoke r1 (§19.7) the tunnel was up, so this run's semantics count.
+
+### 20.1 What was run
+
+| | |
+|---|---|
+| Tag | `issue152-phaseg-p3-r1` |
+| Started | 2026-09-09T01:15:13Z |
+| Corpus | merged B+C+E, 270 rows (212 plan / 58 decline), fixed phase order |
+| Pacing | 2,200 ms at **one** worker; 3 batches, 11.3 min |
+| Preserved | `nl-ui-out-152-phaseg/p3-new-family/` (`run-manifest.json`, `summary.json`, `observations-w0.jsonl`, `playwright.json`) |
+
+```text
+NL UI sweep — 270 of 270 questions observed
+  pass 269   fail 1   unscored 0
+  outcomes: answered 211  unanswerable 16  absent 43  http_error 0  page_error 0
+  filler-variant disagreements: 0
+  loads with a client-side error (reported, not failed): 0
+  failures by category: fkg_named_player 1
+```
+
+Every transport gate held: 270/270 observed, **0** `http_error`, **0**
+`page_error`, **0** rate-limit detections, **0** unscored, **0** metamorphic
+violations, **0** client-side errors. Playwright exit 0.
+
+### 20.2 The sole failure was a defect in the corpus, not in the parser
+
+`fkg_005` asked **"did gary ablett kick a goal with his first kick"** with an
+`expected_status` of `plan`. Observed outcome: `absent` (HTTP 200 — the page
+rendered, with no NL answer section).
+
+That is the *correct* behaviour under a contract this issue did not write and
+must not weaken. Two players in the directory are named **Gary Ablett** (ids
+4700 and 4701; see the `ablett-0004` family measured for `AFLDB-ISSUE-153`),
+and `src/search/nl/parser.ts:2092` states the resolver's rule outright:
+
+> the resolver found SOMETHING, just nothing it would commit to — "ablett"
+> surfaces both Gary Abletts below accept strength. That is an ambiguity, not
+> an unknown word.
+
+An unsuffixed "Gary Ablett" therefore resolves to `ambiguousPlayerMention`, and
+the pipeline declines rather than silently answering about whichever record
+sorted first. A question that cannot name one player **must not** be a `plan`
+expectation. The row asserted the opposite, so the corpus was wrong and the
+engine was right.
+
+This is also why the fix is not "add an alias" or "prefer the junior". Guessing
+between two real players is precisely the failure mode `playerId`/`matchedName`
+telemetry exists to make visible (§ISSUE-110, `src/search/nl/plan.ts:1970`).
+
+### 20.3 The correction — one row replaced, one row added
+
+- **`fkg_005` plan row rewritten** to the suffixed form: *"did gary ablett jr
+  kick a goal with his first kick"*, tagged `player,yes-no,suffix-alias`. This
+  keeps the family's named-player coverage and now exercises the Jr/Jnr alias
+  path (`src/search/nl/parser.ts:1383`) rather than an unresolvable mention.
+- **`fkg_dec_007` added** to the first-kick-goal decline corpus with the bare
+  wording — category `fkg_decline_ambiguous_player`, tags `player,ambiguous`.
+  The observed `absent` is a legitimate decline (`tools/nl/ui-corpus.ts:172`),
+  so the run-1 observation already stands as this row's red evidence.
+
+Nothing else was touched: no parser, planner, compiler, renderer, vocabulary,
+query, migration or grant change. `PARSER_VERSION` stays **37**.
+
+### 20.4 New pinned Phase G P3 size — 271
+
+Plan stayed **212** because `fkg_005` was *replaced*, not added; only the
+decline side grew.
+
+| | Before | After |
+|---|---|---|
+| coaching plan / decline | 99 / 25 | 99 / 25 |
+| after-the-siren plan / decline | 93 / 27 | 93 / 27 |
+| first-kick-goal plan / decline | 20 / 6 | 20 / **7** |
+| **Total** | 270 (212 / 58) | **271 (212 / 59)** |
+
+`build-phase-g-corpora.ts` refused to build until this was recorded, which is
+the guard working as designed:
+
+```text
+new: expected 270 rows, merged 271. A tracked corpus changed size --
+update PHASE_G_SETS and the issue record together, rather than loosening the gate.
+```
+
+**The guard was not loosened.** `PHASE_G_SETS.new.expected` is now
+`{ rows: 271, plan: 212, decline: 59, unknown: 0 }` and the merged output is
+renamed `phase-g-new-family-271.csv`. Harness files updated to match, all
+counts pinned rather than relaxed: `tools/issue-152/build-phase-g-corpora.ts`,
+`phase-g-new-corpus.ps1` (banner, decline gate, manifest `kind`, GREEN line),
+`phase-g-verify.ps1` (step 3 expectation), `phase-g-smoke.ps1` (banner text),
+`tools/issue-152/README.md`. `phase-g-status.ps1` needed no change — it counts
+data lines at run time and hard-codes nothing.
+
+### 20.5 What P3 run 1 does and does not prove
+
+**Proves.** The transport is honest end to end, and 269 of 270 rendered
+answers agree with the corpus — including all 58 decline expectations and all
+212 plan expectations except the defective row. This is the first semantic
+evidence for Phases B, C and E through a real browser.
+
+**Does not prove.** P3 acceptance itself. Two rows have never been observed in
+their current form: the rewritten `fkg_005` and the new `fkg_dec_007`. P3-r2
+must run the full 271 — a partial re-run of the two changed rows would not
+re-establish the metamorphic groupings or the transport gates.
+
+### 20.6 Status
+
+Phase G P3 is **NOT YET GREEN — one valid run, one corpus defect found and
+fixed, re-run required.** Tag the re-run `issue152-phaseg-p3-r2`. P4 (the
+1,495-row existing gate) is unchanged by this and has not been run.
+
+> **SUPERSEDED 2026-09-09 — see §21.** The re-run was executed as
+> `issue152-phaseg-p3r2` (not `…-p3-r2`) and passed **271/271**; P4 then ran as
+> `issue152-phaseg-p4r1` and passed **1,495/1,495**. This section is retained as
+> the record of how the corpus defect was found and corrected. Phase G is
+> **COMPLETE**.
+---
+
+## 21. Phase G — COMPLETE 2026-09-09; P3-r2 271/271 and P4-r1 1,495/1,495
+
+§9's Phase G gate — "New ISSUE-152 corpus; rendered DEV acceptance", conditional
+on "1,435 + 60 unchanged and still green" — is **met**. Both sweeps ran to
+completion through a real browser against a local production build of this
+branch, every transport gate held, and **no expectation was relaxed to get
+there**: the strict corpus-size guard, the decline gate and the 1,435/60 gate are
+all still the gates they were.
+
+### 21.1 The full Phase G run ledger
+
+| Step | Run tag | Rows | Result |
+|---|---|---|---|
+| P1 build | — | — | **PASS** (§19.1) |
+| P2 server | — | — | `npx next start -p 3100`, `afldb_test` over the 55432 tunnel |
+| P3 attempt 1 | — | 270 | **INADMISSIBLE** — throttled, measured the rate limiter (§19.2) |
+| Smoke r1 | `issue152-phaseg-smoke-r1` | 40 of 270 | **INADMISSIBLE** — infrastructure, not semantics (§19.7) |
+| Smoke r2 | `issue152-phaseg-smoke-r2` | 40 of 270 | **PASS** — 40/40, paced transport clean |
+| P3 r1 | `issue152-phaseg-p3-r1` | 270 | **VALID, 269/270** — one corpus-contract defect (§20) |
+| P3 r2 | `issue152-phaseg-p3r2` | **271** | **PASS — 271/271** (§21.3) |
+| P4 r1 | `issue152-phaseg-p4r1` | **1,495** | **PASS — 1,495/1,495** (§21.4) |
+
+**Run tags as actually recorded.** §20.6 asked for `issue152-phaseg-p3-r2`; the
+runs were tagged `issue152-phaseg-p3r2` and `issue152-phaseg-p4r1` (no hyphen
+before the run number). The `run-manifest.json` files are authoritative and this
+table matches them, not the earlier suggestion.
+
+### 21.2 Smoke r1 vs smoke r2 — why the distinction is kept
+
+Smoke r1 is retained in this record as **inadmissible infrastructure evidence,
+not a failure**: the Windows-side PostgreSQL tunnel was not up, so the server
+answered `ECONNREFUSED 127.0.0.1:55432` and the sweep measured a database that
+was not reachable rather than the parser (§19.7). Smoke r2, run with the tunnel
+up and the same 2,200 ms pacing at one worker, observed **40 of 40 rows,
+40 answered, 0 `http_error`, 0 `page_error`, 0 rate-limit detections**. That is
+what licensed the two full sweeps below: it proved the *transport* before an
+80-minute run was spent proving semantics on it.
+
+### 21.3 P3-r2 — the pinned 271-row new-family corpus, GREEN
+
+| | |
+|---|---|
+| Tag | `issue152-phaseg-p3r2` |
+| Started | 2026-09-09T02:04:42Z |
+| Corpus | `phase-g-new-family-271.csv` — merged B+C+E, **271 rows (212 plan / 59 decline)** |
+| Pacing | 2,200 ms at **one** worker; 3 Playwright batches, 11.3 min |
+| Preserved | `nl-ui-out-152-phaseg/p3-new-family-r2/` (`run-manifest.json`, `summary.json`, `observations-w0.jsonl`, `playwright.json`) |
+
+```text
+NL UI sweep — 271 of 271 questions observed
+  pass 271   fail 0   unscored 0
+  outcomes: answered 212  unanswerable 16  absent 43  http_error 0  page_error 0
+  filler-variant disagreements: 0
+  loads with a client-side error (reported, not failed): 0
+  no scored failures
+```
+
+Every gate held: **271/271 observed**, **0** fail, **0** unscored, **0**
+`http_error`, **0** `page_error`, **0** rate-limit detections, **0** metamorphic
+(filler-variant) disagreements, **0** client-side errors, `failuresByCategory`
+empty. Playwright exit 0, 3 passed.
+
+The 59 decline expectations resolve as **16 `unanswerable` + 43 `absent`** —
+both are legitimate decline outcomes under `tools/nl/ui-corpus.ts:172`, and the
+split is the corpus's, not a scoring relaxation. The 212 `answered` rows are
+exactly the 212 plan expectations.
+
+**Both rows changed after P3-r1 were observed in their current form**, which is
+what §20.5 said P3-r2 had to establish: the rewritten `fkg_005` ("did gary
+ablett jr kick a goal with his first kick") answered, and the new `fkg_dec_007`
+(bare "gary ablett") declined. The full 271 was re-run rather than the two
+changed rows, so the metamorphic groupings and the transport gates were
+re-established, not inherited.
+
+### 21.4 P4-r1 — the existing 1,435 + 60 regression gate, UNCHANGED and GREEN
+
+| | |
+|---|---|
+| Tag | `issue152-phaseg-p4r1` |
+| Started | 2026-09-09T03:09:35Z |
+| Corpus | `phase-g-regression-1495.csv` — the two tracked v3 corpora of 2026-08-22, merged, **unmodified** |
+| Pacing | 2,200 ms at **one** worker; 15 Playwright batches, 1.1 h |
+| Preserved | `nl-ui-out-152-phaseg/p4-regression-r1/` (same four artefacts) |
+
+```text
+NL UI sweep — 1495 of 1495 questions observed
+  pass 1495   fail 0   unscored 0
+  outcomes: answered 1435  unanswerable 60  absent 0  http_error 0  page_error 0
+  filler-variant disagreements: 0
+  loads with a client-side error (reported, not failed): 0
+  no scored failures
+```
+
+**1,495/1,495 observed, 1,435 answered, 60 unanswerable, 0 fail, 0 unscored, 0
+`http_error`, 0 `page_error`, 0 rate-limit detections, 0 metamorphic
+violations, 0 client-side errors.** All 15 batches passed; Playwright exit 0.
+
+The answered/unanswerable split is **exactly** 1,435 / 60 — the gate's own
+shape. Three parser versions (34 → 37), two new grains, a deleted false decline
+and three new fail-closed refusals moved **no** existing row in either
+direction. `corpusSources` in the manifest names the two tracked CSVs directly,
+so the gate was measured on the tracked files and not on a copy that had drifted.
+
+### 21.5 What Phase G proves — and what it still does not
+
+**Proves.** Rendered, browser-observed semantic acceptance for Phases B, C and
+E: 212 plan and 59 decline expectations agree with the shipped code through the
+real `/search` route, and the pre-existing 1,435/60 gate is untouched by all of
+it. Transport honesty is proven independently of semantics — no throttling, no
+HTTP or page errors, no unscored rows, in either sweep.
+
+**Does not prove.** (1) Anything about **DEV or production**: both sweeps ran
+against a local production build of this branch on `127.0.0.1:3100`, because DEV
+serves `main`, which has neither the `coach_record` nor the `after_siren` grain
+and none of the Phase E wording — a DEV sweep would have measured the wrong code
+(§19.1). (2) Anything about **Phases D and F**, which have not started. (3)
+`npm run build` for deployment purposes beyond the P1 gate, `nl:stress`, or any
+deploy step. The migration ordering requirement is untouched: **092 AND 093 must
+both reach `afldb_dev` and production BEFORE the code.**
+
+### 21.6 The corpus correction, restated for the record
+
+P3-r1 was a **valid** run whose single failure was a defect in the corpus, not
+in the engine (§20.2). `fkg_005` asserted `expected_status = plan` for the
+unsuffixed "gary ablett", but two players in the directory carry that name (ids
+4700 and 4701), so the existing resolver contract classifies the bare mention as
+`ambiguousPlayerMention` and declines rather than guessing which record sorted
+first. **That contract is correct and was not weakened.** The plan row was
+suffixed to "gary ablett jr" and the bare wording was added to the decline
+corpus as `fkg_dec_007`, giving the final pinned size **271 = 212 plan + 59
+decline**. `PHASE_G_SETS.new.expected` was updated to match; the strict
+size guard that refused to build was **kept**, not loosened.
+
+### 21.7 The Phase G harness — reusable, and what each piece is for
+
+`tools/issue-152/` is now a complete rendered-acceptance workflow rather than a
+set of one-off commands, and it is the reason r2 was cheap after r1 found a
+defect:
+
+| Script | Role |
+|---|---|
+| `phase-g-tunnel.ps1` | window 1 — the 55432 PostgreSQL tunnel whose absence made smoke r1 inadmissible |
+| `phase-g-server.ps1` | window 2 — `next start -p 3100` against `afldb_test`, log preserved under `nl-ui-out-152-phaseg/server/` |
+| `phase-g-verify.ps1` | static gates only: `tsc --noEmit`, `nl-ui-corpus.test.ts`, corpus build, `playwright --list`, and the pacing validator |
+| `phase-g-smoke.ps1` | 40-row paced transport probe — run before, never instead of, a full sweep |
+| `phase-g-new-corpus.ps1` | P3, the pinned 271 |
+| `phase-g-regression.ps1` | P4, the 1,495-row existing gate |
+| `phase-g-status.ps1` | counts data lines at run time and hard-codes nothing |
+| `phase-g-diagnose.ps1` | post-mortem over a preserved run |
+| `build-phase-g-corpora.ts` | merges the six tracked sources; **refuses to build on a size change** |
+| `phase-g-common.ps1` | shared paths, gates, manifest writer, preservation |
+
+The pacing validator in `phase-g-verify.ps1` step 5 is the guard that matters
+most: `Number('2.2s')` is `NaN`, and before it existed a delay written that way
+would have silently disabled pacing and reproduced §19.2's throttled run — a
+sweep that *looks* paced, measures the rate limiter, and reports the result as
+semantics. `"2.2s"` is now rejected with a non-zero exit and `2200` accepted,
+and the script's own exit status is its verdict rather than its last child's.
+
+**Preserved run output is immutable.** `Save-PhaseGRunOutput` claims a free
+directory name under `nl-ui-out-152-phaseg/` and **refuses to overwrite an
+existing one**, so a re-run cannot quietly replace the evidence it is meant to
+be compared against. That contract is itself tested, offline and in a temporary
+directory, by `tests/phase-g-preserve-static.test.ps1`.
+
+### 21.8 Closeout validation, 2026-09-09
+
+Non-destructive; no sweep, no server, no database, no Git write.
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **PASS** — clean, exit 0 |
+| `nl-parser.test.ts` | **253 / 253** |
+| `nl-plan.test.ts` | **136 / 136** |
+| `nl-describe.test.ts` | **49 / 49** |
+| `nl-audit-acceptance.test.ts` | **10 / 10** |
+| `nl-ui-corpus.test.ts` | **37 / 37** |
+| `nl-semantic-mapping.test.ts` | **159 / 159** |
+| Combined | **6 files, 644 / 644 passed, 0 failed** |
+| `phase-g-verify.ps1` | **PASS — all six gates, exit 0** |
+| `phase-g-preserve-static.test.ps1` | **PASS — 30 assertions, exit 0** |
+
+The 271-row and 1,495-row browser sweeps were **not** re-run: the closeout
+changed only tracking prose, and re-running them would have proven nothing the
+preserved manifests do not already hold.
+
+### 21.9 Status — Phase G COMPLETE; ISSUE-152 stays OPEN
+
+**Phase G is COMPLETE and GREEN.** P3 is green at the pinned 271 and P4 confirms
+the 1,435/60 gate is unchanged.
+
+**ISSUE-152 is NOT resolvable on this evidence.** What remains, unchanged by
+Phase G:
+
+1. **Phase D (family / father–son) has not started.** Its F1-dependent half
+   (C1, FS1–FS3, FS6, decisions D6/D8) is blocked on `AFLDB-ISSUE-153`;
+   C2/C3/C4/FS4 do not depend on F1 and may proceed.
+2. **Phase F (cross-domain) has not started** and is gated on B–D being green
+   (§9), so it cannot start ahead of D.
+3. **Nothing from Phase G is committed**, and the branch is unmerged.
+4. **No deploy.** Migrations **092 and 093 must both reach `afldb_dev` and
+   production BEFORE the code**; `nl:stress` has not been run.
+5. The four external `tests/integration/database.test.ts` dataset-count failures
+   remain out of scope, uninvestigated and unedited.
