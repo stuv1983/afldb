@@ -12,11 +12,11 @@ export const revalidate = 86400;
 
 const TITLE = 'Father–Son Records';
 const DEFINITION =
-  'Father and son pairs recorded under the AFL/VFL father-son rule, ranked by combined '
-  + 'career VFL/AFL games.';
+  'Selections made under the AFL father–son rule — the player drafted under the rule '
+  + 'and his father — ranked by combined career VFL/AFL games.';
 
 export const metadata: Metadata = pageMetadata({
-  title: `${TITLE} — Every Recorded Father and Son`,
+  title: `${TITLE} — Every Recorded Father–Son Selection`,
   description: DEFINITION,
   path: '/records/father-son',
 });
@@ -45,7 +45,7 @@ export default async function FatherSonRecordsPage() {
       <div className="stat-strip">
         <div className="stat">
           <div className="value">{formatNumber(summary.total)}</div>
-          <div className="label">Recorded pairs</div>
+          <div className="label">Recorded selections</div>
         </div>
         <div className="stat">
           <div className="value">{formatNumber(summary.bothLinked)}</div>
@@ -58,7 +58,7 @@ export default async function FatherSonRecordsPage() {
       </div>
 
       <section className="section">
-        <CollapsibleTable id="father-son" title="Father–son pairs" note={`${rows.length} shown`} defaultOpen>
+        <CollapsibleTable id="father-son" title="Father–son selections" note={`${rows.length} shown`} defaultOpen>
           <div className="table-wrap">
             <SortableTable
               defaultSort="combined"
@@ -97,13 +97,28 @@ export default async function FatherSonRecordsPage() {
       <section className="section">
         <h2>About this record</h2>
         <p>
-          These are AFL/VFL father-son rule relationships (relationship type{' '}
-          <code>parent_child</code>), a separate record from AFLDB&rsquo;s sibling family boards
-          and never merged into them. A name without a link is displayed as recorded, not
-          fabricated a player.
+          Each row is one <strong>selection made under the AFL father&ndash;son rule</strong>: a
+          player drafted under the rule, and the father he was selected under. This is a
+          selection record, not a general record of fathers and sons who both played &mdash; a
+          father and son who both reached VFL/AFL level without a father&ndash;son selection
+          are not on this board.
+        </p>
+        <p>
+          AFLDB records those selections in <code>father_son_selections</code>, which is the
+          authority for them; the same loader writes the matching{' '}
+          <code>parent_child</code> relationship rows this board reads, from the same source
+          and import batch, so the two carry the same selections. Club, draft year, pick and
+          draft pathway live only on the selection record, so they are not shown here. This
+          board is separate from AFLDB&rsquo;s sibling family boards and is never merged into
+          them.
+        </p>
+        <p>
+          A name shown without a link is the selection as recorded: AFLDB does not fabricate a
+          player identity for an unmatched name, and a selection with an unlinked side has no
+          combined total rather than a total counting the unlinked side as zero.
         </p>
         <p className="muted">
-          Looking for siblings instead of a father and son? See{' '}
+          Looking for siblings instead of a father&ndash;son selection? See{' '}
           <Link href="/records/family">Family Records</Link>.
         </p>
       </section>
