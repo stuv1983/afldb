@@ -308,8 +308,95 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    unanswerable while its wins/losses siblings answered. The word is
  *    admitted as a grouped metric only behind an explicit club subject,
  *    so "players with more than 200 games" keeps its career reading.
+ * 35: coaching becomes answerable (AFLDB-ISSUE-152 Phase B). A new
+ *    coach_record grain over match_coaches, a coach reference distinct
+ *    from any player reference (18 of 386 coaches have no player row at
+ *    all), and the removal of the UNANSWERABLE_TOPICS 'coaching' rule,
+ *    whose stated reason -- that AFLDB holds no coaching data -- stopped
+ *    being true at migration 087 and had been declining every coaching
+ *    question with an untrue explanation ever since.
+ * 36: after the siren becomes answerable (AFLDB-ISSUE-152 Phase C). A
+ *    tenth grain, after_siren, over the curated after_siren_kicks event
+ *    list (migration 089) -- the first EVENT grain in this vocabulary,
+ *    neither a person nor a per-match statistic. Three INDEPENDENT typed
+ *    dimensions (what the kick registered, what it did to the result,
+ *    and the match result from the kicker's side) rather than one
+ *    collapsed metric, so "a goal after the siren" (71) and "a goal
+ *    after the siren to win" (62) can never compile to the same
+ *    predicate. A match-link boundary (afterSirenRequiresMatchLink)
+ *    decides which semantics a row with no canonical match may answer.
+ *    And the precedence change this family needs above all: the siren
+ *    dimension vocabulary claims "goals"/"kicks" BEFORE the player-metric
+ *    extractor, so "who has kicked the most goals after the siren" can
+ *    never be read as a career-goals leaderboard with "after the siren"
+ *    discarded.
+ * 37: the first-kick-goal family closes its two gaps (AFLDB-ISSUE-152
+ *    Phase E). No grain, no builder and no SQL: "a goal with each of
+ *    their first three kicks" and "whose first-kick goal was their only
+ *    career goal" now emit first_kick_goal_consecutive_min and
+ *    first_kick_goal_only_career_goal, two builders the grid solver has
+ *    always had and the parser could never reach. The second was not a
+ *    decline before it was a MISREAD: the tail "only career goal" was
+ *    left in the text, where extractPlayerMetric read "goal" as the
+ *    ranking subject. The negation exemption widens by one -- an E8 cue
+ *    owns its own "never", as clubs_without already did -- while the
+ *    kick-level claim (no_further_career_kicks) is refused by name so the
+ *    two can never be conflated, and a modifier that reaches the summary
+ *    grain or an out-of-range N declines rather than answering the wider
+ *    question.
+ * 38: family relationships become answerable, in the half that has a
+ *    witness (AFLDB-ISSUE-152 Phase D). No grain and no migration: six
+ *    new grid builders over player_relationships -- has_afl_father,
+ *    has_afl_son, has_afl_parent_or_child, and the three per-player
+ *    questions brother_of_player / father_of_player / son_of_player --
+ *    joining has_brother and father_son_father, which the parser could
+ *    never reach. Three rules decide what this family may say. Direction
+ *    comes from person_a_role/person_b_role, never from which column a
+ *    person sits in. "Brothers" stays label-backed (`brothers` + `twin
+ *    brothers`), so a bare `relationship = 'sibling'` -- which also holds
+ *    8 sisters and 16 unsexed rows -- is never read as "brother". And a
+ *    named relative is a plan field of its own (relationshipSubject)
+ *    paired with the predicate's bound id, because the person a question
+ *    is ABOUT is not the person it returns.
+ *
+ *    What is deliberately still declined: sisters, twins and cousins
+ *    (expressible in the data, no builder; cousins have no rows at all),
+ *    vague "family"/"related to" wording, the family grain (D6), and
+ *    every bare father-son SELECTION form (D8) -- FS4 answers only when
+ *    the wording explicitly says the FATHER's side, so "father-son
+ *    selections" still declines while "fathers of father-son selections"
+ *    answers. Both deferred decisions belong to AFLDB-ISSUE-153.
+ * 39: the cross-domain composition -- one person who both played and
+ *    coached (AFLDB-ISSUE-152 Phase F). No grain, no migration: two new
+ *    grid builders in the Coaching group, has_coached and
+ *    coached_club(organization), ANDed at player_career grain with the
+ *    existing played_for_club. Both join match_coaches, because a
+ *    `coaches` row is an identity claim and nothing more: 368 linked
+ *    coach identities exist and only 365 of those people ever coached a
+ *    match. Both fold coached clubs through clubs.organization_id, never
+ *    a raw match_coaches.club_id, which real coaches diverge on (Pagan 3
+ *    raw ids / 2 organizations, Wallace 3/2, Laidley 2/1).
+ *
+ *    The composition reading is elected inside the coaching block BEFORE
+ *    coach_record, which is that block's fallthrough and would otherwise
+ *    claim the question. Each club is assigned to the playing or the
+ *    coaching side by the nearest verb before it in the reader's own
+ *    wording, and both sides are builder parameters -- scope.clubFor is
+ *    never set, so the compiler's generic playing-club filter is never
+ *    suppressed by a coaching predicate ("played for Richmond and also
+ *    coached Richmond" is 27 people; "coached Richmond" is 41).
+ *
+ *    What is deliberately still declined: every temporal reading --
+ *    "later", "went on to coach", "became a coach" -- refused BY NAME
+ *    with a stated reason (D9, F-D2). The ordering is derivable (238 of
+ *    the 365 coached only after retiring, 0 unknown) and that is exactly
+ *    the trap: nothing in the engine OWNS it. Also declined: a club named
+ *    on one side only ("Richmond players who also coached", F-D3), any
+ *    season/venue/opponent/round/match-type scope, and the son-side
+ *    father-son composition (F-D1), which stays with D8 on
+ *    AFLDB-ISSUE-153.
  */
-export const PARSER_VERSION = 34;
+export const PARSER_VERSION = 39;
 
 // ------------------------------------------------------------------ grain
 
@@ -324,7 +411,73 @@ export type NlGrain =
    * distributed", which is a group-and-count no player-row grain can
    * express.
    */
-  | 'achievement_summary';
+  | 'achievement_summary'
+  /**
+   * A coach's record, derived from match_coaches joined to matches
+   * (AFLDB-ISSUE-152 Phase B). The first person-grain in this vocabulary
+   * that is not a player: 18 of 386 coaches have no player row at all, so
+   * nothing about a coaching answer can be expressed as an NlPlayerRef.
+   */
+  | 'coach_record'
+  /**
+   * A curated, cited kick after the siren (migration 089,
+   * AFLDB-ISSUE-118 §23.33). An EVENT grain, not a person grain and not a
+   * statistic grain: AFLDB has no play-by-play data and never recomputes
+   * one of these from scores or player_match_stats.
+   */
+  | 'after_siren';
+
+// ------------------------------------------------------------ after siren
+
+export type NlAfterSirenSubject = 'event' | 'player';
+export type NlAfterSirenScored = 'goal' | 'behind' | 'none';
+export type NlAfterSirenEffect = 'won' | 'drew' | 'none';
+export type NlAfterSirenKickerResult = 'win' | 'draw' | 'loss';
+export type NlAfterSirenOccurrence = 'first' | 'most_recent';
+
+export const NL_AFTER_SIREN_SUBJECTS: readonly NlAfterSirenSubject[] = ['event', 'player'];
+export const NL_AFTER_SIREN_SCORED: readonly NlAfterSirenScored[] = ['goal', 'behind', 'none'];
+export const NL_AFTER_SIREN_EFFECTS: readonly NlAfterSirenEffect[] = ['won', 'drew', 'none'];
+export const NL_AFTER_SIREN_RESULTS: readonly NlAfterSirenKickerResult[] = ['win', 'draw', 'loss'];
+export const NL_AFTER_SIREN_OCCURRENCES: readonly NlAfterSirenOccurrence[] = ['first', 'most_recent'];
+
+/**
+ * The after_siren descriptor, carried the way achievementSummary,
+ * headToHead and streakDefinition already are -- a single object, so
+ * validatePlan's "fields its compiler cannot honour" list stays a flat
+ * enumeration and no dimension can be added without appearing here.
+ */
+export type NlAfterSiren = {
+  /**
+   * What the rows ARE. 'event' returns the curated events themselves;
+   * 'player' aggregates them per kicker and requires a trusted player
+   * link. The two answer different questions and have different payloads.
+   */
+  subject: NlAfterSirenSubject;
+  /**
+   * after_siren_kicks.kick_scored -- what the kick REGISTERED.
+   * undefined means ANY kick, INCLUDING a miss: "kicks after the siren"
+   * is 126 events, not the 101 that scored something.
+   */
+  kickScored?: NlAfterSirenScored;
+  /**
+   * after_siren_kicks.kick_effect -- what the kick did to the RESULT.
+   * Independent of kickScored and ANDed with it: "a goal after the siren"
+   * is kickScored alone, "a goal after the siren TO WIN" is both.
+   */
+  kickEffect?: NlAfterSirenEffect;
+  /**
+   * after_siren_kicks.kicker_result -- the match result from the kicker's
+   * side. Independent of kickEffect: one measured event is
+   * (none, none, WIN). Never inferred from matches.winner_club_id.
+   */
+  kickerResult?: NlAfterSirenKickerResult;
+  /**
+   * "the first" / "the most recent". Match-linked only (D10 limit 1) --
+   * see afterSirenRequiresMatchLink below.
+   */
+  occurrence?: NlAfterSirenOccurrence;
+};
 
 // ----------------------------------------------------------- achievements
 
@@ -377,6 +530,24 @@ export type NlHeadToHead = {
 // ---------------------------------------------------------------- entities
 
 export type NlPlayerRef = { id: number; slug: string; name: string };
+/**
+ * A `coaches` row. Deliberately NOT an NlPlayerRef: 368 of 386 coaches are
+ * uniquely linked to a player and 18 have no player row at all, so a
+ * player-shaped reference is structurally blind to 4.7% of coaches. The
+ * same human's playing games and coached games are also different numbers
+ * (Mick Malthouse: 174 played, 718 coached) -- the grain, not the name,
+ * decides which is meant.
+ */
+export type NlCoachRef = {
+  /** coaches.id. */
+  id: number;
+  /** coachSlug(display_name) -- derived; `coaches` stores no slug. */
+  slug: string;
+  name: string;
+  /** Non-null only for a 'unique' link (coaches_link_ck, migration 087). */
+  playerId: number | null;
+  playerSlug: string | null;
+};
 /** organizationId is club_organizations.id (lineage-level), the same id space grid-solver club params use. */
 export type NlClubRef = { organizationId: number; slug: string; name: string };
 export type NlVenueRef = { id: number; slug: string; name: string };
@@ -646,7 +817,69 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
     percentage: columnMetric('percentage', 'Percentage', 'percentage'),
   },
   team_streak: {},
+  /**
+   * Coaching aggregates over match_coaches JOIN matches. Every `column`
+   * value here is a MARKER for db/queries/nl/coach-record.ts, not literal
+   * SQL -- the same convention the 13 live_only career stats above already
+   * use. coaches.source_games_coached is evidence only (migration 087) and
+   * is read by none of them.
+   */
+  coach_record: {
+    games: columnMetric('games', 'Games coached', 'games'),
+    wins: columnMetric('wins', 'Wins', 'wins'),
+    draws: columnMetric('draws', 'Draws', 'draws'),
+    losses: columnMetric('losses', 'Losses', 'losses'),
+    finals: columnMetric('finals', 'Finals coached', 'finals'),
+    grand_finals: columnMetric('grand_finals', 'Grand Finals coached', 'grand_finals'),
+    premierships: columnMetric('premierships', 'Premierships', 'premierships'),
+    /** count(DISTINCT m.season) -- seasons in charge, NOT a tenure length: Jack Titus coached Richmond in 1937 and 1965. */
+    seasons: columnMetric('seasons', 'Seasons in charge', 'seasons'),
+    /** count(DISTINCT organization_id): lineage-level clubs, never raw club identities (AFLDB-ISSUE-152 D2). */
+    organizations: columnMetric('organizations', 'Clubs coached', 'organizations'),
+    /** (W + D/2) / G * 100, the site convention. Qualifier-gated -- see NL_COACH_WIN_PCT. */
+    win_pct: columnMetric('win_pct', 'Win percentage', 'win_pct'),
+  },
+  after_siren: {
+    /**
+     * A COUNT of after-siren events in the filtered set. There is exactly
+     * one metric here on purpose: every distinction ("goals", "behinds",
+     * "misses", "game winners", "winning goals") is a typed DIMENSION on
+     * NlAfterSiren, not a second metric name. Two spellings of one question
+     * is the ISSUE-110 failure this grain must not reintroduce.
+     *
+     * `siren_kicks`, NOT `kicks` -- the naming is load-bearing. NL_COVERAGE
+     * is keyed by metric name and already holds a 1965 floor for the
+     * player-statistic column `kicks`; a metric of that name would inherit
+     * it and decline every after-the-siren question about 1913-1964,
+     * including the measured first event (Billy Schmidt, 1913).
+     */
+    siren_kicks: columnMetric('siren_kicks', 'Kicks after the siren', 'siren_kicks'),
+  },
 };
+
+/**
+ * The win-percentage board's qualifier, matching /records/coaches
+ * (getCoachRecordsByWinPct's minGames = 50). Stated in the answer and in
+ * describePlan rather than left implicit: at 50+ games the leader is Cliff
+ * Rankin at 78.95% from 57 games, an answer that reads as wrong to anyone
+ * expecting Jock McHale unless the qualifier is said out loud. The formula
+ * counts a draw as half a win -- George Angus is 41 W / 2 D / 60 g = 70.00,
+ * where a plain W/G would print 68.33.
+ */
+export const NL_COACH_WIN_PCT = {
+  defaultMinGames: 50,
+  formulaNote: 'Win percentage counts a draw as half a win — (wins + draws ÷ 2) ÷ games.',
+} as const;
+
+/**
+ * The one sentence pair a win-percentage coaching answer must always
+ * carry, in the interpretation the reader sees AND in the plan trace.
+ * Exported from here so both callers read the same string.
+ */
+export function coachWinPctQualifierNote(aggKind: NlAggregation['kind'], minGames: number): string {
+  const lead = aggKind === 'min' ? 'Lowest' : 'Best';
+  return `${lead} coaching win percentage, minimum ${minGames} games coached. ${NL_COACH_WIN_PCT.formulaNote}`;
+}
 
 export function isNlMetric(grain: NlGrain, metric: string): boolean {
   if (grain === 'team_streak') return false;
@@ -683,6 +916,33 @@ export type NlCoverage = {
 };
 
 export const NL_COVERAGE: Partial<Record<string, NlCoverage>> = {
+  // The coaching coverage FLOOR, and deliberately nothing more. AFLDB's
+  // earliest match_coaches row is season 1902 (measured 2026-09-08,
+  // exhaustive), so a coaching question about 1901 has no answer and says
+  // so. No upper bound is encoded: pinning one would hard-code a last
+  // season that becomes wrong the moment the next season's matches load,
+  // and an empty future-season result is a genuine empty result, not a
+  // coverage refusal (operator decision, AFLDB-ISSUE-152 §13.17b).
+  //
+  // This says ONLY that AFLDB does not answer coaching-season questions
+  // before 1902. It makes NO claim that every season from 1902 onward is
+  // completely recorded -- that is measurement gap M1, not evidence.
+  games: {
+    firstSeason: 1902,
+    note: 'AFLDB\'s coaching records begin in 1902.',
+    grains: ['coach_record'],
+  },
+  // The after-the-siren FLOOR, and deliberately nothing more. 1913 is the
+  // measured first event (Billy Schmidt, St Kilda v Carlton, 1913-08-02):
+  // it says a 1900 after-siren question has no answer, and makes NO
+  // completeness claim for any season after it. The permanent "curated,
+  // cited list" caveat in describe.ts carries the rest of that honesty
+  // into the rendered answer (operator decision D12).
+  siren_kicks: {
+    firstSeason: 1913,
+    note: 'AFLDB\'s after-the-siren record begins in 1913.',
+    grains: ['after_siren'],
+  },
   behinds: { firstSeason: 1965, note: 'Behinds were not recorded before 1965.' },
   kicks: { firstSeason: 1965, note: 'Kicks were not recorded before 1965.' },
   handballs: { firstSeason: 1965, note: 'Handballs were not recorded before 1965.' },
@@ -733,6 +993,14 @@ export const BROWNLOW_GAME_VOTE_NOTE = NL_COVERAGE.brownlow_votes!.note;
 
 /** The coverage rule for a metric, but only where it actually applies. */
 export function nlCoverageFor(grain: NlGrain, metric: string | null): NlCoverage | null {
+  // The coaching floor is a property of the GRAIN, not of one metric: "who
+  // coached Carlton in 1899" carries no metric at all and must still be
+  // refused. Keyed under 'games' in the table above so the rule has a
+  // single home, and reached from here for every coach_record plan.
+  if (grain === 'coach_record') return NL_COVERAGE.games ?? null;
+  // Same rule for the same reason: a metric-less after-siren list or count
+  // ("after the siren in 1900") must still meet the 1913 floor.
+  if (grain === 'after_siren') return NL_COVERAGE.siren_kicks ?? null;
   if (!metric) return null;
   const coverage = NL_COVERAGE[metric];
   if (!coverage) return null;
@@ -824,6 +1092,41 @@ export type NlQueryPlan = {
   agg: NlAggregation;
   /** The question's subject player, e.g. "dusty's highest disposal game". */
   player?: NlPlayerRef;
+  /**
+   * coach_record only, and mutually exclusive with `player`: the question's
+   * subject coach. A coaching question carries this and never `player`,
+   * because the two identity spaces are not the same set (see NlCoachRef).
+   */
+  coach?: NlCoachRef;
+  /**
+   * player_career only (AFLDB-ISSUE-152 Phase D): the person a per-player
+   * relationship question is ABOUT, when they are not its subject.
+   * "Who are Brent Harvey's brothers" returns players; Brent Harvey is
+   * not one of them, so he cannot be `player` (which pins the answer to
+   * one id) -- he is the parameter of a brother_of_player /
+   * father_of_player / son_of_player predicate, and this is the resolved
+   * reference that predicate's id came from, carried so the answer can
+   * name him. Never a substitute for the parameter: the id reaching SQL
+   * is always the builder's own bound param.
+   */
+  relationshipSubject?: NlPlayerRef;
+  /**
+   * player_career only (AFLDB-ISSUE-152 Phase F): the two organizations a
+   * cross-domain composition binds -- "players who played for Richmond
+   * and also coached Richmond". Both are already builder parameters
+   * (played_for_club and coached_club); this is the resolved reference
+   * each id came from, carried so the answer can NAME both clubs on
+   * their own side of the sentence.
+   *
+   * Deliberately not scope.clubFor. The generic career club filter means
+   * "played for this club", and it is suppressed whenever a predicate
+   * owns the club -- which for coaching would answer "coached Richmond"
+   * (41 people) under a question that asked who both played for and
+   * coached Richmond (27). Never a substitute for the parameters:
+   * validatePlan refuses any plan where these ids and the builders' bound
+   * ids differ.
+   */
+  crossDomainClubs?: { played: NlClubRef; coached: NlClubRef };
   scope: NlMatchScope;
   /**
    * player_game/player_season only: qualify the selected metric against a
@@ -843,6 +1146,8 @@ export type NlQueryPlan = {
   headToHead?: NlHeadToHead;
   /** team_streak only: whether the streak is of wins or losses. */
   streakDefinition?: { kind: 'win' | 'loss' | 'unbeaten' };
+  /** after_siren only: which curated events, aggregated which way. */
+  afterSiren?: NlAfterSiren;
   periodSplit?: 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FULL_MATCH';
   /** team_match only: cumulative score checkpoint. */
   scoreCheckpoint?: 'QT' | 'HT' | '3QT';
@@ -850,6 +1155,15 @@ export type NlQueryPlan = {
   resultFilter?: 'won';
   /** player_game only: restrict player_match_stats to career_game_no = 1. */
   debutGame?: boolean;
+  /**
+   * coach_record win_pct only: the games-coached floor the ranking is
+   * qualified at. A win-percentage ranking with no qualifier is refused
+   * rather than answered from a one-game sample (the measured minimum IS
+   * one game), so a win_pct max/min/top_n plan must carry this; the parser
+   * sets NL_COACH_WIN_PCT.defaultMinGames unless the reader named their own
+   * minimum, and whichever number applies is always stated in the answer.
+   */
+  coachQualifier?: { minGames: number };
   /**
    * team_match grouped-list only: count qualifying results per organization.
    * 'games' counts every match in scope (no result predicate); the result
@@ -936,6 +1250,58 @@ export const NL_CAREER_CLUB_OWNING_BUILDERS: readonly string[] = [
   'first_kick_goal_for_club',
 ];
 
+/**
+ * The Phase D relationship builders (AFLDB-ISSUE-152). The first group
+ * asks about a POPULATION ("players whose father also played"); the
+ * second asks about one named person ("who are Brent Harvey's brothers")
+ * and takes their player id as its parameter.
+ *
+ * Neither group owns a club or a season, so neither appears in the two
+ * lists above: "Richmond players with a brother who played" and "players
+ * whose father played, since 2000" both fail the ownership gate and
+ * decline rather than answering with the scope silently discarded
+ * (AFLDB-ISSUE-110 findings A and B).
+ */
+export const NL_RELATIONSHIP_POPULATION_BUILDERS: readonly string[] = [
+  'has_brother',
+  'has_afl_father',
+  'has_afl_son',
+  'has_afl_parent_or_child',
+  'father_son_father',
+];
+
+export const NL_RELATIONSHIP_OF_PLAYER_BUILDERS: readonly string[] = [
+  'brother_of_player',
+  'father_of_player',
+  'son_of_player',
+];
+
+/**
+ * The Phase F cross-domain builders (AFLDB-ISSUE-152): the person who
+ * both played and coached.
+ *
+ * `coached_club` is deliberately NOT in NL_CAREER_CLUB_OWNING_BUILDERS.
+ * Adding it would make careerPredicatesOwnClubFor true and suppress the
+ * compiler's generic playing-club filter, silently turning "played for
+ * Richmond and also coached Richmond" (27) into "coached Richmond" (41).
+ * Leaving it out is the fail-closed choice: a plan that ever carried both
+ * scope.clubFor and coached_club is refused rather than answered.
+ */
+export const NL_CROSS_DOMAIN_BUILDERS: readonly string[] = ['has_coached', 'coached_club'];
+
+/** True when a plan asks who both played and coached (Phase F). */
+export function isCrossDomainPlan(plan: NlQueryPlan): boolean {
+  return plan.careerPredicates.some((axis) => NL_CROSS_DOMAIN_BUILDERS.includes(axis.builder));
+}
+
+/** True when a plan's predicates include any Phase D relationship question. */
+export function isRelationshipPlan(plan: NlQueryPlan): boolean {
+  return plan.careerPredicates.some(
+    (axis) => NL_RELATIONSHIP_POPULATION_BUILDERS.includes(axis.builder)
+      || NL_RELATIONSHIP_OF_PLAYER_BUILDERS.includes(axis.builder),
+  );
+}
+
 /** True when some predicate consumes the plan's season range as a builder parameter. */
 export function careerPredicatesOwnSeasonRange(predicates: readonly GridAxisState[]): boolean {
   return predicates.some((axis) => NL_CAREER_SEASON_OWNING_BUILDERS.includes(axis.builder));
@@ -986,6 +1352,27 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 }
 
 /**
+ * D10 (§7.1) limit 2, and limit 1. TRUE when the question needs something
+ * `matches` owns -- finals/round_type, canonical date, canonical match
+ * identity -- or needs a deterministic chronology, which `after_siren_kicks`
+ * alone cannot provide: round_raw is free text ('GF', 'round 1', 'round 3'
+ * all occur on non-premiership rows) and gives no within-season order.
+ *
+ * A match-unlinked row is EXCLUDED from these answers and included in
+ * every other one. `premiership_season` alone is NEVER the gate: the four
+ * 2026 premiership rows with no match link are counted, listed, attributed
+ * to their clubs and their kickers, and classified on all three
+ * dimensions -- everything except ordering and finals.
+ *
+ * Exported so the rule lives in exactly one place and both validatePlan
+ * and db/queries/nl/after-siren.ts read the same predicate.
+ */
+export function afterSirenRequiresMatchLink(plan: NlQueryPlan): boolean {
+  return plan.scope.matchType !== undefined
+    || plan.afterSiren?.occurrence !== undefined;
+}
+
+/**
  * Full structural and semantic validation of a plan, run regardless of
  * where the plan came from -- defence in depth even for a plan the
  * parser itself just built, and the ONLY gate a future non-deterministic
@@ -996,7 +1383,10 @@ function validateCondition(cond: NlCareerCondition): NlValidationError | null {
 export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError {
   if (raw.v !== 1) return { error: 'Unrecognised plan version.' };
 
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head'];
+  // NOT compiler-enforced -- a plain literal array. Omitting a grain here
+  // fails CLOSED (every plan of that grain rejected as unknown) rather than
+  // opening a hole, and tests/nl-plan.test.ts catches it.
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record', 'after_siren'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
 
   if (raw.grain === 'head_to_head') {
@@ -1048,6 +1438,129 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     return { error: 'An achievement summary only applies to an achievement-summary question.' };
   }
 
+  // A coaching answer is compiled from match_coaches JOIN matches and
+  // consumes a deliberately narrow set of fields: the coach, the club
+  // lineage, a season range, a metric and how to aggregate it. Everything
+  // else is refused BY NAME rather than dropped on the way to SQL -- the
+  // ISSUE-110 discarded-scope rule, which is why each field is listed here
+  // instead of being left to a general "unknown extras" check.
+  if (raw.grain === 'coach_record') {
+    const coachRefErr = validateRef(raw.coach, 'id', 'Coach');
+    if (coachRefErr) return coachRefErr;
+    if (
+      raw.player || raw.scope.playerIdIn || raw.scope.clubAgainst || raw.scope.matchup
+      || raw.scope.venue || raw.scope.matchType !== undefined || raw.scope.roundNumber !== undefined
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
+      || raw.clubSeasonConditions.length > 0 || raw.achievementSummary || raw.headToHead
+      || raw.streakDefinition || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter
+      || raw.debutGame || raw.havingClause || raw.matchFilter || raw.boundary || raw.mode !== undefined
+    ) {
+      return { error: 'A coaching question contains fields its compiler cannot honour.' };
+    }
+    if (raw.metric !== null && !isNlMetric('coach_record', raw.metric)) {
+      return { error: `"${raw.metric}" is not a recognised coaching statistic.` };
+    }
+    if (!['max', 'min', 'top_n', 'list', 'count'].includes(raw.agg.kind)) {
+      return { error: 'A coaching question cannot be answered that way.' };
+    }
+    // No metric is legal for exactly the two shapes that do not rank:
+    // "who coached Richmond" (list) and "how many coaches has Richmond
+    // had" (count). A max/min/top_n with nothing to rank by is not a
+    // question this grain can answer.
+    if (raw.metric === null && raw.agg.kind !== 'list' && raw.agg.kind !== 'count') {
+      return { error: 'A coaching ranking needs a statistic to rank by.' };
+    }
+    // No coach, no club and no metric is not a coaching question at all,
+    // it is the bare word "coaching".
+    if (raw.metric === null && !raw.coach && !raw.scope.clubFor) {
+      return { error: 'A coaching question needs a coach, a club, or a statistic.' };
+    }
+    // A threshold qualifies the plan's OWN selected metric, so a threshold
+    // with no metric has nothing to qualify and must not reach SQL as a
+    // filter on some default column.
+    if (raw.metricCondition !== undefined && raw.metric === null) {
+      return { error: 'A coaching threshold needs a statistic to qualify.' };
+    }
+    if (raw.coachQualifier !== undefined
+      && (!Number.isInteger(raw.coachQualifier.minGames) || raw.coachQualifier.minGames < 1)) {
+      return { error: 'A coaching qualifier must be a positive number of games.' };
+    }
+    // Win percentage is qualifier-gated: the measured minimum across all
+    // coaches is ONE game, so an unqualified "best win percentage ever"
+    // ranks a 1-game sample and presents it as a record. It refuses
+    // instead. See NL_COACH_WIN_PCT.
+    if (raw.metric === 'win_pct' && ['max', 'min', 'top_n'].includes(raw.agg.kind) && !raw.coachQualifier) {
+      return { error: 'A best-win-percentage question needs a minimum number of games coached.' };
+    }
+  } else if (raw.coach || raw.coachQualifier) {
+    return { error: 'A coach reference only applies to a coaching question.' };
+  }
+
+  // An after-the-siren answer is compiled from after_siren_kicks alone and
+  // consumes a deliberately narrow set of fields. Everything else is
+  // refused BY NAME rather than dropped on the way to SQL -- the ISSUE-110
+  // discarded-scope rule, which is why each field is listed here instead
+  // of being left to a general "unknown extras" check.
+  if (raw.grain === 'after_siren') {
+    const siren = raw.afterSiren;
+    if (!siren) return { error: 'An after-the-siren question must say which events it means.' };
+    if (
+      raw.coach || raw.coachQualifier || raw.scope.matchup || raw.scope.venue
+      || raw.scope.roundNumber !== undefined || raw.scope.playerIdIn
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0
+      || raw.clubSeasonConditions.length > 0 || raw.achievementSummary || raw.headToHead
+      || raw.streakDefinition || raw.periodSplit || raw.scoreCheckpoint || raw.resultFilter
+      || raw.debutGame || raw.havingClause || raw.matchFilter || raw.boundary || raw.mode !== undefined
+    ) {
+      return { error: 'An after-the-siren question contains fields its compiler cannot honour.' };
+    }
+    if (!NL_AFTER_SIREN_SUBJECTS.includes(siren.subject)) {
+      return { error: 'An after-the-siren question must be about the kicks or about the kickers.' };
+    }
+    if (siren.kickScored !== undefined && !NL_AFTER_SIREN_SCORED.includes(siren.kickScored)) {
+      return { error: `Unknown after-the-siren outcome "${siren.kickScored}".` };
+    }
+    if (siren.kickEffect !== undefined && !NL_AFTER_SIREN_EFFECTS.includes(siren.kickEffect)) {
+      return { error: `Unknown after-the-siren effect "${siren.kickEffect}".` };
+    }
+    if (siren.kickerResult !== undefined && !NL_AFTER_SIREN_RESULTS.includes(siren.kickerResult)) {
+      return { error: `Unknown after-the-siren match result "${siren.kickerResult}".` };
+    }
+    if (siren.occurrence !== undefined && !NL_AFTER_SIREN_OCCURRENCES.includes(siren.occurrence)) {
+      return { error: `Unknown after-the-siren occurrence "${siren.occurrence}".` };
+    }
+    if (raw.metric !== null && !isNlMetric('after_siren', raw.metric)) {
+      return { error: `"${raw.metric}" is not a recognised after-the-siren statistic.` };
+    }
+    // "Fewest kicks after the siren" has no answer that means anything: the
+    // set is DEFINED by having at least one, so a min ranking returns
+    // everyone on 1 and presents it as a record (operator decision D15).
+    if (raw.agg.kind === 'min') {
+      return { error: 'Every player in AFLDB\'s after-the-siren record has at least one, so there is no "fewest" to rank.' };
+    }
+    if (!['max', 'top_n', 'list', 'count'].includes(raw.agg.kind)) {
+      return { error: 'An after-the-siren question cannot be answered that way.' };
+    }
+    // A ranking is a leaderboard OF KICKERS. The events themselves are not
+    // ranked against each other -- there is no per-event value to rank by.
+    if ((raw.agg.kind === 'max' || raw.agg.kind === 'top_n') && siren.subject !== 'player') {
+      return { error: 'Ranking after-the-siren kicks means ranking the players who kicked them.' };
+    }
+    // A leaderboard of one is not a ranking.
+    if (raw.player && siren.subject !== 'event') {
+      return { error: 'One named player\'s after-the-siren record is their list of kicks, not a ranking.' };
+    }
+    // The ambiguous-surname ranking path exists so a real tie decides
+    // between candidates. Here the measured metric ceiling is 2 and every
+    // superlative is ALREADY a tie, so ranking across an ambiguous surname
+    // over a 126-row curated list would present a coin flip as a record.
+    if (siren.occurrence !== undefined && siren.subject !== 'event') {
+      return { error: 'The first and most recent after-the-siren kicks are events, not a player ranking.' };
+    }
+  } else if (raw.afterSiren) {
+    return { error: 'An after-the-siren descriptor only applies to an after-the-siren question.' };
+  }
+
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }
@@ -1064,8 +1577,19 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // what keeps a parsed threshold from validating and then silently
   // disappearing downstream -- the ISSUE-110 answered_caveat defect.
   if (raw.metricCondition !== undefined) {
-    if (raw.grain !== 'player_game' && raw.grain !== 'player_season') {
+    if (
+      raw.grain !== 'player_game' && raw.grain !== 'player_season' && raw.grain !== 'coach_record'
+      && raw.grain !== 'after_siren'
+    ) {
       return { error: 'This statistic cannot currently be filtered by that threshold.' };
+    }
+    // "3 or more goals after the siren" counts EVENTS PER KICKER, so it is
+    // a player-subject question. Against the event rows there is nothing
+    // per-row to threshold. (The measured ceiling is 2, which makes this an
+    // honest EMPTY result rather than a decline -- the question is
+    // well-formed and the answer is nobody.)
+    if (raw.grain === 'after_siren' && raw.afterSiren?.subject !== 'player') {
+      return { error: 'An after-the-siren threshold counts kicks per player.' };
     }
     if (!COMPARE_OPS.includes(raw.metricCondition.op)) return { error: 'Unknown comparison.' };
     if (!Number.isFinite(raw.metricCondition.value) || raw.metricCondition.value < 0) {
@@ -1222,6 +1746,101 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
 
   const playerErr = validateRef(raw.player, 'id', 'Player');
   if (playerErr) return playerErr;
+
+  // AFLDB-ISSUE-152 Phase D. relationshipSubject and the per-player
+  // relationship predicates are two halves of one fact and neither is
+  // valid alone: the reference with no predicate would be a person the
+  // query never uses, and the predicate with no reference would answer
+  // "brother of 2164" with no way to say whose brothers these are. The
+  // id must be the SAME id, so the sentence the reader sees and the id
+  // reaching SQL can never drift apart.
+  const relationshipSubjectErr = validateRef(raw.relationshipSubject, 'id', 'Related player');
+  if (relationshipSubjectErr) return relationshipSubjectErr;
+  const relationshipAxes = raw.careerPredicates.filter(
+    (axis) => NL_RELATIONSHIP_OF_PLAYER_BUILDERS.includes(axis.builder),
+  );
+  if (raw.relationshipSubject) {
+    if (raw.grain !== 'player_career') {
+      return { error: 'A relationship question about one player is answered at career grain.' };
+    }
+    if (relationshipAxes.length !== 1) {
+      return { error: 'A named relative must be the parameter of exactly one relationship question.' };
+    }
+    if (relationshipAxes[0].params.player !== String(raw.relationshipSubject.id)) {
+      return { error: 'The named relative does not match the relationship question\'s player.' };
+    }
+    if (raw.player) {
+      return { error: 'A relationship question cannot both name a relative and pin a player.' };
+    }
+  } else if (relationshipAxes.length > 0) {
+    return { error: 'A relationship question about one player must say who that player is.' };
+  }
+
+  // AFLDB-ISSUE-152 Phase F. Every rule here REFUSES; none drops a
+  // filter. No scope reaches SQL unless a compiler or a builder
+  // explicitly owns it, and the coach-only and player-career identity
+  // spaces never mix (18 of the 386 coaches were never players).
+  const crossDomainAxes = raw.careerPredicates.filter(
+    (axis) => NL_CROSS_DOMAIN_BUILDERS.includes(axis.builder),
+  );
+  if (crossDomainAxes.length > 0) {
+    // V9/V10: the composition is a career fact and exists at no other grain.
+    if (raw.grain === 'coach_record') {
+      return { error: 'A question about who both played and coached is about players, not about a coaching record.' };
+    }
+    if (raw.grain !== 'player_career') {
+      return { error: 'A question about who both played and coached is answered across whole careers.' };
+    }
+    // V5: the club-scoped predicate already asserts the coaching. The
+    // unscoped one alongside it is a second, wider claim, and a plan
+    // carrying both would read as one question and answer another.
+    if (
+      crossDomainAxes.some((axis) => axis.builder === 'has_coached')
+      && crossDomainAxes.some((axis) => axis.builder === 'coached_club')
+    ) {
+      return { error: 'A coaching question already scoped to a club must not also ask the unscoped one.' };
+    }
+  }
+  // The two club references and the two bound builder parameters are one
+  // fact stated twice, exactly as relationshipSubject is: the sentence
+  // the reader sees and the ids reaching SQL can never drift apart.
+  const playedClubErr = validateRef(raw.crossDomainClubs?.played, 'organizationId', 'Club');
+  if (playedClubErr) return playedClubErr;
+  const coachedClubErr = validateRef(raw.crossDomainClubs?.coached, 'organizationId', 'Coached club');
+  if (coachedClubErr) return coachedClubErr;
+  const playedForClubAxes = raw.careerPredicates.filter((axis) => axis.builder === 'played_for_club');
+  const coachedClubAxes = raw.careerPredicates.filter((axis) => axis.builder === 'coached_club');
+  if (raw.crossDomainClubs) {
+    if (raw.grain !== 'player_career') {
+      return { error: 'A question about who both played for and coached a club is answered across whole careers.' };
+    }
+    if (playedForClubAxes.length !== 1 || coachedClubAxes.length !== 1) {
+      return { error: 'A played-and-coached question must bind exactly one club on each side.' };
+    }
+    if (playedForClubAxes[0].params.club !== String(raw.crossDomainClubs.played.organizationId)
+      || coachedClubAxes[0].params.club !== String(raw.crossDomainClubs.coached.organizationId)) {
+      return { error: 'The clubs named do not match the clubs the played-and-coached question filters on.' };
+    }
+  } else if (coachedClubAxes.length > 0) {
+    return { error: 'A question about coaching a club must say which club.' };
+  }
+  // V6/V7. AFLDB-ISSUE-152 Phase F leaves the SON side of the father-son
+  // rule deferred (operator decision F-D1, AFLDB-ISSUE-153), so no parser
+  // path emits father_son_selection today. These keep it that way: the
+  // predicate is a LIST of selections and never a ranking, and on its own
+  // it would answer the bare "father-son" question D8 declines because no
+  // witness can distinguish its two readings.
+  const fatherSonSelectionAxes = raw.careerPredicates.filter(
+    (axis) => axis.builder === 'father_son_selection',
+  );
+  if (fatherSonSelectionAxes.length > 0) {
+    if (raw.agg.kind === 'max' || raw.agg.kind === 'min' || raw.agg.kind === 'top_n') {
+      return { error: 'A father–son selection question is a list, not a ranking.' };
+    }
+    if (crossDomainAxes.length === 0) {
+      return { error: 'AFLDB cannot yet answer what "father–son" means on its own.' };
+    }
+  }
 
   if (raw.player && raw.scope.playerIdIn) {
     return { error: 'A plan cannot name one player and a candidate set at the same time.' };
@@ -1414,6 +2033,8 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'achievement',
   head_to_head: 'head-to-head',
+  coach_record: 'coaching',
+  after_siren: 'after the siren',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -1426,6 +2047,8 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'group',
   head_to_head: 'matchup',
+  coach_record: 'coach',
+  after_siren: 'kick',
 };
 
 const TIE_ENTITY: Record<NlGrain, string> = {
@@ -1437,6 +2060,8 @@ const TIE_ENTITY: Record<NlGrain, string> = {
   team_streak: 'streak',
   achievement_summary: 'group',
   head_to_head: 'matchup',
+  coach_record: 'coach',
+  after_siren: 'kick',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {
@@ -1492,6 +2117,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
   }
 
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);
+  if (plan.coach) lines.push(`Coach: ${plan.coach.name}.`);
   if (plan.scope.clubFor) lines.push(`Club: ${plan.scope.clubFor.name}.`);
   if (plan.scope.clubAgainst) lines.push(`Opponent: ${plan.scope.clubAgainst.name}.`);
   if (plan.scope.matchup) lines.push(`Matchup: ${plan.scope.matchup.clubA.name} v ${plan.scope.matchup.clubB.name}.`);
@@ -1530,6 +2156,12 @@ export function describePlan(plan: NlQueryPlan): string[] {
   if (plan.scoreCheckpoint) lines.push(`Score checkpoint: ${plan.scoreCheckpoint}.`);
   if (plan.resultFilter === 'won') lines.push('Final result: selected club won the match.');
   if (plan.debutGame) lines.push("Match boundary: each player's debut game.");
+  // The qualifier is never left implicit: a win-percentage board without
+  // it reads as wrong to anyone who expects the all-time great rather than
+  // the 57-game leader it actually names.
+  if (plan.grain === 'coach_record' && plan.metric === 'win_pct' && plan.coachQualifier) {
+    lines.push(coachWinPctQualifierNote(plan.agg.kind, plan.coachQualifier.minGames));
+  }
   if (!plan.havingClause && plan.agg.kind !== 'list' && plan.agg.kind !== 'count') {
     const entity = TIE_ENTITY[plan.grain];
     lines.push(plan.tiePolicy === 'all'

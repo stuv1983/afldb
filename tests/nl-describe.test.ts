@@ -16,9 +16,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
+import { answerCaveats, dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
-  NlClubSeasonRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlAfterSirenEventRow, NlAfterSirenPlayerRow,
+  NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
 import type { NlQueryPlan } from '../src/search/nl/plan';
@@ -387,5 +388,623 @@ describe('metric-threshold answers (AFLDB-ISSUE-110)', () => {
       headline: '3 qualifying player-seasons',
       interpretation: 'Season goals at most 10.',
     });
+  });
+});
+
+// -------------------------------------- coaching (AFLDB-ISSUE-152 Phase B)
+
+function coachRow(overrides: Partial<NlCoachRecordRow> = {}): NlCoachRecordRow {
+  return {
+    coachId: 17, slug: 'damien-hardwick', displayName: 'Damien Hardwick',
+    coachOnly: false, playerId: 900, playerSlug: 'damien-hardwick',
+    firstSeason: 2010, lastSeason: 2023, seasons: 14, organizations: 1,
+    games: 307, wins: 170, draws: 6, losses: 131,
+    finals: 26, grandFinals: 3, premierships: 3,
+    winPct: '56.35', value: null,
+    ...overrides,
+  };
+}
+
+const HARDWICK_REF = { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick' };
+const RICHMOND_REF = { organizationId: 1, slug: 'richmond', name: 'Richmond' };
+
+function coachPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return plan({ grain: 'coach_record', metric: null, mode: undefined, agg: { kind: 'list' }, limit: 100, ...overrides });
+}
+
+describe('coaching answers', () => {
+  it('a whole career and a record at one club do not produce the same sentence', () => {
+    const row = coachRow();
+    const career = describeAnswer(
+      coachPlan({ coach: HARDWICK_REF }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    const atClub = describeAnswer(
+      coachPlan({ coach: HARDWICK_REF, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(career.interpretation).not.toBe(atClub.interpretation);
+    expect(career.interpretation).toContain('whole coaching career, across every club');
+    expect(atClub.interpretation).toContain("Damien Hardwick's record at Richmond only");
+  });
+
+  it('renders a split stint as seasons in charge, never as a continuous tenure', () => {
+    // Jack Titus coached Richmond in 1937 and again in 1965.
+    const row = coachRow({
+      coachId: 285, slug: 'jack-titus', displayName: 'Jack Titus',
+      firstSeason: 1937, lastSeason: 1965, seasons: 3, games: 17, wins: 5, draws: 0, losses: 12, winPct: '29.41',
+    });
+    const { interpretation } = describeAnswer(
+      coachPlan({ coach: { id: 285, slug: 'jack-titus', name: 'Jack Titus', playerId: null, playerSlug: null }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(interpretation).toContain('3 seasons in charge, 1937\u20131965');
+    expect(interpretation).not.toMatch(/coached from 1937 to 1965/);
+  });
+
+  it('names every coach tied at the lead value', () => {
+    const rows = [
+      coachRow({ coachId: 367, displayName: 'Max Hislop', value: 1 }),
+      coachRow({ coachId: 370, displayName: 'Verdun Howell', value: 1 }),
+    ];
+    const { headline } = describeAnswer(
+      coachPlan({ metric: 'games', agg: { kind: 'min' }, limit: 25, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 2 },
+    );
+    expect(headline).toContain('Max Hislop and Verdun Howell');
+    expect(headline).toContain('(tied)');
+  });
+
+  it('states the qualifier verbatim on every win-percentage answer', () => {
+    const row = coachRow({ coachId: 152, displayName: 'Cliff Rankin', coachOnly: true, playerId: null, playerSlug: null, games: 57, wins: 45, draws: 0, losses: 12, winPct: '78.95', value: 78.9473 });
+    const { headline, interpretation } = describeAnswer(
+      coachPlan({ metric: 'win_pct', agg: { kind: 'max' }, limit: 25, coachQualifier: { minGames: 50 } }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(headline).toContain('78.95%');
+    expect(interpretation).toContain(
+      'Best coaching win percentage, minimum 50 games coached. '
+      + 'Win percentage counts a draw as half a win — (wins + draws ÷ 2) ÷ games.',
+    );
+  });
+
+  it('a club list is a count, and a threshold is a qualifying set', () => {
+    const rows = [coachRow(), coachRow({ coachId: 5, displayName: 'Tom Hafey' })];
+    const list = describeAnswer(
+      coachPlan({ scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 42 },
+    );
+    expect(list.headline).toBe('42 coaches');
+    expect(list.interpretation).toBe('Every coach of Richmond.');
+
+    const thresholded = describeAnswer(
+      coachPlan({ metric: 'wins', metricCondition: { op: 'gte', value: 100 }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'coach_record', lead: rows[0], rows, total: 3 },
+    );
+    expect(thresholded.headline).toBe('3 coaches qualify');
+    expect(thresholded.interpretation).toContain('with wins at least 100');
+  });
+
+  it('answers a count question with the count itself', () => {
+    const { headline, interpretation } = describeAnswer(
+      coachPlan({ agg: { kind: 'count' }, scope: { clubFor: RICHMOND_REF } }),
+      { kind: 'count', value: 42 },
+    );
+    expect(headline).toBe('42 coaches');
+    expect(interpretation).toBe('Every coach of Richmond.');
+  });
+
+  it('says a season scope out loud rather than answering a wider question silently', () => {
+    const row = coachRow();
+    const { interpretation } = describeAnswer(
+      coachPlan({ scope: { clubFor: RICHMOND_REF, seasonMin: 2017, seasonMax: 2017 }, coach: HARDWICK_REF }),
+      { kind: 'coach_record', lead: row, rows: [row], total: 1 },
+    );
+    expect(interpretation).toContain(', 2017');
+  });
+});
+
+// ------------------------------- after the siren (AFLDB-ISSUE-152 Phase C)
+
+function sirenPlanFor(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return plan({
+    grain: 'after_siren',
+    metric: 'siren_kicks',
+    mode: undefined,
+    agg: { kind: 'list' },
+    afterSiren: { subject: 'event' },
+    ...overrides,
+  });
+}
+
+function sirenEvent(overrides: Partial<NlAfterSirenEventRow> = {}): NlAfterSirenEventRow {
+  return {
+    eventId: 121,
+    season: 2025,
+    roundRaw: 'round 19',
+    competition: 'AFL',
+    premiershipSeason: true,
+    playerId: 5000,
+    playerSlug: 'nasiah-wanganeen-milera',
+    playerName: 'Nasiah Wanganeen-Milera',
+    clubName: 'St Kilda',
+    clubSlug: 'st-kilda',
+    opponentName: 'Melbourne',
+    opponentSlug: 'melbourne',
+    kickScored: 'goal',
+    kickEffect: 'won',
+    kickerResult: 'win',
+    siren: 'final',
+    matchId: 16792,
+    matchDate: new Date('2025-07-27T00:00:00Z'),
+    roundType: 'home_and_away',
+    cited: true,
+    value: null,
+    ...overrides,
+  };
+}
+
+function sirenPlayer(overrides: Partial<NlAfterSirenPlayerRow> = {}): NlAfterSirenPlayerRow {
+  return {
+    playerId: 1001, slug: 'barry-hall', displayName: 'Barry Hall',
+    value: 2, firstSeason: 2004, lastSeason: 2011, clubNames: 'Sydney, Western Bulldogs',
+    ...overrides,
+  };
+}
+
+const NO_EXCLUSIONS = { noPlayerLink: 0, noMatchLink: 0 };
+
+describe('after-the-siren answers (AFLDB-ISSUE-152 Phase C)', () => {
+  it('names every holder of a tied record rather than one of them', () => {
+    const rows = [sirenPlayer(), sirenPlayer({ playerId: 4742, slug: 'gary-rohan', displayName: 'Gary Rohan' })];
+    const { headline } = describeAnswer(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player', kickScored: 'goal' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 2, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline).toContain('Barry Hall and Gary Rohan');
+    expect(headline).toContain('(tied)');
+    expect(headline).toContain('2');
+  });
+
+  /**
+   * §15.12's binding distinction, in the reader's own words: 71 goals
+   * after the siren and 62 goals after the siren TO WIN are different
+   * populations, so they must not produce the same sentence.
+   */
+  it('"a goal after the siren" and "a goal after the siren to win" read differently', () => {
+    const rows = [sirenEvent()];
+    const goal = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'goal' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 71, excluded: NO_EXCLUSIONS },
+    );
+    const toWin = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'goal', kickEffect: 'won' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 62, excluded: NO_EXCLUSIONS },
+    );
+    expect(goal.interpretation).not.toBe(toWin.interpretation);
+    expect(toWin.interpretation).toContain('won the match');
+    expect(goal.interpretation).not.toContain('won the match');
+  });
+
+  it('a miss and a miss-and-lost read differently', () => {
+    const rows = [sirenEvent({ kickScored: 'none', kickEffect: 'none', kickerResult: 'loss' })];
+    const missed = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'none' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 25, excluded: NO_EXCLUSIONS },
+    );
+    const andLost = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', kickScored: 'none', kickerResult: 'loss' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 18, excluded: NO_EXCLUSIONS },
+    );
+    expect(missed.interpretation).not.toBe(andLost.interpretation);
+    expect(andLost.interpretation).toContain('lost');
+  });
+
+  it('an occurrence answer names the event, not a count', () => {
+    const row = sirenEvent({
+      eventId: 1, season: 1913, playerId: 2, playerSlug: 'billy-schmidt', playerName: 'Billy Schmidt',
+      clubName: 'St Kilda', opponentName: 'Carlton', matchId: 1313,
+      matchDate: new Date('1913-08-02T00:00:00Z'),
+    });
+    const { headline } = describeAnswer(
+      sirenPlanFor({ afterSiren: { subject: 'event', occurrence: 'first' } }),
+      { kind: 'after_siren_event', lead: row, rows: [row], total: 1, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline).toContain('Billy Schmidt');
+    expect(headline).toContain('1913');
+  });
+
+  it('an event count is worded as kicks, never as coaches', () => {
+    const { headline } = describeAnswer(
+      sirenPlanFor({ agg: { kind: 'count' }, afterSiren: { subject: 'event', kickScored: 'goal' } }),
+      { kind: 'count', value: 71 },
+    );
+    expect(headline).toContain('71');
+    expect(headline).not.toContain('coach');
+  });
+
+  it('an empty result is honest, not a decline', () => {
+    const { headline } = describeAnswer(
+      sirenPlanFor({ scope: { matchType: 'grand_final' } }),
+      { kind: 'after_siren_event', lead: null, rows: [], total: 0, excluded: NO_EXCLUSIONS },
+    );
+    expect(headline.toLowerCase()).toContain('no');
+  });
+
+  it('always carries the curated-list caveat (D12)', () => {
+    const rows = [sirenEvent()];
+    const caveats = answerCaveats(
+      sirenPlanFor(),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 126, excluded: NO_EXCLUSIONS },
+    );
+    expect(caveats.join(' ')).toContain('curated');
+    expect(caveats.join(' ')).toContain('not a systematic record');
+  });
+
+  it('names the excluded unlinked rows, and only when there are any', () => {
+    const rows = [sirenPlayer()];
+    const withExclusions = answerCaveats(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 1, excluded: { noPlayerLink: 6, noMatchLink: 0 } },
+    );
+    expect(withExclusions.join(' ')).toContain('6');
+    expect(withExclusions.join(' ')).toContain('not linked to a player');
+
+    const none = answerCaveats(
+      sirenPlanFor({ agg: { kind: 'max' }, afterSiren: { subject: 'player' } }),
+      { kind: 'after_siren_player', lead: rows[0], rows, total: 1, excluded: NO_EXCLUSIONS },
+    );
+    expect(none.join(' ')).not.toContain('not linked to a player');
+  });
+
+  it('says what a match-link-required answer left out', () => {
+    const rows = [sirenEvent()];
+    const caveats = answerCaveats(
+      sirenPlanFor({ afterSiren: { subject: 'event', occurrence: 'most_recent' } }),
+      { kind: 'after_siren_event', lead: rows[0], rows, total: 1, excluded: { noPlayerLink: 0, noMatchLink: 10 } },
+    );
+    expect(caveats.join(' ')).toContain('10');
+    expect(caveats.join(' ')).toContain('no match link');
+  });
+
+  it('carries no after-siren caveat on any other grain', () => {
+    expect(answerCaveats(plan(), { kind: 'count', value: 1 })).toEqual([]);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase E, decision E-D1. "did Dustin Martin kick a goal
+ * with his first kick" is a yes/no question about ONE player, and the
+ * no-metric branch answered it with "1 player matches" / "0 players
+ * match". The wording is gated narrowly -- a pinned player, conditions,
+ * and no ranking metric -- so every unpinned list keeps the count.
+ */
+describe('a pinned player answering a condition question (AFLDB-ISSUE-152 Phase E)', () => {
+  const martin = { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' };
+  const firstKick = { builder: 'first_kick_goal_player', params: {} };
+
+  function pinned(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      player: martin, careerPredicates: [firstKick], ...overrides,
+    });
+  }
+
+  it('answers yes, and names the condition it answered', () => {
+    const rows = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: null })];
+    const { headline, interpretation } = describeAnswer(
+      pinned(), { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Dustin Martin — yes');
+    expect(interpretation).toContain('Goal with their first VFL/AFL kick');
+  });
+
+  it('answers no on an empty result rather than "0 players match"', () => {
+    const { headline, interpretation } = describeAnswer(
+      pinned(), { kind: 'player_career', lead: null, rows: [], total: 0 },
+    );
+    expect(headline).toBe('Dustin Martin — no');
+    expect(interpretation).toContain('does not meet');
+  });
+
+  it('names both conditions when the question composed them', () => {
+    const { interpretation } = describeAnswer(
+      pinned({
+        careerPredicates: [firstKick, { builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } }],
+      }),
+      { kind: 'player_career', lead: null, rows: [], total: 0 },
+    );
+    expect(interpretation).toContain('Goal with each of their first X kicks');
+  });
+
+  // §17.6: the NL answer is a SUBSET of /records/first-kick-goal, which
+  // lists unlinked rows too. Said once, in the answer, rather than left
+  // for the reader to discover.
+  it('states the curated, linked-only boundary on this family only', () => {
+    const curated = describeAnswer(
+      pinned(), { kind: 'player_career', lead: null, rows: [], total: 0 },
+    ).interpretation;
+    expect(curated).toContain('curated');
+    expect(curated).toContain('not counted');
+
+    const other = describeAnswer(
+      pinned({ careerPredicates: [{ builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } }] }),
+      { kind: 'player_career', lead: null, rows: [], total: 0 },
+    ).interpretation;
+    expect(other).not.toContain('curated');
+  });
+
+  it('leaves an unpinned list on the count wording it has always had', () => {
+    const rows = [careerRow({ value: null })];
+    expect(describeAnswer(
+      pinned({ player: undefined }), { kind: 'player_career', lead: rows[0], rows, total: 320 },
+    ).headline).toBe('320 players match');
+  });
+
+  it('leaves a ranked answer for one player alone', () => {
+    // The gate requires no metric: a pinned player WITH a ranking metric
+    // is still "Dustin Martin — 4 goals", not a yes/no.
+    const rows = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: 4 })];
+    expect(describeAnswer(
+      pinned({ metric: 'goals' }), { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    ).headline).toBe('Dustin Martin — 4 goals');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase D wording. The rule this block exists to hold:
+ * a relationship answer NAMES the relationship. "Players meeting every
+ * condition asked for" is true of every career list ever returned and
+ * tells the reader nothing about which relationship they were shown, so
+ * no Phase D answer may use it.
+ */
+describe('family-relationship answers (AFLDB-ISSUE-152 Phase D)', () => {
+  const harvey = { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' };
+
+  function relationshipPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'has_brother', params: {} }],
+      ...overrides,
+    });
+  }
+
+  const rows = [careerRow({ value: null })];
+  const listPayload = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+
+  it.each([
+    ['has_brother', 'a brother who played VFL/AFL'],
+    ['has_afl_father', 'a father who played VFL/AFL'],
+    ['has_afl_son', 'a son who played VFL/AFL'],
+    ['has_afl_parent_or_child', 'a parent or child who played VFL/AFL'],
+  ])('%s says which relationship it answered', (builder, phrase) => {
+    const { headline, interpretation } = describeAnswer(
+      relationshipPlan({ careerPredicates: [{ builder, params: {} }] }), listPayload,
+    );
+    expect(headline).toBe('658 players match');
+    expect(interpretation).toBe(`Players with ${phrase}.`);
+    expect(interpretation).not.toContain('every condition');
+  });
+
+  it('the father-son father wording names the RULE, not a parent-child link', () => {
+    const { interpretation } = describeAnswer(
+      relationshipPlan({ careerPredicates: [{ builder: 'father_son_father', params: {} }] }), listPayload,
+    );
+    expect(interpretation).toBe('Players whose son was selected under the father–son rule.');
+  });
+
+  it('a per-player answer names the person it is about', () => {
+    const { interpretation } = describeAnswer(
+      relationshipPlan({
+        careerPredicates: [{ builder: 'brother_of_player', params: { player: '2164' } }],
+        relationshipSubject: harvey,
+      }),
+      { kind: 'player_career', lead: rows[0], rows, total: 1 },
+    );
+    expect(interpretation).toBe('Brothers of Brent Harvey.');
+  });
+
+  it('a ranked relationship answer says what it ranked WITHIN', () => {
+    const ranked = [careerRow({ displayName: 'Michael Tuck', value: 426, games: 426 })];
+    const { headline, interpretation } = describeAnswer(
+      relationshipPlan({ metric: 'games', agg: { kind: 'max' } }),
+      { kind: 'player_career', lead: ranked[0], rows: ranked, total: 1 },
+    );
+    expect(headline).toBe('Michael Tuck — 426 games');
+    expect(interpretation).toBe('Highest career games among players with a brother who played VFL/AFL.');
+  });
+
+  it('a pinned player answers yes/no in the relationship’s own words', () => {
+    const pinnedPlan = relationshipPlan({ player: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' } });
+    expect(describeAnswer(pinnedPlan, { kind: 'player_career', lead: null, rows: [], total: 0 }))
+      .toEqual({
+        headline: 'Dustin Martin — no',
+        interpretation: 'Dustin Martin has no recorded brother who played VFL/AFL.',
+      });
+    const hit = [careerRow({ playerId: 100, displayName: 'Dustin Martin', value: null })];
+    expect(describeAnswer(pinnedPlan, { kind: 'player_career', lead: hit[0], rows: hit, total: 1 }).interpretation)
+      .toBe('Dustin Martin has a brother who played VFL/AFL.');
+  });
+
+  // --------------------------------------------------------- the caveats
+
+  it('always states the linked-only boundary', () => {
+    const caveats = answerCaveats(relationshipPlan(), listPayload);
+    expect(caveats[0]).toContain('tracked, cited list');
+    expect(caveats[0]).toContain('name only');
+  });
+
+  it('says out loud that an over-cap list is not the whole list', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    const caveats = answerCaveats(relationshipPlan(), capped);
+    expect(caveats.some((c) => c.includes('658 players qualify'))).toBe(true);
+    expect(caveats.some((c) => c.includes('it is not the whole list'))).toBe(true);
+  });
+
+  /**
+   * Operator decision D20, ACCEPTED 2026-09-09: an over-cap relationship
+   * list uses AFLDB's existing capped-list disclosure contract -- true
+   * total, capped table, explicit disclosure -- and never a Phase-D-only
+   * refusal. Silent truncation is the thing prohibited, and these three
+   * assertions are what "not silent" means in code.
+   */
+  it('D20: the headline is the TRUE total, not the number of rows shown', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    expect(rows).toHaveLength(1);
+    // 658 qualified, 1 row is carried in this payload: the headline reports
+    // the qualifying set, so the count is never the page size.
+    expect(describeAnswer(relationshipPlan(), capped).headline).toBe('658 players match');
+  });
+
+  it('D20: the disclosure names BOTH numbers, so the shortfall is visible', () => {
+    const capped = { kind: 'player_career' as const, lead: rows[0], rows, total: 658 };
+    const disclosure = answerCaveats(relationshipPlan(), capped).find((c) => c.includes('qualify'));
+    expect(disclosure).toBeDefined();
+    expect(disclosure).toContain('658 players qualify');
+    expect(disclosure).toContain(`the first ${rows.length}`);
+    expect(disclosure).toContain('it is not the whole list');
+  });
+
+  it.each([658, 181, 107])(
+    'D20: %i answers with disclosure rather than refusing',
+    (total) => {
+      // The three measured over-cap populations (C2 658, C3 181, FS4 107).
+      // None of them declines: a refusal here would make this one family
+      // behave unlike every other capped list in the engine.
+      const capped = { kind: 'player_career' as const, lead: rows[0], rows, total };
+      const described = describeAnswer(relationshipPlan(), capped);
+      expect(described.headline).toBe(`${total.toLocaleString('en-AU')} players match`);
+      expect(described.interpretation).toBe('Players with a brother who played VFL/AFL.');
+      expect(answerCaveats(relationshipPlan(), capped).some((c) => c.includes(`${total.toLocaleString('en-AU')} players qualify`)))
+        .toBe(true);
+    },
+  );
+
+  it('says nothing about a cap when nothing was capped', () => {
+    const whole = { kind: 'player_career' as const, lead: rows[0], rows, total: 1 };
+    expect(answerCaveats(relationshipPlan(), whole).some((c) => c.includes('qualify'))).toBe(false);
+  });
+
+  it('leaves every other family’s wording untouched', () => {
+    const other = plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } }],
+    });
+    expect(describeAnswer(other, listPayload).interpretation)
+      .toBe('Players meeting every condition asked for.');
+    expect(answerCaveats(other, listPayload)).toEqual([]);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase F wording. Two rules this block exists to hold.
+ *
+ * The answer says "also", never "later": AFLDB does not own the order of
+ * a person's playing and coaching careers, and a sentence that implied it
+ * would claim a fact the SQL never checked (D9/F-D2).
+ *
+ * And the answer states its own cap out loud. 365 people both played and
+ * coached; the list shows 100. A footer under a table is not the answer
+ * saying so (D20).
+ */
+describe('played-and-coached answers (AFLDB-ISSUE-152 Phase F)', () => {
+  const RICHMOND = { organizationId: 18, slug: 'richmond', name: 'Richmond' };
+  const COLLINGWOOD = { organizationId: 4, slug: 'collingwood', name: 'Collingwood' };
+
+  function crossDomainPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'has_coached', params: {} }],
+      ...overrides,
+    });
+  }
+
+  const rows = [careerRow({ value: null })];
+  const listPayload = { kind: 'player_career' as const, lead: rows[0], rows, total: 365 };
+
+  it('X1 says what the composition was', () => {
+    const { headline, interpretation } = describeAnswer(crossDomainPlan(), listPayload);
+    expect(headline).toBe('365 players match');
+    expect(interpretation).toBe('Players who played VFL/AFL and also coached.');
+    expect(interpretation).not.toContain('every condition');
+  });
+
+  it('X2 names both clubs, each on its own side of the sentence', () => {
+    const { interpretation } = describeAnswer(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '18' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+    }), { kind: 'player_career', lead: rows[0], rows, total: 27 });
+    expect(interpretation).toBe('Players who played for Richmond and also coached Richmond.');
+  });
+
+  it('the asymmetric form keeps the two clubs apart', () => {
+    const { interpretation } = describeAnswer(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '4' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: COLLINGWOOD },
+    }), { kind: 'player_career', lead: rows[0], rows, total: 3 });
+    expect(interpretation).toBe('Players who played for Richmond and also coached Collingwood.');
+  });
+
+  it('a ranked composition says what it ranked WITHIN', () => {
+    const ranked = [careerRow({ displayName: 'Michael Tuck', value: 426, games: 426 })];
+    const { headline, interpretation } = describeAnswer(
+      crossDomainPlan({ metric: 'games', agg: { kind: 'max' } }),
+      { kind: 'player_career', lead: ranked[0], rows: ranked, total: 1 },
+    );
+    expect(headline).toBe('Michael Tuck — 426 games');
+    expect(interpretation).toBe('Highest career games among players who played VFL/AFL and also coached.');
+  });
+
+  it('never says "later", in any branch', () => {
+    const sentences = [
+      describeAnswer(crossDomainPlan(), listPayload),
+      describeAnswer(crossDomainPlan({
+        careerPredicates: [
+          { builder: 'played_for_club', params: { club: '18' } },
+          { builder: 'coached_club', params: { club: '4' } },
+        ],
+        crossDomainClubs: { played: RICHMOND, coached: COLLINGWOOD },
+      }), listPayload),
+      describeAnswer(crossDomainPlan({ metric: 'games', agg: { kind: 'max' } }), listPayload),
+    ];
+    for (const { headline, interpretation } of sentences) {
+      expect(`${headline} ${interpretation}`.toLowerCase()).not.toContain('later');
+    }
+    expect(answerCaveats(crossDomainPlan(), listPayload).join(' ').toLowerCase()).not.toContain('later');
+  });
+
+  // --------------------------------------------------------- D20, reused
+
+  it('states the cap in the answer itself: 100 of 365', () => {
+    const hundred = Array.from({ length: 100 }, () => careerRow({ value: null }));
+    const caveats = answerCaveats(crossDomainPlan(), {
+      kind: 'player_career', lead: hundred[0], rows: hundred, total: 365,
+    });
+    expect(caveats).toHaveLength(1);
+    expect(caveats[0]).toContain('365 players qualify');
+    expect(caveats[0]).toContain('first 100 of them');
+  });
+
+  it('says nothing when the whole list is shown', () => {
+    const twentySeven = Array.from({ length: 27 }, () => careerRow({ value: null }));
+    expect(answerCaveats(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '18' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+    }), { kind: 'player_career', lead: twentySeven[0], rows: twentySeven, total: 27 })).toEqual([]);
+  });
+
+  it('invents no coaching-completeness claim in either direction', () => {
+    const caveats = answerCaveats(crossDomainPlan(), listPayload).join(' ');
+    expect(caveats).not.toContain('complete');
+    expect(caveats).not.toContain('curated');
   });
 });

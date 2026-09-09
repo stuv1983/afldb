@@ -14,6 +14,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildSet, expectedBatches, PHASE_G_SETS, type PhaseGSetName,
+} from '../tools/issue-152/build-phase-g-corpora';
+import {
   groupByCore, hydrationByWorker, metamorphicViolations, questionCore, readUiCorpus,
   scoreObservation, summarise,
   type UiCase, type UiObservation, type UiOutcome,
@@ -90,6 +93,357 @@ describe('readUiCorpus', () => {
     const cases = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv');
     expect(cases).toHaveLength(1435);
     expect(cases.filter((row) => /\bmost games in a game\b/i.test(row.question))).toEqual([]);
+  });
+
+  it('leaves the two pre-Phase-B gates untouched and free of coaching questions', () => {
+    // AFLDB-ISSUE-152 Phase B is ADDITIVE: removing the false coaching
+    // decline cannot flip an existing row, because neither gate contains a
+    // single coaching question. Asserted rather than assumed.
+    const realistic = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv');
+    expect(realistic).toHaveLength(1435);
+    expect(declines).toHaveLength(60);
+    for (const row of [...realistic, ...declines]) {
+      expect(row.question, row.id).not.toMatch(/\bcoach(es|ed|ing)?\b/i);
+    }
+  });
+
+  it('reads the Phase B coaching corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(99);
+    expect(declines).toHaveLength(25);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase B row is a coaching question; none belongs in another file.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/coach|played under|premiership coaches/i);
+    }
+    // Ids are unique across both files, so a sweep cannot overwrite one row
+    // with another's observation.
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every A-row family of the coverage matrix is represented.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'coaching_club_coaches', 'coaching_career', 'coaching_at_club', 'coaching_club_ranking',
+      'coaching_league_ranking', 'coaching_win_pct', 'coaching_threshold', 'coaching_season',
+      'coaching_multi_club', 'coaching_premierships', 'coaching_players_coached',
+      'coaching_premiership_coach',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+  });
+
+  it('leaves every earlier gate free of after-the-siren questions', () => {
+    // AFLDB-ISSUE-152 Phase C is ADDITIVE in exactly the way Phase B was:
+    // the tenth grain cannot flip an existing row, because no question in
+    // the 1,435/60 gates or in the Phase B coaching corpora mentions the
+    // siren. Asserted rather than assumed.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id).not.toMatch(/siren/i);
+    }
+  });
+
+  it('reads the Phase C after-the-siren corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(93);
+    expect(declines).toHaveLength(27);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase C row is an after-the-siren question; none belongs in
+    // another file. "misses before extra time" is the one decline whose
+    // subject is the siren without the word -- it is the end-of-regulation
+    // subtype, which D5 does not expose.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/siren|extra time/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every B-row family of the coverage matrix is represented.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'siren_event_list', 'siren_player_rank', 'siren_club_scope', 'siren_opponent_scope',
+      'siren_finals', 'siren_occurrence', 'siren_count', 'siren_effect', 'siren_result',
+      'siren_miss',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    // Every §15.14 decline family has at least one row, so a phrasing that
+    // starts answering one of them fails the sweep by name.
+    const declineFamilies = new Set(declines.map((row) => row.category));
+    for (const family of [
+      'siren_decline_round', 'siren_decline_venue', 'siren_decline_matchup', 'siren_decline_coach',
+      'siren_decline_min', 'siren_decline_coverage', 'siren_decline_per_season',
+      'siren_decline_siren_subtype', 'siren_decline_shot_detail', 'siren_decline_source_score',
+      'siren_decline_competition', 'siren_decline_cross_grain', 'siren_decline_supergoal',
+      'siren_decline_out_of_family',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+  });
+
+  it('leaves the pre-Phase-E gates free of first-kick-goal wording', () => {
+    // AFLDB-ISSUE-152 Phase E is ADDITIVE for the same reason B and C
+    // were: no question in the 1,435/60 gates or in the Phase B/C corpora
+    // asks about a first kick as a GOAL, so no existing row can change
+    // meaning. The one row that mentions a first kick at all --
+    // "the first kick after the siren" -- belongs to the siren grain,
+    // which suppresses this family outright, and is asserted as such in
+    // tests/nl-parser.test.ts rather than excluded silently here.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id).not.toMatch(/first[- ]kick/i);
+    }
+    const siren = [
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of siren.filter((r) => /first[- ]kick/i.test(r.question))) {
+      expect(row.question, row.id).toMatch(/siren/i);
+    }
+  });
+
+  it('reads the Phase E first-kick-goal corpora with the expected shape', () => {
+    const plans = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv');
+    const declines = readUiCorpus('tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv');
+    expect(plans).toHaveLength(20);
+    expect(declines).toHaveLength(7);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase E row is a first-kick question; none belongs in another
+    // file, and none of them mentions the siren.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id).toMatch(/first[- ](?:kick|two|three|four|six)|first \d/i);
+      expect(row.question, row.id).not.toMatch(/siren/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Every §17.16 family is represented, so a wording that starts
+    // answering one of them fails the sweep by name.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'fkg_holder_list', 'fkg_named_player', 'fkg_club_scope', 'fkg_season_scope',
+      'fkg_consecutive', 'fkg_only_goal', 'fkg_composition', 'fkg_summary',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    const declineFamilies = new Set(declines.map((row) => row.category));
+    for (const family of [
+      'fkg_decline_no_further_kicks', 'fkg_decline_kickless', 'fkg_decline_negated',
+      'fkg_decline_summary_modifier', 'fkg_decline_scope', 'fkg_decline_range',
+      // AFLDB-ISSUE-152 Phase G. An unsuffixed "gary ablett" names two
+      // players in afldb_test (4700 and 4701, identical display_name AND
+      // slug), so the shared resolver declines it -- the rule asserted in
+      // tests/nl-semantic-mapping.test.ts, reached here through the
+      // first-kick-goal family. The suffixed form is fkg_005.
+      'fkg_decline_ambiguous_player',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+  });
+
+  // ------------------------------------------------ Phase D relationships
+
+  const REL_PLAN = 'tests/nl-ui/corpora/afldb-ui-questions-relationships-v1-20260909.csv';
+  const REL_DECLINE = 'tests/nl-ui/corpora/afldb-ui-questions-relationships-decline-v1-20260909.csv';
+
+  it('leaves every pre-Phase-D gate free of relationship wording', () => {
+    // AFLDB-ISSUE-152 Phase D is ADDITIVE in exactly the way B, C and E
+    // were, and here the claim is unusually strong: not one question in
+    // the 1,435/60 gates or in the Phase B/C/E corpora contains ANY
+    // relationship word, so the six new builders cannot change the
+    // meaning of a single existing row. Asserted rather than assumed.
+    const earlier = [
+      'tests/nl-ui/corpora/afldb-ui-questions-1440-real-user-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-60-real-user-decline-v3-20260822.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-coaching-decline-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-after-siren-decline-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-v1-20260908.csv',
+      'tests/nl-ui/corpora/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv',
+    ].flatMap((file) => readUiCorpus(file));
+    for (const row of earlier) {
+      expect(row.question, row.id)
+        .not.toMatch(/\b(brothers?|sisters?|cousins?|twins?|famil(y|ies)|fathers?|mothers?|sons?|daughters?|parents?|uncles?|aunts?|grandfathers?|grandmothers?|related)\b/i);
+    }
+  });
+
+  it('reads the Phase D relationship corpora with the expected shape', () => {
+    const plans = readUiCorpus(REL_PLAN);
+    const declines = readUiCorpus(REL_DECLINE);
+    expect(plans).toHaveLength(26);
+    expect(declines).toHaveLength(22);
+    expect(plans.every((row) => row.expectedStatus === 'plan')).toBe(true);
+    expect(declines.every((row) => row.expectedStatus === 'decline')).toBe(true);
+    // Every Phase D row is a relationship question; none belongs in
+    // another file, and none of them mentions the siren or a first kick.
+    for (const row of [...plans, ...declines]) {
+      expect(row.question, row.id)
+        .toMatch(/\b(brothers?|brother-in-law|sisters?|cousins?|twins?|famil(y|ies)|fathers?|mothers?|sons?|daughters?|parents?|uncles?|grandfathers?|related)\b/i);
+      expect(row.question, row.id).not.toMatch(/siren|first[- ]kick/i);
+    }
+    const ids = [...plans, ...declines].map((row) => row.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // §22 covers the UNBLOCKED half only. Every plan family is one of the
+    // four authorised classes; a fifth would mean the phase grew.
+    const categories = new Set(plans.map((row) => row.category));
+    for (const family of [
+      'rel_brother_population', 'rel_brother_ranked', 'rel_brother_pinned',
+      'rel_parent_child_symmetric', 'rel_parent_child_directional',
+      'rel_of_player', 'rel_father_son_rule',
+    ]) {
+      expect(categories.has(family), family).toBe(true);
+    }
+    expect(categories.size).toBe(7);
+  });
+
+  it('keeps a named decline row for every boundary Phase D did NOT cross', () => {
+    // Each of these is a class that must still decline: the blocked
+    // father-son selection forms (D8, ISSUE-153), the family grain (D6),
+    // the relationship types with no witness in the data, the vague
+    // forms, pairings, an ambiguous subject, and the five scopes no
+    // relationship builder owns. One row each, named, so a phrasing that
+    // starts answering one of them fails the sweep BY NAME rather than
+    // silently.
+    const declineFamilies = new Set(readUiCorpus(REL_DECLINE).map((row) => row.category));
+    for (const family of [
+      'rel_decline_family_grain', 'rel_decline_family_size',
+      'rel_decline_fs1', 'rel_decline_fs2', 'rel_decline_fs3', 'rel_decline_fs6',
+      'rel_decline_vague_family', 'rel_decline_vague_related',
+      'rel_decline_sister', 'rel_decline_twin', 'rel_decline_cousin',
+      'rel_decline_grandparent', 'rel_decline_uncle', 'rel_decline_in_law',
+      'rel_decline_mother', 'rel_decline_pairing', 'rel_decline_ambiguous_subject',
+      'rel_decline_scope_club', 'rel_decline_scope_season', 'rel_decline_scope_venue',
+      'rel_decline_scope_opponent', 'rel_decline_scope_match_type',
+    ]) {
+      expect(declineFamilies.has(family), family).toBe(true);
+    }
+    expect(declineFamilies.size).toBe(22);
+  });
+
+  it('keeps the Ben Cousins regression case as a rendered row', () => {
+    // AFLDB-ISSUE-152 §22.8. PLAYER_NICKNAMES maps "cousins" -> "ben
+    // cousins", so an unframed \bcousins?\b gate turned a question ABOUT
+    // Ben Cousins into a question about cousins and declined it. The
+    // corpus carries both halves: the surname resolving as a player next
+    // to a relationship cue (plan), and the relationship word itself
+    // (decline).
+    const cousins = readUiCorpus(REL_PLAN).find((row) => /ben cousins/i.test(row.question));
+    expect(cousins).toBeDefined();
+    expect(cousins!.expectedStatus).toBe('plan');
+    const family = readUiCorpus(REL_DECLINE).find((row) => row.category === 'rel_decline_cousin');
+    expect(family!.expectedStatus).toBe('decline');
+  });
+});
+
+// ------------------------------------------------------- merged sweep sets
+
+/**
+ * The merged corpora the Phase G and Phase D runners actually drive.
+ *
+ * Pinned here rather than only inside build-phase-g-corpora.ts because the
+ * builder asserts what it merged against its own table: if both numbers
+ * lived in one file, editing a corpus and editing the expectation would be
+ * the same edit. The Phase G totals are the ACCEPTED historical evidence
+ * (AFLDB-ISSUE-152 §21) and must not move; the `current` set is Phase D's
+ * separate, additive acceptance set.
+ */
+describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
+  function build(name: PhaseGSetName) {
+    return buildSet(PHASE_G_SETS[name], mkdtempSync(join(tmpdir(), 'afldb-sets-')));
+  }
+
+  it('the accepted Phase G P3 set is still exactly 271 = 212 + 59', () => {
+    const result = build('new');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 271, plan: 212, decline: 59 });
+    expect(expectedBatches(result.rows)).toBe(3);
+  });
+
+  it('the accepted Phase G P4 regression gate is still exactly 1,495', () => {
+    const result = build('regression');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 1495, plan: 1435, decline: 60 });
+  });
+
+  it('the current Phase D set is 319 = 238 plan + 81 decline', () => {
+    const result = build('current');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 319, plan: 238, decline: 81 });
+    // 271 + 48, 212 + 26, 59 + 22 -- the arithmetic stated in the issue.
+    expect(result.rows).toBe(271 + 48);
+    expect(result.plan).toBe(212 + 26);
+    expect(result.decline).toBe(59 + 22);
+    // nl-stress.spec.ts slices at NL_UI_BATCH (default 100), and the Phase D
+    // runner refuses a corpus that does not produce this many batches.
+    expect(expectedBatches(result.rows)).toBe(4);
+  });
+
+  it('the current set APPENDS: its first 271 rows are the P3 corpus, in order', () => {
+    // §19.3 identifies throttled rows by corpus POSITION, so Phase G's
+    // statements stay checkable only while rows 1-271 never move.
+    const phaseG = readUiCorpus(build('new').path);
+    const current = readUiCorpus(build('current').path);
+    expect(current.slice(0, phaseG.length)).toEqual(phaseG);
+    expect(current.slice(phaseG.length)).toHaveLength(48);
+    expect(current.slice(phaseG.length).every((row) => /^rel_/.test(row.id))).toBe(true);
+  });
+
+  it('the next Phase F set is 349 = 253 plan + 96 decline', () => {
+    const result = build('next');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 349, plan: 253, decline: 96 });
+    // 319 + 30, 238 + 15, 81 + 15 -- the arithmetic stated in the issue.
+    expect(result.rows).toBe(319 + 30);
+    expect(result.plan).toBe(238 + 15);
+    expect(result.decline).toBe(81 + 15);
+    expect(expectedBatches(result.rows)).toBe(4);
+  });
+
+  it('the next set APPENDS: its first 319 rows are the Phase D corpus, in order', () => {
+    // The same rule, one generation on: §23/§24's position-based
+    // statements about the 319-row set survive only while rows 1-319
+    // never move.
+    const current = readUiCorpus(build('current').path);
+    const next = readUiCorpus(build('next').path);
+    expect(next.slice(0, current.length)).toEqual(current);
+    expect(next.slice(current.length)).toHaveLength(30);
+    expect(next.slice(current.length).every((row) => /^xd_/.test(row.id))).toBe(true);
+  });
+
+  /**
+   * AFLDB-ISSUE-152 Phase F. The three highest-value pins, stated here as
+   * well as in PHASE_G_SETS and the runner: the capped-disclosure rows
+   * (the 365/100 sentence is the single most important rendered
+   * assertion in Phase F), the lineage-regression rows, and the
+   * collision row that must keep ANSWERING as a coaching record.
+   */
+  it('the Phase F rows carry their named pins', () => {
+    const phaseF = readUiCorpus(build('next').path).slice(-30);
+    const byId = new Map(phaseF.map((row) => [row.id, row]));
+    expect(phaseF.filter((row) => row.tags.includes('d20'))).toHaveLength(2);
+    expect(phaseF.filter((row) => row.tags.includes('lineage'))).toHaveLength(2);
+    expect(byId.get('xd_015')?.expectedStatus).toBe('plan');
+    expect(byId.get('xd_015')?.tags).toContain('coach-record');
+    // The boundaries this phase does not move, each re-pinned as a decline.
+    for (const id of ['xd_dec_010', 'xd_dec_011', 'xd_dec_014']) {
+      expect(byId.get(id)?.expectedStatus, id).toBe('decline');
+    }
+    expect(phaseF.filter((row) => row.tags.includes('fd2'))).toHaveLength(4);
   });
 });
 

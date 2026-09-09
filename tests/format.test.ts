@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   NOT_RECORDED,
+  coachProfilePath,
   formatHallOfFameClub,
   formatRound,
   formatRoundShort,
@@ -308,5 +309,25 @@ describe('shouldShowUnmatched', () => {
         clubName: null,
       }),
     ).toBe(true);
+  });
+});
+
+describe('coachProfilePath', () => {
+  it('sends a linked coach to their player page, not to a guaranteed redirect', () => {
+    // /coaches/[slug]-id permanently redirects a linked coach to /players.
+    expect(coachProfilePath({
+      slug: 'damien-hardwick', coachId: 17, playerId: 900, playerSlug: 'damien-hardwick',
+    })).toBe('/players/damien-hardwick-900');
+  });
+
+  it('sends a coach-only person to the coach route, never to /players', () => {
+    const href = coachProfilePath({ slug: 'cliff-rankin', coachId: 152, playerId: null, playerSlug: null });
+    expect(href).toBe('/coaches/cliff-rankin-152');
+    expect(href).not.toContain('/players');
+  });
+
+  it('falls back to the coach route when the link has no slug to render', () => {
+    expect(coachProfilePath({ slug: 'neil-craig', coachId: 5, playerId: 42, playerSlug: null }))
+      .toBe('/coaches/neil-craig-5');
   });
 });

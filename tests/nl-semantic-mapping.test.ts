@@ -247,6 +247,60 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     }
   });
 
+  /**
+   * AFLDB-ISSUE-152 Phase G. The rule directly above is grain-independent
+   * and family-independent, and this is the regression that proves it
+   * rather than assuming it: the Phase G P3 sweep marked one row failing,
+   * `did gary ablett kick a goal with his first kick`, expected `plan`
+   * and observed `absent`. That was the ambiguity rule doing its job in a
+   * family the rule predates, not a first-kick-goal defect -- the panel is
+   * absent because `answerNlQuestion` returns null for every
+   * `status: 'none'`, so a decline and a missing answer are the same
+   * rendered page.
+   *
+   * Measured in afldb_test on 2026-09-09: players 4700 and 4701 BOTH have
+   * display_name "Gary Ablett" AND slug "gary-ablett", each carrying the
+   * bare "Gary Ablett" as a `source_string` alias and its own generational
+   * `alternate` alias ("Gary Ablett Snr" / "Gary Ablett Jnr"). The real
+   * resolver returns them 10.9 points apart (1135.7 / 1124.8) -- nowhere
+   * near the 200-point gap rule -- so the bare mention is two people by
+   * construction, and the suffix is the ONLY thing that separates them.
+   *
+   * No first-kick-goal resolver exists or should: the shared player
+   * resolution above is the whole contract, and these four sentences are
+   * asserted here, next to it, rather than in the family's own suite.
+   */
+  describe('AFLDB-ISSUE-152 first-kick-goal named-player resolution', () => {
+    it('declines the unsuffixed name, which names two players', async () => {
+      const parsed = await parseNlQuestion('did gary ablett kick a goal with his first kick', ctx);
+      expect(parsed.status).toBe('none');
+      if (parsed.status !== 'none') return;
+      expect(parsed.reason).toBe('ambiguous');
+      expect(parsed.report.confidence).toBeCloseTo(0.7);
+      // The decline is the ambiguity, not an unparsed question: the
+      // first-kick-goal phrase itself was understood and consumed, so
+      // nothing is left over for the vocabulary miner to chase.
+      expect(parsed.report.unsupportedTerms).toEqual([]);
+      expect(parsed.report.components?.tokenRatio).toBe(1);
+      expect(parsed.report.components?.playerCertainty).toBeCloseTo(0.7);
+    });
+
+    it.each([
+      ['did gary ablett jr kick a goal with his first kick', 101],
+      ['did gary ablett jnr kick a goal with his first kick', 101],
+      ['did gary ablett sr kick a goal with his first kick', 102],
+      ['did gary ablett snr kick a goal with his first kick', 102],
+    ] as const)('plans the suffixed name against one identity: %s', async (question, playerId) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(p.player?.id).toBe(playerId);
+      // The suffix justified the identity through the matched alias only;
+      // the canonical ref never carries it.
+      expect(p.player?.name).toBe('Gary Ablett');
+      expect(p.careerPredicates).toEqual([{ builder: 'first_kick_goal_player', params: {} }]);
+    });
+  });
+
   it('keeps surname-candidate ranking behavior', async () => {
     const p = await plan('Ablett most goals');
     expect(p.scope.playerIdIn).toEqual([101, 102]);

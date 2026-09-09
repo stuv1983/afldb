@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext } from '@/search/nl/parser';
 import { validatePlan, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const clubs: NlClubDirectoryEntry[] = [
   { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
@@ -191,5 +191,277 @@ describe('NL full-audit acceptance corpus', () => {
 
     const debutSeason = await parseNlQuestion('most goals in a debut season', ctx);
     if (debutSeason.status === 'plan') expect(debutSeason.plan.debutGame).toBeUndefined();
+  });
+});
+
+// ------------------------------------- coaching (AFLDB-ISSUE-152 Phase B)
+
+/** The measured coaches used as witnesses in the issue's evidence pack. */
+const coaches: NlCoachDirectoryEntry[] = [
+  { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick', names: ['damien hardwick', 'hardwick'] },
+  { id: 1, slug: 'mick-malthouse', name: 'Mick Malthouse', playerId: 9635, playerSlug: 'mick-malthouse', names: ['mick malthouse', 'malthouse'] },
+  { id: 2, slug: 'jock-mchale', name: 'Jock McHale', playerId: 910, playerSlug: 'jock-mchale', names: ['jock mchale', 'mchale'] },
+  { id: 152, slug: 'cliff-rankin', name: 'Cliff Rankin', playerId: null, playerSlug: null, names: ['cliff rankin', 'rankin'] },
+  { id: 285, slug: 'jack-titus', name: 'Jack Titus', playerId: 800, playerSlug: 'jack-titus', names: ['jack titus', 'titus'] },
+  // Both Pannams coached Richmond, so the bare surname is deliberately no alias.
+  { id: 160, slug: 'albert-pannam', name: 'Albert Pannam', playerId: 700, playerSlug: 'albert-pannam', names: ['albert pannam'] },
+  { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
+];
+
+const coachCtx: NlParseContext = { clubs, venues, coaches, resolvePlayer: async () => [] };
+
+const coachingQuestions: [string, Record<string, unknown>][] = [
+  ['who coached Richmond', { grain: 'coach_record', metric: null, agg: { kind: 'list' }, scope: { clubFor: { slug: 'richmond' } } }],
+  ['how many coaches has Richmond had', { grain: 'coach_record', agg: { kind: 'count' } }],
+  ['Damien Hardwick coaching record', { grain: 'coach_record', coach: { id: 17 } }],
+  ['Damien Hardwick coaching record at Richmond', { grain: 'coach_record', coach: { id: 17 }, scope: { clubFor: { slug: 'richmond' } } }],
+  ['which coach has coached the most games', { grain: 'coach_record', metric: 'games', agg: { kind: 'max' } }],
+  ['which coach has the most wins', { grain: 'coach_record', metric: 'wins', agg: { kind: 'max' } }],
+  ['coaches with the most premierships', { grain: 'coach_record', metric: 'premierships', agg: { kind: 'max' } }],
+  ['which coach has coached the most grand finals', { grain: 'coach_record', metric: 'grand_finals', agg: { kind: 'max' } }],
+  ['top 5 coaches by premierships', { grain: 'coach_record', metric: 'premierships', agg: { kind: 'top_n', n: 5 } }],
+  ['best coaching win percentage', { grain: 'coach_record', metric: 'win_pct', coachQualifier: { minGames: 50 } }],
+  ['coaches with at least 100 games best win percentage', { grain: 'coach_record', metric: 'win_pct', coachQualifier: { minGames: 100 } }],
+  ['Richmond coaches with 100+ wins', { grain: 'coach_record', metric: 'wins', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 100 } }],
+  ['coaches who have coached more than one club', { grain: 'coach_record', metric: 'organizations', metricCondition: { op: 'gt', value: 1 } }],
+  ['who coached Richmond in 2017', { grain: 'coach_record', scope: { clubFor: { slug: 'richmond' }, seasonMin: 2017, seasonMax: 2017 } }],
+  ['players coached by Damien Hardwick', { grain: 'player_career', careerPredicates: [{ builder: 'coached_by', params: { coach: '17' } }] }],
+  ['premiership coaches', { grain: 'player_career', careerPredicates: [{ builder: 'premiership_coach', params: {} }] }],
+];
+
+/** Every form of §13.15 that must land on a decline or an honest refusal, never on an answer. */
+const coachingDeclines = [
+  'who coached Carlton in 1899',
+  'Pannam coaching record',
+  'Smith coaching record',
+  'who coached Richmond in 1899',
+  'Richmond players coached by Damien Hardwick',
+  'players who later coached Richmond',
+  'who was Richmond\'s assistant coach in 2017',
+  'who was the caretaker coach of Carlton',
+  'which coach won the most coaching awards',
+  'why was Damien Hardwick sacked',
+  'what was Damien Hardwick\'s coaching salary',
+  'who coached Victoria in a state game',
+  'Damien Hardwick record against Alastair Clarkson',
+  'was every club\'s coach recorded in 1940',
+  'best coaching win percentage of any coach ever no minimum',
+  'most wins in a season by a coach',
+];
+
+describe('NL coaching acceptance (AFLDB-ISSUE-152 Phase B)', () => {
+  it('parses every supported coaching family to the intended plan', async () => {
+    for (const [question, expected] of coachingQuestions) {
+      const parsed = await parseNlQuestion(question, coachCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported coaching form rather than answering a narrower question', async () => {
+    for (const question of coachingDeclines) {
+      const parsed = await parseNlQuestion(question, coachCtx);
+      if (parsed.status !== 'plan') continue;
+      // A plan that validates would be an ANSWER to a question AFLDB
+      // cannot answer; a plan that fails validation is an honest refusal.
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
+  });
+});
+
+// ------------------------------ after the siren (AFLDB-ISSUE-152 Phase C)
+
+const sirenPlayers: Record<string, { id: number; slug: string; name: string }[]> = {
+  'barry hall': [{ id: 1001, slug: 'barry-hall', name: 'Barry Hall' }],
+  'gary rohan': [{ id: 4742, slug: 'gary-rohan', name: 'Gary Rohan' }],
+};
+
+const sirenCtx: NlParseContext = {
+  clubs,
+  venues,
+  coaches,
+  resolvePlayer: async (name: string) => (sirenPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+};
+
+const sirenQuestions: [string, Record<string, unknown>][] = [
+  ['who has kicked the most goals after the siren', {
+    grain: 'after_siren', metric: 'siren_kicks', agg: { kind: 'max' },
+    afterSiren: { subject: 'player', kickScored: 'goal' },
+  }],
+  ['most kicks after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'player' },
+  }],
+  ['goals after the siren to win', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'goal', kickEffect: 'won' },
+  }],
+  ['behinds after the siren to draw', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'behind', kickEffect: 'drew' },
+  }],
+  ['missed after the siren and lost', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'none', kickerResult: 'loss' },
+  }],
+  ['how many kicks after the siren', { grain: 'after_siren', agg: { kind: 'count' } }],
+  ['the first kick after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'event', occurrence: 'first' },
+  }],
+  ['the most recent goal after the siren', {
+    grain: 'after_siren', afterSiren: { subject: 'event', kickScored: 'goal', occurrence: 'most_recent' },
+  }],
+  ['goals after the siren against Richmond', {
+    grain: 'after_siren', scope: { clubAgainst: { slug: 'richmond' } },
+  }],
+  ['goals after the siren for Geelong', {
+    grain: 'after_siren', scope: { clubFor: { slug: 'geelong' } },
+  }],
+  ['after the siren in the finals', { grain: 'after_siren', scope: { matchType: 'finals' } }],
+  ['Barry Hall goals after the siren', {
+    grain: 'after_siren', player: { id: 1001 }, afterSiren: { subject: 'event', kickScored: 'goal' },
+  }],
+  ['who has kicked the most goals after the siren for Richmond in the finals since 2000', {
+    grain: 'after_siren', afterSiren: { subject: 'player', kickScored: 'goal' },
+    scope: { clubFor: { slug: 'richmond' }, matchType: 'finals', seasonMin: 2000 },
+  }],
+];
+
+/** Every §15.14 form: a decline, or a plan its own validator refuses. */
+const sirenDeclines = [
+  'goals after the siren in round 1',
+  'goals after the siren at the MCG',
+  'Richmond v Carlton after the siren',
+  'which coach won most games on a goal after the siren',
+  'fewest kicks after the siren',
+  'goals after the siren in 1900',
+  'most goals after the siren in a season',
+  'goals after the siren in extra time',
+  'who kicked it out on the full after the siren',
+  'how much did they win by after the siren',
+  'goals after the siren in the NAB Cup',
+  '300 game players who kicked a goal after the siren',
+  'was it a supergoal after the siren',
+  'did the siren sound before the kick',
+];
+
+describe('NL after-the-siren acceptance (AFLDB-ISSUE-152 Phase C)', () => {
+  it('parses every supported after-the-siren family to the intended plan', async () => {
+    for (const [question, expected] of sirenQuestions) {
+      const parsed = await parseNlQuestion(question, sirenCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported after-the-siren form', async () => {
+    for (const question of sirenDeclines) {
+      const parsed = await parseNlQuestion(question, sirenCtx);
+      if (parsed.status !== 'plan') continue;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
+  });
+
+  /**
+   * The 1,435-row realistic and 60-row decline gates are untouched by this
+   * phase, exactly as Phase B asserted for coaching: no existing corpus
+   * question mentions the siren, so none of them can change meaning.
+   */
+  it('no existing audit-corpus question mentions the siren', () => {
+    expect(questions.filter((q) => /siren/i.test(q))).toEqual([]);
+  });
+});
+
+// ------------------------ first-kick-goal closure (AFLDB-ISSUE-152 Phase E)
+
+const fkgPlayers: Record<string, { id: number; slug: string; name: string }[]> = {
+  'dustin martin': [{ id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }],
+};
+
+const fkgCtx: NlParseContext = {
+  clubs,
+  venues,
+  coaches,
+  resolvePlayer: async (name: string) => (fkgPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+};
+
+/** Every supported Phase E form, with the plan it must produce. */
+const fkgQuestions: [string, Record<string, unknown>][] = [
+  ['players who kicked a goal with each of their first three kicks', {
+    grain: 'player_career', metric: null,
+    careerPredicates: [{ builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } }],
+  }],
+  ['players who kicked goals with their first 2 kicks', {
+    grain: 'player_career',
+    careerPredicates: [{ builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } }],
+  }],
+  ['players whose first-kick goal was their only career goal', {
+    grain: 'player_career', metric: null,
+    careerPredicates: [{ builder: 'first_kick_goal_only_career_goal', params: {} }],
+  }],
+  ['players who goaled with their first kick and never scored again', {
+    grain: 'player_career',
+    careerPredicates: [{ builder: 'first_kick_goal_only_career_goal', params: {} }],
+  }],
+  ['carlton players who kicked a goal with each of their first two kicks', {
+    grain: 'player_career',
+    careerPredicates: [
+      { builder: 'first_kick_goal_for_club', params: { club: '4' } },
+      { builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } },
+    ],
+  }],
+  ['players who kicked a goal with each of their first two kicks in the 1940s', {
+    grain: 'player_career',
+    careerPredicates: [
+      { builder: 'first_kick_goal_between', params: { from: '1940', to: '1949' } },
+      { builder: 'first_kick_goal_consecutive_min', params: { kicks: '2' } },
+    ],
+  }],
+  ['did dustin martin kick a goal with his first kick', {
+    grain: 'player_career', player: { id: 100 },
+    careerPredicates: [{ builder: 'first_kick_goal_player', params: {} }],
+  }],
+];
+
+/** Every §17.7 form: a decline, or a plan its own validator refuses. */
+const fkgDeclines = [
+  'players who never kicked the ball again after their first-kick goal',
+  'kickless matches before a first kick',
+  'players who never kicked a goal with their first kick',
+  'which club has had the most players goal with each of their first three kicks',
+  'by decade players whose first-kick goal was their only career goal',
+  'players who kicked a goal with each of their first three kicks at the mcg',
+  'players who kicked a goal with each of their first three kicks against collingwood',
+  'players who kicked a goal with each of their first 0 kicks',
+  'players who kicked a goal with each of their first 40 kicks',
+  'players who kicked a goal with each of their first three kicks this decade',
+];
+
+describe('NL first-kick-goal acceptance (AFLDB-ISSUE-152 Phase E)', () => {
+  it('parses every supported first-kick-goal family to the intended plan', async () => {
+    for (const [question, expected] of fkgQuestions) {
+      const parsed = await parseNlQuestion(question, fkgCtx);
+      expect(parsed.status, question).toBe('plan');
+      if (parsed.status !== 'plan') continue;
+      expect(parsed.plan, question).toMatchObject(expected);
+      expect(validatePlan(parsed.plan), question).not.toHaveProperty('error');
+    }
+  });
+
+  it('declines every unsupported first-kick-goal form', async () => {
+    for (const question of fkgDeclines) {
+      const parsed = await parseNlQuestion(question, fkgCtx);
+      if (parsed.status !== 'plan') continue;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    }
+  });
+
+  /**
+   * Phase E is additive in the way Phases B and C were: the 44-question
+   * audit corpus contains no first-kick-goal wording, so no existing row
+   * can change meaning.
+   */
+  it('no existing audit-corpus question mentions a first kick', () => {
+    expect(questions.filter((q) => /first[- ]kick/i.test(q))).toEqual([]);
   });
 });

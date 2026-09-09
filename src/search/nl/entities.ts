@@ -11,10 +11,24 @@
  * VENUE_NICKNAMES); tests inject small fake directories instead.
  */
 
-import type { NlClubRef, NlVenueRef } from '@/search/nl/plan';
+import type { NlClubRef, NlCoachRef, NlVenueRef } from '@/search/nl/plan';
 
 export type NlClubDirectoryEntry = NlClubRef & { names: string[] };
 export type NlVenueDirectoryEntry = NlVenueRef & { names: string[] };
+/**
+ * 386 coaches, small enough for the same in-memory directory clubs and
+ * venues already use -- and deliberately NOT routed through searchPlayers:
+ * a coaching question resolves in the coach identity space, which is not
+ * the player one (18 coaches have no player row at all).
+ *
+ * `names` carries the full display name always, and a bare surname ONLY
+ * when that surname belongs to exactly one coach. Albert Pannam and
+ * Charlie Pannam both coached Richmond; Len Smith and Norm Smith both
+ * coached. A bare "Pannam" or "Smith" therefore resolves to nothing, stays
+ * in the text as a leftover token and declines -- the fail-closed outcome
+ * rather than a coin flip between two real people.
+ */
+export type NlCoachDirectoryEntry = NlCoachRef & { names: string[] };
 
 export type NlEntityMatch<T> = { entity: T; matchedText: string };
 
@@ -50,6 +64,10 @@ export function findClub(text: string, directory: readonly NlClubDirectoryEntry[
 }
 
 export function findVenue(text: string, directory: readonly NlVenueDirectoryEntry[]): NlEntityMatch<NlVenueDirectoryEntry> | null {
+  return findLongestMatch(text, directory);
+}
+
+export function findCoach(text: string, directory: readonly NlCoachDirectoryEntry[]): NlEntityMatch<NlCoachDirectoryEntry> | null {
   return findLongestMatch(text, directory);
 }
 

@@ -949,6 +949,29 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
                              AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)`;
 
+    // AFLDB-ISSUE-152 Phase F. "Played AND coached" -- the person, not
+    // their players. The match_coaches join is the semantic, not an
+    // optimisation: coaches.player_id alone is an identity claim and
+    // returns 368 people, 3 of whom never coached a match. The
+    // 'unique' link rule is premiership_coach's own, reused verbatim so
+    // one identity contract covers the whole Coaching group.
+    case 'has_coached':
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique')`;
+    // The same seam folded to an organization lineage. match_coaches.club_id
+    // is a RAW historical club identity, and real coaches diverge on it
+    // (Pagan 3 raw ids / 2 organizations, Wallace 3/2, Laidley 2/1), so a
+    // raw-id comparison would silently answer a narrower question. A rename
+    // folds and a merger never does, both automatic from organization_id.
+    case 'coached_club': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+                             AND mc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
+    }
+
     // -- Captaincy -- no CHECK constraint ties captaincies.player_id to
     // its link_status_value, so both are checked explicitly. -----------
     case 'club_captain': {
@@ -1298,6 +1321,75 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
                            WHERE r.relationship = 'sibling' AND r.relationship_label IN ('brothers', 'twin brothers')
                              AND r.person_b_player_id IS NOT NULL AND ac.games > 0)`;
+    // AFLDB-ISSUE-152 Phase D. player_relationships at relationship =
+    // 'parent_child', whose roles are exhaustively father -> son here (127
+    // rows, measured 2026-09-09 against afldb_test). The role columns are
+    // named explicitly rather than direction being inferred from which
+    // column a person sits in: person_a is the father BY ROLE, not by
+    // being column A. Same fail-closed rule as has_brother above -- both
+    // sides linked, and the OTHER side has actually played.
+    case 'has_afl_father':
+      return sql`p.id IN (SELECT r.person_b_player_id FROM player_relationships r
+                            JOIN player_career_stats fc ON fc.player_id = r.person_a_player_id
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_a_role = 'father' AND r.person_b_role = 'son'
+                             AND r.person_b_player_id IS NOT NULL AND fc.games > 0)`;
+    case 'has_afl_son':
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                            JOIN player_career_stats sc ON sc.player_id = r.person_b_player_id
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_a_role = 'father' AND r.person_b_role = 'son'
+                             AND r.person_a_player_id IS NOT NULL AND sc.games > 0)`;
+    // The symmetric form: either side of a linked parent_child row whose
+    // relative played. Deliberately role-BLIND, because direction is
+    // exactly what this question does not ask -- and because this is the
+    // shape whose population was measured (181).
+    case 'has_afl_parent_or_child':
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                            JOIN player_career_stats bc ON bc.player_id = r.person_b_player_id
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_a_player_id IS NOT NULL AND bc.games > 0
+                           UNION
+                          SELECT r.person_b_player_id FROM player_relationships r
+                            JOIN player_career_stats ac ON ac.player_id = r.person_a_player_id
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_b_player_id IS NOT NULL AND ac.games > 0)`;
+    // The per-player relationship questions. The named person is the
+    // OTHER side; the answer is whoever stands in the named relationship
+    // to them, so no row here filters on the answer's own games -- a
+    // canonical player row is the identity being asked for. An unlinked
+    // opposite side is a name in the source and satisfies nothing, which
+    // is the fail-closed half of the same rule.
+    case 'brother_of_player': {
+      const otherId = requireInt(axis, 'player', 'Player');
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                           WHERE r.relationship = 'sibling'
+                             AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_b_player_id = ${otherId}
+                             AND r.person_a_player_id IS NOT NULL
+                           UNION
+                          SELECT r.person_b_player_id FROM player_relationships r
+                           WHERE r.relationship = 'sibling'
+                             AND r.relationship_label IN ('brothers', 'twin brothers')
+                             AND r.person_a_player_id = ${otherId}
+                             AND r.person_b_player_id IS NOT NULL)`;
+    }
+    case 'father_of_player': {
+      const otherId = requireInt(axis, 'player', 'Player');
+      return sql`p.id IN (SELECT r.person_a_player_id FROM player_relationships r
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_a_role = 'father' AND r.person_b_role = 'son'
+                             AND r.person_b_player_id = ${otherId}
+                             AND r.person_a_player_id IS NOT NULL)`;
+    }
+    case 'son_of_player': {
+      const otherId = requireInt(axis, 'player', 'Player');
+      return sql`p.id IN (SELECT r.person_b_player_id FROM player_relationships r
+                           WHERE r.relationship = 'parent_child'
+                             AND r.person_a_role = 'father' AND r.person_b_role = 'son'
+                             AND r.person_a_player_id = ${otherId}
+                             AND r.person_b_player_id IS NOT NULL)`;
+    }
     case 'national_draft_pick_between': {
       const [lo, hi] = orderedRange(axis, 'from', 'From pick', 'to', 'To pick');
       return sql`p.id IN (SELECT player_id FROM draft_picks

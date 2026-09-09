@@ -281,6 +281,255 @@ export const CLUB_SEASON_METRIC_WORDS: [RegExp, 'wins' | 'losses' | 'draws' | 'p
 ];
 
 /**
+ * Any coaching cue, and the gate for COACH_METRIC_WORDS below. Nothing in
+ * the coaching vocabulary is tried until this matches, for exactly the
+ * reason CLUB_SEASON_METRIC_WORDS is gated: "games", "wins", "losses" and
+ * "premierships" all name player and club statistics too, and the cue is
+ * what says which of them the reader meant.
+ */
+export const COACH_CUE_RE = /\bcoach(?:es|ed|ing)?\b|\bcoaching record\b|\bin charge of\b|\bat the helm\b/;
+
+/**
+ * The PLAYER-grain readings of a coaching cue: "players coached by X",
+ * "who did X coach", "played under X". These are questions about players,
+ * answered at player_career grain through the coached_by career predicate
+ * -- not questions about a coach's record.
+ */
+export const COACHED_BY_RE = /\bcoached by\b|\bplayed under\b|\bunder coach\b/;
+
+/**
+ * "premiership coach(es)" as a PLAYER-grain predicate: which PLAYERS went
+ * on to coach a premiership side. Deliberately distinct from the
+ * coach-grain `premierships` metric ("coaches with the most
+ * premierships"), which ranks coaches by flags won -- the two questions
+ * have different answers and must not collapse into one.
+ */
+export const PREMIERSHIP_COACH_RE = /\bpremiership[- ]winning coach(?:es)?\b|\bpremiership coach(?:es)?\b/;
+
+// ------------------------------------------- cross-domain: played AND coached
+
+/**
+ * AFLDB-ISSUE-152 Phase F. The two verbs, as their own sources, so the
+ * parser can find every OCCURRENCE of each and decide which side of the
+ * composition a club mention sits on. A club is never guessed onto a
+ * side: it is assigned by the nearest verb before it, or the question
+ * declines (F-D3).
+ */
+export const CROSS_DOMAIN_PLAY_VERB_SOURCE = String.raw`\bplay(?:ed|s|ing)?\b`;
+export const CROSS_DOMAIN_COACH_VERB_SOURCE = String.raw`\bcoach(?:ed|es|ing)?\b`;
+
+/**
+ * The COMPOSITION cue: one person who both played and coached. This is
+ * deliberately NOT the bare COACH_CUE_RE -- the cross-domain reading is
+ * elected before coach_record, which is the coaching block's fallthrough
+ * and would otherwise claim every one of these questions.
+ *
+ * The gap between the two verbs is bounded and word-only, so the cue
+ * cannot reach across a whole sentence and read two unrelated clauses as
+ * a composition.
+ */
+export const CROSS_DOMAIN_COMPOSITION_RE = new RegExp([
+  // "played and also coached", "played for Richmond and coached Collingwood"
+  String.raw`\bplay(?:ed|s|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+and\s+(?:also\s+|then\s+|later\s+|subsequently\s+)?coach(?:ed|es|ing)?\b`,
+  // "coached Richmond and also played"
+  String.raw`\bcoach(?:ed|es|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+and\s+(?:also\s+|then\s+)?play(?:ed|s|ing)?\b`,
+  // "which players both played and coached"
+  String.raw`\bboth\s+play(?:ed|s|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+coach(?:ed|es|ing)?\b`,
+  // "players who also coached"
+  String.raw`\bplayers?\b(?:\s+[\w'’/-]+){0,6}\s+also\s+coach(?:ed|es|ing)?\b`,
+].join('|'));
+
+/**
+ * "both played for and coached Richmond" -- the two verbs conjoined with
+ * NO club of their own between them, so the single club named after them
+ * belongs to both sides. Without this the club would be assigned to the
+ * coaching side alone and the question would decline as one-sided (F-D3),
+ * which for this wording would be wrong: the reader named both roles.
+ */
+export const CROSS_DOMAIN_SHARED_CLUB_RE = /\bplay(?:ed|s|ing)?\s+(?:for\s+)?and\s+(?:also\s+)?coach(?:ed|es|ing)?\b/;
+
+/**
+ * Temporal / sequential wording, refused by name (operator decision
+ * F-D2, upholding D9). AFLDB can DERIVE the ordering -- of the 365 people
+ * who played and coached, 238 first coached after their playing career
+ * ended and 127 did not, with 0 unknown -- and that is exactly the trap.
+ * Nothing in the engine OWNS that ordering: no builder, no plan field, no
+ * renderer. Supporting "later" would be a separate, deliberate design
+ * decision with its own measured contract.
+ *
+ * The words are matched so the question can decline WITH A STATED REASON.
+ * They are never consumed and never silently stripped: stripping "later"
+ * turns the reader's question into a different one that happens to have
+ * an answer, which is the precise failure D9 exists to prevent.
+ */
+export const CROSS_DOMAIN_TEMPORAL_RE = new RegExp([
+  String.raw`\blater\b`,
+  String.raw`\bwent on to\b`,
+  String.raw`\bgo on to\b`,
+  String.raw`\bafterwards\b`,
+  String.raw`\bsubsequently\b`,
+  String.raw`\bthen\s+coach(?:ed|es|ing)?\b`,
+  String.raw`\bbefore\s+(?:he\s+|they\s+)?coach(?:ed|es|ing)?\b`,
+  String.raw`\bafter\s+(?:he\s+|they\s+)?retired\b`,
+  String.raw`\bafter\s+(?:his|their)\s+playing\s+(?:career|days)\b`,
+  String.raw`\bonce\s+(?:he\s+|they\s+)?retired\b`,
+  String.raw`\bbecame\s+(?:a\s+)?coach(?:es)?\b`,
+  String.raw`\bturned\s+to\s+coaching\b`,
+  String.raw`\bpost[- ]playing\b`,
+].join('|'));
+
+/**
+ * The connective words the cross-domain reading OWNS and therefore
+ * consumes: the composition's own vocabulary and the competition name.
+ * Nothing here narrows the question, so consuming it cannot hide a
+ * filter -- and leaving it would decline every supported wording on
+ * leftover tokens alone.
+ */
+export const CROSS_DOMAIN_CONSUME_RE = new RegExp([
+  // "VFL/AFL" reaches this point as "vfl/": canonicalise strips the bare
+  // "afl" as conversational filler and leaves the slash attached to what
+  // remains. The slash must come with it, or the orphaned token is the
+  // one leftover word that declines an otherwise complete question.
+  String.raw`/?\bvfl\b/?`,
+  String.raw`/?\bafl\b/?`,
+  String.raw`\bplay(?:ed|s|ing)?\b`,
+  String.raw`\balso\b`,
+  String.raw`\bboth\b`,
+  String.raw`\bamong(?:st)?\b`,
+].join('|'));
+
+// ------------------------------------------------------- after the siren
+
+/**
+ * The after-the-siren cue gate (AFLDB-ISSUE-152 Phase C), mirroring
+ * COACH_CUE_RE. NOTHING in the after-siren vocabulary below is tried
+ * until this matches, because "goals", "behinds", "points", "won" and
+ * "drew" all name other things in this engine.
+ *
+ * The bare `\bsiren\b` alternative is last and is safe: no other AFLDB
+ * concept in the vocabulary uses the word, and the same shape already
+ * works for the bare `\bcoach\b` above.
+ */
+export const AFTER_SIREN_CUE_RE =
+  /\bafter the siren\b|\bafter-the-siren\b|\bpost[- ]siren\b|\bon the siren\b|\bas the siren (?:sounded|went)\b|\bsiren\b/;
+
+/**
+ * after_siren_kicks.kick_scored -- what the kick REGISTERED. Order
+ * matters, following the COACH_METRIC_WORDS precedent: the multi-word
+ * miss idioms before the bare "missed".
+ *
+ * "Missed after the siren" is fixed to kick_scored='none' only. A behind
+ * is colloquially also a miss, but the column's own meaning is "the shot
+ * registered nothing", and the rendered interpretation states which
+ * reading was answered so a reader can see it. "Kicked a behind after the
+ * siren" reaches the behind reading through the behind/point vocabulary.
+ */
+export const AFTER_SIREN_SCORED_WORDS: [RegExp, 'goal' | 'behind' | 'none'][] = [
+  [/\bgoals?\b|\bmajors?\b|\bsnags?\b|\bsausages?\b/, 'goal'],
+  [/\bbehinds?\b|\bminors?\b|\bpoints?\b/, 'behind'],
+  // DELIBERATELY NOT HERE: "out on the full", "fell short", "hit the
+  // post". Each names a shot_detail value, which D5 does not expose, and
+  // mapping one to the coarser kick_scored='none' would answer a
+  // narrower question than the reader asked. Left unmatched, the words
+  // survive as leftover tokens and the question declines -- the same
+  // fail-closed mechanism every other unsupported term uses.
+  [/\bmiss(?:ed|es|ing)?\b|\bsprayed\b|\bfailed to score\b|\bdid ?n.?t score\b/, 'none'],
+];
+
+/**
+ * after_siren_kicks.kick_effect -- what the kick did to the RESULT.
+ * Independent of the scored dimension and ANDed with it. "to win" before
+ * the bare "winning", the same longest-phrase-first ordering the coaching
+ * metric list uses.
+ */
+export const AFTER_SIREN_EFFECT_WORDS: [RegExp, 'won' | 'drew'][] = [
+  // The hyphenated compounds are listed WHOLE and before the bare
+  // "winning". A token like "match-winning" is one token to
+  // meaningfulTokens, so consuming only the "winning" half leaves the
+  // whole compound counted as an unexplained leftover and declines a
+  // question the engine understood completely.
+  [/\b(?:game|match)[- ]winning\b|\bto win\b|\bgame[- ]winner\b|\bmatch[- ]winner\b|\bwinners?\b|\bwinning\b|\bto snatch (?:the )?(?:win|victory)\b|\bto steal (?:the )?(?:win|victory)\b/, 'won'],
+  [/\bto draw\b|\bto tie\b|\bto level (?:the )?(?:scores?|match|game)?\b|\bfor a draw\b/, 'drew'],
+];
+
+/**
+ * after_siren_kicks.kicker_result -- the match result from the KICKER's
+ * side, read from the source's own final score at import time and never
+ * inferred here from matches.winner_club_id.
+ *
+ * Tried BEFORE AFTER_SIREN_EFFECT_WORDS, so "missed after the siren and
+ * lost" reads kickerResult='loss' and "and won" is not mistaken for
+ * kickEffect='won'. The two are semantically different and the measured
+ * (none, none, win) event proves it: a player who scored nothing after
+ * the siren whose side won anyway.
+ */
+export const AFTER_SIREN_RESULT_WORDS: [RegExp, 'win' | 'draw' | 'loss'][] = [
+  [/\band (?:still )?won\b|\bin a win\b|\bwon anyway\b|\band (?:their|his) (?:side|team) won\b/, 'win'],
+  [/\band (?:still )?lost\b|\bin a loss\b|\bin a losing\b|\band (?:their|his) (?:side|team) lost\b/, 'loss'],
+  [/\bin a draw\b|\band drew\b|\bin a drawn (?:match|game)\b/, 'draw'],
+];
+
+/**
+ * "the first" / "the most recent". Match-linked only (D10 limit 1):
+ * round_raw is free text and gives no within-season order, so the
+ * compiler orders by matches.match_date or declines the row.
+ */
+export const AFTER_SIREN_OCCURRENCE_WORDS: [RegExp, 'first' | 'most_recent'][] = [
+  [/\bmost recent(?:ly)?\b|\blatest\b|\bthe last\b|\bwhen was the last\b/, 'most_recent'],
+  [/\bfirst\b|\bearliest\b|\bwhen was the first\b/, 'first'],
+];
+
+/**
+ * An explicit PLAYER-subject cue: the question asks who, not which kicks.
+ * A ranking aggregation and a metric threshold elect the player subject
+ * on their own; this list catches the shapes that name the subject
+ * without ranking words of their own.
+ */
+export const AFTER_SIREN_PLAYER_SUBJECT_RE =
+  /\bwhich players?\b|\bwhat players?\b|\bplayers? who\b|\bwho has kicked\b|\bwho kicked\b|\bwho has\b/;
+
+/**
+ * The grain's own subject noun, consumed with no dimension set: "kicks
+ * after the siren" is EVERY event, including the misses, not only the
+ * ones that scored. Without this the word survives as a leftover token
+ * and declines a question the engine understood completely.
+ */
+export const AFTER_SIREN_KICK_NOUN_RE = /\bkicks?\b|\battempts?\b|\bshots?\b/;
+
+/**
+ * coach_record ranking words, tried ONLY once COACH_CUE_RE has matched.
+ * Order matters: "grand finals" must be claimed before the bare "finals",
+ * and the win-percentage phrases before the bare "win".
+ */
+export const COACH_WIN_PCT_RE = /\bwin (?:percentage|pct|rate)\b|\bwinning percentage\b|\bwin ?%/;
+
+export const COACH_METRIC_WORDS: [RegExp, string][] = [
+  [COACH_WIN_PCT_RE, 'win_pct'],
+  [/\bpremierships?\b|\bflags?\b/, 'premierships'],
+  [/\bgrand finals?\b/, 'grand_finals'],
+  [/\bfinals?\b/, 'finals'],
+  [/\bwins?\b|\bvictories\b/, 'wins'],
+  [/\blosses\b|\bdefeats\b/, 'losses'],
+  [/\bdraws?\b/, 'draws'],
+  // "seasons in charge" is claimed as one phrase: the bare word alone
+  // leaves "in charge" behind as a leftover token, which declines a
+  // question the engine understood completely.
+  [/\bseasons? in charge\b|\byears in charge\b|\bseasons?\b/, 'seasons'],
+  // Lineage-level clubs (AFLDB-ISSUE-152 D2): "coached more than one club"
+  // counts ORGANIZATIONS, never raw historical club identities -- Denis
+  // Pagan and Terry Wallace each show 2 organizations across 3 identities.
+  [/\bclubs?\b/, 'organizations'],
+  [/\bgames?\b|\bmatches\b/, 'games'],
+];
+
+/**
+ * An explicit refusal of the win-percentage qualifier ("no minimum", "any
+ * number of games"). The measured minimum across all coaches is ONE game,
+ * so this is refused rather than answered from a one-game sample.
+ */
+export const COACH_NO_QUALIFIER_RE = /\bno minimum\b|\bwithout a minimum\b|\bany number of games\b|\bno qualifier\b/;
+
+/**
  * club_season boolean conditions -- "fewest wins BY A PREMIER", "worst
  * team to MAKE FINALS". Each reads one already-computed club_seasons
  * column (is_premier / wooden_spoon / finals_played); unlike the metric
@@ -736,6 +985,250 @@ export const ACHIEVEMENT_SUMMARY_CUES: [RegExp, string][] = [
   [/\bmost\s+recent\b|\blatest\b|\bmost\s+recently\b|\blast\s+player\b/, 'latest'],
 ];
 
+/**
+ * AFLDB-ISSUE-152 Phase E (E7). "a goal with EACH of their first three
+ * kicks" -- the multi-kick subtype recorded in
+ * player_achievements.consecutive_goal_kicks (migration 053, `smallint NOT
+ * NULL DEFAULT 1 CHECK (>= 1)`), which FIRST_KICK_GOAL_RE cannot match
+ * because the numeral and "each of" sit between "first" and "kicks".
+ *
+ * Tried BEFORE FIRST_KICK_GOAL_RE and consuming the whole span, because it
+ * subsumes it: any of "goal", "kick" or the numeral left in the text is
+ * handed straight to the metric extractors, which read "goals" as the
+ * ranking subject -- the same reason step 5a exists at all.
+ *
+ * The count is a capture group per branch (a JS alternation cannot share
+ * one), resolved by readFirstKickCount. An out-of-range count is NOT
+ * clamped: N = 0, N = -2 and N = 40 are questions this data cannot answer,
+ * and the parser refuses them by name rather than sending an
+ * always-empty predicate to SQL.
+ */
+const FIRST_KICK_COUNT = String.raw`(-?\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)`;
+
+export const FIRST_KICK_CONSECUTIVE_RE = new RegExp([
+  // "kicked a goal with each of their first three kicks", "goals with their first 3 kicks"
+  String.raw`(?:kick(?:ed|s)?|scor(?:ed|es)?|boot(?:ed|s)?|slott(?:ed|s)?|got|goaled)?\s*(?:a\s+)?goals?\s+(?:with|from|off|on)\s+(?:each\s+of\s+)?(?:their|his|her|the|a)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+  // "their first three kicks were all goals"
+  String.raw`(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks\s+(?:were|was)\s+(?:all\s+)?goals?`,
+  // "goaled with each of their first three kicks" -- verb form, no article
+  String.raw`goal(?:ed|ing)\s+(?:with|from|off)\s+(?:each\s+of\s+)?(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+  // "scored with each of their first three kicks" -- no "goal" word at all
+  String.raw`scor(?:ed|es|ing)\s+(?:with|from|off)\s+(?:each\s+of\s+)?(?:their|his|her|the)?\s*(?:very\s+)?first\s+${FIRST_KICK_COUNT}\s+kicks?`,
+].map((source) => `(?:${source})`).join('|'));
+
+/**
+ * The upper bound on N. The source legend's observed maximum is a single
+ * digit (6 on the loaded curated extract), so a two-digit request is not a
+ * narrower question, it is a misunderstanding of the record.
+ */
+export const FIRST_KICK_CONSECUTIVE_MAX = 10;
+
+/** The captured count, as digits or a number word. Null when neither. */
+export function readFirstKickCount(token: string): number | null {
+  if (/^-?\d+$/.test(token)) return Number(token);
+  return NUMBER_WORDS[token] ?? null;
+}
+
+/**
+ * AFLDB-ISSUE-152 Phase E (E8). "whose first-kick goal was their only
+ * career goal" -- player_achievements.no_further_career_goals.
+ *
+ * Consulted ONLY once the achievement phrase has already matched, exactly
+ * like ACHIEVEMENT_SUMMARY_CUES, so a loose phrase can never elect the
+ * family on its own. Consumed inside step 5a, which is the whole point:
+ * left in the text, the tail's "goal" is read by extractPlayerMetric as
+ * the ranking subject -- a silent misread rather than a decline.
+ *
+ * Goal-level only. "never kicked the ball again" is a different, kick-level
+ * claim (no_further_career_kicks) that AFLDB does not answer, and it must
+ * not be folded in here -- see FIRST_KICK_NO_FURTHER_KICKS_CUES.
+ */
+/**
+ * The relation that ties a negation-form E8 cue back to the achievement
+ * phrase: "never kicked another goal AFTER THEIR first-kick goal".
+ *
+ * By the time these cues run, the achievement span itself has already been
+ * consumed, so what the connective governs is gone and only the connective
+ * and its determiner survive. That remnant is part of the same claim, not
+ * a leftover the question failed to express, so the cue must take it --
+ * otherwise a fully supported wording declines on an unsupported "after".
+ *
+ * A determiner is REQUIRED, which is what keeps this narrow: "after their"
+ * is the remnant of a consumed noun phrase, while "after 1950" or "after
+ * round 12" is a scope clause with its own owner, and neither can match.
+ */
+const AFTER_THE_ACHIEVEMENT = String.raw`(?:\s+(?:after|following|since)\s+(?:that|this|it|their|his|her|the)\b(?:\s+(?:goals?|one|kicks?))?)?`;
+
+export const FIRST_KICK_ONLY_GOAL_CUES: RegExp[] = [
+  /\b(?:was|were|is|being)\s+(?:their|his|her)?\s*only\s+(?:ever\s+|career\s+)?goals?\b/,
+  /\bonly\s+(?:career\s+|ever\s+)?goals?\s+(?:of|in)\s+(?:their|his|her|the)?\s*(?:whole\s+|entire\s+)?career\b/,
+  /\btheir\s+only\s+(?:ever\s+|career\s+)?goals?\b/,
+  new RegExp(String.raw`\bnever\s+(?:kicked|booted|slotted|scored)\s+another\s+goal\b${AFTER_THE_ACHIEVEMENT}`),
+  new RegExp(String.raw`\bnever\s+(?:goaled|scored)\s+again\b${AFTER_THE_ACHIEVEMENT}`),
+];
+
+/**
+ * The kick-level claim (`no_further_career_kicks`), deliberately NOT
+ * supported (E9). Recognised only so the question declines by name instead
+ * of losing its tail to the metric extractors and answering the goal-level
+ * question it did not ask.
+ */
+export const FIRST_KICK_NO_FURTHER_KICKS_CUES: RegExp[] = [
+  /\bnever\s+(?:kicked|touched)\s+(?:the\s+)?(?:ball|footy|football)\s+again\b/,
+  /\bnever\s+(?:had\s+)?another\s+kick\b/,
+  /\bnever\s+kicked\s+again\b/,
+  /\bno\s+further\s+(?:career\s+)?kicks\b/,
+];
+
+// --------------------------------------------------- family relationships
+
+/**
+ * AFLDB-ISSUE-152 Phase D. player_relationships holds exactly two
+ * relationship types with rows -- `sibling` (498) and `parent_child`
+ * (127) -- so this vocabulary is deliberately narrow, and every word in
+ * it must appear in a genuine RELATIONSHIP FRAME before it counts.
+ *
+ * The frame requirement is not tidiness. "Cousins" is Ben Cousins, whose
+ * surname is also a PLAYER_NICKNAMES key; a bare `\bcousins?\b` gate
+ * would have turned "most goals by ben cousins" into a family question
+ * and declined it. So a relationship word counts only when an article,
+ * possessive, pronoun, copula or "of/who/that" governs it -- "A brother",
+ * "whose father", "are cousins", "brothers of" -- which is exactly how a
+ * reader words the relationship and never how they word a surname.
+ *
+ * The possessive form is checked against the RAW question, not the
+ * canonicalised one: canonicalise strips "'s", and that apostrophe is the
+ * whole difference between "Brent Harvey's son" (who is it?) and "did
+ * Brent Harvey have a son who played" (yes/no).
+ */
+
+/** Words an in-scope or out-of-scope relationship noun may be governed by. */
+const REL_LEAD = String.raw`(?:a|an|the|any|one|two|both|and|or|his|her|their|its|whose|another|other|is|are|was|were|has|have|had|with)`;
+
+/** A relationship noun in a genuine frame: "<lead> brother", "brothers of/who/that". */
+function relationshipFrame(noun: string): RegExp {
+  return new RegExp(String.raw`\b${REL_LEAD}\s+(?:\w+\s+)?${noun}\b|\b${noun}\s+(?:of|who|that)\b`);
+}
+
+/**
+ * The relationship families that must DECLINE, each with the wording the
+ * decline says out loud. Checked before every supported reading, so a
+ * question that names one of these can never fall through to a narrower
+ * one that happens to share a word ("a twin brother" is not "a brother").
+ *
+ * Every entry is an empty set, an unsexed set, or a grain this phase does
+ * not build:
+ *  - sisters (8 rows) and twins (10) are expressible but have no builder;
+ *  - cousin, grandparent, aunt/uncle, spouse and in-law have ZERO rows;
+ *  - mother/daughter cannot exist: parent_child is exhaustively
+ *    father -> son (measured, 127 of 127);
+ *  - "family", "relatives" and "related to" are the family GRAIN (D6) and
+ *    the open question of what a family IS -- AFLDB-ISSUE-153;
+ *  - "pairs" asks for a pairing, which is not a player.
+ */
+export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
+  [relationshipFrame('sisters?'), 'AFLDB records 8 sister relationships and has no way to search them; only brothers are searchable.'],
+  [relationshipFrame('twins?'), 'AFLDB\'s brother record does not separate twins from other brothers, so a twins-only question cannot be answered.'],
+  [relationshipFrame('cousins?'), 'AFLDB holds no cousin relationships at all.'],
+  [relationshipFrame('grand(?:father|mother|son|daughter|parents?|children)'), 'AFLDB holds no grandparent or grandchild relationships at all.'],
+  [relationshipFrame('(?:uncles?|aunts?|aunties?|nephews?|nieces?)'), 'AFLDB holds no uncle, aunt, nephew or niece relationships at all.'],
+  [relationshipFrame('(?:in[- ]laws?|spouses?|wife|wives|husbands?|partners?)'), 'AFLDB holds no spouse or in-law relationships at all.'],
+  [relationshipFrame('(?:mothers?|daughters?)'), 'Every parent-child relationship AFLDB records is a father and a son.'],
+  [relationshipFrame('(?:famil(?:y|ies)|relatives?|family members?)'), 'AFLDB cannot yet answer a question about a football family as a whole.'],
+  [/\brelated to\b/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
+  [relationshipFrame('(?:pairs?|duos?|combinations?)'), 'AFLDB answers relationship questions about players, not about pairings.'],
+];
+
+/**
+ * FS4 -- the FATHER's side of the father-son draft rule, and the only
+ * father-son SELECTION wording Phase D may claim. Every other father-son
+ * form (the selections themselves, by club, by year, by distribution)
+ * stays unrecognised until AFLDB-ISSUE-153 settles what the bare phrase
+ * means (decision D8): those words are left in the text, where they
+ * remain leftover tokens and the question declines exactly as it did
+ * before this phase.
+ *
+ * Each cue therefore has to say the father's side EXPLICITLY -- "fathers
+ * of", "father-son fathers", "whose son was selected", "had a son
+ * drafted" -- and each requires the father-son rule to be named, because
+ * "whose son was drafted" alone is an ordinary draft question this
+ * builder does not answer.
+ */
+export const FATHER_SON_FATHER_CUES: RegExp[] = [
+  /\bfathers? of (?:the )?father[- ]son (?:selections?|picks?|players?|draftees?|recruits?)\b/,
+  /\bfather[- ]son fathers?\b/,
+  /\b(?:whose|who(?:se)? own) sons? (?:was|were) (?:selected|drafted|taken|picked|recruited)(?: under)?(?: the)? father[- ]son(?: rule)?\b/,
+  /\b(?:had|have|has) (?:a |their |his )?sons? (?:selected|drafted|taken|picked|recruited)(?: under)?(?: the)? father[- ]son(?: rule)?\b/,
+  /\bfathers? whose sons? (?:was|were) (?:a )?father[- ]son (?:selections?|picks?)\b/,
+];
+
+/** Any father-son rule wording at all -- the D8 guard. */
+export const FATHER_SON_RULE_RE = /\bfather[- ]son\b/;
+
+/**
+ * The three per-player readings, in the two shapes a reader writes them:
+ * "brothers of Brent Harvey" (canonicalised text) and "Brent Harvey's
+ * son" (RAW question -- see this section's header).
+ */
+export const RELATIONSHIP_OF_PLAYER_RE = /\b(brothers?|fathers?|sons?) of\b/;
+export const RELATIONSHIP_POSSESSIVE_RE = /['’]s\s+(brothers?|fathers?|sons?|sisters?|twins?|cousins?|mothers?|daughters?|famil(?:y|ies)|family members?|relatives?)\b/;
+
+/** The supported population readings, each mapped to the builder it emits. */
+export const RELATIONSHIP_POPULATION_CUES: [RegExp, 'has_brother' | 'has_afl_father' | 'has_afl_son'][] = [
+  [relationshipFrame('brothers?'), 'has_brother'],
+  [relationshipFrame('fathers?'), 'has_afl_father'],
+  [relationshipFrame('sons?'), 'has_afl_son'],
+];
+
+/**
+ * The symmetric parent-or-child reading. Either noun in a frame elects
+ * it, and it is checked BEFORE the directional cues so "the parent or
+ * child of another AFL player" is one symmetric question rather than two
+ * directional ones ANDed into an empty set.
+ */
+export const RELATIONSHIP_SYMMETRIC_CUES: RegExp[] = [
+  relationshipFrame('parents?'),
+  relationshipFrame('child(?:ren)?'),
+];
+
+/**
+ * Words a relationship clause leaves behind once its noun is consumed.
+ * None is a stopword (they are meaningful in other questions), and each
+ * one left in the text would depress the token ratio or, worse, be read
+ * as a failed player-name guess: "VFL/AFL" canonicalises to the bare
+ * token "vfl/" because CONVERSATIONAL_FILLER strips "afl" out of it.
+ */
+export const RELATIONSHIP_CLAUSE_NOISE: RegExp[] = [
+  // Deliberately no trailing \b: the leftover check compares whole
+  // tokens, so the slash has to be consumed WITH the word or the token
+  // "vfl/" is still reported as an unsupported term.
+  /\bvfl\/?/,
+  /\balso\b/,
+  /\banother\b/,
+  /\bboth\b/,
+  // "who ARE Brent Harvey's brothers". Every other copula is a STOPWORDS
+  // entry; this one is not, and left behind it is swallowed into the
+  // candidate player span, where "are dustin martin" resolves to nobody.
+  /\bare\b/,
+];
+
+/**
+ * The extra words an FS4 cue leaves behind ("most games by A FATHER whose
+ * son was selected under the father-son RULE"). Applied only once an FS4
+ * cue has matched -- stripping "selections" or "father-son" on any other
+ * reading would erase the very tokens that keep FS1/FS2/FS3/FS6 declining.
+ */
+export const FATHER_SON_FATHER_NOISE: RegExp[] = [
+  /\bfather[- ]son\b/,
+  /\bfathers?\b/,
+  /\bsons?\b/,
+  /\brules?\b/,
+  /\bselections?\b/,
+  /\bpicks?\b/,
+  /\bdrafted\b/,
+  /\bselected\b/,
+];
+
 // ------------------------------------------------------------------ nicknames
 
 /** Seed vocabulary; grown from real search-log usage (db/queries/nl/log.ts, phase F). */
@@ -877,11 +1370,6 @@ export const UNANSWERABLE_TOPICS: UnanswerableTopic[] = [
     re: /\b(?:r50s?|rebound[- ]?(?:fifties|50s?))\b/,
     topic: 'rebound 50s',
     reason: 'Rebound 50s are not tracked as a supported AFLDB natural-language statistic.',
-  },
-  {
-    re: /\bcoach(?:es|ed|ing)?\b/,
-    topic: 'coaching',
-    reason: 'AFLDB has no coaching data at all -- no coach, no coach-per-club-season, nothing.',
   },
   {
     // Bare \bfantasy\b, not "fantasy points": readers ask for a "fantasy

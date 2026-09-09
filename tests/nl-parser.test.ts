@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
 import { NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlClubDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
+import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 1, slug: 'richmond', name: 'Richmond', names: ['richmond', 'tigers'] },
@@ -26,16 +26,57 @@ const VENUES: NlVenueDirectoryEntry[] = [
   { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
 ];
 
+/**
+ * A stand-in for buildCoachDirectory's 386 rows, including the two
+ * measured surname collisions that must NOT resolve: Albert Pannam and
+ * Charlie Pannam both coached Richmond, and Len Smith and Norm Smith both
+ * coached, so neither surname is an alias here -- exactly as the real
+ * directory builder leaves them out.
+ */
+const COACHES: NlCoachDirectoryEntry[] = [
+  { id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick', names: ['damien hardwick', 'hardwick'] },
+  { id: 1, slug: 'mick-malthouse', name: 'Mick Malthouse', playerId: 9635, playerSlug: 'mick-malthouse', names: ['mick malthouse', 'malthouse'] },
+  { id: 152, slug: 'cliff-rankin', name: 'Cliff Rankin', playerId: null, playerSlug: null, names: ['cliff rankin', 'rankin'] },
+  { id: 160, slug: 'albert-pannam', name: 'Albert Pannam', playerId: 700, playerSlug: 'albert-pannam', names: ['albert pannam'] },
+  { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
+];
+
 const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   'dustin martin': [{ ref: { id: 100, slug: 'dustin-martin', name: 'Dustin Martin' }, score: 1000 }],
-  'gary ablett': [{ ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000 }],
+  // TWO candidates, because afldb_test holds two: players 4700 and 4701
+  // share the display name "Gary Ablett" AND the slug "gary-ablett", and
+  // the real resolver returns them 10.9 points apart. The single-candidate
+  // stand-in this replaces made an unsuffixed "gary ablett" look uniquely
+  // resolvable to anyone writing a test against it -- which is how the
+  // Phase G corpus came to expect a plan for a question the engine has
+  // declined by design since AFLDB-ISSUE-110. The contract itself is
+  // asserted in tests/nl-semantic-mapping.test.ts.
+  'gary ablett': [
+    { ref: { id: 101, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 1000, matchedName: 'Gary Ablett' },
+    { ref: { id: 102, slug: 'gary-ablett', name: 'Gary Ablett' }, score: 990, matchedName: 'Gary Ablett' },
+  ],
+  // AFLDB-ISSUE-152 Phase C: the measured joint holder of "most goals
+  // after the siren" (2, tied with Gary Rohan).
+  'barry hall': [{ ref: { id: 1001, slug: 'barry-hall', name: 'Barry Hall' }, score: 1000 }],
+  // AFLDB-ISSUE-152 Phase D witnesses, with afldb_test's own ids: Brent
+  // Harvey is both a brother (relationship 358, Shane Harvey) and a
+  // father-son father (relationship 112, Cooper Harvey), so one name
+  // exercises every per-player reading.
+  'brent harvey': [{ ref: { id: 2164, slug: 'brent-harvey', name: 'Brent Harvey' }, score: 1000 }],
+  'cooper harvey': [{ ref: { id: 3048, slug: 'cooper-harvey', name: 'Cooper Harvey' }, score: 1000 }],
+  'phil krakouer': [{ ref: { id: 10500, slug: 'phil-krakouer', name: 'Phil Krakouer' }, score: 1000 }],
+  // The surname that is also a relationship word. "Most goals by Ben
+  // Cousins" must stay a goals question: PLAYER_NICKNAMES maps "cousins"
+  // to him, and a bare cousin gate would have declined it as a family
+  // question AFLDB cannot answer.
+  'ben cousins': [{ ref: { id: 1500, slug: 'ben-cousins', name: 'Ben Cousins' }, score: 1000 }],
 };
 
 function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
   return Promise.resolve(PLAYERS[name.toLowerCase()] ?? []);
 }
 
-const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, coaches: COACHES, resolvePlayer: fakeResolvePlayer };
 
 async function parse(question: string): Promise<NlParse> {
   return parseNlQuestion(question, ctx);
@@ -523,13 +564,13 @@ describe('12. aggregate-vs-single scope for a named player', () => {
 });
 
 describe('unanswerable topics decline with a reason rather than a wrong answer', () => {
-  it('coaching questions are declined', async () => {
+  it('coaching questions are no longer declined as unsupported (AFLDB-ISSUE-152 F2)', async () => {
+    // The old rule claimed AFLDB held no coaching data at all, which
+    // stopped being true at migration 087. It is deleted, not softened.
     const result = await parse('who coached richmond to the 2017 premiership');
-    expect(result.status).toBe('unanswerable');
-    if (result.status === 'unanswerable') {
-      expect(result.topic).toBe('coaching');
-      expect(result.reason).toMatch(/coaching data/i);
-    }
+    expect(result.status).not.toBe('unanswerable');
+    expect(result.status).toBe('plan');
+    if (result.status === 'plan') expect(result.plan.grain).toBe('coach_record');
   });
 
   it('streak questions are parsed', async () => {
@@ -1174,5 +1215,926 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
     const p = await plan('players who debuted in a grand final');
     expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
     expect(p.careerPredicates).toEqual([]);
+  });
+});
+
+// ------------------------------------------------- coaching (ISSUE-152 B)
+
+describe('coaching questions (AFLDB-ISSUE-152 Phase B)', () => {
+  it('a coach cue elects the coach_record grain, and an unranked club question is a list', async () => {
+    const p = await plan('who coached richmond');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBeNull();
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"how many coaches has richmond had" is a count, not a ranking', async () => {
+    const p = await plan('how many coaches has richmond had');
+    expect(p.grain).toBe('coach_record');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coach name resolves from the coach directory, never as a player', async () => {
+    const p = await plan('damien hardwick coaching record');
+    expect(p.grain).toBe('coach_record');
+    expect(p.coach).toEqual({
+      id: 17, slug: 'damien-hardwick', name: 'Damien Hardwick', playerId: 900, playerSlug: 'damien-hardwick',
+    });
+    expect(p.player).toBeUndefined();
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a whole career and a record at one club are different plans', async () => {
+    const career = await plan('damien hardwick coaching record');
+    const atClub = await plan('damien hardwick coaching record at richmond');
+    expect(career.scope.clubFor).toBeUndefined();
+    expect(atClub.scope.clubFor?.name).toBe('Richmond');
+    expect(atClub.coach?.id).toBe(17);
+  });
+
+  it('a coach-only person carries no player link', async () => {
+    const p = await plan('cliff rankin coaching record');
+    expect(p.coach?.playerId).toBeNull();
+    expect(p.coach?.playerSlug).toBeNull();
+  });
+
+  it('"players coached by X" is a player question, answered by the coached_by predicate', async () => {
+    const p = await plan('players coached by damien hardwick');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'coached_by', params: { coach: '17' } });
+    expect(p.coach).toBeUndefined();
+  });
+
+  it('"premiership coaches" is a player predicate, NOT the coach-grain premierships metric', async () => {
+    const p = await plan('premiership coaches');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerPredicates).toContainEqual({ builder: 'premiership_coach', params: {} });
+  });
+
+  it('"coaches with the most premierships" is the coach-grain metric, NOT the player predicate', async () => {
+    // D3: the two questions have different answers and must not collapse.
+    const p = await plan('coaches with the most premierships');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('premierships');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.careerPredicates).toEqual([]);
+  });
+
+  it('reads each coaching metric word behind the cue', async () => {
+    expect((await plan('which coach has coached the most games')).metric).toBe('games');
+    expect((await plan('which coach has the most wins')).metric).toBe('wins');
+    expect((await plan('which coach has coached the most grand finals')).metric).toBe('grand_finals');
+    expect((await plan('which coach has coached the most finals')).metric).toBe('finals');
+    expect((await plan('which coach has the most seasons in charge')).metric).toBe('seasons');
+  });
+
+  it('a coaching threshold becomes the grain\'s own metricCondition and lists qualifiers', async () => {
+    const p = await plan('richmond coaches with 100+ wins');
+    expect(p.grain).toBe('coach_record');
+    expect(p.metric).toBe('wins');
+    expect(p.metricCondition).toEqual({ op: 'gte', value: 100 });
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toEqual([]);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('"coached more than one club" counts organizations, not raw club identities', async () => {
+    const p = await plan('coaches who have coached more than one club');
+    expect(p.metric).toBe('organizations');
+    expect(p.metricCondition).toEqual({ op: 'gt', value: 1 });
+  });
+
+  it('a top-N count belongs to the aggregation, never to the metric', async () => {
+    const p = await plan('top 5 coaches by premierships');
+    expect(p.agg).toEqual({ kind: 'top_n', n: 5 });
+    expect(p.metricCondition).toBeUndefined();
+  });
+
+  it('a win-percentage ranking carries the 50-game qualifier by default', async () => {
+    const p = await plan('best coaching win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 50 });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a reader-stated minimum is honoured instead of the default', async () => {
+    const p = await plan('coaches with at least 100 games best win percentage');
+    expect(p.metric).toBe('win_pct');
+    expect(p.coachQualifier).toEqual({ minGames: 100 });
+  });
+
+  it('"no minimum" refuses rather than ranking a one-game sample', async () => {
+    const p = await plan('best coaching win percentage no minimum');
+    expect(p.coachQualifier).toBeUndefined();
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('a season before 1902 is refused by the coaching coverage floor', async () => {
+    const p = await plan('who coached carlton in 1899');
+    const validated = validatePlan(p);
+    expect(validated).toHaveProperty('error');
+    if ('error' in validated) expect(validated.error).toMatch(/coaching records begin in 1902/);
+  });
+
+  it('a season inside coverage is answered, and a future season is left to the empty result', async () => {
+    expect(validatePlan(await plan('who coached richmond in 2017'))).not.toHaveProperty('error');
+    expect(validatePlan(await plan('who coached richmond in 2030'))).not.toHaveProperty('error');
+  });
+
+  it('an ambiguous coach surname declines rather than picking one of two real people', async () => {
+    const result = await parse('pannam coaching record');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('a per-season coaching split declines rather than answering the all-time total', async () => {
+    const result = await parse('most wins in a season by a coach');
+    expect(result.status).toBe('none');
+    expect(result.report.notes.join(' ')).toMatch(/per-season coaching splits/);
+  });
+
+  it('"Richmond players coached by X" declines: no builder owns the club (ISSUE-110 ownership)', async () => {
+    const p = await plan('richmond players coached by damien hardwick');
+    expect(validatePlan(p)).toHaveProperty('error');
+  });
+
+  it('an absent coach directory declines rather than half-resolving a coaching question', async () => {
+    const noCoaches: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+    const result = await parseNlQuestion('damien hardwick coaching record', noCoaches);
+    expect(result.status).not.toBe('plan');
+  });
+
+  describe('no coach cue: every pre-Phase-B reading is unchanged', () => {
+    it('"most wins" stays a career question', async () => {
+      const p = await plan('most wins');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most games" stays a career question', async () => {
+      const p = await plan('most games');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+    });
+
+    it('"richmond most wins in a season" stays a club-season question', async () => {
+      const p = await plan('richmond most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+    });
+
+    it('"most premierships" stays a career question', async () => {
+      const p = await plan('most premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('premierships');
+    });
+  });
+});
+
+describe('after-the-siren questions (AFLDB-ISSUE-152 Phase C)', () => {
+  it('the cue is required: "most goals" alone is still a career-goals ranking', async () => {
+    const p = await plan('most goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.metric).toBe('goals');
+  });
+
+  /**
+   * R0/§15.4's load-bearing precedence rule. Before Phase C the metric
+   * extractor claimed "goals" and only the confidence gate's unresolved
+   * penalty on the leftover "after siren" tokens stopped a career-goals
+   * leaderboard being returned. Once the cue consumes those tokens the
+   * penalty is gone, so "goals" MUST be claimed as the kickScored
+   * dimension first.
+   */
+  it('"goals" is claimed as the kickScored dimension, never as the career goals metric', async () => {
+    const p = await plan('who has kicked the most goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.metric).toBe('siren_kicks');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a bare "kicks after the siren" carries NO kickScored: any kick, including a miss', async () => {
+    const p = await plan('most kicks after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren?.kickScored).toBeUndefined();
+    expect(p.afterSiren?.subject).toBe('player');
+  });
+
+  it('a goal after the siren and a goal after the siren TO WIN are different plans', async () => {
+    const goal = await plan('goals after the siren');
+    const toWin = await plan('goals after the siren to win');
+    expect(goal.afterSiren).toEqual({ subject: 'event', kickScored: 'goal' });
+    expect(toWin.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', kickEffect: 'won' });
+  });
+
+  it('"to draw" is the drew effect, distinct from the drawn-match result', async () => {
+    const p = await plan('behinds after the siren to draw');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'behind', kickEffect: 'drew' });
+  });
+
+  it('the kicker result is read BEFORE the effect, so "and lost" is never an effect', async () => {
+    const p = await plan('missed after the siren and lost');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'loss' });
+    expect(p.afterSiren?.kickEffect).toBeUndefined();
+  });
+
+  it('"and won" is the kicker result, not the winning-kick effect', async () => {
+    const p = await plan('missed after the siren and won');
+    expect(p.afterSiren).toEqual({ subject: 'event', kickScored: 'none', kickerResult: 'win' });
+  });
+
+  it('occurrence words elect first / most recent, at event subject', async () => {
+    const first = await plan('the first goal after the siren');
+    expect(first.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'first' });
+    expect(first.agg).toEqual({ kind: 'list' });
+
+    const latest = await plan('the most recent goal after the siren');
+    expect(latest.afterSiren).toEqual({ subject: 'event', kickScored: 'goal', occurrence: 'most_recent' });
+  });
+
+  it('a count cue is an event count, never a player leaderboard', async () => {
+    const p = await plan('how many goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.agg).toEqual({ kind: 'count' });
+    expect(p.afterSiren?.subject).toBe('event');
+  });
+
+  it('an unranked question is an event list, not a rank-one leader', async () => {
+    const p = await plan('goals after the siren for richmond');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+  });
+
+  it('the opponent role is the kicked-against club', async () => {
+    const p = await plan('goals after the siren against richmond');
+    expect(p.scope.clubAgainst?.name).toBe('Richmond');
+    expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  it('a named player takes the event subject: his events, not a leaderboard of one', async () => {
+    const p = await plan('barry hall goals after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(p.player?.id).toBe(1001);
+    expect(p.afterSiren?.subject).toBe('event');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  /**
+   * The explicit inversion of the Phase B rule: for coaching, "finals" was
+   * a METRIC and had to be claimed before extractMatchType. Here finals is
+   * genuine match SCOPE (D4), so the after-siren block must LEAVE it.
+   */
+  it('leaves "finals" for match-type extraction rather than claiming it', async () => {
+    const p = await plan('goals after the siren in the finals');
+    expect(p.grain).toBe('after_siren');
+    expect(p.scope.matchType).toBe('finals');
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('combines finals, club lineage and a season range at player subject', async () => {
+    const p = await plan('who has kicked the most goals after the siren for richmond in the finals since 2000');
+    expect(p.grain).toBe('after_siren');
+    expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal' });
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.matchType).toBe('finals');
+    expect(p.scope.seasonMin).toBe(2000);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('a coaching cue and a siren cue together fail closed', async () => {
+    const parsed = await parse('which coach won most games on a goal after the siren');
+    expect(parsed.status).toBe('none');
+    if (parsed.status === 'none') expect(parsed.reason).toBe('unrecognised');
+  });
+
+  it('a bare "siren" with nothing else declines', async () => {
+    const parsed = await parse('siren');
+    expect(parsed.status).toBe('none');
+  });
+
+  // ------------------------------------------------- §15.14 decline table
+
+  it.each([
+    ['C-D1  round scope', 'goals after the siren in round 1'],
+    ['C-D2  venue', 'goals after the siren at the mcg'],
+    ['C-D3  matchup', 'richmond v carlton after the siren'],
+    ['C-D4  coach + siren', 'which coach won most games on a goal after the siren'],
+    ['C-D5  min', 'fewest kicks after the siren'],
+    ['C-D6  coverage floor', 'goals after the siren in 1900'],
+    ['C-D7  per-season grain', 'most goals after the siren in a season'],
+    ['C-D8  siren subtype', 'goals after the siren in extra time'],
+    ['C-D9  shot detail', 'who kicked it out on the full after the siren'],
+    ['C-D10 source scores', 'how much did they win by after the siren'],
+    ['C-D11 competition name', 'goals after the siren in the nab cup'],
+    ['C-D13 cross-grain', '300 game players who kicked a goal after the siren'],
+    ['C-D14 supergoal', 'was it a supergoal after the siren'],
+    ['C-D15 out of family', 'did the siren sound before the kick'],
+  ])('%s declines or fails validation', async (_label, question) => {
+    const parsed = await parse(question);
+    if (parsed.status !== 'plan') return;
+    expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase E: the first-kick-goal family closes its two gaps.
+ *
+ * E1-E6 already worked and are covered by §14/§15 above; nothing here
+ * re-tests them except where a Phase E wording has to leave them alone.
+ * What is new is E7 ("a goal with each of their first three kicks") and
+ * E8 ("whose first-kick goal was their only career goal") -- two builders
+ * the grid solver has always had and the parser could never reach.
+ *
+ * E8 was not a decline before it was a MISREAD: the tail "only career
+ * goal" survived step 5a, and extractPlayerMetric read "goal" as the
+ * question's ranking subject. `metric === null` is therefore asserted on
+ * every E8 wording, not just the predicate.
+ */
+describe('first-kick-goal closure (AFLDB-ISSUE-152 Phase E)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------ E7 (R1)
+
+  describe('E7 — a goal with each of their first N kicks', () => {
+    it.each([
+      ['word numeral', 'players who kicked a goal with each of their first three kicks', '3'],
+      ['bare numeral', 'players who kicked goals with their first 3 kicks', '3'],
+      ['each of the', 'players who kicked a goal with each of the first two kicks', '2'],
+      ['verb form', 'players who goaled with each of their first four kicks', '4'],
+      ['scored form', 'players who scored with each of their first six kicks', '6'],
+      ['subject form', 'players whose first three kicks were all goals', '3'],
+    ])('%s -> first_kick_goal_consecutive_min with the exact bound', async (_label, question, kicks) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ kicks });
+      // The whole span is consumed, so neither "goal" nor "kicks" nor the
+      // numeral survives for the metric extractors to claim.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // E-D3: the column is NOT NULL DEFAULT 1 CHECK (>= 1), so ">= 1" is
+    // exactly the whole family. N = 1 must therefore produce the plain
+    // builder, whose label reads correctly, not a redundant bound.
+    it('N = 1 is the plain family, not a consecutive bound', async () => {
+      const p = await plan('players who kicked a goal with their first one kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+
+    it('leaves the base wording exactly as it was', async () => {
+      const p = await plan('players who kicked a goal with their first kick');
+      expect(builders(p)).toEqual(['first_kick_goal_player']);
+    });
+  });
+
+  // ------------------------------------------------------------ E8 (R2)
+
+  describe('E8 — the first-kick goal was their only career goal', () => {
+    it.each([
+      'players whose first-kick goal was their only career goal',
+      'players whose first kick goal was their only goal',
+      'players who kicked a goal with their first kick and never kicked another goal',
+      'players who goaled with their first kick and never scored again',
+    ])('%s -> first_kick_goal_only_career_goal, with no metric misread', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+      // The defect this closes: "goal" left in the text became the ranking
+      // subject and the question answered a career-goals leaderboard.
+      expect(p.metric).toBeNull();
+      expect(p.careerConditions).toEqual([]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The cue owns its own negation, exactly as clubs_without does. Without
+    // this the existing guard would read "never kicked another goal" as a
+    // polarity inversion of the whole family and decline a question the
+    // engine now answers exactly.
+    it('the E8 cue owns the negation it contains', async () => {
+      const p = await plan('players who never kicked another goal after their first-kick goal');
+      expect(builders(p)).toEqual(['first_kick_goal_only_career_goal']);
+    });
+  });
+
+  // -------------------------------------------------- composition (R3)
+
+  describe('composition with the scoped builders', () => {
+    it('club + E7 -> the club is owned by first_kick_goal_for_club', async () => {
+      const p = await plan('carlton players who kicked a goal with each of their first three kicks');
+      expect(builders(p)).toEqual(['first_kick_goal_for_club', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params.club).toBe('2');
+      expect(p.careerPredicates[1].params.kicks).toBe('3');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('season range + E7 -> the range is owned by first_kick_goal_between', async () => {
+      const p = await plan('players who kicked a goal with each of their first two kicks in the 1940s');
+      expect(builders(p)).toEqual(['first_kick_goal_between', 'first_kick_goal_consecutive_min']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '1940', to: '1949' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('club + season + E8 -> all three, in a stable order', async () => {
+      const p = await plan('carlton players since 2000 whose first-kick goal was their only career goal');
+      expect(builders(p)).toEqual([
+        'first_kick_goal_for_club', 'first_kick_goal_between', 'first_kick_goal_only_career_goal',
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player keeps the pin and the modifier together', async () => {
+      const p = await plan('did dustin martin kick a goal with each of his first two kicks');
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(builders(p)).toEqual(['first_kick_goal_consecutive_min']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------ the decline table (R4)
+
+  describe('§17.7 declines', () => {
+    it.each([
+      ['E-DEC-1  kick-level (E9)', 'players who never kicked the ball again after their first-kick goal'],
+      ['E-DEC-1b kick-level (E9)', 'players with a first-kick goal who never had another kick'],
+      ['E-DEC-3  polarity inversion', 'players who never kicked a goal with each of their first three kicks'],
+      ['E-DEC-4  summary + E7', 'which club has had the most players goal with each of their first three kicks'],
+      ['E-DEC-5  summary + E8', 'by decade players whose first-kick goal was their only career goal'],
+      ['E-DEC-8  N = 0', 'players who kicked a goal with each of their first 0 kicks'],
+      ['E-DEC-8b N negative', 'players who kicked a goal with each of their first -2 kicks'],
+      ['E-DEC-8c N absurd', 'players who kicked a goal with each of their first 40 kicks'],
+      ['E-DEC-2  kickless matches (E9)', 'kickless matches before a first kick'],
+      ['E-DEC-9  bare decade', 'players who kicked a goal with each of their first three kicks this decade'],
+    ])('%s declines rather than answering something narrower', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+    it.each([
+      ['E-DEC-6  venue', 'players who kicked a goal with each of their first three kicks at the mcg'],
+      ['E-DEC-6b opponent', 'players who kicked a goal with each of their first three kicks against collingwood'],
+      ['E-DEC-6c match type', 'players who kicked a goal with each of their first three kicks in a grand final'],
+      ['E-DEC-10 club + decade + venue', 'carlton players who kicked a goal with their first kick in the 1940s at the mcg'],
+    ])('%s is rejected rather than silently unscoped', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    // E-DEC-2 and E-DEC-11 are not this family and have no vocabulary of
+    // their own. What matters is only that neither can reach a
+    // first-kick-goal builder; whatever else the parser makes of them is
+    // pre-existing behaviour this phase does not change.
+    it.each([
+      ['E-DEC-2b kickless matches', 'players who did not record a kick in their first two games'],
+      ['E-DEC-11 kicks before first goal', 'how many kicks did dustin martin have before his first goal'],
+    ])('%s never reaches this family', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(builders(parsed.plan).filter((b) => b.startsWith('first_kick_goal')), question).toEqual([]);
+    });
+  });
+
+  // ------------------------------------------------------------ boundaries
+
+  it('the after-siren suppression still wins over step 5a', async () => {
+    // "the first kick after the siren" contains this family's noun and is
+    // a corpus row of Phase C's own. The siren reading must keep it.
+    const p = await plan('the first kick after the siren');
+    expect(p.grain).toBe('after_siren');
+    expect(builders(p)).toEqual([]);
+  });
+
+  it('leaves the summary grain untouched when no modifier is present', async () => {
+    const p = await plan('first kick goal players by decade');
+    expect(p.grain).toBe('achievement_summary');
+    expect(p.achievementSummary?.kind).toBe('by_decade');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase D. Family relationships, in the half of the
+ * family that has a witness in the data.
+ *
+ * Red-before-green: every question below declined before this phase --
+ * recorded in full by the Stage-0 probe, 31 of 31 NONE. The declines at
+ * the end of this block declined then and must keep declining now, which
+ * is the harder half: the supported cues share their words with the
+ * blocked ones ("a twin brother" contains "a brother", "father-son
+ * selections" contains both "father" and "son").
+ */
+describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ C2
+
+  describe('C2 -- a brother who played (has_brother, reused unchanged)', () => {
+    it.each([
+      'which players had a brother who played AFL',
+      'players with a brother who also played VFL/AFL',
+      'which AFL players had brothers who played',
+    ])('%s -> the label-backed has_brother predicate', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(p.metric).toBeNull();
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a career ranking rather than replacing it', async () => {
+      const p = await plan('most games by a player with a brother who played AFL');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a named player is a pinned yes/no, not a list of his brothers', async () => {
+      const p = await plan('did Dustin Martin have a brother who played AFL');
+      expect(p.player?.id).toBe(100);
+      expect(p.relationshipSubject).toBeUndefined();
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ C3
+
+  describe('C3 -- parent and child, typed by role', () => {
+    it.each([
+      'players who are the parent or child of another AFL player',
+      'which AFL players are a parent and child',
+    ])('%s -> the symmetric predicate', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['has_afl_parent_or_child']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the father direction', async () => {
+      const p = await plan('players whose father also played AFL');
+      expect(builders(p)).toEqual(['has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the son direction', async () => {
+      const p = await plan('players whose son also played AFL');
+      expect(builders(p)).toEqual(['has_afl_son']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the two directions are different predicates, never one', async () => {
+      const father = await plan('players whose father also played AFL');
+      const son = await plan('players whose son also played AFL');
+      expect(builders(father)).not.toEqual(builders(son));
+    });
+  });
+
+  // ------------------------------------------------------------------ C4
+
+  describe('C4 -- the relatives of one named player', () => {
+    it('who are Dustin Martin’s brothers', async () => {
+      const p = await plan("who are Dustin Martin's brothers");
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('100');
+      // The named person is the OBJECT: pinning him would return him, or
+      // nobody, instead of his brothers.
+      expect(p.player).toBeUndefined();
+      expect(p.relationshipSubject?.id).toBe(100);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('brothers of Brent Harvey (the "of" wording)', async () => {
+      const p = await plan('brothers of Brent Harvey');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.name).toBe('Brent Harvey');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Brent Harvey’s son', async () => {
+      const p = await plan("who is Brent Harvey's son");
+      expect(builders(p)).toEqual(['son_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('2164');
+      expect(p.relationshipSubject?.id).toBe(2164);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('who is Cooper Harvey’s father', async () => {
+      const p = await plan("who is Cooper Harvey's father");
+      expect(builders(p)).toEqual(['father_of_player']);
+      expect(p.careerPredicates[0].params.player).toBe('3048');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('an ambiguous name fails closed rather than picking a Gary Ablett', async () => {
+      const parsed = await parse('brothers of Gary Ablett');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a name AFLDB cannot identify fails closed', async () => {
+      const parsed = await parse('brothers of Some Unknown Person');
+      expect(parsed.status).toBe('none');
+    });
+  });
+
+  // ----------------------------------------------------------------- FS4
+
+  describe('FS4 -- fathers of father-son selections (father_son_father, reused)', () => {
+    it.each([
+      'players whose son was selected under the father-son rule',
+      'which players had a son drafted under the father-son rule',
+      'fathers of father-son selections',
+    ])('%s -> father_son_father', async (question) => {
+      const p = await plan(question);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('composes with a ranking', async () => {
+      const p = await plan('which father-son fathers played the most games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a father-side ranking with the rule spelled out', async () => {
+      const p = await plan('most games by a father whose son was selected under the father-son rule');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a pinned father-side yes/no', async () => {
+      const p = await plan('did Brent Harvey have a son selected under the father-son rule');
+      expect(p.player?.id).toBe(2164);
+      expect(builders(p)).toEqual(['father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // -------------------------------------------- the D8 boundary (blocked)
+
+  describe('the blocked father-son SELECTION forms still decline (D8, ISSUE-153)', () => {
+    it.each([
+      ['FS1 the rule itself', 'players selected under the father-son rule'],
+      ['FS1 the bare phrase', 'father-son selections'],
+      ['FS1 picks', 'which players were father-son picks'],
+      ['FS2 club-scoped', 'geelong father-son selections'],
+      ['FS3 year-scoped', 'father-son selections in 2022'],
+      ['FS6 distribution', 'father-son selections by club'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+
+    it('an FS4 cue never lends its builder to an FS1 question', async () => {
+      const parsed = await parse('father-son selections');
+      if (parsed.status === 'plan') expect(builders(parsed.plan)).toEqual([]);
+    });
+  });
+
+  // ---------------------------------------------------- out of scope
+
+  describe('the relationship families with no builder decline by name', () => {
+    it.each([
+      ['sisters', 'which players had a sister who played'],
+      ['twins', 'which players had a twin brother who played AFL'],
+      ['cousins', 'which AFL players are cousins'],
+      ['mothers', 'which players had a mother who played'],
+      ['the family grain (D6)', 'biggest football families'],
+      ['the family grain (D6)', 'which family has the most AFL players'],
+      ['C5 families of N', 'families with three AFL players'],
+      ['vague family wording', "who are Dustin Martin's family members"],
+      ['vague relatedness', 'AFL players related to Phil Krakouer'],
+      ['pairings, not players', 'parent and child pairs who both played AFL'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      expect(parsed.status, question).toBe('none');
+    });
+  });
+
+  // ------------------------------------------- ownership and collisions
+
+  describe('composition beyond the relationship itself', () => {
+    it('a count question counts the qualifying set', async () => {
+      const p = await plan('how many players had a brother who played AFL');
+      expect(p.agg).toEqual({ kind: 'count' });
+      expect(builders(p)).toEqual(['has_brother']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('two relationships compose as two predicates, ANDed', async () => {
+      const p = await plan('players with a brother and a father who played AFL');
+      expect(builders(p)).toEqual(['has_brother', 'has_afl_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('a career threshold survives alongside a per-player relationship', async () => {
+      // The ISSUE-110 shape: a condition the plan cannot honour must never
+      // be silently dropped. Here it IS honoured, as a career condition.
+      const p = await plan('brothers of Brent Harvey who played 100 games');
+      expect(builders(p)).toEqual(['brother_of_player']);
+      expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 100 }]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  describe('scope this family cannot own is refused, never discarded', () => {
+    it.each([
+      ['a club', 'richmond players with a brother who played'],
+      ['a season range', 'players with a brother who played since 2000'],
+      ['a venue', 'players with a brother who played at the mcg'],
+    ])('%s', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+
+    it('a season-grain ranking declines rather than dropping the relationship', async () => {
+      const parsed = await parse('most goals in 2015 by a player with a brother who played');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a surname that is also a relationship word is still a player', async () => {
+      const p = await plan('most goals by ben cousins');
+      expect(p.player?.name).toBe('Ben Cousins');
+      expect(builders(p)).toEqual([]);
+    });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-152 Phase F. The cross-domain composition: one person who
+ * both played and coached. The R0 probe recorded on the issue measured
+ * that NONE of these wordings produced a plan under v38 -- and that one
+ * of them ("played for Richmond and coached Collingwood") reached
+ * validatePlan as a coach_record carrying an opponent, refused there
+ * rather than answered.
+ */
+describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ X1
+
+  describe('X1 -- played and also coached', () => {
+    it.each([
+      'players who also coached',
+      'which players both played and coached',
+      'players who played and coached',
+      'players who played vfl afl and also coached',
+    ])('%s -> has_coached at career grain', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.metric).toBeNull();
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.crossDomainClubs).toBeUndefined();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('"how many" is a count of the same population', async () => {
+      const p = await plan('how many players have played and coached');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.agg).toEqual({ kind: 'count' });
+    });
+
+    it('a career metric ranks players WITHIN the composition', async () => {
+      const p = await plan('most career games among players who also coached');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ X2
+
+  describe('X2 -- played for a club and also coached a club', () => {
+    it.each([
+      'players who played for richmond and also coached richmond',
+      'who both played for and coached richmond',
+      'richmond players who also coached richmond',
+    ])('%s -> both clubs as builder parameters', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('1');
+      // THE structural decision of this phase: no scope.clubFor, so the
+      // compiler's generic playing-club filter can never be suppressed by
+      // a coaching predicate.
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Richmond');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the asymmetric form binds two different organizations', async () => {
+      const p = await plan('players who played for richmond and coached collingwood');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('3');
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Collingwood');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ---------------------------------------------------- temporal declines
+
+  describe('temporal wording declines by name, never silently stripped (D9/F-D2)', () => {
+    it.each([
+      'players who later coached richmond',
+      'players who went on to coach',
+      'players who became a coach',
+      'players who played and then coached',
+      'players who coached after they retired',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('does not record the order');
+    });
+  });
+
+  // -------------------------------------------------- one-sided declines
+
+  describe('a club on one side only declines (F-D3)', () => {
+    it.each([
+      'richmond players who also coached',
+      'players who coached richmond and also played',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('must name the club on');
+    });
+  });
+
+  // -------------------------------------------------- unsupported scope
+
+  describe('scope neither builder owns is refused, never discarded', () => {
+    it('an opponent declines at parse -- this reading clears clubAgainst', async () => {
+      const parsed = await parse('players who played and also coached against carlton');
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('cannot also be scoped to an opponent');
+    });
+
+    it.each([
+      ['a season', 'players who played and also coached in 1990'],
+      ['a venue', 'players who played and also coached at the mcg'],
+      ['a round', 'players who played and also coached in round 5'],
+      ['a match type', 'players who played and also coached in finals'],
+    ])('%s is refused at validatePlan', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+  });
+
+  // ----------------------------------------------------- boundaries kept
+
+  describe('the boundaries this phase does not move', () => {
+    it('the son-side father-son composition is still deferred (F-D1)', async () => {
+      const parsed = await parse('players selected under the father son rule who also coached');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a coaching record is still a coaching record', async () => {
+      const p = await plan('richmond coaching record');
+      expect(p.grain).toBe('coach_record');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+    });
+
+    it('coached_by is untouched', async () => {
+      const p = await plan('players coached by damien hardwick');
+      expect(builders(p)).toEqual(['coached_by']);
+    });
+
+    it('premiership_coach is untouched', async () => {
+      const p = await plan('premiership coaches');
+      expect(builders(p)).toEqual(['premiership_coach']);
+    });
+
+    it('"Richmond players coached by Damien Hardwick" still fails the ownership gate', async () => {
+      const parsed = await parse('richmond players coached by damien hardwick');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
   });
 });

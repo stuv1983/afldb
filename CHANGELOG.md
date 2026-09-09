@@ -15,6 +15,270 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
+
+- AFLDB knows who played and it knows who coached, and until now the search box could not be asked
+  about the people who did both. It can now: "which players both played and coached", "players who
+  played VFL/AFL and also coached", "how many players have played and coached", and the club form -
+  "players who played for Richmond and also coached Richmond", "who both played for and coached the
+  Western Bulldogs", "players who played for Richmond and coached Collingwood". The composition also
+  ranks, so "most career games among players who also coached" ranks careers within that group
+  rather than ignoring half the question.
+- Holding a coach's page is not the same as having coached a match, and the two answers differ. The
+  search counts only people with an actual coaching appearance, which is 365 people rather than the
+  368 who merely hold a linked coaching identity.
+- A club on the coaching side means the club through its whole history, not one of its historical
+  names. Someone who coached the Bulldogs answers to Footscray and to the Western Bulldogs; someone
+  who coached Sydney answers to South Melbourne. Answering only the exact recorded name would have
+  quietly excluded most of them.
+- The two halves of a club question stay independent. Coaching a club does not imply having played
+  for it - fourteen people coached Richmond and never played there - so "played for Richmond and
+  also coached Richmond" returns the 27 who did both, not the 41 who coached them.
+- Both clubs are always named on their own side of the answer, and a list longer than the hundred
+  rows shown says so in the answer itself.
+- Questions AFLDB cannot honestly answer decline by name and say why. It does not record which of a
+  person's two careers came first, so "players who later coached", "players who went on to coach"
+  and "which players became a coach after retiring" all decline and say so, rather than being
+  quietly reinterpreted as the question it can answer. A club named on only one side ("Richmond
+  players who also coached") declines rather than guessing which club the coaching half means, and
+  a season, venue, opponent, round or match type on one of these questions is refused rather than
+  dropped. Father-son selections in combination with coaching are still not supported and are being
+  decided separately.
+- These questions have now been asked through a real browser against a real build, and they are
+  green. All 349 questions in the combined new-family set behaved exactly as written down: 253
+  answered, 96 declined, nothing failed, nothing went unscored, and not one page errored or was
+  throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then
+  run again in full. It came back 1,435 answered and 60 declined - its exact previous shape.
+  Another parser version, two more grid builders and a whole new kind of question moved no
+  existing answer in either direction.
+- Before any of that counted, the running site had to prove it was actually serving this change:
+  "players who also coached" had to answer "365 players match" first. A sweep whose numbers look
+  clean but whose build predates the work measures nothing, and that check is now a precondition
+  rather than a courtesy.
+- The same check confirmed the long-list disclosure end to end: 365 people match, a hundred are
+  shown, the page says "Showing 100 of 365", and the answer itself says the displayed rows are not
+  the whole list.
+- No application, parser, planner, query, schema or permission behaviour changed during that
+  acceptance. Two test type contracts were corrected and the sweep harness was taught the name of
+  the new question set; neither changes what AFLDB answers.
+
+### Natural-language search - football families become answerable, in the half the data can prove (AFLDB-ISSUE-152 Phase D) - 9 September 2026
+
+- AFLDB has recorded who is whose brother, father and son for a long time, and the search box could
+  not be asked about any of it. It can now: "which players had a brother who played AFL", "players
+  whose father also played AFL", "who are Brent Harvey's brothers", "which father-son fathers played
+  the most games". The relationship also composes with a ranking, so "most games by a player with a
+  brother who played AFL" ranks careers within the relationship instead of ignoring one half of the
+  question, and a named player gets a straight yes or no.
+- Direction is read from the recorded roles, never from which side of the row a person happens to
+  sit on. "Players whose father played" and "players whose son played" are two different questions
+  with two different answers, and neither is the other one relabelled.
+- "Brother" continues to mean the recorded brother relationships specifically, not siblings in
+  general - AFLDB also records sisters and unsexed sibling rows, and reading those as brothers would
+  be an invention.
+- A relative AFLDB has not linked to a player is a name in a source, not a person in the database,
+  and it now says so in the answer rather than quietly counting or quietly dropping them. Two
+  relatives who share a name - there are two Gary Abletts, father and son - stay two people.
+- Questions this data cannot honestly answer now decline by name instead of failing as gibberish:
+  sisters, twins, cousins, grandparents, in-laws, mothers and daughters, "family members of X",
+  "related to X", and anything about a football family as a whole. Each says what AFLDB actually
+  holds. Asking about the football families themselves, and about father-son draft selections as
+  such, is still not supported and is being decided separately.
+- Every answer says which relationship it answered. A list that is longer than the hundred rows a
+  page shows now says so in the answer itself - "658 players qualify... it is not the whole list" -
+  rather than leaving the reader to notice the table footer.
+- One question that used to work kept working, and now has a test to keep it that way: Ben Cousins's
+  surname is also a family word, and "most goals by ben cousins" is a goals question.
+- Showing part of a long list is now a stated decision rather than an implicit one. A relationship
+  question that matches more than a page of players reports the true total, shows the same capped
+  table every other list uses, and says in the answer that what is displayed is not the whole list.
+  Nothing is silently cut, and no question is refused merely for having a lot of correct answers.
+- Forty-eight of these questions - twenty-six that should be answered and twenty-two that should be
+  declined - are now part of the browser sweep AFLDB runs before shipping search changes, each one
+  checked against the real database before being written down. They are added alongside the existing
+  271-question and 1,495-question sweeps rather than replacing either, so the earlier results stay
+  exactly as they were recorded.
+- That sweep has now been run through a real browser against a real build, and it is green. All 319
+  questions in the combined set behaved exactly as written down: 238 answered, 81 declined, nothing
+  failed, nothing went unscored, and not one page errored or was throttled.
+- The 1,495-question regression sweep that guards everything AFLDB could already answer was then run
+  again in full. It came back 1,435 answered and 60 declined - its exact previous shape. Six new
+  relationship builders and another parser version moved no existing answer in either direction.
+- A first attempt at the new sweep was thrown away rather than reported. It had been run against a
+  build that predated the relationship work, so it was asking the new questions of the old search
+  engine: the numbers looked clean and meant nothing. A sweep now has to demonstrate that the build
+  underneath it actually contains the change before any of its results are counted.
+- The questions AFLDB still cannot answer honestly - football families as a whole, and father-son
+  draft selections as such - are unchanged by all of this. They still decline by name, and what they
+  should mean is still being decided.
+
+### Natural-language search - the new record families pass a full browser sweep, and the existing 1,495-question gate is untouched (AFLDB-ISSUE-152 Phase G) - 9 September 2026
+
+- The coaching, after-the-siren and first-kick-goal questions added over the last three parser
+  versions have now been asked through a real browser against a real build, not just through unit
+  tests. All 271 of them agreed with what they were supposed to do: 212 answered, 59 declined,
+  nothing failed, nothing went unscored, and not one page errored.
+- The 1,495-question regression corpus that guards everything AFLDB could already answer was then
+  re-run in full. It came back 1,435 answered and 60 declined - its exact previous shape. Two new
+  grains, a deleted false decline and three new refusals moved no existing answer in either
+  direction.
+- A sweep can no longer mistake rate limiting for an answer. `/search` limits how many questions one
+  address may ask per minute, and a limited page renders "Too many searches" with no answer section -
+  which looked byte-for-byte identical to a correct decline. A sweep that outran the limiter therefore
+  reported fiction in both directions at once: every throttled real question counted as a failure, and
+  every throttled decline counted as a pass. Throttling is now detected by name and reported as the
+  loud page-level error it is, so a run either measures the search engine or says plainly that it did
+  not.
+- Sweeps can also now pace themselves, and the pacing is validated rather than assumed. A delay
+  written as "2.2s" instead of 2200 would previously have read as not-a-number, silently switched
+  pacing off, and produced exactly the throttled run the setting exists to prevent. It is now
+  rejected outright.
+- Two players are named Gary Ablett, and the tests now say so. Asked about an unsuffixed "Gary
+  Ablett", AFLDB declines rather than guessing which of the two it means - that has been true since
+  the ambiguity rules were written, and it is correct. But a test fixture had long stood in a single
+  invented candidate for that name, which made the bare name look uniquely resolvable to anyone
+  writing tests against it. The fixture now carries both players, the ambiguity contract is asserted
+  directly, and the question that exposed the gap is kept as a permanent decline case.
+- Rendered acceptance is now a repeatable procedure rather than a set of one-off commands: tunnel,
+  server, static verification, a short paced smoke test, then the two sweeps, with status and
+  post-mortem tools alongside. Preserved evidence from a completed run is immutable and a re-run
+  refuses to overwrite it, so a later run can never quietly replace the record it is meant to be
+  compared against.
+- No application, parser, planner, query, schema or permission behaviour changed in this work. The
+  corpus grew by one decline case and one question was rewritten to name a player unambiguously; the
+  strict corpus-size guard that caught the change was kept, not relaxed.
+
+### Natural-language search - the first-kick-goal record answers its last two questions (AFLDB-ISSUE-152 Phase E) - 9 September 2026
+
+- AFLDB's curated first-kick-goal record has been searchable in plain English for a while: who did it,
+  who did it for a club, who did it in a decade, the first and most recent, and the by-club/by-decade
+  summaries. Two things it records were unreachable. "Players who kicked a goal with each of their
+  first three kicks" and "players whose first-kick goal was their only career goal" now answer, using
+  two conditions the database has always held and the search engine could never ask for. No new data,
+  no new query and no schema change - the wiring was the gap.
+- The second one was not a decline before it was a MISREAD. "Whose first-kick goal was their only career
+  goal" left the word "goal" sitting in the question after the rest had been understood, and the ranking
+  logic picked it up: the site would confidently return a career-goals leaderboard under a question about
+  players who kicked exactly one goal. That reading is now impossible.
+- "Never" is read as part of the claim, not as a reversal of it. "Players who never kicked another goal
+  after their first-kick goal" is the same question as "whose first-kick goal was their only career
+  goal", and both answer. Asking for the opposite of the record - "players who never kicked a goal with
+  their first kick" - still declines, because the record lists who DID it and nothing else.
+- Only career GOALS and never kicking again are different claims, and the site now says so out loud.
+  AFLDB records whether a player ever kicked another goal (23 players did not); whether they ever kicked
+  the football again is a different, kick-level fact it does not answer (4 rows carry it, and they are
+  a different set). Asking the second gets a named explanation, not a silent answer to the first.
+- Three questions that cannot be answered now say so by name rather than trailing off into a low-confidence
+  decline: a club-by-club or decade-by-decade SUMMARY cannot also be narrowed to the multi-kick or
+  only-career-goal subset (the summary counts every holder); a streak length outside 1-10 kicks is outside
+  what the record holds; and the kick-level claim above. Each explains itself in a sentence.
+- Asking about one player gets a yes or a no. "Did Dustin Martin kick a goal with his first kick" used to
+  answer "0 players match". It now answers with the player's name, yes or no, and names the conditions
+  that were checked. List questions are unchanged.
+- The answer counts only players AFLDB has linked to a person. The record board at /records/first-kick-goal
+  lists unlinked rows too, so a search answer is deliberately a slightly smaller set - 330 of 334 on the
+  reference data - and the answer text says so rather than quietly absorbing the difference.
+- Search behaviour version 37. Answers already given are unaffected; no page, board or import changed.
+
+### Natural-language search - after-the-siren questions are answerable (AFLDB-ISSUE-152 Phase C) - 8 September 2026
+
+- AFLDB has held a curated, cited list of kicks after the siren since migration 089 - 126 events
+  from 1913 onward, each classified on three independent axes. The natural-language engine could
+  not reach any of it: "who has kicked the most goals after the siren" declined, and the only
+  reason it declined rather than answering wrongly was that the leftover words "after siren"
+  dragged confidence below the gate. The metric extractor had already claimed "goals" as the
+  career-goals statistic. A tenth grain, `after_siren`, now owns the family, and the parser claims
+  the siren vocabulary BEFORE any metric extractor so that reading can never surface.
+- The three dimensions stay independent and are never merged. What the kick REGISTERED
+  (goal / behind / nothing), what it did to the RESULT (won / drew / nothing), and the match result
+  from the KICKER's side are separate typed fields, ANDed. "A goal after the siren" and "a goal
+  after the siren to win" are different populations, and the answer text names every applied
+  dimension so a reader can see which question was answered. One measured event is a kick that
+  scored nothing, changed nothing, and whose side won anyway - which is why the third axis exists.
+- An absent outcome means EVERY kick, misses included: "kicks after the siren" is all 126 events,
+  not only the ones that scored.
+- Every superlative in this family is a tie. The measured ceiling is two, so "most goals after the
+  siren" names Barry Hall AND Gary Rohan, and "most kicks after the siren" names nine players.
+  An answer that named one of them would be wrong by construction.
+- A kick with no canonical match link is counted, listed, attributed to its club and its kicker,
+  and classified on all three axes. It is excluded only from the two things `matches` owns:
+  ordering ("the first", "the most recent") and finals scope. The answer says how many were left
+  out and why, rather than dropping them silently.
+- Finals scope reads `matches.round_type`, never the source's own round text. One 1980 event is
+  recorded with the round "GF" in a non-premiership Escort Championships match, and a round-shaped
+  filter over that text would return it as a Grand Final. "After the siren in a Grand Final" is an
+  honest empty result: no VFL/AFL Grand Final after-siren event exists.
+- Every after-the-siren answer carries a permanent caveat that this is a curated, cited list of
+  individual events, not a systematic record of every kick after every siren. A coverage floor
+  alone would have implied a completeness the family does not have.
+- Declines are explicit rather than approximate: a round number, a venue, a two-club matchup, a
+  per-season split, the siren subtype, the shot detail, the verbatim source scores, the competition
+  name, and "fewest kicks after the siren" - which has no meaningful answer, because the set is
+  defined by having at least one.
+- Migration `093_nl_search_log_after_siren_grain.sql` extends the telemetry grain constraint, which
+  is the fourth time that constraint has had to catch up with the grain vocabulary. Without it every
+  after-the-siren answer would render correctly while its telemetry row was rejected and dropped in
+  silence. The requirement was proven by a failing test before the migration was written, and the
+  migration must reach each database before the code that needs it.
+- `PARSER_VERSION` 35 -> 36.
+
+
+### Natural-language search - coaching questions are answerable, and the false coaching decline is gone (AFLDB-ISSUE-152) - 8 September 2026
+
+- AFLDB has held canonical coaching data since migration 087: 386 coaches and 32,034
+  `match_coaches` rows spanning 1902-2025. The natural-language engine nonetheless declined
+  every question containing the word "coach" with the stated reason "AFLDB has no coaching data
+  at all - no coach, no coach-per-club-season, nothing." That sentence had been untrue since the
+  data landed, and it was the first rule the parser consulted, so no coaching question could
+  reach anything downstream. The rule is deleted in the same change that makes coaching
+  answerable - never softened while still refusing.
+- A new `coach_record` grain answers a coach's record from `match_coaches` joined to
+  `matches`, the same canonical per-match assignment `/coaches` and `/records/coaches`
+  already read. `coaches.source_games_coached` remains evidence only and is read nowhere.
+  Supported: who has coached a club, how many coaches a club has had, a coach's whole career, a
+  coach's record at one club, club and league rankings by games/wins/draws/losses/finals/grand
+  finals/premierships/seasons in charge/clubs coached, thresholds on any of them, season-scoped
+  coaching, plus the two player-grain readings - "players coached by X" and "premiership
+  coaches" - through the Grid Solver's existing coaching builders.
+- A coach reference is deliberately distinct from a player reference. 368 of the 386 coaches are
+  uniquely linked to a player and 18 have no player row at all, so a player-shaped reference is
+  structurally blind to 4.7% of coaches; and for the same human the two numbers differ (Mick
+  Malthouse: 174 games played, 718 coached). A coach's name resolves in the coach directory only
+  under a coaching cue, so "most games" keeps its career reading. A surname shared by two
+  coaches - Pannam, Smith - is not an alias at all and declines rather than guessing.
+- Club scope folds the `organization_id` lineage exactly as the club page does: Footscray-era
+  coaching counts towards Western Bulldogs, and nothing of Fitzroy's reaches Brisbane Lions.
+  "Coached more than one club" counts organizations, never raw club identities.
+- Win percentage is the site's draw-weighted `(W + D/2) / G`, never `W / G`, and a
+  win-percentage ranking always states its qualifier - 50 games coached by default, or the
+  reader's own minimum - because at 50+ games the leader is Cliff Rankin at 78.95% from 57
+  games. A ranking with no qualifier at all is refused rather than answered from a one-game
+  sample.
+- A tenure is never rendered as a continuous run: Jack Titus coached Richmond in 1937 and again
+  in 1965, so a row shows the season span with the count of seasons in charge beside it.
+- Coaching coverage is a floor at 1902 and nothing more. A question about 1899 is refused with
+  that reason; a question about a season AFTER the last recorded one is a genuine empty result,
+  not a refusal, so no last season is hard-coded. The floor makes no claim that every season
+  from 1902 onward is completely recorded.
+- Coaching questions Phase B does not support - assistant/caretaker roles, coach-versus-coach
+  head-to-head, coaching awards, tenure reasons, contracts, salaries, state or other-competition
+  coaching, per-season coaching splits, and "Richmond players coached by X" (no builder owns the
+  club) - now decline through the ordinary path, which says the question was not understood
+  rather than claiming data that exists does not. Parser version 34 -> 35.
+- Phase B needs one migration, `092_nl_search_log_coach_record_grain.sql`, because the ninth
+  supported NL grain exposed schema drift in migration 079: `nl_search_log.grain`'s CHECK
+  constraint still listed the eight grains that existed when 079 was written, so a
+  `coach_record` telemetry row was rejected by the database. `logNlSearch` deliberately
+  swallows an INSERT failure so telemetry can never turn a correct answer into a failed search,
+  which meant coaching questions would have answered correctly while every coaching row was
+  dropped from the search log in silence - the same failure 055 and 079 each repaired for an
+  earlier grain. 092 is forward-only and strictly widening: all eight existing grains are kept
+  verbatim, the constraint is not weakened, and `logNlSearch` is unchanged. It must be applied
+  before the code reaches an environment. The contract test now drives its accepted list from
+  the `NlGrain` type and also proves an unsupported grain is still rejected, so the tenth grain
+  fails a test instead of silently losing its telemetry.
+
 ### Natural-language search - "teams with N games against <club>" is answerable (AFLDB-ISSUE-110) - 8 September 2026
 
 - `games` joins `wins`, `losses` and `draws` as a grouped team-result metric. A rendered UI
