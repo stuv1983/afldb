@@ -557,7 +557,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A and B complete and validated | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §26.20; next: plan Phase C, Brownlow administration (Opus High) |
+| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A and B complete and validated; Phase C planning complete | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: implement Phase C1 (Opus High, §27.25) then C2 (Sonnet High, §27.26) |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -20849,7 +20849,7 @@ on DEV.
 
 ## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
 
-**Status:** Open / In progress — Phase A and Phase B complete and validated; Phases C–I not started
+**Status:** Open / In progress — Phase A and Phase B complete and validated; Phase C planning complete; Phases C–I not started
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition
 **Found:** 2026-09-10
@@ -20936,6 +20936,20 @@ Implemented to `AFLDB-ISSUE-155.md` §26; the full record, including every devia
 **Browser-driven fixes (UI layer only, no server/SQL/audit change).** Acceptance showed the four success confirmations were never visible: a successful mutation revalidates the page, swaps the submitting control for the next one and, for deactivate/reactivate, moves the card between the active and deactivated lists and remounts it, so a result held inside the control was discarded by the same commit that produced it. The result is now owned by `AdminSessionsClient` above both lists and rendered from a prop; a deactivated card stays open while it holds one; and the deactivation `reason`/`confirmEmail` inputs are controlled so a refusal no longer clears what was typed. Refusals were correct throughout, before and after.
 
 **Follow-up, not a Phase B defect:** the privilege suite asserts `afldb_auth` access to `auth_users` but has no explicit negative assertion for `DELETE ON auth_users`. Phase B adds no delete path and changes no grants; worth adding when that suite is next edited.
+
+### Phase C — Brownlow administration: planning complete (2026-09-10)
+
+Planning-only session (native inspection, no commands, no database access, no source edits). The implementation-ready contract is `AFLDB-ISSUE-155.md` §27, which governs over §8 where they differ. Decisions recorded there:
+
+- **Current model confirmed.** Three grains, none with a match identifier: `brownlow_season_votes` (authoritative season totals, artefact-loaded by truncate-and-copy), `brownlow_round_votes` (`(season, player_id, round_number)`, 1984+, provenance quartet from 083, written by the fitzRoy rebuild loader without `source_id` and by the ownership-gated settle applier), `player_match_stats.brownlow_votes` (partial, written by the generic match sheet). Derived: `player_season_stats`, `player_career_stats`, `stat_availability` — all from `brownlow_season_votes`.
+- **Canonical fact = match-level vote assignment**: `brownlow_round_votes` gains nullable `match_id`, deterministically backfilled through the player's own `player_match_stats` row; unresolved rows stay NULL and are reported. Season totals for admin-published seasons are derived from those facts into `brownlow_season_votes` with `manual_admin_edit` provenance; artefact seasons stay **source-published** (explicit compatibility state: known total, incomplete match attribution, disagreement shown never applied).
+- **Migration required: yes** — one additive migration (094 at planning time): `match_id` + backfill + partial unique indexes `(match_id, player_id)` and `(match_id, votes) WHERE votes > 0`; new `brownlow_vote_entry_state` (draft/final/void, revision, actor FKs) and `brownlow_season_authority` (revision, published revision/by/at); `data_edits` allowlist widened; app read + import write grants. `data_overrides` is deliberately untouched (the settle's manual-authority proof pins its CHECK).
+- **Draft/final model:** Admin drafts (`data.brownlow.draft`), Super Admin finalises, corrects, voids and publishes (`data.brownlow.finalise`); §25 Decision 1 adopted as Option A. Corrections are direct updates with reason and full before/after in `data_edits`; a correction in a published season re-derives the season atomically, so no "published but stale" public state exists.
+- **Participants** = `player_match_stats` rows for the match only; finalisation blocked when either side has fewer than 18 rows (threshold confirmed by preflight P8).
+- **Concurrency:** revision compare-and-set on the entry row plus a canonical fingerprint CAS over the match's existing vote rows; lock order advisory `pg_advisory_xact_lock(717275, 3)` → `matches FOR UPDATE` → entry row → season authority row.
+- **Importer precedence:** manual > settle > rebuild. The settle already refuses foreign-owned rows; the artefact loader and the fitzRoy round-vote loader gain fail-closed refusals when manual-owned rows exist. Promotion/restore lineage must carry the new tables before any post-Phase-C promotion (operator follow-up).
+- **Legacy writer:** the match sheet's Brownlow write is removed (server refuses a non-null value; the column is preserved through match-sheet saves); the BV column becomes read-only with a link to Brownlow administration.
+- **Split:** C1 (schema, transactions, reconciliation, importer guards, DB/concurrency tests) — Opus High; C2 (routes `/admin/brownlow`, `/[season]`, `/[season]/[round]` with inline match editors, actions, nav, badge, browser acceptance) — Sonnet High. Handoff prompts §27.25 and §27.26; preflights P1–P12 in §27.20 (P3 = 0 and P11 all true are hard gates); test matrix §27.27.
 
 **Known cosmetic observation, not caused by Phase B:** at 375 px the page scrolls 6 px horizontally, entirely from the shared `details.table-details > summary` (a `flex-wrap: nowrap` row whose long email title plus `.table-details-note` cannot shrink). Hiding the note removes the overflow exactly. A one-line `flex-wrap: wrap` on that shared rule would fix it site-wide and was left for the owner.
 

@@ -4,7 +4,7 @@
 **Severity:** Medium
 **Area:** Admin, authentication, data management, acquisition, provenance
 **Found:** 2026-09-10
-**Implementation:** Phase A (§23) complete and verified 2026-09-10 — see `issues.md` for the record. Phase B (§26) complete and validated 2026-09-10 — see §26.20 for the record. Phases C–I not started.
+**Implementation:** Phase A (§23) complete and verified 2026-09-10 — see `issues.md` for the record. Phase B (§26) complete and validated 2026-09-10 — see §26.20 for the record. Phase C planning complete 2026-09-10 — §27 is the C1/C2 implementation contract. Phases C–I not started.
 
 ## 1. Executive summary
 
@@ -463,7 +463,8 @@ Extend the closest existing suites before creating new test homes.
 **Validation gate:** pure validation tests → migration/constraint integration → authoritative write/audit/partial-coverage/correction integration → regression that match/awards cannot alter Brownlow → privilege test.
 **Dependencies:** A; unique-match preflight.
 **Stop:** ambiguous source authority or incomplete season being written to `brownlow_season_votes`.
-**Model/effort:** `gpt-6-astra`, xhigh.
+**Model/effort:** Opus, high (implementation only; the implementation-ready plan is §27).
+**Planning status:** complete 2026-09-10 — see §27 for the binding Phase C contract and §27.25 for the C1 handoff prompt. Where §8 and §27 differ, §27 governs.
 
 ### Phase C2 — Brownlow Admin UI
 
@@ -474,7 +475,8 @@ Extend the closest existing suites before creating new test homes.
 **Validation gate:** component/action tests → affected route tests → Brownlow E2E including invalid participant/duplicate/stale edit → responsive E2E.
 **Dependencies:** C1 and owner decision on Admin draft access.
 **Stop:** UI can submit a player outside the server-loaded participant set or bypass season publication review.
-**Model/effort:** `gpt-6-astra`, high.
+**Model/effort:** Sonnet, high (implementation only; the contract is §27, handoff §27.26).
+**Planning status:** complete 2026-09-10 — see §27.
 
 ### Phase D — Coach administration and durable assignments
 
@@ -569,6 +571,7 @@ Only two product decisions need owner review; neither blocks the rest of the pla
 - **Option B:** Brownlow is entirely Super Admin-only, including draft entry.
 - **Recommendation:** Option A. Participant validation, no public effect from drafts and Super Admin publication preserve the authority boundary while allowing data-entry delegation.
 - **Consequences:** A requires separate `brownlow.draft` and `brownlow.finalise` capabilities and displays draft actor history. B is simpler but concentrates a repetitive entry task in the highest role.
+- **Status:** adopted as Option A by the Phase C plan (§27.8), per the owner's Phase C brief of 2026-09-10 (`data.brownlow.read`, `data.brownlow.draft`, `data.brownlow.finalise`).
 
 ### Decision 2 — Allowed formatting for managed public copy
 
@@ -983,6 +986,454 @@ Deviations 2-4 are UI-layer only: no Server Action signature, transaction, guard
 
 **Follow-up noted, not actioned:** preflight P3 found that the privilege suite positively asserts `afldb_auth` access to `auth_users` but carries no explicit negative assertion for `DELETE ON auth_users`. Phase B adds no delete path, changes no grants and touches no migration, so this is not a Phase B defect - it is a hardening assertion worth adding when the privilege suite is next edited.
 
+## 27. Phase C — Brownlow administration: implementation-ready plan
+
+Planned 2026-09-10 by native repository inspection only (no commands, no database access, no source edits). Every "confirmed" statement below was read from the current worktree at `codex/issue-155-admin-overhaul` with Phases A and B applied. Anything only establishable at runtime is a numbered preflight in §27.20. This section is the implementation contract for Phase C; §8 remains the product intent and §27 governs where they differ. Phase A/B architecture (capability table, `requireCapability`, transactional audit, advisory-lock namespace `717275`) is settled and is reused, not reopened.
+
+### 27.1 Confirmed current Brownlow data model
+
+Brownlow is stored in **three grains plus two derived copies**. None of them carries a match identifier today.
+
+| Relation | Grain / key | Coverage | Columns that matter | Writers today |
+|---|---|---|---|---|
+| `brownlow_season_votes` (005) | one row per `(season, player_id)`, `brownlow_season_uq` | 1924–2025 except 1942–1945; rows only for players who polled (0-vote rows: preflight P4) | `votes`, `vote_rank`, `eligible_rank`, `is_ineligible`, `is_winner`, `games`, `three/two/one_vote_games`, `polling_games`, `link_status_value`, `source_id`, `source_record_id`, `import_batch_id` (nullable), `club_id` (unpopulated) | `tools/migration/import_brownlow_season.py` only: `TRUNCATE ONLY brownlow_season_votes` then COPY of the tracked artefact, refused unless the post-write measurement equals the manifest and the declared season set equals the decided seasons in the database (`check_database_coverage`). Declared **AUTHORITATIVE** for season and career totals by 005, 007, 015, `db-health.ts` and `tests/integration/release-gates.test.ts` ("gate: Brownlow authority"). |
+| `brownlow_round_votes` (005; provenance quartet added by 083) | one row per `(season, player_id, round_number)`, `brownlow_round_uq`; `played boolean NOT NULL`; `votes` 0–3 nullable; `source_id`, `source_record_id`, `import_batch_id`, `imported_at` | 1984–2025; rows exist only where the source published a vote (a published 0 is a row; NA is never a row); finals never | **no `match_id`, no club** | (a) `tools/migration/import_fitzroy_core.py::import_brownlow_round_votes` — rebuild path, `DELETE … WHERE season = ANY(snapshot seasons)` then COPY, **writes no `source_id`** (five columns only), derived 1:1 from per-match votes because a player plays once per H&A round; (b) `src/lib/acquisition/canonical-apply.ts::writeBrownlowRoundVotes` — the settle applier, `afltables` source, ownership-gated: an `unowned` (NULL `source_id`) or `foreign` (other `source_id`) row is refused and never adopted (`ownershipOf`, settle tests "refuses a foreign-owned canonical row"). |
+| `player_match_stats.brownlow_votes` (004) | per player per match, `pms_player_match_uq (player_id, match_id)`, CHECK 0–3 | 1931–1934 and 1984–2025, partial even inside that window ("never sum this for career totals") | one column on the lineup row | fitzRoy core rebuild; **`src/db/queries/match-sheet.ts::saveMatchSheet`** (generic match sheet, Super Admin, validates blank-or-exact-3/2/1 in `src/lib/match-sheet.ts`, refuses finals and seasons whose `stat_availability.brownlow_match_votes` coverage is not complete/partial, then upserts the column); `src/lib/ingest/datasets.ts` (legacy `player_match_stats` upload dataset). The settle deliberately never writes this column. |
+| `player_season_stats.brownlow_votes` + `brownlow_status` (015) | derived, `(player_id, season)`; `pss_brownlow_grain_ck` | — | `complete` ⇒ votes 0..n; `pending`/`not_applicable` ⇒ NULL | `recomputeSeasonBrownlowStatus(tx, season)` and `recomputePlayerDerivedStats(tx, ids, season)` in `src/db/queries/player-derived.ts`; `tools/migration/rebuild_derived.py`. All read `brownlow_season_votes` only. |
+| `player_career_stats.brownlow_votes`, `brownlow_medals` (007) | derived, per player | — | sum of `brownlow_season_votes.votes`, count of `is_winner` | `recomputePlayerDerivedStats` (both the playing-record insert and the no-match-history insert); `rebuild_derived.py`. `db-health.ts::reconcileCareerTotals` asserts career = sum(bsv). |
+| `stat_availability` rows for `brownlow_match_votes`, `brownlow_round_votes`, `brownlow_season_total` (015/016) | per season per grain, `coverage_status` enum | — | complete / partial / not_collected / not_applicable / pending | migration 016 and `import_legacy_afl.py` recompute them from the loaded data (match grain: an H&A match is "complete" when its `player_match_stats.brownlow_votes` sum to 6). `saveMatchSheet` and the fitzRoy loader read them as the coverage authority. |
+
+**Match identity available today.** `matches` (003, 084, 085): `id`, `match_key text NOT NULL UNIQUE` (`season|round|date|home|away`), `season`, `round_code`, `round_number` (NOT NULL iff `round_type = 'home_and_away'`), `round_type` enum (`home_and_away`, `wildcard_final`, `elimination_final`, …, `grand_final`), `is_final` (= `round_type <> 'home_and_away'`; the Wildcard Final is `is_final = true` and is not polled — 084/085 name Brownlow scoping as a consumer of `is_final`), `is_finals_series`, `match_date`, `venue_id/venue_raw`, `home_club_id`, `away_club_id`. A Brownlow-eligible match is exactly `round_type = 'home_and_away'`.
+
+**Participants today.** The canonical line-up is `player_match_stats` rows for the match (`getMatchPlayers` in `src/db/queries/matches.ts`; the match sheet writes the same rows). There is no separate lineup table for canonical seasons; `staging.afl_api_lineups` (077) is staging only. The settle writes `player_match_stats` for completed current-season matches, so current-season participants exist once a match is settled.
+
+**Player identity.** Every Brownlow row uses `players.id` as a hard FK; no name matching anywhere in the Brownlow path (`import_brownlow_season.py::ProfileResolver` is fail-closed by profile URL).
+
+**Audit and provenance infrastructure.** `data_edits` (057/058): append-only, `table_name` CHECK allowlist `('players','matches','draft_picks','award_winners','hall_of_fame','honour_team_members')`, `row_id > 0`, `field_group`, `old_values`/`new_values` jsonb, `admin_user_id NOT NULL` FK `auth_users`, `note ≤ 2000`; written by `recordDataEdit(tx, …)` (`src/db/queries/audit-log.ts`) inside the import-role transaction so a failed audit rolls the edit back. Source `manual_admin_edit` exists (057). `data_overrides` (073) `entity_type` CHECK is `('players','matches','draft_picks')` and **`src/lib/acquisition/manual-authority.ts` pins that exact list as a proof** that `brownlow_round_votes` overrides are unrepresentable; widening it would flip the settle's manual-authority answer from `clear` to `indeterminate` (§22 "Override constraint drift"). Phase C therefore must **not** touch `data_overrides`.
+
+**Write connection pattern.** Every manual statistical write (`match-sheet.ts`, `data-edits.ts`, `match-admin.ts`, `awards-admin.ts`) opens a short-lived `postgres(process.env.AFLDB_IMPORT_DATABASE_URL, { max: 1 })` and runs one `importSql.begin()` transaction; reads use the `afldb_app` pool (`sql` from `@/db/client`). `afldb_auth` holds no statistical writes. `afldb_import` already inserts `data_edits` and rows with `auth_users` FKs.
+
+**Public consumers.** `/brownlow` (force-dynamic; winners, career leaders, multiple winners — all from `brownlow_season_votes` / `player_career_stats`); `/brownlow/[year]` (ISR 3600, prerendered; `brownlow_season_votes`); `/seasons/[year]` (ISR 3600; `getSeasonBrownlow` from `brownlow_season_votes` and `getSeasonRoundVotes` from `brownlow_round_votes`, club resolved through `player_match_stats` by season/round); `/players/[slug]` (ISR 3600; `player_season_stats`/`player_career_stats`); `/clubs/[slug]` (ISR 86400; club honours); `/clubs/compare` (force-dynamic; per-match `player_match_stats.brownlow_votes` analytics); `/matches/[id]` (ISR 3600; `player_match_stats.brownlow_votes`); `/records/[category]` (ISR 3600; `most-brownlow-votes` from career); advanced search, NL, query builder and Grid Solver (career column; NL `player_game` grain reads `player_match_stats.brownlow_votes`).
+
+**Existing tests.** `tests/match-sheet.test.ts` (3/2/1 payload validation), `tests/integration/data-editor.test.ts` T6/T6b (Wildcard Final refusal, nothing written), `tests/admin-match-mutations.test.ts` (source contract: `match-admin.ts`/`data-edits.ts` never mutate either Brownlow table and call `recomputeSeasonBrownlowStatus`), `tests/integration/release-gates.test.ts` ("gate: Brownlow authority", "gate: Brownlow coverage semantics", 2026 pending-never-zero), `tests/integration/settle-afltables.test.ts` (round-grain write, foreign/unowned refusal, no season total from a partial set), `tests/brownlow-season-artefact.test.ts`, `tests/fitzroy-core-import.test.ts`, `tests/integration/privileges.test.ts`, `tests/integration/database.test.ts`. Concurrency idiom: `tests/integration/admin-lifecycle.test.ts` and `player-link-concurrency.test.ts` (two `max: 1` connections, `pg_blocking_pids` polling).
+
+### 27.2 Current source/writer inventory and classification
+
+| Writer | Target | Phase C classification |
+|---|---|---|
+| `import_brownlow_season.py` (artefact loader) | `brownlow_season_votes` (truncate + copy) | **Retain as the historical source loader; make it manual-aware and fail-closed** (§27.11). Never run by the web app. |
+| `import_fitzroy_core.py::import_brownlow_round_votes` (rebuild) | `brownlow_round_votes` season-scoped delete + copy, no `source_id` | **Retain for rebuilds; refuse to delete manual-owned rows** (§27.11). |
+| `canonical-apply.ts::writeBrownlowRoundVotes` (settle) | `brownlow_round_votes`, `afltables`-owned rows only | **Retain unchanged.** Its ownership gate already refuses `manual_admin_edit` rows. It never sets `match_id`; Phase C's read model resolves the match for unowned/afltables rows by `(season, round_number, player)` through `player_match_stats` (§27.5) and the migration backfill sets it. |
+| `match-sheet.ts::saveMatchSheet` (generic Data Editor match sheet) | `player_match_stats.brownlow_votes` | **Redirect: the write is removed.** A submitted non-null `brownlowVotes` is refused with an error naming Brownlow administration; the upsert no longer lists the column so existing values are preserved (§27.15). |
+| `src/lib/ingest/datasets.ts` `player_match_stats` dataset | `player_match_stats.brownlow_votes` | **Compatibility/import-only, unchanged.** It is a registered legacy intake dataset (Phase H decides its retirement). Recorded, not modified. |
+| `recomputePlayerDerivedStats`, `recomputeSeasonBrownlowStatus`, `rebuild_derived.py` | derived `player_season_stats`, `player_career_stats` | **Retain; extend** with one narrow Brownlow-only career helper (§27.10). |
+| `awards-admin.ts` | refuses Brownlow winners in `award_winners` | Retain unchanged. |
+| **New** `src/db/queries/admin-brownlow.ts` | `brownlow_vote_entry_state`, `brownlow_season_authority`, `brownlow_round_votes` (manual rows), `player_match_stats.brownlow_votes` (mirror), `brownlow_season_votes` (manual season rows), derived totals, `stat_availability`, `data_edits` | **The only application writer of Brownlow facts.** |
+
+### 27.3 Canonical source-of-truth decision (binding)
+
+1. **The canonical Brownlow fact is the match-level vote assignment**: one `brownlow_round_votes` row per `(match_id, player_id)` with `votes ∈ {1,2,3}` and `match_id` set. The existing round-grain key `(season, player_id, round_number)` is preserved because it is equivalent to the match grain for home-and-away football (one match per player per round) and because two importers own it.
+2. **Season totals are derived from those facts** for every season the workflow publishes: `brownlow_season_votes` rows for an admin-published season carry `source_id = manual_admin_edit` and are recomputed only by the publish/correction transaction.
+3. **Compatibility state, explicit:** for a season whose `brownlow_season_votes` rows come from the artefact (`source_id ≠ manual_admin_edit`) the season total remains **source-published** and authoritative for public totals, whatever the state of match-grain attribution. This is how AFLDB represents "known total, incomplete match attribution": artefact season rows plus zero-or-more match facts, with the per-player difference between the two surfaced in the admin season view and never applied automatically. Nothing is destroyed to reach this state.
+4. **`player_match_stats.brownlow_votes` becomes a mirror**, written only by the Brownlow transaction for finalised matches (3/2/1 on the three players, 0 on every other participant of that match, because a finalised match is a declared-complete coverage set — §5) and never by any other application path. Existing historical values stay as they are.
+5. **`player_season_stats` and `player_career_stats` remain derived** from `brownlow_season_votes`, exactly as today; the only change is that the Brownlow transaction refreshes them for the affected players in the same transaction.
+6. **Existing violations of this model** (removed or restricted by Phase C): the generic match sheet's ability to write per-match votes (§27.15); the absence of a match identifier on the round facts (§27.5); the artefact loader's blind truncate (§27.11).
+7. **No independent manually maintained total exists after Phase C.** The publish transaction is the only writer of a manual `brownlow_season_votes` row, and it always derives from the complete finalised match set.
+
+### 27.4 Historical-data classification
+
+Computed at read time per season (no stored classification), from `stat_availability` and the tables above:
+
+| Class | Seasons (expected) | Admin behaviour |
+|---|---|---|
+| **No medal** (`brownlow_season_total` = `not_applicable`) | 1897–1923, 1942–1945 | Season not listed for entry; every mutation refuses `season_not_polled`. |
+| **Source-published, match grain complete or partial** | 1984–2025 (round rows from fitzRoy/settle; match grain mostly complete, `brownlow_match_votes` complete/partial) | Listed. Matches whose backfilled rows sum to 6 show as `imported`; Super Admin may correct any match (creates a manual entry) and may re-publish the season from match grain. Ordinary entry is not required. |
+| **Source-published, match grain absent** | 1924–1934 with partial 1931–1934 `player_match_stats` votes, 1935–1983 none | Listed. Entry permitted (Admin drafts, Super Admin finalises). The artefact total stands until every H&A match is finalised and the Super Admin publishes. 1931–1934 `player_match_stats` values are **not** backfilled into round rows (they are partial and the coverage authority already says so); the editor shows them as a hint only. |
+| **Current season, pending** (`seasons.status = 'in_progress'`, `brownlow_season_total` = `pending`) | 2026 | Listed. Entry as above once votes are known (§27.19). Publication allowed when every expected H&A match is complete, without waiting for `seasons.status = 'complete'`. |
+
+The migration fabricates no match-grain precision: backfill sets `match_id` only where the round fact resolves to exactly one match through the player's own `player_match_stats` row (§27.5); it never creates vote rows, zero rows or season rows.
+
+### 27.5 Match identity and backfill decision
+
+**Decision:** add `match_id integer NULL REFERENCES matches(id) ON DELETE SET NULL` to `brownlow_round_votes`. Backfill deterministically; leave the unresolved NULL; enforce the match-grain invariants with partial unique indexes that ignore NULL `match_id`.
+
+**Backfill statement (inside the migration, before the indexes):**
+
+```sql
+UPDATE brownlow_round_votes rv
+   SET match_id = r.match_id
+  FROM (
+    SELECT rv2.id,
+           (array_agg(m.id))[1] AS match_id,
+           count(DISTINCT m.id)  AS candidates
+      FROM brownlow_round_votes rv2
+      JOIN matches m
+        ON m.season = rv2.season
+       AND m.round_type = 'home_and_away'
+       AND m.round_number = rv2.round_number
+      JOIN player_match_stats pms
+        ON pms.match_id = m.id AND pms.player_id = rv2.player_id
+     WHERE rv2.match_id IS NULL
+     GROUP BY rv2.id
+  ) r
+ WHERE r.id = rv.id AND r.candidates = 1;
+```
+
+A row with zero candidates (no line-up row: the coverage gap `rounds.ts` already documents) or more than one (a data defect) stays NULL and is counted by preflight P2 and by the admin season view as `unresolved`. Fuzzy matching by name, date or club is never used; the only key is the player's own canonical line-up row in that season/round.
+
+**Constraints after backfill** (all partial on `match_id IS NOT NULL`, so unresolved history is untouched):
+
+- `ux_brownlow_round_votes_match_player UNIQUE (match_id, player_id)`;
+- `ux_brownlow_round_votes_match_value UNIQUE (match_id, votes) WHERE match_id IS NOT NULL AND votes > 0` — at most one 3, one 2 and one 1 per match, enforced by the database;
+- `ix_brownlow_round_votes_match ON brownlow_round_votes (match_id) WHERE match_id IS NOT NULL` — the FK's own index (the migration-041 rule `tests/integration/fk-indexes.test.ts` enforces).
+
+Preflight P3 must return zero before the migration is applied; the runner is transactional, so a violation aborts the whole migration with nothing applied. A non-zero P3 is a **hard stop** (§27.22): the source data has two players on one vote value in one match, and that is evidence to repair, not a constraint to weaken.
+
+**Consistency rule** (transaction-checked, not a trigger): a manual row's `match_id` must satisfy `matches.season = rv.season AND matches.round_number = rv.round_number AND round_type = 'home_and_away'`. `ON DELETE SET NULL` keeps the round fact when a match is deleted (facts are never destroyed); the workflow row (§27.16) restricts the delete instead.
+
+### 27.6 Participant eligibility contract
+
+- **Participants of a match** = `SELECT player_id, club_id, jumper_number FROM player_match_stats WHERE match_id = $1` — the same canonical line-up the public match page and the match sheet use. Nothing else (no staging lineups, no `player_clubs`, no free text).
+- **Complete participant set** = both `home_club_id` and `away_club_id` have **at least 18** line-up rows for the match (the smallest side any VFL/AFL era fielded; preflight P8 confirms no legitimate H&A match falls under it, and if it does the threshold is lowered to the measured minimum, never removed).
+- Draft saves accept only players in the participant set, whatever its completeness. **Finalisation, correction and adoption of imported rows require a complete participant set**; otherwise the mutation refuses `participants_incomplete` and the UI shows a blocked state with the counts per club and a link to the match sheet (Super Admin) where line-ups are repaired. There is no operator override inside the Brownlow workflow.
+- Substitutes/interchange: every player with a line-up row is eligible (an unused substitute has no row unless the source recorded one; that is the line-up's decision, not Brownlow's).
+- Identity: `players.id` only. A line-up row whose player is later merged/relinked is the player-links subsystem's concern; the Brownlow transaction re-reads participants under the match lock at commit time, so a stale participant list in the browser is refused as `not_participant`.
+
+### 27.7 Draft / final / correction state machine
+
+Per match, in `brownlow_vote_entry_state` (§27.16):
+
+| State | Meaning | Public effect |
+|---|---|---|
+| (no row) + no positive round rows | not entered | none |
+| (no row) + imported rows with `match_id` summing to 6 (`imported`) or to another positive total (`imported_partial`) | source-published match fact | already public (round votes on the season page, mirror on the match page where the source loaded it) |
+| `draft` | 0–3 distinct participants selected; saved by Admin or Super Admin | **none** — drafts never reach any public query |
+| `final` | exactly 3 distinct participants; canonical rows written | round facts and match mirror public; season total only after publication |
+| `void` | Super Admin declared "no votes awarded for this match" with a reason (exists for the exception case preflight P7 may reveal; counts as complete for season completeness; writes no vote rows and clears the mirror to NULL) | none |
+
+Transitions and who may perform them:
+
+| From → to | Action | Capability | Notes |
+|---|---|---|---|
+| none/imported/draft → draft | `saveDraft` | `data.brownlow.draft` | duplicates and non-participants refused even in draft; CAS on `revision` |
+| none/imported/draft → final | `finaliseMatch` | `data.brownlow.finalise` | requires complete 3/2/1, complete participants, CAS on `revision` **and** on the canonical fingerprint (§27.14) |
+| final → final (new values) | `correctMatch` | `data.brownlow.finalise` | reason required (3–500 chars); direct authoritative update with the full before/after in `data_edits`; no revision history table |
+| final/imported → void, void → final | `voidMatch` / `finaliseMatch` | `data.brownlow.finalise` | reason required |
+| final → draft | **not available** | — | a finalised match is corrected, never reopened into a public-invisible state; "reopen" in the UI is `correctMatch` with the current values preloaded |
+
+Answers to the §8 questions: a finalised match **can** be changed, by a Super Admin only, as a direct update with reason and audit; correcting a match in an admin-published season **re-derives the season in the same transaction** (§27.10), so the public totals never enter a "published but unreconciled" state; correcting a match in a **source-published** season leaves the artefact total untouched and shows the resulting disagreement until the Super Admin publishes from match grain; public totals change only at publication or at a correction of an already-published season; season publication is a separate Super Admin transaction (§27.9); partial data cannot masquerade as complete because publication requires every expected H&A match to be complete and derives from nothing else.
+
+### 27.8 Capability matrix (Decision 1 of §25 adopted as Option A)
+
+Add three members to `Capability` and `CAPABILITY_ROLES` in `src/lib/auth/capabilities.ts`; `hasCapability` needs no special case:
+
+```ts
+| 'data.brownlow.read'
+| 'data.brownlow.draft'
+| 'data.brownlow.finalise'
+…
+'data.brownlow.read':     ADMIN_AND_UP,
+'data.brownlow.draft':    ADMIN_AND_UP,
+'data.brownlow.finalise': SUPER_ADMIN_ONLY,
+```
+
+| Operation | Contributor | Admin | Super Admin | Server guard |
+|---|---|---|---|---|
+| See Brownlow in the Data nav; open season/round pages | No (bounced to upload) | Yes | Yes | page: `requireCapability('data.brownlow.read')` |
+| Save/clear a draft; adopt imported values into a draft | No | Yes | Yes | action: `requireCapability('data.brownlow.draft')` |
+| Finalise, correct, void a match | No | **No** | Yes | action: `requireCapability('data.brownlow.finalise')` — resolves to super_admin only |
+| Publish / re-publish a season; set ineligibility | No | **No** | Yes | same |
+| See the Publish panel and Finalise/Correct controls | — | rendered disabled with the reason "Super Admin only" | rendered | UI only; the guard above is the boundary |
+| Edit `player_match_stats.brownlow_votes` through the match sheet | No | No | **No** (removed) | `saveMatchSheet` refuses |
+
+`can_manage_admins` is irrelevant here and grants nothing. Every Server Action calls its guard itself; the capability entries describe those guards, as in Phases A/B.
+
+### 27.9 Season completeness and publication model
+
+Read-model per season (`getBrownlowSeasonOverview(season)`), all counts over `matches WHERE season = $1 AND round_type = 'home_and_away'`:
+
+- `expected` = H&A match count; `final`, `draft`, `void` = entry-state counts; `imported` = matches without an entry row whose round rows (`match_id` set) sum to 6 with three distinct positive values; `importedPartial` = positive sum ≠ 6; `notEntered` = the remainder; `unresolved` = round rows in the season with `match_id IS NULL`; `participantsIncomplete` = H&A matches failing §27.6.
+- `complete` = `final + void + imported == expected`.
+- `authority` = `none` (no `brownlow_season_votes` rows), `source` (rows with `source_id ≠ manual_admin_edit`), `manual` (rows with `source_id = manual_admin_edit`); `publishedRevision`, `revision` from `brownlow_season_authority`; `stale = authority = 'manual' AND publishedRevision <> revision` (defensive; a new match created in a published season is the case that produces it).
+- Season status label: `not_polled` | `not_started` | `in_progress` | `entered` (complete, authority ≠ manual) | `published` (authority = manual, not stale) | `published_stale` | `source_published` (authority = source, entry not complete or not started).
+- **Disagreement report** (source-published seasons): per player, `sum(votes)` over resolved round rows vs `brownlow_season_votes.votes`; shown, never applied.
+
+**Publication** (`publishSeason`, Super Admin) requires `complete = true` and `unresolved = 0`, takes `ineligiblePlayerIds[]` (validated against the polled set; prefilled from the current `brownlow_season_votes.is_ineligible` flags whatever their source) and `expectedRevision`, and writes the derived rows (§27.10). Publication is idempotent for identical inputs (re-publish produces identical rows and a new revision; allowed). There is no "unpublish": reversal is a correction plus re-publish, or an operator artefact reload (which the loader refuses for manual seasons, §27.11).
+
+### 27.10 Reconciliation and derived-total model
+
+One helper family in `src/db/queries/admin-brownlow.ts`, called only from the Brownlow transactions, all on the same `tx`:
+
+1. `writeMatchFacts(tx, match, selection, actor, revision)` — for the three players: upsert `brownlow_round_votes (season, player_id, round_number, match_id, played = true, votes, source_id = manual, source_record_id = 'entry:<match_id>:r<revision>', import_batch_id = NULL, imported_at = now())` on `(season, player_id, round_number)`; delete every other row for that match (`match_id = $1`) **and** every unresolved row for the match's `(season, round_number)` whose player is a participant of this match (re-attributing and superseding the stale row; the old values go into the audit); set `player_match_stats.brownlow_votes` = 3/2/1/0 across the match's participants. For `void`: delete positive rows for the match, mirror to NULL.
+2. `deriveSeasonRows(tx, season, ineligibleIds)` — from resolved round rows of the season: per player `votes = sum`, `three/two/one_vote_games` = counts by value, `polling_games` = count of positive rows, `games` = that player's H&A line-up rows in the season (preflight P9 confirms this matches the artefact's `games` semantics; if the artefact counts finals too, use `player_season_stats.games`), `vote_rank = rank() OVER (ORDER BY votes DESC)`, `eligible_rank` = same over eligible players, `is_winner = NOT is_ineligible AND eligible_rank = 1` (ties are multiple winners), `link_status_value = 'unique'`, `source_id = manual`, `source_record_id = 'publish:<season>:r<revision>'`. Rows only for `votes > 0`. Replaces all rows for the season (`DELETE WHERE season = $1` then insert). Preserves `is_ineligible` per the submitted set.
+3. `recomputeSeasonBrownlowStatus(tx, season)` (existing) — refreshes `player_season_stats` for the season.
+4. `recomputeBrownlowCareerTotals(tx, playerIds)` (**new**, `player-derived.ts`, kept in lockstep with `rebuild_derived.py` and the existing `brownlow` CTE) — `UPDATE player_career_stats SET brownlow_votes = COALESCE(sum, 0), brownlow_medals = COALESCE(count winners, 0)` for the union of players in the old and new season rows. This is deliberately narrower than `recomputePlayerDerivedStats` (which rebuilds playing records the Brownlow change did not touch).
+5. `recomputeBrownlowCoverage(tx, season)` (**new**) — the migration-016 `resolved` CTE restricted to one season, upserting the three `stat_availability` rows. Called after every finalise/void/correct (match grain) and publish (all three grains).
+
+`db-health.ts::reconcileCareerTotals` remains the independent drift check and is the post-deploy validation (§27.21). No other path may write any of these tables for Brownlow purposes; `tests/admin-match-mutations.test.ts` is extended to assert that `admin-brownlow.ts` is the only file under `src/db/queries` and `src/app` containing an INSERT/UPDATE/DELETE against `brownlow_round_votes` or `brownlow_season_votes`.
+
+### 27.11 Importer / reload precedence
+
+Precedence, highest first: **admin-finalised manual fact** → **settle-imported (afltables) fact** → **rebuild-loaded historical fact** → nothing. Concretely:
+
+- **Settle (`canonical-apply.ts`)**: already refuses to update a `manual_admin_edit`-owned row (foreign ownership) and never inserts over an existing key; a manual row therefore survives every settle. Rows the settle inserts for a match that already has a manual entry cannot exist (the manual finalisation deleted or claimed every round row for that match; a later settle proposal for the same `(season, player, round)` finds the manual row and refuses). No change.
+- **Artefact loader (`import_brownlow_season.py`)**: extend `check_database_coverage` to refuse when `brownlow_season_votes` holds any `source_id = manual_admin_edit` row ("season(s) <list> are admin-published; reload refused. Correct them through Brownlow administration or delete the manual rows deliberately first."). Fail closed, never silent. The existing "declared = decided seasons" check already refuses a manifest that omits a manually published new season; this makes the overlap case explicit too.
+- **fitzRoy rebuild loader (`import_fitzroy_core.py::import_brownlow_round_votes`)**: before the season-scoped `DELETE`, refuse if any row in those seasons carries `source_id = manual_admin_edit` (same message shape). A rebuild database is empty of manual rows, so rebuilds are unaffected; a live database with manual rows is protected.
+- **Promotion/restore pipelines** (ISSUE-139/151 lineage remap) must carry the two new tables and the manual-owned rows of the two existing tables. That is an operator follow-up outside Phase C and is listed as a stop condition for running a promotion after Phase C is live (§27.22).
+- **Imported rows on entry**: the match editor initialises from existing round rows (resolved or backfilled); "Adopt" copies them into a draft (Admin) or straight into a finalisation (Super Admin). Finalisation over imported rows claims them (rewrites provenance to manual with the old values audited). A settle that lands new imported values between page load and submit is caught by the canonical fingerprint CAS (§27.14).
+
+### 27.12 Provenance model
+
+Reuse the existing quartet; add no parallel framework.
+
+| Fact | Where provenance lives |
+|---|---|
+| Match-level vote row | `brownlow_round_votes.source_id/source_record_id/import_batch_id/imported_at` (083 quartet); manual rows: `manual_admin_edit`, `entry:<match_id>:r<revision>`, NULL batch |
+| Who entered/finalised, when, last reason | `brownlow_vote_entry_state.created_by/created_at/updated_by/updated_at/finalised_by/finalised_at/last_reason` (auth user FKs, as `data_edits` already does) |
+| Season total row | `brownlow_season_votes.source_id/source_record_id/import_batch_id`; manual: `manual_admin_edit`, `publish:<season>:r<revision>` |
+| Who published, when, revision | `brownlow_season_authority` |
+| Correction history (before/after, actor, reason, time) | `data_edits` rows (§27.13) — the append-only history; no per-row revision table |
+| Upstream source reference | retained on imported rows; an adopted-then-finalised row records the superseded imported values in its `data_edits.old_values` |
+
+### 27.13 Audit model
+
+All required audit is `recordDataEdit(tx, …)` inside the import-role transaction (migration-066 discipline: audit failure rolls the fact back). Migration widens `data_edits_table_name_check` (058 pattern) with `'brownlow_vote_entry_state'` and `'brownlow_season_authority'`.
+
+| Event | `table_name` / `row_id` | `field_group` | `old_values` → `new_values` (jsonb) | `note` |
+|---|---|---|---|---|
+| draft created / changed / cleared | `brownlow_vote_entry_state` / `match_id` | `draft` | `{status, three, two, one, revision}` → same shape | optional |
+| match finalised (incl. adoption) | same | `finalise` | `{status, three, two, one, revision, canonicalRows:[{playerId, votes, sourceId}]}` → same | optional |
+| finalised match corrected | same | `correct` | same shape | **reason (required)** |
+| match voided / un-voided | same | `void` | same | reason (required) |
+| season published / re-published | `brownlow_season_authority` / `season` | `publish` | `{revision, authority, rowCount, votesTotal, winners:[playerId], ineligible:[playerId]}` → same | optional |
+| correction that re-derived a published season | second `data_edits` row on `brownlow_season_authority` in the same transaction | `republish` | as above | copied reason |
+
+Every row carries `admin_user_id` (actor). Refusals `stale`, `forbidden`, `already_final` are additionally written to `auth_audit_log` via `audit('admin.brownlow_refused', {...})` after the failed call, mirroring Phase B; `invalid`/`not_found` are not audited.
+
+### 27.14 Stale-edit and concurrency strategy
+
+- **Revision CAS.** `brownlow_vote_entry_state.revision` (monotonic). Every mutation carries `expectedRevision` (0 = "no row existed when the page rendered"). Inside the transaction, after `SELECT … FROM matches WHERE id = $1 FOR UPDATE` and `SELECT … FROM brownlow_vote_entry_state WHERE match_id = $1 FOR UPDATE`, a mismatch refuses `stale`. Insert uses `INSERT … ON CONFLICT (match_id) DO NOTHING` followed by a re-read under the match lock, so two "first" drafts do not both succeed.
+- **Canonical fingerprint CAS** for finalise/correct/adopt: the read model returns `canonicalFingerprint` = sha-256 of the sorted `(player_id, votes, source_id)` triples of the match's positive round rows (resolved and, for the match's season/round, unresolved rows of its participants). The transaction recomputes it under the match lock and refuses `stale` when it differs (covers a settle landing votes, a second Super Admin's correction, or an operator repair between load and submit).
+- **Locks, in fixed order** to avoid deadlock: (1) `pg_advisory_xact_lock(717275, 3)` for any operation that touches season authority (finalise/correct/void — because they may re-derive a published season — and publish; **not** for draft saves); (2) `FOR UPDATE` on the `matches` row; (3) `FOR UPDATE` on the entry-state row; (4) `FOR UPDATE` on the `brownlow_season_authority` row (inserted with `ON CONFLICT DO NOTHING` first). Key 3 is the next free key in the `0xAF1DB` namespace (1 = honour teams, 2 = admin lifecycle); it is a frozen literal.
+- **Scenarios:** Admin drafts while Super Admin finalises the same match → the later one sees a changed `revision` and is refused `stale`, and the page reloads with the finalised state (an Admin cannot overwrite a final row in any case: `already_final`). Two finalisations → second refused `stale`. Correction racing a settle → fingerprint refuses the correction; the settle's own transaction never touches a manual row. Two publishes → second refused `stale` on the authority revision. Corrections during a publish → serialised by the advisory lock; the loser re-reads and CAS-refuses.
+- No SERIALIZABLE, no distributed locking, no epoch.
+
+### 27.15 Legacy Data Editor transition
+
+- **Backend (C1):** `src/lib/match-sheet.ts::validateMatchSheetPayload` rejects any payload where a player has a non-null `brownlowVotes` with `"Brownlow votes are managed in Brownlow administration (/admin/brownlow) and cannot be saved from the match sheet."`; `src/db/queries/match-sheet.ts::saveMatchSheet` removes `brownlow_votes` from both the INSERT column list and the `ON CONFLICT` SET, so the mirror written by the Brownlow transaction (or the historical source value) is preserved through any match-sheet save. The finals/coverage checks that only served the removed write are deleted with it. Existing tests: `tests/match-sheet.test.ts` cases that accept a 3/2/1 allocation are inverted; `tests/integration/data-editor.test.ts` T6/T6b become "refused before any write, for any match, with the redirect message".
+- **UI (C2):** `MatchSheetEditor.tsx` renders the `BV` column read-only (current value or "—") with a link to the match's Brownlow editor (`/admin/brownlow/<season>/<round>#match-<id>`); the input is removed rather than disabled, so nothing can be typed.
+- **Deletion of a match with Brownlow entry** (`deleteMatch` in `match-admin.ts`): now fails on the `brownlow_vote_entry_state` FK (`ON DELETE RESTRICT`); the existing error path surfaces it. This is the intended fail-closed behaviour; `match-admin.ts` is not changed and `tests/admin-match-mutations.test.ts` keeps asserting it never mutates Brownlow tables.
+- Awards, players, Hall of Fame and honour-team editing are untouched.
+
+### 27.16 Schema / migration plan — **migration required: yes**, one file
+
+Next free number at planning time is **094** (`093_nl_search_log_after_siren_grain.sql` is the latest); re-number against the branch at implementation start (§22 "Migration collision"). Forward-only; every object is additive.
+
+```sql
+-- 094_brownlow_admin_workflow.sql (AFLDB-ISSUE-155 Phase C1)
+
+-- 1. Match identity on the round fact (nullable; backfilled; never NOT NULL)
+ALTER TABLE brownlow_round_votes
+  ADD COLUMN match_id integer REFERENCES matches(id) ON DELETE SET NULL;
+COMMENT ON COLUMN brownlow_round_votes.match_id IS
+  'Exact home-and-away match this vote was polled in. NULL = not resolved (no line-up row, or ambiguous); never guessed.';
+
+-- 2. Deterministic backfill (§27.5 statement)
+
+-- 3. Match-grain invariants, partial on match_id IS NOT NULL
+CREATE UNIQUE INDEX ux_brownlow_round_votes_match_player
+  ON brownlow_round_votes (match_id, player_id) WHERE match_id IS NOT NULL;
+CREATE UNIQUE INDEX ux_brownlow_round_votes_match_value
+  ON brownlow_round_votes (match_id, votes) WHERE match_id IS NOT NULL AND votes > 0;
+CREATE INDEX ix_brownlow_round_votes_match
+  ON brownlow_round_votes (match_id) WHERE match_id IS NOT NULL;
+
+-- 4. Workflow state (NOT a public statistical authority)
+CREATE TABLE brownlow_vote_entry_state (
+  match_id           integer     PRIMARY KEY REFERENCES matches(id) ON DELETE RESTRICT,
+  season             smallint    NOT NULL REFERENCES seasons(year),
+  status             text        NOT NULL CHECK (status IN ('draft', 'final', 'void')),
+  three_player_id    integer     REFERENCES players(id),
+  two_player_id      integer     REFERENCES players(id),
+  one_player_id      integer     REFERENCES players(id),
+  revision           integer     NOT NULL DEFAULT 1 CHECK (revision >= 1),
+  created_by         integer     NOT NULL REFERENCES auth_users(id),
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_by         integer     NOT NULL REFERENCES auth_users(id),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  finalised_by       integer     REFERENCES auth_users(id),
+  finalised_at       timestamptz,
+  finalised_revision integer,
+  last_reason        text        CHECK (last_reason IS NULL OR length(last_reason) <= 500),
+  CONSTRAINT bves_distinct_ck CHECK (
+    three_player_id IS DISTINCT FROM two_player_id
+    AND three_player_id IS DISTINCT FROM one_player_id
+    AND two_player_id   IS DISTINCT FROM one_player_id),
+  CONSTRAINT bves_final_complete_ck CHECK (
+    status <> 'final'
+    OR (three_player_id IS NOT NULL AND two_player_id IS NOT NULL AND one_player_id IS NOT NULL
+        AND finalised_by IS NOT NULL AND finalised_at IS NOT NULL AND finalised_revision IS NOT NULL)),
+  CONSTRAINT bves_void_empty_ck CHECK (
+    status <> 'void'
+    OR (three_player_id IS NULL AND two_player_id IS NULL AND one_player_id IS NULL
+        AND finalised_by IS NOT NULL AND last_reason IS NOT NULL))
+);
+CREATE INDEX ix_bves_season_status ON brownlow_vote_entry_state (season, status);
+CREATE INDEX ix_bves_three ON brownlow_vote_entry_state (three_player_id) WHERE three_player_id IS NOT NULL;
+CREATE INDEX ix_bves_two   ON brownlow_vote_entry_state (two_player_id)   WHERE two_player_id   IS NOT NULL;
+CREATE INDEX ix_bves_one   ON brownlow_vote_entry_state (one_player_id)   WHERE one_player_id   IS NOT NULL;
+-- (created_by/updated_by/finalised_by: index per the fk-indexes test's current rule; check that test first)
+
+-- 5. Season authority / publication record
+CREATE TABLE brownlow_season_authority (
+  season             smallint    PRIMARY KEY REFERENCES seasons(year),
+  revision           integer     NOT NULL DEFAULT 1 CHECK (revision >= 1),
+  published_revision integer,
+  published_by       integer     REFERENCES auth_users(id),
+  published_at       timestamptz,
+  updated_by         integer     NOT NULL REFERENCES auth_users(id),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT bsa_published_ck CHECK (
+    (published_revision IS NULL) = (published_by IS NULL)
+    AND (published_revision IS NULL) = (published_at IS NULL))
+);
+
+-- 6. Audit allowlist (058 pattern)
+ALTER TABLE data_edits
+  DROP CONSTRAINT data_edits_table_name_check,
+  ADD CONSTRAINT data_edits_table_name_check CHECK (table_name IN (
+    'players', 'matches', 'draft_picks', 'award_winners', 'hall_of_fame', 'honour_team_members',
+    'brownlow_vote_entry_state', 'brownlow_season_authority'));
+
+-- 7. Privileges: same shape as every statistical table
+SELECT afldb_meta.grant_app_read('brownlow_vote_entry_state');
+SELECT afldb_meta.grant_app_read('brownlow_season_authority');
+GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_vote_entry_state, brownlow_season_authority TO afldb_import;
+```
+
+Also: add both tables to `tools/maintenance/privileges.sql` (the reconciler's hand-typed lists; §memory: a table missing from it is silently revoked on the next reconcile) and extend `tests/integration/privileges.test.ts` (app SELECT only; import write; auth nothing). No `data_overrides` change (§27.1). No `NOT NULL` transition for `match_id`, ever — unresolved history is a legitimate state. No enum types (text + CHECK, as 057/058 chose). No JSON for vote assignments. A new table is chosen over widening `brownlow_round_votes` with workflow columns because drafts must never be rows in a public fact table.
+
+### 27.17 Transaction design
+
+All four run in `src/db/queries/admin-brownlow.ts` on a short-lived `postgres(AFLDB_IMPORT_DATABASE_URL, { max: 1 })` `begin()` (the `match-sheet.ts` pattern); each returns a discriminated result (`{ ok: true, state }` / `{ ok: false, code, message }`), never throws for a business refusal. Actor guard is in the Server Action (§27.8); the transaction re-reads nothing from the form beyond ids, expected revisions and the selection.
+
+**`saveDraftBrownlowMatch({ matchId, selection: {three?, two?, one?}, expectedRevision, actorId, note? })`**
+1. `SELECT id, season, round_number, round_type, home_club_id, away_club_id FROM matches WHERE id = $1 FOR UPDATE` → `not_found`; `round_type <> 'home_and_away'` → `not_home_and_away`; season class no-medal → `season_not_polled`.
+2. Participants (§27.6); each selected id ∈ participants else `not_participant`; distinct else `duplicate_player`.
+3. Entry row `FOR UPDATE` (insert `draft` with `ON CONFLICT DO NOTHING`, re-read). `status = 'final'|'void'` → `already_final`. `revision <> expectedRevision` → `stale`.
+4. `UPDATE … SET three/two/one, revision = revision + 1, updated_by, updated_at`.
+5. `recordDataEdit` (`draft`). 6. Return `{ revision, status, selection }`. No canonical, derived, coverage or public write. Revalidate admin round page only.
+
+**`finaliseBrownlowMatch({ matchId, selection (all three), expectedRevision, expectedCanonicalFingerprint, actorId, reason?, adoptImported? })`**
+1. `pg_advisory_xact_lock(717275, 3)`. 2. Match `FOR UPDATE` and checks as above. 3. Participants complete (§27.6) else `participants_incomplete`; selection complete else `incomplete`; membership/distinctness as above. 4. Entry row lock; `final`/`void` → `already_final` (use correct); revision CAS → `stale`. 5. Recompute canonical fingerprint under lock → `stale` if different. 6. `writeMatchFacts` (§27.10 item 1). 7. `UPDATE` entry → `final`, `finalised_by/at`, `finalised_revision = revision + 1`, `revision + 1`. 8. Season authority row: insert-if-absent, `FOR UPDATE`, `revision + 1`; **if `published_revision IS NOT NULL`** run `deriveSeasonRows` with the existing ineligible set, `recomputeSeasonBrownlowStatus`, `recomputeBrownlowCareerTotals(affected)`, set `published_revision = revision`, audit `republish`. 9. `recomputeBrownlowCoverage(season)`. 10. `recordDataEdit` (`finalise`, with `canonicalRows` before/after). 11. Return `{ revision, status: 'final', selection, seasonAuthority }`. Revalidation per §27.18.
+
+**`correctBrownlowMatch(...)`** = `finaliseBrownlowMatch` with `status = 'final'` required at step 4 (`not_final` otherwise), `reason` required (else `invalid`), audit `correct`. **`voidBrownlowMatch`** = same skeleton, no selection, reason required, `writeMatchFacts` in void mode, audit `void`.
+
+**`publishBrownlowSeason({ season, ineligiblePlayerIds, expectedRevision, actorId, note? })`**
+1. Advisory lock (717275, 3). 2. Season exists and is polled; authority row insert-if-absent, `FOR UPDATE`; revision CAS → `stale`. 3. Completeness (§27.9) with `unresolved = 0` else `season_incomplete` (message lists the counts). 4. Every ineligible id must have polled in the season else `invalid`. 5. Old season rows captured; `deriveSeasonRows`; `recomputeSeasonBrownlowStatus`; `recomputeBrownlowCareerTotals(old ∪ new players)`; `recomputeBrownlowCoverage`. 6. `UPDATE` authority `revision + 1`, `published_revision = revision`, `published_by/at`. 7. `recordDataEdit` (`publish`). 8. Return the new overview. Revalidation per §27.18.
+
+Failure handling: any thrown error (constraint, audit, connection) rolls the transaction back and is returned as `db_error` with the message logged server-side; `recordDataEdit` failing is therefore `db_error` with nothing committed (proven by the integration test that submits a 501-character reason → `last_reason` CHECK passes at 500 but the audit note is deliberately given 2001 characters in the test double to trip `data_edits.note` — or simply by forcing the audit insert to fail through a test-only invalid `admin_user_id`). Split outcomes are impossible by construction.
+
+### 27.18 Publication / cache behaviour
+
+| Mutation | Paths revalidated after commit |
+|---|---|
+| draft save / clear | `/admin/brownlow/[season]/[round]` and `/admin/brownlow/[season]` (`revalidatePath(..., 'page')` on the dynamic patterns) |
+| finalise / correct / void, season **not** admin-published | admin paths above; `/seasons/${season}` via the existing all-worker fan-out `revalidateSeason()` from `src/lib/acquisition/season-revalidation.ts` when its env is configured (falls back to local `revalidatePath`); `/matches/${matchId}` (mirror) locally |
+| finalise / correct in an admin-published season, publish, re-publish | all of the above plus `/brownlow`, `/brownlow/${season}`, `/players/[slug]` (`'page'`), `/clubs/[slug]` (`'page'`), `/records/[category]` (`'page'`) locally |
+
+Known limitation (recorded, not solved here): `revalidatePath` from a Server Action invalidates the worker that served it (ISSUE-134 evidence); only the season page has the cross-worker route. Other pages refresh within their ISR window (≤ 1 h; club pages 24 h). Extending `/api/internal/revalidate-season` to an allowlisted path set is a small C2 option if acceptance shows it matters; not required. Drafts never reach any public query, so no draft can leak whatever the cache state.
+
+### 27.19 Current-season coexistence (no refresh-job work)
+
+- Until award night the source publishes no votes; the settle produces no round rows and `brownlow_season_total` reads `pending` (release-gate test). The admin season page for 2026 shows `not_started` with every H&A match `not entered`; participants exist for settled matches.
+- On award night an operator enters votes round by round (Admin drafts, Super Admin finalises), or, if a later settle imports votes first, adopts them. Publication follows when complete. Nothing here schedules or runs an import (Phase G).
+- Season rollover (`src/lib/rollover/season-rollover.ts`) already treats the Brownlow coverage transition as an operator-declared decision; `recomputeBrownlowCoverage` keeps the per-season rows consistent with whatever the workflow has done, so rollover evidence remains truthful.
+
+### 27.20 SQL / runtime preflights (run before applying the migration; record results in the issue)
+
+| # | Question | Query shape | Gate |
+|---|---|---|---|
+| P1 | Round-fact volume and span | `SELECT count(*), min(season), max(season), count(*) FILTER (WHERE votes = 0), count(*) FILTER (WHERE source_id IS NULL), count(DISTINCT source_id) FROM brownlow_round_votes` | informational; expect 1984–2025/2026 |
+| P2 | Backfill resolvability | the §27.5 SELECT with `count(*) FILTER (WHERE candidates = 1 / 0 / > 1)` | `> 1` must be 0 (else repair first); `0` is reported as the unresolved baseline |
+| P3 | Match-grain uniqueness | after computing candidate `match_id` in a CTE: duplicates of `(match_id, votes) WHERE votes > 0` and of `(match_id, player_id)` | **must be 0** (hard stop) |
+| P4 | Season-row semantics | `SELECT count(*) FILTER (WHERE votes = 0), count(*) FILTER (WHERE source_id IS NULL), count(*) FILTER (WHERE source_id = (SELECT id FROM sources WHERE key='manual_admin_edit')) FROM brownlow_season_votes` | zero manual rows expected today; 0-vote row count decides whether `deriveSeasonRows` emits 0 rows |
+| P5 | Season totals vs sum of round facts (1984–2025) | per season: `sum(rv.votes)` vs `sum(bsv.votes)`, and per player mismatches | informational; the disagreement report baseline |
+| P6 | Match-grain sums | per H&A match 1984+: `sum(rv.votes)` grouped into 6 / other positive / none | reveals the exception population for P7 |
+| P7 | Exceptions | list matches from P6 with a positive sum ≠ 6 | if any are legitimate "no votes awarded" cases, `void` is used; otherwise repair |
+| P8 | Participant completeness | per season: H&A matches where either club has < 18 `player_match_stats` rows | expect 0 for 1899+; decides the §27.6 threshold |
+| P9 | `games` semantics of the artefact | for 3 seasons compare `bsv.games` with H&A line-up count and with `player_season_stats.games` | decides item 2 of §27.10 |
+| P10 | Unresolved player links inside Brownlow rows | `link_status_value` distribution on `brownlow_season_votes` (`db-health` already lists it) | informational |
+| P11 | Privileges | `has_table_privilege('afldb_import','stat_availability','UPDATE')`, `…('player_career_stats','UPDATE')`, `…('player_season_stats','UPDATE')`, `…('brownlow_season_votes','DELETE')` | all true (the import role rebuilds them today); else stop |
+| P12 | Mirror column baseline | count of H&A matches 1984+ where `player_match_stats.brownlow_votes` sum ≠ `rv` sum | informational; documents pre-existing drift the mirror will not retro-fix |
+
+### 27.21 Deployment sequencing
+
+1. Operator runs P1–P12 on the target (DEV first, then PROD); P3 = 0 and P11 all true are required.
+2. Apply migration 094 (transactional: schema, backfill, indexes, CHECK widening, grants in one commit), then `db:privileges` to reconcile `privileges.sql`.
+3. Deploy C1 code (no route yet): the match-sheet write is gone, the new tables exist, nothing is reachable. Old code that may still be running tolerates the additive schema.
+4. Run `tests/integration/privileges.test.ts` and the C1 integration suite against the host's `_test` database where available (PROD has no `afldb_test`; rely on DEV/streamanator per memory).
+5. Deploy C2 (routes, nav, actions). Verify a Contributor is bounced and an Admin sees no finalise control.
+6. Validate reconciliation on the live database: `db-health` career check = 0 mismatches; `SELECT count(*) FROM brownlow_round_votes WHERE match_id IS NULL` equals the P2 baseline; release gates green.
+7. Public route validation: `/brownlow`, `/brownlow/<year>`, `/seasons/<year>` render unchanged for an untouched season; after a test finalisation on DEV, the season page shows the round votes and the match page the mirror.
+8. Only then perform any real entry. No step creates two live authorities: until publish, the artefact rows are authoritative; at publish, the manual rows replace them atomically.
+
+Rollback = disable the routes/actions; new tables and manual rows stay (forward-only, §14).
+
+### 27.22 Risks and stop conditions
+
+- **P3 > 0** (two players share a vote value in one match, or one player has two rows for a match): stop; repair the source data before the migration.
+- **P2 ambiguity > 0** (a player with two line-up rows in one H&A round): stop and repair the line-up.
+- **P11 false**: the import role cannot rebuild derived/coverage tables from the web path — stop; do not widen the app role.
+- **`manual-authority.ts` contract**: if implementation finds it necessary to touch `data_overrides.entity_type`, stop; the settle's proof would break.
+- **Promotion/restore after Phase C**: a lineage-remap promotion that does not carry `brownlow_vote_entry_state`, `brownlow_season_authority` and manual-owned rows would erase admin decisions — stop any promotion until the ISSUE-151 pipeline lists them.
+- **Participant coverage** (P8) shows material historical H&A ranges under 18 rows per side: lower the threshold to the measured minimum; if a range has no line-ups at all, entry there is blocked by design and the range is reported — not a reason to allow free-text players.
+- **Audit atomicity**: the design keeps `data_edits` in the fact transaction; if any implementation pressure suggests post-commit audit, stop.
+- **Fabricated precision**: the migration must never turn a season total into match rows, nor 1931–1934 partial match votes into round rows.
+- **Cross-worker cache**: not a stop; recorded limitation (§27.18).
+
+### 27.23 Implementation split — C1 / C2 confirmed
+
+The split in §23 is correct and is adopted: C1 is entirely server-side and database-bound (migration, transactions, importer guards, contract tests) and can be validated without a browser; C2 is a thin UI over C1's read model and results, whose only client-side logic (selection state, duplicate prevention, keyboard flow) is repeated server-side. Neither depends on the other's model choice.
+
+### 27.24 Recommended model / effort
+
+- **C1 — Opus, high.** Transactional data-authority code, migration/backfill, importer guards, deterministic concurrency tests.
+- **C2 — Sonnet, high.** Routes/components/actions over fixed server contracts; no data-authority logic lives client-side, so Opus is not warranted.
+- Astra is not used for either.
+
+### 27.25 Handoff contract — C1 (Brownlow canonical backend/schema)
+
+**Session:** fresh; model Opus, effort high; worktree `D:\dev\afldb-issue-155`, branch `codex/issue-155-admin-overhaul`; follow `CLAUDE.md`; the user runs all commands.
+
+**Prompt:**
+
+> Implement AFLDB-ISSUE-155 Phase C1 exactly as specified in `AFLDB-ISSUE-155.md` §27 (read §27 fully first; §8 is intent only, §27 governs). Phases A and B are complete and must not change. Do not build any `/admin/brownlow` UI (that is C2). Scope: (1) migration `094_brownlow_admin_workflow.sql` per §27.16, re-numbered if the branch has moved, including the §27.5 backfill and partial unique indexes; add both new tables to `tools/maintenance/privileges.sql` and `tests/integration/privileges.test.ts`. (2) `src/lib/brownlow/entry.ts` (pure, no `server-only`): selection validation (distinct, participant membership, complete-for-final), state transitions, error codes and messages, canonical fingerprint, season-row derivation math (ranks, eligible ranks, tied winners). (3) `src/db/queries/admin-brownlow.ts`: read model (`listBrownlowSeasons`, `getBrownlowSeasonOverview`, `getBrownlowRound`, `getBrownlowMatchEditorModel` returning participants, current entry, imported rows, fingerprint, participant completeness, disagreement report) and the four transactions of §27.17 on the `AFLDB_IMPORT_DATABASE_URL` short-lived connection with the §27.14 lock order and `recordDataEdit` in-transaction. (4) `src/db/queries/player-derived.ts`: add `recomputeBrownlowCareerTotals` and `recomputeBrownlowCoverage` in lockstep with `rebuild_derived.py` and migration 016. (5) `src/db/queries/audit-log.ts`: extend `DataEditTableName`. (6) `src/lib/auth/capabilities.ts`: add `data.brownlow.read/draft/finalise` per §27.8. (7) Legacy writer per §27.15: `src/lib/match-sheet.ts` refuses non-null `brownlowVotes`; `src/db/queries/match-sheet.ts` no longer writes `brownlow_votes`. (8) Importer guards per §27.11 in `tools/migration/import_brownlow_season.py` (`check_database_coverage`) and `tools/migration/import_fitzroy_core.py` (`import_brownlow_round_votes`), fail-closed with a clear message. (9) Tests per §27.26: new `tests/brownlow-entry.test.ts`; extend `tests/match-sheet.test.ts`, `tests/admin-match-mutations.test.ts`, `tests/auth.test.ts` (capabilities), `tests/integration/data-editor.test.ts` (T6/T6b), `tests/integration/privileges.test.ts`; new `tests/integration/admin-brownlow.test.ts` including the deterministic two-connection races and audit-failure rollback; source-contract assertions for the two Python guards in `tests/brownlow-season-artefact.test.ts` and `tests/fitzroy-core-import.test.ts`. Before writing the migration, ask the user to run preflights P1–P12 (§27.20) against `afldb_test` and record the results in the ISSUE-155 entry; stop if P3 or P2-ambiguity is non-zero. Then give the focused commands in this order: `npm run test -- tests/brownlow-entry.test.ts tests/match-sheet.test.ts tests/admin-match-mutations.test.ts tests/auth.test.ts`, then `npm run db:migrate` against `AFLDB_TEST_DATABASE_URL` (the user chooses the exact invocation), then `npm run test -- tests/integration/admin-brownlow.test.ts tests/integration/data-editor.test.ts tests/integration/privileges.test.ts tests/integration/release-gates.test.ts`, then `npm run typecheck`. Record results in `issues.md`, update `IssuesIndex.md`, add an Unreleased `CHANGELOG.md` entry, and stop at the C1 validation gate. Do not start C2.
+
+### 27.26 Handoff contract — C2 (Brownlow Admin UI)
+
+**Session:** fresh; model Sonnet, effort high; same worktree/branch; C1 committed and its integration gate green.
+
+**Prompt:**
+
+> Implement AFLDB-ISSUE-155 Phase C2 exactly as specified in `AFLDB-ISSUE-155.md` §27 (read §27.6–§27.9, §27.14–§27.15, §27.18 and §27.26; C1's `src/db/queries/admin-brownlow.ts` and `src/lib/brownlow/entry.ts` are the fixed contracts — do not change transaction, guard, SQL or audit code). Build: `src/app/admin/brownlow/page.tsx` (season list with status label, expected/final/draft/imported/unresolved counts, authority and last editor via `authSql` email lookup), `src/app/admin/brownlow/[season]/page.tsx` (round grid with per-round completeness, disagreement report for source-published seasons, Super Admin publish panel with ineligible-player multi-select prefilled from current rows, `expectedRevision` hidden field), `src/app/admin/brownlow/[season]/[round]/page.tsx` rendering every H&A match in fixture order with an inline `MatchVoteEditor.tsx` client component per match (teams, date, venue; participants grouped by club with jumper numbers; three type-ahead selects for 3/2/1 that exclude already-chosen players; visible current state, imported values with an Adopt control, participant-incomplete block; Save draft; Finalise / Correct (with reason) / Void for Super Admin, rendered disabled with reason for Admin; success/refusal/stale messages held by the round page so a revalidation does not discard them, and entered values preserved on refusal — the Phase B lessons in §26.20), `src/app/admin/brownlow/actions.ts` (Server Actions: `saveDraft`, `finalise`, `correct`, `void`, `publish`, each calling `requireCapability` per §27.8, parsing ids/revisions/fingerprint from the form, calling the C1 transaction, auditing refusals per §27.13, revalidating per §27.18), keyboard flow (Tab order 3→2→1→Save, Enter submits, focus moves to the next match on success). Add the Data-group nav link in `src/app/admin/nav-model.ts` on `data.brownlow.read`, an overview badge on `/admin` for the current season's incomplete H&A count, and make the match sheet's BV column read-only with a link (§27.15). Tests: extend `tests/auth.test.ts` for the nav; new `tests/admin-brownlow-actions.test.ts` (parse/guard/refusal-audit with the queries mocked, the `tests/admin-lifecycle-actions.test.ts` pattern). Then run the browser acceptance of §27.27 at 1440×900 and 375×812 on DEV, restoring every touched row afterwards, and record the evidence in `issues.md`. Do not start Phase D.
+
+### 27.27 Focused test matrix
+
+**C1 unit (`tests/brownlow-entry.test.ts`, pure):** valid 3/2/1; missing one/two/three selections is draft-valid and final-invalid; same player twice; non-participant id; participant-complete threshold; state transitions (none→draft→final, final→final by correct only, draft→final needs finalise capability flag in the pure model, void rules); fingerprint stability and change; season derivation: ranks, eligible ranks with ineligible players, tied winners, zero-vote exclusion, 3/2/1 game counts, polling games; error-code → message mapping.
+
+**C1 source-contract:** `admin-brownlow.ts` is the only application file mutating the two Brownlow tables; `match-sheet.ts` contains no `brownlow_votes` write; `match-admin.ts`/`data-edits.ts` unchanged assertions; capability table entries; the two Python guards exist (regex on source).
+
+**C1 DB integration (`tests/integration/admin-brownlow.test.ts`, `afldb_test`):** migration objects and privileges; backfill result equals the P2 expectation on the rebuilt test data and both partial unique indexes exist; draft create; draft update; draft on a finalised match refused; finalise writes three manual rows with `match_id`, provenance and the 3/2/1/0 mirror, one `data_edits` row, coverage row updated; correction writes before/after and reason; non-participant, duplicate player, incomplete selection, non-H&A match (Wildcard Final and a Grand Final), no-medal season, participants-incomplete refused with nothing written; stale revision refused; stale fingerprint refused after a simulated settle-style update of an imported row; audit failure rolls back the fact rows; finalise in a **source-published** season leaves `brownlow_season_votes` untouched and the disagreement report shows the delta; publish refused while incomplete or with unresolved rows; publish writes derived rows with manual provenance, ranks/winners/ineligibility, `player_season_stats` and `player_career_stats` updated for affected players, `db-health` reconcile = 0; correction in a **published** season re-derives atomically and bumps `published_revision`; re-publish idempotent; the artefact-loader guard and fitzRoy guard refuse when a manual row exists (executed through a minimal Python invocation if the harness allows, else the source contract); `deleteMatch` on a match with an entry row fails and leaves everything intact; match-sheet save preserves the mirror. **Concurrency:** Admin draft vs Super Admin finalise (loser refused `stale`); two finalisations; correction vs a concurrent correction; two publishes — each with `pg_blocking_pids` proof of the wait.
+
+**Action/auth (`tests/admin-brownlow-actions.test.ts`):** Contributor redirected; Admin can draft, cannot finalise/correct/void/publish (each refused by the guard before the query is called); Super Admin can; capability table and nav visibility agree with the guards; refusal audit written for `stale`/`forbidden`/`already_final` only.
+
+**Browser acceptance (manual, DEV, both widths), as in §26.20:** season list and status labels; round navigation and completeness; rapid entry of two consecutive matches by keyboard only; duplicate prevented (second select excludes the first); non-participant unavailable (not in list) and, via a hand-edited form post, refused by the server; draft save with visible confirmation; Admin sees finalise disabled with reason; Super Admin finalises; stale-tab conflict on the same match shows the stale message and reloads current state; correction with reason; season page shows the round votes after finalise and totals after a DEV-only publish of a test season (then restored); match page mirror; publish refused while incomplete; role-specific controls; no horizontal overflow at 375×812; zero console/runtime errors.
+
+### 27.28 Genuine unresolved decisions
+
+None block C1. Two are settled by preflight rather than by the owner: the `games` semantic for manual season rows (P9) and the §27.6 threshold (P8). One is an owner/operator follow-up outside Phase C: adding the Brownlow tables and manual-owned rows to the promotion/restore lineage (ISSUE-151 pipeline) before any post-Phase-C promotion. Decision 1 of §25 is adopted as Option A by this plan (Admin drafts; Super Admin finalises/publishes), per the owner's Phase C brief.
+
 ## Next action
 
-Phase A and Phase B are complete and validated; both are uncommitted in the worktree and await the operator’s review and commit. The next action is to plan Phase C (Brownlow administration) in a fresh session — model Opus, effort high — reading §10 for intent and §26.20 for the Phase B record before designing it. Phases C–I remain unstarted.
+Phase A and Phase B are complete and validated; Phase C planning is complete (§27, 2026-09-10). Next: implement **Phase C1** in a fresh session — model Opus, effort high — using the §27.25 handoff prompt, beginning with preflights P1–P12. Then **Phase C2** — model Sonnet, effort high — using §27.26. Phases D–I remain unstarted.
