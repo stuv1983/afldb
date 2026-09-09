@@ -1975,3 +1975,166 @@ describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
     });
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase F. The cross-domain composition: one person who
+ * both played and coached. The R0 probe recorded on the issue measured
+ * that NONE of these wordings produced a plan under v38 -- and that one
+ * of them ("played for Richmond and coached Collingwood") reached
+ * validatePlan as a coach_record carrying an opponent, refused there
+ * rather than answered.
+ */
+describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
+  function builders(p: NlQueryPlan): string[] {
+    return p.careerPredicates.map((axis) => axis.builder);
+  }
+
+  // ------------------------------------------------------------------ X1
+
+  describe('X1 -- played and also coached', () => {
+    it.each([
+      'players who also coached',
+      'which players both played and coached',
+      'players who played and coached',
+      'players who played vfl afl and also coached',
+    ])('%s -> has_coached at career grain', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.metric).toBeNull();
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.crossDomainClubs).toBeUndefined();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('"how many" is a count of the same population', async () => {
+      const p = await plan('how many players have played and coached');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(p.agg).toEqual({ kind: 'count' });
+    });
+
+    it('a career metric ranks players WITHIN the composition', async () => {
+      const p = await plan('most career games among players who also coached');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('games');
+      expect(builders(p)).toEqual(['has_coached']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ X2
+
+  describe('X2 -- played for a club and also coached a club', () => {
+    it.each([
+      'players who played for richmond and also coached richmond',
+      'who both played for and coached richmond',
+      'richmond players who also coached richmond',
+    ])('%s -> both clubs as builder parameters', async (question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('1');
+      // THE structural decision of this phase: no scope.clubFor, so the
+      // compiler's generic playing-club filter can never be suppressed by
+      // a coaching predicate.
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Richmond');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the asymmetric form binds two different organizations', async () => {
+      const p = await plan('players who played for richmond and coached collingwood');
+      expect(builders(p)).toEqual(['played_for_club', 'coached_club']);
+      expect(p.careerPredicates[0].params.club).toBe('1');
+      expect(p.careerPredicates[1].params.club).toBe('3');
+      expect(p.crossDomainClubs?.played.name).toBe('Richmond');
+      expect(p.crossDomainClubs?.coached.name).toBe('Collingwood');
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+  });
+
+  // ---------------------------------------------------- temporal declines
+
+  describe('temporal wording declines by name, never silently stripped (D9/F-D2)', () => {
+    it.each([
+      'players who later coached richmond',
+      'players who went on to coach',
+      'players who became a coach',
+      'players who played and then coached',
+      'players who coached after they retired',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('does not record the order');
+    });
+  });
+
+  // -------------------------------------------------- one-sided declines
+
+  describe('a club on one side only declines (F-D3)', () => {
+    it.each([
+      'richmond players who also coached',
+      'players who coached richmond and also played',
+    ])('%s', async (question) => {
+      const parsed = await parse(question);
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('must name the club on');
+    });
+  });
+
+  // -------------------------------------------------- unsupported scope
+
+  describe('scope neither builder owns is refused, never discarded', () => {
+    it('an opponent declines at parse -- this reading clears clubAgainst', async () => {
+      const parsed = await parse('players who played and also coached against carlton');
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toContain('cannot also be scoped to an opponent');
+    });
+
+    it.each([
+      ['a season', 'players who played and also coached in 1990'],
+      ['a venue', 'players who played and also coached at the mcg'],
+      ['a round', 'players who played and also coached in round 5'],
+      ['a match type', 'players who played and also coached in finals'],
+    ])('%s is refused at validatePlan', async (_label, question) => {
+      const parsed = await parse(question);
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan), question).toHaveProperty('error');
+    });
+  });
+
+  // ----------------------------------------------------- boundaries kept
+
+  describe('the boundaries this phase does not move', () => {
+    it('the son-side father-son composition is still deferred (F-D1)', async () => {
+      const parsed = await parse('players selected under the father son rule who also coached');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('a coaching record is still a coaching record', async () => {
+      const p = await plan('richmond coaching record');
+      expect(p.grain).toBe('coach_record');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+    });
+
+    it('coached_by is untouched', async () => {
+      const p = await plan('players coached by damien hardwick');
+      expect(builders(p)).toEqual(['coached_by']);
+    });
+
+    it('premiership_coach is untouched', async () => {
+      const p = await plan('premiership coaches');
+      expect(builders(p)).toEqual(['premiership_coach']);
+    });
+
+    it('"Richmond players coached by Damien Hardwick" still fails the ownership gate', async () => {
+      const parsed = await parse('richmond players coached by damien hardwick');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+  });
+});

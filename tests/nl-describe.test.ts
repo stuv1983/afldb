@@ -895,3 +895,116 @@ describe('family-relationship answers (AFLDB-ISSUE-152 Phase D)', () => {
     expect(answerCaveats(other, listPayload)).toEqual([]);
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase F wording. Two rules this block exists to hold.
+ *
+ * The answer says "also", never "later": AFLDB does not own the order of
+ * a person's playing and coaching careers, and a sentence that implied it
+ * would claim a fact the SQL never checked (D9/F-D2).
+ *
+ * And the answer states its own cap out loud. 365 people both played and
+ * coached; the list shows 100. A footer under a table is not the answer
+ * saying so (D20).
+ */
+describe('played-and-coached answers (AFLDB-ISSUE-152 Phase F)', () => {
+  const RICHMOND = { organizationId: 18, slug: 'richmond', name: 'Richmond' };
+  const COLLINGWOOD = { organizationId: 4, slug: 'collingwood', name: 'Collingwood' };
+
+  function crossDomainPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [{ builder: 'has_coached', params: {} }],
+      ...overrides,
+    });
+  }
+
+  const rows = [careerRow({ value: null })];
+  const listPayload = { kind: 'player_career' as const, lead: rows[0], rows, total: 365 };
+
+  it('X1 says what the composition was', () => {
+    const { headline, interpretation } = describeAnswer(crossDomainPlan(), listPayload);
+    expect(headline).toBe('365 players match');
+    expect(interpretation).toBe('Players who played VFL/AFL and also coached.');
+    expect(interpretation).not.toContain('every condition');
+  });
+
+  it('X2 names both clubs, each on its own side of the sentence', () => {
+    const { interpretation } = describeAnswer(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '18' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+    }), { kind: 'player_career', lead: rows[0], rows, total: 27 });
+    expect(interpretation).toBe('Players who played for Richmond and also coached Richmond.');
+  });
+
+  it('the asymmetric form keeps the two clubs apart', () => {
+    const { interpretation } = describeAnswer(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '4' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: COLLINGWOOD },
+    }), { kind: 'player_career', lead: rows[0], rows, total: 3 });
+    expect(interpretation).toBe('Players who played for Richmond and also coached Collingwood.');
+  });
+
+  it('a ranked composition says what it ranked WITHIN', () => {
+    const ranked = [careerRow({ displayName: 'Michael Tuck', value: 426, games: 426 })];
+    const { headline, interpretation } = describeAnswer(
+      crossDomainPlan({ metric: 'games', agg: { kind: 'max' } }),
+      { kind: 'player_career', lead: ranked[0], rows: ranked, total: 1 },
+    );
+    expect(headline).toBe('Michael Tuck — 426 games');
+    expect(interpretation).toBe('Highest career games among players who played VFL/AFL and also coached.');
+  });
+
+  it('never says "later", in any branch', () => {
+    const sentences = [
+      describeAnswer(crossDomainPlan(), listPayload),
+      describeAnswer(crossDomainPlan({
+        careerPredicates: [
+          { builder: 'played_for_club', params: { club: '18' } },
+          { builder: 'coached_club', params: { club: '4' } },
+        ],
+        crossDomainClubs: { played: RICHMOND, coached: COLLINGWOOD },
+      }), listPayload),
+      describeAnswer(crossDomainPlan({ metric: 'games', agg: { kind: 'max' } }), listPayload),
+    ];
+    for (const { headline, interpretation } of sentences) {
+      expect(`${headline} ${interpretation}`.toLowerCase()).not.toContain('later');
+    }
+    expect(answerCaveats(crossDomainPlan(), listPayload).join(' ').toLowerCase()).not.toContain('later');
+  });
+
+  // --------------------------------------------------------- D20, reused
+
+  it('states the cap in the answer itself: 100 of 365', () => {
+    const hundred = Array.from({ length: 100 }, () => careerRow({ value: null }));
+    const caveats = answerCaveats(crossDomainPlan(), {
+      kind: 'player_career', lead: hundred[0], rows: hundred, total: 365,
+    });
+    expect(caveats).toHaveLength(1);
+    expect(caveats[0]).toContain('365 players qualify');
+    expect(caveats[0]).toContain('first 100 of them');
+  });
+
+  it('says nothing when the whole list is shown', () => {
+    const twentySeven = Array.from({ length: 27 }, () => careerRow({ value: null }));
+    expect(answerCaveats(crossDomainPlan({
+      careerPredicates: [
+        { builder: 'played_for_club', params: { club: '18' } },
+        { builder: 'coached_club', params: { club: '18' } },
+      ],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+    }), { kind: 'player_career', lead: twentySeven[0], rows: twentySeven, total: 27 })).toEqual([]);
+  });
+
+  it('invents no coaching-completeness claim in either direction', () => {
+    const caveats = answerCaveats(crossDomainPlan(), listPayload).join(' ');
+    expect(caveats).not.toContain('complete');
+    expect(caveats).not.toContain('curated');
+  });
+});

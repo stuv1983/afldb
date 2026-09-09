@@ -9,7 +9,7 @@
 | Base SHA | `c2761e64e9089f9e38572145e67a6ab2fee0fe12` (`Merge branch 'opus/issue-110-semantic-closeout'`) |
 | Base freshness | `main` is AT that SHA — it has not advanced. `git merge-base HEAD main` = the same commit. |
 | Parser baseline | `PARSER_VERSION` **34** (`src/search/nl/plan.ts:312`). **Not incremented by Stage 0.** |
-| Status | **OPEN — PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASE D (UNBLOCKED HALF: C2/C3/C4/FS4) IMPLEMENTED, RENDERED AND GREEN 2026-09-09 — P5-r2 319/319 AND A FRESH P4-r1 1,495/1,495 (§24), UNCOMMITTED; PHASE F NOT STARTED.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 SATISFIED by the authorised `afldb_test` load (§18.2); D6/D8 deferred to AFLDB-ISSUE-153. Implementations: **§14** Phase B (`e8f5f67`), **§16** Phase C (`47a645f`), **§18** Phase E (`75d207d`) — §17 is superseded by §18. **§19–§21 record Phase G**: P3-r2 **271/271** and P4-r1 **1,495/1,495**, both with every transport gate at zero (§21.3, §21.4). **§22–§24 record Phase D's unblocked half**: `PARSER_VERSION` 38, six new grid builders, no migration, 67 new DB-free cases and 20 DB-backed ones green, and the rendered acceptance now COMPLETE — **P5-r2 319/319** (238 answered / 21 unanswerable / 60 absent, every transport counter at zero, 4/4 batches) and a **fresh P4-r1 1,495/1,495** (1,435 + 60, unchanged), with **D20 ACCEPTED** as capped-list disclosure. **P5 attempt 1 was INADMISSIBLE** — a stale pre-Phase-D standalone build — and a fresh discriminator proved Phase D rendering before P5-r2 (§24.1, §24.2). Historical Phase G P3/P4 evidence is untouched (§24.5). The issue stays OPEN for the **blocked Phase D half** (C1, C5/C6, FS1–FS3, FS6 and D6/D8, with AFLDB-ISSUE-153), **Phase F** (gated on B–D), the **uncommitted working tree**, and the **un-run deploy steps** — migrations **092 and 093 must both reach `afldb_dev` and production BEFORE the code**. |
+| Status | **OPEN — PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASE D (UNBLOCKED HALF: C2/C3/C4/FS4) IMPLEMENTED, RENDERED AND GREEN 2026-09-09 — P5-r2 319/319 AND A FRESH P4-r1 1,495/1,495 (§24), UNCOMMITTED; PHASE F PLANNED 2026-09-09 (runbook §25) — NOT STARTED, NOT AUTHORISED TO CODE.** Inventory complete, semantic contract approved, **evidence gate executed and GREEN (2026-09-08)**, **operator decisions final (2026-09-08, §7)**: D1–D5, D7, D9 approved; D10 partially approved; D11 SATISFIED by the authorised `afldb_test` load (§18.2); D6/D8 deferred to AFLDB-ISSUE-153. Implementations: **§14** Phase B (`e8f5f67`), **§16** Phase C (`47a645f`), **§18** Phase E (`75d207d`) — §17 is superseded by §18. **§19–§21 record Phase G**: P3-r2 **271/271** and P4-r1 **1,495/1,495**, both with every transport gate at zero (§21.3, §21.4). **§22–§24 record Phase D's unblocked half**: `PARSER_VERSION` 38, six new grid builders, no migration, 67 new DB-free cases and 20 DB-backed ones green, and the rendered acceptance now COMPLETE — **P5-r2 319/319** (238 answered / 21 unanswerable / 60 absent, every transport counter at zero, 4/4 batches) and a **fresh P4-r1 1,495/1,495** (1,435 + 60, unchanged), with **D20 ACCEPTED** as capped-list disclosure. **P5 attempt 1 was INADMISSIBLE** — a stale pre-Phase-D standalone build — and a fresh discriminator proved Phase D rendering before P5-r2 (§24.1, §24.2). Historical Phase G P3/P4 evidence is untouched (§24.5). The issue stays OPEN for the **blocked Phase D half** (C1, C5/C6, FS1–FS3, FS6 and D6/D8, with AFLDB-ISSUE-153), **Phase F** (gated on B–D), the **uncommitted working tree**, and the **un-run deploy steps** — migrations **092 and 093 must both reach `afldb_dev` and production BEFORE the code**. |
 | Migration | **One — `092_nl_search_log_coach_record_grain.sql` (Phase B, F5).** Stage 0's "none proposed" is superseded by implementation evidence (§14.6): the ninth `NlGrain` cannot be admitted without extending the `nl_search_log.grain` CHECK. Applied to `afldb_test` and verified 2026-09-08. |
 | Found | 2026-09-08 |
 | Evidence executed | 2026-09-08, `afldb_test` over the operator's `55432` tunnel, read-only, `ROLLBACK`. Production untouched. |
@@ -4955,3 +4955,953 @@ for the operator to stage.
 
 **Do not resolve ISSUE-152 on this evidence.** No Git write, commit, merge or
 deploy was performed in this slice.
+
+---
+
+## 25. Phase F — cross-domain composition implementation plan (PLAN ONLY, NOT IMPLEMENTED)
+
+> **SUPERSEDED BY §26 (2026-09-09).** This section is the plan and remains
+> the contract Phase F was built against; §26 records what was built, the
+> five recorded deviations, and what is still outstanding. The status line
+> below describes this section, not the phase.
+
+**Status: PLANNED. Phase F has NOT started.** No executable source, migration,
+corpus, test or `PARSER_VERSION` change was made by this section. The measured
+`afldb_test` evidence of **2026-09-09** (F0–F8, recorded verbatim in §25.2) is
+the authoritative semantic basis and is not re-derived below.
+
+Gate satisfied: §9 requires B–D green before F. **B (§14), C (§16), E (§18), G
+(§21) and D's unblocked half (§22–§24) are green**; D's remaining half is
+formally deferred to `AFLDB-ISSUE-153` and is **not** a Phase F dependency —
+none of C1, FS1, FS2, FS3, FS6, D6 or D8 supplies a predicate, a plan field or
+a vocabulary rule that X1, X2 or X3 consumes, except through the single explicit
+boundary named in **F-D1** (§25.13).
+
+### 25.1 Exact scope recovered from the issue
+
+Phase F owns exactly the three **X** families of §5.1, plus one Phase-B
+deferral that §13.15(4) and §13.6 assigned to it by name:
+
+| ID | Family | Source | IN Phase F |
+|---|---|---|---|
+| **X1** | Played AFL/VFL **and also coached** | §5.1, §5.2 F, D9 | **IN** |
+| **X2** | Played for club X **and also coached** club X (or another club) | §5.1, §5.2 F, D9 | **IN** |
+| **X3** | Father–son **selected** player who **also coached** | §5.1, §5.2 F, D9, §6.3 | **IN — conditionally, see F-D1** |
+| **§13.15(4)** | "Richmond players coached by Damien Hardwick" — the `coached_by` + club ownership failure | §13.15(4): "It needs the `coached_club(org)` builder, which is **Phase F**. Declines until then." | **IN** |
+| **§13.6 / A9 fallback** | "coached more than one club" if A9 had not shipped in Phase B | §13.6 | **OUT — moot.** A9 shipped in Phase B; the `organizations` metric exists on `coach_record`. Nothing carries over. |
+
+Explicitly **OUT** of Phase F, unchanged and still declining:
+
+- **"later"** in any form (D9, §11) — see §25.7.
+- **C1, FS1, FS2, FS3, FS6, D6, D8** — `AFLDB-ISSUE-153`. Phase F introduces no
+  wording, builder or plan field for any of them, and their existing named
+  decline rows are untouched.
+- **C5/C6**, sisters, twins, cousins, grandparents, in-laws, mothers — Phase D
+  boundaries, untouched.
+- Season, venue, opponent, round and match-type scope on any cross-domain
+  question (§25.9).
+- Any coach-versus-coach, assistant/caretaker, representative-side or
+  coaching-tenure semantics (§13.15(6)–(8)).
+- **Premiership players who became coaches**, if read as "premiership **as a
+  player**": that is `premiership_coach` inverted and is *not* what §5.1 X2
+  names. §5.1's X2 title is the evidence pack's label; **F2's measured
+  population is the club-composition question** (played Richmond ∧ coached
+  Richmond, 27), and that is what Phase F implements. The premiership reading
+  is a different question with no measured population and is **OUT**.
+
+### 25.2 Measured basis (2026-09-09, `afldb_test`, read-only, `afldb_app`)
+
+Executed over the 127.0.0.1:55432 tunnel on one reserved backend under
+`default_transaction_read_only=on`, `BEGIN TRANSACTION READ ONLY` … `ROLLBACK`.
+Production untouched. **These are facts; Phase F does not re-measure them.**
+
+| Ref | Fact | Value |
+|---|---|---|
+| **F0** | `coaches` rows / player-linked / coach-only | **386 / 368 / 18** |
+| F0 | linked coaches whose player has AFL/VFL games | **368** (zero-game linked: **0**) |
+| F0 | player ids linked to more than one coach row | **0** |
+| **F1** | **X1 — played AND actually coached (`match_coaches` evidence)** | **365** |
+| F1 | the weaker `coaches`-identity-only seam | 368 — **NOT the X1 semantic** |
+| **F2** | **X2 — played Richmond ∧ coached Richmond** | **27** |
+| F2 | Richmond `organization_id` / raw `club_ids` | **18** / `[18]` |
+| F2 | coached Richmond, never played Richmond | **14** (Yze, Jeans, McQualter, Hardwick, Frawley, Rawlings, Gieschen, Walls …) |
+| F2 | linked players who coached Richmond, played anywhere | **41** |
+| **F3** | **X3 — father–son selection ∧ coached** | **1** — **Rhyce Shaw**, player 10974, coach 233, father 10853, selection club 5, draft year 1999 |
+| F3 | father–son selections / selected unlinked / father unlinked | 127 / 28 / 4 |
+| **F4** | raw club identities ≠ organizations for real coaches | Pagan **3/2**, Wallace **3/2**, Laidley **2/1**; Minogue 5 orgs, Northey 5, Malthouse 4, Blight 4, Barassi 4, Hafey 4, Walls 4 |
+| **F5** | of the 365: coaching began strictly after the playing career | **238**; began before or during: **127**; chronology missing: **0** |
+| **F6** | duplicate display names within X1 / across coaches | **0 / 0** |
+| **F8** | negative witnesses available | player-linked coaches with no father–son selection (Kingsley, Simpson, Yze, Clarkson, Jeans); players with no coaching record (Aaron Black ×2, Cadman, Davey, Cerra) |
+
+Top X1 witnesses (playing games / coached games): Malthouse 174/718, McHale
+261/713, Sheedy 251/678, Jeans 77/576, Hafey 67/522, Parkin 211/518, Barassi
+254/515, Matthews 332/461.
+
+X2 witnesses (Richmond playing / Richmond coached): Hafey 67/248, Dyer 311/222,
+Bentley 263/133, Hughes 87/120, Jewell 80/113, Minogue 94/101, Wallace 11/99,
+Bartlett 403/88.
+
+**Three consequences that drive the whole design:**
+
+1. **F1 vs the 368 seam.** A `coaches` row is an identity, not proof that the
+   person coached a match. X1 must be `match_coaches`-backed. `premiership_coach`
+   already reads `coaches ⋈ match_coaches` and is the shape to copy; a naive
+   `EXISTS (SELECT 1 FROM coaches WHERE player_id = p.id)` returns **368** and
+   is the exact regression the oracle suite must forbid.
+2. **F4 kills raw club equality.** `match_coaches.club_id` is a raw historical
+   identity. Any coached-club scope must fold through
+   `clubs.organization_id`, exactly as §13.6 requires for `coach_record`.
+3. **F5 is why "later" still declines.** Chronology is *derivable* (238 vs 127,
+   0 missing) — and that is precisely the trap. D9 declined "later" because the
+   ordering is **not a stored, owned semantic**, not because it is
+   uncomputable. Phase F does **not** reopen D9 (§25.7).
+
+### 25.3 Operator matrix
+
+Common to all three families: grain `player_career`, `agg: 'list'`,
+`metric: null` unless a career metric is separately named, result grain **one
+row per canonical player id**, identity keyed by `playerId` (F6 changes
+nothing — §25.8), tie behaviour inherited from the existing
+`rank()`-with-ties + `dedupeByIdentity` path, and the D20 capped-list
+disclosure contract (§25.11).
+
+#### X1 — played and also coached
+
+| Aspect | Contract |
+|---|---|
+| Approved wording | "players who also coached", "players who went on to coach"¹, "which players both played and coached", "players who played and coached", "how many players have played and coached" |
+| Mandatory decline | any "**later**" / "**afterwards**" / "**after they retired**" / "**before they coached**" temporal wording (§25.7); "premiership players who became coaches" (no measured population, §25.1) |
+| Parser ownership | new cross-domain reading `coachReading = 'coached_population'`, elected inside the existing §1684 coaching block, **before** `coach_record` (§25.8) |
+| Plan shape | `grain: 'player_career'`, `careerPredicates: [{ builder: 'has_coached', params: {} }]`, no `scope.clubFor` |
+| Result grain | canonical players, one row each |
+| Builder | **NEW `has_coached`**, parameterless (§25.4) |
+| Coach/player seam | `coaches.player_id IS NOT NULL AND link_status_value = 'unique'` **AND** an actual `match_coaches` row — population **365**, never 368 |
+| Club ownership | none; `scope.clubFor` present ⇒ **refuse** (`has_coached` owns no club) |
+| SQL ownership | `has_coached` alone |
+| Rendering | "Players who also played and coached." Never "later". |
+| List / rank / count | `list` by default; `count` when the reader asks "how many"; a career metric ("most games among players who also coached") is admitted through the existing ranked path — this is **ranking players by a career metric**, not ranking the composition |
+| Ties | existing `rank()`-with-ties; `dedupeByIdentity` on `playerId` |
+| D20 | **365 > 100 ⇒ mandatory.** True total 365, 100 rows, explicit "Showing 100 of 365" caveat, silent truncation prohibited |
+
+¹ "went on to coach" is **temporal wording** and is listed here only to be
+refused. See F-D2 (§25.13) — the recommendation is to **decline** it with the
+"later" family. It is written into this row so the ambiguity is decided
+deliberately rather than by regex accident.
+
+#### X2 — played for a club and also coached a club
+
+| Aspect | Contract |
+|---|---|
+| Approved wording | "players who played for Richmond and also coached Richmond", "who both played for and coached Richmond", "Richmond players who also coached Richmond", "players who played for Richmond and coached Collingwood" (asymmetric, same shape) |
+| Mandatory decline | "later"/"went on to" wording; a club named on only one side with the other side unstated ("Richmond players who also coached" — see F-D3, §25.13); any season/venue/opponent/round/match-type scope |
+| Parser ownership | the same cross-domain reading, plus **role-scoped club extraction**: the playing club and the coached club are extracted as two independently-bound organizations |
+| Plan shape | `grain: 'player_career'`, `careerPredicates: [{ builder: 'played_for_club', params: { club: '<orgA>' } }, { builder: 'coached_club', params: { club: '<orgB>' } }]`, **`scope.clubFor` left UNSET** |
+| Result grain | canonical players, one row each |
+| Builders | `played_for_club` **REUSED unchanged** (existing, org-lineage, `grid-solver.ts:255`) + **NEW `coached_club(club)`** |
+| Coach/player seam | as X1 — `coaches.player_id` linked *and* a `match_coaches` row for that organization |
+| Club ownership | **both clubs are builder parameters.** `scope.clubFor` is never set, so `careerPredicatesOwnClubFor` is never consulted and the generic playing-club `EXISTS` at `player-career.ts:155` is never emitted (§25.5 — this is the single most important structural decision in Phase F) |
+| SQL ownership | `played_for_club` owns the playing org; `coached_club` owns the coached org; nothing else reaches SQL |
+| Rendering | "Players who played for Richmond and also coached Richmond." Both club names always stated, on their own side of the sentence |
+| List / rank / count | `list`; `count` on "how many"; career-metric ranking admitted as for X1 |
+| Ties | as X1 |
+| D20 | 27 is under the cap; the contract still applies unconditionally and fires for a larger organization |
+
+#### X3 — father–son selected player who also coached
+
+| Aspect | Contract |
+|---|---|
+| Approved wording | **explicit draft-rule wording only**, and only in composition with the coaching conjunct: "players selected under the father–son rule who also coached", "which father–son rule selections went on to coach"¹ |
+| Mandatory decline | every bare/vague father–son form (D8, unchanged); the same wording **without** the coaching conjunct (that is FS1, still blocked); "later"/temporal wording; ranking wording of any kind |
+| Parser ownership | a **son-side explicit-rule cue admitted only when the cross-domain coaching conjunct is present** (§25.8 step 4), otherwise the D8 guard at `vocab.ts:1074` stands unchanged |
+| Plan shape | `careerPredicates: [{ builder: 'father_son_selection', params: {} }, { builder: 'has_coached', params: {} }]` |
+| Result grain | canonical players; an **unlinked** selected player is a name in the source and can be no one (28 of 127 are unlinked) |
+| Builders | `father_son_selection` **REUSED unchanged** (`grid-solver.ts:1279`, linked rows only) + `has_coached` |
+| Club ownership | none; a club with X3 ⇒ refuse |
+| SQL ownership | the two builders, ANDed |
+| Rendering | "Players selected under the father–son rule who also coached." |
+| List / rank / count | **LIST ONLY.** `count` is admissible ("how many"), `max`/`min`/`top_n` are **refused** (§25.10) |
+| Ties | not applicable — no ranking exists to tie |
+| D20 | population **1**; the contract applies and never fires |
+
+¹ again temporal — refused under F-D2 unless the operator decides otherwise.
+
+### 25.4 Builder decision — two new builders, two reuses, one rejection
+
+**Decision: Phase F adds exactly TWO new Grid Solver builders —
+`has_coached` (parameterless) and `coached_club(club)` — and reuses
+`played_for_club` and `father_son_selection` unchanged.** Catalogue **164 → 166**.
+
+**What `coached_by` owns, and why it cannot serve.** `coached_by`
+(`grid-solver-spec.ts:340`, `grid-solver.ts:935`) takes **`coach` and nothing
+else**, and answers *"players who were coached by this coach"* — its SQL joins
+`player_match_stats` to `match_coaches` on `(match_id, club_id)` and filters
+`mc.coach_id = $1`. Three independent reasons it cannot represent Phase F:
+
+1. **Wrong subject.** Its result set is the coach's *players*, not the coach.
+   X1/X2/X3 ask about people who **were** the coach.
+2. **Wrong parameter.** It owns a *coach id*. It owns no club, which is exactly
+   the §13.15(4) ownership failure: with `coached_by` in the predicate list a
+   `scope.clubFor` is consumed by nothing and would reach SQL as nothing at all
+   (ISSUE-110 finding B). §13.15(4) already names `coached_club(org)` as the
+   Phase F fix.
+3. **Wrong seam.** It never touches `coaches.player_id`, so it cannot express
+   the player↔coach identity link at all.
+
+**Overloading it is prohibited** — adding an optional club parameter would give
+one builder two meanings ("coached by X" and "coached club Y"), which is the
+ISSUE-110 two-spellings-of-one-question defect the catalogue exists to prevent.
+
+**Why organization lineage must live inside the builder.** F4 measures the
+divergence on real coaches (Pagan 3 raw / 2 orgs, Wallace 3/2, Laidley 2/1). If
+the caller folded, every future caller would have to fold identically;
+`match_coaches.club_id` is the raw historical identity and §13.6 already makes
+folding the compiler's job. `coached_club` therefore takes the **organization
+id** — the same `club()` param type `played_for_club`, `club_captain` and
+`first_kick_goal_for_club` already take, whose `NlClubRef.organizationId`
+(`plan.ts:381`) is already lineage-level — and folds inside its own SQL. A
+rename folds; a merger never does; both follow from `organization_id` with no
+special case.
+
+**Does X1 need its own predicate, or can it reuse something?** It needs
+`has_coached`. Nothing existing expresses "this player coached at least one
+match": `premiership_coach` is a strictly narrower feat (Grand Final winner),
+`coached_by` is the wrong subject, and `coached_club` requires a club the X1
+question does not supply. `has_coached` is `coached_club` with the club
+predicate dropped — deliberately a separate parameterless key rather than an
+optional parameter, matching how `club_captain` / `club_captain_any` are two
+keys in the same catalogue.
+
+**Can X2 be two independent predicates on `player_career`?** **Yes, and it
+must be.** `played_for_club(orgA)` ∧ `coached_club(orgB)` is a conjunction of
+two independently-compiled `EXISTS`/`IN` fragments over `p.id`, which is
+exactly what `careerPredicates` is (§5.2 F: "a coaching predicate would be one
+more"). It also makes the asymmetric question ("played for Richmond, coached
+Collingwood") free, and it keeps each club owned by the builder that uses it.
+
+Proposed SQL, mirroring `premiership_coach`'s existing seam and
+`club_captain`'s existing lineage fold:
+
+```sql
+-- has_coached: played is asserted by the grid's own p.id domain; this
+-- predicate asserts only that the person actually coached a match.
+-- 365 with the match_coaches join; 368 without it (F1/F7).
+p.id IN (SELECT c.player_id
+           FROM coaches c
+           JOIN match_coaches mc ON mc.coach_id = c.id
+          WHERE c.player_id IS NOT NULL
+            AND c.link_status_value = 'unique')
+
+-- coached_club(<organization id>): the same seam, folded to a lineage.
+p.id IN (SELECT c.player_id
+           FROM coaches c
+           JOIN match_coaches mc ON mc.coach_id = c.id
+          WHERE c.player_id IS NOT NULL
+            AND c.link_status_value = 'unique'
+            AND mc.club_id IN (SELECT id FROM clubs WHERE organization_id = $1))
+```
+
+`link_status_value = 'unique'` is `premiership_coach`'s own rule
+(`grid-solver.ts:944`) and is reused verbatim: F0 measures 368 unique links and
+**0** player ids linked to more than one coach row, so the rule costs nothing
+and keeps one identity contract across the catalogue.
+
+**Group placement:** both go in the existing `Coaching` group beside
+`coached_by` and `premiership_coach`. **No migration. No new table. No new
+column.**
+
+### 25.5 Grain and plan decision — no new grain, no new plan field, no migration
+
+**Decision: everything stays on `player_career` + `careerPredicates`. Phase F
+adds no grain, no plan field, no migration.**
+
+Proof against the current type/validation/compiler contract:
+
+- **Type.** `careerPredicates: GridAxisState[]` (max 8, `NL_LIMITS`) already
+  carries parameterised builders; `has_coached` (0 params) and
+  `coached_club` (1 club param) are ordinary members. Phase D needed
+  `relationshipSubject` only because a *named person* had to be echoed back in
+  the sentence; Phase F names no person that the predicates do not already bind
+  as an organization.
+- **Validation.** The ownership machinery Phase F needs already exists:
+  `NL_CAREER_CLUB_OWNING_BUILDERS` / `careerPredicatesOwnClubFor`
+  (`plan.ts:1203,1247`) and the `player_career` refusals at `plan.ts:1743`,
+  `:1771`, `:1790`.
+- **Compiler.** `answerPlayerCareer` compiles predicates through `compileAxis`,
+  the grid solver's own catalogue, so two new builders are reachable with **no
+  compiler change at all** (`player-career.ts` is not edited).
+- **Rendering.** `answerCaveats` and `describePlayerCareerAnswer` already carry
+  the capped-list contract and the "among …" ranked wording; Phase F extends the
+  predicate→phrase maps, not the payload shape.
+
+**The one structural trap, and the decision that avoids it.** If `coached_club`
+were added to `NL_CAREER_CLUB_OWNING_BUILDERS` and X2 were expressed as
+`scope.clubFor = Richmond` + `coached_club(18)`, then
+`careerPredicatesOwnClubFor` returns true and `player-career.ts:155`
+**suppresses the generic playing-club `EXISTS`** — silently answering "coached
+Richmond" (41) instead of "played Richmond and coached Richmond" (27). The
+suppression is correct for `first_kick_goal_for_club`, where the feat implies
+playing for the club; it is **wrong** for coaching, where F2 measures 14 people
+who coached Richmond without ever playing there.
+
+**Therefore:**
+
+- **X2 sets no `scope.clubFor` at all.** Both clubs are builder parameters.
+- **`coached_club` is NOT added to `NL_CAREER_CLUB_OWNING_BUILDERS`.** It never
+  needs to be, because it never coexists with `scope.clubFor` — and if a future
+  parser bug ever produced that combination, the existing `plan.ts:1743` refusal
+  fires and the question declines instead of answering the wrong one. Leaving it
+  out is the fail-closed choice.
+- A new named test asserts precisely this: a plan with `scope.clubFor` set
+  **and** `coached_club` present is **refused**.
+
+### 25.6 Club ownership rules (binding)
+
+- Every coached-club scope compiles to
+  `mc.club_id IN (SELECT id FROM clubs WHERE organization_id = $1)` —
+  never `mc.club_id = $1`, never a raw `clubs.id`.
+- The bound value is `NlClubRef.organizationId`, already lineage-level
+  (`plan.ts:381`); no lookup is added.
+- Renames fold, mergers never do — automatic from `organization_id`.
+- F4's Pagan / Wallace / Laidley witnesses are pinned in the oracle suite
+  (§25.12 T7) as the regression that catches a raw-id reintroduction.
+
+### 25.7 Temporal boundary — "also" ships, "later" declines
+
+**D9 is not reopened.** F5 makes chronology *derivable* (238 after, 127
+before-or-during, 0 missing) and that changes nothing: the decline stands
+because no builder, plan field or renderer **owns** a temporal ordering between
+a playing and a coaching career. Supporting "later" would be a separate,
+deliberate ownership/design decision — a new builder with its own measured
+contract — and Phase F does not take it.
+
+**Where the refusal lives — parser, by name, never a silent strip:**
+
+- A new `CROSS_DOMAIN_TEMPORAL_RE` in `vocab.ts` matching
+  `later`, `went on to`, `afterwards`, `after (?:he |they )?retired`,
+  `after (?:his|their) playing (?:career|days)`, `subsequently`, `then coached`,
+  `before (?:he |they )?coached`.
+- Checked **inside the cross-domain reading, before any predicate is emitted**,
+  and returning the existing named-decline shape used at `parser.ts:1928`:
+  `report.confidence = 1`, a stated note, `{ status: 'none', reason: 'unrecognised' }`.
+- The stated note is the honest one:
+  *"AFLDB does not record the order of a person's playing and coaching careers,
+  so it cannot answer whether one came after the other. Ask instead who both
+  played and coached."*
+- **The words are never consumed and never stripped.** A silent strip would turn
+  "players who later coached Richmond" into the *different* question the
+  evidence pack itself got wrong (§5.3.F: §6.1 is titled "later" and its SQL has
+  no temporal predicate at all). That failure mode is the reason D9 exists.
+- `validatePlan` carries the second half of the same invariant as a
+  belt-and-braces refusal: **no plan may carry a temporal marker field**, because
+  none exists — nothing to check, and nothing may be added.
+
+### 25.8 Parser extraction order (one bump: v38 → **v39**)
+
+Exactly **one** `PARSER_VERSION` bump for Phase F, documented in the `plan.ts`
+history comment as every prior phase did.
+
+The collision risk is concrete and must be measured before anything is written:
+`COACH_CUE_RE` (`vocab.ts:290`) matches the bare word **"coached"**, so *today*
+"players who played for Richmond and also coached Richmond" enters the §1684
+coaching block, elects `coachReading = 'coach_record'`, finds no coach in the
+directory, and reaches grain election with `scope.clubFor = Richmond` already
+consumed by `extractClubs` (§1625) — `structuralOk` is **true** on
+`!!scope.clubFor`. Whether that currently declines rests entirely on the
+leftover-token confidence ratio. **This is a red-before-green probe, not an
+assumption** — see §25.14 R0.
+
+Ordering, as a numbered contract:
+
+1. **Clubs (§1625) and seasons (§1659) stay where they are.** Unchanged. The
+   clubs the cross-domain reading needs are already extracted, with their roles
+   and text positions available from `ClubExtraction`.
+2. **The cross-domain reading is elected FIRST inside the §1684 coaching
+   block** — before `coached_by`, before `premiership_coach`, before
+   `coach_record`. Its cue is a **composition cue**
+   (`\b(?:also|both)\b` adjacent to a playing/coaching pair, `played and coached`,
+   `both played and coached`, `played .* and (?:also )?coached`), not the bare
+   `COACH_CUE_RE`. Electing after `coach_record` would be useless: `coach_record`
+   is the block's fallthrough and would already have claimed the question.
+3. **The temporal refusal (§25.7) runs immediately after election and before any
+   predicate is emitted.** "Players who later coached Richmond" must decline
+   *as a cross-domain question with a stated reason*, not as an unrecognised
+   token soup.
+4. **The X3 son-side cue runs only inside the cross-domain reading** (subject to
+   **F-D1**), after the temporal refusal. Outside it, `FATHER_SON_RULE_RE`'s D8
+   guard (`vocab.ts:1074`) is **untouched** and FS1/FS2/FS3/FS6 keep declining
+   on their own leftover tokens exactly as §22 left them.
+5. **Club-role assignment.** The playing club is the organization named on the
+   playing side of the composition; the coached club is the one on the coaching
+   side. One club named for both sides binds both parameters to the same org
+   (the Richmond case, 27). Ambiguity here is a **decline**, not a guess
+   (F-D3, §25.13).
+6. **`extractRelationship` (§1925) is unchanged and still runs after.** A
+   cross-domain plan that reached it would already have consumed its cues.
+7. **The generic player-name scan is unchanged and still runs after the coaching
+   block** — the §1684 comment's whole point: 368 of 386 coaches share a name
+   with a player, and X1/X2/X3 name **no person at all**, so no coach or player
+   name may be resolved by them. A cross-domain question that *does* carry a
+   person name (F-D3's "did Mick Malthouse play and coach") is out of Phase F
+   scope in this plan and declines.
+8. **Match type, round, venue, opponent extraction unchanged.** Anything they
+   set on a cross-domain plan is refused in `validatePlan` (§25.9), never
+   dropped.
+9. **Grain election (§2348) gains one branch:** `coachReading ===
+   'coached_population'` ⇒ `grain = 'player_career'`, placed **before** the
+   `coachReading === 'coach_record'` branch. `structuralOk`'s existing
+   `player_career` clause already accepts `careerPredicates.length > 0`, so no
+   confidence-model change is needed.
+10. **`careerPredicates` emission** joins the existing block at `parser.ts:2770`
+    beside `coached_by` / `premiership_coach`.
+
+### 25.9 `validatePlan` ownership — fail-closed rules
+
+Every rule below refuses; none drops a filter. No scope reaches SQL unless a
+compiler or builder explicitly owns it.
+
+| # | Condition | Refusal |
+|---|---|---|
+| V1 | `coached_club` present **and** `scope.clubFor` set | "This kind of career question cannot be limited to one club." — the existing `plan.ts:1743` rule, which fires because `coached_club` is deliberately **not** in `NL_CAREER_CLUB_OWNING_BUILDERS` (§25.5) |
+| V2 | any cross-domain predicate **and** `scope.seasonMin`/`seasonMax` | existing `plan.ts:1790` — neither new builder owns a season, so a season range fails closed |
+| V3 | any cross-domain predicate **and** `scope.venue` / `clubAgainst` / `matchType` / `roundNumber` | existing `plan.ts:1771` career-scope refusal |
+| V4 | `has_coached` **and** `scope.clubFor` | V1's rule; `has_coached` owns no club either |
+| V5 | `has_coached` **and** `coached_club` in one plan | **new** — "A coaching question already scoped to a club must not also ask the unscoped one." Prevents a redundant/contradictory pair reaching SQL |
+| V6 | `father_son_selection` present **and** `agg.kind` is `max`, `min` or `top_n` | **new** — "A father–son selection question is a list, not a ranking." (D9: X3 is a list, never a ranking) |
+| V7 | `father_son_selection` present **without** a coaching predicate | **new, and the F-D1 boundary made explicit** — "AFLDB cannot yet answer what 'father–son' means on its own." FS1 stays blocked |
+| V8 | any bare/vague father–son wording | unchanged — never reaches `validatePlan`; the parser's D8 guard stops it |
+| V9 | grain is `coach_record` **and** a cross-domain predicate is present | **new** — the coach-only grain (18 coach-only people, F0) must never leak into player-career semantics, and vice versa |
+| V10 | any cross-domain predicate at a grain other than `player_career` | **new** — "A question about who both played and coached is answered at career grain." |
+| V11 | a temporal marker of any kind | structurally impossible: no plan field exists and none is added (§25.7) |
+
+### 25.10 SQL and builder semantics — the three populations
+
+| Family | Compiled shape | Expected on `afldb_test` |
+|---|---|---|
+| **X1** | `has_coached` alone | **365** — *not* 368. The `match_coaches` join is the whole difference and is asserted by its own oracle test (§25.12 T8) |
+| **X2** | `played_for_club(18)` **AND** `coached_club(18)` | **27**. Both halves preserved: `played_for_club` alone would over-count, `coached_club(18)` alone returns **41** (F2), and the two must intersect |
+| **X3** | `father_son_selection` **AND** `has_coached` | **1** — Rhyce Shaw (10974). Linked rows only; the 28 unlinked selected players are names, not identities |
+
+`has_coached`'s `match_coaches` join is a hard requirement of the semantic, not
+an optimisation: mere existence of `coaches.player_id` is an identity claim and
+nothing more.
+
+### 25.11 Rendering contract
+
+Extend the existing Phase D machinery in `describe.ts`; add no new payload kind.
+
+- **Subject phrases** (a `CROSS_DOMAIN_PHRASE` map beside
+  `RELATIONSHIP_WITH_PHRASE`):
+  - `has_coached` → *"Players who also played and coached."*
+  - `played_for_club(A)` + `coached_club(A)` → *"Players who played for
+    Richmond and also coached Richmond."*
+  - `played_for_club(A)` + `coached_club(B)` → *"Players who played for
+    Richmond and also coached Collingwood."*
+  - `father_son_selection` + `has_coached` → *"Players selected under the
+    father–son rule who also coached."*
+- **"Later" is never rendered**, in any string, under any branch, unless a
+  future separate operator decision approves the semantics. A grep-level test
+  asserts the token is absent from every Phase F wording constant.
+- **Ranked composition** reuses the Phase D "among …" wording: *"Most career
+  games among players who also played and coached."*
+- **Capped-list disclosure (D20, reused verbatim).** `answerCaveats`
+  (`describe.ts:619`) is gated today on `isRelationshipPlan`. Phase F adds a
+  sibling `isCrossDomainPlan(plan)` and the two share one caveat body, so there
+  is **one** cap contract, not two. For X1 with 365 qualifying and
+  `NL_LIMITS.maxListRows = 100`:
+
+  > *"365 players qualify. This answer lists the first 100 of them, most games
+  > first; it is not the whole list."*
+
+  Silent truncation is prohibited. The table's own footer is not sufficient —
+  the answer sentence itself must say it, exactly as D20 requires.
+- **No coaching-completeness caveat is invented.** M1 (per-season coaching
+  completeness) is still unmeasured; Phase F therefore makes no completeness
+  claim in either direction.
+
+### 25.12 Independent DB-oracle test matrix
+
+New file `tests/integration/nl-answers-cross-domain.test.ts`, modelled exactly
+on `tests/integration/nl-answers-relationships.test.ts`: every count compared
+against **independently hand-written SQL**, with the measured F0–F8 fixture
+contract asserted once so a data change is a deliberate decision.
+
+| # | Pins | Guards against |
+|---|---|---|
+| **T1** | X1 answer count **= 365**, and equals hand-written `coaches ⋈ match_coaches` SQL | the core X1 semantic |
+| **T2** | X2 answer count **= 27**, equals hand-written `player_clubs`/`match_coaches` intersection | the conjunction |
+| **T3** | X3 answer count **= 1** | X3's population |
+| **T4** | X3's single row **is player 10974, Rhyce Shaw** (id, not name) | identity by id |
+| **T5** | Richmond **positives**: Hafey, Dyer, Bentley, Jewell, Bartlett, Minogue, Wallace, Hughes all present in X2 | false negatives |
+| **T6** | Richmond **negatives**: Hardwick, Walls, Jeans, Yze, McQualter, Frawley, Rawlings, Gieschen **absent** from X2 (coached, never played there) — and Aaron Edwards / Fiora / Pattison absent (played, never coached there) | both directions of the conjunction |
+| **T7** | **Lineage trap**: Pagan, Wallace, Laidley each satisfy `coached_club` for **every** organization they coached (2, 2, 1) and for **no** organization they did not; a raw-`club_id` implementation fails this | the F4 regression |
+| **T8** | **The 368 seam**: hand-written `coaches WHERE player_id IS NOT NULL` ∩ played = **368**, X1 = **365**, and the difference is exactly the coach identities with **no `match_coaches` row** | X1 regressing to the identity-only seam |
+| **T9** | father–son **negative**: Kingsley, Simpson, Yze, Clarkson, Jeans are in X1 and **absent** from X3 | X3 collapsing into X1 |
+| **T10** | coaching **negative**: Aaron Cadman, Aaron Davey, Adam Cerra absent from X1 | X1 over-reaching |
+| **T11** | **Identity**: both "Aaron Black" ids absent from X1 and never merged by name (F6/F8) | name-based identity |
+| **T12** | D20: X1 `payload.total` **= 365**, `payload.rows.length` **= 100**, and the caveat string contains both numbers | silent truncation |
+| **T13** | `validatePlan` refuses V1, V5, V6, V7, V9, V10 (one case each) | ownership fail-closed |
+| **T14** | `coached_club(18)` alone = **41**; asserted so the X2 test is known to be measuring the intersection and not one half | a half-dropped conjunction |
+
+DB-free suites extended in place (no new file): `tests/nl-parser.test.ts`
+(cross-domain election, the temporal declines, the X3 composition boundary),
+`tests/nl-plan.test.ts` (the V-rules), `tests/nl-describe.test.ts` (wording, the
+"later" absence assertion, the cap sentence), `tests/grid-solver-spec.test.ts`
+(catalogue **164 → 166**), `tests/nl-ui-corpus.test.ts` (the new pins).
+
+### 25.13 Operator decisions required before Phase F is coded
+
+| ID | Question | Recommendation |
+|---|---|---|
+| **F-D1** | **X3 needs an explicit son-side father–son cue, which is currently blocked.** §22's D8 guard admits *only* the FATHER-side FS4 wording; the SON side (`father_son_selection`, FS1) is deferred to `AFLDB-ISSUE-153`. X3 cannot be answered without it. Options: **(a)** admit the explicit son-side rule cue **only in composition with the coaching conjunct**, leaving standalone FS1 declining (V7); **(b)** defer X3 entirely until D8 is settled, shipping Phase F as X1 + X2 only. | **(b) — defer X3.** D8's own recorded ground is that *"no witness can distinguish the two readings"* (§7, D8), and that is still true inside a composition: option (a) also produces a product surface where "players selected under the father–son rule" declines but the same phrase plus "who also coached" answers — a difference no reader can predict. The measured population is **1 row**. The semantic cost is high, the yield is one player, and X3 is cleanly re-addable the day D8 lands. **If the operator prefers (a), the plan above is complete for it** — V7 is exactly the boundary it needs. |
+| **F-D2** | Do "**went on to coach**" / "**became a coach**" / "**turned to coaching**" decline with "later", or read as "also"? | **Decline, with "later".** They assert the same ordering "later" does. D9's whole basis is that the ordering is unowned; admitting a synonym would reopen the decision by regex. |
+| **F-D3** | A club named on only one side — "**Richmond players who also coached**" (played Richmond, coached anywhere = a real question) and "**players who coached Richmond and also played**" — answer or decline? | **Decline in Phase F.** Both are legitimate questions, but each needs its own role-scoped club binding and neither has a measured population in F0–F8. Declining them keeps Phase F to the three measured populations; each gets a named decline corpus row so the boundary is visible and re-openable. |
+| **F-D4** | X2 currently plans `played_for_club`, which reads `player_clubs`. F2's **27** was measured from **Richmond playing games**. Are the two definitions identical here? | **One targeted evidence query is required** — the only genuinely missing fact in this plan. See §25.16. |
+
+### 25.14 Implementation sequence
+
+0. **R0 — red-before-green probe (mandatory, first).** A throwaway script, the
+   §16.1 / §22.2 pattern, parses ~24 Phase F wordings against the current v38
+   parser and prints each outcome. It must show that **no** X1/X2/X3 wording is
+   currently answered. **If any wording currently returns a plan — especially
+   the `coach_record`-election path in §25.8 — that is a live wrong-answer
+   defect and must be recorded in this runbook before any code is written.**
+   The probe is deleted afterwards, as §22.2's was.
+1. Builders: `has_coached`, `coached_club` in `grid-solver-spec.ts` and
+   `grid-solver.ts`; `grid-solver-spec.test.ts` 164 → 166.
+2. Vocabulary: composition cues, `CROSS_DOMAIN_TEMPORAL_RE`, (F-D1(a) only) the
+   son-side rule cue.
+3. Parser: the cross-domain reading, in the order §25.8 fixes; `PARSER_VERSION`
+   **38 → 39**, one bump, with the `plan.ts` history comment.
+4. `validatePlan`: V5, V6, V7, V9, V10 (V1–V4 already exist and are asserted,
+   not rewritten).
+5. `describe.ts`: `isCrossDomainPlan`, the phrase map, the shared D20 caveat.
+6. DB-free tests: parser, plan, describe, spec — **red first**.
+7. `tests/integration/nl-answers-cross-domain.test.ts` — T1–T14, hand-written
+   SQL, read-only against `afldb_test`.
+8. Corpus: the two new tracked CSVs, `PHASE_G_SETS.next`, the runner, the pins
+   (§25.15).
+9. Rendered acceptance: build → discriminator → P6 → fresh P4 regression
+   (§25.15).
+10. Runbook §26 (implementation record), `IssuesIndex.md`, `issues.md`,
+    `CHANGELOG.md` — the last only if behaviour materially changed, which for a
+    shipped Phase F it will have.
+
+### 25.15 Corpus and rendered acceptance plan
+
+**The accepted historical sets do not move.** The Phase G `new` set stays
+**271 = 212 + 59**; the Phase D `current` set stays **319 = 238 + 81** and
+`phase-d-corpus.ps1` still runs exactly it. Phase F **appends** a third
+generation, `PHASE_G_SETS.next`, whose first 319 rows are byte-for-byte the
+319-row file, so every position-based statement in §19.3, §23 and §24 survives.
+
+Two new tracked corpora, `tests/nl-ui/corpora/`:
+
+| File | Rows |
+|---|---|
+| `afldb-ui-questions-cross-domain-v1-<date>.csv` | **14 plan** |
+| `afldb-ui-questions-cross-domain-decline-v1-<date>.csv` | **16 decline** |
+
+Plan rows (14): X1 plain ×3 (list, count, one filler paraphrase); **X1 capped
+disclosure ×2** (the 365/100 sentence must render — the single highest-value
+rendered assertion in Phase F); X1 ranked-by-career-metric ×1; X2 Richmond
+symmetric ×3 (including a pinned positive that must contain Hafey and a pinned
+form that must not contain Hardwick); X2 asymmetric ×1; X2 organization-lineage
+regression ×2 (a Pagan/Wallace-shaped club whose raw and lineage ids differ);
+filler variants ×2. **X3 contributes 0 plan rows under the recommended F-D1(b)**
+— it becomes 2 plan rows (list form, count form) if the operator chooses (a).
+
+Decline rows (16): "later" ×4 (X1, X2, X3 shapes, plus a "went on to" F-D2
+form); unsupported scope ×5 (season, venue, opponent, round, match type on a
+cross-domain question); vague father–son ×2 (unchanged D8 forms, re-pinned in
+this generation); standalone explicit FS1 wording ×1 (V7 — the F-D1 boundary,
+which stays a decline under either option); one-sided club ×2 (F-D3); ranked X3
+×1 (V6); `coach_record` collision ×1 ("Richmond's coaching record" must still
+answer as `coach_record`, pinned as a *plan* row rather than a decline —
+counted in the plan column if the operator wants it, otherwise stated here as
+the collision the parser must not break).
+
+**Resulting totals:**
+
+| Set | Rows | Plan | Decline | Playwright batches @ 100 |
+|---|---|---|---|---|
+| `new` (frozen, Phase G) | 271 | 212 | 59 | 3 |
+| `current` (frozen, Phase D) | 319 | 238 | 81 | 4 |
+| **`next` (Phase F)** | **349** | **252** | **97** | **4** |
+| `regression` (frozen) | 1,495 | 1,435 | 60 | 15 |
+
+349 = 319 + 30; 252 = 238 + 14; 97 = 81 + 16. Under F-D1(a) the totals are
+**351 / 254 / 97**, still 4 batches. Pins stated three times independently, as
+Phase D established: `PHASE_G_SETS.next`, the new
+`tools/issue-152/phase-f-corpus.ps1`, and `tests/nl-ui-corpus.test.ts`.
+
+**Rendered acceptance (P6), reusing the Phase G/D tooling unchanged:**
+
+1. Fresh production build of this branch — DEV serves `main` and would measure
+   the wrong code (§19.1).
+2. **Stale-build preflight/discriminator**: a Phase-F-only question rendered on
+   the running server *before* the sweep. P5 attempt 1 was inadmissible for
+   exactly this reason (§24.1); the discriminator is not optional.
+3. Immutable `-OutName` (preserved output refuses overwrite), **fresh
+   `-RunTag`** (`issue152-phasef-p6…`), the P3/P4/P5 tags refused by name.
+4. **2,200 ms pacing, ONE worker**, `NL_UI_LIMIT` refused not inherited,
+   throttling classified as `page_error` and a hard failure.
+5. Corpus guard: refuse anything that is not 349/252/97 and does not slice into
+   4 batches; TCP tunnel probe, no database client in the script.
+6. **100% of the current set must pass**, then a **fresh 1,495-row regression
+   re-run**.
+
+Acceptance requires, on both sweeps: **0 semantic failures, 0 unscored, 0 rate
+limit, 0 page_error, 0 http_error, 0 filler disagreements, 0 client-side
+errors.**
+
+### 25.16 The one genuinely missing evidence query (F-D4)
+
+Everything else in this plan is settled by F0–F8. One fact is not, and it
+decides whether `played_for_club` is the right reuse for X2:
+
+`played_for_club` reads `player_clubs` ("club identities actually
+represented", `007_derived_stats.sql:127`), while F2's **27** was measured from
+**Richmond playing games**. The definitions coincide only if no `player_clubs`
+row carries `games = 0`. If any does, X2 via `played_for_club` would return a
+number other than 27 and the builder choice must change to a games-backed
+predicate.
+
+Read-only, `afldb_test`, over the existing tunnel — three counts:
+
+```sql
+BEGIN TRANSACTION READ ONLY;
+
+-- (1) Does player_clubs ever record a zero-game membership?
+SELECT count(*) AS zero_game_memberships FROM player_clubs WHERE games = 0;
+
+-- (2) X2 exactly as the plan would compile it (played_for_club ∧ coached_club).
+--     Must equal 27.
+SELECT count(*) AS x2_via_player_clubs
+  FROM players p
+ WHERE p.id IN (SELECT pc.player_id FROM player_clubs pc
+                 WHERE pc.club_id IN (SELECT id FROM clubs WHERE organization_id = 18))
+   AND p.id IN (SELECT c.player_id FROM coaches c
+                  JOIN match_coaches mc ON mc.coach_id = c.id
+                 WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+                   AND mc.club_id IN (SELECT id FROM clubs WHERE organization_id = 18));
+
+-- (3) X1 exactly as the plan would compile it. Must equal 365, not 368.
+SELECT count(DISTINCT c.player_id) AS x1_via_has_coached
+  FROM coaches c
+  JOIN match_coaches mc ON mc.coach_id = c.id
+ WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique';
+
+ROLLBACK;
+```
+
+Expected: **0, 27, 365**. Query (3) also settles a second question the plan
+assumes: that adding `link_status_value = 'unique'` (reused from
+`premiership_coach`) does not move X1 off 365. **Any other result changes the
+builder design and must be reported before implementation begins.**
+
+### 25.17 Blockers, dependencies and stop condition
+
+**Blockers:** none technical. Phase F's gate (B–D green) is satisfied.
+
+**Dependencies:** operator answers to **F-D1** through **F-D4**; F-D4 needs the
+three-count query above; and the pre-existing ISSUE-152 obligations are
+unchanged — the working tree since `50f8c54` is uncommitted, migrations **092
+and 093 must both reach `afldb_dev` and production BEFORE the code**, and
+`nl:stress` has still not been run for B, C, D or E.
+
+**Not blockers:** C1, FS1, FS2, FS3, FS6, D6, D8 and `AFLDB-ISSUE-153`. They
+remain explicit declines and are re-pinned, not relaxed, by the Phase F corpus.
+The two pre-existing `tests/integration/grid-solver.test.ts` won-final failures
+are still out of scope and untouched.
+
+**Stop condition for this section:** planning only. No executable source,
+migration, corpus, test, harness or `PARSER_VERSION` change; no database
+command; no Git write; **Phase F is not started and ISSUE-152 is not
+resolvable**.
+
+---
+
+## 26. Phase F — IMPLEMENTED 2026-09-09 (X1 + X2; X3 deferred by F-D1)
+
+**Status: IMPLEMENTED and LOCALLY VALIDATED. Rendered acceptance NOT yet
+run.** §25 remains the contract; this section records what was built
+against it, every deviation, and what is still outstanding.
+
+The four operator decisions are final and were applied as given:
+
+| ID | Decision | Effect on the build |
+|---|---|---|
+| **F-D1** | **(b) — defer X3 to `AFLDB-ISSUE-153`** | No son-side father-son wording. `father_son_selection` is emitted by no parser path, and a NEW named refusal inside the cross-domain reading stops the composition from becoming a back door into D8 (§26.4). Rhyce Shaw stays measured evidence for ISSUE-153 and is not a Phase F query. |
+| **F-D2** | **decline** temporal wording | `CROSS_DOMAIN_TEMPORAL_RE`, checked inside the reading before any predicate is emitted. "went on to", "became a coach", "later", "then coached", "after they retired" all decline WITH A STATED REASON. Nothing is stripped. |
+| **F-D3** | **decline** one-sided club composition | Club roles are assigned per OCCURRENCE by the nearest verb; a side left empty declines. |
+| **F-D4** | **resolved — `played_for_club` reuse approved** | No new playing-side builder, no new grain, no migration. The transcript `nl-ui-out-152-phaseg/evidence/ISSUE-152-phase-f-fd4-afldb_test-20260909-191040.txt` is retained evidence and was NOT re-derived; its zero-game-membership fact is re-asserted once as a fixture in the oracle suite. |
+
+### 26.1 R0 — red before green, recorded
+
+The mandatory §25.14(0) probe was written, run against the **v38** parser
+and deleted. Its transcript is preserved at
+`nl-ui-out-152-phaseg/evidence/ISSUE-152-phase-f-r0-probe-20260909.txt`.
+
+**No X1, X2 or X3 wording answered under v38.** 24 wordings, all declining
+or refused.
+
+One finding, recorded because §25.14 requires it to be: the
+`coach_record`-election path §25.8 predicted **is real**. Under v38,
+*"players who played for Richmond and coached Collingwood"* produced a
+**plan at confidence 1.00** — `grain: 'coach_record'`, `clubFor:
+Richmond`, `clubAgainst: Collingwood` — and was stopped by `validatePlan`
+("A coaching question contains fields its compiler cannot honour."), not
+by the confidence gate. It was therefore never a wrong answer, but it was
+one ownership rule away from being one. Every other cross-domain wording
+declined at parse.
+
+Also confirmed unchanged and still refused at `validatePlan`: *"Richmond
+players coached by Damien Hardwick"* — see §26.8.
+
+### 26.2 Files changed
+
+| File | Change |
+|---|---|
+| `src/search/grid-solver-spec.ts` | **+2 builders** in the existing `Coaching` group: `has_coached` (no params), `coached_club` (`club()`). Catalogue **164 → 166**. |
+| `src/db/queries/grid-solver.ts` | The two SQL cases. Both join `match_coaches`; `coached_club` folds through `clubs.organization_id`. |
+| `src/search/nl/vocab.ts` | `CROSS_DOMAIN_PLAY_VERB_SOURCE`, `CROSS_DOMAIN_COACH_VERB_SOURCE`, `CROSS_DOMAIN_COMPOSITION_RE`, `CROSS_DOMAIN_SHARED_CLUB_RE`, `CROSS_DOMAIN_TEMPORAL_RE`, `CROSS_DOMAIN_CONSUME_RE`. |
+| `src/search/nl/parser.ts` | `clubScanText` snapshot; `assignCrossDomainClubs` + two position helpers; the `coached_population` reading elected first inside the §1684 coaching block; grain branch before `coach_record`; predicate emission; the `crossDomainClubs` plan field. |
+| `src/search/nl/plan.ts` | `crossDomainClubs` plan field; `NL_CROSS_DOMAIN_BUILDERS`; `isCrossDomainPlan`; V5/V6/V7/V9/V10 plus the club-reference/parameter agreement rule; `PARSER_VERSION` **38 → 39** with its history entry. |
+| `src/search/nl/describe.ts` | `cappedListCaveat` extracted and SHARED with Phase D; `isCrossDomainPlan` caveat branch; `crossDomainSubjectPhrase`, wired into both the list and the ranked branch. |
+| `tests/grid-solver-spec.test.ts` | 164 → 166. |
+| `tests/nl-parser.test.ts` | +1 describe block, 27 cases. |
+| `tests/nl-plan.test.ts` | +1 describe block, 9 cases. |
+| `tests/nl-describe.test.ts` | +1 describe block, 8 cases. |
+| `tests/nl-ui-corpus.test.ts` | The `next` set pins (349/253/96), the append-order pin, and the named-row pins — 3 cases. |
+| `tests/integration/nl-answers-cross-domain.test.ts` | **NEW.** The independent DB oracle suite, 21 cases. |
+| `tests/nl-ui/corpora/afldb-ui-questions-cross-domain-v1-20260909.csv` | **NEW.** 15 plan rows. |
+| `tests/nl-ui/corpora/afldb-ui-questions-cross-domain-decline-v1-20260909.csv` | **NEW.** 15 decline rows. |
+| `tools/issue-152/build-phase-g-corpora.ts` | `PHASE_G_SETS.next` — 349 rows, appending to `current`. |
+| `tools/issue-152/phase-f-corpus.ps1` | **NEW.** The P6 runner. |
+
+**No migration. No new table. No new column. No new grain. No change to
+`src/db/queries/nl/player-career.ts`.**
+
+### 26.3 The two builders, and the two rules they encode
+
+```sql
+-- has_coached
+p.id IN (SELECT c.player_id FROM coaches c
+           JOIN match_coaches mc ON mc.coach_id = c.id
+          WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique')
+
+-- coached_club(<organization id>)
+p.id IN (SELECT c.player_id FROM coaches c
+           JOIN match_coaches mc ON mc.coach_id = c.id
+          WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+            AND mc.club_id IN (SELECT id FROM clubs WHERE organization_id = $1))
+```
+
+1. **A `coaches` row is an identity, not proof of coaching.** The
+   `match_coaches` join is the semantic. 368 linked identities; **365**
+   people actually coached a match. The oracle suite asserts the
+   difference is exactly the identities with no `match_coaches` row.
+2. **A coached club is an organization lineage.** Never `mc.club_id =
+   $1`. Measured on the real divergence: Pagan 3 raw ids / 2
+   organizations, Wallace 3/2, Laidley 2/1.
+
+### 26.4 The parser, and the four things it refuses
+
+The reading is elected **first** inside the coaching block, on a
+COMPOSITION cue (`played … and also coached`, `both played … coached`,
+`players … also coached`) or a temporal cue — never on the bare
+`COACH_CUE_RE`. Electing after `coach_record`, the block's fallthrough,
+would have been useless.
+
+Inside the reading, in order, before any predicate exists:
+
+1. **Temporal wording → decline, by name** (F-D2/D9). *"AFLDB does not
+   record the order of a person's playing and coaching careers, so it
+   cannot answer whether one came after the other. Ask instead who both
+   played and coached."*
+2. **Any father-son wording → decline, by name** — a NEW refusal, and a
+   deviation from §25 recorded deliberately (§26.7). It exists so that a
+   phrase which declines on its own can never become answerable merely by
+   appending "and also coached". The D8 guard at `vocab.ts` is untouched.
+3. **A club governed by an against-preposition → decline.** This reading
+   CLEARS `clubAgainst` on its way to binding both sides, so an opponent
+   had to be caught here; without it, *"played and also coached against
+   Carlton"* bound Carlton as the coached club and answered confidently.
+   Found by the corpus verification run, not by reasoning.
+4. **A one-sided or ambiguous club composition → decline** (F-D3).
+
+**Club roles are assigned per OCCURRENCE**, by the nearest verb before
+each mention in the reader's own wording, measured on a snapshot taken
+before club names were spliced out. "Richmond … Richmond" is one entity
+match in two places, and asking only where the first one sits would have
+put the whole question on the playing side. Two exceptions, both narrow
+and explicit: a club conjoined by both verbs with nothing between them
+("both played for **and** coached Richmond") binds both sides, and a club
+as the leading noun adjunct of "players" ("**Richmond players** who also
+coached Richmond") is the playing side.
+
+**`scope.clubFor` is never set.** Both clubs are builder parameters. This
+is the single most important structural decision in the phase: had
+`coached_club` owned `scope.clubFor`, the compiler's generic playing-club
+`EXISTS` would have been suppressed and *"played for Richmond and also
+coached Richmond"* would have answered **41** (coached Richmond) instead
+of **27**.
+
+### 26.5 Wording
+
+- X1 → *"Players who played VFL/AFL and also coached."*
+- X2 → *"Players who played for Richmond and also coached Richmond."*
+- Asymmetric → *"Players who played for Richmond and also coached Collingwood."*
+- Ranked → *"Highest career games among players who played VFL/AFL and also coached."*
+
+**"Later" appears in no branch and no constant**, asserted by a test.
+
+**D20 is REUSED, not re-invented.** `answerCaveats`' cap sentence was
+extracted into one helper shared by the Phase D relationship branch and
+the Phase F cross-domain branch, so there is one cap contract rather than
+two. X1 renders: *"365 players qualify. This answer lists the first 100 of
+them, most games first; it is not the whole list."* No coaching-
+completeness caveat was invented in either direction (M1 is still
+unmeasured).
+
+### 26.6 Validation
+
+| Gate | Result |
+|---|---|
+| R0 red-before-green probe (v38) | **PASS** — no Phase F wording answered; one `coach_record` election recorded (§26.1) |
+| `npm run typecheck` | **PASS** |
+| DB-free suite (`vitest run`, excluding integration + nl-ui) | **3,777 passed**, 14 skipped, **2 failed — both pre-existing and unrelated** (§26.9). Baseline before this phase was 3,730; **+47 new DB-free cases**, plus the 21 oracle cases below. |
+| `tests/nl-parser.test.ts` | 327 passed (+27 Phase F) |
+| `tests/nl-plan.test.ts` | 153 passed (+9 Phase F) |
+| `tests/nl-describe.test.ts` | 74 passed (+8 Phase F) |
+| `tests/nl-ui-corpus.test.ts` | 48 passed (+3 Phase F) |
+| `tests/grid-solver-spec.test.ts` | catalogue 166 |
+| **`tests/integration/nl-answers-cross-domain.test.ts`** | **21 passed** — the oracle suite |
+| Every other NL integration suite (11 files) | **215 passed**, 0 failed |
+| Corpus verification against `afldb_test` | **30/30 rows** behaved as pinned, BEFORE pinning |
+| `build-phase-g-corpora.ts next` | 349 rows, 253 plan, 96 decline, 4 batches |
+
+**The oracle suite's pins**, every one compared against independently
+hand-written SQL:
+
+| Pin | Value |
+|---|---|
+| X1 | **365** — and *not* the 368 identity-only seam, with the difference proven to be the matchless identities |
+| X2 Richmond | **27** |
+| `coached_club(18)` alone | **41**, so 27 is provably an intersection; 41 − 27 = the measured **14** |
+| Richmond positives present | Hafey 12550, Dyer 6244, Bentley 10377, Hughes 4386, Jewell 12775, Minogue 3195, Wallace 12378, Bartlett 8193 |
+| Coached-Richmond-only absent | Yze 67, Jeans 481, McQualter 600, Hardwick 3175, Frawley 3266, Rawlings 6669, Gieschen 6912, Walls 11145 — and each IS in the coaching half, so their absence is the playing half working |
+| Played-Richmond-only absent | Edwards 6, Fiora 7, Pattison 51 |
+| Never coached absent | Aaron Black **1 and 2** (one display name, two identities), Cadman 3, Davey 5, Cerra 28 |
+| Lineage traps | Pagan 3651, Wallace 12378, Laidley 3208 — each satisfies `coached_club` for EVERY organization they coached and for none they did not; raw ids proven to outnumber organizations |
+| D20 | `total` 365, `rows` 100, caveat contains both numbers |
+| Fixture | 386 / 368 / 18 coach rows; **0** zero-game `player_clubs` memberships (F-D4) |
+| Ownership | V1, V5, V6, V7, V9, V10 each refused |
+
+Corpus verification measured every plan row's real population:
+365 ×6, ranked lead Kevin Bartlett 403 games, Richmond **27** ×3,
+Richmond→Collingwood **4**, Sydney **28**, Western Bulldogs **18**,
+and `Richmond's coaching record` still electing `coach_record`.
+
+The two lineage rows are the strongest of these: Sydney's lineage answer
+is **28** where a raw-`club_id` implementation would answer **2**, and the
+Western Bulldogs' is **18** where a raw-id implementation would answer
+**0**.
+
+### 26.7 Deviations from §25, and why
+
+1. **A new plan field, `crossDomainClubs`, WAS added.** §25.5 said none
+   was needed. Source inspection proves that was mistaken: `describe.ts`
+   has no club directory and no way to turn an organization id into a
+   name, so §25.11's requirement that both club names always be stated is
+   unsatisfiable from the builder parameters alone. The field carries the
+   same contract `relationshipSubject` already carries — it is the
+   resolved reference the bound id came from, never a substitute for it —
+   and `validatePlan` refuses any plan where the named clubs and the
+   bound parameters disagree, in either direction.
+2. **A father-son refusal was added inside the reading** (§26.4(2)).
+   §25.8(4) assumed the D8 guard's leftover tokens would be enough under
+   F-D1(b). They were, for the wordings measured — but only by accident
+   of token counting, and the operator's brief is explicit that no
+   surface may exist where wording declines alone and answers with a
+   coaching conjunct appended. This makes that a rule rather than a
+   coincidence.
+3. **An opponent refusal was added inside the reading** (§26.4(3)). Not
+   anticipated by §25.9, which assumed `validatePlan`'s existing
+   career-scope rule would catch it. It cannot: this reading clears
+   `clubAgainst` before `validatePlan` ever sees the plan. **Found by
+   measurement** — the first corpus verification run answered *"players
+   who played and also coached against Carlton"* with 27 Carlton people.
+4. **The corpus split is 15 plan / 15 decline, not 14 / 16.** X3 is
+   deferred, and the `coach_record` collision row — which must ANSWER —
+   is counted in the plan column, where a row expecting a plan belongs.
+   §25.15 left this to the operator. **Set total 349 and batch count 4
+   are unchanged.**
+5. **`CROSS_DOMAIN_CONSUME_RE` consumes `vfl/`, not `vfl` and `afl`.**
+   `canonicalise` strips a bare "afl" as conversational filler, so
+   "VFL/AFL" reaches the reading as the single orphaned token `vfl/`.
+   Found by the corpus verification run; the row it broke is one of
+   §25.3's own approved wordings.
+
+### 26.8 "Richmond players coached by Damien Hardwick" — still a decline
+
+§25.1 lists §13.15(4) as IN Phase F. **It was not implemented, and it
+still refuses at `validatePlan`.** The reason is the contract's own:
+
+- §25.3 gives it no operator-matrix row, §25.11 no wording, §25.12 no
+  oracle test and §25.15 no corpus row. It is named IN and specified
+  nowhere.
+- It has **no measured population** in F0–F8.
+- Its two readings — "coached by Hardwick *at Richmond*" and "played for
+  Richmond *and* coached by Hardwick anywhere" — are different questions
+  with different answers, and the wording does not choose between them.
+  That is exactly the shape **F-D3** decides: a club named on one side
+  with no explicitly owned target on the other declines.
+- `coached_by` owns a coach id and no club, and the brief forbids
+  overloading it.
+
+It is re-pinned as a decline and re-addable the day it has an owned
+coaching-club target and a measured population.
+
+### 26.9 The two DB-free failures are NOT Phase F
+
+- `tests/finals-semantics-contract.test.ts` — the known Windows CRLF
+  failure: the test splits migration SQL on a bare `\n` and this is an
+  `autocrlf=true` checkout. Passes on Linux.
+- `tests/reference-data.test.ts` — expects a hard-coded list of
+  post-migration-045 tables and receives three more
+  (`external_grid_axes`, `external_grid_sources`, `external_grids`).
+
+Neither file is modified by this phase, and neither reads any file this
+phase modified — both read migration SQL, of which none changed. They are
+pre-existing on this branch. Recorded here because §22.10/§24.8 name only
+the two `tests/integration/grid-solver.test.ts` won-final failures, and
+these two were not previously written down.
+
+### 26.10 Status — Phase F code COMPLETE; rendered acceptance OUTSTANDING
+
+Done: §25.14 steps 0–8, plus the corpus build (step 9).
+
+**Not done, and required before Phase F can be called green:**
+
+1. **Fresh production build of this branch.** DEV serves `main` and would
+   measure the wrong code (§19.1).
+2. **The stale-build discriminator**, which is not optional (§24.1):
+   `/search?q=players+who+also+coached` on the running server must answer
+   **"365 players match"** BEFORE the sweep starts.
+3. **P6** — `.\tools\issue-152\phase-f-corpus.ps1`, 349 rows, immutable
+   `-OutName p6-phase-f-next`, fresh `-RunTag issue152-phasef-p6`,
+   2,200 ms at one worker (~13 min).
+4. **A fresh P4 regression re-run** — `.\tools\issue-152\phase-g-regression.ps1`,
+   1,495 rows (~55 min).
+
+Both sweeps must show 0 semantic failures, 0 unscored, 0 rate limit,
+0 `page_error`, 0 `http_error`, 0 filler disagreements, 0 client-side
+errors.
+
+The pre-existing ISSUE-152 obligations are unchanged: **migrations 092
+and 093 must reach `afldb_dev` and production BEFORE the code**, and
+`nl:stress` has still not been run for B, C, D, E or F.
+
+**ISSUE-152 is NOT resolvable.** No deployment, no merge, no production
+change was made.

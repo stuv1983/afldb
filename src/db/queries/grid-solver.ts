@@ -949,6 +949,29 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                            WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
                              AND m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id)`;
 
+    // AFLDB-ISSUE-152 Phase F. "Played AND coached" -- the person, not
+    // their players. The match_coaches join is the semantic, not an
+    // optimisation: coaches.player_id alone is an identity claim and
+    // returns 368 people, 3 of whom never coached a match. The
+    // 'unique' link rule is premiership_coach's own, reused verbatim so
+    // one identity contract covers the whole Coaching group.
+    case 'has_coached':
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique')`;
+    // The same seam folded to an organization lineage. match_coaches.club_id
+    // is a RAW historical club identity, and real coaches diverge on it
+    // (Pagan 3 raw ids / 2 organizations, Wallace 3/2, Laidley 2/1), so a
+    // raw-id comparison would silently answer a narrower question. A rename
+    // folds and a merger never does, both automatic from organization_id.
+    case 'coached_club': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT c.player_id FROM coaches c
+                            JOIN match_coaches mc ON mc.coach_id = c.id
+                           WHERE c.player_id IS NOT NULL AND c.link_status_value = 'unique'
+                             AND mc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
+    }
+
     // -- Captaincy -- no CHECK constraint ties captaincies.player_id to
     // its link_status_value, so both are checked explicitly. -----------
     case 'club_captain': {

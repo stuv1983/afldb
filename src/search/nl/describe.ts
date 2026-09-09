@@ -9,7 +9,7 @@
  */
 import { GRID_BUILDERS } from '@/search/grid-solver-spec';
 import {
-  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isRelationshipPlan, NL_METRICS,
+  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isCrossDomainPlan, isRelationshipPlan, NL_METRICS,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import type {
@@ -608,6 +608,19 @@ function describeAfterSirenPlayerAnswer(
  * Returns [] for every other grain, so answer.ts can call it
  * unconditionally.
  */
+/**
+ * The capped-list disclosure (AFLDB-ISSUE-152 D20), said in the answer's
+ * own sentence rather than left to the table's footer. Shared verbatim by
+ * the Phase D relationship answers and the Phase F cross-domain answers,
+ * so a reader is never silently shown 100 of 365 rows.
+ */
+function cappedListCaveat(plan: NlQueryPlan, payload: NlAnswerPayload): string | null {
+  if (payload.kind !== 'player_career' || plan.metric !== null) return null;
+  if (payload.total <= payload.rows.length) return null;
+  return `${payload.total.toLocaleString('en-AU')} players qualify. This answer lists the first `
+    + `${payload.rows.length.toLocaleString('en-AU')} of them, most games first; it is not the whole list.`;
+}
+
 export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): string[] {
   // AFLDB-ISSUE-152 Phase D. Two boundaries a relationship answer must
   // state in its own sentence. The first is always true: the source is a
@@ -621,13 +634,20 @@ export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): stri
       'AFLDB\'s family relationships come from a tracked, cited list of football families. '
       + 'A relative it has not linked to a player is a name only, and is counted nowhere here.',
     ];
-    if (payload.kind === 'player_career' && plan.metric === null && payload.total > payload.rows.length) {
-      caveats.push(
-        `${payload.total.toLocaleString('en-AU')} players qualify. This answer lists the first `
-        + `${payload.rows.length.toLocaleString('en-AU')} of them, most games first; it is not the whole list.`,
-      );
-    }
+    const capped = cappedListCaveat(plan, payload);
+    if (capped) caveats.push(capped);
     return caveats;
+  }
+  // AFLDB-ISSUE-152 Phase F. A cross-domain answer carries the SAME cap
+  // contract, from the same helper, so there is one disclosure rule and
+  // not two: 365 players both played and coached, the list shows 100, and
+  // the answer sentence itself says so. No completeness caveat is
+  // invented alongside it -- per-season coaching completeness is
+  // unmeasured, and a claim in either direction would be one AFLDB cannot
+  // support.
+  if (isCrossDomainPlan(plan)) {
+    const capped = cappedListCaveat(plan, payload);
+    return capped ? [capped] : [];
   }
   if (plan.grain !== 'after_siren') return [];
   const caveats: string[] = [
@@ -718,6 +738,28 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
  * son was selected under the father-son rule". Null when the plan carries
  * no relationship, which is every pre-Phase-D answer.
  */
+/**
+ * AFLDB-ISSUE-152 Phase F. The cross-domain answer's subject, as a
+ * sentence-leading phrase. Truthful "also" wording only: the word
+ * "later" appears in no branch of this function and in no Phase F
+ * constant, because AFLDB does not own the order of the two careers
+ * (D9/F-D2) and a sentence that implies it would claim a fact the SQL
+ * never checked.
+ *
+ * Both clubs are always named, each on its own side of the sentence,
+ * from the references the plan carries beside the builders' bound ids.
+ */
+function crossDomainSubjectPhrase(plan: NlQueryPlan): string | null {
+  if (plan.crossDomainClubs) {
+    return `Players who played for ${plan.crossDomainClubs.played.name} `
+      + `and also coached ${plan.crossDomainClubs.coached.name}`;
+  }
+  if (plan.careerPredicates.some((axis) => axis.builder === 'has_coached')) {
+    return 'Players who played VFL/AFL and also coached';
+  }
+  return null;
+}
+
 function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
   const ofAxis = plan.careerPredicates.find((axis) => RELATIONSHIP_OF_NOUN[axis.builder]);
   if (ofAxis && plan.relationshipSubject) {
@@ -769,7 +811,7 @@ function describePlayerCareerAnswer(
           + `every condition asked for: ${conditions}.${curatedRecordNote(plan)}`,
       };
     }
-    const relationship = relationshipSubjectPhrase(plan);
+    const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
       interpretation: relationship
@@ -785,7 +827,7 @@ function describePlayerCareerAnswer(
   // ranked WITHIN: "Most career games among players with a brother who
   // played VFL/AFL" is a different record from "most career games", and
   // the two must never read the same.
-  const relationship = relationshipSubjectPhrase(plan);
+  const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
   const among = relationship
     ? ` among ${relationship.charAt(0).toLowerCase()}${relationship.slice(1)}`
     : '';

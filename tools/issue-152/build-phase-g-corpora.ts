@@ -40,7 +40,7 @@ export const PHASE_G_ROOT = 'nl-ui-out-152-phaseg';
 const CORPORA_DIR = `${PHASE_G_ROOT}/corpora`;
 const SOURCE_DIR = 'tests/nl-ui/corpora';
 
-export type PhaseGSetName = 'new' | 'current' | 'regression';
+export type PhaseGSetName = 'new' | 'current' | 'next' | 'regression';
 
 /**
  * `tests/nl-ui/nl-stress.spec.ts` slices the corpus into Playwright tests
@@ -119,6 +119,46 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-relationships-decline-v1-20260909.csv`,
     ],
     expected: { rows: 319, plan: 238, decline: 81, unknown: 0 },
+  },
+
+  /**
+   * AFLDB-ISSUE-152 Phase F. The NEXT new-family acceptance set: the
+   * pinned 319 above plus the two additive cross-domain corpora, 349
+   * rows.
+   *
+   * A third generation, appended for the same reason Phase D appended a
+   * second. Phase D's accepted evidence is "319 = 238 plan + 81 decline,
+   * green at P5-r2" (§24.3), and that statement stays checkable only
+   * while the corpus it names keeps its size and its row order. The eight
+   * Phase B/C/E/D sources are therefore listed here in the SAME order as
+   * `current`, so rows 1-319 of this file are byte-for-byte the 319-row
+   * file and every position-based statement in §19.3, §23 and §24
+   * survives. The 30 Phase F rows are 320-349.
+   *
+   * 253 plan = 238 + 15. 96 decline = 81 + 15.
+   *
+   * The 15/15 split deviates from the provisional 14/16 in §25.15: X3 is
+   * deferred (operator decision F-D1) and the `coach_record` collision
+   * row -- "Richmond's coaching record", which must still ANSWER -- is
+   * counted in the plan column, which is where a row expecting a plan
+   * belongs. The set total, 349, and its batch count, 4, are unchanged.
+   */
+  next: {
+    name: 'next',
+    output: `${CORPORA_DIR}/phase-f-next-new-family-349.csv`,
+    sources: [
+      `${SOURCE_DIR}/afldb-ui-questions-coaching-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-coaching-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-after-siren-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-after-siren-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-first-kick-goal-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-first-kick-goal-decline-v1-20260908.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-relationships-v1-20260909.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-relationships-decline-v1-20260909.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-cross-domain-v1-20260909.csv`,
+      `${SOURCE_DIR}/afldb-ui-questions-cross-domain-decline-v1-20260909.csv`,
+    ],
+    expected: { rows: 349, plan: 253, decline: 96, unknown: 0 },
   },
 
   /**
@@ -234,10 +274,10 @@ export function buildSet(set: PhaseGSet, outDir?: string): PhaseGBuildResult {
 if (/build-phase-g-corpora/.test(process.argv[1] ?? '')) {
   const requested = process.argv[2] ?? 'all';
   const names: PhaseGSetName[] = requested === 'all'
-    ? ['new', 'current', 'regression']
-    : requested === 'new' || requested === 'current' || requested === 'regression'
+    ? ['new', 'current', 'next', 'regression']
+    : requested === 'new' || requested === 'current' || requested === 'next' || requested === 'regression'
       ? [requested]
-      : (() => { throw new Error(`unknown set "${requested}"; expected new, current, regression or all`); })();
+      : (() => { throw new Error(`unknown set "${requested}"; expected new, current, next, regression or all`); })();
 
   for (const name of names) console.log(JSON.stringify(buildSet(PHASE_G_SETS[name])));
 }

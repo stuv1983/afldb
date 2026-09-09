@@ -400,6 +400,49 @@ describe('PHASE_G_SETS (AFLDB-ISSUE-152 sweep corpora)', () => {
     expect(current.slice(phaseG.length)).toHaveLength(48);
     expect(current.slice(phaseG.length).every((row) => /^rel_/.test(row.id))).toBe(true);
   });
+
+  it('the next Phase F set is 349 = 253 plan + 96 decline', () => {
+    const result = build('next');
+    expect({ rows: result.rows, plan: result.plan, decline: result.decline })
+      .toEqual({ rows: 349, plan: 253, decline: 96 });
+    // 319 + 30, 238 + 15, 81 + 15 -- the arithmetic stated in the issue.
+    expect(result.rows).toBe(319 + 30);
+    expect(result.plan).toBe(238 + 15);
+    expect(result.decline).toBe(81 + 15);
+    expect(expectedBatches(result.rows)).toBe(4);
+  });
+
+  it('the next set APPENDS: its first 319 rows are the Phase D corpus, in order', () => {
+    // The same rule, one generation on: §23/§24's position-based
+    // statements about the 319-row set survive only while rows 1-319
+    // never move.
+    const current = readUiCorpus(build('current').path);
+    const next = readUiCorpus(build('next').path);
+    expect(next.slice(0, current.length)).toEqual(current);
+    expect(next.slice(current.length)).toHaveLength(30);
+    expect(next.slice(current.length).every((row) => /^xd_/.test(row.id))).toBe(true);
+  });
+
+  /**
+   * AFLDB-ISSUE-152 Phase F. The three highest-value pins, stated here as
+   * well as in PHASE_G_SETS and the runner: the capped-disclosure rows
+   * (the 365/100 sentence is the single most important rendered
+   * assertion in Phase F), the lineage-regression rows, and the
+   * collision row that must keep ANSWERING as a coaching record.
+   */
+  it('the Phase F rows carry their named pins', () => {
+    const phaseF = readUiCorpus(build('next').path).slice(-30);
+    const byId = new Map(phaseF.map((row) => [row.id, row]));
+    expect(phaseF.filter((row) => row.tags.includes('d20'))).toHaveLength(2);
+    expect(phaseF.filter((row) => row.tags.includes('lineage'))).toHaveLength(2);
+    expect(byId.get('xd_015')?.expectedStatus).toBe('plan');
+    expect(byId.get('xd_015')?.tags).toContain('coach-record');
+    // The boundaries this phase does not move, each re-pinned as a decline.
+    for (const id of ['xd_dec_010', 'xd_dec_011', 'xd_dec_014']) {
+      expect(byId.get(id)?.expectedStatus, id).toBe('decline');
+    }
+    expect(phaseF.filter((row) => row.tags.includes('fd2'))).toHaveLength(4);
+  });
 });
 
 // -------------------------------------------------------------------- cores

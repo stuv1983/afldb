@@ -342,6 +342,16 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // Derived from the Grand Final result and that match's coaching
   // assignment through the coach's proven player link; nothing stored.
   premiership_coach: { key: 'premiership_coach', label: 'Premiership coach', group: 'Coaching', params: [] },
+  // AFLDB-ISSUE-152 Phase F. A player who ALSO coached -- the cross-domain
+  // composition, and the subject is the coach, not their players (which is
+  // what coached_by answers). A `coaches` row is an IDENTITY claim and
+  // nothing more: 368 linked coach identities exist but only 365 of those
+  // people ever coached a match, so both builders join match_coaches and
+  // neither is satisfied by the identity row alone. Parameterless and
+  // club-scoped are two keys rather than one optional parameter, exactly
+  // as club_captain / club_captain_any already are.
+  has_coached: { key: 'has_coached', label: 'Also coached', group: 'Coaching', params: [] },
+  coached_club: { key: 'coached_club', label: 'Coached club', group: 'Coaching', params: [club()] },
 
   // Captaincy -- club_captain/captain_between_seasons kept their original
   // keys and behaviour from V1 but are relabelled here: they were always

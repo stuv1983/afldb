@@ -306,6 +306,98 @@ export const COACHED_BY_RE = /\bcoached by\b|\bplayed under\b|\bunder coach\b/;
  */
 export const PREMIERSHIP_COACH_RE = /\bpremiership[- ]winning coach(?:es)?\b|\bpremiership coach(?:es)?\b/;
 
+// ------------------------------------------- cross-domain: played AND coached
+
+/**
+ * AFLDB-ISSUE-152 Phase F. The two verbs, as their own sources, so the
+ * parser can find every OCCURRENCE of each and decide which side of the
+ * composition a club mention sits on. A club is never guessed onto a
+ * side: it is assigned by the nearest verb before it, or the question
+ * declines (F-D3).
+ */
+export const CROSS_DOMAIN_PLAY_VERB_SOURCE = String.raw`\bplay(?:ed|s|ing)?\b`;
+export const CROSS_DOMAIN_COACH_VERB_SOURCE = String.raw`\bcoach(?:ed|es|ing)?\b`;
+
+/**
+ * The COMPOSITION cue: one person who both played and coached. This is
+ * deliberately NOT the bare COACH_CUE_RE -- the cross-domain reading is
+ * elected before coach_record, which is the coaching block's fallthrough
+ * and would otherwise claim every one of these questions.
+ *
+ * The gap between the two verbs is bounded and word-only, so the cue
+ * cannot reach across a whole sentence and read two unrelated clauses as
+ * a composition.
+ */
+export const CROSS_DOMAIN_COMPOSITION_RE = new RegExp([
+  // "played and also coached", "played for Richmond and coached Collingwood"
+  String.raw`\bplay(?:ed|s|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+and\s+(?:also\s+|then\s+|later\s+|subsequently\s+)?coach(?:ed|es|ing)?\b`,
+  // "coached Richmond and also played"
+  String.raw`\bcoach(?:ed|es|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+and\s+(?:also\s+|then\s+)?play(?:ed|s|ing)?\b`,
+  // "which players both played and coached"
+  String.raw`\bboth\s+play(?:ed|s|ing)?\b(?:\s+[\w'’/-]+){0,6}\s+coach(?:ed|es|ing)?\b`,
+  // "players who also coached"
+  String.raw`\bplayers?\b(?:\s+[\w'’/-]+){0,6}\s+also\s+coach(?:ed|es|ing)?\b`,
+].join('|'));
+
+/**
+ * "both played for and coached Richmond" -- the two verbs conjoined with
+ * NO club of their own between them, so the single club named after them
+ * belongs to both sides. Without this the club would be assigned to the
+ * coaching side alone and the question would decline as one-sided (F-D3),
+ * which for this wording would be wrong: the reader named both roles.
+ */
+export const CROSS_DOMAIN_SHARED_CLUB_RE = /\bplay(?:ed|s|ing)?\s+(?:for\s+)?and\s+(?:also\s+)?coach(?:ed|es|ing)?\b/;
+
+/**
+ * Temporal / sequential wording, refused by name (operator decision
+ * F-D2, upholding D9). AFLDB can DERIVE the ordering -- of the 365 people
+ * who played and coached, 238 first coached after their playing career
+ * ended and 127 did not, with 0 unknown -- and that is exactly the trap.
+ * Nothing in the engine OWNS that ordering: no builder, no plan field, no
+ * renderer. Supporting "later" would be a separate, deliberate design
+ * decision with its own measured contract.
+ *
+ * The words are matched so the question can decline WITH A STATED REASON.
+ * They are never consumed and never silently stripped: stripping "later"
+ * turns the reader's question into a different one that happens to have
+ * an answer, which is the precise failure D9 exists to prevent.
+ */
+export const CROSS_DOMAIN_TEMPORAL_RE = new RegExp([
+  String.raw`\blater\b`,
+  String.raw`\bwent on to\b`,
+  String.raw`\bgo on to\b`,
+  String.raw`\bafterwards\b`,
+  String.raw`\bsubsequently\b`,
+  String.raw`\bthen\s+coach(?:ed|es|ing)?\b`,
+  String.raw`\bbefore\s+(?:he\s+|they\s+)?coach(?:ed|es|ing)?\b`,
+  String.raw`\bafter\s+(?:he\s+|they\s+)?retired\b`,
+  String.raw`\bafter\s+(?:his|their)\s+playing\s+(?:career|days)\b`,
+  String.raw`\bonce\s+(?:he\s+|they\s+)?retired\b`,
+  String.raw`\bbecame\s+(?:a\s+)?coach(?:es)?\b`,
+  String.raw`\bturned\s+to\s+coaching\b`,
+  String.raw`\bpost[- ]playing\b`,
+].join('|'));
+
+/**
+ * The connective words the cross-domain reading OWNS and therefore
+ * consumes: the composition's own vocabulary and the competition name.
+ * Nothing here narrows the question, so consuming it cannot hide a
+ * filter -- and leaving it would decline every supported wording on
+ * leftover tokens alone.
+ */
+export const CROSS_DOMAIN_CONSUME_RE = new RegExp([
+  // "VFL/AFL" reaches this point as "vfl/": canonicalise strips the bare
+  // "afl" as conversational filler and leaves the slash attached to what
+  // remains. The slash must come with it, or the orphaned token is the
+  // one leftover word that declines an otherwise complete question.
+  String.raw`/?\bvfl\b/?`,
+  String.raw`/?\bafl\b/?`,
+  String.raw`\bplay(?:ed|s|ing)?\b`,
+  String.raw`\balso\b`,
+  String.raw`\bboth\b`,
+  String.raw`\bamong(?:st)?\b`,
+].join('|'));
+
 // ------------------------------------------------------- after the siren
 
 /**

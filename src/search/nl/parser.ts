@@ -65,6 +65,8 @@ import {
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
+  CROSS_DOMAIN_COACH_VERB_SOURCE, CROSS_DOMAIN_COMPOSITION_RE, CROSS_DOMAIN_CONSUME_RE,
+  CROSS_DOMAIN_PLAY_VERB_SOURCE, CROSS_DOMAIN_SHARED_CLUB_RE, CROSS_DOMAIN_TEMPORAL_RE,
   FIRST_KICK_CONSECUTIVE_MAX, FIRST_KICK_CONSECUTIVE_RE, FIRST_KICK_GOAL_RE,
   FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
   FATHER_SON_FATHER_CUES, FATHER_SON_FATHER_NOISE, FATHER_SON_RULE_RE,
@@ -219,6 +221,110 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
   }
 
   return { text: working, clubFor, clubAgainst, matchup, consumed };
+}
+
+// ------------------------------------------- cross-domain club role scoping
+
+type CrossDomainClubs =
+  | { ok: true; played?: NlEntityMatch<NlClubDirectoryEntry>; coached?: NlEntityMatch<NlClubDirectoryEntry> }
+  | { ok: false; reason: 'side' | 'opponent' };
+
+/** Every start offset of a word-boundary-anchored phrase, not just the first. */
+function allPhrasePositions(text: string, phrase: string): number[] {
+  const re = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+  const out: number[] = [];
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) out.push(m.index);
+  return out;
+}
+
+function allCuePositions(text: string, source: string): number[] {
+  const re = new RegExp(source, 'g');
+  const out: number[] = [];
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) out.push(m.index);
+  return out;
+}
+
+/**
+ * AFLDB-ISSUE-152 Phase F. Which side of "played ... and also coached ..."
+ * each club mention sits on, decided by the nearest VERB before it in the
+ * question as the reader wrote it -- not by extractClubs' clubFor/against
+ * roles, which are governed by prepositions and mean something else
+ * entirely here.
+ *
+ * "played for Richmond and also coached Richmond" is ONE club name in two
+ * places, so positions are read per OCCURRENCE: extractClubs collapses
+ * both mentions into a single entity match, and asking only where the
+ * first one sits would put the whole question on the playing side.
+ *
+ * Fails closed, deliberately and in three ways (operator decision F-D3):
+ * a mention with no verb before it at all ("Richmond players who also
+ * coached"), a side left empty while the other is filled ("players who
+ * coached Richmond and also played"), and two different clubs on one
+ * side. Each is a legitimate question; none has an owned coaching-club
+ * target in the wording, and guessing one is how a club filter comes to
+ * mean something the reader did not ask for.
+ */
+function assignCrossDomainClubs(
+  scanText: string,
+  mentions: readonly (NlEntityMatch<NlClubDirectoryEntry> | undefined)[],
+): CrossDomainClubs {
+  const distinct = new Map<string, NlEntityMatch<NlClubDirectoryEntry>>();
+  for (const m of mentions) {
+    if (m) distinct.set(`${m.entity.organizationId}|${m.matchedText}`, m);
+  }
+  if (distinct.size === 0) return { ok: true };
+
+  const playAt = allCuePositions(scanText, CROSS_DOMAIN_PLAY_VERB_SOURCE);
+  const coachAt = allCuePositions(scanText, CROSS_DOMAIN_COACH_VERB_SOURCE);
+
+  let played: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  let coached: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  for (const mention of distinct.values()) {
+    for (const at of allPhrasePositions(scanText, mention.matchedText)) {
+      // An OPPONENT is match scope, and neither cross-domain builder owns
+      // one. Caught here rather than left to validatePlan because this
+      // reading clears clubAgainst on its way to binding both sides:
+      // without this, "played and also coached AGAINST Carlton" would
+      // bind Carlton as the coached club and answer confidently.
+      if (AGAINST_PREPOSITION.test(scanText.slice(Math.max(0, at - 20), at))) {
+        return { ok: false, reason: 'opponent' };
+      }
+      const lastPlay = playAt.filter((i) => i < at).pop() ?? -1;
+      const lastCoach = coachAt.filter((i) => i < at).pop() ?? -1;
+      if (lastPlay < 0 && lastCoach < 0) {
+        // "Richmond players who also coached Richmond" -- the club as a
+        // leading noun adjunct on "players" IS the playing side, and it
+        // is the only unverbed position with an unambiguous role. Any
+        // other bare mention declines.
+        const after = scanText.slice(at + mention.matchedText.length);
+        if (!/^\s+players?\b/.test(after)) return { ok: false, reason: 'side' };
+        if (played && played.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        played = mention;
+        continue;
+      }
+      if (lastPlay > lastCoach) {
+        if (played && played.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        played = mention;
+      } else {
+        if (coached && coached.entity.organizationId !== mention.entity.organizationId) {
+          return { ok: false, reason: 'side' };
+        }
+        coached = mention;
+      }
+    }
+  }
+
+  // "both played for and coached Richmond": the two verbs are conjoined
+  // with no club between them, so the one club named after them is on
+  // both sides. Only this exact shape -- never inferred from a club
+  // merely appearing somewhere on its own.
+  if (!played && coached && CROSS_DOMAIN_SHARED_CLUB_RE.test(scanText)) played = coached;
+  if ((played && !coached) || (!played && coached)) return { ok: false, reason: 'side' };
+  return { ok: true, played, coached };
 }
 
 // ------------------------------------------------------------------ seasons
@@ -1622,7 +1728,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // cannot govern a later club as though the reader wrote "lost to".
   // The cue is committed only after two real clubs resolve.
   const headToHeadResult = extractHeadToHeadCue(text);
-  const clubExtraction = extractClubs(headToHeadResult.cue ? headToHeadResult.text : text, ctx.clubs);
+  // AFLDB-ISSUE-152 Phase F. The text WITH its club mentions still in
+  // place, kept so the cross-domain reading below can tell which side of
+  // "played ... and also coached ..." each club sits on. By the time that
+  // block runs the names have been spliced out of `text` and their
+  // positions -- the only evidence of role -- are gone with them.
+  const clubScanText = headToHeadResult.cue ? headToHeadResult.text : text;
+  const clubExtraction = extractClubs(clubScanText, ctx.clubs);
   text = clubExtraction.text;
   consumedTokens.push(...clubExtraction.consumed);
   let clubFor = byClubPlayer.clubFor ?? clubExtraction.clubFor;
@@ -1675,66 +1787,151 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // resolvePlayer: 368 of 386 coaches share a name with a player row, and
   // resolving "damien hardwick" as a PLAYER for a coaching question would
   // answer with his 207 playing games instead of his 307 coached ones.
-  let coachReading: 'coach_record' | 'coached_by' | 'premiership_coach' | null = null;
+  let coachReading: 'coach_record' | 'coached_by' | 'premiership_coach' | 'coached_population' | null = null;
   let coach: NlCoachRef | undefined;
   let coachMetric: string | undefined;
   let coachCondition: NlMetricCondition | undefined;
   let coachQualifierMinGames: number | undefined;
   let coachQualifierRefused = false;
+  // AFLDB-ISSUE-152 Phase F. The clubs the cross-domain composition binds
+  // as BUILDER parameters -- one owned by the playing side, one by the
+  // coaching side. Never scope.clubFor: the generic career club filter
+  // means "played for this club", and letting it stand in for the
+  // coaching side would answer "coached Richmond" (41 people) under a
+  // question that asked who both played for AND coached Richmond (27).
+  let crossDomainPlayedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  let crossDomainCoachedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
   if (COACH_CUE_RE.test(text) || COACHED_BY_RE.test(text)) {
-    const coachedBy = COACHED_BY_RE.exec(text);
-    const premiershipCoach = PREMIERSHIP_COACH_RE.exec(text);
-    const cue = COACH_CUE_RE.exec(text);
-    const phrase = coachedBy ?? premiershipCoach ?? cue!;
-    coachReading = coachedBy ? 'coached_by' : premiershipCoach ? 'premiership_coach' : 'coach_record';
-    consumedTokens.push(phrase[0]);
-    text = stripMatch(text, phrase[0]);
-    for (let cueLeft = COACH_CUE_RE.exec(text); cueLeft !== null; cueLeft = COACH_CUE_RE.exec(text)) {
-      consumedTokens.push(cueLeft[0]);
-      text = stripMatch(text, cueLeft[0]);
-    }
+    // AFLDB-ISSUE-152 Phase F. The CROSS-DOMAIN reading is elected FIRST,
+    // before coached_by, premiership_coach and coach_record. coach_record
+    // is this block's fallthrough, so electing after it would be useless:
+    // it would already have claimed the question, consumed the coaching
+    // cue, and -- with a club still in scope -- reached validatePlan as a
+    // coaching record it cannot honour. The cue is a COMPOSITION cue, not
+    // the bare COACH_CUE_RE, so an ordinary coaching question is
+    // untouched.
+    if (CROSS_DOMAIN_COMPOSITION_RE.test(text) || CROSS_DOMAIN_TEMPORAL_RE.test(text)) {
+      coachReading = 'coached_population';
 
-    // The coach directory, never searchPlayers. An absent directory (a
-    // caller that did not build one) resolves nothing, which declines.
-    if (coachReading !== 'premiership_coach') {
-      const coachMatch = findCoach(text, ctx.coaches ?? []);
-      if (coachMatch) {
-        coach = {
-          id: coachMatch.entity.id,
-          slug: coachMatch.entity.slug,
-          name: coachMatch.entity.name,
-          playerId: coachMatch.entity.playerId,
-          playerSlug: coachMatch.entity.playerSlug,
-        };
-        text = stripMatch(text, coachMatch.matchedText);
-        consumedTokens.push(coachMatch.matchedText);
-        report.entityResolution.push({
-          mention: coachMatch.matchedText, resolvedTo: coachMatch.entity.name, certainty: 1,
-        });
+      // The temporal refusal, BEFORE any predicate is emitted and before
+      // any word is consumed (D9, upheld by F-D2). Declining here, with a
+      // stated reason, is the whole point: the alternative is a silent
+      // strip that answers a question the reader did not ask.
+      if (CROSS_DOMAIN_TEMPORAL_RE.test(text)) {
+        report.confidence = 1;
+        report.notes.push(
+          'AFLDB does not record the order of a person\'s playing and coaching careers, '
+          + 'so it cannot answer whether one came after the other. '
+          + 'Ask instead who both played and coached.',
+        );
+        return { status: 'none', reason: 'unrecognised', report };
       }
-    }
 
-    if (coachReading === 'coach_record') {
-      if (COACH_WIN_PCT_RE.test(text)) {
-        const noQualifier = COACH_NO_QUALIFIER_RE.exec(text);
-        if (noQualifier) {
-          coachQualifierRefused = true;
-          consumedTokens.push(noQualifier[0]);
-          text = stripMatch(text, noQualifier[0]);
-        } else {
-          const qualifier = extractCoachMetric(text, COACH_GAMES_WORDS);
-          if (qualifier.condition && (qualifier.condition.op === 'gte' || qualifier.condition.op === 'gt')) {
-            coachQualifierMinGames = qualifier.condition.value;
-            text = qualifier.text;
-            consumedTokens.push(...qualifier.consumed);
-          }
+      // The F-D1 boundary, made explicit. The SON side of the father-son
+      // rule is deferred with D8 (AFLDB-ISSUE-153): no witness can
+      // distinguish its two readings. Refusing it here keeps the product
+      // surface honest -- without this, a phrase that declines on its own
+      // could become answerable merely by appending "and also coached",
+      // and the coaching conjunct would be doing work no reader could
+      // predict. The D8 guard itself is untouched.
+      if (FATHER_SON_RULE_RE.test(text)) {
+        report.confidence = 1;
+        report.notes.push(
+          'AFLDB cannot yet answer what "father–son" means on its own, '
+          + 'so it cannot answer it in combination with a coaching question either.',
+        );
+        return { status: 'none', reason: 'unrecognised', report };
+      }
+
+      const roles = assignCrossDomainClubs(clubScanText, [
+        clubFor, clubAgainst, matchup?.clubA, matchup?.clubB,
+      ]);
+      if (!roles.ok) {
+        report.confidence = 1;
+        report.notes.push(roles.reason === 'opponent'
+          ? 'A question about who both played and coached cannot also be scoped to an opponent.'
+          : 'A question about who both played for and coached a club must name the club on '
+            + 'each side. AFLDB cannot assume which club the coaching half means.');
+        return { status: 'none', reason: 'unrecognised', report };
+      }
+      crossDomainPlayedClub = roles.played;
+      crossDomainCoachedClub = roles.coached;
+      // Both clubs are now builder parameters. Nothing is left in match
+      // scope for a compiler to drop or a validator to have to guess at.
+      clubFor = undefined;
+      clubAgainst = undefined;
+      matchup = undefined;
+
+      for (let cue = COACH_CUE_RE.exec(text); cue !== null; cue = COACH_CUE_RE.exec(text)) {
+        consumedTokens.push(cue[0]);
+        text = stripMatch(text, cue[0]);
+      }
+      // A plain replace, not stripMatch: some of these matches end in a
+      // slash ("vfl/", what canonicalise leaves of "VFL/AFL"), and
+      // stripMatch's trailing \b would never fire on one -- leaving the
+      // token unconsumed and the loop unable to make progress. The
+      // no-progress guard is the belt to that braces.
+      for (let word = CROSS_DOMAIN_CONSUME_RE.exec(text); word !== null; word = CROSS_DOMAIN_CONSUME_RE.exec(text)) {
+        const next = text.replace(word[0], ' ').replace(/\s+/g, ' ').trim();
+        if (next === text) break;
+        consumedTokens.push(word[0]);
+        text = next;
+      }
+    } else {
+      const coachedBy = COACHED_BY_RE.exec(text);
+      const premiershipCoach = PREMIERSHIP_COACH_RE.exec(text);
+      const cue = COACH_CUE_RE.exec(text);
+      const phrase = coachedBy ?? premiershipCoach ?? cue!;
+      coachReading = coachedBy ? 'coached_by' : premiershipCoach ? 'premiership_coach' : 'coach_record';
+      consumedTokens.push(phrase[0]);
+      text = stripMatch(text, phrase[0]);
+      for (let cueLeft = COACH_CUE_RE.exec(text); cueLeft !== null; cueLeft = COACH_CUE_RE.exec(text)) {
+        consumedTokens.push(cueLeft[0]);
+        text = stripMatch(text, cueLeft[0]);
+      }
+
+      // The coach directory, never searchPlayers. An absent directory (a
+      // caller that did not build one) resolves nothing, which declines.
+      if (coachReading !== 'premiership_coach') {
+        const coachMatch = findCoach(text, ctx.coaches ?? []);
+        if (coachMatch) {
+          coach = {
+            id: coachMatch.entity.id,
+            slug: coachMatch.entity.slug,
+            name: coachMatch.entity.name,
+            playerId: coachMatch.entity.playerId,
+            playerSlug: coachMatch.entity.playerSlug,
+          };
+          text = stripMatch(text, coachMatch.matchedText);
+          consumedTokens.push(coachMatch.matchedText);
+          report.entityResolution.push({
+            mention: coachMatch.matchedText, resolvedTo: coachMatch.entity.name, certainty: 1,
+          });
         }
       }
-      const coachMetricResult = extractCoachMetric(text);
-      text = coachMetricResult.text;
-      consumedTokens.push(...coachMetricResult.consumed);
-      coachMetric = coachMetricResult.metric;
-      coachCondition = coachMetricResult.condition;
+
+      if (coachReading === 'coach_record') {
+        if (COACH_WIN_PCT_RE.test(text)) {
+          const noQualifier = COACH_NO_QUALIFIER_RE.exec(text);
+          if (noQualifier) {
+            coachQualifierRefused = true;
+            consumedTokens.push(noQualifier[0]);
+            text = stripMatch(text, noQualifier[0]);
+          } else {
+            const qualifier = extractCoachMetric(text, COACH_GAMES_WORDS);
+            if (qualifier.condition && (qualifier.condition.op === 'gte' || qualifier.condition.op === 'gt')) {
+              coachQualifierMinGames = qualifier.condition.value;
+              text = qualifier.text;
+              consumedTokens.push(...qualifier.consumed);
+            }
+          }
+        }
+        const coachMetricResult = extractCoachMetric(text);
+        text = coachMetricResult.text;
+        consumedTokens.push(...coachMetricResult.consumed);
+        coachMetric = coachMetricResult.metric;
+        coachCondition = coachMetricResult.condition;
+      }
     }
   }
 
@@ -2373,6 +2570,17 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'achievement_summary';
   } else if (headToHead) {
     grain = 'head_to_head';
+  } else if (coachReading === 'coached_population') {
+    // AFLDB-ISSUE-152 Phase F. "Who both played and coached" is a fact
+    // about a CAREER, and careerPredicates exist at no other grain.
+    // Placed before the coach_record branch: coach_record is the coaching
+    // block's default reading and would otherwise take a question whose
+    // subject is the player, not the coaching record. A career metric is
+    // still honoured -- "most career games among players who also
+    // coached" ranks players WITHIN the composition, which is a different
+    // record from "most career games" and must not read the same.
+    grain = 'player_career';
+    metric = playerMetricResult.metric ?? null;
   } else if (coachReading === 'coach_record') {
     grain = 'coach_record';
     metric = coachMetric ?? null;
@@ -2777,6 +2985,28 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   if (grain === 'player_career' && coachReading === 'premiership_coach') {
     careerPredicates.push({ builder: 'premiership_coach', params: {} });
   }
+  // AFLDB-ISSUE-152 Phase F. The cross-domain composition, as two
+  // independently compiled predicates over the same p.id. Either BOTH
+  // clubs are bound or NEITHER is -- assignCrossDomainClubs declines a
+  // one-sided composition rather than letting one half reach SQL
+  // unscoped. has_coached and coached_club never appear together: the
+  // club-scoped predicate already asserts the coaching, and asking the
+  // unscoped question alongside it would be a second, wider claim
+  // (validatePlan refuses the pair outright).
+  if (grain === 'player_career' && coachReading === 'coached_population') {
+    if (crossDomainPlayedClub && crossDomainCoachedClub) {
+      careerPredicates.push({
+        builder: 'played_for_club',
+        params: { club: String(crossDomainPlayedClub.entity.organizationId) },
+      });
+      careerPredicates.push({
+        builder: 'coached_club',
+        params: { club: String(crossDomainCoachedClub.entity.organizationId) },
+      });
+    } else {
+      careerPredicates.push({ builder: 'has_coached', params: {} });
+    }
+  }
   // AFLDB-ISSUE-152 Phase D. The population readings are parameterless
   // predicates; the per-player reading takes the resolved person's id as
   // its parameter and is paired with relationshipSubject on the plan, so
@@ -2963,6 +3193,28 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     agg,
     ...(subjectPlayer ? { player: subjectPlayer } : {}),
     ...(relationshipSubject ? { relationshipSubject } : {}),
+    // AFLDB-ISSUE-152 Phase F, and the same contract relationshipSubject
+    // carries: the two organizations the cross-domain predicates already
+    // bind, kept here ONLY so the answer can name them. The ids reaching
+    // SQL are always the builders' own bound parameters, and validatePlan
+    // refuses the plan if these two references and those parameters ever
+    // disagree.
+    ...(crossDomainPlayedClub && crossDomainCoachedClub
+      ? {
+        crossDomainClubs: {
+          played: {
+            organizationId: crossDomainPlayedClub.entity.organizationId,
+            slug: crossDomainPlayedClub.entity.slug,
+            name: crossDomainPlayedClub.entity.name,
+          },
+          coached: {
+            organizationId: crossDomainCoachedClub.entity.organizationId,
+            slug: crossDomainCoachedClub.entity.slug,
+            name: crossDomainCoachedClub.entity.name,
+          },
+        },
+      }
+      : {}),
     ...(coach && grain === 'coach_record' ? { coach } : {}),
     scope,
     ...(metricCondition ? { metricCondition } : {}),

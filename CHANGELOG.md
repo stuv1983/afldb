@@ -15,6 +15,36 @@ commit.
 
 ## [Unreleased]
 
+### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
+
+- AFLDB knows who played and it knows who coached, and until now the search box could not be asked
+  about the people who did both. It can now: "which players both played and coached", "players who
+  played VFL/AFL and also coached", "how many players have played and coached", and the club form -
+  "players who played for Richmond and also coached Richmond", "who both played for and coached the
+  Western Bulldogs", "players who played for Richmond and coached Collingwood". The composition also
+  ranks, so "most career games among players who also coached" ranks careers within that group
+  rather than ignoring half the question.
+- Holding a coach's page is not the same as having coached a match, and the two answers differ. The
+  search counts only people with an actual coaching appearance, which is 365 people rather than the
+  368 who merely hold a linked coaching identity.
+- A club on the coaching side means the club through its whole history, not one of its historical
+  names. Someone who coached the Bulldogs answers to Footscray and to the Western Bulldogs; someone
+  who coached Sydney answers to South Melbourne. Answering only the exact recorded name would have
+  quietly excluded most of them.
+- The two halves of a club question stay independent. Coaching a club does not imply having played
+  for it - fourteen people coached Richmond and never played there - so "played for Richmond and
+  also coached Richmond" returns the 27 who did both, not the 41 who coached them.
+- Both clubs are always named on their own side of the answer, and a list longer than the hundred
+  rows shown says so in the answer itself.
+- Questions AFLDB cannot honestly answer decline by name and say why. It does not record which of a
+  person's two careers came first, so "players who later coached", "players who went on to coach"
+  and "which players became a coach after retiring" all decline and say so, rather than being
+  quietly reinterpreted as the question it can answer. A club named on only one side ("Richmond
+  players who also coached") declines rather than guessing which club the coaching half means, and
+  a season, venue, opponent, round or match type on one of these questions is refused rather than
+  dropped. Father-son selections in combination with coaching are still not supported and are being
+  decided separately.
+
 ### Natural-language search - football families become answerable, in the half the data can prove (AFLDB-ISSUE-152 Phase D) - 9 September 2026
 
 - AFLDB has recorded who is whose brother, father and son for a long time, and the search box could

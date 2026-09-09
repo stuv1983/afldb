@@ -991,3 +991,99 @@ describe('validatePlan — family relationships (AFLDB-ISSUE-152 Phase D)', () =
     expect(validatePlan(relationshipPlan({ scope: { seasonMin: 2000 } }))).toHaveProperty('error');
   });
 });
+
+/**
+ * AFLDB-ISSUE-152 Phase F. Ownership, stated as refusals. Every rule
+ * here fails CLOSED: nothing is dropped on the way to SQL, and a plan
+ * shape the compiler cannot honour is refused rather than answered as a
+ * wider question.
+ */
+describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
+  const RICHMOND = { organizationId: 18, slug: 'richmond', name: 'Richmond' };
+  const COLLINGWOOD = { organizationId: 4, slug: 'collingwood', name: 'Collingwood' };
+  const hasCoached = { builder: 'has_coached', params: {} };
+  const coachedRichmond = { builder: 'coached_club', params: { club: '18' } };
+  const playedRichmond = { builder: 'played_for_club', params: { club: '18' } };
+
+  function x1(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return basePlan({ metric: null, agg: { kind: 'list' }, careerPredicates: [hasCoached], ...overrides });
+  }
+
+  function x2(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return basePlan({
+      metric: null,
+      agg: { kind: 'list' },
+      careerPredicates: [playedRichmond, coachedRichmond],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+      ...overrides,
+    });
+  }
+
+  it('accepts X1 and X2 as the parser builds them', () => {
+    expect(validatePlan(x1())).not.toHaveProperty('error');
+    expect(validatePlan(x2())).not.toHaveProperty('error');
+  });
+
+  // V1/V4 -- the existing ownership gate, asserted rather than rewritten.
+  it('V1/V4: a club in match scope is refused, because neither builder owns one', () => {
+    expect(validatePlan(x1({ scope: { clubFor: RICHMOND } }))).toHaveProperty('error');
+    expect(validatePlan(x2({ scope: { clubFor: RICHMOND } }))).toHaveProperty('error');
+  });
+
+  // V2/V3 -- the existing career-scope gates.
+  it('V2/V3: season, venue, opponent, round and match type are all refused', () => {
+    expect(validatePlan(x1({ scope: { seasonMin: 1990, seasonMax: 1999 } }))).toHaveProperty('error');
+    expect(validatePlan(x1({ scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }))).toHaveProperty('error');
+    expect(validatePlan(x1({ scope: { clubAgainst: COLLINGWOOD } }))).toHaveProperty('error');
+    expect(validatePlan(x1({ scope: { roundNumber: 5 } }))).toHaveProperty('error');
+    expect(validatePlan(x1({ scope: { matchType: 'final' } }))).toHaveProperty('error');
+  });
+
+  it('V5: the club-scoped and unscoped coaching predicates never coexist', () => {
+    expect(validatePlan(x2({
+      careerPredicates: [playedRichmond, coachedRichmond, hasCoached],
+    }))).toHaveProperty('error');
+  });
+
+  it('V9: the composition never leaks into the coach-only grain', () => {
+    expect(validatePlan(x1({ grain: 'coach_record', metric: null }))).toHaveProperty('error');
+  });
+
+  it('V10: the composition exists at career grain and nowhere else', () => {
+    expect(validatePlan(x1({ grain: 'player_season', metric: 'goals' }))).toHaveProperty('error');
+    expect(validatePlan(x1({ grain: 'player_game', mode: 'single', metric: 'goals' }))).toHaveProperty('error');
+  });
+
+  it('V6: a father–son selection is a list, never a ranking', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: 'games', agg: { kind: 'max' }, careerPredicates: [fs, hasCoached],
+    }))).toHaveProperty('error');
+  });
+
+  it('V7: a father–son selection on its own is still the deferred D8 question', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: null, agg: { kind: 'list' }, careerPredicates: [fs],
+    }))).toHaveProperty('error');
+  });
+
+  it('the named clubs and the bound ids are one fact, and cannot drift apart', () => {
+    // A reference that does not match its builder's parameter would let
+    // the sentence say Richmond while the SQL filtered Collingwood.
+    expect(validatePlan(x2({
+      crossDomainClubs: { played: RICHMOND, coached: COLLINGWOOD },
+    }))).toHaveProperty('error');
+    // A coached club with no reference could never be named in the answer.
+    expect(validatePlan(basePlan({
+      metric: null, agg: { kind: 'list' }, careerPredicates: [playedRichmond, coachedRichmond],
+    }))).toHaveProperty('error');
+    // A reference with no predicates behind it is a club the query never uses.
+    expect(validatePlan(basePlan({
+      metric: null,
+      agg: { kind: 'list' },
+      careerPredicates: [hasCoached],
+      crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
+    }))).toHaveProperty('error');
+  });
+});

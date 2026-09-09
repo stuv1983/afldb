@@ -366,8 +366,37 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    the wording explicitly says the FATHER's side, so "father-son
  *    selections" still declines while "fathers of father-son selections"
  *    answers. Both deferred decisions belong to AFLDB-ISSUE-153.
+ * 39: the cross-domain composition -- one person who both played and
+ *    coached (AFLDB-ISSUE-152 Phase F). No grain, no migration: two new
+ *    grid builders in the Coaching group, has_coached and
+ *    coached_club(organization), ANDed at player_career grain with the
+ *    existing played_for_club. Both join match_coaches, because a
+ *    `coaches` row is an identity claim and nothing more: 368 linked
+ *    coach identities exist and only 365 of those people ever coached a
+ *    match. Both fold coached clubs through clubs.organization_id, never
+ *    a raw match_coaches.club_id, which real coaches diverge on (Pagan 3
+ *    raw ids / 2 organizations, Wallace 3/2, Laidley 2/1).
+ *
+ *    The composition reading is elected inside the coaching block BEFORE
+ *    coach_record, which is that block's fallthrough and would otherwise
+ *    claim the question. Each club is assigned to the playing or the
+ *    coaching side by the nearest verb before it in the reader's own
+ *    wording, and both sides are builder parameters -- scope.clubFor is
+ *    never set, so the compiler's generic playing-club filter is never
+ *    suppressed by a coaching predicate ("played for Richmond and also
+ *    coached Richmond" is 27 people; "coached Richmond" is 41).
+ *
+ *    What is deliberately still declined: every temporal reading --
+ *    "later", "went on to coach", "became a coach" -- refused BY NAME
+ *    with a stated reason (D9, F-D2). The ordering is derivable (238 of
+ *    the 365 coached only after retiring, 0 unknown) and that is exactly
+ *    the trap: nothing in the engine OWNS it. Also declined: a club named
+ *    on one side only ("Richmond players who also coached", F-D3), any
+ *    season/venue/opponent/round/match-type scope, and the son-side
+ *    father-son composition (F-D1), which stays with D8 on
+ *    AFLDB-ISSUE-153.
  */
-export const PARSER_VERSION = 38;
+export const PARSER_VERSION = 39;
 
 // ------------------------------------------------------------------ grain
 
@@ -1081,6 +1110,23 @@ export type NlQueryPlan = {
    * is always the builder's own bound param.
    */
   relationshipSubject?: NlPlayerRef;
+  /**
+   * player_career only (AFLDB-ISSUE-152 Phase F): the two organizations a
+   * cross-domain composition binds -- "players who played for Richmond
+   * and also coached Richmond". Both are already builder parameters
+   * (played_for_club and coached_club); this is the resolved reference
+   * each id came from, carried so the answer can NAME both clubs on
+   * their own side of the sentence.
+   *
+   * Deliberately not scope.clubFor. The generic career club filter means
+   * "played for this club", and it is suppressed whenever a predicate
+   * owns the club -- which for coaching would answer "coached Richmond"
+   * (41 people) under a question that asked who both played for and
+   * coached Richmond (27). Never a substitute for the parameters:
+   * validatePlan refuses any plan where these ids and the builders' bound
+   * ids differ.
+   */
+  crossDomainClubs?: { played: NlClubRef; coached: NlClubRef };
   scope: NlMatchScope;
   /**
    * player_game/player_season only: qualify the selected metric against a
@@ -1229,6 +1275,24 @@ export const NL_RELATIONSHIP_OF_PLAYER_BUILDERS: readonly string[] = [
   'father_of_player',
   'son_of_player',
 ];
+
+/**
+ * The Phase F cross-domain builders (AFLDB-ISSUE-152): the person who
+ * both played and coached.
+ *
+ * `coached_club` is deliberately NOT in NL_CAREER_CLUB_OWNING_BUILDERS.
+ * Adding it would make careerPredicatesOwnClubFor true and suppress the
+ * compiler's generic playing-club filter, silently turning "played for
+ * Richmond and also coached Richmond" (27) into "coached Richmond" (41).
+ * Leaving it out is the fail-closed choice: a plan that ever carried both
+ * scope.clubFor and coached_club is refused rather than answered.
+ */
+export const NL_CROSS_DOMAIN_BUILDERS: readonly string[] = ['has_coached', 'coached_club'];
+
+/** True when a plan asks who both played and coached (Phase F). */
+export function isCrossDomainPlan(plan: NlQueryPlan): boolean {
+  return plan.careerPredicates.some((axis) => NL_CROSS_DOMAIN_BUILDERS.includes(axis.builder));
+}
 
 /** True when a plan's predicates include any Phase D relationship question. */
 export function isRelationshipPlan(plan: NlQueryPlan): boolean {
@@ -1710,6 +1774,72 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     }
   } else if (relationshipAxes.length > 0) {
     return { error: 'A relationship question about one player must say who that player is.' };
+  }
+
+  // AFLDB-ISSUE-152 Phase F. Every rule here REFUSES; none drops a
+  // filter. No scope reaches SQL unless a compiler or a builder
+  // explicitly owns it, and the coach-only and player-career identity
+  // spaces never mix (18 of the 386 coaches were never players).
+  const crossDomainAxes = raw.careerPredicates.filter(
+    (axis) => NL_CROSS_DOMAIN_BUILDERS.includes(axis.builder),
+  );
+  if (crossDomainAxes.length > 0) {
+    // V9/V10: the composition is a career fact and exists at no other grain.
+    if (raw.grain === 'coach_record') {
+      return { error: 'A question about who both played and coached is about players, not about a coaching record.' };
+    }
+    if (raw.grain !== 'player_career') {
+      return { error: 'A question about who both played and coached is answered across whole careers.' };
+    }
+    // V5: the club-scoped predicate already asserts the coaching. The
+    // unscoped one alongside it is a second, wider claim, and a plan
+    // carrying both would read as one question and answer another.
+    if (
+      crossDomainAxes.some((axis) => axis.builder === 'has_coached')
+      && crossDomainAxes.some((axis) => axis.builder === 'coached_club')
+    ) {
+      return { error: 'A coaching question already scoped to a club must not also ask the unscoped one.' };
+    }
+  }
+  // The two club references and the two bound builder parameters are one
+  // fact stated twice, exactly as relationshipSubject is: the sentence
+  // the reader sees and the ids reaching SQL can never drift apart.
+  const playedClubErr = validateRef(raw.crossDomainClubs?.played, 'organizationId', 'Club');
+  if (playedClubErr) return playedClubErr;
+  const coachedClubErr = validateRef(raw.crossDomainClubs?.coached, 'organizationId', 'Coached club');
+  if (coachedClubErr) return coachedClubErr;
+  const playedForClubAxes = raw.careerPredicates.filter((axis) => axis.builder === 'played_for_club');
+  const coachedClubAxes = raw.careerPredicates.filter((axis) => axis.builder === 'coached_club');
+  if (raw.crossDomainClubs) {
+    if (raw.grain !== 'player_career') {
+      return { error: 'A question about who both played for and coached a club is answered across whole careers.' };
+    }
+    if (playedForClubAxes.length !== 1 || coachedClubAxes.length !== 1) {
+      return { error: 'A played-and-coached question must bind exactly one club on each side.' };
+    }
+    if (playedForClubAxes[0].params.club !== String(raw.crossDomainClubs.played.organizationId)
+      || coachedClubAxes[0].params.club !== String(raw.crossDomainClubs.coached.organizationId)) {
+      return { error: 'The clubs named do not match the clubs the played-and-coached question filters on.' };
+    }
+  } else if (coachedClubAxes.length > 0) {
+    return { error: 'A question about coaching a club must say which club.' };
+  }
+  // V6/V7. AFLDB-ISSUE-152 Phase F leaves the SON side of the father-son
+  // rule deferred (operator decision F-D1, AFLDB-ISSUE-153), so no parser
+  // path emits father_son_selection today. These keep it that way: the
+  // predicate is a LIST of selections and never a ranking, and on its own
+  // it would answer the bare "father-son" question D8 declines because no
+  // witness can distinguish its two readings.
+  const fatherSonSelectionAxes = raw.careerPredicates.filter(
+    (axis) => axis.builder === 'father_son_selection',
+  );
+  if (fatherSonSelectionAxes.length > 0) {
+    if (raw.agg.kind === 'max' || raw.agg.kind === 'min' || raw.agg.kind === 'top_n') {
+      return { error: 'A father–son selection question is a list, not a ranking.' };
+    }
+    if (crossDomainAxes.length === 0) {
+      return { error: 'AFLDB cannot yet answer what "father–son" means on its own.' };
+    }
   }
 
   if (raw.player && raw.scope.playerIdIn) {
