@@ -6,6 +6,7 @@ import type postgres from 'postgres';
 import { cache } from 'react';
 
 import { authSql } from '@/db/authClient';
+import { hasCapability, type Capability } from '@/lib/auth/capabilities';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
 import {
   ADMIN_COOKIE,
@@ -307,6 +308,22 @@ export async function requireAdminManager(): Promise<AdminUser> {
   const admin = await requireAdmin();
   if (!hasAdminManagementAccess(admin)) redirect('/admin');
   return admin;
+}
+
+/**
+ * Require a signed-in staff session that holds a specific capability
+ * (`src/lib/auth/capabilities.ts`), or redirect exactly as requireAdmin()
+ * and requireSuperAdmin() already do: a contributor bounces to the one
+ * route they may reach, anyone else lacking the capability bounces to the
+ * dashboard. AFLDB-ISSUE-155 Phase A: a granular alternative to picking
+ * requireAdmin() vs requireSuperAdmin() by hand, for a route whose access
+ * the capability table already names. It does not replace either guard --
+ * every route that already calls one keeps doing so.
+ */
+export async function requireCapability(capability: Capability): Promise<AdminUser> {
+  const admin = await requireUploader();
+  if (hasCapability(admin, capability)) return admin;
+  redirect(admin.role === 'contributor' ? '/admin/upload' : '/admin');
 }
 
 export async function destroyAdminSession(): Promise<void> {

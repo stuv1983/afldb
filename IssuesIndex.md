@@ -2443,3 +2443,11 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
   clean rebuild. Preserved `afldb_test_pre_rebuild_20260825` stays locked, never an input.
   ISSUE-092 §11 tests 24–27 still pending.
 -->
+
+## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
+
+- **Severity:** Medium
+- **Area:** Admin / Auth / Data management / Acquisition
+- **State:** Open / In progress — Phase A (capability policy + Admin Centre nav) implemented and verified 2026-09-10. Phase B (Super Admin user lifecycle) implemented and validated 2026-09-10, record in `AFLDB-ISSUE-155.md` §26.20: promote/demote/deactivate/reactivate in one transaction under `pg_advisory_xact_lock(717275, 2)`, deactivate-not-delete, transactional last-viable-Super-Admin invariant, no self-demote/deactivate, session revoke on every transition, atomic audit, no migration. Gates: 98/98 unit+action, 17/17 DB integration and deterministic concurrency, typecheck green, desktop 1440×900 and mobile 375×812 browser acceptance passed. Both phases are uncommitted in the worktree. Phases C–I not started.
+- **Key files/subsystems:** `src/lib/auth/capabilities.ts`, `src/lib/auth/session.ts`, `src/app/admin/admins/**`, `src/lib/auth/admin-lifecycle.ts`, `src/db/queries/admin-users.ts`, `admins/lifecycle-actions.ts`, `LifecycleControls.tsx`; later phases: Brownlow and coach queries/importers, manual authority/overrides, site content/settings, current-season acquisition.
+- **Next action:** Operator review and commit of the uncommitted Phase A + Phase B working tree, then plan Phase C (Brownlow administration) in a fresh Opus High session.

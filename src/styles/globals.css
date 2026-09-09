@@ -1291,7 +1291,14 @@ details.admin-section > summary h2 {
     padding-bottom: 0.75rem;
   }
   .admin-nav.collapsed { border-bottom: 0; padding-bottom: 0; }
-  .admin-nav-body {
+  /* :not([hidden]) -- AdminNav sets the `hidden` attribute, not a class, when
+     collapsed (see its own comment on why: find-in-page and the keyboard can
+     open it too, same reasoning as AdminSection's <details>). An unqualified
+     `display: grid` here outranks the UA [hidden] rule regardless of
+     specificity, since author CSS always beats the UA stylesheet -- so the
+     "single toggle button" this media query's block comment describes was
+     never actually reachable at this width. */
+  .admin-nav-body:not([hidden]) {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
     gap: 0.75rem 1.5rem;

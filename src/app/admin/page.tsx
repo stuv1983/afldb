@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
+import { listUnresolvedLinks } from '@/db/queries/player-links';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
@@ -18,7 +19,11 @@ export const metadata: Metadata = {
 export default async function AdminDashboard() {
   const admin = await requireAdmin();
 
-  const [{ gridAudience }, submissions, recentAudit] = await Promise.all([
+  // The overview badges (AFLDB-ISSUE-155 Phase A) want role-filtered, cheap
+  // counts of open work. Player-link resolution is super-admin-only, so the
+  // (unpaginated) unresolved-link read only runs for that role -- the same
+  // query the player-links page itself already runs on every visit.
+  const [{ gridAudience }, submissions, recentAudit, unresolvedLinks] = await Promise.all([
     getSiteSettingsForAdmin(),
     authSql<{
       id: number; dataset: string; filename: string; status: string;
@@ -37,6 +42,7 @@ export default async function AdminDashboard() {
        ORDER BY at DESC
        LIMIT 15
     `,
+    admin.role === 'super_admin' ? listUnresolvedLinks() : Promise.resolve([]),
   ]);
 
   const pending = submissions.filter((s) => ['staged', 'validated'].includes(s.status));
@@ -52,7 +58,16 @@ export default async function AdminDashboard() {
 
       {pending.length > 0 && (
         <p className="notice">
-          {pending.length} submission{pending.length === 1 ? '' : 's'} awaiting review.
+          <a href="#submissions">
+            {pending.length} submission{pending.length === 1 ? '' : 's'} awaiting review.
+          </a>
+        </p>
+      )}
+      {unresolvedLinks.length > 0 && (
+        <p className="notice">
+          <Link href="/admin/player-links">
+            {unresolvedLinks.length} player link{unresolvedLinks.length === 1 ? '' : 's'} awaiting resolution.
+          </Link>
         </p>
       )}
 
@@ -66,7 +81,7 @@ export default async function AdminDashboard() {
         Currently open to {GRID_AUDIENCES.find((a) => a.value === gridAudience)?.label.toLowerCase()}.
       </p>
 
-      <section className="section">
+      <section id="submissions" className="section">
         <div className="split-head">
           <h2>Data submissions</h2>
           <Link className="more" href="/admin/upload">Upload a file →</Link>

@@ -15,6 +15,46 @@ commit.
 
 ## [Unreleased]
 
+### Administrator account lifecycle (AFLDB-ISSUE-155 Phase B) - 10 September 2026
+
+- A super admin can now promote, demote, deactivate and reactivate an administrator account from
+  `/admin/admins`, instead of an account's role and status being changeable only in the database.
+  Demotion also clears `can_manage_admins`; deactivation asks for the account's email to be typed
+  and for a short reason.
+- Accounts are never deleted. Deactivation is the end of access, not the end of the record: the
+  account and everything it has ever edited, reviewed or resolved are kept, and a deactivated
+  account cannot sign in and holds no live session. Reactivation restores access and revives no
+  previous session.
+- The site cannot be left without a way in. Demoting or deactivating the last super admin who could
+  actually sign in - enabled, with a password and an enrolled authenticator - is refused, and the
+  count is taken inside the same transaction as the change, under an advisory lock, so two super
+  admins acting at the same moment cannot each remove the other. Nobody can demote or deactivate
+  their own account.
+- Every successful change signs the target out of all their sessions and writes its audit row in
+  the same transaction as the change itself: if the trail cannot be written, nothing is. Refusals
+  that say something about a real account - a stale page, a self-action, a lost invariant - are
+  audited too, and a stale page is told the account changed rather than being silently reapplied.
+- Lifecycle actions are super-admin-only, enforced by the Server Actions themselves.
+  `can_manage_admins` keeps its existing invite and password-reset delegation and gains no power
+  over roles or account status. An ordinary admin keeps the page and their own sessions, and can
+  now sign out only their own session rather than anyone's.
+
+### Admin Centre navigation and capability policy (AFLDB-ISSUE-155 Phase A) - 10 September 2026
+
+- The admin sidebar's flat, hand-conditioned link list is replaced with a grouped Admin Centre
+  layout — Overview, Data, Acquisition, People & access, Site, Operations, Account — driven by a
+  new central capability policy (`src/lib/auth/capabilities.ts`) rather than a `superAdmin ? … : …`
+  local to the nav. Every existing route keeps its own server-side guard unchanged; the policy
+  describes enforcement that already existed, it grants nothing new.
+- The Grid Solver link is removed from the admin sidebar — it is a public tool, not an
+  administrative capability — while `/admin/grid-solver` remains as a compatibility redirect for
+  old bookmarks.
+- The admin dashboard gained two overview badges: pending submissions and, for super admins,
+  unresolved player links, each linking to the page that resolves it.
+- Fixed a pre-existing responsive defect in the admin sidebar: on a narrow screen the sidebar was
+  meant to default to collapsed (a single toggle button), but a CSS rule forced it open regardless
+  of that state, so every mobile admin page load showed the full sidebar above the page content.
+
 ### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
 
 - AFLDB knows who played and it knows who coached, and until now the search box could not be asked

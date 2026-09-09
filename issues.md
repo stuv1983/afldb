@@ -557,6 +557,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
+| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A and B complete and validated | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §26.20; next: plan Phase C, Brownlow administration (Opus High) |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -20845,3 +20846,97 @@ sizing the choice first by running `ISSUE-152-nl-evidence.sql` §3.1, §3.2, §3
 §4.1 against `afldb_test` READ ONLY. Then allocate a branch and worktree and implement.
 Resolve only when both pages' prose and queries agree and the boards have been eyeballed
 on DEV.
+
+## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
+
+**Status:** Open / In progress — Phase A and Phase B complete and validated; Phases C–I not started
+**Severity:** Medium
+**Area:** Admin / Authentication / Data management / Acquisition
+**Found:** 2026-09-10
+**Runbook:** `AFLDB-ISSUE-155.md`
+
+### Problem
+
+The Admin Centre has grown feature-by-feature. Role visibility and server-side guards exist, but high-value data work, acquisition, access, content, health and QA are spread across a flat route set with different authority and audit models. AFLDB now has stronger canonical sources, manual mutation support, provenance, durable overrides and auditing, but it lacks coherent Brownlow, coach, special-record and administrative-user workflows. Browser CSV intake also needs a dataset-by-dataset retirement review rather than blanket removal.
+
+### Scope
+
+- Define a role-aware Admin Centre information architecture and a server-enforced capability matrix.
+- Add planned workflows for Brownlow round entry/finalisation, coach identity and match-grain tenure, admin-user role/deactivation lifecycle, structured public text, and first-kick/after-siren records.
+- Preserve Brownlow source authority, stable identity, historical club identity, NULL/coverage semantics, manual provenance, durable override/reload survival, required atomic data-edit auditing and database-role separation.
+- Retain only allowlisted, bounded Super Admin refreshes; leave rebuilds, migrations, arbitrary SQL/shell/Git/deployment and unrestricted importer arguments operator-only.
+- Review staged browser file intake by registered dataset, preserving internal importer/recovery formats where still owned.
+
+### Confirmed current-state evidence
+
+- Current auth distinguishes contributor, Admin and Super Admin; page/action guards are server-side, while navigation is presentation only.
+- Existing Admin routes cover staged upload/submissions, access/admin accounts, data editor, player links, current-season acquisition, content/settings, QA and health. Brownlow, coaches and special records have no dedicated admin routes.
+- Brownlow round and season/career authority is protected; generic match and awards mutations must not become a second authority.
+- Coach identities already permit nullable player links and match-grain club assignments, supporting coach-only people and mid-season changes.
+- `data_overrides`, `manual_admin_edit`, required `data_edits` and fail-closed ownership checks are existing foundations.
+- Disabled auth users are already rejected by session loading, so durable deactivation is preferable to hard deletion.
+- Existing site content/settings and current-season controls should be extended rather than replaced.
+
+### Planning state
+
+An implementation-ready candidate runbook is saved in `AFLDB-ISSUE-155.md`. It contains source-of-truth and permissions matrices, Admin Centre routes, domain workflows, proposed migrations, security/audit/cache contracts, test and deployment sequencing, bounded implementation phases, projected files, validation gates, stop conditions and two owner decisions.
+
+### Phase A — Capability policy and Admin Centre information architecture (2026-09-10)
+
+**Implemented and verified**, per the runbook's Phase A scope (§23) and validation gate.
+
+Files changed:
+
+- `src/lib/auth/capabilities.ts` (new) — the capability policy: a `Capability` union covering every existing gated admin surface (`data.playerLinks`, `data.dataEditor`, `acquisition.legacyIntake`, `acquisition.currentSeason`, `people.betaAccess`, `people.admins.read`, `people.admins.manage`, `site.content`, `site.settings`, `operations.queryBuilder`, `operations.dbHealth`, `operations.appHealth`, `operations.nlTelemetry`) and `hasCapability()`. Kept pure (no `server-only`) because `AdminNav` (a Client Component) imports the same module tree via `nav-model.ts`. Every role list was checked against the actual `requireAdmin`/`requireSuperAdmin`/`requireUploader` call already on each page before being encoded — the table describes existing enforcement, it does not grant anything new.
+- `src/lib/auth/session.ts` — added `requireCapability(capability)`, a granular guard built on `requireUploader()` + `hasCapability()`, redirecting exactly as `requireAdmin`/`requireSuperAdmin` already do. `requireAdmin`, `requireSuperAdmin`, `requireUploader` and `requireAdminManager`, and every existing page/action's own guard call, are unchanged.
+- `src/app/admin/nav-model.ts` — `adminNavFor` now derives visibility from `hasCapability()` instead of a local boolean, and the groups match the runbook's target IA (§7): Overview, Data (Player links, Data editor), Acquisition (Current season, Legacy file intake — renamed from "Upload a file"), People & access (Beta access, Administrators), Site, Operations (Data QA search, DB/App health, Search telemetry, Reader feedback), Account. A group empty for a given viewer is omitted rather than shown with no links. The Grid Solver link is removed from the admin nav per the runbook's explicit instruction (§7); the `/admin/grid-solver` compatibility redirect route itself is untouched. No route was added, renamed or removed.
+- `src/app/admin/page.tsx` — overview badges (§7): pending-submissions count (existing data, now linking to the submissions section) and unresolved-player-links count for super admins (reuses the existing `listUnresolvedLinks()` query, no new SQL).
+- `tests/auth.test.ts` — extended (no new test file) with unit coverage for `hasCapability`, `adminNavFor` (all three roles, Grid Solver absence, group ordering/omission) and `isCurrentAdminPath`.
+- `src/styles/globals.css` — fixed a pre-existing responsive defect found during the Phase A browser check: at ≤900px, `.admin-nav-body { display: grid; ... }` had no `[hidden]` exception, so it overrode the browser's default `[hidden] { display: none }` rule regardless of the `AdminNav` collapsed state. The nav's mobile default (collapse to a single toggle button) was therefore never actually reachable — every narrow-width load rendered the full expanded sidebar above the page content. Scoped the rule to `.admin-nav-body:not([hidden])`. Pre-existing, not introduced by this phase; fixed in place because it directly blocked the Phase A responsive requirement (§7: "The navigation must collapse to a labelled menu on narrow screens") this session was asked to verify.
+
+No migrations. No database privilege change. No admin route added, removed or redirected.
+
+Validation completed:
+
+- `npm run test -- tests/auth.test.ts` — 44/44 passed.
+- `npm run typecheck` — passed.
+- Browser check, signed in as super admin against the local dev server (`localhost:3100`): desktop (1440×900) — full grouped nav renders (Overview/Data/Acquisition/People & access/Site/Operations/Account), both overview badges render with live counts (25 pending submissions, 7,143 unresolved player links) and link correctly (submissions badge jumps to `#submissions`, player-links badge routes to `/admin/player-links`); mobile (375×812) — nav defaults to collapsed (single toggle button, no page content pushed down), the toggle expands/collapses correctly, a link from the expanded mobile nav (`/admin/db-health`) routes correctly, no page-level horizontal overflow, no console errors.
+
+### Phase B — Super Admin user lifecycle: planning complete (2026-09-10)
+
+Planning-only session (native inspection, no commands, no source edits). The implementation-ready contract is `AFLDB-ISSUE-155.md` §26, which governs over §10 where they differ. Decisions recorded there:
+
+- **Deactivate, never delete.** Sixteen FK columns reference `auth_users`, all `NO ACTION` except `auth_sessions` (cascade); `data_edits`, `player_link_resolutions`, `data_overrides`, `admin_invites` and `data_submissions` attribution columns are NOT NULL; `afldb_auth` holds no DELETE on `auth_users`. No delete mutation will be implemented. `disabled_at` is the existing status primitive and is already enforced by `getAdminUser` and `adminLogin`.
+- **Viable Super Admin** = `role='super_admin' AND disabled_at IS NULL AND password_hash IS NOT NULL AND totp_secret IS NOT NULL`. Demote/deactivate of a super admin commits only if at least one other viable super admin remains, counted inside the transaction.
+- **Concurrency:** one `pg_advisory_xact_lock` constant key serialising all lifecycle mutations, plus `FOR UPDATE` on actor and target, compare-and-set on the role/active state the page rendered, session revoke and `auditInTransaction` in the same `authSql.begin()` transaction. No migration, no epoch, no SERIALIZABLE.
+- **Self-demotion and self-deactivation refused.** Actor re-read under the lock.
+- **Sessions:** every role/status change (promotion included) revokes the target's sessions; reactivation revives none and leaves credentials to the existing temporary-password control.
+- **Permissions:** lifecycle mutations are `super_admin`-only via `requireSuperAdmin` and a new `people.admins.lifecycle` capability; `can_manage_admins` keeps invite/reset delegation, gains no lifecycle power, and is cleared on demotion. Ordinary admins keep the page (`people.admins.read`) but see only their own sessions and may revoke only their own; `revokeSession` gets the matching ownership rule (today any admin can revoke any session).
+- **Migration required: no.**
+- **Planned files:** `capabilities.ts` (+1 capability), new `src/lib/auth/admin-lifecycle.ts`, new `src/db/queries/admin-users.ts`, new `admins/lifecycle-actions.ts` and `LifecycleControls.tsx`, edits to `admins/page.tsx`, `AdminSessionsClient.tsx`, `actions.ts`; tests in `tests/auth.test.ts`, new `tests/admin-lifecycle-actions.test.ts`, new `tests/integration/admin-lifecycle.test.ts` (incl. a deterministic two-connection race using `pg_blocking_pids`).
+- Implementation preflight P1–P4 and the handoff prompt are in §26.16 and §26.19.
+
+### Phase B — Super Admin user lifecycle: implemented and validated (2026-09-10)
+
+Implemented to `AFLDB-ISSUE-155.md` §26; the full record, including every deviation and its rationale, is §26.20.
+
+**Delivered.** Four lifecycle transitions on `/admin/admins`, super-admin-only: promote, demote (clearing `can_manage_admins`), deactivate (typed email plus a required reason) and reactivate. Each runs as one `authSql.begin()` transaction: `pg_advisory_xact_lock(717275, 2)`, `FOR UPDATE` on actor and target, every rule re-derived from those rows, compare-and-set against the `expectedRole`/`expectedActive` the page rendered, the viable-super-admin count taken under the lock, the target's live sessions revoked, and `auditInTransaction` — commit or nothing. No hard delete anywhere; no migration; no grant, FK or privilege change.
+
+**Enforcement, as built.** Self-demotion and self-deactivation are refused, and the viewer's own card renders no lifecycle controls at all. The last viable super admin cannot be demoted or deactivated, including under a genuine two-connection race. `can_manage_admins` gains no lifecycle power. Every Server Action calls `requireSuperAdmin()` for itself; `people.admins.lifecycle` is capability metadata that describes that guard rather than replacing it. Reactivation revives no previous session. A failed compare-and-set is reported as `stale`, never as success, and audited as `admin.lifecycle_refused`.
+
+**Files.** New: `src/lib/auth/admin-lifecycle.ts`, `src/db/queries/admin-users.ts`, `src/app/admin/admins/lifecycle-actions.ts`, `src/app/admin/admins/LifecycleControls.tsx`, `tests/admin-lifecycle-actions.test.ts`, `tests/integration/admin-lifecycle.test.ts`. Modified: `src/lib/auth/capabilities.ts` (Phase A's table, one capability added), `src/app/admin/admins/page.tsx`, `src/app/admin/admins/AdminSessionsClient.tsx`, `src/app/admin/admins/actions.ts`, `tests/auth.test.ts`.
+
+**Validation.**
+
+- `npm run test -- tests/auth.test.ts tests/admin-lifecycle-actions.test.ts` — **98/98 passed** (67 + 31), re-run green after the browser-driven UI corrections.
+- `npm run test -- tests/integration/admin-lifecycle.test.ts` — **17/17 passed** (16.5 s) against `afldb_test`, including the atomic mutation-plus-audit case, the audit-failure rollback case, the deactivated account that cannot sign in and is still refused by the delete guard, the deterministic mutual-demotion race (the loser waits on the lock, re-reads its own row and refuses) and the concurrent-deactivation case proving the invariant is counted under the lock.
+- `npm run typecheck` — **passed**.
+- **Browser acceptance, DEV, super admin.** Preflight P1: four viable super admins. Desktop 1440×900 — list, roles, statuses and the "You" marker render; own-account card offers no lifecycle controls; a full promote → demote → deactivate → reactivate round trip on `e2e-plain-admin@afldb.test` verified in `auth_users` and `auth_audit_log` (rows **771–785**, all against that one test account: fourteen committed transitions, the round trip having been repeated to verify the UI corrections and again at mobile width, plus one audited refusal at row 782, `code: stale`; each committed row carries before/after/expected/target/revokedSessions); the mismatched-typed-email refusal and a genuinely stale second tab were both refused cleanly, the latter audited as `code: stale` with nothing written. Mobile 375×812 — admin menu still collapses and expands (Phase A intact), controls and the deactivation form fit the viewport, promote/demote round trip works with visible confirmation. Zero console errors at both widths. Every account was restored to its starting state.
+
+**Browser-driven fixes (UI layer only, no server/SQL/audit change).** Acceptance showed the four success confirmations were never visible: a successful mutation revalidates the page, swaps the submitting control for the next one and, for deactivate/reactivate, moves the card between the active and deactivated lists and remounts it, so a result held inside the control was discarded by the same commit that produced it. The result is now owned by `AdminSessionsClient` above both lists and rendered from a prop; a deactivated card stays open while it holds one; and the deactivation `reason`/`confirmEmail` inputs are controlled so a refusal no longer clears what was typed. Refusals were correct throughout, before and after.
+
+**Follow-up, not a Phase B defect:** the privilege suite asserts `afldb_auth` access to `auth_users` but has no explicit negative assertion for `DELETE ON auth_users`. Phase B adds no delete path and changes no grants; worth adding when that suite is next edited.
+
+**Known cosmetic observation, not caused by Phase B:** at 375 px the page scrolls 6 px horizontally, entirely from the shared `details.table-details > summary` (a `flex-wrap: nowrap` row whose long email title plus `.table-details-note` cannot shrink). Hiding the note removes the overflow exactly. A one-line `flex-wrap: wrap` on that shared rule would fix it site-wide and was left for the owner.
+
+**Exact next action:** operator review and commit of the uncommitted Phase A + Phase B working tree, then plan **Phase C (Brownlow administration)** in a fresh **Opus High** session.

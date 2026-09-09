@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { AdminSessionsClient } from '@/app/admin/admins/AdminSessionsClient';
 import { InviteManager } from '@/app/admin/admins/InviteManager';
 import { authSql } from '@/db/authClient';
+import { listAdminAccounts } from '@/db/queries/admin-users';
 import { hasAdminManagementAccess, requireAdmin } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -10,20 +11,6 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Administrators',
   robots: { index: false, follow: false },
-};
-
-type SessionRow = {
-  userId: number;
-  email: string;
-  role: string;
-  canManageAdmins: boolean;
-  mustChangePassword: boolean;
-  passwordChangedAt: Date | null;
-  sessionId: number | null;
-  createdAt: Date | null;
-  expiresAt: Date | null;
-  ip: string | null;
-  userAgent: string | null;
 };
 
 type InviteRow = {
@@ -39,21 +26,15 @@ type InviteRow = {
 };
 
 export default async function AdminsPage() {
+  // Ordinary admins keep this page: they read the account list and manage
+  // their OWN sessions. The lifecycle controls are rendered only for a
+  // super admin, and the four Server Actions behind them call
+  // requireSuperAdmin() for themselves (AFLDB-ISSUE-155 Phase B §26.9).
   const admin = await requireAdmin();
   const canManage = hasAdminManagementAccess(admin);
 
-  const [rows, invites] = await Promise.all([
-    authSql<SessionRow[]>`
-      SELECT u.id AS "userId", u.email, u.role, u.can_manage_admins AS "canManageAdmins",
-             u.must_change_password AS "mustChangePassword",
-             u.password_changed_at  AS "passwordChangedAt",
-             s.id AS "sessionId", s.created_at AS "createdAt", s.expires_at AS "expiresAt",
-             s.ip::text AS ip, s.user_agent AS "userAgent"
-        FROM auth_users u
-        LEFT JOIN auth_sessions s
-          ON s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()
-       ORDER BY u.email, s.created_at DESC
-    `,
+  const [{ accounts, sessions }, invites] = await Promise.all([
+    listAdminAccounts(authSql, { id: admin.id, role: admin.role }),
     canManage
       ? authSql<InviteRow[]>`
           SELECT i.id, i.email, i.role, i.can_manage_admins AS "canManageAdmins",
@@ -67,10 +48,10 @@ export default async function AdminsPage() {
       : Promise.resolve([]),
   ]);
 
-  const admins = new Map<string, SessionRow[]>();
-  for (const row of rows) {
-    if (!admins.has(row.email)) admins.set(row.email, []);
-    admins.get(row.email)!.push(row);
+  const sessionsByUser = new Map<number, typeof sessions>();
+  for (const session of sessions) {
+    if (!sessionsByUser.has(session.userId)) sessionsByUser.set(session.userId, []);
+    sessionsByUser.get(session.userId)!.push(session);
   }
 
   return (
@@ -78,32 +59,40 @@ export default async function AdminsPage() {
       <div className="page-header">
         <h1>Administrators</h1>
         <p className="subtitle">
-          {canManage
-            ? 'Invite new admins below, reset a forgotten password, or sign a live '
-              + 'session out.'
-            : 'This page can sign a live session out. Ask a super admin for an invite link.'}
+          {admin.role === 'super_admin'
+            ? 'Promote, demote, deactivate or reactivate an account, invite new admins, '
+              + 'reset a forgotten password, or sign a live session out. Accounts are '
+              + 'never deleted.'
+            : canManage
+              ? 'Invite new admins below, reset a forgotten password, or sign your own '
+                + 'session out.'
+              : 'This page lists the accounts and can sign your own session out. '
+                + 'Ask a super admin for an invite link.'}
         </p>
       </div>
 
       <AdminSessionsClient
         canManage={canManage}
-        viewerId={admin.id}
-        admins={[...admins.entries()].map(([email, sessions]) => ({
-          userId: sessions[0].userId,
-          email,
-          role: sessions[0].role,
-          canManageAdmins: sessions[0].canManageAdmins,
-          mustChangePassword: sessions[0].mustChangePassword,
-          passwordChangedAt: sessions[0].passwordChangedAt?.toISOString() ?? null,
-          sessions: sessions
-            .filter((s) => s.sessionId !== null)
-            .map((s) => ({
-              sessionId: s.sessionId!,
-              createdAt: s.createdAt!.toISOString(),
-              expiresAt: s.expiresAt!.toISOString(),
-              ip: s.ip,
-              userAgent: s.userAgent,
-            })),
+        viewer={{ id: admin.id, role: admin.role }}
+        admins={accounts.map((account) => ({
+          id: account.id,
+          email: account.email,
+          role: account.role,
+          canManageAdmins: account.canManageAdmins,
+          disabledAt: account.disabledAt?.toISOString() ?? null,
+          hasPassword: account.hasPassword,
+          hasTotp: account.hasTotp,
+          mustChangePassword: account.mustChangePassword,
+          passwordChangedAt: account.passwordChangedAt?.toISOString() ?? null,
+          createdAt: account.createdAt.toISOString(),
+          lastSignInAt: account.lastSignInAt?.toISOString() ?? null,
+          sessions: (sessionsByUser.get(account.id) ?? []).map((s) => ({
+            sessionId: s.sessionId,
+            createdAt: s.createdAt.toISOString(),
+            expiresAt: s.expiresAt.toISOString(),
+            ip: s.ip,
+            userAgent: s.userAgent,
+          })),
         }))}
       />
 
