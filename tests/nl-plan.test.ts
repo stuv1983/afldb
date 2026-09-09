@@ -1054,17 +1054,45 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
     expect(validatePlan(x1({ grain: 'player_game', mode: 'single', metric: 'goals' }))).toHaveProperty('error');
   });
 
-  it('V6: a father–son selection is a list, never a ranking', () => {
+  // V6 -- narrowed by AFLDB-ISSUE-153 Stage 2 to the composition D9 is
+  // actually about. The COMPOSED question is still a list and never a
+  // ranking; the plain FS1 ranking is now the exact mirror of the shipped
+  // father-side rel_024 and must answer, or the son side would be denied a
+  // wording the father side is given (decision Q1 consequence 3).
+  it('V6: a father–son selection COMPOSED with coaching is a list, never a ranking', () => {
     const fs = { builder: 'father_son_selection', params: {} };
     expect(validatePlan(basePlan({
       metric: 'games', agg: { kind: 'max' }, careerPredicates: [fs, hasCoached],
     }))).toHaveProperty('error');
   });
 
-  it('V7: a father–son selection on its own is still the deferred D8 question', () => {
+  it('V6: the UNcomposed father–son selection ranking answers, mirroring the father side', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: 'games', agg: { kind: 'max' }, careerPredicates: [fs],
+    }))).not.toHaveProperty('error');
+  });
+
+  // V7 is GONE: D8 is decided (operator decision Q1), so a father–son
+  // selection standing on its own is FS1 and answers. The bare and
+  // collective forms still decline, but they decline in the parser now,
+  // at the narrowed FATHER_SON_RULE_RE guard, which is where the
+  // explicit-versus-collective distinction actually lives.
+  it('V7 is retired: a father–son selection on its own is FS1 and answers', () => {
     const fs = { builder: 'father_son_selection', params: {} };
     expect(validatePlan(basePlan({
       metric: null, agg: { kind: 'list' }, careerPredicates: [fs],
+    }))).not.toHaveProperty('error');
+  });
+
+  // V6b. "by club" on a selection question means the SELECTING club, and
+  // the generic metric extractor reads it as clubs_played -- the number of
+  // clubs the player went on to play for. Refused rather than answered
+  // with the plausible wrong number.
+  it('V6b: a father–son selection never answers a clubs_played reading of "by club"', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: 'clubs_played', agg: { kind: 'list' }, careerPredicates: [fs],
     }))).toHaveProperty('error');
   });
 

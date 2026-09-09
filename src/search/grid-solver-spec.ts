@@ -438,6 +438,13 @@ export const GRID_BUILDERS: Record<string, GridBuilderDef> = {
   // selected. Linked rows only, the draft and Hall of Fame rule.
   father_son_selection: { key: 'father_son_selection', label: 'Father–son selection', group: 'Draft & recruitment', params: [] },
   father_son_father: { key: 'father_son_father', label: 'Father of a father–son selection', group: 'Draft & recruitment', params: [] },
+  // AFLDB-ISSUE-153 Stage 3 (FS2/FS3). The club that MADE the selection,
+  // folded by organization lineage, and the year the selection was made.
+  // The year parameter is deliberately labelled "draft year" everywhere a
+  // reader can see it: draft_year is not a playing season, and 0 of the
+  // 99 linked selected players debuted in theirs.
+  father_son_selection_for_club: { key: 'father_son_selection_for_club', label: 'Father–son selection by club', group: 'Draft & recruitment', params: [club()] },
+  father_son_selection_between: { key: 'father_son_selection_between', label: 'Father–son selection, draft years', group: 'Draft & recruitment', params: [season('from', 'From draft year'), season('to', 'To draft year')] },
   // National draft only (draft_kind = 'national'), unlike draft_pick_between
   // which spans every draft kind -- "pick 1 in the National Draft".
   national_draft_pick_between: { key: 'national_draft_pick_between', label: 'National Draft pick between', group: 'Draft & recruitment', params: [int('from', 'From pick'), int('to', 'To pick')] },

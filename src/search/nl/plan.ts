@@ -395,8 +395,35 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  *    season/venue/opponent/round/match-type scope, and the son-side
  *    father-son composition (F-D1), which stays with D8 on
  *    AFLDB-ISSUE-153.
+ *
+ * v40 -- AFLDB-ISSUE-153 Stages 2-5, ONE version for the whole semantic
+ * checkpoint. Operator decision Q1 (D8) binds explicit father-son
+ * RULE/SELECTION/DRAFT/PICK wording, and "father-son" plus an explicit
+ * ROLE noun (Q1a option (a)), to father_son_selections -- the
+ * authoritative record, of which player_relationships.parent_child is a
+ * same-source, same-batch projection measured set-identical to it (Stage
+ * 0 §4.1). The binding is symmetric: the son side (FS1, 99) gets exactly
+ * the wording the father side (FS4, 107) already ships, and neither gets
+ * one the other is denied.
+ *
+ * What arrives with it: FS1 as a population; FS2 club scope and FS3
+ * draft-year scope, each OWNED by its builder so a club or a year is
+ * never silently discarded, and draft_year never read as a playing
+ * season (0 of 99 selected players debuted in their draft year, §4.4);
+ * FS6 as a distribution over the 127 SELECTION EVENTS, which is a
+ * different denominator from the 99 linked players and is said so in the
+ * answer; and X3, the composition with actual coaching.
+ *
+ * What is deliberately still declined: the bare and collective forms --
+ * "father-son players", "father-son pairs", "father-son duos",
+ * "father-son families" -- which stop at the narrowed
+ * FATHER_SON_RULE_RE guard in the parser, because that wording really is
+ * ambiguous between the rule and any father and son, and C3/C4 already
+ * serve the relationship reading. Every ISSUE-152 freeze holds: no
+ * chronology contract, actual coaching still required, one-sided club
+ * composition still fails closed.
  */
-export const PARSER_VERSION = 39;
+export const PARSER_VERSION = 40;
 
 // ------------------------------------------------------------------ grain
 
@@ -520,6 +547,22 @@ export type NlAchievementSummary = {
   achievementKey: NlAchievementKey;
   kind: NlAchievementSummaryKind;
 };
+
+/**
+ * AFLDB-ISSUE-153 Stage 4 (FS6). The father-son SELECTION distribution.
+ *
+ * Two groupings, and both are properties of the SELECTION rather than of
+ * the player: the club that made it, folded by organization lineage, and
+ * the year it was made. The year is a draft year, which is why the kind
+ * is named `by_draft_year` and not `by_season` -- 0 of the 99 linked
+ * selected players debuted in the season they were drafted, so the two
+ * would be different groupings of different rows (Stage 0 §4.4).
+ */
+export type NlFatherSonSummaryKind = 'by_club' | 'by_draft_year';
+
+const NL_FATHER_SON_SUMMARY_KINDS: readonly NlFatherSonSummaryKind[] = ['by_club', 'by_draft_year'];
+
+export type NlFatherSonSummary = { kind: NlFatherSonSummaryKind };
 
 export type NlHeadToHeadKind = 'record' | 'compare_wins' | 'draw_count' | 'last_draw';
 
@@ -1142,6 +1185,14 @@ export type NlQueryPlan = {
   clubSeasonConditions: NlClubSeasonCondition[];
   /** achievement_summary only: which achievement, summarised which way. */
   achievementSummary?: NlAchievementSummary;
+  /**
+   * achievement_summary only (AFLDB-ISSUE-153 Stage 4, FS6): the father-son
+   * SELECTION distribution. It shares the grain and the payload shape with
+   * an achievement summary and nothing else -- it summarises
+   * father_son_selections, not player_achievements -- so it is its own
+   * field and the two are mutually exclusive.
+   */
+  fatherSonSummary?: NlFatherSonSummary;
   /** head_to_head only: the relationship answer requested for scope.matchup. */
   headToHead?: NlHeadToHead;
   /** team_streak only: whether the streak is of wins or losses. */
@@ -1244,10 +1295,24 @@ export const NL_CONFIDENCE = {
 export const NL_CAREER_SEASON_OWNING_BUILDERS: readonly string[] = [
   'debuted_between',
   'first_kick_goal_between',
+  // AFLDB-ISSUE-153 Stage 3 (FS3). This one owns the year range as a
+  // DRAFT year, not a playing season -- the only builder in this list
+  // whose year is not a season at all. It is here because ownership is
+  // about which builder consumes scope.seasonMin/seasonMax, and this
+  // builder does; describePlan and the answer sentence both then say
+  // "draft" out loud, so the reader is never shown a draft year labelled
+  // as a season.
+  'father_son_selection_between',
 ];
 
 export const NL_CAREER_CLUB_OWNING_BUILDERS: readonly string[] = [
   'first_kick_goal_for_club',
+  // AFLDB-ISSUE-153 Stage 3 (FS2). The SELECTING club. Registered here or
+  // the club fails the ownership gate and "Geelong father-son selections"
+  // declines -- and, worse, without it the compiler's generic playing-club
+  // filter would answer "father-son selections who later played for
+  // Geelong", a different set.
+  'father_son_selection_for_club',
 ];
 
 /**
@@ -1268,6 +1333,26 @@ export const NL_RELATIONSHIP_POPULATION_BUILDERS: readonly string[] = [
   'has_afl_son',
   'has_afl_parent_or_child',
   'father_son_father',
+  // AFLDB-ISSUE-153 Stage 2 (FS1). The son's side of the father-son
+  // rule joins its father's side here so both carry the SAME unlinked-
+  // relative caveat: 28 of the 127 selections name a son AFLDB has not
+  // linked, and that name is counted nowhere in the 99.
+  'father_son_selection',
+  'father_son_selection_for_club',
+  'father_son_selection_between',
+];
+
+/**
+ * Every builder that reads father_son_selections from the SON's side:
+ * the bare FS1 population and its two Stage 3 scoped forms. Named once
+ * so no guard below can be narrowed by adding a scope -- a rule that
+ * held for "father-son selections" and silently lapsed for "Geelong
+ * father-son selections" would be the worst of both.
+ */
+export const NL_FATHER_SON_SELECTION_BUILDERS: readonly string[] = [
+  'father_son_selection',
+  'father_son_selection_for_club',
+  'father_son_selection_between',
 ];
 
 export const NL_RELATIONSHIP_OF_PLAYER_BUILDERS: readonly string[] = [
@@ -1413,29 +1498,60 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // An achievement summary counts rows; it never ranks by a statistic, so
   // it carries its own descriptor instead of a metric.
   if (raw.grain === 'achievement_summary') {
-    if (!raw.achievementSummary) return { error: 'An achievement summary must say which achievement it summarises.' };
-    if (!isNlAchievementKey(raw.achievementSummary.achievementKey)) {
-      return { error: `Unknown achievement "${raw.achievementSummary.achievementKey}".` };
+    // AFLDB-ISSUE-153 Stage 4 (FS6). The father-son distribution shares
+    // this grain and this payload shape, and nothing else: it summarises
+    // father_son_selections, not player_achievements. Handled first and
+    // returned from, so the achievement rules below never see a plan that
+    // has no achievement to check.
+    if (raw.fatherSonSummary) {
+      if (raw.achievementSummary) {
+        return { error: 'A summary is of one thing: an achievement or the father–son selections, never both.' };
+      }
+      if (!NL_FATHER_SON_SUMMARY_KINDS.includes(raw.fatherSonSummary.kind)) {
+        return { error: `Unknown father–son summary "${raw.fatherSonSummary.kind}".` };
+      }
+      if (raw.metric !== null) return { error: 'A father–son selection summary does not rank by a statistic.' };
+      if (raw.player) return { error: 'A father–son selection summary is about the selections, not one player.' };
+      if (raw.careerPredicates.length > 0) {
+        return { error: 'A father–son selection summary counts selections, so it carries no career condition.' };
+      }
+      // Fail-closed on every scope. The distribution counts SELECTION
+      // events -- including the 28 whose selected player AFLDB has not
+      // linked -- and a club or a season scope would have to be applied to
+      // the selection, not to a career. Neither is built, so neither is
+      // silently dropped: "Geelong father-son selections by year" declines
+      // rather than quietly answering the whole competition.
+      const { clubFor, clubAgainst, venue, matchType, seasonMin, seasonMax } = raw.scope;
+      if (clubFor || clubAgainst || venue || matchType !== undefined
+        || seasonMin !== undefined || seasonMax !== undefined) {
+        return { error: 'A father–son selection distribution cannot yet be narrowed to a club or a year.' };
+      }
+    } else if (!raw.achievementSummary) {
+      return { error: 'An achievement summary must say which achievement it summarises.' };
+    } else {
+      if (!isNlAchievementKey(raw.achievementSummary.achievementKey)) {
+        return { error: `Unknown achievement "${raw.achievementSummary.achievementKey}".` };
+      }
+      if (!NL_ACHIEVEMENT_SUMMARY_KINDS.includes(raw.achievementSummary.kind)) {
+        return { error: `Unknown achievement summary "${raw.achievementSummary.kind}".` };
+      }
+      if (raw.metric !== null) return { error: 'An achievement summary does not rank by a statistic.' };
+      // The summary executor honours a season range and a club -- and ONLY
+      // those. Any other scope the parser consumed would be silently
+      // dropped, answering a different question than the one asked, so it
+      // is rejected here instead.
+      if (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined) {
+        return { error: 'An achievement summary cannot be scoped to a venue, opponent, or match type.' };
+      }
+      if (raw.scope.clubFor && raw.achievementSummary.kind === 'clubs_without') {
+        return { error: 'Asking which clubs never had one cannot be scoped to a single club.' };
+      }
+      if (raw.player) {
+        return { error: 'An achievement summary is about the achievement, not one player.' };
+      }
     }
-    if (!NL_ACHIEVEMENT_SUMMARY_KINDS.includes(raw.achievementSummary.kind)) {
-      return { error: `Unknown achievement summary "${raw.achievementSummary.kind}".` };
-    }
-    if (raw.metric !== null) return { error: 'An achievement summary does not rank by a statistic.' };
-    // The summary executor honours a season range and a club -- and ONLY
-    // those. Any other scope the parser consumed would be silently
-    // dropped, answering a different question than the one asked, so it
-    // is rejected here instead.
-    if (raw.scope.venue || raw.scope.clubAgainst || raw.scope.matchType !== undefined) {
-      return { error: 'An achievement summary cannot be scoped to a venue, opponent, or match type.' };
-    }
-    if (raw.scope.clubFor && raw.achievementSummary.kind === 'clubs_without') {
-      return { error: 'Asking which clubs never had one cannot be scoped to a single club.' };
-    }
-    if (raw.player) {
-      return { error: 'An achievement summary is about the achievement, not one player.' };
-    }
-  } else if (raw.achievementSummary) {
-    return { error: 'An achievement summary only applies to an achievement-summary question.' };
+  } else if (raw.achievementSummary || raw.fatherSonSummary) {
+    return { error: 'A summary descriptor only applies to a summary question.' };
   }
 
   // A coaching answer is compiled from match_coaches JOIN matches and
@@ -1824,22 +1940,46 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   } else if (coachedClubAxes.length > 0) {
     return { error: 'A question about coaching a club must say which club.' };
   }
-  // V6/V7. AFLDB-ISSUE-152 Phase F leaves the SON side of the father-son
-  // rule deferred (operator decision F-D1, AFLDB-ISSUE-153), so no parser
-  // path emits father_son_selection today. These keep it that way: the
-  // predicate is a LIST of selections and never a ranking, and on its own
-  // it would answer the bare "father-son" question D8 declines because no
-  // witness can distinguish its two readings.
+  // V6. AFLDB-ISSUE-153 Stage 2 replaces the pair of guards ISSUE-152
+  // Phase F left here.
+  //
+  // V7 -- "on its own it would answer the bare father-son question D8
+  // declines" -- is GONE, and deliberately: D8 is decided (operator
+  // decision Q1). The bare and collective forms still decline, but they
+  // now decline in the PARSER, at the narrowed FATHER_SON_RULE_RE guard,
+  // which is where the distinction actually is. A plan that reaches here
+  // carrying father_son_selection was built from wording that named the
+  // rule, a selection, a draft, a pick or the son's role, so refusing it
+  // again at plan time would refuse the wording the operator approved.
+  //
+  // V6 survives, narrowed to the composition it was really about. D9
+  // (frozen, ISSUE-152 §2.8) says X3 -- selected under the rule AND
+  // coached -- is a LIST and never a ranking, because a "most games by a
+  // father-son selection who coached" answer ranks a one-row population
+  // and reads as a record that is not one. That is a statement about the
+  // cross-domain composition, not about FS1: the son-side ranking
+  // "which father-son sons played the most games" is the exact mirror of
+  // the shipped rel_024 on the father side, and decision Q1 consequence
+  // 3 forbids denying one side a wording the other is given.
   const fatherSonSelectionAxes = raw.careerPredicates.filter(
-    (axis) => axis.builder === 'father_son_selection',
+    (axis) => NL_FATHER_SON_SELECTION_BUILDERS.includes(axis.builder),
   );
-  if (fatherSonSelectionAxes.length > 0) {
+  if (fatherSonSelectionAxes.length > 0 && crossDomainAxes.length > 0) {
     if (raw.agg.kind === 'max' || raw.agg.kind === 'min' || raw.agg.kind === 'top_n') {
       return { error: 'A father–son selection question is a list, not a ranking.' };
     }
-    if (crossDomainAxes.length === 0) {
-      return { error: 'AFLDB cannot yet answer what "father–son" means on its own.' };
-    }
+  }
+  // V6b. "father-son selections by club" is FS6 -- a distribution over the
+  // SELECTING clubs -- and the generic metric extractor reads its "by
+  // club" as clubs_played, the number of clubs the player went on to play
+  // for. Those are different questions with different answers, and the
+  // wrong one is plausible enough to be believed. Refused by name until
+  // the FS6 grain claims the wording ahead of the metric extractor; after
+  // that this stays as the backstop, because "by club" on a selection
+  // question means the club that made the selection, never a career
+  // breadth count.
+  if (fatherSonSelectionAxes.length > 0 && raw.metric === 'clubs_played') {
+    return { error: 'On a father–son selection question, "by club" means the club that made the selection, which AFLDB cannot yet group by.' };
   }
 
   if (raw.player && raw.scope.playerIdIn) {
@@ -2116,16 +2256,32 @@ export function describePlan(plan: NlQueryPlan): string[] {
     lines.push(`Searched ${grainLabel} records for ${aggWord} matching ${GRAIN_SUBJECT[plan.grain]}.`);
   }
 
+  // AFLDB-ISSUE-153 Stage 3. On a father-son SELECTION plan the club is
+  // the club that made the selection and the years are DRAFT years, not
+  // playing seasons. The plan panel is where a reader checks what was
+  // actually answered, so it is the last place either may be mislabelled:
+  // 0 of the 99 selected players debuted in their draft year, so "Seasons:
+  // 2022-2022" on an FS3 answer would be wrong for every row it described.
+  const fatherSonSelectionPlan = plan.careerPredicates.some(
+    (axis) => NL_FATHER_SON_SELECTION_BUILDERS.includes(axis.builder),
+  );
+
   if (plan.player) lines.push(`Player: ${plan.player.name}.`);
   if (plan.coach) lines.push(`Coach: ${plan.coach.name}.`);
-  if (plan.scope.clubFor) lines.push(`Club: ${plan.scope.clubFor.name}.`);
+  if (plan.scope.clubFor) {
+    lines.push(fatherSonSelectionPlan
+      ? `Selecting club: ${plan.scope.clubFor.name} (including its earlier names).`
+      : `Club: ${plan.scope.clubFor.name}.`);
+  }
   if (plan.scope.clubAgainst) lines.push(`Opponent: ${plan.scope.clubAgainst.name}.`);
   if (plan.scope.matchup) lines.push(`Matchup: ${plan.scope.matchup.clubA.name} v ${plan.scope.matchup.clubB.name}.`);
   if (plan.scope.venue) lines.push(`Venue: ${plan.scope.venue.name}.`);
   if (plan.scope.roundNumber) lines.push(`Round: ${plan.scope.roundNumber}.`);
   if (plan.scope.matchType) lines.push(`Match type: ${plan.scope.matchType.replace(/_/g, ' ')}.`);
   if (plan.scope.seasonMin !== undefined || plan.scope.seasonMax !== undefined) {
-    lines.push(`Seasons: ${plan.scope.seasonMin ?? '…'}-${plan.scope.seasonMax ?? '…'}.`);
+    lines.push(fatherSonSelectionPlan
+      ? `Draft years: ${plan.scope.seasonMin ?? '…'}-${plan.scope.seasonMax ?? '…'} (the year of the selection, not a playing season).`
+      : `Seasons: ${plan.scope.seasonMin ?? '…'}-${plan.scope.seasonMax ?? '…'}.`);
   }
   if (plan.metricCondition) {
     const label = metricLabelOf(plan.grain, plan.metric) ?? 'value';

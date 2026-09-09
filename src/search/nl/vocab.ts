@@ -1162,8 +1162,95 @@ export const FATHER_SON_FATHER_CUES: RegExp[] = [
   /\bfathers? whose sons? (?:was|were) (?:a )?father[- ]son (?:selections?|picks?)\b/,
 ];
 
-/** Any father-son rule wording at all -- the D8 guard. */
+/**
+ * FS1 -- the SON's side of the same rule: the player selected under it.
+ * AFLDB-ISSUE-153 Stage 2, under operator decision Q1 (D8) and its Q1a
+ * clause.
+ *
+ * The binding these cues implement: father_son_selections is the
+ * AUTHORITATIVE record of AFL father-son selections, and
+ * player_relationships.parent_child is its projection -- written by
+ * tools/migration/father_son.py from the same source and import batch,
+ * and measured set-identical to it at son (99), father (107) and pair
+ * (96) level with zero divergence witnesses (Stage 0 §4.1). So wording
+ * that NAMES the rule, a selection, a draft or a pick is not ambiguous
+ * between two rival records; it names the one record twice written, and
+ * only father_son_selections carries the club, year and pick that FS2,
+ * FS3 and FS6 scope on.
+ *
+ * The cue list is therefore the EXPLICITNESS test, and it is the same
+ * test on both sides (decision Q1 consequence 3 -- neither side gets a
+ * wording the other is denied):
+ *
+ *  - naming the rule/selection/draft/pick qualifies:
+ *    "selected under the father-son rule", "father-son selections",
+ *    "father-son picks", "father-son draftees";
+ *  - "father-son" plus an explicit ROLE noun qualifies (Q1a option (a)),
+ *    because the role resolves the side: "father-son sons" mirrors the
+ *    shipped "father-son fathers" (rel_024);
+ *  - "father-son" plus a COLLECTIVE noun does not, and still falls
+ *    through to the guard below: "father-son players", "father-son
+ *    pairs", "father-son duos", "father-son families". That wording is
+ *    genuinely ambiguous between the rule and any father and son, and
+ *    C3/C4 already serve the relationship reading under unambiguous
+ *    wording.
+ *
+ * "recruits" is accepted here only because FATHER_SON_FATHER_CUES
+ * already accepts it on the father side; the symmetry clause is what
+ * puts it in this list, not its own explicitness.
+ */
+export const FATHER_SON_SELECTION_CUES: RegExp[] = [
+  /\bfather[- ]son (?:rule )?(?:selections?|picks?|draftees?|recruits?)\b/,
+  /\bfather[- ]son sons?\b/,
+  /\b(?:selected|drafted|taken|picked|recruited) (?:as|under) (?:a |the )?father[- ]son(?: rule)?(?: selections?| picks?)?\b/,
+  /\bunder the father[- ]son rule\b/,
+];
+
+/**
+ * Any father-son wording the two explicit cue lists did NOT claim -- the
+ * D8 guard, now narrowed by ISSUE-153 to exactly the bare and collective
+ * forms. It still stops the extractor dead and consumes nothing, so the
+ * pre-existing leftover-token decline fires and the question declines by
+ * name, as it did before.
+ */
 export const FATHER_SON_RULE_RE = /\bfather[- ]son\b/;
+
+/**
+ * FS3's fail-closed condition (AFLDB-ISSUE-153 Stage 3).
+ *
+ * A father-son selection question that names a year means the DRAFT
+ * year, and that is what the builder binds. But a question that ALSO
+ * talks about playing is asking about a playing season, and the two
+ * readings share not one row: 0 of the 99 linked selected players
+ * debuted in their draft year, 60 debuted a year later and 39 two or
+ * more years later (Stage 0 §4.4). Choosing either reading for "father-
+ * son selections who played in 2022" would answer a question nobody
+ * asked, so the year is left unowned and the pre-existing ownership gate
+ * refuses the plan.
+ *
+ * Only consulted when a year is actually present, so "which father-son
+ * sons played the most games" -- a ranking with no year at all -- is
+ * unaffected.
+ */
+export const FATHER_SON_PLAYING_SEASON_MIX_RE = /\b(?:play|plays|played|playing|debut|debuts|debuted)\b/;
+
+/**
+ * FS6 -- the father-son SELECTION distribution (AFLDB-ISSUE-153 Stage 4).
+ *
+ * These cues turn an FS1 question into a group-and-count over the
+ * selections themselves. They are matched and CONSUMED before the metric
+ * extractor runs, which is not merely tidy: left in the text, "by club"
+ * is read as the clubs_played metric -- how many clubs the player went on
+ * to play for -- and "father-son selections by club" would answer a
+ * plausible, believable, wrong question.
+ *
+ * "by year" is a DRAFT year here, like every other year in this family.
+ */
+export const FATHER_SON_SUMMARY_CUES: [RegExp, 'by_club' | 'by_draft_year'][] = [
+  [/\b(?:by|per|for each|broken down by|grouped by) (?:selecting |drafting |recruiting )?clubs?\b/, 'by_club'],
+  [/\b(?:by|per|for each|broken down by|grouped by) (?:draft )?years?\b/, 'by_draft_year'],
+  [/\bby draft\b/, 'by_draft_year'],
+];
 
 /**
  * The three per-player readings, in the two shapes a reader writes them:

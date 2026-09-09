@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import { NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import { describePlan, NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
@@ -1885,24 +1885,227 @@ describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
     });
   });
 
-  // -------------------------------------------- the D8 boundary (blocked)
+  // ----------------------------------------------------------------- FS1
 
-  describe('the blocked father-son SELECTION forms still decline (D8, ISSUE-153)', () => {
+  /**
+   * AFLDB-ISSUE-153 Stage 2. D8 is decided (operator decision Q1): wording
+   * that names the RULE, a SELECTION, a DRAFT or a PICK -- and, under Q1a
+   * option (a), "father-son" plus an explicit ROLE noun -- binds to
+   * father_son_selections, the authoritative record. The son side gets
+   * exactly the wording the father side already ships, and neither side
+   * gets one the other is denied.
+   *
+   * These questions all declined at ISSUE-152 Phase F and are the flip
+   * this stage owns. The block after them is the harder half: the
+   * COLLECTIVE forms share every word with these and must still decline.
+   */
+  describe('FS1 -- selected under the father-son rule (father_son_selection)', () => {
     it.each([
-      ['FS1 the rule itself', 'players selected under the father-son rule'],
-      ['FS1 the bare phrase', 'father-son selections'],
-      ['FS1 picks', 'which players were father-son picks'],
-      ['FS2 club-scoped', 'geelong father-son selections'],
-      ['FS3 year-scoped', 'father-son selections in 2022'],
-      ['FS6 distribution', 'father-son selections by club'],
+      ['the rule itself', 'players selected under the father-son rule'],
+      ['the selection noun', 'father-son selections'],
+      ['picks', 'which players were father-son picks'],
+      ['draftees', 'father-son draftees'],
+      ['the role noun (Q1a), mirroring rel_024', 'father-son sons'],
+    ])('%s -> father_son_selection', async (_label, question) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('player_career');
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // Q1 consequence 3, the symmetry clause, made concrete: rel_024 is
+    // pinned as answering on the father side, so its son-side mirror
+    // answers too. This is the one place the two sides could have drifted.
+    it('the son-side mirror of rel_024 ranks, exactly as the father side does', async () => {
+      const p = await plan('which father-son sons played the most games');
+      expect(p.metric).toBe('games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('counts the qualifying set', async () => {
+      const p = await plan('how many players were selected under the father-son rule');
+      expect(p.agg).toEqual({ kind: 'count' });
+      expect(builders(p)).toEqual(['father_son_selection']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The father side keeps its claim on wording that names it, even
+    // though that wording also contains an FS1 cue.
+    it('an FS1 cue never takes a question the FATHER side already owns', async () => {
+      for (const question of [
+        'fathers of father-son selections',
+        'players whose son was selected under the father-son rule',
+        'which father-son fathers played the most games',
+      ]) {
+        const p = await plan(question);
+        expect(builders(p), question).toEqual(['father_son_father']);
+      }
+    });
+  });
+
+  // ------------------------------------- the D8 boundary, as narrowed
+
+  describe('the COLLECTIVE father-son forms still decline (D8/Q1, ISSUE-153)', () => {
+    it.each([
+      ['bare players', 'father-son players'],
+      ['pairs', 'father-son pairs'],
+      ['duos', 'father-son duos'],
+      ['families', 'father-son families'],
     ])('%s', async (_label, question) => {
       const parsed = await parse(question);
       expect(parsed.status, question).toBe('none');
     });
 
-    it('an FS4 cue never lends its builder to an FS1 question', async () => {
-      const parsed = await parse('father-son selections');
-      if (parsed.status === 'plan') expect(builders(parsed.plan)).toEqual([]);
+  });
+
+  // ----------------------------------------------------------------- FS6
+
+  /**
+   * AFLDB-ISSUE-153 Stage 4. A distribution of the SELECTIONS, not a list
+   * of the players -- a distinction that is worth 14 of the 17 clubs.
+   */
+  describe('FS6 -- the father-son selection distribution', () => {
+    it.each([
+      ['by club', 'father-son selections by club', 'by_club'],
+      ['per club', 'father-son selections per club', 'by_club'],
+      ['by year', 'father-son selections by year', 'by_draft_year'],
+      ['by draft year', 'father-son selections by draft year', 'by_draft_year'],
+    ])('%s', async (_label, question, kind) => {
+      const p = await plan(question);
+      expect(p.grain).toBe('achievement_summary');
+      expect(p.fatherSonSummary).toEqual({ kind });
+      // The distribution counts selections; it never carries a career
+      // predicate, and it must never be read as a player ranking.
+      expect(builders(p)).toEqual([]);
+      expect(p.metric).toBeNull();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The wrong answer this stage exists to prevent. Left in the text,
+    // "by club" resolves to clubs_played -- how many clubs the player went
+    // on to play for -- which is plausible, believable and not the
+    // question. The cue is consumed before the metric extractor runs.
+    it('"by club" is the selecting club, never the clubs_played metric', async () => {
+      const p = await plan('father-son selections by club');
+      expect(p.metric).not.toBe('clubs_played');
+      expect(p.fatherSonSummary?.kind).toBe('by_club');
+    });
+
+    it('a scope the distribution cannot honour fails closed', async () => {
+      const parsed = await parse('geelong father-son selections by year');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+
+    // FS6 is a shape this one family has, not a grouping the parser now
+    // offers every relationship.
+    it('does not lend its grouping to any other relationship', async () => {
+      const parsed = await parse('players with a brother who played by club');
+      if (parsed.status === 'plan') expect(parsed.plan.fatherSonSummary).toBeUndefined();
+    });
+  });
+
+  // ------------------------------------------------------------ FS2/FS3
+
+  /**
+   * AFLDB-ISSUE-153 Stage 3. father_son_selections is the only one of the
+   * two father-son surfaces that carries a club or a date at all, so these
+   * two scopes exist in this reading and nowhere else. Both are bound as
+   * the builder's own parameters -- the ownership rule ISSUE-110 findings
+   * A and B established -- so neither can be silently discarded.
+   */
+  describe('FS2/FS3 -- the selecting club and the draft year', () => {
+    it('FS2: the club is the SELECTING club, and it is owned by the builder', async () => {
+      const p = await plan('geelong father-son selections');
+      expect(builders(p)).toEqual(['father_son_selection_for_club']);
+      expect(p.careerPredicates[0].params).toEqual({ club: '4' });
+      expect(p.scope.clubFor?.organizationId).toBe(4);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('FS3: the year is a DRAFT year, owned by the builder and labelled as one', async () => {
+      const p = await plan('father-son selections in 2022');
+      expect(builders(p)).toEqual(['father_son_selection_between']);
+      expect(p.careerPredicates[0].params).toEqual({ from: '2022', to: '2022' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+      // The plan panel is where a reader checks what was answered. 0 of
+      // the 99 selected players debuted in their draft year, so a line
+      // reading "Seasons: 2022-2022" would be wrong about every row.
+      const lines = describePlan(p).join(' ');
+      expect(lines).toContain('Draft years: 2022-2022');
+      expect(lines).not.toContain('Seasons:');
+    });
+
+    it('both scopes compose, each owned by its own builder', async () => {
+      const p = await plan('geelong father-son selections in 2022');
+      expect(builders(p)).toEqual([
+        'father_son_selection_for_club', 'father_son_selection_between',
+      ]);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    // The Stage 0 trap. A question that scopes a year AND talks about
+    // playing is ambiguous between a draft year and a playing season, and
+    // the two readings share not one row -- so the year is left unowned
+    // and the ownership gate refuses the plan.
+    it('a draft year mixed with a playing-season reading fails closed', async () => {
+      const parsed = await parse('father-son selections who played in 2022');
+      expect(parsed.status).toBe('plan');
+      if (parsed.status !== 'plan') return;
+      expect(builders(parsed.plan)).toEqual(['father_son_selection']);
+      expect(parsed.plan.scope.seasonMin).toBe(2022);
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+  });
+
+  // ------------------------------------------------------------------ X3
+
+  /**
+   * AFLDB-ISSUE-153 Stage 5, operator decision Q6. The Phase F in-reading
+   * refusal blocked father-son wording of ANY kind inside a cross-domain
+   * composition, which was wider than F-D1's own justification: it also
+   * refused the FATHER side, whose wording ships and answers everywhere
+   * else in the product. Narrowed to the bare and collective forms.
+   *
+   * Every Phase F freeze holds: conjunction not chronology, and a club
+   * named on one side only still fails closed.
+   */
+  describe('X3 -- the father-son rule composed with actual coaching', () => {
+    it('the son side composes', async () => {
+      const p = await plan('players selected under the father-son rule who also coached');
+      expect(builders(p)).toEqual(['has_coached', 'father_son_selection']);
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the father side composes too — the 11 players the old guard also blocked', async () => {
+      const p = await plan('players who were father-son fathers and also coached');
+      expect(builders(p)).toEqual(['has_coached', 'father_son_father']);
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('the collective form still declines by name inside the composition', async () => {
+      const parsed = await parse('which father-son players also coached');
+      expect(parsed.status).toBe('none');
+      expect(parsed.report.notes.join(' ')).toMatch(/what "father–son" means on its own/);
+    });
+
+    it('a club named on one side only still fails closed (F-D3)', async () => {
+      const parsed = await parse('players selected under the father-son rule who also coached Geelong');
+      expect(parsed.status).toBe('none');
+    });
+
+    it('the temporal readings are still refused by name (D9/F-D2)', async () => {
+      for (const question of [
+        'players selected under the father-son rule who later coached',
+        'father-son selections who went on to coach',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+      }
     });
   });
 

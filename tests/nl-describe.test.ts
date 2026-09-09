@@ -348,6 +348,81 @@ describe('describeAnswer — achievement summary distributions', () => {
   });
 });
 
+// ------------------------------------------------- FS6 (AFLDB-ISSUE-153)
+
+/**
+ * The father-son distribution shares the achievement summary's payload
+ * shape and grain, and counts something else entirely: SELECTION EVENTS.
+ *
+ * Operator decision Q2 sets the denominator at 127 selections rather than
+ * the 99 linked selected players, so these tests are written to FAIL if
+ * 99 is ever substituted, and to fail if the sentence calls the 127
+ * "players". Both would be one word wrong and 14 of 17 clubs wrong.
+ */
+describe('describeAnswer — the father-son selection distribution (FS6)', () => {
+  const summaryPlan = plan({ grain: 'achievement_summary', metric: null, mode: undefined, agg: { kind: 'list' } });
+  const SELECTIONS = 127;
+  const LINKED_PLAYERS = 99;
+
+  // The Stage 0 measurement, at the two clubs where the denominators
+  // diverge most: Carlton 13 selections vs 7 linked players, Collingwood
+  // 17 vs 15.
+  const clubRows = [
+    { label: 'Collingwood', value: 17, href: '/clubs/collingwood' },
+    { label: 'Geelong', value: 14, href: '/clubs/geelong' },
+    { label: 'Carlton', value: 13, href: '/clubs/carlton' },
+  ];
+
+  function fs6(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: 'achievement_summary' as const,
+      groupBy: 'club',
+      achievementLabel: 'Selected under the AFL father–son rule',
+      rows: clubRows,
+      total: SELECTIONS,
+      unit: { one: 'father–son selection', many: 'father–son selections' },
+      disclosure: `${LINKED_PLAYERS} of those selections name a player AFLDB has linked to a profile.`,
+      ...overrides,
+    };
+  }
+
+  it('counts SELECTIONS, and says so — never "players"', () => {
+    const { headline, interpretation } = describeAnswer(summaryPlan, fs6());
+    expect(headline).toBe('Collingwood — 17');
+    expect(interpretation).toContain('127 recorded father–son selections');
+    // The substitution this test exists to catch.
+    expect(interpretation).not.toContain('99');
+    expect(interpretation).not.toContain('recorded players');
+  });
+
+  it('names the draft year as the grouping, never a season', () => {
+    const { interpretation } = describeAnswer(summaryPlan, fs6({
+      groupBy: 'draft_year',
+      rows: [{ label: '2021', value: 6, href: null }, { label: '2022', value: 9, href: null }],
+    }));
+    expect(interpretation).toContain('by draft year');
+    expect(interpretation).not.toContain('by season');
+  });
+
+  it('discloses the linked-player coverage as a caveat, not as the denominator', () => {
+    const payload = fs6();
+    const caveats = answerCaveats(summaryPlan, payload).join(' ');
+    expect(caveats).toContain('99');
+    expect(describeAnswer(summaryPlan, payload).interpretation).toContain('127');
+  });
+
+  it('an achievement summary is unaffected and still counts players', () => {
+    const { interpretation } = describeAnswer(summaryPlan, {
+      kind: 'achievement_summary',
+      groupBy: 'club',
+      achievementLabel: 'Scored a goal with their first kick',
+      rows: clubRows,
+      total: 56,
+    });
+    expect(interpretation).toContain('56 recorded players');
+  });
+});
+
 // ------------------------------------------- metric-threshold descriptions
 
 describe('metric-threshold answers (AFLDB-ISSUE-110)', () => {

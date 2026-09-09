@@ -239,6 +239,19 @@ export type NlAnswerPayload =
       rows: NlAchievementGroupRow[];
       /** Linked rows the summary covers, so a caveat can say what it excludes. */
       total: number;
+      /**
+       * What `total` counts, when it is not players (AFLDB-ISSUE-153 Stage
+       * 4). The father-son distribution counts SELECTION EVENTS -- 127 of
+       * them -- which is a materially different number from the 99 linked
+       * players it names, so the sentence must not call them players.
+       * Absent means players, which every achievement summary counts.
+       */
+      unit?: { one: string; many: string };
+      /**
+       * A second figure the answer discloses without letting it become the
+       * denominator (AFLDB-ISSUE-153 operator decision Q2).
+       */
+      disclosure?: string;
     }
   | { kind: 'unanswerable'; topic: string; reason: string };
 

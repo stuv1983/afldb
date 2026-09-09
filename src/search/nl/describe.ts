@@ -9,7 +9,8 @@
  */
 import { GRID_BUILDERS } from '@/search/grid-solver-spec';
 import {
-  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isCrossDomainPlan, isRelationshipPlan, NL_METRICS,
+  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isCrossDomainPlan, isRelationshipPlan,
+  NL_FATHER_SON_SELECTION_BUILDERS, NL_METRICS,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import type {
@@ -226,8 +227,14 @@ function describeTeamStreakAnswer(
 function describeAchievementSummaryAnswer(
   payload: Extract<NlAnswerPayload, { kind: 'achievement_summary' }>,
 ): { headline: string; interpretation: string } {
-  const { rows, groupBy, achievementLabel, total } = payload;
-  const held = `${total.toLocaleString('en-AU')} recorded ${total === 1 ? 'player' : 'players'}`;
+  const { rows, groupBy, achievementLabel, total, unit } = payload;
+  // AFLDB-ISSUE-153 Stage 4 (FS6). What is being counted is said out loud,
+  // because for the father-son distribution it is NOT players: 127
+  // selection events, against 99 linked selected players. Calling the 127
+  // "players" would be the single wrong word that makes the whole answer
+  // wrong -- and it would be wrong by 14 of 17 clubs.
+  const noun = unit ? (total === 1 ? unit.one : unit.many) : (total === 1 ? 'player' : 'players');
+  const held = `${total.toLocaleString('en-AU')} recorded ${noun}`;
 
   if (rows.length === 0) {
     return { headline: 'No matching records found', interpretation: `${achievementLabel}: ${held}.` };
@@ -262,11 +269,14 @@ function describeAchievementSummaryAnswer(
   const leader = tiedWith.length > 1
     ? `${tiedWith.map((r) => r.label).join(', ')} — ${top.value.toLocaleString('en-AU')} each (tied)`
     : `${top.label} — ${top.value.toLocaleString('en-AU')}`;
-  const noun = groupBy === 'club' ? 'club' : groupBy === 'decade' ? 'decade' : 'season';
+  const groupNoun = groupBy === 'club' ? 'club'
+    : groupBy === 'decade' ? 'decade'
+      : groupBy === 'draft_year' ? 'draft year'
+        : 'season';
 
   return {
     headline: leader,
-    interpretation: `${achievementLabel}, by ${noun}. Measured across ${held}.`,
+    interpretation: `${achievementLabel}, by ${groupNoun}. Measured across ${held}.`,
   };
 }
 
@@ -622,6 +632,14 @@ function cappedListCaveat(plan: NlQueryPlan, payload: NlAnswerPayload): string |
 }
 
 export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): string[] {
+  // AFLDB-ISSUE-153 Stage 4 (operator decision Q2). The distribution's
+  // denominator is 127 SELECTION EVENTS, and the 99 linked selected
+  // players is disclosed beside it rather than substituted for it. Said
+  // first, before anything else, because a reader who assumes the wrong
+  // one of those two numbers misreads 14 of the 17 clubs.
+  if (payload.kind === 'achievement_summary' && payload.disclosure) {
+    return [payload.disclosure];
+  }
   // AFLDB-ISSUE-152 Phase D. Two boundaries a relationship answer must
   // state in its own sentence. The first is always true: the source is a
   // tracked, cited export in which both sides of a relationship may be
@@ -730,6 +748,14 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
     yes: 'had a son selected under the father–son rule',
     no: 'had no son selected under the father–son rule',
   },
+  // AFLDB-ISSUE-153 Stage 2 (FS1). Always "selected under the father–son
+  // rule", never the bare "father–son": the bare phrase is the wording
+  // decision Q1 keeps declining, and an answer must not use words the
+  // question is not allowed to.
+  father_son_selection: {
+    yes: 'was selected under the father–son rule',
+    no: 'was not selected under the father–son rule',
+  },
 };
 
 /**
@@ -760,6 +786,30 @@ function crossDomainSubjectPhrase(plan: NlQueryPlan): string | null {
   return null;
 }
 
+/**
+ * AFLDB-ISSUE-153 Stage 3. The two scopes a father-son selection question
+ * can carry, in the ONLY words that are true of them.
+ *
+ * "by Geelong", never "for Geelong": the club made the selection, and
+ * whether the player went on to play a game for it is a different fact
+ * this predicate never checked. "in the 2022 draft", never "in 2022": 0
+ * of the 99 linked selected players debuted in the season they were
+ * drafted, 60 debuted a year later and 39 two or more years later (Stage
+ * 0 §4.4), so a sentence saying "selected under the father-son rule in
+ * 2022" would be read by most people as a playing season and would be
+ * wrong about every row beneath it.
+ */
+function fatherSonSelectionScope(plan: NlQueryPlan): string {
+  const bits: string[] = [];
+  if (plan.scope.clubFor) bits.push(`by ${plan.scope.clubFor.name}`);
+  const { seasonMin, seasonMax } = plan.scope;
+  if (seasonMin !== undefined && seasonMin === seasonMax) bits.push(`in the ${seasonMin} draft`);
+  else if (seasonMin !== undefined && seasonMax !== undefined) bits.push(`in the ${seasonMin}–${seasonMax} drafts`);
+  else if (seasonMin !== undefined) bits.push(`in the ${seasonMin} draft or later`);
+  else if (seasonMax !== undefined) bits.push(`in the ${seasonMax} draft or earlier`);
+  return bits.length > 0 ? ` ${bits.join(' ')}` : '';
+}
+
 function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
   const ofAxis = plan.careerPredicates.find((axis) => RELATIONSHIP_OF_NOUN[axis.builder]);
   if (ofAxis && plan.relationshipSubject) {
@@ -769,9 +819,18 @@ function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
     .map((axis) => RELATIONSHIP_WITH_PHRASE[axis.builder])
     .filter((phrase): phrase is string => phrase !== undefined);
   const fatherSonFather = plan.careerPredicates.some((axis) => axis.builder === 'father_son_father');
+  // AFLDB-ISSUE-153 Stage 2. The son's side says the rule out loud for
+  // the same reason the father's side does, and for one more: 0 of the
+  // 99 selected players debuted in the season they were drafted (Stage 0
+  // §4.4), so a sentence that said only "father–son players" would invite
+  // a reader to read a playing season into a draft year.
+  const fatherSonSelection = plan.careerPredicates.some(
+    (axis) => NL_FATHER_SON_SELECTION_BUILDERS.includes(axis.builder),
+  );
   const clauses: string[] = [];
   if (withPhrases.length > 0) clauses.push(`with ${withPhrases.join(' and ')}`);
   if (fatherSonFather) clauses.push('whose son was selected under the father–son rule');
+  if (fatherSonSelection) clauses.push(`selected under the father–son rule${fatherSonSelectionScope(plan)}`);
   if (clauses.length === 0) return null;
   return `Players ${clauses.join(', ')}`;
 }
