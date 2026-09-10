@@ -7,7 +7,20 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 14 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`.
+**Open issues:** 18 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-157`, `-158`.
+
+<!-- 2026-09-11 (ADMIN CENTRE COMPLETION UMBRELLA ALLOCATED — PLANNING ONLY):
+     `AFLDB-ISSUE-156` (Admin Centre completion umbrella), `AFLDB-ISSUE-157` (P1 Admin foundation
+     and audit viewer) and `AFLDB-ISSUE-158` (P2 Capability enforcement) allocated after verifying
+     none appeared anywhere in the working tree or `git log --all`. ISSUE-155 Phases D–I transfer
+     BY REFERENCE to the 156 umbrella (P3/P4/P6/P7/P11/P12); ISSUE-155 retains only the PROD closeout
+     of implemented A/B/C1/C2. P3–P12 are named placeholders with NO ID until each phase starts.
+     `AFLDB-ISSUE-154` remains a ledger hole reserved for the Grid Solver won-final defect — not
+     reused. Migration 095 is only the planning-time next-free snapshot and is NOT allocated.
+     Runbook: `AFLDB-ISSUE-156.md`. No `src/`, `tools/`, `tests/`, `deploy/` or `CHANGELOG.md`
+     change. This count also corrects the header, which omitted the already-open `-155`. -->
+
+
 
 <!-- 2026-09-09 (ISSUE-152 PHASE D RENDERED ACCEPTANCE COMPLETE AND GREEN; UNBLOCKED HALF CLOSED):
      the rendered sweep §23 left as the next action has been RUN, and the unblocked Phase D
@@ -557,6 +570,10 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
+| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Planning complete 2026-09-11 — no implementation started. Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children allocated: 157 (P1), 158 (P2); P3–P12 are named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: start ISSUE-157 in a fresh implementation session |
+| **ID:** AFLDB-ISSUE-157 — Admin foundation and audit viewer (156 P1) | **Status:** Open / Not started — read-only `/admin/audit` over `auth_audit_log` + `data_edits`; confirmed no migration and no privilege change (`privileges.sql:441`, `:463`); `data_overrides` visibility deferred (afldb_import-only grant). | **Severity:** Medium | **Area:** Admin / Auth / Operations; contract `AFLDB-ISSUE-156.md` §11 P1; next: `npm run preflight -- --mode implementation --issue 157` on a fresh worktree |
+| **ID:** AFLDB-ISSUE-158 — Capability enforcement (156 P2) | **Status:** Open / Not started — make the 15 unenforced capabilities in `src/lib/auth/capabilities.ts` authoritative via `requireCapability()` plus a source-contract regression in `tests/auth.test.ts`; `people.admins.lifecycle` keeps `requireSuperAdmin`. No migration, no privilege change. | **Severity:** Medium | **Area:** Admin / Auth; contract `AFLDB-ISSUE-156.md` §11 P2; next: after ISSUE-157, same preflight with `--issue 158` |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -20845,3 +20862,1124 @@ sizing the choice first by running `ISSUE-152-nl-evidence.sql` §3.1, §3.2, §3
 §4.1 against `afldb_test` READ ONLY. Then allocate a branch and worktree and implement.
 Resolve only when both pages' prose and queries agree and the boards have been eyeballed
 on DEV.
+
+## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
+
+**Status:** Open / In progress — Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented, committed at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` (branch `codex/issue-155-admin-overhaul`), and **DEPLOYED TO DEV, fully accepted** (migrations 092/093/094 applied, privileges reconciled, schema/privilege verified, pre-deploy `_test` suites green, live-DB reconciliation clean, Super Admin/Admin/Contributor capability-boundary and Save Draft browser acceptance all PASS on the deployed service — full record below). **DEV is COMPLETE. PROD is PENDING** — not started, not scheduled in this entry. Phases D–I not started.
+**Severity:** Medium
+**Area:** Admin / Authentication / Data management / Acquisition
+**Found:** 2026-09-10
+**Runbook:** `AFLDB-ISSUE-155.md`
+
+### Problem
+
+The Admin Centre has grown feature-by-feature. Role visibility and server-side guards exist, but high-value data work, acquisition, access, content, health and QA are spread across a flat route set with different authority and audit models. AFLDB now has stronger canonical sources, manual mutation support, provenance, durable overrides and auditing, but it lacks coherent Brownlow, coach, special-record and administrative-user workflows. Browser CSV intake also needs a dataset-by-dataset retirement review rather than blanket removal.
+
+### Scope
+
+- Define a role-aware Admin Centre information architecture and a server-enforced capability matrix.
+- Add planned workflows for Brownlow round entry/finalisation, coach identity and match-grain tenure, admin-user role/deactivation lifecycle, structured public text, and first-kick/after-siren records.
+- Preserve Brownlow source authority, stable identity, historical club identity, NULL/coverage semantics, manual provenance, durable override/reload survival, required atomic data-edit auditing and database-role separation.
+- Retain only allowlisted, bounded Super Admin refreshes; leave rebuilds, migrations, arbitrary SQL/shell/Git/deployment and unrestricted importer arguments operator-only.
+- Review staged browser file intake by registered dataset, preserving internal importer/recovery formats where still owned.
+
+### Confirmed current-state evidence
+
+- Current auth distinguishes contributor, Admin and Super Admin; page/action guards are server-side, while navigation is presentation only.
+- Existing Admin routes cover staged upload/submissions, access/admin accounts, data editor, player links, current-season acquisition, content/settings, QA and health. Brownlow, coaches and special records have no dedicated admin routes.
+- Brownlow round and season/career authority is protected; generic match and awards mutations must not become a second authority.
+- Coach identities already permit nullable player links and match-grain club assignments, supporting coach-only people and mid-season changes.
+- `data_overrides`, `manual_admin_edit`, required `data_edits` and fail-closed ownership checks are existing foundations.
+- Disabled auth users are already rejected by session loading, so durable deactivation is preferable to hard deletion.
+- Existing site content/settings and current-season controls should be extended rather than replaced.
+
+### Planning state
+
+An implementation-ready candidate runbook is saved in `AFLDB-ISSUE-155.md`. It contains source-of-truth and permissions matrices, Admin Centre routes, domain workflows, proposed migrations, security/audit/cache contracts, test and deployment sequencing, bounded implementation phases, projected files, validation gates, stop conditions and two owner decisions.
+
+### Phase A — Capability policy and Admin Centre information architecture (2026-09-10)
+
+**Implemented and verified**, per the runbook's Phase A scope (§23) and validation gate.
+
+Files changed:
+
+- `src/lib/auth/capabilities.ts` (new) — the capability policy: a `Capability` union covering every existing gated admin surface (`data.playerLinks`, `data.dataEditor`, `acquisition.legacyIntake`, `acquisition.currentSeason`, `people.betaAccess`, `people.admins.read`, `people.admins.manage`, `site.content`, `site.settings`, `operations.queryBuilder`, `operations.dbHealth`, `operations.appHealth`, `operations.nlTelemetry`) and `hasCapability()`. Kept pure (no `server-only`) because `AdminNav` (a Client Component) imports the same module tree via `nav-model.ts`. Every role list was checked against the actual `requireAdmin`/`requireSuperAdmin`/`requireUploader` call already on each page before being encoded — the table describes existing enforcement, it does not grant anything new.
+- `src/lib/auth/session.ts` — added `requireCapability(capability)`, a granular guard built on `requireUploader()` + `hasCapability()`, redirecting exactly as `requireAdmin`/`requireSuperAdmin` already do. `requireAdmin`, `requireSuperAdmin`, `requireUploader` and `requireAdminManager`, and every existing page/action's own guard call, are unchanged.
+- `src/app/admin/nav-model.ts` — `adminNavFor` now derives visibility from `hasCapability()` instead of a local boolean, and the groups match the runbook's target IA (§7): Overview, Data (Player links, Data editor), Acquisition (Current season, Legacy file intake — renamed from "Upload a file"), People & access (Beta access, Administrators), Site, Operations (Data QA search, DB/App health, Search telemetry, Reader feedback), Account. A group empty for a given viewer is omitted rather than shown with no links. The Grid Solver link is removed from the admin nav per the runbook's explicit instruction (§7); the `/admin/grid-solver` compatibility redirect route itself is untouched. No route was added, renamed or removed.
+- `src/app/admin/page.tsx` — overview badges (§7): pending-submissions count (existing data, now linking to the submissions section) and unresolved-player-links count for super admins (reuses the existing `listUnresolvedLinks()` query, no new SQL).
+- `tests/auth.test.ts` — extended (no new test file) with unit coverage for `hasCapability`, `adminNavFor` (all three roles, Grid Solver absence, group ordering/omission) and `isCurrentAdminPath`.
+- `src/styles/globals.css` — fixed a pre-existing responsive defect found during the Phase A browser check: at ≤900px, `.admin-nav-body { display: grid; ... }` had no `[hidden]` exception, so it overrode the browser's default `[hidden] { display: none }` rule regardless of the `AdminNav` collapsed state. The nav's mobile default (collapse to a single toggle button) was therefore never actually reachable — every narrow-width load rendered the full expanded sidebar above the page content. Scoped the rule to `.admin-nav-body:not([hidden])`. Pre-existing, not introduced by this phase; fixed in place because it directly blocked the Phase A responsive requirement (§7: "The navigation must collapse to a labelled menu on narrow screens") this session was asked to verify.
+
+No migrations. No database privilege change. No admin route added, removed or redirected.
+
+Validation completed:
+
+- `npm run test -- tests/auth.test.ts` — 44/44 passed.
+- `npm run typecheck` — passed.
+- Browser check, signed in as super admin against the local dev server (`localhost:3100`): desktop (1440×900) — full grouped nav renders (Overview/Data/Acquisition/People & access/Site/Operations/Account), both overview badges render with live counts (25 pending submissions, 7,143 unresolved player links) and link correctly (submissions badge jumps to `#submissions`, player-links badge routes to `/admin/player-links`); mobile (375×812) — nav defaults to collapsed (single toggle button, no page content pushed down), the toggle expands/collapses correctly, a link from the expanded mobile nav (`/admin/db-health`) routes correctly, no page-level horizontal overflow, no console errors.
+
+### Phase B — Super Admin user lifecycle: planning complete (2026-09-10)
+
+Planning-only session (native inspection, no commands, no source edits). The implementation-ready contract is `AFLDB-ISSUE-155.md` §26, which governs over §10 where they differ. Decisions recorded there:
+
+- **Deactivate, never delete.** Sixteen FK columns reference `auth_users`, all `NO ACTION` except `auth_sessions` (cascade); `data_edits`, `player_link_resolutions`, `data_overrides`, `admin_invites` and `data_submissions` attribution columns are NOT NULL; `afldb_auth` holds no DELETE on `auth_users`. No delete mutation will be implemented. `disabled_at` is the existing status primitive and is already enforced by `getAdminUser` and `adminLogin`.
+- **Viable Super Admin** = `role='super_admin' AND disabled_at IS NULL AND password_hash IS NOT NULL AND totp_secret IS NOT NULL`. Demote/deactivate of a super admin commits only if at least one other viable super admin remains, counted inside the transaction.
+- **Concurrency:** one `pg_advisory_xact_lock` constant key serialising all lifecycle mutations, plus `FOR UPDATE` on actor and target, compare-and-set on the role/active state the page rendered, session revoke and `auditInTransaction` in the same `authSql.begin()` transaction. No migration, no epoch, no SERIALIZABLE.
+- **Self-demotion and self-deactivation refused.** Actor re-read under the lock.
+- **Sessions:** every role/status change (promotion included) revokes the target's sessions; reactivation revives none and leaves credentials to the existing temporary-password control.
+- **Permissions:** lifecycle mutations are `super_admin`-only via `requireSuperAdmin` and a new `people.admins.lifecycle` capability; `can_manage_admins` keeps invite/reset delegation, gains no lifecycle power, and is cleared on demotion. Ordinary admins keep the page (`people.admins.read`) but see only their own sessions and may revoke only their own; `revokeSession` gets the matching ownership rule (today any admin can revoke any session).
+- **Migration required: no.**
+- **Planned files:** `capabilities.ts` (+1 capability), new `src/lib/auth/admin-lifecycle.ts`, new `src/db/queries/admin-users.ts`, new `admins/lifecycle-actions.ts` and `LifecycleControls.tsx`, edits to `admins/page.tsx`, `AdminSessionsClient.tsx`, `actions.ts`; tests in `tests/auth.test.ts`, new `tests/admin-lifecycle-actions.test.ts`, new `tests/integration/admin-lifecycle.test.ts` (incl. a deterministic two-connection race using `pg_blocking_pids`).
+- Implementation preflight P1–P4 and the handoff prompt are in §26.16 and §26.19.
+
+### Phase B — Super Admin user lifecycle: implemented and validated (2026-09-10)
+
+Implemented to `AFLDB-ISSUE-155.md` §26; the full record, including every deviation and its rationale, is §26.20.
+
+**Delivered.** Four lifecycle transitions on `/admin/admins`, super-admin-only: promote, demote (clearing `can_manage_admins`), deactivate (typed email plus a required reason) and reactivate. Each runs as one `authSql.begin()` transaction: `pg_advisory_xact_lock(717275, 2)`, `FOR UPDATE` on actor and target, every rule re-derived from those rows, compare-and-set against the `expectedRole`/`expectedActive` the page rendered, the viable-super-admin count taken under the lock, the target's live sessions revoked, and `auditInTransaction` — commit or nothing. No hard delete anywhere; no migration; no grant, FK or privilege change.
+
+**Enforcement, as built.** Self-demotion and self-deactivation are refused, and the viewer's own card renders no lifecycle controls at all. The last viable super admin cannot be demoted or deactivated, including under a genuine two-connection race. `can_manage_admins` gains no lifecycle power. Every Server Action calls `requireSuperAdmin()` for itself; `people.admins.lifecycle` is capability metadata that describes that guard rather than replacing it. Reactivation revives no previous session. A failed compare-and-set is reported as `stale`, never as success, and audited as `admin.lifecycle_refused`.
+
+**Files.** New: `src/lib/auth/admin-lifecycle.ts`, `src/db/queries/admin-users.ts`, `src/app/admin/admins/lifecycle-actions.ts`, `src/app/admin/admins/LifecycleControls.tsx`, `tests/admin-lifecycle-actions.test.ts`, `tests/integration/admin-lifecycle.test.ts`. Modified: `src/lib/auth/capabilities.ts` (Phase A's table, one capability added), `src/app/admin/admins/page.tsx`, `src/app/admin/admins/AdminSessionsClient.tsx`, `src/app/admin/admins/actions.ts`, `tests/auth.test.ts`.
+
+**Validation.**
+
+- `npm run test -- tests/auth.test.ts tests/admin-lifecycle-actions.test.ts` — **98/98 passed** (67 + 31), re-run green after the browser-driven UI corrections.
+- `npm run test -- tests/integration/admin-lifecycle.test.ts` — **17/17 passed** (16.5 s) against `afldb_test`, including the atomic mutation-plus-audit case, the audit-failure rollback case, the deactivated account that cannot sign in and is still refused by the delete guard, the deterministic mutual-demotion race (the loser waits on the lock, re-reads its own row and refuses) and the concurrent-deactivation case proving the invariant is counted under the lock.
+- `npm run typecheck` — **passed**.
+- **Browser acceptance, DEV, super admin.** Preflight P1: four viable super admins. Desktop 1440×900 — list, roles, statuses and the "You" marker render; own-account card offers no lifecycle controls; a full promote → demote → deactivate → reactivate round trip on `e2e-plain-admin@afldb.test` verified in `auth_users` and `auth_audit_log` (rows **771–785**, all against that one test account: fourteen committed transitions, the round trip having been repeated to verify the UI corrections and again at mobile width, plus one audited refusal at row 782, `code: stale`; each committed row carries before/after/expected/target/revokedSessions); the mismatched-typed-email refusal and a genuinely stale second tab were both refused cleanly, the latter audited as `code: stale` with nothing written. Mobile 375×812 — admin menu still collapses and expands (Phase A intact), controls and the deactivation form fit the viewport, promote/demote round trip works with visible confirmation. Zero console errors at both widths. Every account was restored to its starting state.
+
+**Browser-driven fixes (UI layer only, no server/SQL/audit change).** Acceptance showed the four success confirmations were never visible: a successful mutation revalidates the page, swaps the submitting control for the next one and, for deactivate/reactivate, moves the card between the active and deactivated lists and remounts it, so a result held inside the control was discarded by the same commit that produced it. The result is now owned by `AdminSessionsClient` above both lists and rendered from a prop; a deactivated card stays open while it holds one; and the deactivation `reason`/`confirmEmail` inputs are controlled so a refusal no longer clears what was typed. Refusals were correct throughout, before and after.
+
+**Follow-up, not a Phase B defect:** the privilege suite asserts `afldb_auth` access to `auth_users` but has no explicit negative assertion for `DELETE ON auth_users`. Phase B adds no delete path and changes no grants; worth adding when that suite is next edited.
+
+### Phase C — Brownlow administration: planning complete (2026-09-10)
+
+Planning-only session (native inspection, no commands, no database access, no source edits). The implementation-ready contract is `AFLDB-ISSUE-155.md` §27, which governs over §8 where they differ. Decisions recorded there:
+
+- **Current model confirmed.** Three grains, none with a match identifier: `brownlow_season_votes` (authoritative season totals, artefact-loaded by truncate-and-copy), `brownlow_round_votes` (`(season, player_id, round_number)`, 1984+, provenance quartet from 083, written by the fitzRoy rebuild loader without `source_id` and by the ownership-gated settle applier), `player_match_stats.brownlow_votes` (partial, written by the generic match sheet). Derived: `player_season_stats`, `player_career_stats`, `stat_availability` — all from `brownlow_season_votes`.
+- **Canonical fact = match-level vote assignment**: `brownlow_round_votes` gains nullable `match_id`, deterministically backfilled through the player's own `player_match_stats` row; unresolved rows stay NULL and are reported. Season totals for admin-published seasons are derived from those facts into `brownlow_season_votes` with `manual_admin_edit` provenance; artefact seasons stay **source-published** (explicit compatibility state: known total, incomplete match attribution, disagreement shown never applied).
+- **Migration required: yes** — one additive migration (094 at planning time): `match_id` + backfill + partial unique indexes `(match_id, player_id)` and `(match_id, votes) WHERE votes > 0`; new `brownlow_vote_entry_state` (draft/final/void, revision, actor FKs) and `brownlow_season_authority` (revision, published revision/by/at); `data_edits` allowlist widened; app read + import write grants. `data_overrides` is deliberately untouched (the settle's manual-authority proof pins its CHECK).
+- **Draft/final model:** Admin drafts (`data.brownlow.draft`), Super Admin finalises, corrects, voids and publishes (`data.brownlow.finalise`); §25 Decision 1 adopted as Option A. Corrections are direct updates with reason and full before/after in `data_edits`; a correction in a published season re-derives the season atomically, so no "published but stale" public state exists.
+- **Participants** = `player_match_stats` rows for the match only; finalisation blocked when either side has fewer than 18 rows (threshold confirmed by preflight P8).
+- **Concurrency:** revision compare-and-set on the entry row plus a canonical fingerprint CAS over the match's existing vote rows; lock order advisory `pg_advisory_xact_lock(717275, 3)` → `matches FOR UPDATE` → entry row → season authority row.
+- **Importer precedence:** manual > settle > rebuild. The settle already refuses foreign-owned rows; the artefact loader and the fitzRoy round-vote loader gain fail-closed refusals when manual-owned rows exist. Promotion/restore lineage must carry the new tables before any post-Phase-C promotion (operator follow-up).
+- **Legacy writer:** the match sheet's Brownlow write is removed (server refuses a non-null value; the column is preserved through match-sheet saves); the BV column becomes read-only with a link to Brownlow administration.
+- **Split:** C1 (schema, transactions, reconciliation, importer guards, DB/concurrency tests) — Opus High; C2 (routes `/admin/brownlow`, `/[season]`, `/[season]/[round]` with inline match editors, actions, nav, badge, browser acceptance) — Sonnet High. Handoff prompts §27.25 and §27.26; preflights P1–P12 in §27.20 (P3 = 0 and P11 all true are hard gates); test matrix §27.27.
+
+**Known cosmetic observation, not caused by Phase B:** at 375 px the page scrolls 6 px horizontally, entirely from the shared `details.table-details > summary` (a `flex-wrap: nowrap` row whose long email title plus `.table-details-note` cannot shrink). Hiding the note removes the overflow exactly. A one-line `flex-wrap: wrap` on that shared rule would fix it site-wide and was left for the owner.
+
+**Exact next action:** operator review and commit of the uncommitted Phase A + Phase B working tree, then plan **Phase C (Brownlow administration)** in a fresh **Opus High** session.
+
+### Phase C1 — Brownlow administration: preflight P13 and the canonical writer (2026-09-10, in progress)
+
+**Preflight P13 (new, read-only, `afldb_test`).** P1–P12 asked whether the data supports the workflow; P13 was added during C1 because `deriveSeasonRows` must produce rows that a reader cannot tell apart from the 98 source-published seasons, and the artefact importer carries those values through rather than deriving them — so the conventions are knowable only by measuring. Full results are recorded in `AFLDB-ISSUE-155.md` §27.29. The bindings, over all 16,120 `brownlow_season_votes` rows:
+
+- `vote_rank` is **competition rank (1, 2, 2, 4) over all polled players including the ineligible** — dense ranking disagrees on 15,590 rows, eligible-only ordering on 636.
+- `eligible_rank` is competition rank **among the eligible only** (zero disagreement over 16,117 rows); an ineligible player carries NULL (all three such rows, and no eligible row).
+- `is_winner` means exactly `eligible_rank = 1`, in both directions, across 112 winner rows; 12 seasons legitimately have more than one winner.
+- `games` is **home-and-away only** — `player_season_stats.games - finals` — on every row of every season (the all-games reading disagrees on 6,507). This closes the P9 open item across all 98 seasons rather than the three P9 sampled.
+- `three/two/one_vote_games` are ordinary exact counts of canonical 3/2/1 match rows, stored **NULL when the count is zero**. P13(h) had shown 4,327 / 3,798 / 3,423 mismatches against the round grain for 1984–2025 while `votes` and `polling_games` matched exactly; P13(j) resolved it — aggregates identical (7,413 each side per value, 22,239 polling), zero populated-and-wrong rows, no transposition, and every mismatch a stored NULL against a derived zero. `IS DISTINCT FROM` had scored "unpopulated" and "differently counted" alike, and migration 005 declares all four columns nullable with no CHECK, so the two hypotheses produced identical evidence until the populated rows were checked on their own.
+
+`deriveSeasonRows` emits `count > 0 ? count : null` for the three columns and always populates `polling_games`; existing artefact rows are not altered; arithmetic on these columns uses `COALESCE(col, 0)`. Pinned by `tests/brownlow-entry.test.ts`. Both scratch integration suites were deleted once §27.29 recorded their output.
+
+**Canonical writer implemented** (`src/db/queries/admin-brownlow.ts`, new): the §27.9 read model (`listBrownlowSeasons`, `getBrownlowSeasonOverview` with the per-round grid, the disagreement report and the current ineligible set, `getBrownlowRound`, `getBrownlowMatchEditorModel`) and the four transactions of §27.17 — `saveDraftBrownlowMatch`, `finaliseBrownlowMatch`, `correctBrownlowMatch`, `voidBrownlowMatch`, `publishBrownlowSeason` — on a short-lived `AFLDB_IMPORT_DATABASE_URL` connection with the §27.14 lock order (advisory `717275, 3` → `matches FOR UPDATE` → entry row → season authority) and `recordDataEdit` inside every transaction. Business refusals are thrown as a private error class so a refusal rolls back rather than commits, and arrive at the caller as `{ ok: false, code }`; only a genuine database failure becomes `db_error`.
+
+**One deliberate departure from §27.10 item 1.** The plan said finalisation deletes every other round row for the match. P1 then measured the round table as a **dense participation record** — 298,622 of 320,861 rows are a published zero meaning "played, polled nothing" — so the writer is **claim-and-demote**: unresolved rows for participants of the match are attached to it (provenance untouched), every row of the match still holding a value is demoted to zero with manual provenance, and the three selected players are then upserted with 3/2/1. No round row is ever deleted. Demote-then-claim is also what keeps the migration-094 partial unique index on `(match_id, votes) WHERE votes > 0` satisfiable through a correction that swaps two players' votes. A `void` (operator decision D2) instead withdraws the values — `votes = NULL`, `played` unchanged, mirror NULL — rather than asserting that forty players each polled zero in a match where no votes were awarded.
+
+**Supporting changes:** `player-derived.ts` gains `recomputeBrownlowCareerTotals` (narrow two-column career update over the union of old and new season-row players) and `recomputeBrownlowCoverage` (the migration-016 rule for one season, with the D1 match-aware round grain and `void` counted as accounted at both match grains); `audit-log.ts` widens `DataEditTableName` for the two migration-094 tables; `capabilities.ts` adds `data.brownlow.read/draft/finalise` per §27.8; `entry.ts` gains the pure `seasonStatusLabel`.
+
+**Recorded divergence, latent not actual:** `recomputeBrownlowCoverage`'s round-grain rule ("every home-and-away match accounted for") differs from migration 016 and `import_legacy_afl.py::_brownlow_availability` ("any round row at all"). On current data the two agree row for row — P6 measured all 7,413 H&A matches of 1984–2025 as complete 3/2/1, and no season outside that window holds a round row (P1) — so the first season to disagree will be one this workflow itself made partial. `import_legacy_afl.py` needs the same amendment before a full rebuild of such a database.
+
+**Validation so far:** `tests/brownlow-entry.test.ts` 85/85; `npx tsc --noEmit` clean. No database command has been run against any host from this session.
+
+**Remaining in C1** (handoff §27.25 items 7–9): the legacy match-sheet writer removal (`src/lib/match-sheet.ts`, `src/db/queries/match-sheet.ts`), the two fail-closed Python importer guards, and the test suite — `tests/integration/admin-brownlow.test.ts` (objects, backfill, the four transactions, the deterministic two-connection races, audit-failure rollback), plus the extensions to `match-sheet`, `admin-match-mutations`, `auth`, `data-editor` and `privileges`. The migration itself has not been applied to any host, so nothing here is database-validated yet.
+
+**Exact next action:** finish C1 items 7–9, then run the §27.25 command sequence against `afldb_test` (unit suites → `db:migrate` → the integration set → typecheck) and stop at the C1 validation gate.
+
+### Phase C1 — legacy writer, importer guards and runtime validation (2026-09-10, items 7–9)
+
+Migration 094 had already been applied and post-validated on `afldb_test` before this session: 320,861 of 320,861 `brownlow_round_votes.match_id` resolved, zero post-backfill integrity mismatches, both partial unique indexes validated, the workflow and authority constraints validated, and the focused regression green at 152/152 (`brownlow-entry` 85/85, `auth` 67/67). It was not reapplied. This session completed §27.25 items 7–9.
+
+**Legacy match-sheet writer removed (§27.15).** `validateMatchSheetPayload` now refuses **any** non-null `brownlowVotes` — a complete 3/2/1, a partial allocation, a value out of range, and an explicit zero alike — with one message naming `/admin/brownlow`, exported as `BROWNLOW_MATCH_SHEET_REFUSAL` so the refusal text is asserted rather than duplicated. The previously accepted 3/2/1 case is now the primary refusal case. `saveMatchSheet` no longer names `brownlow_votes` in the INSERT column list or the `ON CONFLICT` SET, so the mirror written by Brownlow administration (or the historical source value) survives every match-sheet save; the `is_final` and `stat_availability` gates that existed only to guard that write were deleted with it, and the now-unused `is_final` read was dropped from the locking SELECT. `match-admin.ts` carries exactly one change, made while validating this (§27.15, corrected 2026-09-10): `deleteMatch` reads `brownlow_vote_entry_state` under the match lock and refuses — naming the status and the Brownlow round page — **before** any destructive statement runs. Migration 094's `ON DELETE RESTRICT` still guarantees it at the storage layer, but only as a backstop: a raised foreign-key violation is not control flow a Data Editor user can act on, and relying on it alone meant the refusal arrived after the deletes had been attempted. The read is a `SELECT`, so the whole-`src` "no Brownlow fact writer" contract is unaffected.
+
+**Two fail-closed importer guards (§27.11).** `import_brownlow_season.py::check_database_coverage` refuses when `brownlow_season_votes` holds any `manual_admin_edit` row, scoped to the whole table rather than the declared seasons because the load is `TRUNCATE ONLY` + COPY and would destroy a manual row in any season. `import_fitzroy_core.py::import_brownlow_round_votes` refuses before its season-scoped `DELETE` when any row in the snapshot's seasons carries `manual_admin_edit`, with the same season scoping the delete uses. Both name the seasons and say what to do. A rebuild database holds no manual rows, so a real rebuild is unaffected.
+
+**One defect found by writing the runtime validation, and fixed.** `recomputeBrownlowCoverage` recomputed `stat_availability.brownlow_season_total` from `medal_awarded` (`EXISTS` a `brownlow_season_votes` row) alone, while `lockMatch` refuses every Brownlow mutation in a season whose coverage there is `not_applicable` — the mechanism that keeps 1942–45 un-enterable. A **completed** season with no season rows yet is exactly the state a new season occupies between its first finalisation and its publication, so the first finalisation would have flipped that season to `not_applicable` and every match after it would have been refused `season_not_polled`, with no way out but a hand-edit of the coverage grid. The season could then never be completed, so it could never be published. Fixed by one branch: a season this workflow holds finalised or voided home-and-away matches for is `partial` — some of its totals are settled, none are published. Recorded in the function's own comment as a second, non-optional divergence from migration 016, alongside the D1 round-grain one.
+
+**One type corrected:** `getBrownlowMatchEditorModel` declared `jumperNumber: number | null` for `player_match_stats.jumper_number`, which is `text` (migration 004) because historical numbers are not all integers and leading zeros are meaningful. C2 renders that field, so the wrong type would have been built on.
+
+**Tests written (§27.27).** New `tests/integration/admin-brownlow.test.ts` and its fixture `tests/integration/brownlow-fixture.ts`, which reserves seasons **2089** (four full home-and-away matches over two rounds plus a Wildcard Final and a Grand Final, seeded source-published), **2085** (one side short of the §27.6 threshold) and **2084** (coverage says no medal), on the ISSUE-129 committed-fixture convention: namespaced keys, clubs and sources read only, full cleanup, and a fail-closed collision check. No real Brownlow row is a subject or is written. Coverage: migration objects, the partial-index predicates, the P2 backfill expectation, the audit allowlist widening, both new tables in the app-read registry, and `data_overrides.entity_type` still free of `brownlow` (the §27.22 stop condition); refusals that write nothing (non-home-and-away for both a Wildcard Final and a Grand Final, unpolled season, non-participant, duplicate player, incomplete finalisation, participant-incomplete with the draft still permitted); the season administered as a narrative — draft, draft update, stale revision, finalise with provenance and the dense mirror, source-published totals left untouched with the disagreement reported, draft-on-final refused, correction with reason and full before/after, correction without a reason refused, fingerprint CAS refused after a simulated settle, adoption that demotes rather than deletes, void that withdraws values and keeps `played`, second void refused, void without a reason refused, audit-failure rollback, and completion; publication — unattached row refused, incomplete season refused, stray ineligibility refused, the publication itself against every P13 convention (manual provenance, competition ranks, `is_winner` ⇔ `eligible_rank = 1` in both directions, NULL-for-zero counts, NULL `club_id`), derived season and career figures in step, `db-health` career drift unchanged, stale publication refused, idempotent re-publication, and a correction that re-derives a published season atomically; the two reload-path guard predicates executed against the database; mirror preservation through a match-sheet save and the `deleteMatch` refusal; and four two-connection races — draft vs finalise, two corrections, two finalisations of a voided match in a published season, two publications — each with `pg_blocking_pids()` proof that **both** contenders waited, using the production entry points unmodified with no test-only hook in the transaction.
+
+Extended: `tests/match-sheet.test.ts` (the inverted Brownlow cases), `tests/admin-match-mutations.test.ts` (no `brownlow_votes` write remains in `match-sheet.ts`; a whole-`src` scan asserting the only Brownlow fact writers are `admin-brownlow.ts` and the ownership-gated settle applier `canonical-apply.ts`), `tests/auth.test.ts` (`data.brownlow.read/draft/finalise`, including that `can_manage_admins` reaches none of them), `tests/brownlow-season-artefact.test.ts` and `tests/fitzroy-core-import.test.ts` (source contracts for the two Python guards, including that the fitzRoy refusal precedes its `DELETE`), `tests/integration/data-editor.test.ts` (T6/T6b restated as unconditional refusal, plus T6c for an explicit zero), `tests/integration/privileges.test.ts` (the two workflow tables as the fifth and sixth registry exceptions, with their exact shape — SELECT/INSERT/UPDATE/DELETE, no TRUNCATE, no owned sequence — and `afldb_auth` holding nothing on them).
+
+### Phase C1 — runtime validation of the Brownlow gate (2026-09-10)
+
+**`tests/integration/admin-brownlow.test.ts` against `afldb_test`: 44/44 passed, ~109 s.** Migration 094 was not reapplied. The audit-probe case emits the expected stderr from the deliberately failing audit insert, and its rollback assertion passes. Four things had to be corrected to get there, none of them in the locking design:
+
+1. **Refusal precedence (application change, §27.14/§27.17).** `assertRevision()` now runs **before** `checkTransition()`. The two orders differ only for a transaction that loses a race and finds a row that is both moved and no longer in the state it acted on; §27.17 step 4 answered that with `already_final`, contradicting §27.14's own normative scenario "Two finalisations → second refused `stale`". `stale` is also the more useful answer, because the loser did not choose to act on a decided match — it acted on a page that had stopped being true. Non-racing behaviour is unchanged and still proved: submitting against the **current** revision of an already final or void match returns `already_final`.
+2. **Row-lock observation (test harness, not the application).** The three advisory-lock races are proved by a direct `pg_blocking_pids()` reading, which is correct for an advisory lock. It is not correct for a row lock, and the draft-vs-finalisation race contends on the `matches` row: the first waiter takes the *tuple* lock and waits on the holder's transaction id, and the second queues behind **it**, so the second contender names the first contender and never the holder. Diagnosed from live `pg_stat_activity` (holder 3168847; 3168867 `Lock/transactionid` blocked by [3168847]; 3168868 `Lock/tuple` blocked by [3168867]) — "both blocked by the holder" is unreachable for a row lock however long it is polled, and the race itself had been correct all along, one winner and one `stale`. The proof now walks the blocking graph transitively from the holder (recursive CTE) and additionally requires each contender to be `wait_event_type = 'Lock'` and executing the contended `matches … FOR UPDATE`. No committed timeout was raised, and no application locking changed. The temporary diagnostic suite has been deleted.
+3. **Two assertions that were wrong about the workflow.** The correction test conflated a *reshuffle* with a *displacement*: a previous holder still on the corrected sheet is demoted (the former 3-vote holder to 2), and only the holder who leaves the sheet keeps the `votes = 0, played = true` row that "claim and demote, never delete" is about. And `participantsComplete` in `getBrownlowRound` compared a bare `count()` — which postgres.js returns as a **string** — so `foreignRows === 0` was false for every match; the counts are cast `::int` in the SQL and the threshold is `MIN_CLUB_LINEUP_ROWS` rather than a literal, so it cannot drift from `assessParticipants`.
+4. **Race seeding.** The two-finalisations race inherited its subject's `void` status, its season's completeness and its season's publication from three earlier `it()`s in two other describe blocks, so it could not be run alone. It now establishes that state itself through the production entry points, skipping each step that is already true — a no-op in the full ordered run.
+
+**Validation status:** the Brownlow integration gate is green; the rest of the §27.25 sequence has not been run from this session.
+
+**Superseded next action (2026-09-10, completed):** run the remaining §27.25 sequence — typecheck, the six-suite unit run, `admin-brownlow` + `data-editor`, then separately `privileges` + `release-gates`. Results are in the closeout record below.
+
+### Phase C1 — fixture residue cleanup, §27.30 harness fix and C1 gate closeout (2026-09-10)
+
+**Fixture residue cleanup — committed, `afldb_test` only.** The contamination recorded in `AFLDB-ISSUE-155.md` §27.30 (a timed-out `beforeAll` left committed fixture rows with no handle to remove them) was cleared by a guarded cleanup that refused to proceed unless every precondition held: **all 15 entanglement guards = 0** (no fixture row shared identity with, or was referenced by, a real row), **fixture auth precondition = 0**, **every FK blocker scan = 0**, postconditions **P01–P14 green** and **P15 collateral accounting green**. **Exactly 419 rows were deleted** and nothing else. Result: *committed; `afldb_test` is clean of ISSUE-155 fixture residue.*
+
+**§27.30 harness defect — FIXED and VALIDATED, not fixed-by-inspection.** Cleanup no longer depends on the handle `seedBrownlowSeason` returns. A module-level **seed registry** entry exists before the first fixture row is written; each seed owns a **dedicated connection**; the seed observes a cancellation flag at checkpoints; `afterAll` sweeps the registry — **cancel first**, wait briefly for cooperative settlement, forcibly close the dedicated connection if it has not settled, and only then remove rows; removal is memoised, idempotent and fail-closed. The internal 300 s seed deadline (`AFLDB_BROWNLOW_SEED_DEADLINE_MS`) is retained **only** as secondary protection against a hung seed that reaches no checkpoint.
+
+Both abnormal paths were exercised directly through a temporary suite `tests/integration/tmp-issue155-cancel.test.ts`, since deleted:
+
+- **Run A** — `npx vitest run tests/integration/tmp-issue155-cancel.test.ts --testTimeout=600000 --hookTimeout=600000`: registry-sweep cancellation path **PASS** (1 passed / 1 skipped, ~3.6 s, clean process exit).
+- **Run B** — the same with `AFLDB_BROWNLOW_SEED_DEADLINE_MS=3000`: internal-deadline path **PASS** (1 passed / 1 skipped, ~5.5 s, clean process exit).
+
+The clean exits are part of the evidence: closing a dedicated seed connection mid-flight does not hang the Vitest process.
+
+**Independent post-abnormal-path verification (read-only).** Run from outside the harness with Node + `postgres` inside a `READ ONLY` transaction, refusing before connection and again on `current_database()` unless the database name ends in `_test`. Every ISSUE-155 residue counter was **zero**: reserved seasons 2084/2085/2089; `issue155-*` matches and players; `player_match_stats`, `player_season_stats`, `player_club_season_stats`, `player_career_stats`, `player_clubs`, `club_seasons`, `stat_availability`; `brownlow_season_votes`, `brownlow_round_votes`, `brownlow_vote_entry_state`, `brownlow_season_authority`; `data_edits` on fixture match/player/workflow subjects; the fixture auth user `issue-155-brownlow-test@example.test`; and the `issue155_audit_probe_trg` trigger and `issue155_audit_probe` function. **`ISSUE155_RESIDUE_ZERO: YES`**, with `GLOBAL_DATA_EDITS_ORPHANS: 0` printed as informational only — a whole-database integrity measure deliberately kept out of the ISSUE-155 verdict so an unrelated orphan could not produce a false NO.
+
+**C1 gate results.** `npm run typecheck` **GREEN**. `tests/integration/admin-brownlow.test.ts` **44/44 PASS** (the only stderr is the deliberate audit-probe rollback case). `tests/integration/data-editor.test.ts` 9 passed / 1 failed / 2 skipped, with **T6, T6b and T6c all passing**. `privileges` + `release-gates` 56 passed / 3 failed / 7 skipped.
+
+**All four remaining failures are externally owned — proved, not assumed.** An independent read-only attribution query returned `matches_2026` **213**, `complete_2026` **213**, `complete_le2025` **15,187**, `club_seasons_2026` **18**, `pss_2026` **577**, `cohort_on_2025_basis` **261** — **`PURE_2026_DRIFT_CONFIRMED: YES`**:
+
+1. Advanced Search *expected 261, actual 268* — with 2026 goals removed from career goals the cohort is exactly **261**, the pinned number; the seven extra players crossed the 50-goal floor on 2026 goals alone.
+2. Western Bulldogs *expected `to = 2025`, actual 2026* — `club_seasons` holds 18 rows for 2026; the gate's own comment records that **ISSUE-095 deliberately re-pinned this bound from 2026 to 2025** because an in-progress season belongs to the current-season pipeline.
+3. Attendance *expected complete 15,187, actual 15,400* — complete rows at season ≤ 2025 are **exactly 15,187**, the 213 extra being 2026 matches; `not_collected` unchanged at **1,651**, so no historical value moved.
+4. The `data-editor` ladder failure (*"expected canonical in-progress season row to exist, got undefined"*) is the same cause with a direct mechanism: the test selects the newest season with **no** non-final matches and asserts in its own message that *"a canonical rebuild leaves the in-progress season without matches"*. `matches_2026 = 213`, so no such season exists and the subject is `undefined`.
+
+None of these is an ISSUE-155 regression and none is a historical-data regression. The contamination-specific failures seen before the cleanup are gone: no extra 2,085 rows, and `not_collected` returned from 1,653 to 1,651. **No expected value and no ladder logic was changed for this issue**, and the known `external_grid_axes`/`external_grids` privilege mismatch was left untouched.
+
+**Database-state policy question — documented, unowned, not decided here.** The release gates are pinned to a canonical baseline of **1897–2025** (stated in their own source: ISSUE-095 for the club-lineage bound, ISSUE-113 for the cohort digest and for "never emits a row for an in-progress season, so 2026 derives as pending"), while `afldb_test` now also carries current-season 2026 rows. Each fact is intentional in its own terms; the missing rule is the one reconciling them, because the gate predicates are unbounded by season. The provenance of the 2026 rows is **not** established by this evidence — the current-season pipeline (ISSUE-098/-099/-100) is the only writer of an in-progress season and is the presumed origin. Deciding the reconciliation (bound the gates by season, or keep `afldb_test` canonical-through-2025 and stage current-season work elsewhere) belongs to the release-gate/current-season owner and is a candidate for its own tracked issue; it also owns the `data-editor` ladder assertion.
+
+**Phase C1 is complete and its gate is green** on everything ISSUE-155 owns. C2 is not started and nothing has been deployed.
+
+**Exact next action:** commit the C1 closeout on `codex/issue-155-admin-overhaul`, then start **Phase C2** (§27.26, Sonnet high, fresh session). Do not absorb the §27.31 database-state policy question or the `external_grid` privilege mismatch into C2.
+
+### Phase C2 implementation and validation (2026-09-10) — Sonnet, high
+
+**Built, per §27.26.** A thin UI over the fixed C1 read model and transactions; no transaction,
+guard, SQL or audit code changed.
+
+- **Routes.** `src/app/admin/brownlow/page.tsx` (polled-season list: status label, coverage
+  counts, authority, last editor via an `authSql` email lookup); `[season]/page.tsx` (coverage
+  strip, per-round completeness table, source-vs-published disagreement report, and the publish
+  panel); `[season]/[round]/page.tsx` (every H&A match in fixture order, one inline editor
+  each, round nav from `overview.rounds`, a standing note that finals are not administered).
+- **Client components.** `[season]/[round]/RoundMatches.tsx` owns every editor's last result so
+  it survives the revalidation a successful write triggers (§26.20 deviation 2) and moves focus
+  to the next match on success; `[season]/[round]/MatchVoteEditor.tsx` (participants grouped by
+  club with text jumper numbers, three type-ahead selectors that exclude each other's picks,
+  Adopt for imported rows, a participant-incomplete block linking the match sheet, Save
+  draft / Finalise / Correct / Void with `formAction` per button, reason field for Super
+  Admin, keyboard flow 3→2→1→Save→next match, entered values kept on a refusal);
+  `[season]/PublishPanel.tsx` (readiness, backend blockers, ineligible-player multi-select
+  prefilled from the current rows, `expectedRevision` hidden field, two-step confirm, Super
+  Admin only, stale → reload prompt).
+- **Server Actions.** `src/app/admin/brownlow/actions.ts` — `saveDraftAction` behind
+  `requireCapability('data.brownlow.draft')`; `finaliseAction` / `correctAction` / `voidAction`
+  / `publishSeasonAction` behind `requireCapability('data.brownlow.finalise')`. Each parses
+  ids / revisions / fingerprint / selection / reason, calls the C1 transaction, audits
+  `stale` / `already_final` / `forbidden` refusals via `audit('admin.brownlow_refused', …)`
+  (never `invalid` / `not_found` / the domain refusals), and revalidates per §27.18 —
+  admin paths always, `/seasons/<year>` (+ best-effort cross-worker `revalidateSeason` when
+  `AFLDB_REVALIDATE_URL` is set) and `/matches/<id>` on a fact write, plus `/brownlow`,
+  `/brownlow/<year>`, `/players/[slug]`, `/clubs/[slug]`, `/records/[category]` when a
+  publication or a re-derived published season is involved.
+- **Supplementary reads.** `src/db/queries/admin-brownlow-ui.ts` (server-only, SELECT only —
+  `listSeasonPolledPlayers`, `getBrownlowSeasonAdminMeta`, `resolveAdminEmails`,
+  `getBrownlowDashboardBadge`). The sole-writer contract in
+  `tests/admin-match-mutations.test.ts` is unaffected.
+- **Nav + dashboard.** `src/app/admin/nav-model.ts` gains a Data-group Brownlow link on
+  `data.brownlow.read` (so a plain Admin now has a Data group with exactly that link);
+  `src/app/admin/page.tsx` shows the current polled season's incomplete-H&A count for anyone
+  with `data.brownlow.read`.
+- **Match sheet (§27.15).** `MatchSheetEditor.tsx` renders the BV column read-only (value or
+  "—"), removes `brownlowVotes` from the submitted payload entirely, and shows a line linking
+  the match's Brownlow editor (`/admin/brownlow/<season>/<round>#match-<id>`) for H&A matches,
+  or "not awarded in finals" otherwise.
+- **Tests.** New `tests/admin-brownlow-actions.test.ts` (24 cases, the
+  `tests/admin-lifecycle-actions.test.ts` mocked-module pattern: capability boundary incl. an
+  Admin who can draft but not finalise/correct/void/publish, form parsing, the exact
+  transaction arguments, `void` called with no `selection`, the refusal-audit set, publish
+  ineligible-id parsing, revalidation targets). `tests/auth.test.ts` extended for the nav
+  (`adminNavFor` now gives a plain Admin a `data` group holding only `/admin/brownlow`; Data
+  order is data-editor → brownlow → player-links; contributor still sees none). One line added
+  to the `tests/admin-nav/admin-nav.spec.ts` diagnostic route list.
+
+**Two pre-existing test failures repaired while validating (not C2 regressions — proved by
+`git log` on the files, and by the fact that C2 touches no migration, no enum, no contract):**
+
+1. `tests/external-grids-import.test.ts > never widens the corpus grants past append-only` —
+   a genuine small C1 defect: migration 094's `privileges.sql` mirror block was inserted
+   *between* the migration-080 `external_grid_sources` guard and the `staging` guard, i.e.
+   inside the text span that test reads and asserts carries no `DELETE`. **Fixed** by moving
+   the Brownlow block to *before* the migration-080 block (still after the revoke loop, still
+   "beside the 066/080 blocks"), with a comment stating why. `tests/integration/privileges.test.ts`
+   (real grants on `afldb_test`) is position-independent and stays green.
+2. `tests/reference-data.test.ts > finds the tables created after 045 that never registered
+   import write` — the expected list had not been updated since ISSUE-122 (migration 083), so
+   it was already red on this branch from the Gridley corpus merge (migration 080's
+   `external_grid_*` trio, never `grant_import_write`-registered by design). **Synced** the
+   list: added `brownlow_vote_entry_state` and `brownlow_season_authority` (narrow-grant by
+   design, same as `canonical_applications` / `data_edits` already in the list) and the
+   `external_grid_*` trio, each with a comment.
+
+**C2 validation evidence.**
+
+| Gate | Command | Result |
+|---|---|---|
+| Types | `npm run typecheck` | **GREEN** (`next typegen` + `tsc --noEmit`, no diagnostics) |
+| C2 Server Actions + nav | `npx vitest run tests/admin-brownlow-actions.test.ts tests/auth.test.ts` | **PASS** (24 + the auth suite) |
+| Match sheet backend | `tests/match-sheet.test.ts` | **PASS** |
+| Sole-writer / match-mutation contracts | `tests/admin-match-mutations.test.ts` | **PASS** |
+| C1 canonical suite (regression) | `npx vitest run tests/integration/admin-brownlow.test.ts --testTimeout=120000 --hookTimeout=600000` | **44/44 PASS** (~112 s); migration 094 not reapplied |
+| Data editor integration | `tests/integration/data-editor.test.ts` | 11 passed / 1 failed / 2 skipped — T6/T6b/T6c PASS; the one failure is the pre-existing 2026 ladder/no-matches drift (§27.31 item 4) |
+| Privileges integration | `tests/integration/privileges.test.ts` | 35 passed / 1 failed — the failure is the known `external_grid_axes` / `external_grids` "WRITABLE BUT NOT REGISTERED" mismatch (§27.31 "untouched, by instruction"); the two Brownlow workflow tables are correctly SELECT-for-app / write-for-import / nothing-for-auth |
+| Full DB-free suite | `npx vitest run tests/ --exclude 'tests/integration/**'` | **3970 passed / 3 failed / 14 skipped** — see below |
+
+**The 3 remaining DB-free failures, and the integration failures above, are all external or
+deferred — none is a C2 regression:**
+
+- `tests/db-promotion-check.test.ts` ×2 ("leaves exactly the pinned football tables
+  unclassified", "classifies every migration-created table the way the live gate does") —
+  `brownlow_vote_entry_state` and `brownlow_season_authority` are not yet in
+  `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`). This is **exactly the §27.28
+  follow-up** ("adding the Brownlow tables and manual-owned rows to the promotion/restore
+  lineage (ISSUE-151 pipeline) before any post-Phase-C promotion") and a **§27.22 stop
+  condition for running any promotion after Phase C**. It was deliberately not done in C2
+  (operator decision, 2026-09-10): registering the two tables via `grant_import_write()` is
+  the *wrong* fix — it would hand `afldb_import` (a reload path) TRUNCATE and unrestricted
+  DELETE on a record of administrative decisions, the precise thing migrations 066/073/078/080/083
+  and migration 094 itself avoid. The correct fix is two `PROMOTION_CONTRACT` entries with
+  `footballRefs` / `lineageRefs` / remediation for `match_id → matches` (current-season id
+  remap via `match_key`), the player-id and season references, plus an update to the hardcoded
+  assertion list at `tests/db-promotion-check.test.ts:349`.
+- `tests/finals-semantics-contract.test.ts > adds the enum value in its own migration` — the
+  Windows CRLF false-failure: two identical-looking one-element arrays that differ only by
+  a trailing `\r`. Passes on Linux. Documented; do not flip `autocrlf`.
+- `tests/integration/data-editor.test.ts` ladder assertion and the
+  `external_grid_axes`/`external_grids` privilege mismatch — both explicitly recorded as
+  externally owned in §27.31 and untouched by ISSUE-155.
+
+**Manual / operator validation (deferred to the operator).** No dev server was running and
+CLAUDE.md keeps server start-up and browser sessions with the operator. The §27.27 browser
+acceptance at 1440×900 and 375×812 on DEV — Admin can draft but not finalise/publish; Super
+Admin can finalise/correct/void/publish; stale-tab conflict shows the reload message with
+values kept; a match-sheet save writes unrelated stats without touching the Brownlow mirror;
+`/admin/brownlow` usable at both widths; no finals administerable; publication state obvious;
+zero console/runtime errors — has **not** been run and is the remaining C2 validation step.
+
+**Deployment.** C1 and C2 deploy together (the old MatchSheetEditor still posted Brownlow
+values, which C1 now refuses; C2 stops it posting them). Deployment is **NOT** safe yet:
+(1) the §27.21 sequence has not been run on DEV or PROD; (2) the browser acceptance above is
+outstanding; (3) the `PROMOTION_CONTRACT` follow-up below is a pre-deploy stop condition for
+any promotion that would run after this ships.
+
+**Files changed in C2.** New: `src/app/admin/brownlow/labels.ts`,
+`src/app/admin/brownlow/actions.ts`, `src/app/admin/brownlow/page.tsx`,
+`src/app/admin/brownlow/[season]/page.tsx`, `src/app/admin/brownlow/[season]/PublishPanel.tsx`,
+`src/app/admin/brownlow/[season]/[round]/page.tsx`,
+`src/app/admin/brownlow/[season]/[round]/RoundMatches.tsx`,
+`src/app/admin/brownlow/[season]/[round]/MatchVoteEditor.tsx`,
+`src/db/queries/admin-brownlow-ui.ts`, `tests/admin-brownlow-actions.test.ts`. Modified:
+`src/app/admin/nav-model.ts`, `src/app/admin/page.tsx`,
+`src/app/admin/data-editor/MatchSheetEditor.tsx`, `tools/maintenance/privileges.sql`,
+`tests/auth.test.ts`, `tests/reference-data.test.ts`, `tests/admin-nav/admin-nav.spec.ts`.
+
+**ISSUE-155 remains OPEN**, but the promotion-contract item below is now IMPLEMENTED, not
+outstanding. `PROMOTION_CONTRACT` in `tools/db/promotion-inventory.ts` carries both
+`brownlow_vote_entry_state` (`productionOnly: true`, `treatment: 'reinstate'`,
+`compare: 'equal'`, `restoreAfter: ['auth_users']`, staged reinstatement because `match_id` is a
+NOT NULL primary-key reference into rebuilt `matches` — remapped old id → `match_key` →
+candidate id via a new `rowIdColumn` mechanism, since this table's primary key IS the remapped
+column, not a separate surrogate `id`; `three_player_id`/`two_player_id`/`one_player_id` remap
+through the AFL Tables profile-url identity, same as `player_link_resolutions.player_id`; season
+is a natural key into `seasons(year)` and needs no remap) and `brownlow_season_authority`
+(`productionOnly: true`, `treatment: 'reinstate'`, `compare: 'equal'`,
+`restoreAfter: ['auth_users']`, not staged and not lineage-bound — its only FK is
+`season → seasons(year)`, a permanent natural identity). Neither table is registered via
+`grant_import_write()`. `tests/db-promotion-check.test.ts` was updated to match (the hardcoded
+reference list at the old line 349 and the two new-table assertions). This is uncommitted, in
+the current working tree, and has not yet been re-run to green from a fresh command in this
+session — see the validation table below and "Exact next action".
+
+**What is still open before ISSUE-155 can close:** the working tree (this promotion-contract
+work plus the post-C2 stale-tab/focus fixes recorded above) has not been committed; the full
+regression sequence (§27.25-shaped: unit → `db-promotion-check` → `admin-brownlow` integration →
+`privileges`/`release-gates` → typecheck) has not been re-run end-to-end against the current tree
+in one pass; the disposable `issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089)
+have not been cleaned up; and the §27.21 deploy sequence has not been run on DEV or PROD. None of
+these is a defect — they are the remaining gates.
+
+### §27.27 browser acceptance, stale-tab sub-case — run against `afldb_test` fixture, STOPPED on a new defect (2026-09-10)
+
+Ran the stale-tab-conflict repro from the C2 closeout's remaining validation step, against the
+disposable `issue155-acceptance-*` fixture already seeded in `afldb_test` (seasons 2089/2085, no
+fixture reset), two tabs on `/admin/brownlow/2089/1`, match #18296. Working tree at the time
+carried an **uncommitted, in-progress fix** for a stale-tab selection/reason reset defect found in
+an earlier pass of this same session (not yet in `issues.md`): `MatchVoteEditor.tsx`'s four
+buttons changed from the `formAction` pattern the C2 closeout above describes to `type="button"`
+plus a new `vote-form-data.ts` (`buildBrownlowVoteFormData`) that builds the submitted `FormData`
+from React `selection`/`reason` state rather than reading it back off the DOM, because React 19
+resets a `<form>`'s controlled fields after a `formAction` submission completes.
+
+**Result: the fix does not close the defect it targets, and introduces a second one. Sections E–K
+were not run (stop condition, item 8).**
+
+1. **Server-side compare-and-set is correct.** With tab A holding the canonical revision-3 → 4
+   correction and stale tab B (still showing revision 3) submitting a distinct 3/2/1 and a
+   distinct reason, the write was refused both times it was tried (`code: 'stale'`, canonical DB
+   state left as tab A's committed correction). Captured directly from the Server Action's own
+   multipart request/response bodies (`browser_network_request`), the FormData actually
+   transmitted matched tab B's live on-screen intent exactly, not any DOM-reverted or stale
+   default — confirming `buildBrownlowVoteFormData` itself does what its doc comment claims.
+
+2. **But on a clean page load (full navigation, no Fast-Refresh history), the visible
+   selection/reason reset recurs anyway, and the second-submit step cannot be performed.**
+   Immediately after the refused submission, the three `<select>`s and the reason field snapped
+   back to the values `model` held at tab B's *original* page load (the pre-correction canonical
+   holders, empty reason) — not to tab A's newly committed values, and not to what the operator
+   had just chosen in tab B. The refusal alert rendered correctly (naming "revision 4, not 3"),
+   but the `Correct finalised votes` button then went `disabled` again because the reason field
+   was now empty, making the required second-submit-without-reselecting step impossible through
+   the UI. `model.revision`'s own displayed text was unchanged (still "3"), which rules out a
+   revalidated/fresh-canonical explanation; root cause is not diagnosed (candidates include an
+   implicit Next.js App Router client-side re-render of the route after any Server Action
+   round-trip, independent of `revalidatePath`, causing `MatchVoteEditor` to remount and
+   re-run its `useState(model.selection)` / `useState('')` initializers even though the
+   `useEffect` guard's own dependencies — `model.revision`, `model.canonicalFingerprint` — did
+   not change). This is the same failure mode `vote-form-data.ts` was written to fix, recurring
+   through the display layer instead of the submission layer.
+   *(A first attempt at this same repro, run against the tab pair as left mid-fix from the prior
+   session — many Fast-Refresh cycles deep — did not show this reset and did complete a clean
+   second-submit proof with correctly preserved values. That result is real but was obtained
+   under confounded conditions and is superseded by the clean-load result above, which is the
+   one that matches how an operator would actually hit this.)*
+
+3. **New defect, deterministic, unrelated to staleness: every vote-editor submission (Save
+   draft / Finalise / Correct / Void, success or refusal, first click on a freshly mounted page
+   included) logs a React console error:** `An async function with useActionState was called
+   outside of a transition. This is likely not what you intended (for example, isPending will
+   not update correctly). Either call the returned function inside startTransition, or pass it
+   to an `action` or `formAction` prop.` Root cause is exactly what the message names:
+   `MatchVoteEditor.tsx`'s `onClick={() => runners.X.submit(buildFormData())}` calls each
+   `useActionState` dispatch directly from a plain click handler, which the move away from
+   `formAction` (fix in item 2) made necessary but did not wrap in `startTransition`. Violates
+   the §27.27 "zero console/runtime errors" acceptance criterion on its own.
+
+**Evidence:** `08-clean-reload-stale-selection-reset-recurs.png` (repo root, this session);
+Server Action request/response bodies captured live via Playwright MCP network inspection
+(not saved to disk — quoted inline above from the tool output).
+
+**Not done:** sections E (publication)/F (match-sheet compatibility)/G (incomplete-lineup
+refusal)/H (keyboard/nav)/I (responsive)/J (console/network beyond this)/K (capability
+boundaries) of §27.27. No code was edited, no fixture was reset, nothing was committed, nothing
+was deployed.
+
+**Exact next action:** fix both defects in `MatchVoteEditor.tsx` (wrap each `runners.X.submit(...)`
+call in `startTransition`, and diagnose why `selection`/`reason` local state resets after a
+refused action despite unchanged `model.revision`/`canonicalFingerprint`), then re-run the
+stale-tab repro clean before resuming §27.27 sections E–K.
+
+### §27.27 stale-tab defects — both root-caused and FIXED, stale-tab repro re-run clean (2026-09-10)
+
+Took over the two blockers the stale-tab run above stopped on. Both are now diagnosed from
+measured browser evidence (not inference) and fixed; the stale-tab scenario re-runs clean from
+freshly navigated tabs. Ran against the same disposable `issue155-acceptance-*` fixture already
+seeded in `afldb_test` (season 2089, match #18296, no fixture reset, no genuine season touched),
+dev server on port 3100 with every runtime DSN pointed at `afldb_test`.
+
+**BLOCKER B — React "called outside of a transition" — root cause and fix.** Exactly what the
+message named. `MatchVoteEditor.tsx` dispatched each `useActionState` action straight from an
+`onClick`. `react-dom`'s `runActionStateAction` records `isTransition` from
+`ReactSharedInternals.T` at dispatch time; outside a transition it skips the
+`onStartTransitionFinish` hook (so the async action is never entangled and `isPending` is
+unreliable) and logs the error. Fixed by routing all four buttons through one `submit(runner)`
+helper that snapshots the FormData from state and then calls the dispatcher inside
+`startTransition`. Native `formAction` submission was NOT reintroduced. `isPending` measured
+working afterwards: the Correct button sampled at 40 ms intervals across a live round-trip showed
+`Saving correction…|disabled=true` then `Correct finalised votes|disabled=false`.
+
+**BLOCKER A — selection/reason reset after a refusal — root cause.** The candidate recorded above
+(an App Router re-render/remount re-running the `useState` initialisers) is WRONG and was ruled
+out on evidence. Two independent proofs that no re-render occurred: the Server Action response
+body carried `"f":""` — no Flight data — because Next 16 sets `skipPageRendering` whenever an
+action did not revalidate (`next/dist/server/app-render/action-handler.js`), and a refusal returns
+before `revalidatePath`; with `flightData === undefined` and `ActionDidNotRevalidate` the
+`serverActionReducer` bails out with `return state`. Only one network request was made, and no RSC
+refetch followed.
+
+What actually happens, measured with mount/unmount/render/`useState`-initialiser instrumentation
+in the live page: after every Server Action round-trip the App Router **destroys and re-creates
+this subtree's effects**. `useState` initialisers do NOT re-run (the `[VE useState INIT]` probes
+fired only at hydration; React state and refs survive), but every `useEffect` cleanup fires and
+every `useEffect` body runs again — on the refusal the console showed `[VE UNMOUNT] 18296`,
+`[VE MOUNT] 18296`, `[VE RESET EFFECT] 18296 rev 5 fp 290f3e…` with the revision and fingerprint
+**unchanged from mount**, and the very next render carried the canonical selection and an empty
+reason. So the defect is: **a `useEffect` dependency array only suppresses re-runs within one
+continuous mount. After an effect re-mount there is no previous deps array to compare against, so
+the effect always runs.** The reset was therefore firing on every action completion, including
+refusals where nothing on the server had moved, wiping the operator's selection and reason and
+disabling the very button the retry needed. It is the same class of bug as the `formAction` one —
+a lifecycle event silently overwriting live operator intent — recurring through the display layer.
+
+**BLOCKER A — fix.** Reconciliation is now decided from data, not from effect lifecycle. Selection
+and reason live in one state object that records which server truth it was last reconciled to
+(`revision:canonicalFingerprint`); `reconcileVoteEditorState` returns that **same object** when the
+match has not moved and a fresh one when it has. The component applies it with React's documented
+"adjusting state when a prop changes" render-phase pattern, so `MatchVoteEditor.tsx` now contains
+no `useEffect` at all and nothing about effect lifecycle can reach the operator's work. This also
+removes a pre-existing `react-hooks/set-state-in-effect` lint error that was already failing at
+`da7723f` on the old reset effect.
+
+**Files changed.** `src/app/admin/brownlow/[season]/[round]/MatchVoteEditor.tsx` (transition-wrapped
+`submit` helper; single reconciled state object; reset `useEffect` removed),
+`src/app/admin/brownlow/[season]/[round]/vote-form-data.ts` (adds `BrownlowServerTruth`,
+`VoteEditorLocalState`, `initialVoteEditorState`, `reconcileVoteEditorState`, and documents both
+mechanisms), `tests/brownlow-vote-form-data.test.ts` (+10 tests). No server, action, query,
+migration, privilege or fixture change; nothing committed, nothing deployed.
+
+**Automated gates.** `npm run typecheck` GREEN. `npx eslint` GREEN on both changed source files.
+`tests/brownlow-vote-form-data.test.ts` 15/15, `tests/brownlow-entry.test.ts` +
+`tests/admin-brownlow-actions.test.ts` — 132/132 across the three files. `git diff --check` clean.
+`tests/integration/admin-brownlow.test.ts` deliberately NOT run: the live acceptance fixture owns
+`issue155-2089-*`.
+
+New coverage in `tests/brownlow-vote-form-data.test.ts`: a refusal preserves every vote slot; a
+refusal preserves the reason; reconciliation is idempotent across repeated re-runs (the measured
+effect-remount); a second submit after a refusal builds FormData carrying the preserved intent and
+the still-stale `expectedRevision`; a successful commit adopts the new canonical truth and drops
+the reason, then stays adopted; a same-revision fingerprint change is still adopted. Plus a
+source-contract block on `MatchVoteEditor.tsx` (comments stripped first) pinning the three shapes
+no pure function can guard: no `formAction`/`type="submit"`, every dispatch through
+`startTransition(() => runner.submit(formData))` with no direct `runners.X.submit(` call, and no
+`useEffect`. All three assertions fail against the `da7723f` file.
+
+**Live stale-tab re-test, clean tabs, both fixes in — PASS.** Tab A (fresh navigation, revision 6)
+committed a correction → revision 7, holders `16953/16938/16939`, its own selection reconciled to
+the new canonical and its reason cleared; zero console errors. Stale tab B (fresh navigation,
+still revision 6) submitted `16936/16937/16946` with reason `TAB B preserved intent charlie`:
+refused (`revision 7, not 6`), and afterwards the three selects still read `16936/16937/16946`,
+the reason still read `TAB B preserved intent charlie`, the displayed revision was still 6, the
+Correct button was still enabled, and the console had zero errors and zero warnings. Submitted
+again **without changing anything**: the captured multipart body carried
+`three=16936 two=16937 one=16946 reason="TAB B preserved intent charlie" expectedRevision=6` —
+the preserved intent, not a reverted default — and was refused again on the same compare-and-set.
+A third submit (used to sample `isPending`) was likewise refused. After all three refusals a fresh
+load of tab B showed revision 7 with holders `16953/16938/16939`: canonical state is exactly tab
+A's commit, untouched.
+
+**§27.27 can resume at Section E.** Sections A–D of the browser acceptance are now clean on the
+2089 fixture, the two stop-condition defects are closed, and no further ISSUE-155 defect was found
+during this work. The fixture is left with match #18296 at revision 7 (finalised, holders
+`16953/16938/16939`) and #18297 unchanged at revision 2.
+
+**Still open, unchanged:** the `PROMOTION_CONTRACT` item above remains the one thing blocking
+ISSUE-155, and remains a pre-deploy stop condition.
+
+### §27.27 browser acceptance sections E–H — E/F/G PASS, STOPPED on a new keyboard defect in H (2026-09-10)
+
+Resumed the browser acceptance at Section E against the same disposable `issue155-acceptance-*`
+fixture in `afldb_test` (seasons 2089/2085, no fixture reset, no genuine season touched), dev
+server on port 3100 with every runtime DSN pointed at `afldb_test`. Sections A–D were already
+clean. Sections **E, F and G PASS**; Section **H found a genuine new defect** and the run stopped
+there under the standing stop condition. Sections I (responsive), J (console/network as its own
+pass) and K (capability boundaries) were **not run**.
+
+**E — season publication: PASS.** Readiness and blockers rendered correctly at every stage
+(`2 of 4 home-and-away matches are finalised or voided` while incomplete, `Publish season…`
+disabled; the same panel on 2085 blocked with `0 of 2 …`). To reach a publishable state, round 2
+of 2089 was completed through the UI: **#18298 finalised** (3 `16936` / 2 `16937` / 1 `16946`,
+revision 1) and **#18299 voided** with a reason (revision 1) — 4/4 accounted, 3 finalised,
+1 voided, 0 unattached, 0 line-ups short. Ineligibility handling works end to end: ticking
+`Issue155 2089 C0 P0` (id `16936`) in the panel moved the summary to `1 marked` and emitted the
+matching `<input name="ineligible" value="16936">`. Publication succeeded with the two-step
+confirm and reported **"Season 2089 published: 9 polling players, 18 votes, 2 medallists"**; the
+season badge moved `SOURCE PUBLISHED / Source-authoritative` → `PUBLISHED / Manually published`,
+and the "Round facts vs the source-published total" disagreement report disappeared as it should
+once authority is manual. **Stale publication is refused**: a second tab held from before the
+publish (`expectedRevision=12`) was refused with *"The season has changed since the page was
+loaded (revision 13, not 12)"* plus a `Reload this season →` link, and committed nothing.
+The **canonical public total reflects the accepted data exactly** (`/brownlow/2089`): ranks
+`1,1,1,4,4,4,7,7,7` — competition rank over ALL polled players (P13(c)) — the ineligible player
+holding rank 1 with an `INELIGIBLE` marker and no medal (P13(a), P13(f)), two tied winners
+sharing the medal (P13(g)), and a `GAMES` column of home-and-away games only (P13(i)).
+
+> **Finding E-1 (Low, cosmetic, non-blocking, NOT the stop condition).** The season-publish stale
+> refusal renders the match-worded generic text `src/lib/brownlow/entry.ts:144` —
+> *"Someone else changed **this match** while you were editing it"* — above the accurate
+> season-specific detail sentence. The refusal itself, its detail and its reload link are all
+> correct; only the leading noun is wrong on the season path. Recorded rather than stopped on,
+> because it blocks nothing and the operative sentence is accurate. Fix alongside the H defect.
+
+**F — Match Sheet compatibility: PASS.** On disposable fixture match **#18296** (finalised at
+revision 7, holders 3/2/1): the sheet carries the §27.15 notice *"Brownlow votes (BV) are
+read-only here. Manage them in Brownlow administration →"*, and every `BV` cell is rendered as
+plain text with **zero `<input>` elements** — the three vote rows read `3 / 2 / 1` against
+`C0 P17 / C0 P2 / C0 P3` and cannot be typed into. Two unrelated valid saves were made (tackles
+for `Issue155 2089 C0 P0` 3 → 5, then 5 → 3, each with an audit note): both POSTed 200, both
+persisted across a full reload, and the second rendered
+*"✓ Match sheet saved successfully (36 players). Career and season stats updated."* — the normal
+save path is intact. **No Brownlow mutation occurred through the match sheet**: #18296 stayed at
+revision 7 with unchanged holders, and the season list's Brownlow "Last activity" stayed at the
+`08:30` publish rather than moving to the `08:32`/`08:33` sheet saves. (The first save's success
+banner was initially missed by a `.notice`/`role=status` selector — the banner is an
+inline-styled `✓` block, not a `.notice`. No defect.)
+
+**G — incomplete-lineup refusal: PASS at the UI boundary.** Season 2085 / match **#18303**
+(deliberate short away line-up) renders *"This match cannot be finalised or voided: Currently the
+away line-up has 10 of 18. Repair the line-up on the match sheet →"* with **Finalise and Void
+both disabled**, and the season panel refuses publication with `0 of 2 home-and-away matches are
+finalised or voided` and a disabled `Publish season…`. **Nothing committed**: #18303 stayed at
+revision 0 / "No decision" / no votes throughout. A deliberate client-side bypass — completing a
+valid 3/2/1, clearing the DOM `disabled` flag on Finalise and clicking, then dispatching a
+synthetic `MouseEvent` — produced **no network request at all**: `react-dom`'s `getListener`
+reads `props.disabled` from the fiber, not from the DOM node, so a disabled React button cannot
+be clicked through from the page. The server-side `participants_incomplete` refusal therefore
+could not be provoked from the browser and remains covered by the C1 integration suite
+(§27.27 "participants-incomplete refused with nothing written").
+
+**H — keyboard/navigation: one PASS half, one DEFECT.** Tab order through a match editor is
+correct and there is no keyboard trap: `3 votes → 2 votes → 1 vote → Reason → Save draft →
+Finalise` (disabled buttons correctly skipped), then focus leaves the section into the next
+match. Duplicate prevention holds under the keyboard (an id chosen in one slot is `disabled` in
+the other two, and `ArrowDown` steps over it). A complete **keyboard-only finalisation** works:
+`ArrowDown` selections, `Tab` to Finalise, `Enter` → *"Match finalised."*, #18302 revision 1, and
+focus then advanced to the **next match's first select** (`onAdvance`), which is exactly the
+rapid consecutive-entry flow §27.27 asks for.
+
+> **DEFECT H-1 (STOP CONDITION) — after a refused action the keyboard operator's focus is dumped
+> to `document.body`.** Measured, not inferred, on a genuine stale-tab refusal of
+> `Correct finalised votes` for #18302 (tab A had moved it to revision 2; tab B still held
+> revision 1). The refusal itself is correct — *"…(revision 2, not 1)"*, selection `17008/17018/
+> 17019` and the typed reason both preserved, the Correct button left enabled, nothing committed,
+> zero console errors. But focus is lost. Instrumented `blur`/`focus` listeners plus a
+> `MutationObserver` on the button's `disabled` attribute recorded, on the same button node
+> (`isConnected === true` throughout — this is **not** an unmount/remount):
+>
+> ```text
+> focus            t=68797  active=CORRECT  correctDisabled=false
+> mutate-disabled  t=72348  active=CORRECT  correctDisabled=true    <- anyPending
+> blur             t=72351  active=BODY     correctDisabled=true    <- 3 ms later
+> mutate-disabled  t=73490  active=BODY     correctDisabled=false   <- action resolved, refused
+> ```
+>
+> **Mechanism:** `MatchVoteEditor.tsx` disables all four action buttons for the duration of a
+> submit (`disabled={anyPending || …}`). Disabling the element that currently has focus makes the
+> browser blur it and move focus to `<body>`, and nothing restores it when `anyPending` clears.
+> On a **success** the loss is masked because `onAdvance` explicitly moves focus to the next
+> match; on a **refusal** there is no such move, so a keyboard operator is returned to the top of
+> the document and must Tab all the way back to the very button the retry needs — while the page
+> is telling them to try again. This fails the §27.27 / Section H criterion "focus remains
+> sensible after refusal" and is the same class as the two defects already fixed in this issue: a
+> lifecycle side effect silently discarding live operator context.
+>
+> **Sibling to check when fixing:** `PublishPanel.tsx`'s `Confirm publish` is likewise
+> `disabled={pending}`, so the season-publish refusal path is expected to lose focus the same way
+> (observed in source; not separately measured).
+
+**Console/network throughout E–H:** every step above was checked with
+`browser_console_messages` — **zero errors and zero warnings** on every navigation, every
+successful action and every refusal — and the only non-static requests were the expected Server
+Action POSTs, all `200`. This is corroborating evidence for J, not a substitute for running J.
+
+**Evidence (repo root, this session):** `09-sectionE-publish-panel-ready.png`,
+`10-sectionE-published-result.png`, `11-sectionE-public-season-total.png`,
+`12-sectionF-match-sheet-saved-bv-readonly.png`,
+`13-sectionG-incomplete-lineup-refusal.png`,
+`14-sectionH-focus-lost-to-body-after-refusal.png`. The E stale-publish refusal and the H
+instrumentation traces were captured live through Playwright MCP and are quoted inline above.
+
+**Fixture state left behind (all disposable, `afldb_test` only).** Season **2089 is now
+PUBLISHED** (manual authority, revision 13; ineligible set = `{16936}`): #18296 final rev 7,
+#18297 final rev 2, #18298 final rev 1, #18299 **void** rev 1. Season **2085** is unpublished:
+#18302 final rev 2, #18303 untouched at rev 0 (the deliberate incomplete-lineup case). #18300
+(wildcard final) and #18301 (grand final) untouched. Match sheet #18296 had two audited saves
+whose net data effect is zero (tackles 3 → 5 → 3). No genuine season was touched, nothing was
+deployed, nothing was committed.
+
+**Exact next action:** fix H-1 (restore focus to the dispatching control when an action
+completes without advancing — and check `PublishPanel`'s `Confirm publish` for the same), fix
+E-1's match-worded season refusal text, re-run the Section H refusal check, then run §27.27
+sections **I, J and K**.
+
+### §27.27 sections I–K complete; H-1 CLOSED; final finding disposed BENIGN — §27.27 fully PASS (2026-09-10)
+
+**H-1 correction: CLOSED, not open.** Fixed with focus restoration (`src/app/admin/brownlow/focus-restore.ts`,
+wired into both `MatchVoteEditor.tsx` and `PublishPanel.tsx` — confirmed present in both files) and
+live-retested successfully. Any earlier note in this issue or in `IssuesIndex.md` describing H-1 as
+open or as a standing stop condition is superseded by this entry.
+
+**Sections I and J: PASS** (responsive layout; console/network as its own pass — zero errors/warnings
+across the runs, corroborating evidence for J per the E–H entry above).
+
+**Section K (capability boundaries): PASS for all three roles** — Super Admin (full capability,
+`26-K-super-admin-full-capability.png`), Admin (`data.brownlow.read`/`draft` only: season list and
+round page readable, Save draft succeeds and revisions the row, Finalise/Correct/Void/Publish render
+`disabled` with "Super Admin only" copy, a forced DOM-bypass click on every one of those four
+controls produced zero new network requests), and Contributor (no Brownlow nav entry, no
+Admin/Super Admin lifecycle links; `/admin/brownlow`, `/admin/brownlow/2085`,
+`/admin/brownlow/2085/1` all redirect server-side to `/admin/upload` before any Brownlow markup,
+form, or action reference reaches the client; a raw `fetch()` POST with a forged `Next-Action`
+header 404s at the framework level, and a raw POST with no action header still resolves the same
+`requireCapability` → `NEXT_REDIRECT` path, proved from the RSC payload itself — no alternate route
+exists, since every Brownlow mutation funnels through the single `requireCapability` gate in
+`src/app/admin/brownlow/actions.ts`).
+
+**Final finding disposition: `flushComponentPerformance` negative-timestamp console error — BENIGN
+DEV-MODE FRAMEWORK ARTIFACT / NOT AN ISSUE-155 PRODUCT DEFECT.** Read-only investigation, no
+application code changed, no `requireCapability` weakened, no `node_modules` patched:
+
+1. **Application-code timing finding: none.** `requireCapability()` (`src/lib/auth/session.ts:323-327`)
+   is `const admin = await requireUploader(); if (hasCapability(...)) return admin; redirect(...)`
+   — no Performance API call anywhere in it or in the three Brownlow page components, which call it
+   as their literal first statement before any data fetch or JSX
+   (`src/app/admin/brownlow/page.tsx:30`, `[season]/page.tsx:31`, `[season]/[round]/page.tsx:27`).
+   A repository-wide grep for `performance.`/`Performance(`/`PerformanceObserver` under `src/`
+   found exactly three matches, all unrelated (NL-search description, health-init-script,
+   NL player-game query) — none on this render path.
+2. **Dev-mode root cause, found in the vendored runtime:**
+   `node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3907-3919`,
+   inside `flushComponentPerformance`. When a Server Component chunk resolves as `"rejected"`
+   (exactly what a thrown `NEXT_REDIRECT` produces), React's dev-only component-performance
+   instrumentation calls `performance.measure(measureName, { start: 0 > startTime ? 0 : startTime,
+   end: childrenEndTime, ... })` to log an "Errored" DevTools timeline entry. `start` is clamped to
+   0 if negative; `end` (`childrenEndTime`) is **not** — and for a page whose render is aborted by
+   `requireCapability`'s redirect before any real timing accrues, `end` can come out negative, which
+   `performance.measure()` rejects with exactly the observed `TypeError`. This is a bug in React's
+   own dev instrumentation (an unclamped `end`), not in any AFLDB code.
+3. **Production-mode result: clean, and the vulnerable code does not exist in the production
+   bundle.** Static proof first: `react-server-dom-webpack-client.browser.production.js` (the
+   sibling file `next build` actually ships) has **zero** occurrences of
+   `flushComponentPerformance`, `performance.measure`, or `supportsUserTiming` — dead-code-eliminated
+   at build time, not merely disabled. Empirical proof followed: built the worktree normally
+   (`npm run build`, `next build --webpack` succeeded, 1532 pages generated against `afldb_test`)
+   and served the real production artefact — `node .next/standalone/server.js` (the standalone
+   entry this repo's `tools/build/prepare-standalone.mjs` prepares; `next start` itself warns it
+   "does not work with output: standalone" and was not used) — on port 3101, every runtime DSN
+   (`DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`) rebuilt to point at
+   `afldb_test` only, via a new `tools/admin/issue155-acceptance-start-prod.ps1` (mirrors the
+   DSN-rebuild/refuse-if-not-afldb_test/refuse-if-port-busy discipline of
+   `issue155-acceptance-start-dev.ps1`). The existing Contributor cookie carried over (same
+   `AFLDB_SESSION_SECRET`, same `afldb_test` session row, `localhost` cookie scope ignores port).
+   `/admin/brownlow`, `/admin/brownlow/2085`, `/admin/brownlow/2085/1` were each navigated twice
+   (5 attempts total) — every one redirected correctly to `/admin/upload` with **zero console
+   messages of any kind**. As a bonus corroborating check, the raw-POST probe against prod still
+   carries the `NEXT_REDIRECT` digest (required for the client router) but **no longer carries the
+   server stack trace / file paths** that the same probe returned in dev — confirming Next.js
+   production builds strip that detail as expected. The prod server (port 3101) was stopped after
+   the checks; the acceptance dev server (port 3100, PID unchanged throughout) was never touched.
+4. **Non-Brownlow control: reproduces.** `/admin/db-health` (`requireSuperAdmin()` — the same
+   shared `redirect()`-on-refusal shape as `requireCapability`, just without the capability-table
+   indirection) as Contributor produced the identical `TypeError` naming `DatabaseHealthPage`,
+   confirmed via a cumulative console-history check after a batch of navigations. (Per-navigation
+   immediate checks on `/admin/db-health` initially read clean three times running — the flush
+   appears to fire on a short async delay after the visible redirect resolves, so a same-tick
+   check can race it and miss it; the cumulative check does not have that race and is the reliable
+   signal.) This confirms the defect is generic to the shared capability-redirect pattern, not
+   specific to Brownlow or to Phase C.
+5. **Classification (rule A applies): BENIGN DEV-MODE FRAMEWORK ARTIFACT / NOT AN ISSUE-155 PRODUCT
+   DEFECT.** No fix applied; `requireCapability` and every other guard are unchanged.
+
+**§27.27 is now fully PASS** (A–K). C1+C2 deploy readiness per §27.21 is otherwise unblocked by
+browser acceptance; the promotion-contract stop condition in the Next action below is still
+outstanding and separate.
+
+**Authoritative fixture state — read-only query against `afldb_test` (`current_database()` confirmed),
+superseding any earlier browser-observed summary in this issue:**
+
+```
+match_id | status | revision | updated_at
+18302    | final  | 2        | 2026-09-10 18:40:18.869344+10
+18303    | draft  | 2        | 2026-09-10 20:05:10.465903+10
+
+season | revision | published_revision | updated_at
+2085   | 3        | (null)             | 2026-09-10 18:40:18.869344+10
+2089   | 15       | 15                 | 2026-09-10 19:01:47.770127+10
+```
+
+2089's `revision 15` supersedes the `revision 13` figure carried forward in the E–H entry above and
+in the Admin/Contributor K browser sessions this session — that figure was stale narrative, not a
+fresh read; no root cause for the delta was investigated here (out of scope for this disposition).
+No mutation occurred to 2089 or to any genuine season during I/J/K or this disposition. No deploy,
+no commit.
+
+**Exact next action (superseded — see the section below):** clean the disposable
+`issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089 and their matches/vote rows),
+then re-run `tests/integration/admin-brownlow.test.ts` and `tests/admin-brownlow-actions.test.ts`
+clean, before proceeding to the §27.21 deploy sequence. The promotion-contract item in the section
+above (`brownlow_vote_entry_state` / `brownlow_season_authority` into `PROMOTION_CONTRACT`) is no
+longer outstanding as of the entry below — it is implemented in the working tree.
+
+### Linux-local validation, Windows-tunnel integration-timeout disposition, and worktree hygiene (2026-09-10)
+
+**`tests/integration/admin-brownlow.test.ts` — Linux-local against `afldb_test`: 44/44 PASS,
+~7.95s test time / ~8.80s total Vitest duration.** Run against the exact current working tree
+(including the post-C2 stale-tab/focus fixes and the promotion-contract changes). The
+audit-probe case's deliberately failing PostgreSQL insert produced its expected stderr during the
+rollback assertion, and that test PASSed — the same expected-stderr shape recorded in the original
+C1 runtime validation above.
+
+**`tests/admin-brownlow-actions.test.ts` — 32/32 PASS, both Linux-local and the prior Windows
+non-DB run.** (The C2 closeout above recorded this suite at 24 cases; it now carries 32, reflecting
+cases added alongside the stale-tab/focus fixes.)
+
+**Windows-tunnel integration timeout — diagnosed and disposed: NOT an ISSUE-155 product or test
+defect.** The same `admin-brownlow` integration suite had previously been timing out in
+`beforeAll` when run from Windows over the SSH tunnel to the `afldb_test` host, which the
+now-deleted `issue155-db-connectivity-check` diagnostic was written to investigate. Disposition:
+tunnel connectivity itself was healthy throughout (direct diagnostic queries measured ~150–165 ms;
+a focused per-statement measurement across the Windows → SSH tunnel path measured ~65.8 ms per SQL
+round trip). The Brownlow acceptance fixture seed issues on the order of 700+ statements in total;
+season 2089 alone is ~326 statements, measured at ~21.5 s over the tunnel. At ~65.8 ms/statement
+that arithmetic alone does not leave room for the rest of the seed inside Vitest's default 30 s
+`beforeAll` budget — the timeout is tunnel latency multiplied by statement count, not a stall, a
+lock, or a defect in the suite or the application code it exercises. The Linux-local run above
+(same tree, same suite, 44/44 in ~8s total) is the proof the suite itself is healthy. No
+`hookTimeout` was raised and no production or test code was changed to work around this; it is
+recorded here as an explanation, not a fix, because there is nothing to fix.
+
+**§27.27 browser acceptance — reconfirmed.** Sections A–K are all PASS (per the entries above);
+DEFECT H-1 is CLOSED (focus restoration, `src/app/admin/brownlow/focus-restore.ts`); the
+Contributor capability/security boundary probes in Section K passed (no Brownlow nav or route
+access, every route redirects server-side before any Brownlow markup or action reference reaches
+the client, a forged `Next-Action` probe 404s); and the `flushComponentPerformance`
+negative-timestamp console finding is classified BENIGN DEV-MODE FRAMEWORK ARTIFACT / NOT AN
+ISSUE-155 PRODUCT DEFECT (absent from the production React bundle, clean across real
+production-mode navigations against `afldb_test`, reproduces identically on a non-Brownlow
+`requireSuperAdmin` control page).
+
+**Worktree hygiene, this session.** Deleted: seven one-off diagnostic scripts written for specific
+incidents during acceptance (`issue155-audit-evidence.ps1`, `issue155-auth-diagnostic.ps1`,
+`issue155-auth-factor-check.ps1`, `issue155-db-connectivity-check.ps1`/`.cjs`,
+`issue155-remove-orphan-season-2089.ps1`, `issue155-reset-admin-totp.ps1`) and all 30 root-level
+acceptance screenshots (`01-login-page.png` through `30-K-admin-crafted-bypass-no-request.png`) —
+the written record above is the retained evidence; none of these files followed the repository's
+existing evidence convention (a structured `artifacts/<topic>/` tree) and only 8 of the 30
+screenshots were ever cited by filename in this record. Kept as reusable operator tooling:
+`issue155-acceptance-create.ps1`, `issue155-acceptance-cleanup.ps1`,
+`issue155-acceptance-start-dev.ps1`, `issue155-acceptance-start-prod.ps1` (`afldb_test`-only,
+safety-guarded, generically reusable for future acceptance passes). Nothing was committed.
+
+**Exact next action (superseded — see the DEV deployment record below):** commit the reviewed
+working tree (10 tracked modifications, the 5 required new source/test files, the 4 acceptance
+tooling scripts, and this documentation); then run the full regression sequence fresh against the
+committed tree — unit suites, `db-promotion-check`, `admin-brownlow` + `admin-brownlow-actions`
+integration, `privileges` + `release-gates`, typecheck — followed by cleaning the disposable
+`issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089), then the §27.21 deploy
+sequence. Do not close ISSUE-155 until that full sequence and the deploy are complete and recorded.
+
+### Committed (2026-09-10) and DEV §27.21 deployment complete (2026-09-11)
+
+**Committed** at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` on `codex/issue-155-admin-overhaul`:
+the post-C2 stale-tab/`startTransition`/focus-restore fixes, the `fingerprint.ts` client/server
+split, the `PROMOTION_CONTRACT` implementation for `brownlow_vote_entry_state` /
+`brownlow_season_authority`, four warning-only lint cleanups (an unused `PublishPanel` prop, two
+stale `eslint-disable-next-line no-console` comments), and this documentation. `git diff --check`
+clean; the disposable acceptance PNGs and one-off diagnostic scripts were deleted, not committed
+(see the worktree-hygiene entry above).
+
+**§27.20 DEV preflight — P1–P12, all complete on `afldb_dev` (2026-09-10/11), matching the
+reference `afldb_test` evidence exactly:** P1 320,861 round rows 1984–2025; P2 zero ambiguity
+(320,861/320,861 resolvable, 0/0 zero/many-candidate); **P3 HARD GATE PASS** (0 duplicate
+match/vote groups, 0 duplicate match/player groups); P4 zero `manual_admin_edit` season rows; P5
+44,478 round votes = 44,478 season votes, 0 mismatches; P6 7,413 textbook H&A matches, 0
+other-positive, 0 none (range corrected to 1984–2025, see the runbook fix below); P7 0 exception
+matches; P8 16,327 H&A matches 1897–2026, 7 under-18 — all seven are incomplete 2026
+current-season imports, zero genuine historical exceptions, §27.6 threshold stays at 18; P9
+16,120 rows, 0 disagreement against `player_season_stats.games - finals` (6,507 disagree against
+the rejected all-games reading, confirming the adopted formula); P10 16,120/16,120 Brownlow
+season rows trusted (`unique`/`resolved`); **P11 HARD GATE PASS** (all four `afldb_import`
+privilege checks true). Two genuine range/wording defects in the §27.20 table itself were found
+and fixed during this pass (not defects in the data or the migration) — see "Runbook corrections"
+below.
+
+**Migration + privilege reconciliation on `afldb_dev` (2026-09-11).** Discovered en route:
+`db:status` showed three pending migrations, not one — `092_nl_search_log_coach_record_grain.sql`
+and `093_nl_search_log_after_siren_grain.sql` (AFLDB-ISSUE-152 Phase B/C, already merged to
+`origin/main`, confirmed additive CHECK-widening only, genuinely never reached `afldb_dev`) ahead
+of `094_brownlow_admin_workflow.sql` (ISSUE-155, branch-local). All three applied via
+`tools/db/migrate.ts --target dev`, in filename order, `094` requiring the explicit
+`--allow-branch-local` acknowledgement. Result: **94/94 applied, 0 pending.** `npm run
+db:privileges` (dev target) reconciled: `afldb_app` 52 public relations readable / 21 revoked,
+`afldb_import` 44 registered tables writable / 29 revoked, `afldb_auth` grants applied on 35/35
+tables / 38 other relations revoked, `nl_search_telemetry_clear()` PUBLIC revoked / `afldb_auth`
+EXECUTE granted, `afldb_backup` unchanged. Independently re-verified read-only afterward (not
+just trusted the reconciler's own summary): `brownlow_round_votes.match_id` exists, nullable,
+correct FK; `brownlow_vote_entry_state` and `brownlow_season_authority` both exist with every
+named CHECK/PK constraint and both partial unique indexes present; neither table registered in
+`afldb_meta.import_writable_tables` (confirmed narrow-grant, not registry-grant, as migration
+094's own §7 requires); `afldb_app` SELECT-only, `afldb_import` SELECT/INSERT/UPDATE/DELETE with
+**no TRUNCATE**, `afldb_auth` zero privileges on either table; zero `PUBLIC` grants anywhere in
+the Brownlow domain.
+
+**Pre-deploy `_test` validation, Linux-local against the exact committed tree:**
+`tests/integration/admin-brownlow.test.ts` **44/44 PASS**; `tests/admin-brownlow-actions.test.ts`
+**32/32 PASS**; `tests/integration/privileges.test.ts` **35/36** — the sole failure is the
+pre-existing, already-tracked `external_grid_axes`/`external_grids` "WRITABLE BUT NOT REGISTERED"
+drift (AFLDB-ISSUE-138), explicitly unrelated to ISSUE-155; every Brownlow-workflow-table
+privilege assertion passed.
+
+**DEV deployment (2026-09-11), `deploy/sync-dev.ps1 -RemoteRef codex/issue-155-admin-overhaul`.**
+First attempt failed at `npm run db:migrate` for the same branch-local reason as the manual
+preflight run (`checkMigrationSafety()` runs unconditionally regardless of what's actually
+pending); resolved by independently re-confirming `db:status` = 0 pending on `afldb_dev`, then
+re-running with `-SkipMigrate` (an existing, narrow, already-supported switch — no deploy script
+was modified, and no migration-safety check was weakened globally). Result: `npm ci` PASS,
+Next.js production build PASS, standalone preparation PASS, `afldb.service` restarted
+successfully, `/api/health` PASS (`{"status":"ok","database":"ok","latencyMs":29}`) at the exact
+committed revision, `codex/issue-155-admin-overhaul` @ `3eb6739`.
+
+**Live-database reconciliation on `afldb_dev` post-deploy (§27.21 step 6), reproducing
+`db-health.ts::reconcileCareerTotals()`'s five checks exactly plus the P2-baseline comparison:**
+games 0, goals 0, finals 0, brownlow_votes 0, missing_career_rows 0 mismatches;
+`brownlow_round_votes` rows with `match_id IS NULL` = **0**, matching the P2 baseline
+(`candidates_zero = 0`) exactly.
+
+**Browser acceptance on the deployed DEV service (`http://10.0.40.100:8090`).** Super Admin
+login PASS, Admin Centre nav renders with Brownlow visible in Data; `/admin/brownlow`,
+`/admin/brownlow/2025`, 2025 Round 1 all PASS — fixtures, selections, line-ups and workflow
+controls render correctly, zero console errors, no beta-gate/permission issues. Admin capability
+boundary PASS. Contributor capability boundary PASS. **Mutation acceptance: Save Draft**, chosen
+specifically because `runMatchMutation()` (`src/db/queries/admin-brownlow.ts:996-1109`) proves in
+source that `action === 'saveDraft'` never calls `writeMatchFacts` and never touches
+`brownlow_season_authority` — a draft is structurally incapable of reaching any public table, so
+no designated disposable target was needed (that concept only ever applied to the `afldb_test`
+fixture, which doesn't exist on `afldb_dev`). Result: PASS — `/brownlow/2025` public rendering
+confirmed unchanged after the draft save.
+
+**Runbook corrections applied to `AFLDB-ISSUE-155.md` §27.20 (2026-09-11), all found by DEV
+preflight cross-checks against the actual migration/data, not assumed:**
+- **P6** — "1984+" corrected to **1984–2025**: `brownlow_round_votes` has zero rows outside that
+  span (confirmed by P1), so driving the match-grain sum check from `matches` past 2025 would
+  wrongly classify every in-progress current-season H&A match as a "none" exception.
+- **P8** — "expect 0 for 1899+" corrected to reflect the actual accepted state: zero genuine
+  historical exceptions, but 7 incomplete 2026 current-season matches under the 18-per-side floor
+  is expected and benign (they correctly refuse finalisation until repaired by the normal
+  current-season pipeline); the measured span is 1897–2026, not "1899+".
+- **P12** — split into two populations instead of one "1984+" range: the genuine 1984–2025
+  mirror-vs-round comparison, and the separate pre-1984 mirror-only population (exactly
+  1931–1934), which has no `rv` counterpart and must never be compared against one.
+
+**DEV is COMPLETE. PROD is PENDING** — not started, not scheduled here. ISSUE-155 remains OPEN.
+No PROD command has been given or run at any point in this deployment. No new implementation was
+started on this branch.
+
+**Exact next action:** none scheduled — DEV acceptance is the last completed milestone. The next
+session should plan the PROD promotion/deploy sequence (equivalent §27.21 steps against
+production, plus whatever additional promotion/restore-lineage considerations the ISSUE-151
+pipeline requires for a production host, which was never part of this DEV pass) as its own
+deliberate, separately-scoped piece of work — not a continuation to start automatically.
+
+### Scope transfer — Phases D–I moved to AFLDB-ISSUE-156 (2026-09-11)
+
+Planning-only session; no code, test, migration, privilege or deployment change. The remaining
+unimplemented scope of this issue — `AFLDB-ISSUE-155.md` §23 Phase D (coach administration),
+Phase E (special records and durable suppression), Phase F (structured site content), Phase G
+(safe current-season refresh jobs), Phase H (dataset-by-dataset CSV transition) and Phase I
+(integrated acceptance and permission audit) — is **transferred by reference** to the new
+`AFLDB-ISSUE-156` Admin Centre completion umbrella (runbook `AFLDB-ISSUE-156.md` §0), where they
+become placeholder phases P3, P4, P6, P7, P11 and P12. `AFLDB-ISSUE-155.md` is not rewritten; its
+§5/§6/§7/§17/§18/§23 remain the binding baseline architecture and are cited, not re-derived.
+
+**ISSUE-155 now owns only the PROD closeout of the implemented and DEV-accepted Phases A, B, C1
+and C2.** That PROD leg is not a blocker for ISSUE-156 or any of its children. Nothing about the
+committed branch state (`3eb6739`, `e27e985`) changes.
+
+Two findings established during the ISSUE-156 planning that bear on the transferred phases are
+recorded in `AFLDB-ISSUE-156.md` §10 and repeated here so the D-phase owner cannot miss them:
+- Coach-only identity creation as this issue's §9 described it **cannot be implemented as
+  specified**: `coaches.afltables_coach_path` is `NOT NULL UNIQUE` (migration 087:38) and
+  `coaches.source_id` is `NOT NULL` (087:58). ISSUE-156 P3 must resolve the schema/provenance
+  decision at preflight before any UI work (stop condition C-1).
+- The audit viewer prerequisite (ISSUE-157) reads `auth_audit_log` and `data_edits` with no
+  migration or privilege change; `data_overrides` visibility needs separate privilege/deploy
+  treatment and is outside that phase's default scope.
+
+## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
+
+**Status:** Open / Planning complete 2026-09-11 — no implementation started.
+**Severity:** Medium
+**Area:** Admin / Authentication / Data management / Acquisition / Operations
+**Found:** 2026-09-11
+**Runbook:** `AFLDB-ISSUE-156.md`
+**Lineage:** `AFLDB-ISSUE-155` Phases D–I (transferred by reference, see that entry's
+"Scope transfer" record). ISSUE-155 retains only its PROD closeout.
+
+### Problem
+
+ISSUE-155 delivered the Admin Centre shell, Super Admin lifecycle and Brownlow administration
+(A/B/C1/C2, DEV-accepted 2026-09-11) but everything from its Phase D onward — coaches, special
+records, honours lifecycle, site content, refresh controls, CSV transition and integrated
+acceptance — is unimplemented. Two structural gaps surfaced during C1/C2 that every later phase
+depends on and that no issue tracked:
+
+1. **The audit trail is effectively invisible.** `src/app/admin/page.tsx:46-51` is the only read
+   of `auth_audit_log` in the application (three columns, `LIMIT 15`, no `detail`, no filters).
+   `data_edits` has zero read surface in `src/`; its only touch point is the writer in
+   `src/db/queries/audit-log.ts`. "Who changed player X, when, from what, to what" is answerable
+   only by SQL.
+2. **The capability model is decorative.** `src/lib/auth/capabilities.ts` declares 18
+   capabilities; only the three `data.brownlow.*` ones reach `requireCapability()`. The other 15
+   exist solely in `src/app/admin/nav-model.ts` visibility. Enforcement is 130 role-name guard
+   call sites (`requireSuperAdmin` 78, `requireAdmin` 23, `requireUploader` 13,
+   `requireAdminManager` 5) against 11 `requireCapability` calls. Editing a capability today
+   changes the sidebar and nothing else — exactly the drift ISSUE-155 §17 forbids.
+
+### Scope
+
+- Own the remaining Admin Centre work as an umbrella; sequence the two prerequisites first.
+- Children allocated now: `AFLDB-ISSUE-157` (P1 Admin foundation and audit viewer) and
+  `AFLDB-ISSUE-158` (P2 Capability enforcement).
+- Named placeholders, ID allocated only when each starts: P3 Coach administration (155 Phase D),
+  P4 Special records (Phase E), P5 Awards/honours correction lifecycle, P6 Site content and
+  versioning (Phase F), P7 Safe refresh and operational controls (Phase G), P8 Data-editor
+  decomposition into domain routes, P9 Player/entity lifecycle incl. merge (HIGH blast radius),
+  P10 Fixture-identity correction (HIGH), P11 Dataset-by-dataset CSV transition (Phase H),
+  P12 Integrated acceptance and permission audit (Phase I).
+- Reuse ISSUE-155's approved architecture (§5/§6/§7/§17/§18/§23) rather than redesign it.
+
+### Planning decisions (owner-confirmed 2026-09-11)
+
+- ISSUE-155 PROD is not a blocker. ISSUE-151 is not a blocker; its promotion/restore-lineage
+  contract must be honoured: every phase that adds a table or a NOT NULL football reference
+  (P3, P4, P5, P7, P9, P10) adds its `tools/db/promotion-inventory.ts` classification in the same
+  change. P1, P2, P6, P8, P11, P12 are unaffected.
+- `AFLDB-ISSUE-154` is a ledger hole reserved by `IssuesIndex.md` for the Grid Solver won-final
+  defect. Not reused.
+- Migration 095 is only the planning-time next-free snapshot (highest on all local branches is
+  094). Not allocated. Every phase re-checks numbering at its own preflight.
+- `CHANGELOG.md` not updated — planning only, no retained project change.
+
+### Confirmed current-state evidence (2026-09-11 snapshot)
+
+- `tools/maintenance/privileges.sql:441` grants `afldb_auth` `SELECT, INSERT` on
+  `auth_audit_log`; `:463` the same on `data_edits`. The `afldb_auth` list is subtractive
+  (`:430-434`). `data_overrides` is granted only to `afldb_import` (`:318-327`).
+- `coaches.afltables_coach_path` `NOT NULL UNIQUE` and `coaches.source_id` `NOT NULL`
+  (migration 087:38, :58) — ISSUE-155 §9 coach-only identity creation cannot be implemented as
+  specified; P3 stop condition C-1.
+- `data_overrides.entity_type` CHECK still only `('players','matches','draft_picks')` (073);
+  `data_edits.table_name` allowlist at 8 entities (057 → 058 → 094).
+- No player-merge tooling exists anywhere in the repository. `src/lib/acquisition/match-rekey.ts`
+  owns fixture rekey and reads `data_overrides` (`:191`, `:199`).
+- CSV/upload/email ingestion is live (6 datasets in `src/lib/ingest/datasets.ts`, plus
+  `tools/email_intake/fetch_and_stage.py`). `/admin/grid-solver` is a `permanentRedirect` shell.
+  `/admin/data-editor` is 3,694 lines over 12 files.
+
+### Validation
+
+Documentary only: `AFLDB-ISSUE-156.md` exists with its twelve sections and both child handoff
+contracts; `issues.md` and `IssuesIndex.md` list 156/157/158 and agree; no file under `src/`,
+`tools/`, `tests/`, `deploy/` and no `CHANGELOG.md` change.
+
+### Next action
+
+Start `AFLDB-ISSUE-157` in a fresh implementation session (Fable, high effort, normal
+implementation mode; escalate to a fresh Opus session only if implementation uncovers genuine
+auth/privilege architecture ambiguity) from a new
+worktree: `npm run worktree:bootstrap -- --issue 157 --branch <agent>/issue-157`, then
+`npm run preflight -- --mode implementation --issue 157`, carrying over `AFLDB-ISSUE-156.md`
+§11 P1 handoff contract and §4/§5.
+
+## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
+
+**Status:** Open / Not started
+**Severity:** Medium
+**Area:** Admin / Authentication / Operations
+**Found:** 2026-09-11
+**Parent:** `AFLDB-ISSUE-156` (contract: `AFLDB-ISSUE-156.md` §11 "P1 handoff contract")
+
+### Problem
+
+`auth_audit_log` and `data_edits` are written on every admin mutation and refusal but have no
+usable read surface (see ISSUE-156 Problem 1). Later phases cannot prove attribution or
+correctness without seeing the audit trail they write.
+
+### Scope
+
+- New read-only `/admin/audit` route (Operations group): unified timeline or two tabs over
+  `auth_audit_log` and `data_edits`; filters for actor, date range, entity
+  (`table_name` + `row_id`) and action; a per-entity "who changed what, from → to" view over
+  `data_edits.old_values` / `new_values`.
+- SELECT-only reader functions beside the writer in `src/db/queries/audit-log.ts`.
+- A viewer capability added to the `Capability` union and enforced with `requireCapability()`.
+- `src/components/admin/` extraction only where two or more admin routes already duplicate the
+  pattern; reuse the `player-links` pager.
+
+### Established facts (planning, 2026-09-11)
+
+- **No migration and no privilege change** for the default scope: `privileges.sql:441` and `:463`
+  already grant `afldb_auth` SELECT on both tables via `src/db/authClient.ts`.
+- `data_overrides` visibility is **deferred**: `afldb_import`-only grant, subtractive `afldb_auth`
+  list, so it needs a `privileges.sql` change plus a deploy-order step. Optional later extension.
+- Driver traps: both `id` columns are `bigint` and postgres.js returns int8 as a string (cast
+  `::int` or key on strings); `auth_audit_log.detail` is `jsonb` and is already decoded.
+- No ISSUE-151 dependency (no table, no football FK). No ISSUE-155 PROD dependency.
+
+### Validation (planned)
+
+Query-contract unit tests → route/action authorisation for Contributor/Admin/Super Admin →
+filter-correctness integration on `afldb_test` → responsive browser pass 320 px / tablet /
+desktop → typecheck. Nav contract extends `tests/auth.test.ts`.
+
+### Stop conditions
+
+Any write path introduced; any privilege or migration found necessary for the default scope.
+
+### Next action
+
+Fresh implementation session: bootstrap worktree for issue 157, run
+`npm run preflight -- --mode implementation --issue 157`, re-verify the privilege grants and
+the `Capability` union, then implement per the §11 P1 contract.
+
+## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
+
+**Status:** Open / Not started
+**Severity:** Medium
+**Area:** Admin / Authentication
+**Found:** 2026-09-11
+**Parent:** `AFLDB-ISSUE-156` (contract: `AFLDB-ISSUE-156.md` §11 "P2 handoff contract")
+**Lineage:** extends `AFLDB-ISSUE-155` §23 Phase A
+
+### Problem
+
+Of 18 declared capabilities in `src/lib/auth/capabilities.ts`, only the three `data.brownlow.*`
+ones are enforced by `requireCapability()`; the rest drive navigation visibility only, while
+authorisation is 130 role-name guard call sites. Capability edits therefore change what the
+sidebar shows and nothing else (see ISSUE-156 Problem 2).
+
+### Scope
+
+- Migrate role-name guards to `requireCapability()` where the capability describes the exact same
+  boundary, across `src/app/admin/**`.
+- Retain explicit Super Admin-only boundaries where policy requires them: `people.admins.lifecycle`
+  keeps `requireSuperAdmin()` (ISSUE-155 §26.3) and gains a documented capability assertion
+  beside it, not instead of it.
+- Source-contract regression in `tests/auth.test.ts`: every `Capability` union member is
+  referenced by at least one `requireCapability()` call at a route/action boundary, and no admin
+  route or Server Action reaches a mutation without a server-side capability assertion.
+
+### Established facts (planning, 2026-09-11)
+
+- No migration, no privilege change, no ISSUE-151 dependency.
+- Functionally independent of ISSUE-157; depends on it only for shared component patterns.
+- Guard counts above are a snapshot; re-enumerate at preflight.
+
+### Validation (planned)
+
+Capability source-contract test → per-role direct-URL and direct-action rejection tests for all
+capabilities → confirm no route lost its existing guard → typecheck.
+
+### Stop condition
+
+Any existing direct URL loses its current server guard, or a capability is enforced more weakly
+than the role guard it replaced.
+
+### Next action
+
+After ISSUE-157: bootstrap worktree for issue 158, run
+`npm run preflight -- --mode implementation --issue 158`, then implement per the §11 P2 contract.

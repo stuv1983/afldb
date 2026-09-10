@@ -102,6 +102,7 @@ import {
   rollbackSql,
   resolveLineageRemap,
   resyncIdentitySql,
+  rowIdColumnOf,
   shellQuote,
   stageSql,
   STAGING_SCHEMA,
@@ -824,11 +825,14 @@ async function gateLineageIdentity(
         slots.push({ table: t.name, ref, target, disposition, totalRows, enumerated: false, rows: [] });
         continue;
       }
+      // AFLDB-ISSUE-155: the row anchor is the table's own identifying column, not always
+      // `id` (brownlow_vote_entry_state's primary key is match_id itself).
+      const rowIdCol = quoteIdent(rowIdColumnOf(t));
       const rows = await old(
-        `SELECT id::bigint AS row_id, ${column}::bigint AS old_value
+        `SELECT ${rowIdCol}::bigint AS row_id, ${column}::bigint AS old_value
            FROM ${relation}
           WHERE ${column} IS NOT NULL${where}
-          ORDER BY id`, params);
+          ORDER BY ${rowIdCol}`, params);
       slots.push({
         table: t.name, ref, target, disposition, totalRows, enumerated: true,
         rows: rows.map((r) => ({ rowId: asInt(r.row_id), oldValue: asInt(r.old_value) })),

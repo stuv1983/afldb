@@ -64,6 +64,7 @@ import {
   reinstatedSchemas,
   resyncIdentitySql,
   rollbackSql,
+  rowIdColumnOf,
   swapSql,
   STAGING_SCHEMA,
   isStagedLineageColumn,
@@ -343,9 +344,14 @@ describe('the production-only state contract', () => {
   it('declares every FK into rebuilt data that the migrations define on a contract table', () => {
     // From the migrations: 023 data_submissions.import_batch_id, 056 player_link_resolutions.player_id,
     // 067 player_link_match_candidates.player_id, 074 promotion_decisions.candidate_id,
-    // 080 external_grid_sources.ingest_source_id and external_grids.import_batch_id.
+    // 080 external_grid_sources.ingest_source_id and external_grids.import_batch_id,
+    // 094 brownlow_vote_entry_state.{match_id,three_player_id,two_player_id,one_player_id}.
     const refs = PROMOTION_CONTRACT.flatMap((t) => (t.footballRefs ?? []).map((r) => `${t.name}.${r.column}->${r.references}`)).sort();
     expect(refs).toEqual([
+      'brownlow_vote_entry_state.match_id->matches',
+      'brownlow_vote_entry_state.one_player_id->players',
+      'brownlow_vote_entry_state.three_player_id->players',
+      'brownlow_vote_entry_state.two_player_id->players',
       'data_submissions.import_batch_id->import_batches',
       'external_grid_sources.ingest_source_id->sources',
       'external_grids.import_batch_id->import_batches',
@@ -1034,8 +1040,11 @@ describe('lineage-safe reinstatement', () => {
   const PROFILE = 'afltables_profile_url';
 
   it('declares every lineage-bound column, including the Gridley source reference', () => {
+    // AFLDB-ISSUE-155: brownlow_vote_entry_state joins the list. Migration 094's workflow rows
+    // carry four references into rebuilt data — three nullable player slots and match_id, which
+    // is also the table's primary key — and a rebuild reassigns every one of those ids.
     expect(lineageBoundTables().map((t) => t.name).sort())
-      .toEqual(['data_edits', 'external_grid_sources', 'player_link_resolutions']);
+      .toEqual(['brownlow_vote_entry_state', 'data_edits', 'external_grid_sources', 'player_link_resolutions']);
 
     const resolutions = lineageTargetsOf(contractByName('player_link_resolutions')!);
     expect(resolutions.find((x) => x.ref.column === 'player_id')!.target)
@@ -1059,7 +1068,29 @@ describe('lineage-safe reinstatement', () => {
     expect(gridTarget).toMatchObject({ entity: 'sources', identity: 'source_key' });
     const gridRefs = lineageTargetsOf(gridSource);
     expect(gridRefs).toHaveLength(1);
-    for (const { ref } of [...resolutions, ...edits, ...gridRefs]) {
+
+    // AFLDB-ISSUE-155. Declaration order is the remap order, and it is load-bearing: every plan
+    // on this table is anchored by match_id (the table's own primary key — rowIdColumn), so the
+    // player slots must be remapped while match_id still holds its pre-cutover value. match_id
+    // settles last and is self-anchored.
+    const brownlow = contractByName('brownlow_vote_entry_state')!;
+    const brownlowRefs = lineageTargetsOf(brownlow);
+    expect(brownlowRefs.map((x) => `${x.ref.column}->${x.target.entity}:${x.target.identity}`)).toEqual([
+      'three_player_id->players:afltables_profile_url',
+      'two_player_id->players:afltables_profile_url',
+      'one_player_id->players:afltables_profile_url',
+      'match_id->matches:match_key',
+    ]);
+    expect(stableLineageTargetForFootballRef(brownlow, 'match_id', 'matches'))
+      .toMatchObject({ entity: 'matches', identity: 'match_key' });
+    // The row anchor is declared only where the surrogate default is wrong; everywhere else the
+    // generic machinery keeps identifying a row by `id`.
+    expect(rowIdColumnOf(brownlow)).toBe('match_id');
+    for (const t of PROMOTION_CONTRACT) {
+      if (t.name !== 'brownlow_vote_entry_state') expect(rowIdColumnOf(t), t.name).toBe('id');
+    }
+
+    for (const { ref } of [...resolutions, ...edits, ...gridRefs, ...brownlowRefs]) {
       expect(ref.remediation.length, ref.column).toBeGreaterThan(80);
     }
   });
@@ -1584,12 +1615,22 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
       { column: 'ingest_source_id', references: 'sources', identity: 'source_key' },
     ]);
     for (const environment of ENVIRONMENTS) {
-      expect(stagedReinstateTables(environment).map((t) => t.name)).toEqual(['external_grid_sources']);
+      // Sorted (order, name): brownlow_vote_entry_state and external_grid_sources tie on
+      // order 20, so name breaks the tie.
+      expect(stagedReinstateTables(environment).map((t) => t.name))
+        .toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
       expect(isStagedLineageColumn('external_grid_sources', 'ingest_source_id', environment)).toBe(true);
       // Neither another column of the same table nor a lineage-bound column elsewhere.
       expect(isStagedLineageColumn('external_grid_sources', 'code', environment)).toBe(false);
       expect(isStagedLineageColumn('player_link_resolutions', 'player_id', environment)).toBe(false);
       expect(isStagedLineageColumn('data_edits', 'row_id', environment)).toBe(false);
+      // AFLDB-ISSUE-155: brownlow_vote_entry_state is staged by match_id (NOT NULL), and its
+      // nullable player-slot columns are staged TOO — table-level, not column-level — because
+      // the whole row sits in promotion_staging until match_id is settled.
+      expect(isStagedLineageColumn('brownlow_vote_entry_state', 'match_id', environment)).toBe(true);
+      expect(isStagedLineageColumn('brownlow_vote_entry_state', 'three_player_id', environment)).toBe(true);
+      expect(isStagedLineageColumn('brownlow_vote_entry_state', 'two_player_id', environment)).toBe(true);
+      expect(isStagedLineageColumn('brownlow_vote_entry_state', 'one_player_id', environment)).toBe(true);
     }
     // The nullable exception path (§7.4) and the NOT NULL refusal path (§7.4b, import_batch_id)
     // are untouched: neither shape is staged.
@@ -1643,8 +1684,9 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
   it('splits the restore into direct, staged and dependants, and the planned order is still FK-safe', () => {
     for (const environment of ENVIRONMENTS) {
       const groups = reinstateGroups(environment);
-      expect(groups.staged).toEqual(['external_grid_sources']);
+      expect(groups.staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
       expect(groups.dependants).toEqual(['external_grids', 'external_grid_axes']);
+      expect(groups.direct).not.toContain('brownlow_vote_entry_state');
       expect(groups.direct).not.toContain('external_grid_sources');
       expect(groups.direct).not.toContain('external_grids');
       expect(groups.direct).not.toContain('external_grid_axes');
@@ -1798,8 +1840,25 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     }
     expect(stagedPlanProblems({ ...good, reinstate: `${good.reinstate}pg_restore --disable-triggers …\n` })).toContain('reinstate bypasses or weakens a constraint');
     // The promotion must keep the ids and drop the staging copy; the redirect must be present.
-    const noOverride = { ...good, promoteStaged: good.promoteStaged.replace(' OVERRIDING SYSTEM VALUE', '') };
-    expect(stagedPlanProblems(noOverride)).toContain('promotion-promote-staged.sql does not promote external_grid_sources with its ids preserved');
+    // Dropping OVERRIDING SYSTEM VALUE is refused for EVERY staged table, and per table: the
+    // validator walks reinstateGroups().staged, so a plan that keeps the ids of one staged table
+    // and reassigns another's is caught, naming exactly the offender. (Asserted with both a
+    // replaceAll and a single-occurrence replace so neither table can be covered by the other.)
+    const staged = reinstateGroups('prod').staged;
+    expect(staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+    const noOverride = { ...good, promoteStaged: good.promoteStaged.replaceAll(' OVERRIDING SYSTEM VALUE', '') };
+    expect(stagedPlanProblems(noOverride))
+      .toEqual(staged.map((t) => `promotion-promote-staged.sql does not promote ${t} with its ids preserved`));
+    for (const table of staged) {
+      const one = {
+        ...good,
+        promoteStaged: good.promoteStaged.replace(
+          `INSERT INTO "public"."${table}" OVERRIDING SYSTEM VALUE`, `INSERT INTO "public"."${table}"`),
+      };
+      expect(one.promoteStaged, table).not.toBe(good.promoteStaged);
+      expect(stagedPlanProblems(one))
+        .toEqual([`promotion-promote-staged.sql does not promote ${table} with its ids preserved`]);
+    }
     const noRedirect = { ...good, reinstate: good.reinstate.replace(stagedCopyRedirect('external_grid_sources'), 's/x/y/') };
     expect(stagedPlanProblems(noRedirect)).toContain('staged table external_grid_sources restore does not redirect its COPY to promotion_staging');
     const cascade = { ...good, promoteStaged: good.promoteStaged.replace('DROP SCHEMA "promotion_staging";', 'DROP SCHEMA "promotion_staging" CASCADE;') };
@@ -1819,28 +1878,58 @@ describe('staged reinstatement of NOT NULL lineage-bound references', () => {
     // an empty staging copy always refuses (detection of a failed staged restore is kept).
     const promote = promoteStagedSql();
     expect(promote).toContain('IF staged_rows = 0 THEN');
-    expect(promote).toContain('is empty: the staged restore (plan step 2b) did not run or restored nothing');
     expect(promote).toContain('an empty copy is never a legitimate state');
+    // Every staged table carries its OWN emptiness refusal — one populated copy never vouches
+    // for a sibling that restored nothing.
+    for (const t of stagedReinstateTables('prod')) {
+      expect(promote, t.name).toContain(
+        `promotion_staging.${t.name} is empty: the staged restore (plan step 2b) did not run or restored nothing`);
+    }
+    expect((promote.match(/IF staged_rows = 0 THEN/g) ?? []).length).toBe(stagedReinstateTables('prod').length);
     // ...and the ambiguity is settled BEFORE any plan exists: the pre-cutover inventory must
     // show rows in every staged table of the environment, or the phase refuses.
     for (const environment of ENVIRONMENTS) {
       const staged = stagedReinstateTables(environment).map((t) => t.name);
-      expect(staged).toEqual(['external_grid_sources']);
-      const ok = judgeStagedSourceRows({ 'public.external_grid_sources': 1, 'public.external_grids': 0 }, environment);
-      expect(ok).toEqual({ populated: [{ table: 'external_grid_sources', rows: 1 }], empty: [], missing: [], verdict: 'PASS' });
-      const empty = judgeStagedSourceRows({ 'public.external_grid_sources': 0 }, environment);
+      // AFLDB-ISSUE-155: brownlow_vote_entry_state is staged too (match_id is a NOT NULL
+      // primary-key reference into rebuilt matches), so the gate now judges two tables.
+      expect(staged).toEqual(['brownlow_vote_entry_state', 'external_grid_sources']);
+      const ok = judgeStagedSourceRows(
+        { 'public.brownlow_vote_entry_state': 4, 'public.external_grid_sources': 1, 'public.external_grids': 0 },
+        environment);
+      expect(ok).toEqual({
+        populated: [{ table: 'brownlow_vote_entry_state', rows: 4 }, { table: 'external_grid_sources', rows: 1 }],
+        empty: [], missing: [], verdict: 'PASS',
+      });
+      // Each staged table is judged on its own, and a populated sibling never covers for it:
+      // one empty (counted at 0) or one absent (never counted) is enough to refuse.
+      const empty = judgeStagedSourceRows(
+        { 'public.brownlow_vote_entry_state': 0, 'public.external_grid_sources': 0 }, environment);
       expect(empty.verdict).toBe('FAIL');
-      expect(empty.empty).toEqual(['external_grid_sources']);
+      expect(empty.empty).toEqual(staged);
+      for (const one of staged) {
+        const others = Object.fromEntries(staged.filter((t) => t !== one).map((t) => [`public.${t}`, 2]));
+        const oneEmpty = judgeStagedSourceRows({ ...others, [`public.${one}`]: 0 }, environment);
+        expect(oneEmpty.verdict, one).toBe('FAIL');
+        expect(oneEmpty.empty, one).toEqual([one]);
+        expect(oneEmpty.missing, one).toEqual([]);
+        const oneAbsent = judgeStagedSourceRows(others, environment);
+        expect(oneAbsent.verdict, one).toBe('FAIL');
+        expect(oneAbsent.missing, one).toEqual([one]);
+        expect(oneAbsent.empty, one).toEqual([]);
+      }
       const absent = judgeStagedSourceRows({ 'public.external_grids': 3 }, environment);
       expect(absent.verdict).toBe('FAIL');
-      expect(absent.missing).toEqual(['external_grid_sources']);
+      expect(absent.missing).toEqual(staged);
       // Only a staged table is judged: a non-staged reinstated table at 0 is not this gate's business.
-      expect(judgeStagedSourceRows({ 'public.external_grid_sources': 2, 'public.auth_users': 0 }, environment).verdict).toBe('PASS');
+      expect(judgeStagedSourceRows(
+        { 'public.brownlow_vote_entry_state': 4, 'public.external_grid_sources': 2, 'public.auth_users': 0 },
+        environment).verdict).toBe('PASS');
     }
     // The checker applies it at exactly the pre-cutover phase, from the inventory it already took.
     const source = readFileSync(join(REPO, 'tools', 'db', 'promotion-check.ts'), 'utf8');
     expect(source).toContain("if (phase === 'pre-cutover') gateStagedSourceRows(counts, opts.environment, report);");
     expect(isStagedReinstatement(gridSources)).toBe(true);
+    expect(isStagedReinstatement(contractByName('brownlow_vote_entry_state')!)).toBe(true);
   });
 
   it('an interrupted staged reinstatement fails closed: the leftover schema is refused everywhere and never reused', () => {

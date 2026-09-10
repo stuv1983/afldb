@@ -428,9 +428,14 @@ describe('afldb_auth is confined to the operational tables', () => {
     // an incident, or one left by an abandoned migration, survived every
     // run of the script that claims to reconcile privileges.
     //
-    // These five are statistical tables that appear in no afldb_auth grant
+    // These are statistical tables that appear in no afldb_auth grant
     // in any migration, so the role must hold no privilege on them --
     // not even SELECT, which the validation reads are scoped away from.
+    //
+    // The last two are the migration-094 Brownlow workflow tables. They
+    // carry auth_users foreign keys, which is exactly the shape that
+    // tempts a grant to the login role; §27.16 gives it nothing, and the
+    // admin read model reaches them on the app pool like every other read.
     const rows = await sql<{ name: string; privilege: string }[]>`
       SELECT c.relname AS name, p.privilege
         FROM pg_class c
@@ -438,7 +443,8 @@ describe('afldb_auth is confined to the operational tables', () => {
        CROSS JOIN LATERAL (VALUES ('SELECT'), ('INSERT'), ('UPDATE')) AS p(privilege)
        WHERE n.nspname = 'public'
          AND c.relname IN ('player_match_stats', 'brownlow_season_votes',
-                           'draft_picks', 'club_seasons', 'data_issues')
+                           'draft_picks', 'club_seasons', 'data_issues',
+                           'brownlow_vote_entry_state', 'brownlow_season_authority')
          AND has_any_column_privilege(${AUTH_ROLE}, c.oid, p.privilege)
        ORDER BY 1, 2
     `;
@@ -751,6 +757,12 @@ describe('afldb_import is confined to the statistical tables', () => {
     // canonical mutation ledger, SELECT + INSERT and nothing else. All
     // four stay out of the registry on purpose -- registering them would
     // grant full DML -- and their exact narrow shapes are asserted below.
+    //
+    // brownlow_vote_entry_state and brownlow_season_authority (migration
+    // 094, AFLDB-ISSUE-155 §27.16) are the fifth and sixth. They are
+    // records of administrative decisions, and the registry's loop grants
+    // TRUNCATE -- the one power a reload path must never hold over them.
+    // They take full row DML minus TRUNCATE, asserted exactly below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -761,7 +773,9 @@ describe('afldb_import is confined to the statistical tables', () => {
        WHERE n.nspname = 'public'
          AND c.relkind IN ('r', 'p')
          AND c.relname NOT IN ('data_edits', 'player_link_resolutions',
-                               'canonical_applications')
+                               'canonical_applications',
+                               'brownlow_vote_entry_state',
+                               'brownlow_season_authority')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -775,6 +789,47 @@ describe('afldb_import is confined to the statistical tables', () => {
       'run npm run db:privileges, or register the table with '
       + "SELECT afldb_meta.grant_import_write('<table>') in its migration",
     ).toEqual([]);
+  });
+
+  it('writes the Brownlow workflow tables but can never truncate them (AFLDB-ISSUE-155 §27.16)', async () => {
+    // Migration 094 grants these two directly instead of registering them.
+    // The registry loop would add TRUNCATE, and these tables are the record
+    // of who drafted, finalised, corrected, voided and published a Brownlow
+    // vote -- a reload path that can empty them erases administrative
+    // decisions silently. The four transactions in admin-brownlow.ts need
+    // SELECT (the FOR UPDATE locks of §27.14), INSERT (first draft, absent
+    // authority row), UPDATE (every transition) and DELETE (a discarded
+    // entry), and nothing else. Neither table owns a sequence: the primary
+    // keys are match_id and season, both supplied by the caller.
+    const rows = await sql<{
+      name: string; selects: boolean; inserts: boolean;
+      updates: boolean; deletes: boolean; truncates: boolean;
+    }[]>`
+      SELECT t.name,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'SELECT')   AS selects,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'INSERT')   AS inserts,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'UPDATE')   AS updates,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'DELETE')   AS deletes,
+             has_table_privilege(${IMPORT_ROLE}, t.name, 'TRUNCATE') AS truncates
+        FROM (VALUES ('brownlow_vote_entry_state'), ('brownlow_season_authority'))
+             AS t(name)
+       ORDER BY 1
+    `;
+    expect(
+      rows,
+      'run npm run db:privileges: its afldb_import section mirrors the '
+      + 'migration-094 grants after the registry loop revokes them',
+    ).toEqual([
+      { name: 'brownlow_season_authority', selects: true, inserts: true, updates: true, deletes: true, truncates: false },
+      { name: 'brownlow_vote_entry_state', selects: true, inserts: true, updates: true, deletes: true, truncates: false },
+    ]);
+
+    const [sequences] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM (VALUES ('brownlow_vote_entry_state'), ('brownlow_season_authority')) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+    `;
+    expect(sequences?.count).toBe(0);
   });
 
   it('appends its own required audit rows and can never rewrite them (AFLDB-ISSUE-027)', async () => {

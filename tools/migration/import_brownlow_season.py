@@ -90,6 +90,9 @@ IDENTITY_PATH = DATA_DIR / "player-identity.csv"
 TOOL_NAME = "import_brownlow_season.py"
 TARGET_TABLE = "brownlow_season_votes"
 SOURCE_KEY = "afltables"
+# AFLDB-ISSUE-155 §27.11: rows an administrator published through Brownlow
+# administration are owned by this source and outrank the artefact.
+MANUAL_SOURCE_KEY = "manual_admin_edit"
 STAT_KEY = "brownlow_season_total"
 
 # §8.6: season, profile path, the 13 substantive columns' worth of facts, the
@@ -585,7 +588,27 @@ class BrownlowSeasonLoadRefused(RuntimeError):
 
 
 def check_database_coverage(pg, declared: set[int]) -> None:
-    """§8.6 item 1, database half: the declared seasons are exactly the decided ones."""
+    """§8.6 item 1, database half: the declared seasons are exactly the decided ones.
+
+    Also enforces AFLDB-ISSUE-155 §27.11 precedence: an admin-published season
+    row outranks the artefact, and this loader replaces the whole table
+    (TRUNCATE ONLY + COPY), so any manual row present would be destroyed. Fail
+    closed before the first write rather than silently overwrite a decision.
+    """
+    with pg.cursor() as cur:
+        cur.execute(
+            f"""SELECT DISTINCT b.season
+                  FROM {TARGET_TABLE} b
+                  JOIN sources s ON s.id = b.source_id
+                 WHERE s.key = %s
+                 ORDER BY b.season""",
+            (MANUAL_SOURCE_KEY,))
+        admin_published = [int(r[0]) for r in cur.fetchall()]
+    if admin_published:
+        raise BrownlowSeasonLoadRefused(
+            f"season(s) {admin_published} are admin-published; reload refused. "
+            "Correct them through Brownlow administration or delete the manual "
+            "rows deliberately first")
     with pg.cursor() as cur:
         cur.execute(
             "SELECT season FROM stat_availability WHERE stat_key = %s AND coverage = 'complete'",

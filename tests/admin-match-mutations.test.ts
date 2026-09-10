@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -22,6 +22,44 @@ describe('admin match mutation source contracts', () => {
     }
     expect(playerDerived).toContain('FROM brownlow_season_votes');
     expect(playerDerived).not.toMatch(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_season_votes/i);
+  });
+
+  // AFLDB-ISSUE-155 §27.15: the match sheet stopped being a Brownlow writer in
+  // Phase C1. The column must not appear in the upsert at all — a stale editor
+  // posting the mirror back would otherwise overwrite the canonical fact, and
+  // the finals/stat_availability gates that existed only to guard that write
+  // went with it.
+  it('never writes player_match_stats.brownlow_votes from the match sheet', () => {
+    expect(matchSheet).not.toMatch(/brownlow_votes\s*=/i);
+    expect(matchSheet).not.toContain('p.brownlowVotes');
+    expect(matchSheet).not.toContain('brownlow_match_votes');
+    expect(matchSheet).not.toContain('Brownlow votes cannot be recorded for finals');
+  });
+
+  // §27.27 C1 source contract. The settle applier is the one other permitted
+  // writer (§27.11: ownership-gated, and it refuses a manual-owned row); every
+  // other application write of a Brownlow fact must go through the Phase C
+  // transactions so the audit, revision CAS and provenance cannot be bypassed.
+  it('keeps Brownlow fact writes to the canonical writer and the settle applier', () => {
+    const writers = new Set<string>();
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(entry.name)) {
+          const text = readFileSync(join(process.cwd(), rel), 'utf8');
+          if (/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+brownlow_(?:round_votes|season_votes|vote_entry_state|season_authority)\b/i.test(text)) {
+            writers.add(rel);
+          }
+        }
+      }
+    };
+    walk('src');
+
+    expect([...writers].sort()).toEqual([
+      'src/db/queries/admin-brownlow.ts',
+      'src/lib/acquisition/canonical-apply.ts',
+    ]);
   });
 
   // AFLDB-ISSUE-129 §8.4 item 9: a super admin may select wildcard_final wherever

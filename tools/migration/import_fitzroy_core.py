@@ -124,6 +124,8 @@ IN_SEASON_KIND = "in_season_partial"
 # fact table is attributed to the fitzRoy dataset that carries it.
 SOURCE_KEY_AFLTABLES = "afltables"
 SOURCE_KEY_FITZROY = "fitzroy_afldata"
+# AFLDB-ISSUE-155 §27.11: admin-finalised facts outrank a rebuild load.
+SOURCE_KEY_MANUAL = "manual_admin_edit"
 
 # The fitzRoy DOB field is its own evidence source, distinct from both
 # the legacy register pass (evidence_type club_player_register) and the
@@ -3062,9 +3064,26 @@ def import_brownlow_round_votes(pg, rep, files: list[SnapshotFile],
             rows.append((season, player_id, int(round_code), True, votes))
 
         with pg.cursor() as cur:
-            # This importer owns the historical round-vote population for
-            # the seasons it imports; the delete is scoped to exactly
-            # those seasons.
+            # AFLDB-ISSUE-155 §27.11: this importer owns the historical
+            # round-vote population, but an admin-finalised match outranks it.
+            # A rebuild database holds no manual rows, so a rebuild is
+            # unaffected; a live database with admin decisions is protected.
+            # Fail closed before the delete, never silently.
+            cur.execute(
+                """SELECT DISTINCT b.season
+                     FROM brownlow_round_votes b
+                     JOIN sources s ON s.id = b.source_id
+                    WHERE b.season = ANY(%s)
+                      AND s.key = %s
+                    ORDER BY b.season""",
+                (snapshot_seasons, SOURCE_KEY_MANUAL))
+            admin_owned = [int(r[0]) for r in cur.fetchall()]
+            if admin_owned:
+                raise RuntimeError(
+                    f"season(s) {admin_owned} hold admin-finalised Brownlow "
+                    "round votes; reload refused. Correct them through Brownlow "
+                    "administration or delete the manual rows deliberately first")
+            # The delete is scoped to exactly the seasons this snapshot carries.
             cur.execute("DELETE FROM brownlow_round_votes WHERE season = ANY(%s)",
                         (snapshot_seasons,))
         copy_rows(pg, "brownlow_round_votes",

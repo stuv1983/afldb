@@ -15,6 +15,154 @@ commit.
 
 ## [Unreleased]
 
+### Brownlow administration browser-acceptance fixes and promotion-contract support (AFLDB-ISSUE-155) - 10 September 2026
+
+- A stale-tab refusal in the vote editor no longer resets the operator's in-progress selection
+  or reason. Reconciliation is now decided from a recorded `revision:canonicalFingerprint` pair
+  rather than a `useEffect` dependency array, because the App Router re-creates the route
+  subtree's effects after every Server Action round-trip and a dependency array cannot detect
+  that.
+- Every vote-editor action (Save draft / Finalise / Correct / Void) now dispatches inside
+  `startTransition`, clearing a React console error ("called outside of a transition") that
+  previously fired on every submission, success or refusal.
+- Keyboard focus is restored to the control that started an action once a refusal completes, and
+  moved into the publish confirmation block when it is revealed (back to "Publish season…" on
+  Cancel) — previously both a refusal and a panel reveal/cancel dropped focus to `document.body`,
+  leaving a keyboard-only operator to tab in from the top of the page.
+- The canonical-fingerprint compare-and-set digest is split into its own server-only module
+  (`src/lib/brownlow/fingerprint.ts`) so `node:crypto` never enters the client bundle that
+  imports `entry.ts`'s browser-safe constants.
+- The promotion contract (`tools/db/promotion-inventory.ts`) now covers the two Brownlow
+  workflow tables added in Phase C1 — `brownlow_vote_entry_state` (staged reinstatement with a
+  `match_id` lineage remap, via a new `rowIdColumn` mechanism for tables whose primary key is
+  the remapped column itself) and `brownlow_season_authority`. Player-slot columns remap through
+  the existing AFL Tables profile-url identity. This was the last known implementation item
+  blocking a safe production promotion after this issue ships; final regression, promotion-check
+  and deploy validation are still pending before ISSUE-155 can close.
+
+### Brownlow administration has a UI (AFLDB-ISSUE-155 Phase C2) - 10 September 2026
+
+- `/admin/brownlow` is the place Brownlow votes are now entered, finalised and published. It
+  lists every polled season with its status, coverage counts, publication authority and last
+  editor; drills into a season's rounds and their completeness; and, per round, shows every
+  home-and-away match with an inline editor. Finals never appear — no votes are awarded in them.
+- Each match editor lists only the players in that match's canonical line-up, grouped by club
+  with their jumper numbers (jumper numbers are text, not numbers). Three type-ahead selectors
+  award the 3, the 2 and the 1; a player already chosen for one cannot be chosen for another.
+  An incomplete selection can be saved as a draft; finalising needs all three and a complete
+  line-up. Where the line-up is short, the editor says which side is short and links to the
+  match sheet, and finalise/void are blocked until it is repaired. Source-published votes can
+  be adopted into the selection with one control.
+- The controls follow the capability split: an Admin may save drafts; only a Super Admin sees
+  working Finalise, Correct, Void and Publish controls — an Admin sees them disabled with the
+  reason. Correcting a finalised match and voiding one each require a typed reason, and the
+  editor says plainly that a correction changes canonical facts and that a void withdraws the
+  vote values while keeping the participation record.
+- The season page carries the publish panel: publication readiness, the blockers the backend
+  would return, an ineligible-player multi-select prefilled from the current season rows, and a
+  source-vs-manual authority line. Publishing is a two-step confirm, Super Admin only, and a
+  stale season revision comes back as a reload prompt rather than a generic error. For a
+  source-published season the round-fact-vs-published-total disagreement is shown on the page.
+- A stale-tab conflict on any of these — someone else finalised the match, a settle landed a
+  vote, the season moved — is surfaced as "someone changed this while you were editing it,
+  reload" with the entered values preserved, never as a silent overwrite and never as
+  "already decided". Backend refusals `stale`, `already_final` and `forbidden` are written to
+  the audit trail; ordinary validation refusals are not.
+- The legacy match sheet's Brownlow column is now read-only: it shows the recorded value or a
+  dash, submits nothing, and points authorised admins at `/admin/brownlow`. This pairs with the
+  Phase C1 rule that the match sheet refuses any Brownlow value — normal match-sheet editing is
+  now compatible with that rule because the value is never sent.
+- The Data section of the admin sidebar gains a Brownlow link (visible to every staff role
+  above contributor), and the dashboard shows the current season's count of home-and-away
+  matches still without finalised votes.
+
+### Brownlow votes have a canonical match identity (AFLDB-ISSUE-155 Phase C1) - 10 September 2026
+
+- A Brownlow vote is now a fact about a **match**, not just about a season and a round number.
+  `brownlow_round_votes` gained a match identifier, deterministically backfilled from each player's
+  own line-up row - 320,861 of 320,861 rows resolved to exactly one match, with no guessing by
+  name, date or club - and the database now states the Brownlow rule itself: within one match a
+  player holds at most one allocation, and at most one player holds each of the 3, the 2 and the 1.
+  A vote that cannot be attributed to a match keeps no match, is reported as unresolved, and is
+  never invented.
+- Behind that sit a draft/final/void workflow per match and a publication record per season, so an
+  administrator's unfinished work is never a row in a public fact table. An admin may draft; only a
+  super admin may finalise, correct, void or publish. Corrections are direct, reasoned and fully
+  audited, and a correction inside an already-published season re-derives that season's totals in
+  the same transaction - there is no published-but-stale state to notice later.
+- Publication derives a season's totals from the finalised matches and takes authority for them.
+  Seasons nobody has administered keep the totals their source published, and where the match-level
+  facts disagree with those totals the difference is **shown, never applied**. Derived season and
+  career figures move with a publication, in the same transaction.
+- **The match sheet no longer writes Brownlow votes.** It refuses any Brownlow value with a message
+  pointing at Brownlow administration, and it preserves the recorded value through every save, so a
+  stale editor can no longer overwrite a vote. Deleting a match that carries a Brownlow decision
+  now fails rather than discarding the decision, and it fails with a message naming the decision
+  and where to withdraw it, before any part of the deletion is attempted.
+- When two administrators submit the same match at the same moment, the one who loses the race is
+  told that the match changed while they were editing it and to reload - not that the match was
+  already decided. They acted on a page that had stopped being true, which is a different problem
+  with a different fix. Submitting against a match you can see is already decided still says so,
+  and still points at Correct.
+- Reload paths can no longer overwrite an administrator's decision. The season-totals artefact
+  loader refuses to reload over an admin-published season, and the fitzRoy rebuild loader refuses
+  to rebuild the round votes of a season holding admin-finalised matches. Both fail closed with a
+  message naming the seasons. A rebuild of a fresh database is unaffected.
+- Fixed while validating the above: entering votes for a completed season that had no published
+  season totals yet would have locked the workflow out of that season after the first match, by
+  recomputing the coverage grid to say the season had no medal. A season holding Brownlow decisions
+  is now reported as partially covered until it is published.
+- Also fixed while validating the above: the Brownlow test fixture could leave rows behind in the
+  integration database. Its data is committed by design - the code under test opens its own
+  connections and could not otherwise see it - and cleanup used to be reachable only through the
+  value the seed returned, so a timed-out setup left committed rows with no way to remove them, and
+  the fixture's own collision guard then refused every later run. Cleanup is now registered before
+  the first row is written, each seed runs on its own connection, and teardown cancels the seed,
+  waits for it to stop, closes that connection if it has not, and only then removes the rows -
+  once, idempotently, and failing loudly rather than reporting a clean database it did not clean.
+  Both abandonment paths are exercised by direct test, and the affected database was independently
+  verified clean afterwards.
+
+### Administrator account lifecycle (AFLDB-ISSUE-155 Phase B) - 10 September 2026
+
+- A super admin can now promote, demote, deactivate and reactivate an administrator account from
+  `/admin/admins`, instead of an account's role and status being changeable only in the database.
+  Demotion also clears `can_manage_admins`; deactivation asks for the account's email to be typed
+  and for a short reason.
+- Accounts are never deleted. Deactivation is the end of access, not the end of the record: the
+  account and everything it has ever edited, reviewed or resolved are kept, and a deactivated
+  account cannot sign in and holds no live session. Reactivation restores access and revives no
+  previous session.
+- The site cannot be left without a way in. Demoting or deactivating the last super admin who could
+  actually sign in - enabled, with a password and an enrolled authenticator - is refused, and the
+  count is taken inside the same transaction as the change, under an advisory lock, so two super
+  admins acting at the same moment cannot each remove the other. Nobody can demote or deactivate
+  their own account.
+- Every successful change signs the target out of all their sessions and writes its audit row in
+  the same transaction as the change itself: if the trail cannot be written, nothing is. Refusals
+  that say something about a real account - a stale page, a self-action, a lost invariant - are
+  audited too, and a stale page is told the account changed rather than being silently reapplied.
+- Lifecycle actions are super-admin-only, enforced by the Server Actions themselves.
+  `can_manage_admins` keeps its existing invite and password-reset delegation and gains no power
+  over roles or account status. An ordinary admin keeps the page and their own sessions, and can
+  now sign out only their own session rather than anyone's.
+
+### Admin Centre navigation and capability policy (AFLDB-ISSUE-155 Phase A) - 10 September 2026
+
+- The admin sidebar's flat, hand-conditioned link list is replaced with a grouped Admin Centre
+  layout — Overview, Data, Acquisition, People & access, Site, Operations, Account — driven by a
+  new central capability policy (`src/lib/auth/capabilities.ts`) rather than a `superAdmin ? … : …`
+  local to the nav. Every existing route keeps its own server-side guard unchanged; the policy
+  describes enforcement that already existed, it grants nothing new.
+- The Grid Solver link is removed from the admin sidebar — it is a public tool, not an
+  administrative capability — while `/admin/grid-solver` remains as a compatibility redirect for
+  old bookmarks.
+- The admin dashboard gained two overview badges: pending submissions and, for super admins,
+  unresolved player links, each linking to the page that resolves it.
+- Fixed a pre-existing responsive defect in the admin sidebar: on a narrow screen the sidebar was
+  meant to default to collapsed (a single toggle button), but a CSS rule forced it open regardless
+  of that state, so every mobile admin page load showed the full sidebar above the page content.
+
 ### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
 
 - AFLDB knows who played and it knows who coached, and until now the search box could not be asked

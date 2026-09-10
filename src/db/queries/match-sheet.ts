@@ -60,10 +60,9 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         season: number;
         homeClubId: number;
         awayClubId: number;
-        isFinal: boolean;
       }[]>`
         SELECT id, season, home_club_id AS "homeClubId",
-               away_club_id AS "awayClubId", is_final AS "isFinal"
+               away_club_id AS "awayClubId"
           FROM matches
          WHERE id = ${input.matchId}
            FOR UPDATE
@@ -81,21 +80,13 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         }
       }
 
-      if (players.some((player) => player.brownlowVotes != null)) {
-        if (match.isFinal) {
-          throw new Error('Brownlow votes cannot be recorded for finals.');
-        }
-        const [availability] = await tx<{ coverage: string }[]>`
-          SELECT coverage::text AS coverage
-            FROM stat_availability
-           WHERE stat_key = 'brownlow_match_votes'
-             AND season = ${match.season}
-        `;
-        if (!availability || !['complete', 'partial'].includes(availability.coverage)) {
-          throw new Error(`Per-match Brownlow votes are not recorded for the ${match.season} season.`);
-        }
-      }
-
+      // AFLDB-ISSUE-155 §27.15: the match sheet no longer writes
+      // player_match_stats.brownlow_votes. validateMatchSheetPayload has
+      // already refused any non-null value, and the upsert below omits the
+      // column entirely so the mirror written by Brownlow administration (or
+      // the historical source value) survives every match-sheet save. The
+      // finals and stat_availability checks existed only to gate that write
+      // and are removed with it.
       const existingPlayers = await tx<{ playerId: number }[]>`
         SELECT player_id AS "playerId"
           FROM player_match_stats
@@ -122,14 +113,12 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
           INSERT INTO player_match_stats (
             player_id, match_id, club_id, jumper_number,
             goals, behinds, kicks, handballs, disposals,
-            marks, tackles, hitouts, frees_for, frees_against,
-            brownlow_votes
+            marks, tackles, hitouts, frees_for, frees_against
           ) VALUES (
             ${p.playerId}, ${input.matchId}, ${p.clubId}, ${p.jumperNumber?.trim() || null},
             ${p.goals ?? null}, ${p.behinds ?? null}, ${kicks}, ${handballs}, ${disposals},
             ${p.marks ?? null}, ${p.tackles ?? null}, ${p.hitouts ?? null},
-            ${p.freesFor ?? null}, ${p.freesAgainst ?? null},
-            ${p.brownlowVotes ?? null}
+            ${p.freesFor ?? null}, ${p.freesAgainst ?? null}
           )
           ON CONFLICT (player_id, match_id) DO UPDATE SET
             club_id = EXCLUDED.club_id,
@@ -143,8 +132,7 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
             tackles = EXCLUDED.tackles,
             hitouts = EXCLUDED.hitouts,
             frees_for = EXCLUDED.frees_for,
-            frees_against = EXCLUDED.frees_against,
-            brownlow_votes = EXCLUDED.brownlow_votes
+            frees_against = EXCLUDED.frees_against
         `;
       }
 

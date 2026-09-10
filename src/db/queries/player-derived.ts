@@ -561,3 +561,212 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
      WHERE s.year = summary.year
   `;
 }
+
+/**
+ * Brownlow career totals for a named set of players (AFLDB-ISSUE-155 §27.10).
+ *
+ * Deliberately narrower than `recomputePlayerDerivedStats`, which rebuilds
+ * a player's whole playing record. A Brownlow publication changes exactly
+ * two career columns, and rebuilding games, goals and disposals alongside
+ * them would put every one of those figures at risk of a defect in this
+ * transaction for no gain.
+ *
+ * The definition is the `brownlow` CTE of `recomputePlayerDerivedStats`
+ * above, restricted to the affected players and kept in lockstep with it
+ * and with `REBUILDS["player_career_stats"]` in
+ * tools/migration/rebuild_derived.py: votes are the sum over
+ * brownlow_season_votes, medals the count of winning seasons, and a
+ * player with no season rows at all falls to 0/0 rather than keeping a
+ * stale total. That last case is why this is an UPDATE over the supplied
+ * ids rather than over the rows a join finds: the set of affected players
+ * includes those whose LAST season row a re-derivation just removed.
+ *
+ * Call with the union of the players in the old and the new season rows.
+ */
+export async function recomputeBrownlowCareerTotals(
+  tx: Tx,
+  playerIds: number[],
+): Promise<void> {
+  const ids = distinctPositiveIntegers(playerIds);
+  if (ids.length === 0) return;
+
+  await tx`
+    UPDATE player_career_stats pcs
+       SET brownlow_votes  = COALESCE(b.votes, 0),
+           brownlow_medals = COALESCE(b.medals, 0)
+      FROM (
+        SELECT selected.player_id,
+               (SELECT sum(bsv.votes)
+                  FROM brownlow_season_votes bsv
+                 WHERE bsv.player_id = selected.player_id)   AS votes,
+               (SELECT count(*)
+                  FROM brownlow_season_votes bsv
+                 WHERE bsv.player_id = selected.player_id
+                   AND bsv.is_winner)                        AS medals
+          FROM player_career_stats selected
+         WHERE selected.player_id = ANY(${ids})
+      ) b
+     WHERE pcs.player_id = b.player_id
+  `;
+}
+
+/**
+ * Per-season Brownlow coverage after a workflow mutation (§27.10 item 5).
+ *
+ * The season-scoped counterpart of migration 016 and of
+ * `import_legacy_afl.py::_brownlow_availability`, which compute the same
+ * three `stat_availability` rows for every season at once. Keep all three
+ * definitions in lockstep.
+ *
+ * ONE RULE DIFFERS, deliberately (operator decision D1). Migration 016
+ * calls the round grain `complete` when the season holds ANY round row,
+ * which was safe while the only writer was a bulk import of a whole
+ * season and stops being safe the moment a Super Admin can finalise a
+ * single match: one hand-entered 1950 match would otherwise report 1950
+ * as completely covered. Here a season is `complete` only when every
+ * home-and-away match is ACCOUNTED FOR -- its round facts are a textbook
+ * 3/2/1, or a Super Admin has declared it `void` -- and `partial` when
+ * some are. `src/lib/brownlow/entry.ts::isMatchAccounted` is the same
+ * rule in the read model.
+ *
+ * On the data as it stands the two rules agree row for row, so this is a
+ * latent divergence rather than an actual one: preflight P6 measured all
+ * 7,413 home-and-away matches of 1984-2025 as complete 3/2/1, and no
+ * season outside that window holds a round row at all (P1). The first
+ * season to disagree will be one this workflow itself made partial, and
+ * a full rebuild of that database would then need the same amendment in
+ * import_legacy_afl.py -- recorded in §27.29 as a follow-up, not left to
+ * be discovered.
+ *
+ * The match-vote grain keeps its 016 definition exactly, with `void`
+ * added for the same reason it counts at the round grain: a declared
+ * no-vote match is a decision, not a gap.
+ *
+ * A SECOND RULE DIFFERS, and unlike D1 this one is not a choice. The
+ * season-total grain gains a `partial` branch for a season this workflow
+ * holds finalised or voided matches for. `lockMatch` refuses a mutation
+ * in any season whose season_total coverage is `not_applicable`, so
+ * recomputing that grain from `medal_awarded` alone would have locked the
+ * workflow out of a season it had just started: a completed season with
+ * no brownlow_season_votes rows yet is exactly the state a NEW season
+ * occupies between its first finalisation and its publication, and it
+ * would have flipped to `not_applicable` on that first finalisation.
+ * Found by the runtime validation in tests/integration/admin-brownlow.test.ts.
+ */
+export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise<void> {
+  await tx`
+    WITH season_ctx AS (
+      SELECT s.year   AS season,
+             s.status AS season_status,
+             EXISTS (SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year)
+               AS medal_awarded
+        FROM seasons s
+       WHERE s.year = ${season}
+    ),
+    workflow_ctx AS (
+      -- Decisions this workflow holds for the season. They are what keeps
+      -- season_total off not_applicable between the first finalisation and
+      -- the publication; see the CASE below.
+      SELECT count(*) AS decided
+        FROM brownlow_vote_entry_state es
+        JOIN matches mt ON mt.id = es.match_id
+       WHERE es.season = ${season}
+         AND es.status IN ('final', 'void')
+         AND mt.round_type = 'home_and_away'
+    ),
+    match_ctx AS (
+      SELECT mt.season,
+             count(*)                                                   AS ha_matches,
+             count(*) FILTER (WHERE rv.total = 6 AND rv.positives = 3
+                                 AND rv.distinct_values = 3)            AS ha_accounted_rounds,
+             count(*) FILTER (WHERE es.status = 'void')                 AS ha_void,
+             count(*) FILTER (WHERE mirror.total = 6)                   AS ha_complete,
+             count(*) FILTER (WHERE mirror.total > 0)                   AS ha_any
+        FROM matches mt
+        LEFT JOIN brownlow_vote_entry_state es ON es.match_id = mt.id
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(sum(brv.votes), 0)                    AS total,
+                 count(*) FILTER (WHERE brv.votes > 0)          AS positives,
+                 count(DISTINCT brv.votes) FILTER (WHERE brv.votes > 0) AS distinct_values
+            FROM brownlow_round_votes brv
+           WHERE brv.match_id = mt.id
+        ) rv ON true
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(sum(pms.brownlow_votes), 0) AS total
+            FROM player_match_stats pms WHERE pms.match_id = mt.id
+        ) mirror ON true
+       WHERE mt.season = ${season}
+         AND mt.round_type = 'home_and_away'
+       GROUP BY mt.season
+    ),
+    round_ctx AS (
+      SELECT count(*) AS vote_rows
+        FROM brownlow_round_votes WHERE season = ${season}
+    ),
+    resolved AS (
+      SELECT c.season,
+             -- The 016 rule, plus one branch that 016 could not have needed.
+             --
+             -- lockMatch refuses every Brownlow mutation in a season whose
+             -- season_total coverage is not_applicable, which is how 1942-45
+             -- stays un-enterable. Recomputing this grain from medal_awarded
+             -- alone would therefore lock the workflow out of the exact season
+             -- it is being used on: a completed season with no
+             -- brownlow_season_votes rows yet -- the state a NEW season is in
+             -- between its first finalisation and its publication -- would
+             -- flip to not_applicable on that first finalisation and refuse
+             -- every match after it, with no way back but a hand-edit. A
+             -- season this workflow holds decisions for is partial: some of
+             -- its totals are settled, none of them are published.
+             CASE
+               WHEN c.medal_awarded                 THEN 'complete'
+               WHEN c.season_status = 'in_progress' THEN 'pending'
+               WHEN w.decided > 0                   THEN 'partial'
+               ELSE 'not_applicable'
+             END::coverage_status AS season_total,
+             -- D1: accounted matches, not "any row at all".
+             CASE
+               WHEN COALESCE(m.ha_matches, 0) > 0
+                AND COALESCE(m.ha_accounted_rounds, 0) + COALESCE(m.ha_void, 0) >= m.ha_matches
+                                                    THEN 'complete'
+               WHEN COALESCE(r.vote_rows, 0) > 0
+                 OR COALESCE(m.ha_void, 0) > 0      THEN 'partial'
+               WHEN c.season_status = 'in_progress' THEN 'pending'
+               WHEN c.medal_awarded                 THEN 'not_collected'
+               ELSE 'not_applicable'
+             END::coverage_status AS round_votes,
+             CASE
+               WHEN COALESCE(m.ha_matches, 0) > 0
+                AND COALESCE(m.ha_complete, 0) + COALESCE(m.ha_void, 0) >= m.ha_matches
+                                                    THEN 'complete'
+               WHEN COALESCE(m.ha_any, 0) > 0
+                 OR COALESCE(m.ha_void, 0) > 0      THEN 'partial'
+               WHEN c.season_status = 'in_progress' THEN 'pending'
+               WHEN c.medal_awarded                 THEN 'not_collected'
+               ELSE 'not_applicable'
+             END::coverage_status AS match_votes,
+             COALESCE(m.ha_complete, 0) AS ha_complete,
+             COALESCE(m.ha_matches, 0)  AS ha_matches
+        FROM season_ctx c
+        LEFT JOIN match_ctx m ON m.season = c.season
+        CROSS JOIN round_ctx r
+        CROSS JOIN workflow_ctx w
+    )
+    INSERT INTO stat_availability (stat_key, season, is_recorded, coverage,
+                                   populated_rows, total_rows)
+    SELECT 'brownlow_season_total', season, season_total = 'complete', season_total,
+           NULL::integer, NULL::integer FROM resolved
+    UNION ALL
+    SELECT 'brownlow_round_votes', season, round_votes = 'complete', round_votes,
+           NULL::integer, NULL::integer FROM resolved
+    UNION ALL
+    SELECT 'brownlow_match_votes', season,
+           match_votes IN ('complete', 'partial'), match_votes,
+           ha_complete::integer, ha_matches::integer FROM resolved
+    ON CONFLICT (stat_key, season) DO UPDATE
+       SET is_recorded    = EXCLUDED.is_recorded,
+           coverage       = EXCLUDED.coverage,
+           populated_rows = EXCLUDED.populated_rows,
+           total_rows     = EXCLUDED.total_rows
+  `;
+}
