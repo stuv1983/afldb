@@ -20849,7 +20849,7 @@ on DEV.
 
 ## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
 
-**Status:** Open / In progress — Phase A and Phase B complete and validated; Phase C planning complete; Phases C–I not started
+**Status:** Open / In progress — Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented and validated, including the §27.27 browser acceptance (A–K, all PASS) and the post-C2 stale-tab/focus fixes; the promotion-contract implementation for the two Phase C tables is complete in the working tree (uncommitted). Remaining before close: commit, full regression, promotion-check and deploy validation. Phases D–I not started.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition
 **Found:** 2026-09-10
@@ -21173,16 +21173,485 @@ any promotion that would run after this ships.
 `src/app/admin/data-editor/MatchSheetEditor.tsx`, `tools/maintenance/privileges.sql`,
 `tests/auth.test.ts`, `tests/reference-data.test.ts`, `tests/admin-nav/admin-nav.spec.ts`.
 
-**ISSUE-155 remains OPEN.** Exact remaining task before it can close:
+**ISSUE-155 remains OPEN**, but the promotion-contract item below is now IMPLEMENTED, not
+outstanding. `PROMOTION_CONTRACT` in `tools/db/promotion-inventory.ts` carries both
+`brownlow_vote_entry_state` (`productionOnly: true`, `treatment: 'reinstate'`,
+`compare: 'equal'`, `restoreAfter: ['auth_users']`, staged reinstatement because `match_id` is a
+NOT NULL primary-key reference into rebuilt `matches` — remapped old id → `match_key` →
+candidate id via a new `rowIdColumn` mechanism, since this table's primary key IS the remapped
+column, not a separate surrogate `id`; `three_player_id`/`two_player_id`/`one_player_id` remap
+through the AFL Tables profile-url identity, same as `player_link_resolutions.player_id`; season
+is a natural key into `seasons(year)` and needs no remap) and `brownlow_season_authority`
+(`productionOnly: true`, `treatment: 'reinstate'`, `compare: 'equal'`,
+`restoreAfter: ['auth_users']`, not staged and not lineage-bound — its only FK is
+`season → seasons(year)`, a permanent natural identity). Neither table is registered via
+`grant_import_write()`. `tests/db-promotion-check.test.ts` was updated to match (the hardcoded
+reference list at the old line 349 and the two new-table assertions). This is uncommitted, in
+the current working tree, and has not yet been re-run to green from a fresh command in this
+session — see the validation table below and "Exact next action".
 
-> Add `brownlow_vote_entry_state` and `brownlow_season_authority` to `PROMOTION_CONTRACT` in
-> `tools/db/promotion-inventory.ts` with `productionOnly: true`, `treatment: 'reinstate'`,
-> `compare: 'equal'`, `restoreAfter: ['auth_users']`, and the required `footballRefs` (for
-> `brownlow_vote_entry_state`: `match_id → matches` NOT NULL with a decided remediation for the
-> current-season id-remap via `matches.match_key`; `three_player_id`/`two_player_id`/
-> `one_player_id → players`; `season → seasons`. For `brownlow_season_authority`:
-> `season → seasons`) and `lineageRefs` where an id can silently change meaning. Update the
-> hardcoded reference list at `tests/db-promotion-check.test.ts:349`. Then re-run
-> `npx vitest run tests/db-promotion-check.test.ts` to green. Do NOT register the tables via
-> `grant_import_write()`. This is the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up
-> and a pre-deploy stop condition; no new issue ID.
+**What is still open before ISSUE-155 can close:** the working tree (this promotion-contract
+work plus the post-C2 stale-tab/focus fixes recorded above) has not been committed; the full
+regression sequence (§27.25-shaped: unit → `db-promotion-check` → `admin-brownlow` integration →
+`privileges`/`release-gates` → typecheck) has not been re-run end-to-end against the current tree
+in one pass; the disposable `issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089)
+have not been cleaned up; and the §27.21 deploy sequence has not been run on DEV or PROD. None of
+these is a defect — they are the remaining gates.
+
+### §27.27 browser acceptance, stale-tab sub-case — run against `afldb_test` fixture, STOPPED on a new defect (2026-09-10)
+
+Ran the stale-tab-conflict repro from the C2 closeout's remaining validation step, against the
+disposable `issue155-acceptance-*` fixture already seeded in `afldb_test` (seasons 2089/2085, no
+fixture reset), two tabs on `/admin/brownlow/2089/1`, match #18296. Working tree at the time
+carried an **uncommitted, in-progress fix** for a stale-tab selection/reason reset defect found in
+an earlier pass of this same session (not yet in `issues.md`): `MatchVoteEditor.tsx`'s four
+buttons changed from the `formAction` pattern the C2 closeout above describes to `type="button"`
+plus a new `vote-form-data.ts` (`buildBrownlowVoteFormData`) that builds the submitted `FormData`
+from React `selection`/`reason` state rather than reading it back off the DOM, because React 19
+resets a `<form>`'s controlled fields after a `formAction` submission completes.
+
+**Result: the fix does not close the defect it targets, and introduces a second one. Sections E–K
+were not run (stop condition, item 8).**
+
+1. **Server-side compare-and-set is correct.** With tab A holding the canonical revision-3 → 4
+   correction and stale tab B (still showing revision 3) submitting a distinct 3/2/1 and a
+   distinct reason, the write was refused both times it was tried (`code: 'stale'`, canonical DB
+   state left as tab A's committed correction). Captured directly from the Server Action's own
+   multipart request/response bodies (`browser_network_request`), the FormData actually
+   transmitted matched tab B's live on-screen intent exactly, not any DOM-reverted or stale
+   default — confirming `buildBrownlowVoteFormData` itself does what its doc comment claims.
+
+2. **But on a clean page load (full navigation, no Fast-Refresh history), the visible
+   selection/reason reset recurs anyway, and the second-submit step cannot be performed.**
+   Immediately after the refused submission, the three `<select>`s and the reason field snapped
+   back to the values `model` held at tab B's *original* page load (the pre-correction canonical
+   holders, empty reason) — not to tab A's newly committed values, and not to what the operator
+   had just chosen in tab B. The refusal alert rendered correctly (naming "revision 4, not 3"),
+   but the `Correct finalised votes` button then went `disabled` again because the reason field
+   was now empty, making the required second-submit-without-reselecting step impossible through
+   the UI. `model.revision`'s own displayed text was unchanged (still "3"), which rules out a
+   revalidated/fresh-canonical explanation; root cause is not diagnosed (candidates include an
+   implicit Next.js App Router client-side re-render of the route after any Server Action
+   round-trip, independent of `revalidatePath`, causing `MatchVoteEditor` to remount and
+   re-run its `useState(model.selection)` / `useState('')` initializers even though the
+   `useEffect` guard's own dependencies — `model.revision`, `model.canonicalFingerprint` — did
+   not change). This is the same failure mode `vote-form-data.ts` was written to fix, recurring
+   through the display layer instead of the submission layer.
+   *(A first attempt at this same repro, run against the tab pair as left mid-fix from the prior
+   session — many Fast-Refresh cycles deep — did not show this reset and did complete a clean
+   second-submit proof with correctly preserved values. That result is real but was obtained
+   under confounded conditions and is superseded by the clean-load result above, which is the
+   one that matches how an operator would actually hit this.)*
+
+3. **New defect, deterministic, unrelated to staleness: every vote-editor submission (Save
+   draft / Finalise / Correct / Void, success or refusal, first click on a freshly mounted page
+   included) logs a React console error:** `An async function with useActionState was called
+   outside of a transition. This is likely not what you intended (for example, isPending will
+   not update correctly). Either call the returned function inside startTransition, or pass it
+   to an `action` or `formAction` prop.` Root cause is exactly what the message names:
+   `MatchVoteEditor.tsx`'s `onClick={() => runners.X.submit(buildFormData())}` calls each
+   `useActionState` dispatch directly from a plain click handler, which the move away from
+   `formAction` (fix in item 2) made necessary but did not wrap in `startTransition`. Violates
+   the §27.27 "zero console/runtime errors" acceptance criterion on its own.
+
+**Evidence:** `08-clean-reload-stale-selection-reset-recurs.png` (repo root, this session);
+Server Action request/response bodies captured live via Playwright MCP network inspection
+(not saved to disk — quoted inline above from the tool output).
+
+**Not done:** sections E (publication)/F (match-sheet compatibility)/G (incomplete-lineup
+refusal)/H (keyboard/nav)/I (responsive)/J (console/network beyond this)/K (capability
+boundaries) of §27.27. No code was edited, no fixture was reset, nothing was committed, nothing
+was deployed.
+
+**Exact next action:** fix both defects in `MatchVoteEditor.tsx` (wrap each `runners.X.submit(...)`
+call in `startTransition`, and diagnose why `selection`/`reason` local state resets after a
+refused action despite unchanged `model.revision`/`canonicalFingerprint`), then re-run the
+stale-tab repro clean before resuming §27.27 sections E–K.
+
+### §27.27 stale-tab defects — both root-caused and FIXED, stale-tab repro re-run clean (2026-09-10)
+
+Took over the two blockers the stale-tab run above stopped on. Both are now diagnosed from
+measured browser evidence (not inference) and fixed; the stale-tab scenario re-runs clean from
+freshly navigated tabs. Ran against the same disposable `issue155-acceptance-*` fixture already
+seeded in `afldb_test` (season 2089, match #18296, no fixture reset, no genuine season touched),
+dev server on port 3100 with every runtime DSN pointed at `afldb_test`.
+
+**BLOCKER B — React "called outside of a transition" — root cause and fix.** Exactly what the
+message named. `MatchVoteEditor.tsx` dispatched each `useActionState` action straight from an
+`onClick`. `react-dom`'s `runActionStateAction` records `isTransition` from
+`ReactSharedInternals.T` at dispatch time; outside a transition it skips the
+`onStartTransitionFinish` hook (so the async action is never entangled and `isPending` is
+unreliable) and logs the error. Fixed by routing all four buttons through one `submit(runner)`
+helper that snapshots the FormData from state and then calls the dispatcher inside
+`startTransition`. Native `formAction` submission was NOT reintroduced. `isPending` measured
+working afterwards: the Correct button sampled at 40 ms intervals across a live round-trip showed
+`Saving correction…|disabled=true` then `Correct finalised votes|disabled=false`.
+
+**BLOCKER A — selection/reason reset after a refusal — root cause.** The candidate recorded above
+(an App Router re-render/remount re-running the `useState` initialisers) is WRONG and was ruled
+out on evidence. Two independent proofs that no re-render occurred: the Server Action response
+body carried `"f":""` — no Flight data — because Next 16 sets `skipPageRendering` whenever an
+action did not revalidate (`next/dist/server/app-render/action-handler.js`), and a refusal returns
+before `revalidatePath`; with `flightData === undefined` and `ActionDidNotRevalidate` the
+`serverActionReducer` bails out with `return state`. Only one network request was made, and no RSC
+refetch followed.
+
+What actually happens, measured with mount/unmount/render/`useState`-initialiser instrumentation
+in the live page: after every Server Action round-trip the App Router **destroys and re-creates
+this subtree's effects**. `useState` initialisers do NOT re-run (the `[VE useState INIT]` probes
+fired only at hydration; React state and refs survive), but every `useEffect` cleanup fires and
+every `useEffect` body runs again — on the refusal the console showed `[VE UNMOUNT] 18296`,
+`[VE MOUNT] 18296`, `[VE RESET EFFECT] 18296 rev 5 fp 290f3e…` with the revision and fingerprint
+**unchanged from mount**, and the very next render carried the canonical selection and an empty
+reason. So the defect is: **a `useEffect` dependency array only suppresses re-runs within one
+continuous mount. After an effect re-mount there is no previous deps array to compare against, so
+the effect always runs.** The reset was therefore firing on every action completion, including
+refusals where nothing on the server had moved, wiping the operator's selection and reason and
+disabling the very button the retry needed. It is the same class of bug as the `formAction` one —
+a lifecycle event silently overwriting live operator intent — recurring through the display layer.
+
+**BLOCKER A — fix.** Reconciliation is now decided from data, not from effect lifecycle. Selection
+and reason live in one state object that records which server truth it was last reconciled to
+(`revision:canonicalFingerprint`); `reconcileVoteEditorState` returns that **same object** when the
+match has not moved and a fresh one when it has. The component applies it with React's documented
+"adjusting state when a prop changes" render-phase pattern, so `MatchVoteEditor.tsx` now contains
+no `useEffect` at all and nothing about effect lifecycle can reach the operator's work. This also
+removes a pre-existing `react-hooks/set-state-in-effect` lint error that was already failing at
+`da7723f` on the old reset effect.
+
+**Files changed.** `src/app/admin/brownlow/[season]/[round]/MatchVoteEditor.tsx` (transition-wrapped
+`submit` helper; single reconciled state object; reset `useEffect` removed),
+`src/app/admin/brownlow/[season]/[round]/vote-form-data.ts` (adds `BrownlowServerTruth`,
+`VoteEditorLocalState`, `initialVoteEditorState`, `reconcileVoteEditorState`, and documents both
+mechanisms), `tests/brownlow-vote-form-data.test.ts` (+10 tests). No server, action, query,
+migration, privilege or fixture change; nothing committed, nothing deployed.
+
+**Automated gates.** `npm run typecheck` GREEN. `npx eslint` GREEN on both changed source files.
+`tests/brownlow-vote-form-data.test.ts` 15/15, `tests/brownlow-entry.test.ts` +
+`tests/admin-brownlow-actions.test.ts` — 132/132 across the three files. `git diff --check` clean.
+`tests/integration/admin-brownlow.test.ts` deliberately NOT run: the live acceptance fixture owns
+`issue155-2089-*`.
+
+New coverage in `tests/brownlow-vote-form-data.test.ts`: a refusal preserves every vote slot; a
+refusal preserves the reason; reconciliation is idempotent across repeated re-runs (the measured
+effect-remount); a second submit after a refusal builds FormData carrying the preserved intent and
+the still-stale `expectedRevision`; a successful commit adopts the new canonical truth and drops
+the reason, then stays adopted; a same-revision fingerprint change is still adopted. Plus a
+source-contract block on `MatchVoteEditor.tsx` (comments stripped first) pinning the three shapes
+no pure function can guard: no `formAction`/`type="submit"`, every dispatch through
+`startTransition(() => runner.submit(formData))` with no direct `runners.X.submit(` call, and no
+`useEffect`. All three assertions fail against the `da7723f` file.
+
+**Live stale-tab re-test, clean tabs, both fixes in — PASS.** Tab A (fresh navigation, revision 6)
+committed a correction → revision 7, holders `16953/16938/16939`, its own selection reconciled to
+the new canonical and its reason cleared; zero console errors. Stale tab B (fresh navigation,
+still revision 6) submitted `16936/16937/16946` with reason `TAB B preserved intent charlie`:
+refused (`revision 7, not 6`), and afterwards the three selects still read `16936/16937/16946`,
+the reason still read `TAB B preserved intent charlie`, the displayed revision was still 6, the
+Correct button was still enabled, and the console had zero errors and zero warnings. Submitted
+again **without changing anything**: the captured multipart body carried
+`three=16936 two=16937 one=16946 reason="TAB B preserved intent charlie" expectedRevision=6` —
+the preserved intent, not a reverted default — and was refused again on the same compare-and-set.
+A third submit (used to sample `isPending`) was likewise refused. After all three refusals a fresh
+load of tab B showed revision 7 with holders `16953/16938/16939`: canonical state is exactly tab
+A's commit, untouched.
+
+**§27.27 can resume at Section E.** Sections A–D of the browser acceptance are now clean on the
+2089 fixture, the two stop-condition defects are closed, and no further ISSUE-155 defect was found
+during this work. The fixture is left with match #18296 at revision 7 (finalised, holders
+`16953/16938/16939`) and #18297 unchanged at revision 2.
+
+**Still open, unchanged:** the `PROMOTION_CONTRACT` item above remains the one thing blocking
+ISSUE-155, and remains a pre-deploy stop condition.
+
+### §27.27 browser acceptance sections E–H — E/F/G PASS, STOPPED on a new keyboard defect in H (2026-09-10)
+
+Resumed the browser acceptance at Section E against the same disposable `issue155-acceptance-*`
+fixture in `afldb_test` (seasons 2089/2085, no fixture reset, no genuine season touched), dev
+server on port 3100 with every runtime DSN pointed at `afldb_test`. Sections A–D were already
+clean. Sections **E, F and G PASS**; Section **H found a genuine new defect** and the run stopped
+there under the standing stop condition. Sections I (responsive), J (console/network as its own
+pass) and K (capability boundaries) were **not run**.
+
+**E — season publication: PASS.** Readiness and blockers rendered correctly at every stage
+(`2 of 4 home-and-away matches are finalised or voided` while incomplete, `Publish season…`
+disabled; the same panel on 2085 blocked with `0 of 2 …`). To reach a publishable state, round 2
+of 2089 was completed through the UI: **#18298 finalised** (3 `16936` / 2 `16937` / 1 `16946`,
+revision 1) and **#18299 voided** with a reason (revision 1) — 4/4 accounted, 3 finalised,
+1 voided, 0 unattached, 0 line-ups short. Ineligibility handling works end to end: ticking
+`Issue155 2089 C0 P0` (id `16936`) in the panel moved the summary to `1 marked` and emitted the
+matching `<input name="ineligible" value="16936">`. Publication succeeded with the two-step
+confirm and reported **"Season 2089 published: 9 polling players, 18 votes, 2 medallists"**; the
+season badge moved `SOURCE PUBLISHED / Source-authoritative` → `PUBLISHED / Manually published`,
+and the "Round facts vs the source-published total" disagreement report disappeared as it should
+once authority is manual. **Stale publication is refused**: a second tab held from before the
+publish (`expectedRevision=12`) was refused with *"The season has changed since the page was
+loaded (revision 13, not 12)"* plus a `Reload this season →` link, and committed nothing.
+The **canonical public total reflects the accepted data exactly** (`/brownlow/2089`): ranks
+`1,1,1,4,4,4,7,7,7` — competition rank over ALL polled players (P13(c)) — the ineligible player
+holding rank 1 with an `INELIGIBLE` marker and no medal (P13(a), P13(f)), two tied winners
+sharing the medal (P13(g)), and a `GAMES` column of home-and-away games only (P13(i)).
+
+> **Finding E-1 (Low, cosmetic, non-blocking, NOT the stop condition).** The season-publish stale
+> refusal renders the match-worded generic text `src/lib/brownlow/entry.ts:144` —
+> *"Someone else changed **this match** while you were editing it"* — above the accurate
+> season-specific detail sentence. The refusal itself, its detail and its reload link are all
+> correct; only the leading noun is wrong on the season path. Recorded rather than stopped on,
+> because it blocks nothing and the operative sentence is accurate. Fix alongside the H defect.
+
+**F — Match Sheet compatibility: PASS.** On disposable fixture match **#18296** (finalised at
+revision 7, holders 3/2/1): the sheet carries the §27.15 notice *"Brownlow votes (BV) are
+read-only here. Manage them in Brownlow administration →"*, and every `BV` cell is rendered as
+plain text with **zero `<input>` elements** — the three vote rows read `3 / 2 / 1` against
+`C0 P17 / C0 P2 / C0 P3` and cannot be typed into. Two unrelated valid saves were made (tackles
+for `Issue155 2089 C0 P0` 3 → 5, then 5 → 3, each with an audit note): both POSTed 200, both
+persisted across a full reload, and the second rendered
+*"✓ Match sheet saved successfully (36 players). Career and season stats updated."* — the normal
+save path is intact. **No Brownlow mutation occurred through the match sheet**: #18296 stayed at
+revision 7 with unchanged holders, and the season list's Brownlow "Last activity" stayed at the
+`08:30` publish rather than moving to the `08:32`/`08:33` sheet saves. (The first save's success
+banner was initially missed by a `.notice`/`role=status` selector — the banner is an
+inline-styled `✓` block, not a `.notice`. No defect.)
+
+**G — incomplete-lineup refusal: PASS at the UI boundary.** Season 2085 / match **#18303**
+(deliberate short away line-up) renders *"This match cannot be finalised or voided: Currently the
+away line-up has 10 of 18. Repair the line-up on the match sheet →"* with **Finalise and Void
+both disabled**, and the season panel refuses publication with `0 of 2 home-and-away matches are
+finalised or voided` and a disabled `Publish season…`. **Nothing committed**: #18303 stayed at
+revision 0 / "No decision" / no votes throughout. A deliberate client-side bypass — completing a
+valid 3/2/1, clearing the DOM `disabled` flag on Finalise and clicking, then dispatching a
+synthetic `MouseEvent` — produced **no network request at all**: `react-dom`'s `getListener`
+reads `props.disabled` from the fiber, not from the DOM node, so a disabled React button cannot
+be clicked through from the page. The server-side `participants_incomplete` refusal therefore
+could not be provoked from the browser and remains covered by the C1 integration suite
+(§27.27 "participants-incomplete refused with nothing written").
+
+**H — keyboard/navigation: one PASS half, one DEFECT.** Tab order through a match editor is
+correct and there is no keyboard trap: `3 votes → 2 votes → 1 vote → Reason → Save draft →
+Finalise` (disabled buttons correctly skipped), then focus leaves the section into the next
+match. Duplicate prevention holds under the keyboard (an id chosen in one slot is `disabled` in
+the other two, and `ArrowDown` steps over it). A complete **keyboard-only finalisation** works:
+`ArrowDown` selections, `Tab` to Finalise, `Enter` → *"Match finalised."*, #18302 revision 1, and
+focus then advanced to the **next match's first select** (`onAdvance`), which is exactly the
+rapid consecutive-entry flow §27.27 asks for.
+
+> **DEFECT H-1 (STOP CONDITION) — after a refused action the keyboard operator's focus is dumped
+> to `document.body`.** Measured, not inferred, on a genuine stale-tab refusal of
+> `Correct finalised votes` for #18302 (tab A had moved it to revision 2; tab B still held
+> revision 1). The refusal itself is correct — *"…(revision 2, not 1)"*, selection `17008/17018/
+> 17019` and the typed reason both preserved, the Correct button left enabled, nothing committed,
+> zero console errors. But focus is lost. Instrumented `blur`/`focus` listeners plus a
+> `MutationObserver` on the button's `disabled` attribute recorded, on the same button node
+> (`isConnected === true` throughout — this is **not** an unmount/remount):
+>
+> ```text
+> focus            t=68797  active=CORRECT  correctDisabled=false
+> mutate-disabled  t=72348  active=CORRECT  correctDisabled=true    <- anyPending
+> blur             t=72351  active=BODY     correctDisabled=true    <- 3 ms later
+> mutate-disabled  t=73490  active=BODY     correctDisabled=false   <- action resolved, refused
+> ```
+>
+> **Mechanism:** `MatchVoteEditor.tsx` disables all four action buttons for the duration of a
+> submit (`disabled={anyPending || …}`). Disabling the element that currently has focus makes the
+> browser blur it and move focus to `<body>`, and nothing restores it when `anyPending` clears.
+> On a **success** the loss is masked because `onAdvance` explicitly moves focus to the next
+> match; on a **refusal** there is no such move, so a keyboard operator is returned to the top of
+> the document and must Tab all the way back to the very button the retry needs — while the page
+> is telling them to try again. This fails the §27.27 / Section H criterion "focus remains
+> sensible after refusal" and is the same class as the two defects already fixed in this issue: a
+> lifecycle side effect silently discarding live operator context.
+>
+> **Sibling to check when fixing:** `PublishPanel.tsx`'s `Confirm publish` is likewise
+> `disabled={pending}`, so the season-publish refusal path is expected to lose focus the same way
+> (observed in source; not separately measured).
+
+**Console/network throughout E–H:** every step above was checked with
+`browser_console_messages` — **zero errors and zero warnings** on every navigation, every
+successful action and every refusal — and the only non-static requests were the expected Server
+Action POSTs, all `200`. This is corroborating evidence for J, not a substitute for running J.
+
+**Evidence (repo root, this session):** `09-sectionE-publish-panel-ready.png`,
+`10-sectionE-published-result.png`, `11-sectionE-public-season-total.png`,
+`12-sectionF-match-sheet-saved-bv-readonly.png`,
+`13-sectionG-incomplete-lineup-refusal.png`,
+`14-sectionH-focus-lost-to-body-after-refusal.png`. The E stale-publish refusal and the H
+instrumentation traces were captured live through Playwright MCP and are quoted inline above.
+
+**Fixture state left behind (all disposable, `afldb_test` only).** Season **2089 is now
+PUBLISHED** (manual authority, revision 13; ineligible set = `{16936}`): #18296 final rev 7,
+#18297 final rev 2, #18298 final rev 1, #18299 **void** rev 1. Season **2085** is unpublished:
+#18302 final rev 2, #18303 untouched at rev 0 (the deliberate incomplete-lineup case). #18300
+(wildcard final) and #18301 (grand final) untouched. Match sheet #18296 had two audited saves
+whose net data effect is zero (tackles 3 → 5 → 3). No genuine season was touched, nothing was
+deployed, nothing was committed.
+
+**Exact next action:** fix H-1 (restore focus to the dispatching control when an action
+completes without advancing — and check `PublishPanel`'s `Confirm publish` for the same), fix
+E-1's match-worded season refusal text, re-run the Section H refusal check, then run §27.27
+sections **I, J and K**.
+
+### §27.27 sections I–K complete; H-1 CLOSED; final finding disposed BENIGN — §27.27 fully PASS (2026-09-10)
+
+**H-1 correction: CLOSED, not open.** Fixed with focus restoration (`src/app/admin/brownlow/focus-restore.ts`,
+wired into both `MatchVoteEditor.tsx` and `PublishPanel.tsx` — confirmed present in both files) and
+live-retested successfully. Any earlier note in this issue or in `IssuesIndex.md` describing H-1 as
+open or as a standing stop condition is superseded by this entry.
+
+**Sections I and J: PASS** (responsive layout; console/network as its own pass — zero errors/warnings
+across the runs, corroborating evidence for J per the E–H entry above).
+
+**Section K (capability boundaries): PASS for all three roles** — Super Admin (full capability,
+`26-K-super-admin-full-capability.png`), Admin (`data.brownlow.read`/`draft` only: season list and
+round page readable, Save draft succeeds and revisions the row, Finalise/Correct/Void/Publish render
+`disabled` with "Super Admin only" copy, a forced DOM-bypass click on every one of those four
+controls produced zero new network requests), and Contributor (no Brownlow nav entry, no
+Admin/Super Admin lifecycle links; `/admin/brownlow`, `/admin/brownlow/2085`,
+`/admin/brownlow/2085/1` all redirect server-side to `/admin/upload` before any Brownlow markup,
+form, or action reference reaches the client; a raw `fetch()` POST with a forged `Next-Action`
+header 404s at the framework level, and a raw POST with no action header still resolves the same
+`requireCapability` → `NEXT_REDIRECT` path, proved from the RSC payload itself — no alternate route
+exists, since every Brownlow mutation funnels through the single `requireCapability` gate in
+`src/app/admin/brownlow/actions.ts`).
+
+**Final finding disposition: `flushComponentPerformance` negative-timestamp console error — BENIGN
+DEV-MODE FRAMEWORK ARTIFACT / NOT AN ISSUE-155 PRODUCT DEFECT.** Read-only investigation, no
+application code changed, no `requireCapability` weakened, no `node_modules` patched:
+
+1. **Application-code timing finding: none.** `requireCapability()` (`src/lib/auth/session.ts:323-327`)
+   is `const admin = await requireUploader(); if (hasCapability(...)) return admin; redirect(...)`
+   — no Performance API call anywhere in it or in the three Brownlow page components, which call it
+   as their literal first statement before any data fetch or JSX
+   (`src/app/admin/brownlow/page.tsx:30`, `[season]/page.tsx:31`, `[season]/[round]/page.tsx:27`).
+   A repository-wide grep for `performance.`/`Performance(`/`PerformanceObserver` under `src/`
+   found exactly three matches, all unrelated (NL-search description, health-init-script,
+   NL player-game query) — none on this render path.
+2. **Dev-mode root cause, found in the vendored runtime:**
+   `node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3907-3919`,
+   inside `flushComponentPerformance`. When a Server Component chunk resolves as `"rejected"`
+   (exactly what a thrown `NEXT_REDIRECT` produces), React's dev-only component-performance
+   instrumentation calls `performance.measure(measureName, { start: 0 > startTime ? 0 : startTime,
+   end: childrenEndTime, ... })` to log an "Errored" DevTools timeline entry. `start` is clamped to
+   0 if negative; `end` (`childrenEndTime`) is **not** — and for a page whose render is aborted by
+   `requireCapability`'s redirect before any real timing accrues, `end` can come out negative, which
+   `performance.measure()` rejects with exactly the observed `TypeError`. This is a bug in React's
+   own dev instrumentation (an unclamped `end`), not in any AFLDB code.
+3. **Production-mode result: clean, and the vulnerable code does not exist in the production
+   bundle.** Static proof first: `react-server-dom-webpack-client.browser.production.js` (the
+   sibling file `next build` actually ships) has **zero** occurrences of
+   `flushComponentPerformance`, `performance.measure`, or `supportsUserTiming` — dead-code-eliminated
+   at build time, not merely disabled. Empirical proof followed: built the worktree normally
+   (`npm run build`, `next build --webpack` succeeded, 1532 pages generated against `afldb_test`)
+   and served the real production artefact — `node .next/standalone/server.js` (the standalone
+   entry this repo's `tools/build/prepare-standalone.mjs` prepares; `next start` itself warns it
+   "does not work with output: standalone" and was not used) — on port 3101, every runtime DSN
+   (`DATABASE_URL`, `AFLDB_IMPORT_DATABASE_URL`, `AFLDB_AUTH_DATABASE_URL`) rebuilt to point at
+   `afldb_test` only, via a new `tools/admin/issue155-acceptance-start-prod.ps1` (mirrors the
+   DSN-rebuild/refuse-if-not-afldb_test/refuse-if-port-busy discipline of
+   `issue155-acceptance-start-dev.ps1`). The existing Contributor cookie carried over (same
+   `AFLDB_SESSION_SECRET`, same `afldb_test` session row, `localhost` cookie scope ignores port).
+   `/admin/brownlow`, `/admin/brownlow/2085`, `/admin/brownlow/2085/1` were each navigated twice
+   (5 attempts total) — every one redirected correctly to `/admin/upload` with **zero console
+   messages of any kind**. As a bonus corroborating check, the raw-POST probe against prod still
+   carries the `NEXT_REDIRECT` digest (required for the client router) but **no longer carries the
+   server stack trace / file paths** that the same probe returned in dev — confirming Next.js
+   production builds strip that detail as expected. The prod server (port 3101) was stopped after
+   the checks; the acceptance dev server (port 3100, PID unchanged throughout) was never touched.
+4. **Non-Brownlow control: reproduces.** `/admin/db-health` (`requireSuperAdmin()` — the same
+   shared `redirect()`-on-refusal shape as `requireCapability`, just without the capability-table
+   indirection) as Contributor produced the identical `TypeError` naming `DatabaseHealthPage`,
+   confirmed via a cumulative console-history check after a batch of navigations. (Per-navigation
+   immediate checks on `/admin/db-health` initially read clean three times running — the flush
+   appears to fire on a short async delay after the visible redirect resolves, so a same-tick
+   check can race it and miss it; the cumulative check does not have that race and is the reliable
+   signal.) This confirms the defect is generic to the shared capability-redirect pattern, not
+   specific to Brownlow or to Phase C.
+5. **Classification (rule A applies): BENIGN DEV-MODE FRAMEWORK ARTIFACT / NOT AN ISSUE-155 PRODUCT
+   DEFECT.** No fix applied; `requireCapability` and every other guard are unchanged.
+
+**§27.27 is now fully PASS** (A–K). C1+C2 deploy readiness per §27.21 is otherwise unblocked by
+browser acceptance; the promotion-contract stop condition in the Next action below is still
+outstanding and separate.
+
+**Authoritative fixture state — read-only query against `afldb_test` (`current_database()` confirmed),
+superseding any earlier browser-observed summary in this issue:**
+
+```
+match_id | status | revision | updated_at
+18302    | final  | 2        | 2026-09-10 18:40:18.869344+10
+18303    | draft  | 2        | 2026-09-10 20:05:10.465903+10
+
+season | revision | published_revision | updated_at
+2085   | 3        | (null)             | 2026-09-10 18:40:18.869344+10
+2089   | 15       | 15                 | 2026-09-10 19:01:47.770127+10
+```
+
+2089's `revision 15` supersedes the `revision 13` figure carried forward in the E–H entry above and
+in the Admin/Contributor K browser sessions this session — that figure was stale narrative, not a
+fresh read; no root cause for the delta was investigated here (out of scope for this disposition).
+No mutation occurred to 2089 or to any genuine season during I/J/K or this disposition. No deploy,
+no commit.
+
+**Exact next action (superseded — see the section below):** clean the disposable
+`issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089 and their matches/vote rows),
+then re-run `tests/integration/admin-brownlow.test.ts` and `tests/admin-brownlow-actions.test.ts`
+clean, before proceeding to the §27.21 deploy sequence. The promotion-contract item in the section
+above (`brownlow_vote_entry_state` / `brownlow_season_authority` into `PROMOTION_CONTRACT`) is no
+longer outstanding as of the entry below — it is implemented in the working tree.
+
+### Linux-local validation, Windows-tunnel integration-timeout disposition, and worktree hygiene (2026-09-10)
+
+**`tests/integration/admin-brownlow.test.ts` — Linux-local against `afldb_test`: 44/44 PASS,
+~7.95s test time / ~8.80s total Vitest duration.** Run against the exact current working tree
+(including the post-C2 stale-tab/focus fixes and the promotion-contract changes). The
+audit-probe case's deliberately failing PostgreSQL insert produced its expected stderr during the
+rollback assertion, and that test PASSed — the same expected-stderr shape recorded in the original
+C1 runtime validation above.
+
+**`tests/admin-brownlow-actions.test.ts` — 32/32 PASS, both Linux-local and the prior Windows
+non-DB run.** (The C2 closeout above recorded this suite at 24 cases; it now carries 32, reflecting
+cases added alongside the stale-tab/focus fixes.)
+
+**Windows-tunnel integration timeout — diagnosed and disposed: NOT an ISSUE-155 product or test
+defect.** The same `admin-brownlow` integration suite had previously been timing out in
+`beforeAll` when run from Windows over the SSH tunnel to the `afldb_test` host, which the
+now-deleted `issue155-db-connectivity-check` diagnostic was written to investigate. Disposition:
+tunnel connectivity itself was healthy throughout (direct diagnostic queries measured ~150–165 ms;
+a focused per-statement measurement across the Windows → SSH tunnel path measured ~65.8 ms per SQL
+round trip). The Brownlow acceptance fixture seed issues on the order of 700+ statements in total;
+season 2089 alone is ~326 statements, measured at ~21.5 s over the tunnel. At ~65.8 ms/statement
+that arithmetic alone does not leave room for the rest of the seed inside Vitest's default 30 s
+`beforeAll` budget — the timeout is tunnel latency multiplied by statement count, not a stall, a
+lock, or a defect in the suite or the application code it exercises. The Linux-local run above
+(same tree, same suite, 44/44 in ~8s total) is the proof the suite itself is healthy. No
+`hookTimeout` was raised and no production or test code was changed to work around this; it is
+recorded here as an explanation, not a fix, because there is nothing to fix.
+
+**§27.27 browser acceptance — reconfirmed.** Sections A–K are all PASS (per the entries above);
+DEFECT H-1 is CLOSED (focus restoration, `src/app/admin/brownlow/focus-restore.ts`); the
+Contributor capability/security boundary probes in Section K passed (no Brownlow nav or route
+access, every route redirects server-side before any Brownlow markup or action reference reaches
+the client, a forged `Next-Action` probe 404s); and the `flushComponentPerformance`
+negative-timestamp console finding is classified BENIGN DEV-MODE FRAMEWORK ARTIFACT / NOT AN
+ISSUE-155 PRODUCT DEFECT (absent from the production React bundle, clean across real
+production-mode navigations against `afldb_test`, reproduces identically on a non-Brownlow
+`requireSuperAdmin` control page).
+
+**Worktree hygiene, this session.** Deleted: seven one-off diagnostic scripts written for specific
+incidents during acceptance (`issue155-audit-evidence.ps1`, `issue155-auth-diagnostic.ps1`,
+`issue155-auth-factor-check.ps1`, `issue155-db-connectivity-check.ps1`/`.cjs`,
+`issue155-remove-orphan-season-2089.ps1`, `issue155-reset-admin-totp.ps1`) and all 30 root-level
+acceptance screenshots (`01-login-page.png` through `30-K-admin-crafted-bypass-no-request.png`) —
+the written record above is the retained evidence; none of these files followed the repository's
+existing evidence convention (a structured `artifacts/<topic>/` tree) and only 8 of the 30
+screenshots were ever cited by filename in this record. Kept as reusable operator tooling:
+`issue155-acceptance-create.ps1`, `issue155-acceptance-cleanup.ps1`,
+`issue155-acceptance-start-dev.ps1`, `issue155-acceptance-start-prod.ps1` (`afldb_test`-only,
+safety-guarded, generically reusable for future acceptance passes). Nothing was committed.
+
+**Exact next action:** commit the reviewed working tree (10 tracked modifications, the 5 required
+new source/test files, the 4 acceptance tooling scripts, and this documentation); then run the
+full regression sequence fresh against the committed tree — unit suites, `db-promotion-check`,
+`admin-brownlow` + `admin-brownlow-actions` integration, `privileges` + `release-gates`, typecheck
+— followed by cleaning the disposable `issue155-acceptance-*` fixtures in `afldb_test`
+(seasons 2085/2089), then the §27.21 deploy sequence. Do not close ISSUE-155 until that full
+sequence and the deploy are complete and recorded.

@@ -3,8 +3,9 @@
 import { useActionState, useMemo, useState, type ChangeEvent } from 'react';
 
 import { publishSeasonAction, type BrownlowActionState } from '@/app/admin/brownlow/actions';
+import { useActionFocusRestore, useRevealFocus } from '@/app/admin/brownlow/focus-restore';
 import type { SeasonPolledPlayer } from '@/db/queries/admin-brownlow-ui';
-import type { BrownlowSeasonAuthority, BrownlowSeasonStatus } from '@/lib/brownlow/entry';
+import type { BrownlowSeasonAuthority } from '@/lib/brownlow/entry';
 
 /**
  * AFLDB-ISSUE-155 Phase C2 — the season publication panel (§27.9, §27.26).
@@ -31,7 +32,6 @@ export function PublishPanel({
   accounted,
   expected,
   authority,
-  status,
   stale,
 }: {
   season: number;
@@ -45,13 +45,21 @@ export function PublishPanel({
   accounted: number;
   expected: number;
   authority: BrownlowSeasonAuthority;
-  status: BrownlowSeasonStatus;
   stale: boolean;
 }) {
   const [state, submit, pending] = useActionState<BrownlowActionState, FormData>(
     publishSeasonAction,
     {},
   );
+  // Confirm publish disables itself while the publish runs, so it shares the
+  // §27.27 H-1 focus loss exactly: a `season_incomplete` or `stale` refusal
+  // re-enables the button with focus stranded on <body>. Same mechanism, same
+  // rule — see `focus-restore.ts`.
+  const captureFocusOrigin = useActionFocusRestore(pending);
+  // Confirming is a swap, not a disable: the button the operator pressed is
+  // unmounted by its own click, so focus has to move forward into the block it
+  // revealed rather than back (§27.27 H-2, `focus-restore.ts`).
+  const { armReveal, captureRevealed } = useRevealFocus();
   const [confirming, setConfirming] = useState(false);
   const [ineligible, setIneligible] = useState<Set<number>>(new Set(prefilledIneligibleIds));
 
@@ -147,26 +155,48 @@ export function PublishPanel({
           </>
         ) : !confirming ? (
           <button
+            ref={captureRevealed}
             type="button"
             className="btn btn-primary"
             disabled={!ready || pending}
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              armReveal();
+              setConfirming(true);
+            }}
           >
             Publish season…
           </button>
         ) : (
-          <div style={{ display: 'grid', gap: '0.4rem' }}>
-            <p className="muted" style={{ fontSize: '0.8125rem', margin: 0 }}>
+          <div
+            ref={captureRevealed}
+            tabIndex={-1}
+            role="group"
+            aria-labelledby={`publish-confirm-${season}`}
+            style={{ display: 'grid', gap: '0.4rem' }}
+          >
+            <p id={`publish-confirm-${season}`} className="muted" style={{ fontSize: '0.8125rem', margin: 0 }}>
               This writes {season}&rsquo;s public Brownlow total from {accounted} accounted match
               {accounted === 1 ? '' : 'es'}
               {authority === 'source' && ', replacing the source-published total'}. It can be
               re-published or corrected afterwards; there is no unpublish.
             </p>
             <div style={{ display: 'flex', gap: '0.6rem' }}>
-              <button type="submit" className="btn btn-primary" disabled={pending}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={pending}
+                onClick={(event) => captureFocusOrigin(event.currentTarget)}
+              >
                 {pending ? 'Publishing…' : 'Confirm publish'}
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setConfirming(false)}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  armReveal();
+                  setConfirming(false);
+                }}
+              >
                 Cancel
               </button>
             </div>

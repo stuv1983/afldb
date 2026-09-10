@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### Brownlow administration browser-acceptance fixes and promotion-contract support (AFLDB-ISSUE-155) - 10 September 2026
+
+- A stale-tab refusal in the vote editor no longer resets the operator's in-progress selection
+  or reason. Reconciliation is now decided from a recorded `revision:canonicalFingerprint` pair
+  rather than a `useEffect` dependency array, because the App Router re-creates the route
+  subtree's effects after every Server Action round-trip and a dependency array cannot detect
+  that.
+- Every vote-editor action (Save draft / Finalise / Correct / Void) now dispatches inside
+  `startTransition`, clearing a React console error ("called outside of a transition") that
+  previously fired on every submission, success or refusal.
+- Keyboard focus is restored to the control that started an action once a refusal completes, and
+  moved into the publish confirmation block when it is revealed (back to "Publish season…" on
+  Cancel) — previously both a refusal and a panel reveal/cancel dropped focus to `document.body`,
+  leaving a keyboard-only operator to tab in from the top of the page.
+- The canonical-fingerprint compare-and-set digest is split into its own server-only module
+  (`src/lib/brownlow/fingerprint.ts`) so `node:crypto` never enters the client bundle that
+  imports `entry.ts`'s browser-safe constants.
+- The promotion contract (`tools/db/promotion-inventory.ts`) now covers the two Brownlow
+  workflow tables added in Phase C1 — `brownlow_vote_entry_state` (staged reinstatement with a
+  `match_id` lineage remap, via a new `rowIdColumn` mechanism for tables whose primary key is
+  the remapped column itself) and `brownlow_season_authority`. Player-slot columns remap through
+  the existing AFL Tables profile-url identity. This was the last known implementation item
+  blocking a safe production promotion after this issue ships; final regression, promotion-check
+  and deploy validation are still pending before ISSUE-155 can close.
+
 ### Brownlow administration has a UI (AFLDB-ISSUE-155 Phase C2) - 10 September 2026
 
 - `/admin/brownlow` is the place Brownlow votes are now entered, finalised and published. It

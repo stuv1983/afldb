@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { startTransition, useActionState, useMemo, useState } from 'react';
 
 import {
   correctAction,
@@ -9,6 +9,7 @@ import {
   voidAction,
   type BrownlowActionState,
 } from '@/app/admin/brownlow/actions';
+import { useActionFocusRestore } from '@/app/admin/brownlow/focus-restore';
 import {
   MATCH_STATE_LABEL,
   MATCH_STATE_TONE,
@@ -18,6 +19,12 @@ import {
 import type { BrownlowMatchEditorModel } from '@/db/queries/admin-brownlow';
 import { REASON_MIN_LENGTH } from '@/lib/brownlow/entry';
 import { formatDate } from '@/lib/format';
+
+import {
+  buildBrownlowVoteFormData,
+  initialVoteEditorState,
+  reconcileVoteEditorState,
+} from './vote-form-data';
 
 /**
  * AFLDB-ISSUE-155 Phase C2 — the vote editor for one home-and-away match.
@@ -35,6 +42,24 @@ import { formatDate } from '@/lib/format';
  * Phase B lesson (§26.20 deviation 2). On a refusal the revision is
  * unchanged, so the local selection and reason are kept and the operator
  * does not retype them (§26.20 deviation 4).
+ *
+ * Three things here look like ceremony and are not; all are §27.27 browser
+ * acceptance defects, and `vote-form-data.ts` / `focus-restore.ts` document
+ * the mechanism of each:
+ *
+ *   1. Selection and reason live in ONE state object carrying the server
+ *      truth it was last reconciled to. Reconciliation is decided from that
+ *      recorded truth, never from a `useEffect` dependency array — the App
+ *      Router re-creates this subtree's effects after every Server Action
+ *      round-trip, and a deps array does not survive an effect re-mount.
+ *   2. Every dispatch is wrapped in `startTransition`. These are async
+ *      `useActionState` actions invoked from a click handler rather than a
+ *      form action, so React requires the transition itself; without it
+ *      `isPending` is unreliable and React logs an error on every submit.
+ *   3. Every action button hands its own element to `captureFocusOrigin`.
+ *      Disabling a focused button makes the browser drop focus to <body>,
+ *      and a refusal — which advances nothing — otherwise leaves a keyboard
+ *      operator stranded there, away from the control they must retry with.
  */
 
 type VoteSlot = 'three' | 'two' | 'one';
@@ -66,17 +91,22 @@ export function MatchVoteEditor({
   onResult: (state: BrownlowActionState) => void;
   onAdvance: () => void;
 }) {
-  const [selection, setSelection] = useState<Selection>(model.selection);
-  const [reason, setReason] = useState('');
+  const [stored, setStored] = useState(() => initialVoteEditorState(model));
 
-  // Reset to server truth whenever the match actually moved (a successful
-  // write bumps the revision). A refusal leaves the revision alone, so the
-  // operator's in-progress selection survives it.
-  useEffect(() => {
-    setSelection(model.selection);
-    setReason('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [model.revision, model.canonicalFingerprint]);
+  // Adopt server truth whenever the match actually moved (a successful write
+  // bumps the revision and the fingerprint). A refusal moves neither, so the
+  // operator's in-progress selection and reason survive it.
+  //
+  // This is React's "adjusting state when a prop changes" pattern, and it is
+  // deliberately NOT a `useEffect`: the App Router re-creates this subtree's
+  // effects after every Server Action round-trip, and an effect's dependency
+  // array cannot tell "the model changed" from "the effects were re-mounted",
+  // so an effect fired the reset on refusals too. Here the decision comes from
+  // the state's own recorded `reconciledTo` instead, which no lifecycle event
+  // can disturb.
+  const local = reconcileVoteEditorState(stored, model);
+  if (local !== stored) setStored(local);
+  const { selection, reason } = local;
 
   const report = (
     action: (previous: BrownlowActionState, formData: FormData) => Promise<BrownlowActionState>,
@@ -86,6 +116,18 @@ export function MatchVoteEditor({
     if (next.ok) onAdvance();
     return next;
   };
+
+  // Built from selection/reason STATE, never read back off the DOM -- see
+  // vote-form-data.ts for why. Never a `<form>`/`type="submit"` action.
+  const buildFormData = (): FormData => buildBrownlowVoteFormData({
+    matchId: model.matchId,
+    season,
+    round,
+    expectedRevision: model.revision,
+    expectedCanonicalFingerprint: model.canonicalFingerprint,
+    selection,
+    reason,
+  });
 
   const draft = useActionState<BrownlowActionState, FormData>(report(saveDraftAction), {});
   const finalise = useActionState<BrownlowActionState, FormData>(report(finaliseAction), {});
@@ -98,6 +140,29 @@ export function MatchVoteEditor({
     void: { submit: voidMatch[1], pending: voidMatch[2] },
   };
   const anyPending = Object.values(runners).some((r) => r.pending);
+
+  // Disabling the focused button while its action runs makes the browser drop
+  // focus to <body>; on a refusal nothing puts it back, which stranded a
+  // keyboard operator away from the control they needed to retry with
+  // (§27.27 defect H-1). `focus-restore.ts` holds the mechanism and the rule.
+  const captureFocusOrigin = useActionFocusRestore(anyPending);
+
+  /**
+   * The only way a submission leaves this component. The FormData is
+   * snapshotted from state BEFORE the transition opens, and the dispatch
+   * happens inside it: an async `useActionState` action called outside a
+   * transition leaves `isPending` unreliable and React logs an error on every
+   * submit (§27.27). Never a native form submission — see `buildFormData`.
+   *
+   * `origin` is the control the operator actually used, captured here rather
+   * than looked up afterwards: by the time the action settles the browser has
+   * already moved focus off it.
+   */
+  const submit = (runner: Runner, origin: HTMLElement | null) => {
+    const formData = buildFormData();
+    captureFocusOrigin(origin);
+    startTransition(() => runner.submit(formData));
+  };
 
   const displayState = matchDisplayState(model.status, model.assignment);
   const participants = model.participants;
@@ -129,7 +194,11 @@ export function MatchVoteEditor({
 
   function setSlot(slot: VoteSlot, value: string) {
     const id = value === '' ? null : Number(value);
-    setSelection((prev) => ({ ...prev, [slot]: id }));
+    setStored((prev) => ({ ...prev, selection: { ...prev.selection, [slot]: id } }));
+  }
+
+  function setReason(value: string) {
+    setStored((prev) => ({ ...prev, reason: value }));
   }
 
   function adoptImported() {
@@ -140,7 +209,7 @@ export function MatchVoteEditor({
       else if (row.votes === 2) next.two = row.playerId;
       else if (row.votes === 1) next.one = row.playerId;
     }
-    setSelection(next);
+    setStored((prev) => ({ ...prev, selection: next }));
   }
 
   const holders = model.canonicalRows
@@ -209,13 +278,15 @@ export function MatchVoteEditor({
         </p>
       )}
 
-      <form style={{ display: 'grid', gap: '0.75rem' }}>
-        <input type="hidden" name="matchId" value={model.matchId} />
-        <input type="hidden" name="season" value={season} />
-        <input type="hidden" name="round" value={round} />
-        <input type="hidden" name="expectedRevision" value={model.revision} />
-        <input type="hidden" name="expectedCanonicalFingerprint" value={model.canonicalFingerprint} />
-
+      {/*
+        onSubmit is belt-and-braces: every action button below is
+        type="button" (see buildFormData's doc comment), so nothing here
+        should ever fire a native submit -- except the HTML "implicit
+        submission" a lone text input triggers on Enter, which would
+        otherwise navigate the page since there is no formAction left to
+        intercept it.
+      */}
+      <form style={{ display: 'grid', gap: '0.75rem' }} onSubmit={(event) => event.preventDefault()}>
         <div style={{ display: 'grid', gap: '0.6rem', maxWidth: '30rem' }}>
           {SLOTS.map(({ slot, label }) => {
             const takenElsewhere = new Set(
@@ -271,9 +342,9 @@ export function MatchVoteEditor({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', alignItems: 'center' }}>
           {model.status !== 'final' && model.status !== 'void' && (
             <button
-              type="submit"
+              type="button"
               className="btn btn-secondary"
-              formAction={runners.draft.submit}
+              onClick={(event) => submit(runners.draft, event.currentTarget)}
               disabled={anyPending}
             >
               {runners.draft.pending ? 'Saving…' : 'Save draft'}
@@ -282,9 +353,9 @@ export function MatchVoteEditor({
 
           {model.status !== 'final' && (
             <button
-              type="submit"
+              type="button"
               className="btn btn-primary"
-              formAction={runners.finalise.submit}
+              onClick={(event) => submit(runners.finalise, event.currentTarget)}
               disabled={
                 anyPending
                 || !canFinalise
@@ -300,9 +371,9 @@ export function MatchVoteEditor({
 
           {model.status === 'final' && (
             <button
-              type="submit"
+              type="button"
               className="btn btn-primary"
-              formAction={runners.correct.submit}
+              onClick={(event) => submit(runners.correct, event.currentTarget)}
               disabled={anyPending || !canFinalise || !selectionComplete || !participantsComplete || !reasonOk}
               title={canFinalise ? undefined : 'Super Admin only'}
             >
@@ -312,9 +383,9 @@ export function MatchVoteEditor({
 
           {model.status !== 'void' && (
             <button
-              type="submit"
+              type="button"
               className="btn btn-secondary btn-danger"
-              formAction={runners.void.submit}
+              onClick={(event) => submit(runners.void, event.currentTarget)}
               disabled={anyPending || !canFinalise || !participantsComplete || !reasonOk}
               title={canFinalise ? undefined : 'Super Admin only'}
             >

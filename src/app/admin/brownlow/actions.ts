@@ -150,11 +150,9 @@ async function fanOutSeason(season: number): Promise<void> {
     if (!config) return;
     const outcome = await revalidateSeason(config, season);
     if (!outcome.ok) {
-      // eslint-disable-next-line no-console
       console.error('[admin-brownlow] season page fan-out incomplete', outcome.failures);
     }
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('[admin-brownlow] season page fan-out failed', error);
   }
 }

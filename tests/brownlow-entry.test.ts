@@ -9,9 +9,13 @@
  * being sparse-positive (P4) — because those are the ones a future
  * reader would otherwise be tempted to "simplify".
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { MANUAL_ATTENDANCE_SOURCE_KEY } from '@/lib/acquisition/manual-authority';
+import { canonicalFingerprint } from '@/lib/brownlow/fingerprint';
 import {
   BROWNLOW_MANUAL_SOURCE_KEY,
   MIN_CLUB_LINEUP_ROWS,
@@ -23,7 +27,6 @@ import {
   assessParticipants,
   brownlowRefusal,
   brownlowRefusalMessage,
-  canonicalFingerprint,
   checkTransition,
   classifyMatchAssignment,
   deriveSeasonRows,
@@ -653,6 +656,73 @@ describe('refusal messages', () => {
 
   it('tells a stale editor to reload rather than blaming them', () => {
     expect(brownlowRefusalMessage('stale')).toContain('Reload');
+  });
+
+  /**
+   * §27.27 acceptance E-1: a stale SEASON publish refused with the generic
+   * match sentence — "Someone else changed this match…" — sitting above a
+   * correct season-specific detail. The subject changes the noun; it must
+   * never change the code, which is what the reload link and the audited
+   * refusal set key off.
+   */
+  describe('refusal subject', () => {
+    it('keeps the match sentence match-specific, and that is the default', () => {
+      expect(brownlowRefusalMessage('stale')).toContain('this match');
+      expect(brownlowRefusalMessage('stale', 'match')).toBe(brownlowRefusalMessage('stale'));
+      expect(brownlowRefusal('stale', 'Revision 8, not 7.').message).toContain('this match');
+    });
+
+    it('calls a stale season a season, never a match', () => {
+      const message = brownlowRefusalMessage('stale', 'season');
+      expect(message).toContain('this season');
+      expect(message).not.toMatch(/\bmatch\b/i);
+      expect(message).toContain('Reload');
+    });
+
+    it('keeps the season sentence and its detail talking about the same object', () => {
+      const refusal = brownlowRefusal(
+        'stale',
+        'The season has changed since the page was loaded (revision 13, not 12).',
+        'season',
+      );
+      expect(refusal.code).toBe('stale');
+      expect(refusal.message).not.toMatch(/\bmatch\b/i);
+      expect(refusal.message).toContain('revision 13, not 12');
+    });
+
+    it('names the season in a season not_found too', () => {
+      expect(brownlowRefusalMessage('not_found', 'season')).toContain('season');
+      expect(brownlowRefusalMessage('not_found', 'season')).not.toMatch(/\bmatch\b/i);
+      expect(brownlowRefusalMessage('not_found')).toContain('match');
+    });
+
+    it('is actually passed by the season publish transaction', () => {
+      // The wording above is only right if the one call site that refuses a
+      // stale SEASON asks for the season subject. Nothing else can catch a
+      // revert of that argument: the code, the detail and every other test
+      // stay green without it -- which is exactly how E-1 shipped.
+      const source = readFileSync(
+        join(process.cwd(), 'src', 'db', 'queries', 'admin-brownlow.ts'),
+        'utf8',
+      );
+      expect(source).toMatch(
+        /The season has changed since the page was loaded[\s\S]{0,200}?'season',/,
+      );
+      expect(source).toMatch(/refuse\('not_found', `Season \$\{input\.season\} does not exist\.`, 'season'\)/);
+    });
+
+    it('falls back to the base sentence for every code with no season wording', () => {
+      // Only the codes whose sentence names its object are overridden; the
+      // rest must not silently lose their wording under a season subject.
+      const codes = [
+        'not_home_and_away', 'season_not_polled', 'not_participant', 'duplicate_player',
+        'incomplete', 'participants_incomplete', 'already_final', 'not_final', 'invalid',
+        'season_incomplete', 'forbidden', 'db_error',
+      ] as const;
+      for (const code of codes) {
+        expect(brownlowRefusalMessage(code, 'season')).toBe(brownlowRefusalMessage(code));
+      }
+    });
   });
 
   it('promises nothing was written when the database refuses', () => {

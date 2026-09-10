@@ -165,7 +165,6 @@ export default async function BrownlowSeasonPage({
           accounted={accounted}
           expected={overview.expected}
           authority={overview.authority}
-          status={overview.status}
           stale={overview.stale}
         />
       )}

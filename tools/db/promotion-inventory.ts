@@ -196,6 +196,15 @@ export type TableTreatment = {
    */
   order: number;
   /**
+   * AFLDB-ISSUE-155. The column that uniquely identifies one row of THIS table, used to
+   * anchor a per-row lineage-remap UPDATE (`WHERE <rowIdColumn> = <row> AND <column> =
+   * <oldValue>`) and to order a staged promotion. Defaults to `id`, true for every table
+   * declared before this field existed. Declared only where the default is wrong: a table
+   * whose own primary key IS the lineage-bound column being remapped (no separate surrogate
+   * `id` exists), for example `brownlow_vote_entry_state.match_id`.
+   */
+  rowIdColumn?: string;
+  /**
    * Foreign keys INTO rebuilt tables. These are the columns that can dangle after a
    * rebuild changes an identity (AFLDB-ISSUE-136 merged players, batches are new), so
    * the checker probes them before reinstatement.
@@ -619,6 +628,123 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
     note: 'The six captured criteria of one board revision. ON DELETE CASCADE from '
       + 'external_grids, so it is reinstated LAST of the three; its own rows carry the '
       + "source's stable criterion keys and raw text, which no later parse can recover.",
+  },
+  // --- Brownlow administration workflow (migration 094, AFLDB-ISSUE-155 Phase C) -------
+  // AFLDB-ISSUE-155 §27.22/§27.28. Two workflow tables, deliberately NOT registered
+  // import-writable (094 §7): they are a record of administrative decisions, and
+  // grant_import_write() would hand afldb_import the same TRUNCATE + unrestricted DELETE
+  // that migrations 066, 073, 078, 080 and 083 all decline to give a reload path. They
+  // are narrow-grant in privileges.sql instead, exactly like those tables.
+  //
+  // brownlow_vote_entry_state.match_id is its PRIMARY KEY, REFERENCES matches(id) ON DELETE
+  // RESTRICT, and is NOT NULL — a plain pg_restore would present the pre-cutover dump's old
+  // integer to that FK before any remap could run, and `matches` is rebuilt/import-writable
+  // (fresh ids on every rebuild), so the old integer is not guaranteed to exist, let alone
+  // still mean the same match. This is exactly the AFLDB-ISSUE-151 staged-reinstatement
+  // shape `external_grid_sources.ingest_source_id` established: the whole table restores
+  // into `promotion_staging` (no FK there), match_id is remapped old id -> match_key ->
+  // candidate id, and only then is it promoted into `public` under the FK, id preserved.
+  //
+  // Because the table's OWN primary key IS the staged column, there is no separate
+  // surrogate `id` to anchor a per-row remap UPDATE or a staged promotion order — the
+  // generic machinery assumed one (every table it had served until now used `id`).
+  // `rowIdColumn: 'match_id'` below generalises that anchor; see `rowIdColumnOf`.
+  //
+  // three_player_id / two_player_id / one_player_id are NULLABLE references into `players`
+  // (also rebuilt/import-writable), remapped through the same AFLDB-ISSUE-142 (B) stable
+  // identity as `player_link_resolutions.player_id`. They are not what makes the table
+  // staged (a nullable reference never blocks the FK), but because the WHOLE row sits in
+  // `promotion_staging` until match_id is settled, their remap must ALSO run there, not
+  // against `public` — `isStagedLineageColumn` is table-level for exactly this reason.
+  // Declared BEFORE match_id in the lineageRefs array below (remap plans run in declaration
+  // order), so the player-slot UPDATEs are applied while match_id — their only row anchor —
+  // still holds its pre-cutover value; match_id's own remap runs last and, being
+  // self-anchored, does not depend on any other column having settled first.
+  //
+  // season (on both tables) is NOT declared as a lineage-bound or football reference.
+  // `seasons.year` is itself the primary key — a permanent natural identity, not a
+  // surrogate integer a rebuild reassigns — so a season referenced by an existing decision
+  // is definitionally still present under the same value after any rebuild. It is also
+  // exactly the shape the generic dangling-reference probe cannot express (it queries the
+  // referenced table by a column literally named `id`, which `seasons` does not have), so
+  // declaring it would trade a probe with no real failure mode for a probe that always
+  // errors. Nothing is remapped and nothing needs to be.
+  {
+    schema: 'public', name: 'brownlow_vote_entry_state', subsystem: 'Brownlow administration',
+    category: 'operations', productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    rowIdColumn: 'match_id',
+    footballRefs: [
+      { column: 'three_player_id', references: 'players', nullable: true },
+      { column: 'two_player_id', references: 'players', nullable: true },
+      { column: 'one_player_id', references: 'players', nullable: true },
+      {
+        column: 'match_id', references: 'matches', nullable: false,
+        remediation: 'match_id is this row\'s PRIMARY KEY (ON DELETE RESTRICT), so a plain '
+          + 'restore refuses the moment the dumped integer is not a candidate match id. '
+          + "matches is import-writable, and its stable identity is match_key "
+          + '(NOT NULL UNIQUE since migration 003), so the plan STAGES this table '
+          + '(AFLDB-ISSUE-151): rows restore into promotion_staging.brownlow_vote_entry_state '
+          + '(no FK there), match_id is remapped old id -> match_key -> candidate id at the '
+          + "plan's remap step, and only then is the row promoted into public under the FK, "
+          + 'id preserved. Never insert a matches row to make an old id fit.',
+      },
+    ],
+    lineageRefs: [
+      {
+        column: 'three_player_id',
+        targets: [{ entity: 'players', identity: 'afltables_profile_url' }],
+        remediation: 'Resolve three_player_id through the AFL Tables profile url and apply '
+          + 'the generated per-row UPDATE after the reinstate, exactly as for '
+          + 'player_link_resolutions.player_id. A slot that does not resolve is never nulled '
+          + 'or dropped: the promotion stops and the operator records the decision, because a '
+          + 'silently-nulled vote slot is indistinguishable from one that was never awarded.',
+      },
+      {
+        column: 'two_player_id',
+        targets: [{ entity: 'players', identity: 'afltables_profile_url' }],
+        remediation: 'Resolve two_player_id through the AFL Tables profile url; same rule as '
+          + 'three_player_id.',
+      },
+      {
+        column: 'one_player_id',
+        targets: [{ entity: 'players', identity: 'afltables_profile_url' }],
+        remediation: 'Resolve one_player_id through the AFL Tables profile url; same rule as '
+          + 'three_player_id.',
+      },
+      {
+        // Declared LAST: the row anchor for every plan above is match_id itself (this
+        // table's own primary key — rowIdColumn), so the player-slot remaps must be applied
+        // while match_id still holds its pre-cutover value. match_id's own remap is
+        // self-anchored (WHERE match_id = <old value> AND match_id = <old value>) and does
+        // not depend on any other column, so it is safe to settle last.
+        column: 'match_id',
+        targets: [{ entity: 'matches', identity: 'match_key' }],
+        remediation: 'STAGED (AFLDB-ISSUE-151): resolved old id -> match_key -> candidate id '
+          + 'and applied to promotion_staging.brownlow_vote_entry_state at the plan\'s remap '
+          + "step, before the row is promoted into public under match_id's own foreign key. "
+          + 'An unresolved match_id is never dropped or guessed by date/round/club: the '
+          + 'promotion stops and the operator records the decision.',
+      },
+    ],
+    note: 'Per-match Brownlow entry workflow (draft/final/void), keyed by match_id itself — '
+      + 'no separate surrogate id (rowIdColumn: match_id). A workflow/decision record, never '
+      + 'a public statistical authority: the canonical facts stay in brownlow_round_votes. '
+      + 'STAGED (AFLDB-ISSUE-151) because match_id is a NOT NULL PRIMARY KEY reference into '
+      + 'rebuilt matches; the nullable player-slot columns ride the same staged reinstatement '
+      + '(AFLDB-ISSUE-142 (B), AFLDB-ISSUE-155). season is a natural key into seasons(year) '
+      + 'and needs no remap. References auth_users (created_by, updated_by, finalised_by).',
+  },
+  {
+    schema: 'public', name: 'brownlow_season_authority', subsystem: 'Brownlow administration',
+    category: 'operations', productionOnly: true, treatment: 'reinstate', compare: 'equal', order: 20,
+    restoreAfter: ['auth_users'],
+    note: 'Publication state of a season\'s Brownlow totals (season is its primary key). '
+      + 'Not staged and not lineage-bound: its only foreign keys are season -> seasons(year), '
+      + "a permanent natural identity that needs no remap (seasons' primary key is the year "
+      + 'itself, not a surrogate a rebuild reassigns), and published_by/updated_by -> '
+      + 'auth_users, which is itself reinstated. No column of this table carries a row id '
+      + "from the replaced database's rebuilt-data lineage.",
   },
   // --- Acquisition schemas (migrations 001, 014, 025, 074, 076, 077) -----------------
   {
@@ -1106,6 +1232,11 @@ export function isStagedReinstatement(table: TableTreatment): boolean {
   return stagedLineageColumns(table).length > 0;
 }
 
+/** The column that identifies one row of this table for a remap anchor or a staged promote. */
+export function rowIdColumnOf(table: TableTreatment): string {
+  return table.rowIdColumn ?? 'id';
+}
+
 export type StagedSourceRowsJudgement = {
   /** Staged tables with rows in the replaced database, with their counts. */
   populated: { table: string; rows: number }[];
@@ -1171,13 +1302,25 @@ export function stagedReinstateTables(environment: Environment = DEFAULT_ENVIRON
     .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-/** Is the named table's named column settled in the staging schema before its FK applies? */
+/**
+ * Is the named table's named column settled in the staging schema before its FK applies?
+ *
+ * Table-level, not column-level: when ANY not-null football reference of a table is staged
+ * (`isStagedReinstatement`), the WHOLE table's rows are restored into `promotion_staging` and
+ * promoted into `public` as one unit (`reinstateGroupsOf`) — so EVERY lineage-bound column of
+ * that table, staged trigger or not, physically sits in the staging schema at remap time.
+ * AFLDB-ISSUE-155: `brownlow_vote_entry_state` is the first table where a NOT NULL staged
+ * reference (`match_id`) and nullable lineage references on the same row (`three_player_id`
+ * etc.) coexist — remapping the nullable columns against `public` would silently do nothing,
+ * because the rows have not been promoted there yet.
+ */
 export function isStagedLineageColumn(
   tableName: string, column: string, environment: Environment = DEFAULT_ENVIRONMENT,
 ): boolean {
   const table = contractByName(tableName);
   if (!table || effectiveTreatment(table, environment) !== 'reinstate') return false;
-  return stagedLineageColumns(table).some((c) => c.column === column);
+  if (!isStagedReinstatement(table)) return false;
+  return (table.lineageRefs ?? []).some((r) => r.column === column);
 }
 
 /**
@@ -1471,6 +1614,9 @@ export function lineageRemapSql(input: LineageRemapInput): string {
     isStagedLineageColumn(plan.table, plan.column, names.environment);
   const relationOf = (plan: LineageColumnPlan): string =>
     `${quoteIdent(staged(plan) ? STAGING_SCHEMA : 'public')}.${quoteIdent(plan.table)}`;
+  // AFLDB-ISSUE-155: the row anchor is the table's OWN identifying column, not always `id`
+  // (brownlow_vote_entry_state's primary key is match_id, the very column some plans remap).
+  const rowIdCol = (plan: LineageColumnPlan): string => rowIdColumnOf(contractByName(plan.table)!);
   const lines: string[] = [];
   lines.push('-- AFLDB-ISSUE-142 (B) — lineage remap for reinstated human/admin rows.');
   lines.push(`-- Candidate '${input.candidate}' (${names.environment}) does NOT share the id lineage of`);
@@ -1518,7 +1664,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
         : '';
       lines.push(`--   ${m.oldId} -> ${m.identity} -> ${m.newId}`);
       lines.push(`UPDATE ${relationOf(plan)} SET ${quoteIdent(plan.column)} = ${m.newId}`
-        + ` WHERE ${quoteIdent('id')} = ${row.rowId} AND ${quoteIdent(plan.column)} = ${m.oldId}${guard};`);
+        + ` WHERE ${quoteIdent(rowIdCol(plan))} = ${row.rowId} AND ${quoteIdent(plan.column)} = ${m.oldId}${guard};`);
     }
     for (const u of plan.remap.unresolved) {
       unresolvedTotal += 1;
@@ -1560,7 +1706,7 @@ export function lineageRemapSql(input: LineageRemapInput): string {
       ? ` AND t.${quoteIdent(plan.kindColumn)} = ${quoteSqlLiteral(plan.kind ?? '')}`
       : '';
     lines.push(`-- ${plan.table}.${plan.column}: expect 0 rows`);
-    lines.push(`SELECT t.${quoteIdent('id')}, t.${quoteIdent(plan.column)} FROM ${relationOf(plan)} t`
+    lines.push(`SELECT t.${quoteIdent(rowIdCol(plan))}, t.${quoteIdent(plan.column)} FROM ${relationOf(plan)} t`
       + ` WHERE t.${quoteIdent(plan.column)} IS NOT NULL${guard}`
       + ` AND t.${quoteIdent(plan.column)} NOT IN (SELECT id FROM (VALUES ${pairs}) v(id, identity));`);
   }
@@ -2151,9 +2297,12 @@ export function promoteStagedSql(environment: Environment = DEFAULT_ENVIRONMENT)
   const blocks = tables.map((t) => {
     const staged = `${schema}.${quoteIdent(t.name)}`;
     const target = `${quoteIdent('public')}.${quoteIdent(t.name)}`;
+    // AFLDB-ISSUE-155: the row anchor for the unsettled-row report and the promotion order is
+    // the table's OWN identifying column, not always `id` (see `rowIdColumnOf`).
+    const rowId = rowIdColumnOf(t);
     const checks = stagedLineageColumns(t).map((c) => {
       const referenced = `${quoteIdent('public')}.${quoteIdent(c.references)}`;
-      return `  SELECT string_agg(format('id %s -> ${c.column} %s', t.${quoteIdent('id')}, t.${quoteIdent(c.column)}), ', ' ORDER BY t.${quoteIdent('id')})
+      return `  SELECT string_agg(format('${rowId} %s -> ${c.column} %s', t.${quoteIdent(rowId)}, t.${quoteIdent(c.column)}), ', ' ORDER BY t.${quoteIdent(rowId)})
     INTO unsettled
     FROM ${staged} t
    WHERE NOT EXISTS (SELECT 1 FROM ${referenced} r WHERE r.id = t.${quoteIdent(c.column)});
@@ -2172,7 +2321,7 @@ BEGIN
 ${checks}
   RAISE NOTICE '${t.name}: % staged row(s) settled', staged_rows;
 END $$;
-INSERT INTO ${target} OVERRIDING SYSTEM VALUE SELECT * FROM ${staged} ORDER BY ${quoteIdent('id')};
+INSERT INTO ${target} OVERRIDING SYSTEM VALUE SELECT * FROM ${staged} ORDER BY ${quoteIdent(rowId)};
 DROP TABLE ${staged};`;
   }).join('\n\n');
   return `-- AFLDB-ISSUE-151: promote the staged, remapped rows into public under the foreign key.
@@ -2588,8 +2737,10 @@ export function stagedPlanProblems(
     if (!artifacts.stage.includes(`CREATE TABLE ${stagedRelation} (LIKE ${publicRelation});`)) {
       problems.push(`promotion-stage.sql does not create ${stagedRelation} as a bare copy`);
     }
+    // AFLDB-ISSUE-155: the promotion order anchor is the table's own row-id column.
+    const rowId = quoteIdent(rowIdColumnOf(contractByName(table)!));
     if (!artifacts.promoteStaged.includes(
-      `INSERT INTO ${publicRelation} OVERRIDING SYSTEM VALUE SELECT * FROM ${stagedRelation} ORDER BY "id";`,
+      `INSERT INTO ${publicRelation} OVERRIDING SYSTEM VALUE SELECT * FROM ${stagedRelation} ORDER BY ${rowId};`,
     )) {
       problems.push(`promotion-promote-staged.sql does not promote ${table} with its ids preserved`);
     }

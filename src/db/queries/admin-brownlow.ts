@@ -9,12 +9,12 @@ import {
   recomputeBrownlowCoverage,
   recomputeSeasonBrownlowStatus,
 } from '@/db/queries/player-derived';
+import { canonicalFingerprint } from '@/lib/brownlow/fingerprint';
 import {
   assessParticipants,
   asCompleteSelection,
   brownlowRefusal,
   BROWNLOW_MANUAL_SOURCE_KEY,
-  canonicalFingerprint,
   checkTransition,
   classifyMatchAssignment,
   deriveSeasonRows,
@@ -1224,7 +1224,6 @@ function auditRows(rows: readonly CanonicalRowWithName[]): Array<Record<string, 
 
 function databaseRefusal(error: unknown, context: string): BrownlowRefusal {
   const message = error instanceof Error ? error.message : String(error);
-  // eslint-disable-next-line no-console
   console.error(`[admin-brownlow] ${context} failed:`, error);
   return brownlowRefusal('db_error', message);
 }
@@ -1283,7 +1282,7 @@ export async function publishBrownlowSeason(input: {
       const [season] = await tx<Array<{ year: number }>>`
         SELECT year FROM seasons WHERE year = ${input.season}
       `;
-      if (!season) refuse('not_found', `Season ${input.season} does not exist.`);
+      if (!season) refuse('not_found', `Season ${input.season} does not exist.`, 'season');
 
       const [availability] = await tx<Array<{ coverage: string }>>`
         SELECT coverage::text AS coverage
@@ -1299,6 +1298,8 @@ export async function publishBrownlowSeason(input: {
         refuse(
           'stale',
           `The season has changed since the page was loaded (revision ${authority.revision}, not ${input.expectedRevision}).`,
+          // §27.27 E-1: this refusal is about the season, not a match.
+          'season',
         );
       }
 

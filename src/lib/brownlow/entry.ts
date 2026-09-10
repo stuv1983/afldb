@@ -8,8 +8,11 @@
  * file owns the reasoning they apply, so the rules are unit-testable
  * without a connection and cannot drift between the four transactions.
  *
- * No `server-only`, no `@/db` import, no I/O. `node:crypto` is the one
- * dependency and is used for a digest, not for secrecy.
+ * No `server-only`, no `@/db` import, no I/O, and — because a client
+ * component (`MatchVoteEditor.tsx`) imports browser-safe constants from
+ * here — no Node built-ins either. The one exception, the `canonicalFingerprint`
+ * digest, lives in `src/lib/brownlow/fingerprint.ts` behind `server-only`
+ * so `node:crypto` never enters a client bundle.
  *
  * THE CENTRAL FACT ABOUT THE DATA (preflight P1, §27.20).
  * `brownlow_round_votes` is a DENSE participation record, not a sparse
@@ -31,8 +34,6 @@
  * dense would be fabricating history the coverage authority says was
  * never collected.
  */
-import { createHash } from 'node:crypto';
-
 import { MANUAL_ATTENDANCE_SOURCE_KEY } from '@/lib/acquisition/manual-authority';
 
 /* ------------------------------------------------------------------ *
@@ -155,6 +156,33 @@ const REFUSAL_MESSAGES: Record<BrownlowRefusalCode, string> = {
 };
 
 /**
+ * What a refusal is about.
+ *
+ * Most of the sentences above name their object, because "this match" is
+ * what makes them read as an explanation rather than a code. Entry work is
+ * per match, so `match` is the default and every existing caller keeps the
+ * sentence it already had. Season publication is the one place the same
+ * rules apply to a different object, and there the match noun is simply
+ * wrong: §27.27 acceptance E-1 measured a stale season-publish refusal
+ * reading "Someone else changed this match…" above a correct
+ * season-specific detail.
+ *
+ * The CODE deliberately does not change with the subject. `stale` is what
+ * the reload link, the audited-refusal set and the action state all key
+ * off; only the noun in the sentence moves.
+ */
+export type BrownlowRefusalSubject = 'match' | 'season';
+
+/** Overrides for the codes whose sentence names the object it refused about. */
+const SEASON_REFUSAL_MESSAGES: Partial<Record<BrownlowRefusalCode, string>> = {
+  not_found:
+    'That season no longer exists.',
+  stale:
+    'Someone else changed this season while you were editing it. '
+    + 'Reload to see the current state, then try again.',
+};
+
+/**
  * Build a refusal, optionally appending a sentence of specifics.
  *
  * The detail carries counts and names the operator needs ("Carlton has
@@ -165,14 +193,19 @@ const REFUSAL_MESSAGES: Record<BrownlowRefusalCode, string> = {
 export function brownlowRefusal(
   code: BrownlowRefusalCode,
   detail?: string,
+  subject: BrownlowRefusalSubject = 'match',
 ): BrownlowRefusal {
-  const base = REFUSAL_MESSAGES[code];
+  const base = brownlowRefusalMessage(code, subject);
   return { ok: false, code, message: detail ? `${base} ${detail}` : base };
 }
 
 /** The base sentence for a code, without any detail. Exposed for tests and the UI. */
-export function brownlowRefusalMessage(code: BrownlowRefusalCode): string {
-  return REFUSAL_MESSAGES[code];
+export function brownlowRefusalMessage(
+  code: BrownlowRefusalCode,
+  subject: BrownlowRefusalSubject = 'match',
+): string {
+  const override = subject === 'season' ? SEASON_REFUSAL_MESSAGES[code] : undefined;
+  return override ?? REFUSAL_MESSAGES[code];
 }
 
 /* ------------------------------------------------------------------ *
@@ -439,7 +472,7 @@ export function validateReason(
 }
 
 /* ------------------------------------------------------------------ *
- * Canonical picture: fingerprint and completeness
+ * Canonical picture: completeness
  * ------------------------------------------------------------------ */
 
 /** One `brownlow_round_votes` row, as the read model and the writer see it. */
@@ -450,30 +483,6 @@ export type CanonicalRoundRow = {
   sourceId: number | null;
   matchId: number | null;
 };
-
-/**
- * The compare-and-set value that catches the canonical picture moving
- * between page render and submit (§27.14).
- *
- * Over POSITIVE rows only, and over the `(player_id, votes, source_id)`
- * triple. Zeros are excluded because they are the dense background —
- * including 40 unchanging rows per match would make the digest churn on
- * line-up edits that have nothing to do with votes. What this must catch
- * is a settle landing a vote, another Super Admin correcting the match,
- * or an operator repair; all three move a positive row.
- *
- * The caller supplies exactly the row set §27.14 defines: the match's
- * resolved rows PLUS the season/round rows still unattached to any match
- * whose player is a participant of this match. Those unresolved rows are
- * in scope precisely because finalisation is about to claim them.
- */
-export function canonicalFingerprint(rows: readonly CanonicalRoundRow[]): string {
-  const lines = rows
-    .filter((row) => row.votes !== null && row.votes > 0)
-    .map((row) => `${row.playerId}:${row.votes}:${row.sourceId ?? ''}`)
-    .sort();
-  return createHash('sha256').update(`${lines.join('\n')}\n`, 'utf8').digest('hex');
-}
 
 /**
  * What the canonical rows say about one match, ignoring workflow state.
