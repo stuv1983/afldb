@@ -432,13 +432,18 @@ Inherits `AFLDB-ISSUE-155.md` §21 in full. Additionally:
 
 ## Next action
 
-**Start `AFLDB-ISSUE-157` (P1) in a fresh implementation session.** Recommended: Fable, high
-effort, normal implementation mode, fresh session, new worktree from clean `main` after the
-operator merges the ISSUE-155 branch (or from `codex/issue-155-admin-overhaul` if the merge has
-not happened, since P1 reads tables the Phase A shell already navigates to). Fable is
-sufficient because ISSUE-157 is bounded by an approved handoff contract, read-only by default,
-and needs no migration or privilege change; escalate to a fresh Opus session only if
-implementation uncovers genuine auth/privilege architecture ambiguity. Carry over: this file's
-§P1 handoff contract and §4/§5. Then P2 (`AFLDB-ISSUE-158`) immediately after.
+**P1 is complete.** `AFLDB-ISSUE-157` resolved 2026-09-11 on `fable/issue-157-admin-audit`
+(deployed to DEV, unmerged): capability `operations.audit.read` (the §2 working name
+`ops.audit.read`, renamed to the union's `operations.` prefix; Admin-and-up, resolving the
+"own-scope TBD" as full scope because the dashboard already showed every admin the whole trail),
+`/admin/audit` plus the per-entity history page, SELECT-only `src/db/queries/audit-reader.ts`,
+`src/components/admin/AdminPager.tsx`. No migration, no privilege change, no write path;
+`data_overrides` still deferred per §5. Evidence in `issues.md` under ISSUE-157.
+
+**Start `AFLDB-ISSUE-158` (P2) in a fresh implementation session** after the operator merges
+the P1 branch. Recommended: Fable, high effort, normal implementation mode, new worktree from
+clean `main`. Carry over: this file's §P2 handoff contract and §2. P1 leaves P2 one worked
+example of the target shape — a capability enforced as the first await of a route, with a
+DB-free route-boundary test for all three roles in `tests/admin-audit-viewer.test.ts`.
 
 Do not start P3 until C-1 (§10) is decided at its preflight.

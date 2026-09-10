@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 18 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-157`, `-158`.
+**Open issues:** 17 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-158`.
 
 <!-- 2026-09-11 (ADMIN CENTRE COMPLETION UMBRELLA ALLOCATED — PLANNING ONLY):
      `AFLDB-ISSUE-156` (Admin Centre completion umbrella), `AFLDB-ISSUE-157` (P1 Admin foundation
@@ -571,8 +571,7 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
-| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Planning complete 2026-09-11 — no implementation started. Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children allocated: 157 (P1), 158 (P2); P3–P12 are named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: start ISSUE-157 in a fresh implementation session |
-| **ID:** AFLDB-ISSUE-157 — Admin foundation and audit viewer (156 P1) | **Status:** Open / Not started — read-only `/admin/audit` over `auth_audit_log` + `data_edits`; confirmed no migration and no privilege change (`privileges.sql:441`, `:463`); `data_overrides` visibility deferred (afldb_import-only grant). | **Severity:** Medium | **Area:** Admin / Auth / Operations; contract `AFLDB-ISSUE-156.md` §11 P1; next: `npm run preflight -- --mode implementation --issue 157` on a fresh worktree |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Planning complete 2026-09-11 — no implementation started. Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11** (`/admin/audit` live on DEV, unmerged), 158 (P2) not started; P3–P12 are named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: start ISSUE-158 in a fresh implementation session |
 | **ID:** AFLDB-ISSUE-158 — Capability enforcement (156 P2) | **Status:** Open / Not started — make the 15 unenforced capabilities in `src/lib/auth/capabilities.ts` authoritative via `requireCapability()` plus a source-contract regression in `tests/auth.test.ts`; `people.admins.lifecycle` keeps `requireSuperAdmin`. No migration, no privilege change. | **Severity:** Medium | **Area:** Admin / Auth; contract `AFLDB-ISSUE-156.md` §11 P2; next: after ISSUE-157, same preflight with `--issue 158` |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
@@ -21876,18 +21875,23 @@ Documentary only: `AFLDB-ISSUE-156.md` exists with its twelve sections and both 
 contracts; `issues.md` and `IssuesIndex.md` list 156/157/158 and agree; no file under `src/`,
 `tools/`, `tests/`, `deploy/` and no `CHANGELOG.md` change.
 
+### P1 complete (2026-09-11)
+
+`AFLDB-ISSUE-157` resolved on `fable/issue-157-admin-audit` (DEV-deployed, unmerged): capability
+`operations.audit.read`, `/admin/audit` and `/admin/audit/entity/[table]/[rowId]`, SELECT-only
+`src/db/queries/audit-reader.ts`, `src/components/admin/AdminPager.tsx`. No migration, privilege
+change or write path. Evidence under ISSUE-157.
+
 ### Next action
 
-Start `AFLDB-ISSUE-157` in a fresh implementation session (Fable, high effort, normal
-implementation mode; escalate to a fresh Opus session only if implementation uncovers genuine
-auth/privilege architecture ambiguity) from a new
-worktree: `npm run worktree:bootstrap -- --issue 157 --branch <agent>/issue-157`, then
-`npm run preflight -- --mode implementation --issue 157`, carrying over `AFLDB-ISSUE-156.md`
-§11 P1 handoff contract and §4/§5.
+After the operator merges the P1 branch, start `AFLDB-ISSUE-158` (P2) in a fresh implementation
+session from a new worktree: `npm run worktree:bootstrap -- --issue 158 --branch <agent>/issue-158`,
+then `npm run preflight -- --mode implementation --issue 158`, carrying over
+`AFLDB-ISSUE-156.md` §11 P2 handoff contract and §2.
 
 ## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
 
-**Status:** Open / Implemented — verification in progress (2026-09-11)
+**Status:** Resolved 2026-09-11 (branch `fable/issue-157-admin-audit`, deployed to DEV; not merged)
 **Severity:** Medium
 **Area:** Admin / Authentication / Operations
 **Found:** 2026-09-11
@@ -21972,11 +21976,58 @@ untouched.
   (filter correctness on `afldb_test` inside an always-rolled-back transaction: label vs current
   email vs id actor matching, inclusive UTC date bounds at 23:59:59Z, paging, entity history).
 
+### Layout correction during browser acceptance (2026-09-11)
+
+The first DEV pass showed the Detail and Change columns cut at the right edge on desktop and the
+Change column's `field before → after` runs compressed. Cause: the page root carries
+`overflow-x: hidden` (globals.css), so a table wider than the content column is clipped rather
+than scrolled at page level, and the two payload columns held values with no natural break point
+(emails, JSON, joined value runs) that `white-space: normal` alone cannot wrap. Fix (CSS block
+"Admin audit viewer" in `globals.css`, scoped classes only): payload cells wrap with
+`overflow-wrap: anywhere`; both tables fold to four columns (user id and IP under the actor;
+field group under the entity; note under the changes); each change renders as its own two-line
+block (field, then before → after); the filter form's grid items take `min-width: 0` and
+`input[type='date']` is styled like the site's other controls, which the global form rule had
+never covered. A second report of `pageOverflows: true` on the edits tab on the build before
+this correction could not be reproduced on the corrected build (below); the offending element
+was not captured, so the fix is attributed to the change set rather than proven per element.
+
+### Validation (2026-09-11)
+
+- Unit: `tests/auth.test.ts` 73/73, `tests/admin-audit-viewer.test.ts` 33/33 (106/106).
+- Typecheck: `npm run typecheck` green; the DEV deploy's `next build` of the layout-corrected
+  commit compiled and is live.
+- Integration on `afldb_test`: `tests/integration/admin-audit.test.ts` 8/8 — action, actor
+  (recorded label / current email / numeric id), inclusive UTC date bounds at 23:59:59Z, paging
+  clamp, distinct actions, entity/actor/table/field/date filters, entity-history ordering, ids as
+  strings, jsonb as objects.
+- Browser (Playwright against DEV `http://10.0.40.100:8090`, Super Admin session, corrected
+  build): `documentElement.scrollWidth > innerWidth` is **false** at 320×568, 768×1024, 1000×800,
+  1280×900 and 1920×1080 on `/admin/audit`, `/admin/audit?tab=edits` (filter panel closed, open,
+  and with four filters applied), `/admin/audit/entity/brownlow_vote_entry_state/16623`, and the
+  `/admin` control. No element outside a `.table-wrap` scroller extends past the viewport on any
+  route. Where a table is wider than its column it scrolls inside `.table-wrap` with the last
+  header cell reachable (edits table 731 px in a 580 px column at 1280 with the sidebar
+  expanded — the same behaviour as the dashboard's own 690 px submissions table; sign-ins table
+  fits at 792 px with the sidebar collapsed; entity-page diff tables fit at 768 and above).
+- Pre-existing, not this route: at exactly 320 px in a desktop browser with a classic 15 px
+  scrollbar, `html { min-width: 320px }` makes the site header, main and footer 320 px wide
+  against a 305 px content width; `/admin` shows the same. Overlay scrollbars on a phone do not
+  exhibit it. Not tracked as an issue.
+
+### Follow-up (not blocking)
+
+- `data_overrides` visibility remains deferred (privilege change + deploy-order step; ISSUE-156
+  §5).
+- At 1280 px with the sidebar expanded the "By" column of the edits table sits behind a
+  sideways scroll. Acceptable under the acceptance rule; a three-column fold (actor under the
+  timestamp) would fit at 608 px and above if wanted later.
+
 ### Next action
 
-Run the validation sequence and record the evidence here: unit suites → integration on
-`afldb_test` → responsive browser pass at 320 px / tablet / desktop on DEV → typecheck. Then
-resolve, sync `IssuesIndex.md` and `CHANGELOG.md`, and start ISSUE-158 in a fresh session.
+Operator: merge-ready check, merge, and the standard DEV smoke; PROD deploy only with the
+ISSUE-155 closeout. Then start `AFLDB-ISSUE-158` (P2) in a fresh session per
+`AFLDB-ISSUE-156.md` §11.
 
 ## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
 
