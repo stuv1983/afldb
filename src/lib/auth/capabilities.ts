@@ -28,6 +28,9 @@ export type CapabilityViewer = {
 export type Capability =
   | 'data.playerLinks'
   | 'data.dataEditor'
+  | 'data.brownlow.read'
+  | 'data.brownlow.draft'
+  | 'data.brownlow.finalise'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -54,6 +57,13 @@ const SUPER_ADMIN_ONLY: readonly CapabilityRole[] = ['super_admin'];
 const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   'data.playerLinks': SUPER_ADMIN_ONLY,
   'data.dataEditor': SUPER_ADMIN_ONLY,
+  // Brownlow administration (AFLDB-ISSUE-155 Phase C §27.8). An Admin may
+  // enter and save a draft -- work that reaches no public query -- while
+  // only a Super Admin may finalise, correct, void or publish, which is
+  // the moment a vote becomes a public statistical fact.
+  'data.brownlow.read': ADMIN_AND_UP,
+  'data.brownlow.draft': ADMIN_AND_UP,
+  'data.brownlow.finalise': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

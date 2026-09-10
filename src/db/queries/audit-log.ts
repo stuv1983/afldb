@@ -19,14 +19,20 @@ import type postgres from 'postgres';
  * system and stays on the auth pool; do not route it through here.
  */
 
-/** Mirrors the data_edits_table_name_check constraint (migrations 057/058). */
+/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094). */
 export type DataEditTableName =
   | 'players'
   | 'matches'
   | 'draft_picks'
   | 'award_winners'
   | 'hall_of_fame'
-  | 'honour_team_members';
+  | 'honour_team_members'
+  // Brownlow administration (migration 094, AFLDB-ISSUE-155 §27.13). The
+  // audited row is the workflow DECISION -- the entry state keyed by
+  // match_id, the season authority keyed by season -- not the fact rows
+  // it writes, which carry their own provenance quartet.
+  | 'brownlow_vote_entry_state'
+  | 'brownlow_season_authority';
 
 export type DataEditAuditInput = {
   tableName: DataEditTableName;

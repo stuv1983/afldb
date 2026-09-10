@@ -15,6 +15,53 @@ commit.
 
 ## [Unreleased]
 
+### Brownlow votes have a canonical match identity (AFLDB-ISSUE-155 Phase C1) - 10 September 2026
+
+- A Brownlow vote is now a fact about a **match**, not just about a season and a round number.
+  `brownlow_round_votes` gained a match identifier, deterministically backfilled from each player's
+  own line-up row - 320,861 of 320,861 rows resolved to exactly one match, with no guessing by
+  name, date or club - and the database now states the Brownlow rule itself: within one match a
+  player holds at most one allocation, and at most one player holds each of the 3, the 2 and the 1.
+  A vote that cannot be attributed to a match keeps no match, is reported as unresolved, and is
+  never invented.
+- Behind that sit a draft/final/void workflow per match and a publication record per season, so an
+  administrator's unfinished work is never a row in a public fact table. An admin may draft; only a
+  super admin may finalise, correct, void or publish. Corrections are direct, reasoned and fully
+  audited, and a correction inside an already-published season re-derives that season's totals in
+  the same transaction - there is no published-but-stale state to notice later.
+- Publication derives a season's totals from the finalised matches and takes authority for them.
+  Seasons nobody has administered keep the totals their source published, and where the match-level
+  facts disagree with those totals the difference is **shown, never applied**. Derived season and
+  career figures move with a publication, in the same transaction.
+- **The match sheet no longer writes Brownlow votes.** It refuses any Brownlow value with a message
+  pointing at Brownlow administration, and it preserves the recorded value through every save, so a
+  stale editor can no longer overwrite a vote. Deleting a match that carries a Brownlow decision
+  now fails rather than discarding the decision, and it fails with a message naming the decision
+  and where to withdraw it, before any part of the deletion is attempted.
+- When two administrators submit the same match at the same moment, the one who loses the race is
+  told that the match changed while they were editing it and to reload - not that the match was
+  already decided. They acted on a page that had stopped being true, which is a different problem
+  with a different fix. Submitting against a match you can see is already decided still says so,
+  and still points at Correct.
+- Reload paths can no longer overwrite an administrator's decision. The season-totals artefact
+  loader refuses to reload over an admin-published season, and the fitzRoy rebuild loader refuses
+  to rebuild the round votes of a season holding admin-finalised matches. Both fail closed with a
+  message naming the seasons. A rebuild of a fresh database is unaffected.
+- Fixed while validating the above: entering votes for a completed season that had no published
+  season totals yet would have locked the workflow out of that season after the first match, by
+  recomputing the coverage grid to say the season had no medal. A season holding Brownlow decisions
+  is now reported as partially covered until it is published.
+- Also fixed while validating the above: the Brownlow test fixture could leave rows behind in the
+  integration database. Its data is committed by design - the code under test opens its own
+  connections and could not otherwise see it - and cleanup used to be reachable only through the
+  value the seed returned, so a timed-out setup left committed rows with no way to remove them, and
+  the fixture's own collision guard then refused every later run. Cleanup is now registered before
+  the first row is written, each seed runs on its own connection, and teardown cancels the seed,
+  waits for it to stop, closes that connection if it has not, and only then removes the rows -
+  once, idempotently, and failing loudly rather than reporting a clean database it did not clean.
+  Both abandonment paths are exercised by direct test, and the affected database was independently
+  verified clean afterwards.
+
 ### Administrator account lifecycle (AFLDB-ISSUE-155 Phase B) - 10 September 2026
 
 - A super admin can now promote, demote, deactivate and reactivate an administrator account from

@@ -282,6 +282,30 @@ describe('fitzRoy core importer contracts (AFLDB-ISSUE-093 §13.4a)', () => {
     expect(importerSource).not.toMatch(/^from common import/m);
   });
 
+  // AFLDB-ISSUE-155 §27.11: manual > settle > rebuild. This loader deletes the
+  // round votes of every season the snapshot carries; an admin-finalised match
+  // must stop it before that delete, not be quietly rebuilt over. A rebuild
+  // database holds no manual rows, so a real rebuild is unaffected. Source
+  // contract only — the executed refusal is in tests/integration/admin-brownlow.test.ts.
+  it('refuses a round-vote reload over admin-finalised matches (§27.11)', () => {
+    expect(importerSource).toContain('SOURCE_KEY_MANUAL = "manual_admin_edit"');
+
+    const start = importerSource.indexOf('def import_brownlow_round_votes');
+    expect(start).toBeGreaterThan(-1);
+    const body = importerSource.slice(start, importerSource.indexOf('\ndef ', start + 1));
+    const guardAt = body.indexOf('SOURCE_KEY_MANUAL');
+    const deleteAt = body.indexOf('DELETE FROM brownlow_round_votes');
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(deleteAt).toBeGreaterThan(-1);
+    // The refusal has to be evaluated before the destructive statement.
+    expect(guardAt).toBeLessThan(deleteAt);
+    expect(body).toContain('hold admin-finalised Brownlow ');
+    expect(body).toContain('reload refused');
+    expect(body).toMatch(/raise RuntimeError\(/);
+    // Scoped to the snapshot's own seasons, exactly like the delete it guards.
+    expect(body).toMatch(/b\.season = ANY\(%s\)/);
+  });
+
   it('pins the explicit stat field mapping by name, not CSV position', () => {
     for (const [src, target] of EXPECTED_STAT_MAP) {
       expect(importerSource).toContain(`("${src}", "${target}")`);

@@ -365,6 +365,25 @@ export async function deleteMatch(input: {
         return { ok: false as const, error: `Match #${input.matchId} does not exist.` };
       }
 
+      // AFLDB-ISSUE-155 §27.15: a match carrying a Brownlow workflow
+      // decision is not deletable. The `ON DELETE RESTRICT` foreign key of
+      // migration 094 §4 guarantees that at the storage layer, but a raised
+      // foreign-key violation is not control flow a Data Editor user can act
+      // on, so the refusal is deliberate and happens before anything
+      // destructive runs. A match with no Brownlow decision is unaffected.
+      const [brownlowEntry] = await tx<{ status: string }[]>`
+        SELECT status FROM brownlow_vote_entry_state WHERE match_id = ${input.matchId}
+      `;
+      if (brownlowEntry) {
+        return {
+          ok: false as const,
+          error:
+            `Match #${input.matchId} carries a Brownlow vote entry (${brownlowEntry.status}) `
+            + 'and cannot be deleted. Remove that decision in Brownlow administration '
+            + `(/admin/brownlow/${match.season}/${match.roundCode}) first.`,
+        };
+      }
+
       // 2. Identify all affected players in this match
       const playerRows = await tx<{ playerId: number }[]>`
         SELECT DISTINCT player_id AS "playerId"

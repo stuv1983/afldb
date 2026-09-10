@@ -277,7 +277,7 @@ describe('capability policy', () => {
     'data.playerLinks', 'data.dataEditor', 'acquisition.currentSeason',
     'site.content', 'site.settings', 'operations.queryBuilder',
     'operations.dbHealth', 'operations.appHealth', 'operations.nlTelemetry',
-    'people.admins.lifecycle',
+    'people.admins.lifecycle', 'data.brownlow.finalise',
   ];
 
   it('opens legacy intake to every staff role, including a contributor', () => {
@@ -318,6 +318,26 @@ describe('capability policy', () => {
     expect(hasCapability(viewer('admin', true), 'people.admins.lifecycle')).toBe(false);
     expect(hasCapability(viewer('admin', true), 'people.admins.manage')).toBe(true);
     expect(hasCapability(viewer('super_admin', false), 'people.admins.lifecycle')).toBe(true);
+  });
+
+  it('splits Brownlow drafting from finalisation (§27.8)', () => {
+    // Decision 1 of §25, adopted as Option A: an Admin may read and draft --
+    // work that reaches no public query -- but only a Super Admin may
+    // finalise, correct, void or publish, which is the moment a vote becomes
+    // a public statistical fact.
+    for (const capability of ['data.brownlow.read', 'data.brownlow.draft'] as const) {
+      expect(hasCapability(viewer('contributor'), capability)).toBe(false);
+      expect(hasCapability(viewer('admin'), capability)).toBe(true);
+      expect(hasCapability(viewer('super_admin'), capability)).toBe(true);
+    }
+    expect(hasCapability(viewer('admin'), 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(viewer('super_admin'), 'data.brownlow.finalise')).toBe(true);
+  });
+
+  it('does not let the admin-management delegation reach Brownlow finalisation', () => {
+    // can_manage_admins is a people delegation; it must not become a data one.
+    expect(hasCapability(viewer('admin', true), 'data.brownlow.finalise')).toBe(false);
+    expect(hasCapability(viewer('admin', true), 'data.brownlow.draft')).toBe(true);
   });
 });
 

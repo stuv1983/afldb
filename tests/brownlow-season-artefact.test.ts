@@ -280,6 +280,31 @@ describe('brownlow season artefact: manifest and loader validation', () => {
     expect(payload.source_key).toBe('afltables');
   });
 
+  // AFLDB-ISSUE-155 §27.11: this loader replaces the whole table, so an
+  // admin-published season row would be destroyed by a reload. The refusal has
+  // to sit in check_database_coverage — the last gate before the first write —
+  // and be scoped to the whole table, not the declared seasons, because the
+  // TRUNCATE is not season-scoped either. There is no database here, so this is
+  // a source contract; the executed behaviour is covered by
+  // tests/integration/admin-brownlow.test.ts.
+  it('refuses a reload over admin-published seasons (§27.11)', () => {
+    const loaderSource = readFileSync(loader, 'utf8').replace(/\r\n/g, '\n');
+    expect(loaderSource).toContain('MANUAL_SOURCE_KEY = "manual_admin_edit"');
+
+    const guard = loaderSource.slice(
+      loaderSource.indexOf('def check_database_coverage'),
+      loaderSource.indexOf('class ProfileResolver'),
+    );
+    expect(guard).not.toBe('');
+    expect(guard).toContain('MANUAL_SOURCE_KEY');
+    expect(guard).toMatch(/JOIN sources s ON s\.id = b\.source_id/);
+    expect(guard).toContain('BrownlowSeasonLoadRefused');
+    expect(guard).toContain('are admin-published; reload refused');
+    expect(guard).toContain('Correct them through Brownlow administration');
+    // No season filter: the load truncates the table, so any manual row anywhere refuses.
+    expect(guard).not.toMatch(/b\.season = ANY/);
+  });
+
   it('refuses a tampered artefact (hash mismatch) through the same CLI', () => {
     const tmp = resolve(root, 'data', 'brownlow', 'season-votes.tampered.tmp.csv');
     writeFileSync(tmp, artefactText.replace(/,f,t,/, ',f,f,'), 'utf8');
