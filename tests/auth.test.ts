@@ -339,6 +339,17 @@ describe('capability policy', () => {
     expect(hasCapability(viewer('admin', true), 'data.brownlow.finalise')).toBe(false);
     expect(hasCapability(viewer('admin', true), 'data.brownlow.draft')).toBe(true);
   });
+
+  it('opens the audit trail to any admin and never to a contributor (AFLDB-ISSUE-157)', () => {
+    // ISSUE-156 §2: read-only inspection of auth_audit_log and data_edits is
+    // Admin-and-up. A contributor reaches one route (upload) and this is not
+    // it; nothing about the viewer is delegated by can_manage_admins either
+    // way, because the plain role list already includes every admin.
+    expect(hasCapability(viewer('contributor'), 'operations.audit.read')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'operations.audit.read')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'operations.audit.read')).toBe(true);
+    expect(hasCapability(viewer('super_admin'), 'operations.audit.read')).toBe(true);
+  });
 });
 
 /**
@@ -581,14 +592,28 @@ describe('adminNavFor', () => {
   });
 
   it('omits a group entirely for a viewer with no capability it contains, rather than showing it empty', () => {
-    // A plain admin holds no capability in Site or Operations, so those groups
-    // are absent. The Data group appears from AFLDB-ISSUE-155 Phase C2: an Admin
-    // may read and draft Brownlow votes (§27.8), so it holds exactly that link.
+    // A plain admin holds no capability in Site, so that group is absent. The
+    // Data group appears from AFLDB-ISSUE-155 Phase C2: an Admin may read and
+    // draft Brownlow votes (§27.8), so it holds exactly that link. Operations
+    // appears from AFLDB-ISSUE-157 and holds exactly the audit trail: every
+    // other Operations link is still super-admin-only.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
-      'overview', 'data', 'acquisition', 'people', 'account',
+      'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
     expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow']);
+    expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
+  });
+
+  it('lists the audit trail last in Operations for a super admin, and never for a contributor (AFLDB-ISSUE-157)', () => {
+    // Gated on operations.audit.read, the capability the route's
+    // requireCapability guard enforces; the link is furniture, the guard is
+    // the boundary.
+    const operations = adminNavFor({ role: 'super_admin', canManageAdmins: false })
+      .find((g) => g.id === 'operations');
+    expect(operations?.links.at(-1)).toMatchObject({ href: '/admin/audit', label: 'Audit trail' });
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/audit');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/audit');
   });
 
   it('gives a super admin every group, in the runbook\'s section order', () => {

@@ -142,7 +142,11 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="section">
-        <CollapsibleTable title="Recent activity">
+        <div className="split-head">
+          <h2>Recent activity</h2>
+          <Link className="more" href="/admin/audit">Full audit trail →</Link>
+        </div>
+        <CollapsibleTable title="Last 15 events">
         <div className="table-wrap">
           <table>
             <tbody>

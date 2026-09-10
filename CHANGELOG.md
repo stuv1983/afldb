@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### Admin Centre audit trail (AFLDB-ISSUE-157, ISSUE-156 P1) - 11 September 2026
+
+- New read-only `/admin/audit` page in the Operations group, open to every Admin and Super
+  Admin, that makes the two audit ledgers inspectable without SQL: "Sign-ins & administration"
+  over `auth_audit_log` (who, when, action, decoded `detail` payload as key/value pairs, IP) and
+  "Data edits" over `data_edits` (which entity, which field group, each changed field as
+  before → after, who, note). Filters for actor (recorded label, current email, or user id),
+  action or table / row id / field group, and a UTC calendar-date range; every view is a
+  shareable URL; 50 rows a page, paged on the server.
+- New `/admin/audit/entity/[table]/[rowId]` page: one entity's complete edit history, newest
+  first, each snapshot rendered field by field (before / after, `null` printed as `null` because
+  in this schema it means "not recorded").
+- New capability `operations.audit.read` (Admin-and-up), enforced with `requireCapability()`
+  before any read on both routes. A contributor is redirected with no query issued; an invalid
+  table or row id in the entity URL is a 404, not a query.
+- SELECT-only reader module `src/db/queries/audit-reader.ts` on the auth pool. Bigint ids are
+  selected as text and kept as strings; jsonb payloads are never decoded a second time; filter
+  values are bound, with LIKE metacharacters escaped. No migration and no privilege change:
+  `afldb_auth` already held SELECT on both tables.
+- The player-links pager is now the shared `src/components/admin/AdminPager.tsx`, used by both
+  routes; the dashboard's "Recent activity" links to the full trail.
+- Tests: capability and nav contract in `tests/auth.test.ts`; `tests/admin-audit-viewer.test.ts`
+  (helpers, reader SQL through a fake pool, route boundary for all three roles);
+  `tests/integration/admin-audit.test.ts` (filter correctness on `afldb_test`, always rolled back).
+
 ### Brownlow administration browser-acceptance fixes and promotion-contract support (AFLDB-ISSUE-155) - 10 September 2026
 
 - A stale-tab refusal in the vote editor no longer resets the operator's in-progress selection

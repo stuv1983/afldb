@@ -7,7 +7,16 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-11
-**Open issues:** 18 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-153`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`, `AFLDB-ISSUE-157`, `AFLDB-ISSUE-158`.
+**Open issues:** 17 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-153`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`, `AFLDB-ISSUE-158`.
+
+<!-- UPDATE 2026-09-11 (ISSUE-157 RESOLVED — ISSUE-156 P1 COMPLETE, DEV-DEPLOYED, UNMERGED):
+     `AFLDB-ISSUE-157` removed from this index. Delivered on `fable/issue-157-admin-audit`:
+     capability `operations.audit.read` (Admin-and-up, `requireCapability()` first await), routes
+     `/admin/audit` (two ledgers, filters, paging) and `/admin/audit/entity/[table]/[rowId]`,
+     SELECT-only `src/db/queries/audit-reader.ts`, `src/components/admin/AdminPager.tsx` extracted
+     from player-links. No migration, no privilege change, no write path. Validation: unit 106/106,
+     integration 8/8 on afldb_test, typecheck, Playwright overflow pass on DEV at 320/768/1000/1280/
+     1920 across both tabs, an entity page and the /admin control. Next: ISSUE-158 (P2). -->
 
 <!-- UPDATE 2026-09-11 (ADMIN CENTRE COMPLETION UMBRELLA ALLOCATED — PLANNING ONLY, NO CODE):
      `AFLDB-ISSUE-156` (umbrella), `AFLDB-ISSUE-157` (P1 Admin foundation and audit viewer) and
@@ -2472,17 +2481,9 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
 
 - **Severity:** Medium
 - **Area:** Admin / Auth / Data management / Acquisition / Operations
-- **State:** Open / Planning complete 2026-09-11 — no implementation started. Umbrella for the former ISSUE-155 Phases D–I plus two newly identified prerequisites: the audit trail has no usable read surface (`src/app/admin/page.tsx:46-51` is the only `auth_audit_log` reader; `data_edits` has none), and 15 of 18 declared capabilities are nav-only, never reaching `requireCapability()`. Children allocated: 157 (P1), 158 (P2). P3 Coach admin (155 Phase D), P4 Special records (E), P5 Honours lifecycle, P6 Site content (F), P7 Safe refresh (G), P8 Data-editor decomposition, P9 Player lifecycle/merge (HIGH), P10 Fixture-identity correction (HIGH), P11 CSV transition (H), P12 Integrated acceptance (I) are named placeholders with no ID until each starts. Migration 095 is the planning snapshot only, not allocated. ISSUE-155 PROD and ISSUE-151 are not blockers; ISSUE-151's promotion-inventory contract applies to P3/P4/P5/P7/P9/P10. ISSUE-154 not reused. P3 carries stop condition C-1 (coach-only identity blocked by NOT NULL `coaches.afltables_coach_path` / `source_id`, migration 087).
+- **State:** Open / P1 complete 2026-09-11 (`AFLDB-ISSUE-157` resolved: `/admin/audit` live on DEV, unmerged); P2 (`AFLDB-ISSUE-158`) not started. Umbrella for the former ISSUE-155 Phases D–I plus two newly identified prerequisites: the audit trail has no usable read surface (`src/app/admin/page.tsx:46-51` is the only `auth_audit_log` reader; `data_edits` has none), and 15 of 18 declared capabilities are nav-only, never reaching `requireCapability()`. Children allocated: 157 (P1), 158 (P2). P3 Coach admin (155 Phase D), P4 Special records (E), P5 Honours lifecycle, P6 Site content (F), P7 Safe refresh (G), P8 Data-editor decomposition, P9 Player lifecycle/merge (HIGH), P10 Fixture-identity correction (HIGH), P11 CSV transition (H), P12 Integrated acceptance (I) are named placeholders with no ID until each starts. Migration 095 is the planning snapshot only, not allocated. ISSUE-155 PROD and ISSUE-151 are not blockers; ISSUE-151's promotion-inventory contract applies to P3/P4/P5/P7/P9/P10. ISSUE-154 not reused. P3 carries stop condition C-1 (coach-only identity blocked by NOT NULL `coaches.afltables_coach_path` / `source_id`, migration 087).
 - **Key files/subsystems:** `AFLDB-ISSUE-156.md` (runbook); baseline architecture `AFLDB-ISSUE-155.md` §5/§6/§7/§17/§18/§23; `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`, `src/db/queries/audit-log.ts`, `tools/maintenance/privileges.sql:435-470`, `tools/db/promotion-inventory.ts`.
-- **Next action:** start `AFLDB-ISSUE-157` in a fresh implementation session (Fable, high effort, normal implementation mode; escalate to a fresh Opus session only if genuine auth/privilege architecture ambiguity surfaces): `npm run worktree:bootstrap -- --issue 157 --branch <agent>/issue-157`, then `npm run preflight -- --mode implementation --issue 157`, carrying `AFLDB-ISSUE-156.md` §11 P1 contract + §4/§5. Then 158.
-
-## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
-
-- **Severity:** Medium
-- **Area:** Admin / Auth / Operations
-- **State:** Open / Not started. Read-only `/admin/audit` (Operations group) over `auth_audit_log` + `data_edits` with actor / date / entity / action filters and a per-entity "who changed what, from → to" view; SELECT-only readers beside the writer in `src/db/queries/audit-log.ts`; a viewer capability enforced via `requireCapability()`; `src/components/admin/` extraction only where two or more routes already duplicate a pattern (reuse the `player-links` pager). **Confirmed no migration, no privilege change** (`privileges.sql:441`, `:463` already grant `afldb_auth` SELECT). `data_overrides` visibility deferred (afldb_import-only grant, subtractive list). Traps: int8-as-string ids, jsonb `detail` already decoded. No ISSUE-151 or ISSUE-155-PROD dependency.
-- **Key files/subsystems:** `AFLDB-ISSUE-156.md` §11 P1 contract; `src/db/queries/audit-log.ts`, `src/db/authClient.ts`, `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`, `src/app/admin/player-links/`, `tests/auth.test.ts`.
-- **Next action:** fresh worktree + `npm run preflight -- --mode implementation --issue 157`; re-verify the two privilege grants and the `Capability` union since `e27e985`; then implement. Stop if any write path or any privilege/migration becomes necessary for the default scope.
+- **Next action:** operator merges `fable/issue-157-admin-audit` after `npm run merge:ready -- --issue 157`; then start `AFLDB-ISSUE-158` in a fresh implementation session: `npm run worktree:bootstrap -- --issue 158 --branch <agent>/issue-158`, `npm run preflight -- --mode implementation --issue 158`, carrying `AFLDB-ISSUE-156.md` §11 P2 contract. P2 can reuse `src/components/admin/AdminPager.tsx` and the `operations.audit.read` enforcement as the pattern for every other capability.
 
 ## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
 
