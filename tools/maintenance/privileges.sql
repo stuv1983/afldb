@@ -350,6 +350,34 @@ BEGIN
     GRANT SELECT ON player_link_suggestions TO afldb_import;
   END IF;
 
+  -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
+  -- workflow. These two tables record administrative decisions -- who
+  -- drafted, who finalised, who published a season and from which
+  -- revision -- and no ETL job writes them. They are deliberately outside
+  -- import_writable_tables for the 080 reason: that registry's loop grants
+  -- TRUNCATE and unrestricted DELETE, which is precisely the power a
+  -- record of decisions must not hand to a reload path. A promotion or
+  -- restore that loses these rows erases admin decisions silently, which
+  -- is why §27.22 of the issue makes carrying them a stop condition.
+  --
+  -- SELECT is needed for the FOR UPDATE row locks the four transactions
+  -- take, UPDATE for every state transition, INSERT for a first draft and
+  -- the insert-if-absent authority row, DELETE for a discarded entry.
+  -- Neither table owns a sequence: the primary keys are match_id and
+  -- season, both supplied, so there is nothing to grant beside them.
+  -- The revoke loop above strips these each run; re-grant them here. This
+  -- block sits BEFORE the migration-080 block on purpose: the external
+  -- grid corpus test (tests/external-grids-import.test.ts) reads the text
+  -- from the external_grid_sources guard to the next staging guard and
+  -- asserts it grants no DELETE, so nothing carrying a DELETE grant may
+  -- fall inside that span.
+  IF to_regclass('public.brownlow_vote_entry_state') IS NOT NULL THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_vote_entry_state TO afldb_import;
+  END IF;
+  IF to_regclass('public.brownlow_season_authority') IS NOT NULL THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_season_authority TO afldb_import;
+  END IF;
+
   -- Migration 080 (AFLDB-ISSUE-118): the external grid corpus is captured
   -- historical evidence, so it is deliberately outside
   -- import_writable_tables -- that registry's loop grants UPDATE, DELETE
@@ -368,29 +396,6 @@ BEGIN
   IF to_regclass('public.external_grid_axes') IS NOT NULL THEN
     GRANT SELECT, INSERT ON external_grid_axes TO afldb_import;
     GRANT USAGE, SELECT ON SEQUENCE external_grid_axes_id_seq TO afldb_import;
-  END IF;
-
-  -- Migration 094 (AFLDB-ISSUE-155 Phase C1): the Brownlow administration
-  -- workflow. These two tables record administrative decisions -- who
-  -- drafted, who finalised, who published a season and from which
-  -- revision -- and no ETL job writes them. They are deliberately outside
-  -- import_writable_tables for the 080 reason: that registry's loop grants
-  -- TRUNCATE and unrestricted DELETE, which is precisely the power a
-  -- record of decisions must not hand to a reload path. A promotion or
-  -- restore that loses these rows erases admin decisions silently, which
-  -- is why §27.22 of the issue makes carrying them a stop condition.
-  --
-  -- SELECT is needed for the FOR UPDATE row locks the four transactions
-  -- take, UPDATE for every state transition, INSERT for a first draft and
-  -- the insert-if-absent authority row, DELETE for a discarded entry.
-  -- Neither table owns a sequence: the primary keys are match_id and
-  -- season, both supplied, so there is nothing to grant beside them.
-  -- The revoke loop above strips these each run; re-grant them here.
-  IF to_regclass('public.brownlow_vote_entry_state') IS NOT NULL THEN
-    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_vote_entry_state TO afldb_import;
-  END IF;
-  IF to_regclass('public.brownlow_season_authority') IS NOT NULL THEN
-    GRANT SELECT, INSERT, UPDATE, DELETE ON brownlow_season_authority TO afldb_import;
   END IF;
 
   -- Staging is the importer's own workspace and holds no operational

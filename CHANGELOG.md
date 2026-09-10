@@ -15,6 +15,42 @@ commit.
 
 ## [Unreleased]
 
+### Brownlow administration has a UI (AFLDB-ISSUE-155 Phase C2) - 10 September 2026
+
+- `/admin/brownlow` is the place Brownlow votes are now entered, finalised and published. It
+  lists every polled season with its status, coverage counts, publication authority and last
+  editor; drills into a season's rounds and their completeness; and, per round, shows every
+  home-and-away match with an inline editor. Finals never appear — no votes are awarded in them.
+- Each match editor lists only the players in that match's canonical line-up, grouped by club
+  with their jumper numbers (jumper numbers are text, not numbers). Three type-ahead selectors
+  award the 3, the 2 and the 1; a player already chosen for one cannot be chosen for another.
+  An incomplete selection can be saved as a draft; finalising needs all three and a complete
+  line-up. Where the line-up is short, the editor says which side is short and links to the
+  match sheet, and finalise/void are blocked until it is repaired. Source-published votes can
+  be adopted into the selection with one control.
+- The controls follow the capability split: an Admin may save drafts; only a Super Admin sees
+  working Finalise, Correct, Void and Publish controls — an Admin sees them disabled with the
+  reason. Correcting a finalised match and voiding one each require a typed reason, and the
+  editor says plainly that a correction changes canonical facts and that a void withdraws the
+  vote values while keeping the participation record.
+- The season page carries the publish panel: publication readiness, the blockers the backend
+  would return, an ineligible-player multi-select prefilled from the current season rows, and a
+  source-vs-manual authority line. Publishing is a two-step confirm, Super Admin only, and a
+  stale season revision comes back as a reload prompt rather than a generic error. For a
+  source-published season the round-fact-vs-published-total disagreement is shown on the page.
+- A stale-tab conflict on any of these — someone else finalised the match, a settle landed a
+  vote, the season moved — is surfaced as "someone changed this while you were editing it,
+  reload" with the entered values preserved, never as a silent overwrite and never as
+  "already decided". Backend refusals `stale`, `already_final` and `forbidden` are written to
+  the audit trail; ordinary validation refusals are not.
+- The legacy match sheet's Brownlow column is now read-only: it shows the recorded value or a
+  dash, submits nothing, and points authorised admins at `/admin/brownlow`. This pairs with the
+  Phase C1 rule that the match sheet refuses any Brownlow value — normal match-sheet editing is
+  now compatible with that rule because the value is never sent.
+- The Data section of the admin sidebar gains a Brownlow link (visible to every staff role
+  above contributor), and the dashboard shows the current season's count of home-and-away
+  matches still without finalised votes.
+
 ### Brownlow votes have a canonical match identity (AFLDB-ISSUE-155 Phase C1) - 10 September 2026
 
 - A Brownlow vote is now a fact about a **match**, not just about a season and a round number.

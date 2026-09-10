@@ -82,8 +82,9 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
   ];
 
   const dataLinks = visibleLinks(viewer, [
-    { href: '/admin/player-links', label: 'Player links', capability: 'data.playerLinks' },
     { href: '/admin/data-editor', label: 'Data editor', capability: 'data.dataEditor' },
+    { href: '/admin/brownlow', label: 'Brownlow', capability: 'data.brownlow.read' },
+    { href: '/admin/player-links', label: 'Player links', capability: 'data.playerLinks' },
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 

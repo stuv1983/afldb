@@ -3,8 +3,10 @@ import Link from 'next/link';
 
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
+import { getBrownlowDashboardBadge } from '@/db/queries/admin-brownlow-ui';
 import { listUnresolvedLinks } from '@/db/queries/player-links';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireAdmin } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 import { GRID_AUDIENCES } from '@/lib/site-settings';
@@ -23,7 +25,12 @@ export default async function AdminDashboard() {
   // counts of open work. Player-link resolution is super-admin-only, so the
   // (unpaginated) unresolved-link read only runs for that role -- the same
   // query the player-links page itself already runs on every visit.
-  const [{ gridAudience }, submissions, recentAudit, unresolvedLinks] = await Promise.all([
+  const canReadBrownlow = hasCapability(
+    { role: admin.role, canManageAdmins: admin.canManageAdmins },
+    'data.brownlow.read',
+  );
+
+  const [{ gridAudience }, submissions, recentAudit, unresolvedLinks, brownlowBadge] = await Promise.all([
     getSiteSettingsForAdmin(),
     authSql<{
       id: number; dataset: string; filename: string; status: string;
@@ -43,6 +50,7 @@ export default async function AdminDashboard() {
        LIMIT 15
     `,
     admin.role === 'super_admin' ? listUnresolvedLinks() : Promise.resolve([]),
+    canReadBrownlow ? getBrownlowDashboardBadge() : Promise.resolve(null),
   ]);
 
   const pending = submissions.filter((s) => ['staged', 'validated'].includes(s.status));
@@ -67,6 +75,14 @@ export default async function AdminDashboard() {
         <p className="notice">
           <Link href="/admin/player-links">
             {unresolvedLinks.length} player link{unresolvedLinks.length === 1 ? '' : 's'} awaiting resolution.
+          </Link>
+        </p>
+      )}
+      {brownlowBadge && brownlowBadge.incomplete > 0 && (
+        <p className="notice">
+          <Link href={`/admin/brownlow/${brownlowBadge.season}`}>
+            {brownlowBadge.incomplete} of {brownlowBadge.expected} {brownlowBadge.season} home-and-away
+            match{brownlowBadge.incomplete === 1 ? '' : 'es'} still need Brownlow votes.
           </Link>
         </p>
       )}

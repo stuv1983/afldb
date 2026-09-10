@@ -581,15 +581,34 @@ describe('adminNavFor', () => {
   });
 
   it('omits a group entirely for a viewer with no capability it contains, rather than showing it empty', () => {
-    // A plain admin holds no capability in Data, Site or Operations today.
-    expect(idsFor({ role: 'admin', canManageAdmins: false })).toEqual([
-      'overview', 'acquisition', 'people', 'account',
+    // A plain admin holds no capability in Site or Operations, so those groups
+    // are absent. The Data group appears from AFLDB-ISSUE-155 Phase C2: an Admin
+    // may read and draft Brownlow votes (§27.8), so it holds exactly that link.
+    const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
+    expect(groups.map((g) => g.id)).toEqual([
+      'overview', 'data', 'acquisition', 'people', 'account',
     ]);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow']);
   });
 
   it('gives a super admin every group, in the runbook\'s section order', () => {
     expect(idsFor({ role: 'super_admin', canManageAdmins: false })).toEqual([
       'overview', 'data', 'acquisition', 'people', 'site', 'operations', 'account',
+    ]);
+  });
+
+  it('shows the Brownlow link to every staff role above contributor, and never to a contributor', () => {
+    // Gated on data.brownlow.read (ADMIN_AND_UP), the same capability the
+    // route's requireCapability guard enforces.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/brownlow');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/brownlow');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
+  });
+
+  it('keeps the Data group in section order: data editor, Brownlow, player links', () => {
+    const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
+    expect(data?.links.map((l) => l.href)).toEqual([
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links',
     ]);
   });
 

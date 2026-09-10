@@ -333,6 +333,17 @@ describe('load_reference_data.py', () => {
       // one appear silently.
       expect(unregistered).toEqual([
         'app_health_events',
+        // 094 (AFLDB-ISSUE-155 Phase C1). The Brownlow administration
+        // workflow: a record of who drafted, finalised, voided and
+        // published. Deliberately outside afldb_meta.import_writable_tables
+        // for the same reason as canonical_applications / data_edits —
+        // registering it would restore UPDATE/DELETE/TRUNCATE to the
+        // import role on every reconcile — and mirrored narrowly in
+        // privileges.sql (SELECT/INSERT/UPDATE/DELETE, no TRUNCATE, no
+        // sequence). Carrying these two tables into the ISSUE-151
+        // promotion/restore lineage is the §27.28 / §27.22 follow-up.
+        'brownlow_season_authority',
+        'brownlow_vote_entry_state',
         // 083 (AFLDB-ISSUE-122). The canonical application ledger is
         // append-only BY GRANT: migration 083 hands afldb_import SELECT,
         // INSERT and the sequence only, and afldb_auth SELECT. Registering
@@ -346,6 +357,14 @@ describe('load_reference_data.py', () => {
         // the column-scoped Data Editor upsert capability, and keeps the
         // table outside afldb_meta.import_writable_tables.
         'data_overrides',
+        // 080 (AFLDB-ISSUE-118). The external grid corpus: immutable
+        // captured evidence, append-only by grant (SELECT/INSERT plus the
+        // one is_current column), never registered for import write. It is
+        // classified in the promotion contract (tools/db/promotion-inventory.ts)
+        // rather than the football/import-writable set.
+        'external_grid_axes',
+        'external_grid_sources',
+        'external_grids',
         'nl_search_feedback',
         'nl_search_log',
         'nl_search_review',

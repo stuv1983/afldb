@@ -557,7 +557,7 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A and B complete and validated; Phase C1 implementation complete (migration 094 applied and post-validated on `afldb_test`; items 7–9 written), awaiting the C1 gate run | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27 (P13 evidence §27.29); next: run the §27.25 gate sequence (focused suites → typecheck → integration set), then C2 (Sonnet High, §27.26) |
+| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -21041,3 +21041,148 @@ None of these is an ISSUE-155 regression and none is a historical-data regressio
 **Phase C1 is complete and its gate is green** on everything ISSUE-155 owns. C2 is not started and nothing has been deployed.
 
 **Exact next action:** commit the C1 closeout on `codex/issue-155-admin-overhaul`, then start **Phase C2** (§27.26, Sonnet high, fresh session). Do not absorb the §27.31 database-state policy question or the `external_grid` privilege mismatch into C2.
+
+### Phase C2 implementation and validation (2026-09-10) — Sonnet, high
+
+**Built, per §27.26.** A thin UI over the fixed C1 read model and transactions; no transaction,
+guard, SQL or audit code changed.
+
+- **Routes.** `src/app/admin/brownlow/page.tsx` (polled-season list: status label, coverage
+  counts, authority, last editor via an `authSql` email lookup); `[season]/page.tsx` (coverage
+  strip, per-round completeness table, source-vs-published disagreement report, and the publish
+  panel); `[season]/[round]/page.tsx` (every H&A match in fixture order, one inline editor
+  each, round nav from `overview.rounds`, a standing note that finals are not administered).
+- **Client components.** `[season]/[round]/RoundMatches.tsx` owns every editor's last result so
+  it survives the revalidation a successful write triggers (§26.20 deviation 2) and moves focus
+  to the next match on success; `[season]/[round]/MatchVoteEditor.tsx` (participants grouped by
+  club with text jumper numbers, three type-ahead selectors that exclude each other's picks,
+  Adopt for imported rows, a participant-incomplete block linking the match sheet, Save
+  draft / Finalise / Correct / Void with `formAction` per button, reason field for Super
+  Admin, keyboard flow 3→2→1→Save→next match, entered values kept on a refusal);
+  `[season]/PublishPanel.tsx` (readiness, backend blockers, ineligible-player multi-select
+  prefilled from the current rows, `expectedRevision` hidden field, two-step confirm, Super
+  Admin only, stale → reload prompt).
+- **Server Actions.** `src/app/admin/brownlow/actions.ts` — `saveDraftAction` behind
+  `requireCapability('data.brownlow.draft')`; `finaliseAction` / `correctAction` / `voidAction`
+  / `publishSeasonAction` behind `requireCapability('data.brownlow.finalise')`. Each parses
+  ids / revisions / fingerprint / selection / reason, calls the C1 transaction, audits
+  `stale` / `already_final` / `forbidden` refusals via `audit('admin.brownlow_refused', …)`
+  (never `invalid` / `not_found` / the domain refusals), and revalidates per §27.18 —
+  admin paths always, `/seasons/<year>` (+ best-effort cross-worker `revalidateSeason` when
+  `AFLDB_REVALIDATE_URL` is set) and `/matches/<id>` on a fact write, plus `/brownlow`,
+  `/brownlow/<year>`, `/players/[slug]`, `/clubs/[slug]`, `/records/[category]` when a
+  publication or a re-derived published season is involved.
+- **Supplementary reads.** `src/db/queries/admin-brownlow-ui.ts` (server-only, SELECT only —
+  `listSeasonPolledPlayers`, `getBrownlowSeasonAdminMeta`, `resolveAdminEmails`,
+  `getBrownlowDashboardBadge`). The sole-writer contract in
+  `tests/admin-match-mutations.test.ts` is unaffected.
+- **Nav + dashboard.** `src/app/admin/nav-model.ts` gains a Data-group Brownlow link on
+  `data.brownlow.read` (so a plain Admin now has a Data group with exactly that link);
+  `src/app/admin/page.tsx` shows the current polled season's incomplete-H&A count for anyone
+  with `data.brownlow.read`.
+- **Match sheet (§27.15).** `MatchSheetEditor.tsx` renders the BV column read-only (value or
+  "—"), removes `brownlowVotes` from the submitted payload entirely, and shows a line linking
+  the match's Brownlow editor (`/admin/brownlow/<season>/<round>#match-<id>`) for H&A matches,
+  or "not awarded in finals" otherwise.
+- **Tests.** New `tests/admin-brownlow-actions.test.ts` (24 cases, the
+  `tests/admin-lifecycle-actions.test.ts` mocked-module pattern: capability boundary incl. an
+  Admin who can draft but not finalise/correct/void/publish, form parsing, the exact
+  transaction arguments, `void` called with no `selection`, the refusal-audit set, publish
+  ineligible-id parsing, revalidation targets). `tests/auth.test.ts` extended for the nav
+  (`adminNavFor` now gives a plain Admin a `data` group holding only `/admin/brownlow`; Data
+  order is data-editor → brownlow → player-links; contributor still sees none). One line added
+  to the `tests/admin-nav/admin-nav.spec.ts` diagnostic route list.
+
+**Two pre-existing test failures repaired while validating (not C2 regressions — proved by
+`git log` on the files, and by the fact that C2 touches no migration, no enum, no contract):**
+
+1. `tests/external-grids-import.test.ts > never widens the corpus grants past append-only` —
+   a genuine small C1 defect: migration 094's `privileges.sql` mirror block was inserted
+   *between* the migration-080 `external_grid_sources` guard and the `staging` guard, i.e.
+   inside the text span that test reads and asserts carries no `DELETE`. **Fixed** by moving
+   the Brownlow block to *before* the migration-080 block (still after the revoke loop, still
+   "beside the 066/080 blocks"), with a comment stating why. `tests/integration/privileges.test.ts`
+   (real grants on `afldb_test`) is position-independent and stays green.
+2. `tests/reference-data.test.ts > finds the tables created after 045 that never registered
+   import write` — the expected list had not been updated since ISSUE-122 (migration 083), so
+   it was already red on this branch from the Gridley corpus merge (migration 080's
+   `external_grid_*` trio, never `grant_import_write`-registered by design). **Synced** the
+   list: added `brownlow_vote_entry_state` and `brownlow_season_authority` (narrow-grant by
+   design, same as `canonical_applications` / `data_edits` already in the list) and the
+   `external_grid_*` trio, each with a comment.
+
+**C2 validation evidence.**
+
+| Gate | Command | Result |
+|---|---|---|
+| Types | `npm run typecheck` | **GREEN** (`next typegen` + `tsc --noEmit`, no diagnostics) |
+| C2 Server Actions + nav | `npx vitest run tests/admin-brownlow-actions.test.ts tests/auth.test.ts` | **PASS** (24 + the auth suite) |
+| Match sheet backend | `tests/match-sheet.test.ts` | **PASS** |
+| Sole-writer / match-mutation contracts | `tests/admin-match-mutations.test.ts` | **PASS** |
+| C1 canonical suite (regression) | `npx vitest run tests/integration/admin-brownlow.test.ts --testTimeout=120000 --hookTimeout=600000` | **44/44 PASS** (~112 s); migration 094 not reapplied |
+| Data editor integration | `tests/integration/data-editor.test.ts` | 11 passed / 1 failed / 2 skipped — T6/T6b/T6c PASS; the one failure is the pre-existing 2026 ladder/no-matches drift (§27.31 item 4) |
+| Privileges integration | `tests/integration/privileges.test.ts` | 35 passed / 1 failed — the failure is the known `external_grid_axes` / `external_grids` "WRITABLE BUT NOT REGISTERED" mismatch (§27.31 "untouched, by instruction"); the two Brownlow workflow tables are correctly SELECT-for-app / write-for-import / nothing-for-auth |
+| Full DB-free suite | `npx vitest run tests/ --exclude 'tests/integration/**'` | **3970 passed / 3 failed / 14 skipped** — see below |
+
+**The 3 remaining DB-free failures, and the integration failures above, are all external or
+deferred — none is a C2 regression:**
+
+- `tests/db-promotion-check.test.ts` ×2 ("leaves exactly the pinned football tables
+  unclassified", "classifies every migration-created table the way the live gate does") —
+  `brownlow_vote_entry_state` and `brownlow_season_authority` are not yet in
+  `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`). This is **exactly the §27.28
+  follow-up** ("adding the Brownlow tables and manual-owned rows to the promotion/restore
+  lineage (ISSUE-151 pipeline) before any post-Phase-C promotion") and a **§27.22 stop
+  condition for running any promotion after Phase C**. It was deliberately not done in C2
+  (operator decision, 2026-09-10): registering the two tables via `grant_import_write()` is
+  the *wrong* fix — it would hand `afldb_import` (a reload path) TRUNCATE and unrestricted
+  DELETE on a record of administrative decisions, the precise thing migrations 066/073/078/080/083
+  and migration 094 itself avoid. The correct fix is two `PROMOTION_CONTRACT` entries with
+  `footballRefs` / `lineageRefs` / remediation for `match_id → matches` (current-season id
+  remap via `match_key`), the player-id and season references, plus an update to the hardcoded
+  assertion list at `tests/db-promotion-check.test.ts:349`.
+- `tests/finals-semantics-contract.test.ts > adds the enum value in its own migration` — the
+  Windows CRLF false-failure: two identical-looking one-element arrays that differ only by
+  a trailing `\r`. Passes on Linux. Documented; do not flip `autocrlf`.
+- `tests/integration/data-editor.test.ts` ladder assertion and the
+  `external_grid_axes`/`external_grids` privilege mismatch — both explicitly recorded as
+  externally owned in §27.31 and untouched by ISSUE-155.
+
+**Manual / operator validation (deferred to the operator).** No dev server was running and
+CLAUDE.md keeps server start-up and browser sessions with the operator. The §27.27 browser
+acceptance at 1440×900 and 375×812 on DEV — Admin can draft but not finalise/publish; Super
+Admin can finalise/correct/void/publish; stale-tab conflict shows the reload message with
+values kept; a match-sheet save writes unrelated stats without touching the Brownlow mirror;
+`/admin/brownlow` usable at both widths; no finals administerable; publication state obvious;
+zero console/runtime errors — has **not** been run and is the remaining C2 validation step.
+
+**Deployment.** C1 and C2 deploy together (the old MatchSheetEditor still posted Brownlow
+values, which C1 now refuses; C2 stops it posting them). Deployment is **NOT** safe yet:
+(1) the §27.21 sequence has not been run on DEV or PROD; (2) the browser acceptance above is
+outstanding; (3) the `PROMOTION_CONTRACT` follow-up below is a pre-deploy stop condition for
+any promotion that would run after this ships.
+
+**Files changed in C2.** New: `src/app/admin/brownlow/labels.ts`,
+`src/app/admin/brownlow/actions.ts`, `src/app/admin/brownlow/page.tsx`,
+`src/app/admin/brownlow/[season]/page.tsx`, `src/app/admin/brownlow/[season]/PublishPanel.tsx`,
+`src/app/admin/brownlow/[season]/[round]/page.tsx`,
+`src/app/admin/brownlow/[season]/[round]/RoundMatches.tsx`,
+`src/app/admin/brownlow/[season]/[round]/MatchVoteEditor.tsx`,
+`src/db/queries/admin-brownlow-ui.ts`, `tests/admin-brownlow-actions.test.ts`. Modified:
+`src/app/admin/nav-model.ts`, `src/app/admin/page.tsx`,
+`src/app/admin/data-editor/MatchSheetEditor.tsx`, `tools/maintenance/privileges.sql`,
+`tests/auth.test.ts`, `tests/reference-data.test.ts`, `tests/admin-nav/admin-nav.spec.ts`.
+
+**ISSUE-155 remains OPEN.** Exact remaining task before it can close:
+
+> Add `brownlow_vote_entry_state` and `brownlow_season_authority` to `PROMOTION_CONTRACT` in
+> `tools/db/promotion-inventory.ts` with `productionOnly: true`, `treatment: 'reinstate'`,
+> `compare: 'equal'`, `restoreAfter: ['auth_users']`, and the required `footballRefs` (for
+> `brownlow_vote_entry_state`: `match_id → matches` NOT NULL with a decided remediation for the
+> current-season id-remap via `matches.match_key`; `three_player_id`/`two_player_id`/
+> `one_player_id → players`; `season → seasons`. For `brownlow_season_authority`:
+> `season → seasons`) and `lineageRefs` where an id can silently change meaning. Update the
+> hardcoded reference list at `tests/db-promotion-check.test.ts:349`. Then re-run
+> `npx vitest run tests/db-promotion-check.test.ts` to green. Do NOT register the tables via
+> `grant_import_write()`. This is the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up
+> and a pre-deploy stop condition; no new issue ID.
