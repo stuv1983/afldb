@@ -7,7 +7,20 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 14 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`.
+**Open issues:** 18 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-157`, `-158`.
+
+<!-- 2026-09-11 (ADMIN CENTRE COMPLETION UMBRELLA ALLOCATED — PLANNING ONLY):
+     `AFLDB-ISSUE-156` (Admin Centre completion umbrella), `AFLDB-ISSUE-157` (P1 Admin foundation
+     and audit viewer) and `AFLDB-ISSUE-158` (P2 Capability enforcement) allocated after verifying
+     none appeared anywhere in the working tree or `git log --all`. ISSUE-155 Phases D–I transfer
+     BY REFERENCE to the 156 umbrella (P3/P4/P6/P7/P11/P12); ISSUE-155 retains only the PROD closeout
+     of implemented A/B/C1/C2. P3–P12 are named placeholders with NO ID until each phase starts.
+     `AFLDB-ISSUE-154` remains a ledger hole reserved for the Grid Solver won-final defect — not
+     reused. Migration 095 is only the planning-time next-free snapshot and is NOT allocated.
+     Runbook: `AFLDB-ISSUE-156.md`. No `src/`, `tools/`, `tests/`, `deploy/` or `CHANGELOG.md`
+     change. This count also corrects the header, which omitted the already-open `-155`. -->
+
+
 
 <!-- 2026-09-09 (ISSUE-152 PHASE D RENDERED ACCEPTANCE COMPLETE AND GREEN; UNBLOCKED HALF CLOSED):
      the rendered sweep §23 left as the next action has been RUN, and the unblocked Phase D
@@ -557,7 +570,10 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close |
+| **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Planning complete 2026-09-11 — no implementation started. Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children allocated: 157 (P1), 158 (P2); P3–P12 are named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: start ISSUE-157 in a fresh implementation session |
+| **ID:** AFLDB-ISSUE-157 — Admin foundation and audit viewer (156 P1) | **Status:** Open / Not started — read-only `/admin/audit` over `auth_audit_log` + `data_edits`; confirmed no migration and no privilege change (`privileges.sql:441`, `:463`); `data_overrides` visibility deferred (afldb_import-only grant). | **Severity:** Medium | **Area:** Admin / Auth / Operations; contract `AFLDB-ISSUE-156.md` §11 P1; next: `npm run preflight -- --mode implementation --issue 157` on a fresh worktree |
+| **ID:** AFLDB-ISSUE-158 — Capability enforcement (156 P2) | **Status:** Open / Not started — make the 15 unenforced capabilities in `src/lib/auth/capabilities.ts` authoritative via `requireCapability()` plus a source-contract regression in `tests/auth.test.ts`; `people.admins.lifecycle` keeps `requireSuperAdmin`. No migration, no privilege change. | **Severity:** Medium | **Area:** Admin / Auth; contract `AFLDB-ISSUE-156.md` §11 P2; next: after ISSUE-157, same preflight with `--issue 158` |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -21757,3 +21773,213 @@ session should plan the PROD promotion/deploy sequence (equivalent §27.21 steps
 production, plus whatever additional promotion/restore-lineage considerations the ISSUE-151
 pipeline requires for a production host, which was never part of this DEV pass) as its own
 deliberate, separately-scoped piece of work — not a continuation to start automatically.
+
+### Scope transfer — Phases D–I moved to AFLDB-ISSUE-156 (2026-09-11)
+
+Planning-only session; no code, test, migration, privilege or deployment change. The remaining
+unimplemented scope of this issue — `AFLDB-ISSUE-155.md` §23 Phase D (coach administration),
+Phase E (special records and durable suppression), Phase F (structured site content), Phase G
+(safe current-season refresh jobs), Phase H (dataset-by-dataset CSV transition) and Phase I
+(integrated acceptance and permission audit) — is **transferred by reference** to the new
+`AFLDB-ISSUE-156` Admin Centre completion umbrella (runbook `AFLDB-ISSUE-156.md` §0), where they
+become placeholder phases P3, P4, P6, P7, P11 and P12. `AFLDB-ISSUE-155.md` is not rewritten; its
+§5/§6/§7/§17/§18/§23 remain the binding baseline architecture and are cited, not re-derived.
+
+**ISSUE-155 now owns only the PROD closeout of the implemented and DEV-accepted Phases A, B, C1
+and C2.** That PROD leg is not a blocker for ISSUE-156 or any of its children. Nothing about the
+committed branch state (`3eb6739`, `e27e985`) changes.
+
+Two findings established during the ISSUE-156 planning that bear on the transferred phases are
+recorded in `AFLDB-ISSUE-156.md` §10 and repeated here so the D-phase owner cannot miss them:
+- Coach-only identity creation as this issue's §9 described it **cannot be implemented as
+  specified**: `coaches.afltables_coach_path` is `NOT NULL UNIQUE` (migration 087:38) and
+  `coaches.source_id` is `NOT NULL` (087:58). ISSUE-156 P3 must resolve the schema/provenance
+  decision at preflight before any UI work (stop condition C-1).
+- The audit viewer prerequisite (ISSUE-157) reads `auth_audit_log` and `data_edits` with no
+  migration or privilege change; `data_overrides` visibility needs separate privilege/deploy
+  treatment and is outside that phase's default scope.
+
+## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
+
+**Status:** Open / Planning complete 2026-09-11 — no implementation started.
+**Severity:** Medium
+**Area:** Admin / Authentication / Data management / Acquisition / Operations
+**Found:** 2026-09-11
+**Runbook:** `AFLDB-ISSUE-156.md`
+**Lineage:** `AFLDB-ISSUE-155` Phases D–I (transferred by reference, see that entry's
+"Scope transfer" record). ISSUE-155 retains only its PROD closeout.
+
+### Problem
+
+ISSUE-155 delivered the Admin Centre shell, Super Admin lifecycle and Brownlow administration
+(A/B/C1/C2, DEV-accepted 2026-09-11) but everything from its Phase D onward — coaches, special
+records, honours lifecycle, site content, refresh controls, CSV transition and integrated
+acceptance — is unimplemented. Two structural gaps surfaced during C1/C2 that every later phase
+depends on and that no issue tracked:
+
+1. **The audit trail is effectively invisible.** `src/app/admin/page.tsx:46-51` is the only read
+   of `auth_audit_log` in the application (three columns, `LIMIT 15`, no `detail`, no filters).
+   `data_edits` has zero read surface in `src/`; its only touch point is the writer in
+   `src/db/queries/audit-log.ts`. "Who changed player X, when, from what, to what" is answerable
+   only by SQL.
+2. **The capability model is decorative.** `src/lib/auth/capabilities.ts` declares 18
+   capabilities; only the three `data.brownlow.*` ones reach `requireCapability()`. The other 15
+   exist solely in `src/app/admin/nav-model.ts` visibility. Enforcement is 130 role-name guard
+   call sites (`requireSuperAdmin` 78, `requireAdmin` 23, `requireUploader` 13,
+   `requireAdminManager` 5) against 11 `requireCapability` calls. Editing a capability today
+   changes the sidebar and nothing else — exactly the drift ISSUE-155 §17 forbids.
+
+### Scope
+
+- Own the remaining Admin Centre work as an umbrella; sequence the two prerequisites first.
+- Children allocated now: `AFLDB-ISSUE-157` (P1 Admin foundation and audit viewer) and
+  `AFLDB-ISSUE-158` (P2 Capability enforcement).
+- Named placeholders, ID allocated only when each starts: P3 Coach administration (155 Phase D),
+  P4 Special records (Phase E), P5 Awards/honours correction lifecycle, P6 Site content and
+  versioning (Phase F), P7 Safe refresh and operational controls (Phase G), P8 Data-editor
+  decomposition into domain routes, P9 Player/entity lifecycle incl. merge (HIGH blast radius),
+  P10 Fixture-identity correction (HIGH), P11 Dataset-by-dataset CSV transition (Phase H),
+  P12 Integrated acceptance and permission audit (Phase I).
+- Reuse ISSUE-155's approved architecture (§5/§6/§7/§17/§18/§23) rather than redesign it.
+
+### Planning decisions (owner-confirmed 2026-09-11)
+
+- ISSUE-155 PROD is not a blocker. ISSUE-151 is not a blocker; its promotion/restore-lineage
+  contract must be honoured: every phase that adds a table or a NOT NULL football reference
+  (P3, P4, P5, P7, P9, P10) adds its `tools/db/promotion-inventory.ts` classification in the same
+  change. P1, P2, P6, P8, P11, P12 are unaffected.
+- `AFLDB-ISSUE-154` is a ledger hole reserved by `IssuesIndex.md` for the Grid Solver won-final
+  defect. Not reused.
+- Migration 095 is only the planning-time next-free snapshot (highest on all local branches is
+  094). Not allocated. Every phase re-checks numbering at its own preflight.
+- `CHANGELOG.md` not updated — planning only, no retained project change.
+
+### Confirmed current-state evidence (2026-09-11 snapshot)
+
+- `tools/maintenance/privileges.sql:441` grants `afldb_auth` `SELECT, INSERT` on
+  `auth_audit_log`; `:463` the same on `data_edits`. The `afldb_auth` list is subtractive
+  (`:430-434`). `data_overrides` is granted only to `afldb_import` (`:318-327`).
+- `coaches.afltables_coach_path` `NOT NULL UNIQUE` and `coaches.source_id` `NOT NULL`
+  (migration 087:38, :58) — ISSUE-155 §9 coach-only identity creation cannot be implemented as
+  specified; P3 stop condition C-1.
+- `data_overrides.entity_type` CHECK still only `('players','matches','draft_picks')` (073);
+  `data_edits.table_name` allowlist at 8 entities (057 → 058 → 094).
+- No player-merge tooling exists anywhere in the repository. `src/lib/acquisition/match-rekey.ts`
+  owns fixture rekey and reads `data_overrides` (`:191`, `:199`).
+- CSV/upload/email ingestion is live (6 datasets in `src/lib/ingest/datasets.ts`, plus
+  `tools/email_intake/fetch_and_stage.py`). `/admin/grid-solver` is a `permanentRedirect` shell.
+  `/admin/data-editor` is 3,694 lines over 12 files.
+
+### Validation
+
+Documentary only: `AFLDB-ISSUE-156.md` exists with its twelve sections and both child handoff
+contracts; `issues.md` and `IssuesIndex.md` list 156/157/158 and agree; no file under `src/`,
+`tools/`, `tests/`, `deploy/` and no `CHANGELOG.md` change.
+
+### Next action
+
+Start `AFLDB-ISSUE-157` in a fresh implementation session (Fable, high effort, normal
+implementation mode; escalate to a fresh Opus session only if implementation uncovers genuine
+auth/privilege architecture ambiguity) from a new
+worktree: `npm run worktree:bootstrap -- --issue 157 --branch <agent>/issue-157`, then
+`npm run preflight -- --mode implementation --issue 157`, carrying over `AFLDB-ISSUE-156.md`
+§11 P1 handoff contract and §4/§5.
+
+## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
+
+**Status:** Open / Not started
+**Severity:** Medium
+**Area:** Admin / Authentication / Operations
+**Found:** 2026-09-11
+**Parent:** `AFLDB-ISSUE-156` (contract: `AFLDB-ISSUE-156.md` §11 "P1 handoff contract")
+
+### Problem
+
+`auth_audit_log` and `data_edits` are written on every admin mutation and refusal but have no
+usable read surface (see ISSUE-156 Problem 1). Later phases cannot prove attribution or
+correctness without seeing the audit trail they write.
+
+### Scope
+
+- New read-only `/admin/audit` route (Operations group): unified timeline or two tabs over
+  `auth_audit_log` and `data_edits`; filters for actor, date range, entity
+  (`table_name` + `row_id`) and action; a per-entity "who changed what, from → to" view over
+  `data_edits.old_values` / `new_values`.
+- SELECT-only reader functions beside the writer in `src/db/queries/audit-log.ts`.
+- A viewer capability added to the `Capability` union and enforced with `requireCapability()`.
+- `src/components/admin/` extraction only where two or more admin routes already duplicate the
+  pattern; reuse the `player-links` pager.
+
+### Established facts (planning, 2026-09-11)
+
+- **No migration and no privilege change** for the default scope: `privileges.sql:441` and `:463`
+  already grant `afldb_auth` SELECT on both tables via `src/db/authClient.ts`.
+- `data_overrides` visibility is **deferred**: `afldb_import`-only grant, subtractive `afldb_auth`
+  list, so it needs a `privileges.sql` change plus a deploy-order step. Optional later extension.
+- Driver traps: both `id` columns are `bigint` and postgres.js returns int8 as a string (cast
+  `::int` or key on strings); `auth_audit_log.detail` is `jsonb` and is already decoded.
+- No ISSUE-151 dependency (no table, no football FK). No ISSUE-155 PROD dependency.
+
+### Validation (planned)
+
+Query-contract unit tests → route/action authorisation for Contributor/Admin/Super Admin →
+filter-correctness integration on `afldb_test` → responsive browser pass 320 px / tablet /
+desktop → typecheck. Nav contract extends `tests/auth.test.ts`.
+
+### Stop conditions
+
+Any write path introduced; any privilege or migration found necessary for the default scope.
+
+### Next action
+
+Fresh implementation session: bootstrap worktree for issue 157, run
+`npm run preflight -- --mode implementation --issue 157`, re-verify the privilege grants and
+the `Capability` union, then implement per the §11 P1 contract.
+
+## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
+
+**Status:** Open / Not started
+**Severity:** Medium
+**Area:** Admin / Authentication
+**Found:** 2026-09-11
+**Parent:** `AFLDB-ISSUE-156` (contract: `AFLDB-ISSUE-156.md` §11 "P2 handoff contract")
+**Lineage:** extends `AFLDB-ISSUE-155` §23 Phase A
+
+### Problem
+
+Of 18 declared capabilities in `src/lib/auth/capabilities.ts`, only the three `data.brownlow.*`
+ones are enforced by `requireCapability()`; the rest drive navigation visibility only, while
+authorisation is 130 role-name guard call sites. Capability edits therefore change what the
+sidebar shows and nothing else (see ISSUE-156 Problem 2).
+
+### Scope
+
+- Migrate role-name guards to `requireCapability()` where the capability describes the exact same
+  boundary, across `src/app/admin/**`.
+- Retain explicit Super Admin-only boundaries where policy requires them: `people.admins.lifecycle`
+  keeps `requireSuperAdmin()` (ISSUE-155 §26.3) and gains a documented capability assertion
+  beside it, not instead of it.
+- Source-contract regression in `tests/auth.test.ts`: every `Capability` union member is
+  referenced by at least one `requireCapability()` call at a route/action boundary, and no admin
+  route or Server Action reaches a mutation without a server-side capability assertion.
+
+### Established facts (planning, 2026-09-11)
+
+- No migration, no privilege change, no ISSUE-151 dependency.
+- Functionally independent of ISSUE-157; depends on it only for shared component patterns.
+- Guard counts above are a snapshot; re-enumerate at preflight.
+
+### Validation (planned)
+
+Capability source-contract test → per-role direct-URL and direct-action rejection tests for all
+capabilities → confirm no route lost its existing guard → typecheck.
+
+### Stop condition
+
+Any existing direct URL loses its current server guard, or a capability is enforced more weakly
+than the role guard it replaced.
+
+### Next action
+
+After ISSUE-157: bootstrap worktree for issue 158, run
+`npm run preflight -- --mode implementation --issue 158`, then implement per the §11 P2 contract.
