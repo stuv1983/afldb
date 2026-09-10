@@ -15,7 +15,7 @@ import {
   NL_LOG_PERIODS,
   parseNlLogPeriod,
 } from '@/db/queries/nl-search-log';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, NOT_RECORDED } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 import {
@@ -79,7 +79,7 @@ export default async function NlSearchAdminPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireSuperAdmin();
+  await requireCapability('operations.nlTelemetry');
 
   const params = await searchParams;
   const days = parseNlLogPeriod(firstValue(params.days));

@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join, relative, sep } from 'node:path';
 
-// The audit suite at the foot of this file exercises the real
-// src/lib/auth/session.ts, which binds the auth pool and reads request
-// headers. Both are replaced here so the writer can be observed without
-// a database and without a Next.js request scope; nothing else in this
-// file touches either module.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The audit suite at the foot of this file, and the requireCapability
+// suite (AFLDB-ISSUE-158), exercise the real src/lib/auth/session.ts, which
+// binds the auth pool, reads request headers and redirects through
+// next/navigation. All three are replaced here so the writer and the guard
+// can be observed without a database and without a Next.js request scope;
+// nothing else in this file touches those modules.
 type CapturedQuery = { strings: string[]; values: unknown[] };
 
 /**
@@ -18,9 +22,22 @@ const jsonParameter = vi.hoisted(() => (
 ));
 
 const poolQueries = vi.hoisted(() => [] as CapturedQuery[]);
+/**
+ * The auth_sessions JOIN auth_users row getAdminUser() should find, if any.
+ * Left null, every statement returns no rows, as it always did.
+ */
+const sessionRow = vi.hoisted(() => ({
+  row: null as null | {
+    id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
+    canManageAdmins: boolean; mustChangePassword: boolean;
+  },
+}));
 vi.mock('@/db/authClient', () => {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     poolQueries.push({ strings: [...strings], values });
+    if (sessionRow.row && strings.join('').includes('FROM auth_sessions s')) {
+      return Promise.resolve([sessionRow.row]);
+    }
     return Promise.resolve([]);
   };
   sql.json = jsonParameter;
@@ -45,6 +62,11 @@ vi.mock('next/headers', () => ({
     delete: () => undefined,
   }),
 }));
+// What Next's redirect() does: throw. The message carries the target so a
+// test can tell /admin/upload from /admin from /admin/login.
+vi.mock('next/navigation', () => ({
+  redirect: (to: string): never => { throw new Error(`NEXT_REDIRECT ${to}`); },
+}));
 
 import type postgres from 'postgres';
 
@@ -61,7 +83,7 @@ import {
   type LifecycleAccountState,
 } from '@/lib/auth/admin-lifecycle';
 import { hasCapability, type Capability, type CapabilityViewer } from '@/lib/auth/capabilities';
-import { audit, auditInTransaction, getAdminUser } from '@/lib/auth/session';
+import { audit, auditInTransaction, getAdminUser, requireCapability } from '@/lib/auth/session';
 import {
   MIN_PASSWORD_LENGTH,
   generateTemporaryPassword,
@@ -300,6 +322,15 @@ describe('capability policy', () => {
       expect(hasCapability(viewer('admin'), capability)).toBe(true);
       expect(hasCapability(viewer('super_admin'), capability)).toBe(true);
     }
+  });
+
+  it('never delegates admin management to a contributor, flag or no flag (AFLDB-ISSUE-158)', () => {
+    // requireAdminManager() bounced a contributor at requireAdmin() before
+    // it ever read can_manage_admins. Now that the capability is the guard
+    // for invites and temporary passwords it must draw the same line, or
+    // the migration would have loosened it.
+    expect(hasCapability(viewer('contributor', false), 'people.admins.manage')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'people.admins.manage')).toBe(false);
   });
 
   it('delegates admin management to a plain admin only when can_manage_admins is set', () => {
@@ -804,5 +835,396 @@ describe('auth_audit_log writer', () => {
     await expect(
       auditInTransaction(tx, 'nl_search.telemetry_cleared', { deletedLogRows: 412 }, admin),
     ).rejects.toThrow('audit unavailable');
+  });
+});
+
+/*
+ * ---------------------------------------------------------------------------
+ * Capability enforcement source contract (AFLDB-ISSUE-158, ISSUE-156 P2).
+ *
+ * The capability table in src/lib/auth/capabilities.ts is only authoritative
+ * while every admin boundary actually consults it. These tests read the
+ * source under src/app/admin and fail on drift: a capability declared but
+ * enforced nowhere, an admin page / route handler / Server Action that does
+ * something before its guard or has no guard, a role guard kept somewhere
+ * policy did not name, or a capability that admits a viewer the role guard
+ * it replaced would have turned away.
+ * ---------------------------------------------------------------------------
+ */
+
+const REPO = process.cwd();
+const ADMIN_ROOT = join(REPO, 'src', 'app', 'admin');
+
+/** A repo-relative, forward-slash path, whatever the host's separator. */
+const repoPath = (file: string): string => relative(REPO, file).split(sep).join('/');
+
+/** Sources are read as LF whatever the checkout's line endings are. */
+const readSource = (file: string): string => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+
+function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    return entry.isDirectory() ? walk(full) : [full];
+  });
+}
+
+/** The `Capability` union, read from the file that declares it. */
+function declaredCapabilities(): string[] {
+  const source = readSource(join(REPO, 'src', 'lib', 'auth', 'capabilities.ts'));
+  const union = source.match(/export type Capability =([\s\S]*?);/);
+  if (!union) throw new Error('export type Capability not found in capabilities.ts');
+  return [...union[1].matchAll(/'([A-Za-z]+(?:\.[A-Za-z]+)+)'/g)].map((m) => m[1]);
+}
+
+const DECLARED_CAPABILITIES = declaredCapabilities();
+
+type BoundaryKind = 'page' | 'route' | 'action';
+type Boundary = { path: string; kind: BoundaryKind; source: string };
+
+/**
+ * Every server boundary under src/app/admin: each page.tsx, each route.ts
+ * and each module whose first statement is 'use server'. Components,
+ * layouts, loading states and pure models are not boundaries.
+ */
+function adminBoundaries(): Boundary[] {
+  const USE_SERVER = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*'use server';/;
+  return walk(ADMIN_ROOT).flatMap((file): Boundary[] => {
+    const name = basename(file);
+    if (!/\.tsx?$/.test(name)) return [];
+    const source = readSource(file);
+    const path = repoPath(file);
+    if (name === 'page.tsx') return [{ path, kind: 'page', source }];
+    if (name === 'route.ts') return [{ path, kind: 'route', source }];
+    if (USE_SERVER.test(source)) return [{ path, kind: 'action', source }];
+    return [];
+  });
+}
+
+const BOUNDARIES = adminBoundaries();
+const boundary = (path: string): Boundary | undefined => BOUNDARIES.find((b) => b.path === path);
+
+const CAPABILITY_GUARD = 'requireCapability';
+const ROLE_GUARDS = ['requireAdmin', 'requireSuperAdmin', 'requireUploader', 'requireAdminManager', 'requireSignedIn'] as const;
+type RoleGuard = (typeof ROLE_GUARDS)[number];
+const ROLE_GUARD_CALL = /\bawait\s+(requireAdmin|requireSuperAdmin|requireUploader|requireAdminManager|requireSignedIn)\(/g;
+
+/**
+ * Where a role guard is still the boundary, and why. Anything not listed
+ * here must be guarded by requireCapability() alone; anything listed here
+ * must still call exactly the guards named. Both directions are asserted,
+ * so this list can neither grow nor go stale quietly.
+ */
+const RETAINED_ROLE_GUARDS: Record<string, { guards: RoleGuard[]; because: string }> = {
+  'src/app/admin/page.tsx': {
+    guards: ['requireAdmin'],
+    because: 'the dashboard is every admin\'s landing page; no capability names it',
+  },
+  'src/app/admin/submissions/[id]/actions.ts': {
+    guards: ['requireAdmin', 'requireSuperAdmin'],
+    because: 'submission validation (admin) and approval/promotion (super admin) have no capability; '
+      + 'acquisition.legacyIntake is ALL_STAFF and would be weaker',
+  },
+  'src/app/admin/admins/lifecycle-actions.ts': {
+    guards: ['requireSuperAdmin'],
+    because: 'ISSUE-156 §11 P2 keeps the explicit super-admin boundary and asserts '
+      + 'people.admins.lifecycle beside it, not instead of it',
+  },
+  'src/app/admin/password/page.tsx': {
+    guards: ['requireSignedIn'],
+    because: 'the one page an account holding a temporary password may reach',
+  },
+  'src/app/admin/password/actions.ts': {
+    guards: ['requireSignedIn'],
+    because: 'changeOwnPassword: the action behind that page, same reason',
+  },
+};
+
+/**
+ * Boundaries that run before a staff session exists or that touch nothing:
+ * exempt from the guard-first rule, and asserted to stay guard-free so a
+ * stale entry here is noticed.
+ */
+const PRE_AUTH_BOUNDARIES: Record<string, string> = {
+  'src/app/admin/login/page.tsx': 'the sign-in form',
+  'src/app/admin/login/actions.ts': 'adminLogin creates the session every guard checks',
+  'src/app/admin/invite/[token]/page.tsx': 'enrolment by invite token, before an account exists',
+  'src/app/admin/invite/[token]/actions.ts': 'beginEnrolment / confirmEnrolment, token-authenticated',
+  'src/app/admin/logout-action.ts': 'ends the session; reads it only to name the audit row',
+  'src/app/admin/grid-solver/page.tsx': 'a permanent redirect to /grid-solver that reads nothing',
+};
+
+type TopLevelFn = { name: string; exported: boolean; chunk: string };
+
+/**
+ * Every top-level `async function` in a module, exported or not, with the
+ * text from its declaration to the first line that is exactly `}` -- its
+ * closing brace in formatted source (a props type closing with `}: {` or
+ * `}) {` is not). An under-read chunk can only fail the test, never pass
+ * it, because the guard has to be the first thing the chunk awaits.
+ */
+function topLevelAsyncFunctions(source: string): TopLevelFn[] {
+  return [...source.matchAll(/^(export\s+)?(?:default\s+)?async\s+function\s+(\w+)/gm)].map((m) => {
+    const rest = source.slice(m.index ?? 0);
+    const close = rest.search(/\n\}[ \t]*(?:\n|$)/);
+    return { name: m[2], exported: Boolean(m[1]), chunk: close === -1 ? rest : rest.slice(0, close) };
+  });
+}
+
+/**
+ * The guard a function reaches before it awaits anything else, or null.
+ * Un-awaited calls to anything but a local async function (Number(),
+ * formData.get(), parsers) are allowed ahead of it; awaiting Next's async
+ * `params` / `searchParams` props is allowed; an un-awaited or awaited call
+ * into a local async function is followed, so `return runX(...)` wrappers
+ * are judged by what runX does first.
+ */
+function firstGuard(fn: TopLevelFn, locals: Map<string, TopLevelFn>, depth = 0): string | null {
+  if (depth > 3) return null;
+  const body = fn.chunk.slice(fn.chunk.indexOf('(') + 1);
+  const steps = /\bawait\s+([A-Za-z_$][\w$.]*)\s*(\()?|(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g;
+  for (const step of body.matchAll(steps)) {
+    if (step[1] !== undefined) {
+      const target = step[1];
+      const isCall = step[2] === '(';
+      if (isCall && (target === CAPABILITY_GUARD || (ROLE_GUARDS as readonly string[]).includes(target))) return target;
+      if (isCall && locals.has(target)) return firstGuard(locals.get(target)!, locals, depth + 1);
+      if (!isCall && /^(params|searchParams|props\.\w+)$/.test(target)) continue;
+      return null;
+    }
+    const callee = step[3];
+    if (locals.has(callee) && callee !== fn.name) return firstGuard(locals.get(callee)!, locals, depth + 1);
+  }
+  return null;
+}
+
+/**
+ * The capability literals named by every awaited requireCapability() call
+ * in a source. Awaited, so a comment that mentions the call cannot stand in
+ * for the code that makes it.
+ */
+function enforcedCapabilities(source: string): string[] {
+  // A capability name is dotted (`group.name[.verb]`); the un-dotted
+  // literal in a ternary's condition (`action === 'saveDraft' ? … : …`) is
+  // not one.
+  return [...source.matchAll(/\bawait\s+requireCapability\(\s*([\s\S]*?)\)/g)]
+    .flatMap((call) => [...call[1].matchAll(/'([A-Za-z]+(?:\.[A-Za-z]+)+)'/g)].map((m) => m[1]));
+}
+
+describe('capability enforcement contract (AFLDB-ISSUE-158)', () => {
+  it('finds the admin boundaries it is about to check', () => {
+    // A walker that silently found nothing would make every rule below
+    // vacuous, so the shape of the area is pinned first.
+    expect(BOUNDARIES.length).toBeGreaterThanOrEqual(40);
+    expect(BOUNDARIES.filter((b) => b.kind === 'page').length).toBeGreaterThanOrEqual(20);
+    expect(BOUNDARIES.filter((b) => b.kind === 'route').length).toBeGreaterThanOrEqual(4);
+    expect(BOUNDARIES.filter((b) => b.kind === 'action').length).toBeGreaterThanOrEqual(15);
+    expect(DECLARED_CAPABILITIES.length).toBeGreaterThanOrEqual(18);
+  });
+
+  it('enforces every declared capability at a real page, route or action boundary', () => {
+    const enforced = new Set(BOUNDARIES.flatMap((b) => enforcedCapabilities(b.source)));
+    const unenforced = DECLARED_CAPABILITIES.filter((capability) => !enforced.has(capability));
+    expect(unenforced, 'declared in capabilities.ts but no boundary calls requireCapability() with it').toEqual([]);
+    const undeclared = [...enforced].filter((capability) => !DECLARED_CAPABILITIES.includes(capability));
+    expect(undeclared, 'named by requireCapability() but absent from the Capability union').toEqual([]);
+  });
+
+  it('guards every admin page, route handler and Server Action before it awaits anything else', () => {
+    const failures: string[] = [];
+    for (const b of BOUNDARIES) {
+      if (b.path in PRE_AUTH_BOUNDARIES) continue;
+      const allowed = new Set<string>([CAPABILITY_GUARD, ...(RETAINED_ROLE_GUARDS[b.path]?.guards ?? [])]);
+      const fns = topLevelAsyncFunctions(b.source);
+      const locals = new Map(fns.map((fn) => [fn.name, fn]));
+      const entryPoints = fns.filter((fn) => fn.exported);
+      if (entryPoints.length === 0) failures.push(`${b.path}: no exported async function found`);
+      for (const fn of entryPoints) {
+        const guard = firstGuard(fn, locals);
+        if (guard === null) failures.push(`${b.path}: ${fn.name} awaits something before any guard, or has none`);
+        else if (!allowed.has(guard)) failures.push(`${b.path}: ${fn.name} is guarded by ${guard}(), which policy does not retain there`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('keeps a role guard only where policy names it, and every guard policy names', () => {
+    const strays: string[] = [];
+    for (const b of BOUNDARIES) {
+      const used = [...new Set([...b.source.matchAll(ROLE_GUARD_CALL)].map((m) => m[1]))].sort();
+      const retained = RETAINED_ROLE_GUARDS[b.path];
+      if (retained === undefined) {
+        if (used.length > 0) strays.push(`${b.path}: ${used.join(', ')} not retained by policy`);
+        continue;
+      }
+      const expected = [...retained.guards].sort();
+      if (used.join() !== expected.join()) {
+        strays.push(`${b.path}: calls [${used.join(', ')}], policy retains [${expected.join(', ')}] because ${retained.because}`);
+      }
+    }
+    expect(strays).toEqual([]);
+    for (const path of Object.keys(RETAINED_ROLE_GUARDS)) {
+      expect(boundary(path), `${path} is listed as retaining a role guard but is not an admin boundary`).toBeDefined();
+    }
+  });
+
+  it('lists the pre-auth surfaces exactly, and none of them has grown a guard', () => {
+    for (const [path, why] of Object.entries(PRE_AUTH_BOUNDARIES)) {
+      const b = boundary(path);
+      expect(b, `${path} (${why}) is listed as pre-auth but is not an admin boundary`).toBeDefined();
+      expect(enforcedCapabilities(b!.source), `${path} now calls requireCapability(); drop it from the pre-auth list`).toEqual([]);
+      expect([...b!.source.matchAll(ROLE_GUARD_CALL)].map((m) => m[1]),
+        `${path} now calls a role guard; drop it from the pre-auth list`).toEqual([]);
+    }
+  });
+
+  it('asserts people.admins.lifecycle beside requireSuperAdmin(), never instead of it', () => {
+    const b = boundary('src/app/admin/admins/lifecycle-actions.ts');
+    expect(b).toBeDefined();
+    // The role guard first, then the capability, with nothing but comments
+    // between them: ISSUE-156 §11 P2's worked example.
+    expect(b!.source).toMatch(
+      /await requireSuperAdmin\(\);\n(?:[ \t]*\/\/[^\n]*\n)*[ \t]*await requireCapability\('people\.admins\.lifecycle'\);/,
+    );
+  });
+
+  it('leaves the shared account-list actions on the door every admin may open', () => {
+    // revokeSession decides who-may-revoke-whom per target; the door is the
+    // list every admin may read, exactly the boundary requireAdmin() drew.
+    expect(boundary('src/app/admin/admins/actions.ts')?.source).toContain("requireCapability('people.admins.read')");
+  });
+
+  it('enforces the capabilities the sidebar shows, so a hidden link is never the only gate', () => {
+    // Every capability nav-model.ts gates a link on is enforced by the
+    // route the link points at; the walker's coverage of every boundary is
+    // what makes the sidebar furniture rather than a gate.
+    const navModel = readSource(join(ADMIN_ROOT, 'nav-model.ts'));
+    const linked = [...navModel.matchAll(/href: '([^']+)'[^\n]*capability: '([A-Za-z.]+)'/g)];
+    expect(linked.length).toBeGreaterThanOrEqual(14);
+    for (const [, href, capability] of linked) {
+      const page = boundary(`src/app${href}/page.tsx`);
+      expect(page, `${href} is linked in the nav but has no page.tsx`).toBeDefined();
+      expect(enforcedCapabilities(page!.source), `${href} does not enforce ${capability}`).toContain(capability);
+    }
+  });
+});
+
+/**
+ * The role guard each capability stands for. Read as: "requireCapability(X)
+ * admits exactly the viewers <guard>() admitted". Typed as a Record so a new
+ * capability fails the typecheck until it is placed; checked below so no
+ * capability is looser OR tighter than the guard the routes used to call.
+ */
+const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmin' | 'requireSuperAdmin' | 'requireAdminManager'> = {
+  'data.playerLinks': 'requireSuperAdmin',
+  'data.dataEditor': 'requireSuperAdmin',
+  'data.brownlow.read': 'requireAdmin',
+  'data.brownlow.draft': 'requireAdmin',
+  'data.brownlow.finalise': 'requireSuperAdmin',
+  'acquisition.legacyIntake': 'requireUploader',
+  'acquisition.currentSeason': 'requireSuperAdmin',
+  'people.betaAccess': 'requireAdmin',
+  'people.admins.read': 'requireAdmin',
+  'people.admins.manage': 'requireAdminManager',
+  'people.admins.lifecycle': 'requireSuperAdmin',
+  'site.content': 'requireSuperAdmin',
+  'site.settings': 'requireSuperAdmin',
+  'operations.queryBuilder': 'requireSuperAdmin',
+  'operations.dbHealth': 'requireSuperAdmin',
+  'operations.appHealth': 'requireSuperAdmin',
+  'operations.nlTelemetry': 'requireSuperAdmin',
+  'operations.audit.read': 'requireAdmin',
+};
+
+/** What each role guard in session.ts admits, restated from its source. */
+function roleGuardAdmits(guard: (typeof EQUIVALENT_ROLE_GUARD)[Capability], viewer: CapabilityViewer): boolean {
+  switch (guard) {
+    case 'requireUploader': return true;
+    case 'requireAdmin': return viewer.role !== 'contributor';
+    case 'requireSuperAdmin': return viewer.role === 'super_admin';
+    case 'requireAdminManager':
+      return viewer.role !== 'contributor' && (viewer.role === 'super_admin' || viewer.canManageAdmins);
+  }
+}
+
+const ROLES: CapabilityViewer['role'][] = ['contributor', 'admin', 'super_admin'];
+const EVERY_VIEWER: CapabilityViewer[] = ROLES.flatMap((role) => [
+  { role, canManageAdmins: false },
+  { role, canManageAdmins: true },
+]);
+
+describe('capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158)', () => {
+  it('places every declared capability', () => {
+    expect(Object.keys(EQUIVALENT_ROLE_GUARD).sort()).toEqual([...DECLARED_CAPABILITIES].sort());
+  });
+
+  it.each(Object.entries(EQUIVALENT_ROLE_GUARD))('%s admits the same viewers as %s()', (capability, guard) => {
+    for (const viewer of EVERY_VIEWER) {
+      expect(
+        hasCapability(viewer, capability as Capability),
+        `${capability} for ${viewer.role}${viewer.canManageAdmins ? '+can_manage_admins' : ''}`,
+      ).toBe(roleGuardAdmits(guard, viewer));
+    }
+  });
+});
+
+/**
+ * The guard itself, end to end and without a database: the signed cookie is
+ * read, the session row is looked up, the temporary-password rule runs, and
+ * the capability table decides -- with the redirect targets the role guards
+ * used, so no route that moved from requireAdmin() / requireSuperAdmin() /
+ * requireUploader() / requireAdminManager() sends anyone somewhere new.
+ */
+describe('requireCapability against the real guard (AFLDB-ISSUE-158)', () => {
+  const signedIn = async (
+    role: CapabilityViewer['role'],
+    canManageAdmins = false,
+    mustChangePassword = false,
+  ) => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '5:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    sessionRow.row = { id: 5, email: `${role}@afldb.test`, role, canManageAdmins, mustChangePassword };
+  };
+
+  afterEach(() => {
+    requestCookie.admin = null;
+    sessionRow.row = null;
+  });
+
+  it.each(DECLARED_CAPABILITIES)('%s: admits the viewers the table names and bounces the rest where the role guards did', async (capability) => {
+    for (const viewer of EVERY_VIEWER) {
+      await signedIn(viewer.role, viewer.canManageAdmins);
+      const label = `${capability} for ${viewer.role}${viewer.canManageAdmins ? '+can_manage_admins' : ''}`;
+      if (hasCapability(viewer, capability as Capability)) {
+        await expect(requireCapability(capability as Capability), label).resolves.toMatchObject({ id: 5, role: viewer.role });
+      } else if (viewer.role === 'contributor') {
+        // requireAdmin()'s bounce: the one route a contributor may reach.
+        await expect(requireCapability(capability as Capability), label).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
+      } else {
+        // requireSuperAdmin()'s and requireAdminManager()'s bounce: the dashboard.
+        await expect(requireCapability(capability as Capability), label).rejects.toThrow(/^NEXT_REDIRECT \/admin$/);
+      }
+    }
+  });
+
+  it('sends an anonymous caller to the login form, whatever the capability', async () => {
+    requestCookie.admin = null;
+    sessionRow.row = null;
+    await expect(requireCapability('acquisition.legacyIntake')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/login$/);
+  });
+
+  it('sends an outstanding temporary password to the change-password page before any capability is consulted', async () => {
+    // The widest capability there is, held by a super admin: still bounced,
+    // because requireUploader()'s rule runs first exactly as it did under
+    // every role guard.
+    await signedIn('super_admin', false, true);
+    await expect(requireCapability('acquisition.legacyIntake')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/password$/);
+  });
+
+  it('turns a delegated contributor away from admin management at the guard, not only in the table', async () => {
+    await signedIn('contributor', true);
+    await expect(requireCapability('people.admins.manage')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
   });
 });

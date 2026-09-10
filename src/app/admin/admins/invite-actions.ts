@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { type AdminUser, audit, requireAdminManager } from '@/lib/auth/session';
+import { type AdminUser, audit, requireCapability } from '@/lib/auth/session';
 
 export type InviteState = {
   error?: string;
@@ -20,7 +20,7 @@ export async function createInvite(
   _previous: InviteState,
   formData: FormData,
 ): Promise<InviteState> {
-  const admin = await requireAdminManager();
+  const admin = await requireCapability('people.admins.manage');
 
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: 'That is not an email address.' };
@@ -84,7 +84,7 @@ export async function revokeInvite(
   _previous: InviteState,
   formData: FormData,
 ): Promise<InviteState> {
-  const admin = await requireAdminManager();
+  const admin = await requireCapability('people.admins.manage');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad invite id.' };
 

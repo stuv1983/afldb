@@ -10,7 +10,7 @@ import {
   getRecentAppHealthEvents,
   parseAppHealthPeriod,
 } from '@/db/queries/app-health';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, NOT_RECORDED } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 
@@ -58,7 +58,7 @@ export default async function AppHealthPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireSuperAdmin();
+  await requireCapability('operations.appHealth');
 
   const params = await searchParams;
   const days = parseAppHealthPeriod(firstValue(params.days));

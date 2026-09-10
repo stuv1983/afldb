@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 import { getMediaBytes } from '@/db/queries/site-content';
 import { apexTemplateDir } from '@/lib/apex-publish';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +61,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  await requireSuperAdmin();
+  await requireCapability('site.content');
 
   const { path } = await params;
   const segments = path ?? [];

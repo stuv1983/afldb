@@ -14,8 +14,9 @@
  * Deliberately not asserted here: that a contributor or a plain admin is
  * turned away. That is `requireSuperAdmin`'s redirect, exercised against
  * the real guard in tests/auth.test.ts and in the browser pass; what this
- * file proves is that every action calls it, and that nothing runs when
- * it does not return.
+ * file proves is that every action calls it -- and, since AFLDB-ISSUE-158,
+ * asserts `people.admins.lifecycle` beside it -- and that nothing runs when
+ * the guard does not return.
  */
 import { revalidatePath } from 'next/cache';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +28,7 @@ import {
   promoteAdmin,
   reactivateAccount,
 } from '@/app/admin/admins/lifecycle-actions';
-import { audit, auditInTransaction, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, auditInTransaction, requireCapability, requireSuperAdmin } from '@/lib/auth/session';
 
 type Statement = { sql: string; values: unknown[]; on: 'pool' | 'tx' };
 
@@ -88,7 +89,9 @@ vi.mock('@/lib/auth/session', () => ({
     if (state.guardThrows) throw new Error('NEXT_REDIRECT');
     return state.viewer;
   }),
-  requireAdmin: vi.fn(async () => {
+  // revokeSession's door (people.admins.read) and the lifecycle actions'
+  // second assertion (people.admins.lifecycle), AFLDB-ISSUE-158.
+  requireCapability: vi.fn(async () => {
     if (state.guardThrows) throw new Error('NEXT_REDIRECT');
     return state.viewer;
   }),
@@ -163,6 +166,14 @@ describe('every lifecycle action is behind requireSuperAdmin', () => {
   it.each(actions)('%s calls the guard', async (_name, action) => {
     await action({}, lifecycleForm({ expectedRole: 'admin' }));
     expect(requireSuperAdmin).toHaveBeenCalled();
+  });
+
+  it.each(actions)('%s asserts people.admins.lifecycle beside the role guard, not instead of it', async (_name, action) => {
+    // ISSUE-156 §11 P2: the explicit super-admin boundary stays, and the
+    // capability is enforced alongside so the table's entry is real.
+    await action({}, lifecycleForm({ expectedRole: 'admin' }));
+    expect(requireSuperAdmin).toHaveBeenCalled();
+    expect(requireCapability).toHaveBeenCalledWith('people.admins.lifecycle');
   });
 
   it.each(actions)('%s issues no statement when the guard does not return', async (_n, action) => {

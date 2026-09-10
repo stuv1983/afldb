@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { authSql } from '@/db/authClient';
 import { deleteRetiredAccessCode, retirementReason } from '@/db/queries/access-codes';
 import { generateToken, sha256Hex } from '@/lib/auth/crypto';
-import { audit, auditInTransaction, requireAdmin } from '@/lib/auth/session';
+import { audit, auditInTransaction, requireCapability } from '@/lib/auth/session';
 import { parseIntInRange } from '@/lib/params';
 
 export type AccessState = {
@@ -19,7 +19,7 @@ export async function createAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const label = String(formData.get('label') ?? '').trim();
   // parseIntInRange rejects non-integers up front; the old hand-rolled
   // Math.min(Math.max(Number(...))) let a non-numeric field become NaN and
@@ -64,7 +64,7 @@ export async function revokeAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad code id.' };
 
@@ -93,9 +93,10 @@ export async function revokeAccessCode(
  * This is the only action in this file that destroys anything. Three
  * things make that safe, and none of them is the button being hidden:
  *
- *   1. requireAdmin(), as every action in this file does. It re-checks
- *      the database row, so a revoked or disabled admin's cookie buys
- *      nothing here either.
+ *   1. requireCapability('people.betaAccess'), as every action in this
+ *      file does -- Admin-and-up, the boundary requireAdmin() drew before
+ *      AFLDB-ISSUE-158. It re-checks the database row, so a revoked or
+ *      disabled admin's cookie buys nothing here either.
  *   2. The eligibility predicate is inside the DELETE itself
  *      (deleteRetiredAccessCode). A still-redeemable code named by a
  *      hand-rolled POST matches no row and is refused, so retirement is
@@ -112,7 +113,7 @@ export async function deleteAccessCode(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad code id.' };
 
@@ -152,7 +153,7 @@ export async function addAllowedEmail(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const note = String(formData.get('note') ?? '').trim() || null;
 
@@ -172,7 +173,7 @@ export async function approveJoinRequest(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
@@ -198,7 +199,7 @@ export async function denyJoinRequest(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
@@ -219,7 +220,7 @@ export async function revokeAllowedEmail(
   _previous: AccessState,
   formData: FormData,
 ): Promise<AccessState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.betaAccess');
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad id.' };
 

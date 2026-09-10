@@ -11,7 +11,7 @@ import {
   type LifecycleAction,
   type LifecycleFailureCode,
 } from '@/lib/auth/admin-lifecycle';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability, requireSuperAdmin } from '@/lib/auth/session';
 
 /**
  * The four account lifecycle Server Actions (AFLDB-ISSUE-155 Phase B).
@@ -23,10 +23,14 @@ import { audit, requireSuperAdmin } from '@/lib/auth/session';
  * -- the hidden `expectedRole`/`expectedActive` fields are a staleness
  * check, not an instruction.
  *
- * `requireSuperAdmin()` is the boundary. The capability table names
- * `people.admins.lifecycle` for the same rule and the sidebar reads it, but
- * a capability table is a description of guards, not a substitute for one:
- * a delegated `can_manage_admins` admin redirects here exactly as a plain
+ * `requireSuperAdmin()` is the boundary, and stays so by policy
+ * (AFLDB-ISSUE-156 §11 P2): the account lifecycle is an explicit
+ * Super-Admin-only rule, not one a capability edit may loosen. The
+ * capability table names `people.admins.lifecycle` for the same rule and
+ * the sidebar reads it; since AFLDB-ISSUE-158 the action asserts that
+ * capability BESIDE the role guard rather than instead of it, so the
+ * table's entry is enforced without becoming the only thing enforcing it.
+ * A delegated `can_manage_admins` admin redirects here exactly as a plain
  * admin does, and a contributor never gets past requireAdmin().
  */
 
@@ -48,6 +52,9 @@ async function runLifecycleAction(
   formData: FormData,
 ): Promise<LifecycleState> {
   const admin = await requireSuperAdmin();
+  // Beside the role guard, not instead of it (see the file comment). Free
+  // at runtime: both read the one request-cached session lookup.
+  await requireCapability('people.admins.lifecycle');
 
   const targetId = Number(formData.get('userId'));
   const expectedRole = formData.get('expectedRole');

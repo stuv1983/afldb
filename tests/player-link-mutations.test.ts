@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   postgres: vi.fn(),
   authSql: vi.fn(),
   sql: vi.fn(),
-  requireSuperAdmin: vi.fn(),
+  requireCapability: vi.fn(),
   audit: vi.fn(),
   revalidatePath: vi.fn(),
   fetchSourceEvidence: vi.fn(),
@@ -18,7 +18,8 @@ vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/authClient', () => ({ authSql: mocks.authSql }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 vi.mock('@/lib/auth/session', () => ({
-  requireSuperAdmin: mocks.requireSuperAdmin,
+  // data.playerLinks / data.dataEditor, both super-admin-only (AFLDB-ISSUE-158).
+  requireCapability: mocks.requireCapability,
   audit: mocks.audit,
 }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -80,8 +81,8 @@ beforeEach(() => {
   mocks.authSql.mockReset();
   mocks.authSql.mockResolvedValue([]);
   mocks.sql.mockReset();
-  mocks.requireSuperAdmin.mockReset();
-  mocks.requireSuperAdmin.mockResolvedValue({ id: 5, email: 'admin@example.test' });
+  mocks.requireCapability.mockReset();
+  mocks.requireCapability.mockResolvedValue({ id: 5, email: 'admin@example.test' });
   mocks.audit.mockReset();
   mocks.revalidatePath.mockReset();
   mocks.fetchSourceEvidence.mockReset();
@@ -355,7 +356,7 @@ describe('confirmUnlinked resolution', () => {
   });
 
   it('server action ignores form-supplied previousStatus and forwards only target details', async () => {
-    mocks.requireSuperAdmin.mockResolvedValueOnce({ id: 5, email: 'admin@example.test' });
+    mocks.requireCapability.mockResolvedValueOnce({ id: 5, email: 'admin@example.test' });
     const { tx, seen } = fakeTransaction((text) => {
       if (text.startsWith('SELECT link_status_value::text')) return [{ status: 'unmatched' }];
       return [];
@@ -370,7 +371,7 @@ describe('confirmUnlinked resolution', () => {
     const result = await confirmUnlinkedAction({}, formData);
 
     expect(result).toEqual({ message: expect.stringContaining('Recorded 1 record(s)') });
-    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledOnce();
 
     const auditInsert = seen.find((query) => (
       query.text.startsWith('INSERT INTO player_link_resolutions')
@@ -796,10 +797,10 @@ describe('player-link action contracts', () => {
     expect(bulk).not.toMatch(/if \(!result\.ok\) return/);
   });
 
-  it('gates every action behind super admin', () => {
+  it('gates every action behind the super-admin-only data.playerLinks capability', () => {
     const exported = actions.match(/export async function (\w+)/g) ?? [];
     expect(exported.length).toBeGreaterThanOrEqual(7);
-    const guards = actions.match(/await requireSuperAdmin\(\)/g) ?? [];
+    const guards = actions.match(/await requireCapability\('data\.playerLinks'\)/g) ?? [];
     expect(guards.length).toBe(exported.length);
   });
 });

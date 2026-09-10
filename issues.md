@@ -572,7 +572,6 @@ created, reopened, resolved, or materially reclassified.
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
 | **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Planning complete 2026-09-11 — no implementation started. Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11** (`/admin/audit` live on DEV, unmerged), 158 (P2) not started; P3–P12 are named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: start ISSUE-158 in a fresh implementation session |
-| **ID:** AFLDB-ISSUE-158 — Capability enforcement (156 P2) | **Status:** Open / Not started — make the 15 unenforced capabilities in `src/lib/auth/capabilities.ts` authoritative via `requireCapability()` plus a source-contract regression in `tests/auth.test.ts`; `people.admins.lifecycle` keeps `requireSuperAdmin`. No migration, no privilege change. | **Severity:** Medium | **Area:** Admin / Auth; contract `AFLDB-ISSUE-156.md` §11 P2; next: after ISSUE-157, same preflight with `--issue 158` |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -21884,10 +21883,9 @@ change or write path. Evidence under ISSUE-157.
 
 ### Next action
 
-After the operator merges the P1 branch, start `AFLDB-ISSUE-158` (P2) in a fresh implementation
-session from a new worktree: `npm run worktree:bootstrap -- --issue 158 --branch <agent>/issue-158`,
-then `npm run preflight -- --mode implementation --issue 158`, carrying over
-`AFLDB-ISSUE-156.md` §11 P2 handoff contract and §2.
+P1 merged to `main` at `3bbcab0`. P2 (`AFLDB-ISSUE-158`) RESOLVED 2026-09-11 on
+`fable/issue-158-capability-enforcement` (validated, unmerged): operator merges it, then the
+next phase is P3, which must not start until §10 C-1 is decided at its preflight.
 
 ## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
 
@@ -22031,7 +22029,8 @@ ISSUE-155 closeout. Then start `AFLDB-ISSUE-158` (P2) in a fresh session per
 
 ## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
 
-**Status:** Open / Not started
+**Status:** Resolved 2026-09-11 (branch `fable/issue-158-capability-enforcement`, validated
+locally; not merged, not deployed)
 **Severity:** Medium
 **Area:** Admin / Authentication
 **Found:** 2026-09-11
@@ -22062,17 +22061,123 @@ sidebar shows and nothing else (see ISSUE-156 Problem 2).
 - Functionally independent of ISSUE-157; depends on it only for shared component patterns.
 - Guard counts above are a snapshot; re-enumerate at preflight.
 
-### Validation (planned)
+### Implementation (2026-09-11)
 
-Capability source-contract test → per-role direct-URL and direct-action rejection tests for all
-capabilities → confirm no route lost its existing guard → typecheck.
+Fresh enumeration at implementation start (post-157 `main` at `3bbcab0`): 18 `Capability`
+members, 3 + `operations.audit.read` = 4 enforced by `requireCapability()` at 7 sites; 14 unenforced.
+Role-guard call sites under `src/app/admin/**`: `requireSuperAdmin` 47, `requireAdmin` 11,
+`requireUploader` 3, `requireAdminManager` 3 (the "130" in the Problem statement counted
+comments and docs too).
+
+**Migrated to `requireCapability()`** — every one an exact-boundary swap (same admitted set, same
+redirect targets, same request-cached session lookup), 54 sites in 28 files:
+
+| Capability | Former guard | Sites |
+|---|---|---|
+| `data.playerLinks` | `requireSuperAdmin` | `player-links/page.tsx`, `player-links/actions.ts` ×7 |
+| `data.dataEditor` | `requireSuperAdmin` | `data-editor/page.tsx`, `data-editor/actions.ts` ×8 |
+| `acquisition.legacyIntake` | `requireUploader` | `upload/page.tsx`, `upload/actions.ts`, `submissions/[id]/page.tsx` (ownership check unchanged) |
+| `acquisition.currentSeason` | `requireSuperAdmin` | `current-season/page.tsx`, `current-season/actions.ts` ×3 |
+| `people.betaAccess` | `requireAdmin` | `access/page.tsx`, `access/actions.ts` ×7 |
+| `people.admins.read` | `requireAdmin` | `admins/page.tsx`, `admins/actions.ts` (`revokeSession`; its per-target rule is unchanged) |
+| `people.admins.manage` | `requireAdminManager` | `admins/invite-actions.ts` ×2, `admins/password-actions.ts` |
+| `site.content` | `requireSuperAdmin` | `content/page.tsx`, `content/actions.ts` ×3, `content/media/route.ts`, `content/asset/[...path]/route.ts`, `content/preview/route.ts` |
+| `site.settings` | `requireSuperAdmin` | `settings/page.tsx`, `settings/actions.ts` ×2 |
+| `operations.queryBuilder` / `dbHealth` / `appHealth` | `requireSuperAdmin` | the three pages |
+| `operations.nlTelemetry` | `requireSuperAdmin` | `nl-search/page.tsx`, `nl-search/[id]/page.tsx`, `nl-search/feedback/page.tsx`, `nl-search/actions.ts` ×2, `nl-search/export/route.ts` |
+
+**Retained role guards** (policy, all listed in the test's `RETAINED_ROLE_GUARDS`):
+`admin/page.tsx` `requireAdmin` (dashboard, no capability names it);
+`submissions/[id]/actions.ts` `requireAdmin` + `requireSuperAdmin` ×2 (no capability describes
+submission review; `acquisition.legacyIntake` is ALL_STAFF and would be weaker);
+`admins/lifecycle-actions.ts` `requireSuperAdmin` first, **then**
+`await requireCapability('people.admins.lifecycle')` beside it (ISSUE-156 §11 P2 worked example;
+free at runtime because `getAdminUser` is request-cached); `password/page.tsx` and
+`password/actions.ts` `requireSignedIn` (the temporary-password page).
+Pre-auth surfaces exempt and pinned: login page/action, invite page/action, logout action,
+grid-solver redirect page. (`nl-search/telemetry-clear-phrase.ts` only *mentions* `'use server'`
+in a comment; it is a plain constant module and not a boundary.)
+
+**Policy finding, fixed before migrating.** `hasCapability(viewer, 'people.admins.manage')`
+returned `viewer.role === 'super_admin' || viewer.canManageAdmins`, which admits a *contributor*
+row carrying `can_manage_admins`; `requireAdminManager()` bounced that viewer at `requireAdmin()`
+first. Migrating as-is would have met the stop condition (capability weaker than the guard it
+replaces). Nothing in the app writes such a row (`createInvite` refuses `can_manage_admins` for a
+contributor invite, demotion clears it) but no constraint forbids it, so the rule is now
+`super_admin || (admin && canManageAdmins)` — exactly `requireAdminManager()` — with a test.
+Not a stop: the fix is one line in the file the contract names, and it makes the capability
+equal to the guard rather than redesigning either.
+
+**Tests.** `tests/auth.test.ts` gains: (1) *capability enforcement contract* — walks
+`src/app/admin/**` (25 pages, 4 route handlers, 18 `'use server'` modules), proves every
+`Capability` member is named by an awaited `requireCapability()` at a boundary, every exported
+async function of every boundary reaches `requireCapability()` (or a retained guard) before any
+other `await` (wrappers such as `promoteAdmin → runLifecycleAction` are followed), role guards
+exist only where `RETAINED_ROLE_GUARDS` names them and every named one is still there, pre-auth
+files have not grown a guard, the lifecycle assertion sits beside `requireSuperAdmin()`, and every
+nav-model link's capability is enforced by the page it targets; (2) *equivalence table* — all 18
+capabilities × 6 viewers (3 roles × delegation flag) admit exactly what the equivalent role guard
+admitted; (3) *real guard* — `requireCapability()` run end to end through the real
+`session.ts` with a signed cookie and a faked session row: per capability and viewer it resolves
+or redirects to `/admin/upload` (contributor) / `/admin` (others), plus anonymous → `/admin/login`,
+temporary password → `/admin/password`, delegated contributor → bounced from
+`people.admins.manage`. Seven existing suites that mocked the old guard names updated
+(`admin-nl-search-actions`, `admin-access-actions`, `admin-settings-actions`,
+`admin-lifecycle-actions` (+ "beside" assertion), `admin-current-season-settle`,
+`current-season-import`, `player-link-mutations`); no coverage removed.
+
+**Docs.** `docs/admin-and-beta.md` (guard paragraph, nav furniture, settings line),
+`docs/search.md` (query builder gate), comments in `capabilities.ts` / `session.ts` and the
+migrated files.
+
+### Validation (2026-09-11, workstation, Windows, operator-authorised execution)
+
+Acceptance gate from `AFLDB-ISSUE-156.md` §11 P2, in order:
+
+1. Capability source-contract test — PASS (`tests/auth.test.ts`, "capability enforcement
+   contract": 48 boundaries walked, 18/18 capabilities enforced, 0 unguarded entry points,
+   retained role guards match policy in both directions).
+2. Per-role direct-action rejection for all 18 capabilities — PASS ("requireCapability against
+   the real guard": 18 × 6 viewers through the real `session.ts`, plus anonymous, temporary
+   password and delegated-contributor cases; and the 18 × 6 equivalence table).
+3. No route lost its existing guard — PASS (guard-first rule over every page, route handler and
+   Server Action; equivalence table shows no capability looser than its former guard).
+4. Typecheck — PASS (`npx tsc --noEmit`, exit 0).
+
+Focused run: `tests/auth.test.ts` + the ten admin suites (`admin-nl-search-actions`,
+`admin-access-actions`, `admin-settings-actions`, `admin-lifecycle-actions`,
+`admin-current-season-settle`, `current-season-import`, `player-link-mutations`,
+`admin-audit-viewer`, `admin-brownlow-actions`, `submission-review-actions`): **11 files, 568
+passed, 4 skipped** (the four are pre-existing `skipIf(!haveSh)` cases in
+`current-season-import` needing a POSIX shell; unrelated). First run exposed two defects in the
+new test itself, both fixed before the pass: the capability-literal regex accepted the un-dotted
+`'saveDraft'` discriminator from the Brownlow ternary, and `telemetry-clear-phrase.ts` had been
+listed as a pre-auth boundary when it only mentions `'use server'` in a comment.
+
+Preflight (`--mode implementation --issue 158`) was run late, after implementation: every check
+passed except "working tree is clean", which failed on the 47 ISSUE-158 paths themselves;
+warnings for missing `.env` / `psql` / `pg_restore` are irrelevant to a no-migration phase.
+
+Not exercised: DEV deployment and a browser pass. The change is a guard-for-guard swap with
+identical redirect targets, proven at the unit level; the standard DEV smoke after merge covers
+the runtime.
 
 ### Stop condition
 
 Any existing direct URL loses its current server guard, or a capability is enforced more weakly
-than the role guard it replaced.
+than the role guard it replaced. Not met: every migrated site is an exact swap (equivalence table
+above), and the one place the capability *was* weaker was tightened before it became the guard.
+
+### Resolution
+
+Root cause: the capability table (ISSUE-155 Phase A) was wired to the sidebar and to three
+Brownlow guards only; every other admin boundary kept a hand-picked role guard, so editing the
+table changed navigation and nothing else. Fix: the 54 exact-boundary swaps, the retained-guard
+policy, the `people.admins.manage` tightening and the source contract described above.
+Follow-up is the parent's: P3 (ISSUE-156 §10 C-1 decision at its preflight). No new issue.
 
 ### Next action
 
-After ISSUE-157: bootstrap worktree for issue 158, run
-`npm run preflight -- --mode implementation --issue 158`, then implement per the §11 P2 contract.
+Operator: commit the reviewed working tree, `npm run merge:ready -- --issue 158`, merge, DEV
+`deploy/sync-dev.ps1` and the standard smoke (sign in as each role; a plain admin bounced from
+`/admin/settings` to `/admin`, a contributor from `/admin/access` to `/admin/upload`).

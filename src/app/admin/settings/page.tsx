@@ -4,7 +4,7 @@ import { SettingsForm } from '@/app/admin/settings/SettingsForm';
 import { TestEmailForm } from '@/app/admin/settings/TestEmailForm';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { emailConfigured } from '@/lib/email/send';
 import { HOME_RECORD_CATEGORIES } from '@/lib/site-settings';
 
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
  * builder.
  */
 export default async function SettingsPage() {
-  await requireSuperAdmin();
+  await requireCapability('site.settings');
   const settings = await getSiteSettingsForAdmin();
   const smtpConfigured = emailConfigured();
 

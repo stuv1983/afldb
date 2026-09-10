@@ -13,7 +13,7 @@ import {
 import { getLatestSettleRun } from '@/db/queries/settle-runs';
 import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
 import { SETTLE_UNIT, startSettleRun } from '@/lib/acquisition/settle-trigger';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 
 export type CurrentSeasonAdminState = {
   error?: string;
@@ -45,7 +45,7 @@ export async function runCurrentSeasonAdminAction(
   _previous: CurrentSeasonAdminState,
   formData: FormData,
 ): Promise<CurrentSeasonAdminState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('acquisition.currentSeason');
   const mode = String(formData.get('mode') ?? 'report');
 
   try {
@@ -132,10 +132,12 @@ export async function runCurrentSeasonAdminAction(
 /**
  * Start one run of the approved AFLDB-ISSUE-122 chain, now.
  *
- * SUPER ADMIN ONLY, enforced here on the server. `requireSuperAdmin()` is the
- * first statement and redirects a plain admin, a contributor and an
- * unauthenticated visitor before anything else happens — the disabled button
- * in the UI is a courtesy, never the control.
+ * SUPER ADMIN ONLY, enforced here on the server.
+ * `requireCapability('acquisition.currentSeason')` -- a super-admin-only
+ * capability, the same boundary requireSuperAdmin() drew before
+ * AFLDB-ISSUE-158 -- is the first statement and redirects a plain admin, a
+ * contributor and an unauthenticated visitor before anything else happens —
+ * the disabled button in the UI is a courtesy, never the control.
  *
  * NO ARGUMENTS — structurally, not by convention. This action takes none, so
  * there is no season, label, path, source, force or bypass value to validate
@@ -156,7 +158,7 @@ export async function runCurrentSeasonAdminAction(
  * deliberately not swallowed.
  */
 export async function startSettleRunAction(): Promise<SettleRunAdminState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('acquisition.currentSeason');
 
   // Captured before the start so the panel can tell this run's batch from the
   // previous one. Just the batch id, not the whole status: the unit state is
@@ -216,6 +218,6 @@ export async function startSettleRunAction(): Promise<SettleRunAdminState> {
  * cannot be used to assert one.
  */
 export async function refreshSettleRunStatusAction(): Promise<SettleRunAdminState> {
-  await requireSuperAdmin();
+  await requireCapability('acquisition.currentSeason');
   return { outcome: 'status', status: await readSettleRunStatus() };
 }

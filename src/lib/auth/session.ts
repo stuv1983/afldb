@@ -313,12 +313,20 @@ export async function requireAdminManager(): Promise<AdminUser> {
 /**
  * Require a signed-in staff session that holds a specific capability
  * (`src/lib/auth/capabilities.ts`), or redirect exactly as requireAdmin()
- * and requireSuperAdmin() already do: a contributor bounces to the one
- * route they may reach, anyone else lacking the capability bounces to the
- * dashboard. AFLDB-ISSUE-155 Phase A: a granular alternative to picking
- * requireAdmin() vs requireSuperAdmin() by hand, for a route whose access
- * the capability table already names. It does not replace either guard --
- * every route that already calls one keeps doing so.
+ * and requireSuperAdmin() do: a contributor bounces to the one route they
+ * may reach, anyone else lacking the capability bounces to the dashboard.
+ *
+ * Introduced by AFLDB-ISSUE-155 Phase A as an alternative to picking
+ * requireAdmin() vs requireSuperAdmin() by hand; since AFLDB-ISSUE-158
+ * (ISSUE-156 P2) it is THE guard for every admin page, route handler and
+ * Server Action whose boundary the capability table names, and the role
+ * guards above remain only where no capability describes the rule (the
+ * dashboard, submission review) or where policy keeps an explicit
+ * super-admin boundary beside the capability (the account lifecycle).
+ * tests/auth.test.ts holds that contract against the source.
+ *
+ * Same session lookup as the role guards -- getAdminUser() is request
+ * cached -- so calling this beside requireSuperAdmin() costs no extra query.
  */
 export async function requireCapability(capability: Capability): Promise<AdminUser> {
   const admin = await requireUploader();

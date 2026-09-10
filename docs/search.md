@@ -132,7 +132,8 @@ Career filters read `player_career_stats` (13,361 rows), never the 694,210-row f
 
 `/admin/query-builder` is a separate tool from everything above: not
 public, linked from the admin nav as **Data QA search**
-(`src/app/admin/nav-model.ts`), gated by `requireSuperAdmin()`. It
+(`src/app/admin/nav-model.ts`), gated by the super-admin-only
+`operations.queryBuilder` capability (`requireCapability()`). It
 exists for ad-hoc data QA — checking the underlying tables directly —
 rather than answering a fixed statistical question.
 

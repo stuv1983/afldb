@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { countMedia, insertMedia, listMedia } from '@/db/queries/site-content';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { mediaFileName, probeImage } from '@/lib/image-probe';
 import { CONTENT_LIMITS } from '@/lib/site-content';
 
@@ -28,7 +28,7 @@ export const dynamic = 'force-dynamic';
  * script being written into a directory a web server publishes.
  */
 export async function POST(request: Request) {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('site.content');
 
   let form: FormData;
   try {

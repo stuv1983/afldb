@@ -7,7 +7,7 @@ import { PublishPanel } from '@/app/admin/content/PublishPanel';
 import { getApexContent, listMedia } from '@/db/queries/site-content';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
 import { apexPublishStatus, describeWritability, listTemplateImages } from '@/lib/apex-publish';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { uploadedSrc } from '@/lib/site-content';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
  * `requireSuperAdmin` already draws around the settings and the query builder.
  */
 export default async function ContentPage() {
-  await requireSuperAdmin();
+  await requireCapability('site.content');
 
   const [content, settings, media, status, shipped] = await Promise.all([
     getApexContent(),

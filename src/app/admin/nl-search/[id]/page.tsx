@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getNlSearchDetail, getNlSessionSearches } from '@/db/queries/nl-search-log';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, NOT_RECORDED } from '@/lib/format';
 import { decodeJsonbObject } from '@/lib/jsonb';
 import { NL_FAILURE_REASON_LABEL, NL_OUTCOME_LABEL } from '@/search/nl/review-spec';
@@ -61,7 +61,7 @@ export default async function NlSearchDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireSuperAdmin();
+  await requireCapability('operations.nlTelemetry');
 
   const { id: rawId } = await params;
   const id = Number(rawId);

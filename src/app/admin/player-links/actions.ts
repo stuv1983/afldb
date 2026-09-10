@@ -14,7 +14,7 @@ import {
   type LinkTargetTable,
 } from '@/db/queries/player-links';
 import { refreshMatchCandidates } from '@/db/queries/player-match-candidates';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 
 export type PlayerLinkActionState = { error?: string; message?: string; warning?: string };
 
@@ -58,7 +58,7 @@ export async function linkPlayer(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -96,7 +96,7 @@ export async function confirmUnlinked(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -122,7 +122,7 @@ export async function reviewSuggestion(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const id = Number(formData.get('suggestionId'));
   if (!Number.isInteger(id) || id <= 0) return { error: 'Bad suggestion id.' };
@@ -144,7 +144,7 @@ export async function createAndLinkPlayer(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -246,7 +246,7 @@ export async function approveSuggestion(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -294,7 +294,7 @@ export async function bulkApproveSuggestions(
   _prev: PlayerLinkActionState,
   formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   const { targets, error } = parseTargets(formData);
   if (error || !targets) return { error };
@@ -361,7 +361,7 @@ export async function refreshSuggestions(
   _prev: PlayerLinkActionState,
   _formData: FormData,
 ): Promise<PlayerLinkActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.playerLinks');
 
   try {
     const result = await refreshMatchCandidates(sql, authSql);
