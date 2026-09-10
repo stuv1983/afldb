@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
 import { generateTemporaryPassword, hashPassword } from '@/lib/auth/crypto';
-import { ROLE_RANK, type AdminUser, audit, requireAdminManager } from '@/lib/auth/session';
+import { ROLE_RANK, type AdminUser, audit, requireCapability } from '@/lib/auth/session';
 
 /**
  * Issue a temporary password for somebody else's account.
@@ -37,7 +37,7 @@ export async function issueTemporaryPassword(
   _previous: PasswordResetState,
   formData: FormData,
 ): Promise<PasswordResetState> {
-  const admin = await requireAdminManager();
+  const admin = await requireCapability('people.admins.manage');
 
   const userId = Number(formData.get('userId'));
   if (!Number.isInteger(userId)) return { error: 'Bad user id.' };

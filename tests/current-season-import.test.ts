@@ -157,9 +157,11 @@ describe('current-season external source import contracts', () => {
 
   it('exposes the refresh only through a super-admin server action', () => {
     expect(adminAction).toContain("'use server'");
-    expect(adminAction).toContain('requireSuperAdmin()');
+    // acquisition.currentSeason is super-admin-only (AFLDB-ISSUE-158); the
+    // capability's role list is held by tests/auth.test.ts.
+    expect(adminAction).toContain("requireCapability('acquisition.currentSeason')");
     expect(adminAction).toContain('runCurrentSeasonRefresh');
-    expect(adminPage).toContain('requireSuperAdmin()');
+    expect(adminPage).toContain("requireCapability('acquisition.currentSeason')");
     expect(adminNav).toContain("href: '/admin/current-season'");
   });
 

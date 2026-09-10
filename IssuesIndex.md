@@ -7,7 +7,18 @@
 > and the Open Issues table at the top of `issues.md`.
 
 **Last updated:** 2026-09-11
-**Open issues:** 17 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-153`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`, `AFLDB-ISSUE-158`.
+**Open issues:** 16 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-153`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`.
+
+<!-- UPDATE 2026-09-11 (ISSUE-158 RESOLVED — ISSUE-156 P2 COMPLETE, VALIDATED, UNMERGED):
+     `AFLDB-ISSUE-158` removed from this index. Delivered on
+     `fable/issue-158-capability-enforcement`: 54 role-guard sites in 28 files under
+     `src/app/admin/**` swapped for `requireCapability()` on the capability naming the same
+     boundary (all 18 now enforced); role guards retained by policy only on the dashboard,
+     submission review, change-password and the lifecycle (which asserts `people.admins.lifecycle`
+     beside `requireSuperAdmin()`); `people.admins.manage` tightened to deny a contributor with
+     `can_manage_admins`; source-contract + equivalence + real-guard tests in `tests/auth.test.ts`.
+     Validation: 11 suites 568 passed / 4 pre-existing shell skips, tsc clean. No migration, no
+     privilege change. Next: operator merge + DEV smoke; P3 waits on ISSUE-156 §10 C-1. -->
 
 <!-- UPDATE 2026-09-11 (ISSUE-157 RESOLVED — ISSUE-156 P1 COMPLETE, DEV-DEPLOYED, UNMERGED):
      `AFLDB-ISSUE-157` removed from this index. Delivered on `fable/issue-157-admin-audit`:
@@ -2481,14 +2492,6 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
 
 - **Severity:** Medium
 - **Area:** Admin / Auth / Data management / Acquisition / Operations
-- **State:** Open / P1 complete 2026-09-11 (`AFLDB-ISSUE-157` resolved: `/admin/audit` live on DEV, unmerged); P2 (`AFLDB-ISSUE-158`) not started. Umbrella for the former ISSUE-155 Phases D–I plus two newly identified prerequisites: the audit trail has no usable read surface (`src/app/admin/page.tsx:46-51` is the only `auth_audit_log` reader; `data_edits` has none), and 15 of 18 declared capabilities are nav-only, never reaching `requireCapability()`. Children allocated: 157 (P1), 158 (P2). P3 Coach admin (155 Phase D), P4 Special records (E), P5 Honours lifecycle, P6 Site content (F), P7 Safe refresh (G), P8 Data-editor decomposition, P9 Player lifecycle/merge (HIGH), P10 Fixture-identity correction (HIGH), P11 CSV transition (H), P12 Integrated acceptance (I) are named placeholders with no ID until each starts. Migration 095 is the planning snapshot only, not allocated. ISSUE-155 PROD and ISSUE-151 are not blockers; ISSUE-151's promotion-inventory contract applies to P3/P4/P5/P7/P9/P10. ISSUE-154 not reused. P3 carries stop condition C-1 (coach-only identity blocked by NOT NULL `coaches.afltables_coach_path` / `source_id`, migration 087).
+- **State:** Open / P1 complete 2026-09-11 (`AFLDB-ISSUE-157` resolved, merged at `3bbcab0`); P2 complete 2026-09-11 (`AFLDB-ISSUE-158` resolved: every `/admin` boundary enforces its capability, validated, unmerged on `fable/issue-158-capability-enforcement`). Umbrella for the former ISSUE-155 Phases D–I plus two newly identified prerequisites: the audit trail has no usable read surface (`src/app/admin/page.tsx:46-51` is the only `auth_audit_log` reader; `data_edits` has none), and 15 of 18 declared capabilities are nav-only, never reaching `requireCapability()`. Children allocated: 157 (P1), 158 (P2). P3 Coach admin (155 Phase D), P4 Special records (E), P5 Honours lifecycle, P6 Site content (F), P7 Safe refresh (G), P8 Data-editor decomposition, P9 Player lifecycle/merge (HIGH), P10 Fixture-identity correction (HIGH), P11 CSV transition (H), P12 Integrated acceptance (I) are named placeholders with no ID until each starts. Migration 095 is the planning snapshot only, not allocated. ISSUE-155 PROD and ISSUE-151 are not blockers; ISSUE-151's promotion-inventory contract applies to P3/P4/P5/P7/P9/P10. ISSUE-154 not reused. P3 carries stop condition C-1 (coach-only identity blocked by NOT NULL `coaches.afltables_coach_path` / `source_id`, migration 087).
 - **Key files/subsystems:** `AFLDB-ISSUE-156.md` (runbook); baseline architecture `AFLDB-ISSUE-155.md` §5/§6/§7/§17/§18/§23; `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`, `src/db/queries/audit-log.ts`, `tools/maintenance/privileges.sql:435-470`, `tools/db/promotion-inventory.ts`.
-- **Next action:** operator merges `fable/issue-157-admin-audit` after `npm run merge:ready -- --issue 157`; then start `AFLDB-ISSUE-158` in a fresh implementation session: `npm run worktree:bootstrap -- --issue 158 --branch <agent>/issue-158`, `npm run preflight -- --mode implementation --issue 158`, carrying `AFLDB-ISSUE-156.md` §11 P2 contract. P2 can reuse `src/components/admin/AdminPager.tsx` and the `operations.audit.read` enforcement as the pattern for every other capability.
-
-## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
-
-- **Severity:** Medium
-- **Area:** Admin / Auth
-- **State:** Open / Not started. Migrate role-name guards under `src/app/admin/**` to `requireCapability()` where the declared capability describes the same boundary (15 unenforced of 18); retain `requireSuperAdmin()` on `people.admins.lifecycle` (ISSUE-155 §26.3) with a capability assertion beside it; add a source-contract regression in `tests/auth.test.ts` proving every `Capability` member is enforced at a route/action boundary and no admin mutation lacks a server-side assertion. No migration, no privilege change, no ISSUE-151 dependency; independent of 157 except for shared component reuse.
-- **Key files/subsystems:** `AFLDB-ISSUE-156.md` §11 P2 contract; `src/lib/auth/capabilities.ts`, `src/lib/auth/session.ts`, `src/app/admin/**`, `tests/auth.test.ts`.
-- **Next action:** after 157: `npm run preflight -- --mode implementation --issue 158`, re-enumerate guard call sites, then implement. Stop if any direct URL loses its current guard or a capability is enforced more weakly than the role guard it replaced.
+- **Next action:** operator commits and merges `fable/issue-158-capability-enforcement` after `npm run merge:ready -- --issue 158`, then DEV `deploy/sync-dev.ps1` + smoke. Next phase is P3 (Coach admin, `AFLDB-ISSUE-156.md` §P3), which must not start until stop condition C-1 (§10) is decided at its preflight; it receives an ID only then.

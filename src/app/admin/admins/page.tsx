@@ -4,7 +4,7 @@ import { AdminSessionsClient } from '@/app/admin/admins/AdminSessionsClient';
 import { InviteManager } from '@/app/admin/admins/InviteManager';
 import { authSql } from '@/db/authClient';
 import { listAdminAccounts } from '@/db/queries/admin-users';
-import { hasAdminManagementAccess, requireAdmin } from '@/lib/auth/session';
+import { hasAdminManagementAccess, requireCapability } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +30,9 @@ export default async function AdminsPage() {
   // their OWN sessions. The lifecycle controls are rendered only for a
   // super admin, and the four Server Actions behind them call
   // requireSuperAdmin() for themselves (AFLDB-ISSUE-155 Phase B §26.9).
-  const admin = await requireAdmin();
+  // people.admins.read is Admin-and-up: the same door requireAdmin() kept
+  // before AFLDB-ISSUE-158.
+  const admin = await requireCapability('people.admins.read');
   const canManage = hasAdminManagementAccess(admin);
 
   const [{ accounts, sessions }, invites] = await Promise.all([

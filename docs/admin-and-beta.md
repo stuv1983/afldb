@@ -103,14 +103,20 @@ power, independent of role, granted per account rather than by promoting
 someone outright.
 
 A `contributor` is upload-only: they sign in the same way (password +
-TOTP) but `requireAdmin()` (`src/lib/auth/session.ts`) redirects that
-role to `/admin/upload` rather than admitting it, so every existing
-admin page and action is closed to a contributor without needing its
-own check. `requireUploader()` is the narrower guard, used only by the
-upload page/action and by the submission-status page (which additionally
-checks the submission belongs to that contributor) — reach for
-`requireAdmin()` everywhere else, and it will keep a contributor out
-correctly on its own.
+TOTP) but every guard in `src/lib/auth/session.ts` redirects that role to
+`/admin/upload` rather than admitting it unless the route's capability is
+open to all staff, so every admin page and action is closed to a
+contributor without needing its own check. Since AFLDB-ISSUE-158 the guard
+each admin page, route handler and Server Action calls is
+`requireCapability('<name>')`, with the name and its role list declared
+once in `src/lib/auth/capabilities.ts`; `acquisition.legacyIntake` is the
+one capability open to a contributor (the upload page/action and the
+submission-status page, which additionally checks the submission belongs
+to that contributor). The role guards `requireAdmin()` /
+`requireSuperAdmin()` / `requireSignedIn()` remain only on the dashboard,
+the submission review actions, the change-password page and (beside the
+capability, by policy) the administrator account lifecycle;
+`tests/auth.test.ts` reads the source and fails if that list drifts.
 
 ### The first super admin
 
@@ -253,8 +259,10 @@ screen it defaults to collapsed and expands into a grid above the page.
 
 Which links appear is derived from the role in `src/app/admin/nav-model.ts`.
 That file is **furniture, never a gate**: every page still calls its own
-`requireAdmin()` / `requireSuperAdmin()`, and a link omitted there is not a
-link that is protected.
+`requireCapability()` (or, where policy retains one, a role guard), and a
+link omitted there is not a link that is protected. The link and the guard
+read the same capability table, and `tests/auth.test.ts` checks that every
+capability a link is gated on is enforced by the page it points at.
 
 The long forms — `/admin/content` and `/admin/settings` — are built from
 `AdminSection`, a `<details>` block that remembers whether it is open, one
@@ -280,7 +288,8 @@ per key in `site_settings` (migration 034) and audited as
 
 Not open to a plain admin, delegated or not: what the front page shows
 and who may reach the grid solver are publication decisions, the same
-line `requireSuperAdmin()` already draws for the query builder.
+line the super-admin-only `site.settings` capability draws here and
+`operations.queryBuilder` draws for the query builder.
 
 Every value is re-parsed on the way in through the same functions the
 read path uses (`src/lib/site-settings.ts`), so a hand-posted form field

@@ -9,7 +9,7 @@ import { saveMatchSheet } from '@/db/queries/match-sheet';
 import { createPlayer, type DraftPickInput } from '@/db/queries/players';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { validateMatchSheetPayload } from '@/lib/match-sheet';
 
 export type SimpleAdminActionState = {
@@ -57,7 +57,7 @@ export async function createPlayerAction(
   _prev: CreatePlayerActionState,
   formData: FormData,
 ): Promise<CreatePlayerActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const displayName = String(formData.get('displayName') ?? '').trim();
   if (!displayName || displayName.length > 100) {
@@ -159,7 +159,7 @@ export async function createAwardWinnerAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const awardId = Number(formData.get('awardId'));
   if (!Number.isInteger(awardId) || awardId <= 0) {
@@ -244,7 +244,7 @@ export async function createHallOfFameAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const name = String(formData.get('name') ?? '').trim();
   const rawPlayerId = formData.get('playerId');
@@ -334,7 +334,7 @@ export async function createHonourTeamMemberAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const teamName = String(formData.get('teamName') ?? '').trim();
   if (!teamName) {
@@ -410,7 +410,7 @@ export async function saveDataEdit(
   _prev: DataEditState,
   formData: FormData,
 ): Promise<DataEditState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const entityKey = String(formData.get('entity') ?? '');
   const entity = EDITABLE_ENTITIES[entityKey];
@@ -468,7 +468,7 @@ export async function saveMatchSheetAction(
   _prev: MatchSheetActionState,
   formData: FormData,
 ): Promise<MatchSheetActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const matchId = Number(formData.get('matchId'));
   if (!Number.isInteger(matchId) || matchId <= 0) {
@@ -532,7 +532,7 @@ export async function createMatchAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const season = Number(formData.get('season'));
   if (!Number.isInteger(season) || season < 1897 || season > 2100) {
@@ -687,7 +687,7 @@ export async function deleteMatchAction(
   _prev: SimpleAdminActionState,
   formData: FormData,
 ): Promise<SimpleAdminActionState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('data.dataEditor');
 
   const matchId = Number(formData.get('matchId'));
   if (!Number.isInteger(matchId) || matchId <= 0) {

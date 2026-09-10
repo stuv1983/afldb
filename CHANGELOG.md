@@ -15,6 +15,28 @@ commit.
 
 ## [Unreleased]
 
+### Admin Centre capabilities are enforced, not decorative (AFLDB-ISSUE-158, ISSUE-156 P2) - 11 September 2026
+
+- Every admin page, route handler and Server Action under `/admin` now authorises through
+  `requireCapability('<name>')` against the one capability table in
+  `src/lib/auth/capabilities.ts`, the same table the sidebar reads. 54 role-guard call sites in
+  28 files were swapped for the capability that names the same boundary: same viewers admitted,
+  same redirects (`/admin/upload` for a contributor, `/admin` otherwise), same request-cached
+  session lookup. All 18 declared capabilities are enforced somewhere real.
+- Role guards remain only where policy keeps them: the dashboard (`requireAdmin`), submission
+  review and promotion (`requireAdmin` / `requireSuperAdmin`, no capability describes them), the
+  change-password page (`requireSignedIn`), and the administrator account lifecycle, which keeps
+  `requireSuperAdmin()` first and now also asserts `people.admins.lifecycle` beside it.
+- Policy fix: `people.admins.manage` no longer admits a contributor row carrying
+  `can_manage_admins` (the app never writes one, but nothing forbade it); the capability now
+  equals the `requireAdminManager()` rule it replaces. No other capability's admitted set changed.
+- Tests: `tests/auth.test.ts` reads the admin source and fails on drift — a capability declared
+  but unenforced, a boundary that awaits anything before its guard or has none, a role guard kept
+  where policy did not name it (or missing where it did), a nav link whose page does not enforce
+  its capability, or a capability looser or tighter than the role guard it replaced; plus
+  `requireCapability()` run for real per capability and viewer without a database. No migration,
+  no privilege change.
+
 ### Admin Centre audit trail (AFLDB-ISSUE-157, ISSUE-156 P1) - 11 September 2026
 
 - New read-only `/admin/audit` page in the Operations group, open to every Admin and Super

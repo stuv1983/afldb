@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { ReviewControls } from '@/app/admin/submissions/[id]/ReviewControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { authSql } from '@/db/authClient';
-import { requireUploader } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 import type { ImportBatchId } from '@/lib/import-batch-id';
 
@@ -20,7 +20,12 @@ export default async function SubmissionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const admin = await requireUploader();
+  // The status page of a legacy-intake submission: open to every staff
+  // role exactly as requireUploader() was (acquisition.legacyIntake is
+  // ALL_STAFF), with the uploader-or-admin ownership check below narrowing
+  // it per submission. The review verdicts in ./actions.ts keep their
+  // role guards: no capability names them (AFLDB-ISSUE-158).
+  const admin = await requireCapability('acquisition.legacyIntake');
 
   const { id: idText } = await params;
   const id = Number(idText);

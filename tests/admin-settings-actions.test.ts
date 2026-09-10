@@ -16,7 +16,8 @@ vi.mock('@/db/authClient', () => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  requireSuperAdmin: vi.fn().mockResolvedValue({ id: 1, email: 'admin@example.com' }),
+  // site.settings (super-admin-only) since AFLDB-ISSUE-158.
+  requireCapability: vi.fn().mockResolvedValue({ id: 1, email: 'admin@example.com' }),
   audit: vi.fn().mockResolvedValue(undefined),
 }));
 

@@ -4,7 +4,7 @@ import { AccessManager } from '@/app/admin/access/AccessManager';
 import { authSql } from '@/db/authClient';
 import { labelAnswers, parseAnswers } from '@/db/queries/early-access';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
-import { betaGateEnabled, requireAdmin } from '@/lib/auth/session';
+import { betaGateEnabled, requireCapability } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AccessPage() {
-  await requireAdmin();
+  await requireCapability('people.betaAccess');
 
   const [settings, [codes, emails, requests]] = await Promise.all([
     // Needed to label the stored answers with their questions' CURRENT

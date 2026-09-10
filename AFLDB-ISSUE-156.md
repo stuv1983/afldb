@@ -440,10 +440,12 @@ Inherits `AFLDB-ISSUE-155.md` §21 in full. Additionally:
 `src/components/admin/AdminPager.tsx`. No migration, no privilege change, no write path;
 `data_overrides` still deferred per §5. Evidence in `issues.md` under ISSUE-157.
 
-**Start `AFLDB-ISSUE-158` (P2) in a fresh implementation session** after the operator merges
-the P1 branch. Recommended: Fable, high effort, normal implementation mode, new worktree from
-clean `main`. Carry over: this file's §P2 handoff contract and §2. P1 leaves P2 one worked
-example of the target shape — a capability enforced as the first await of a route, with a
-DB-free route-boundary test for all three roles in `tests/admin-audit-viewer.test.ts`.
+**P2 is complete.** `AFLDB-ISSUE-158` resolved 2026-09-11 on
+`fable/issue-158-capability-enforcement` (validated: 11 suites / 568 tests, tsc clean; unmerged,
+not deployed): every `/admin` boundary now calls `requireCapability()`, the retained
+role guards are exactly the dashboard, submission review, change-password and the lifecycle
+(beside the capability), the `people.admins.manage` rule was tightened to match
+`requireAdminManager()` before it became the guard, and `tests/auth.test.ts` holds the source
+contract. Evidence and the validation commands are in `issues.md` under ISSUE-158.
 
 Do not start P3 until C-1 (§10) is decided at its preflight.

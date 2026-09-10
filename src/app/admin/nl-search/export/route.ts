@@ -7,7 +7,7 @@ import {
   listNlSearchesForExport,
   parseNlLogPeriod,
 } from '@/db/queries/nl-search-log';
-import { audit, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, requireCapability } from '@/lib/auth/session';
 import { csvResponse, toCsv } from '@/lib/csv';
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +100,7 @@ function isDataset(value: string): value is NlExportDataset {
 }
 
 export async function GET(request: Request) {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('operations.nlTelemetry');
 
   const url = new URL(request.url);
   const dataset = url.searchParams.get('dataset') ?? 'searches';

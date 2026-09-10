@@ -16,6 +16,14 @@
  * Every entry here is a description of a check that already exists on the
  * page or action it names (verified against src/app/admin/**\/page.tsx
  * during Phase A) -- this table does not itself grant anything new.
+ *
+ * Since AFLDB-ISSUE-158 (ISSUE-156 P2) the table is also the check: every
+ * admin page, route handler and Server Action under src/app/admin calls
+ * `requireCapability()` with one of these names, except the dashboard, the
+ * submission review actions and the account lifecycle, which keep their
+ * role guards for the reasons recorded there. tests/auth.test.ts reads the
+ * source and fails if a capability is declared here but enforced nowhere,
+ * or if an admin mutation ships without a server-side guard.
  */
 
 export type CapabilityRole = 'contributor' | 'admin' | 'super_admin';
@@ -75,9 +83,9 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // Promote/demote/deactivate/reactivate (AFLDB-ISSUE-155 Phase B §26.3).
   // Deliberately NOT delegated by `can_manage_admins`: unlike the entry
   // above, this one takes the plain role list, so a delegated manager is
-  // denied. The page and the four Server Actions still call
-  // requireSuperAdmin() themselves -- this entry describes that guard, it
-  // does not replace it.
+  // denied. The four Server Actions still call requireSuperAdmin() first
+  // and assert this capability beside it (AFLDB-ISSUE-158) -- this entry
+  // describes that guard, it does not replace it.
   'people.admins.lifecycle': SUPER_ADMIN_ONLY,
   'site.content': SUPER_ADMIN_ONLY,
   'site.settings': SUPER_ADMIN_ONLY,
@@ -98,7 +106,13 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
 
 export function hasCapability(viewer: CapabilityViewer, capability: Capability): boolean {
   if (capability === 'people.admins.manage') {
-    return viewer.role === 'super_admin' || viewer.canManageAdmins;
+    // The delegation reaches an admin and nobody else. A contributor row
+    // carrying can_manage_admins (nothing in the app writes one -- invites
+    // refuse it and demotion clears it -- but no constraint forbids it) is
+    // still a contributor: requireAdminManager() bounced it at requireAdmin()
+    // before this table existed, and the capability may not be the weaker
+    // of the two now that it is the guard (AFLDB-ISSUE-158).
+    return viewer.role === 'super_admin' || (viewer.role === 'admin' && viewer.canManageAdmins);
   }
   return CAPABILITY_ROLES[capability].includes(viewer.role);
 }

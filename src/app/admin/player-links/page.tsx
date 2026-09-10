@@ -23,7 +23,7 @@ import {
   readSuggestionsForEntities,
 } from '@/db/queries/player-match-candidates';
 import { sql } from '@/db/client';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { BAND_ORDER, isConfidenceBand } from '@/lib/player-matching/confidence';
 import {
   conflictLabel,
@@ -116,7 +116,7 @@ function queueRank(band: ConfidenceBand | undefined, bulkEligible: boolean, ambi
 export default async function PlayerLinksPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
-  await requireSuperAdmin();
+  await requireCapability('data.playerLinks');
   const params = await searchParams;
   const rawTable = firstValue(params.table) ?? '';
   const table = isLinkTargetTable(rawTable) ? rawTable : undefined;

@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deleteAccessCode, revokeAccessCode } from '@/app/admin/access/actions';
 import { authSql } from '@/db/authClient';
-import { audit, auditInTransaction, requireAdmin } from '@/lib/auth/session';
+import { audit, auditInTransaction, requireCapability } from '@/lib/auth/session';
 
 const state = vi.hoisted(() => ({
   /** Every statement either the pool or the transaction ran, in order. */
@@ -31,7 +31,7 @@ const state = vi.hoisted(() => ({
   updateRows: [] as unknown[],
   /** The handle handed to the transaction callback, to prove the audit got it. */
   lastTx: null as unknown,
-  /** Set to make requireAdmin throw, standing in for its redirect(). */
+  /** Set to make requireCapability throw, standing in for its redirect(). */
   adminThrows: false,
 }));
 
@@ -61,7 +61,10 @@ vi.mock('@/db/authClient', () => {
 });
 
 vi.mock('@/lib/auth/session', () => ({
-  requireAdmin: vi.fn(async () => {
+  // people.betaAccess (Admin-and-up) since AFLDB-ISSUE-158; the capability's
+  // own role logic is tests/auth.test.ts's business, this file's is that the
+  // action stops when the guard does.
+  requireCapability: vi.fn(async () => {
     if (state.adminThrows) throw new Error('NEXT_REDIRECT');
     return { id: 7, email: 'admin@example.com' };
   }),
@@ -155,9 +158,9 @@ describe('deleteAccessCode refuses a code that could still be redeemed', () => {
   });
 
   it('requires an admin session before any statement runs', async () => {
-    // requireAdmin re-checks the database row, so a forged or stale cookie
-    // stops here. If it ever stopped being the first thing this action
-    // did, this is the test that notices.
+    // requireCapability re-checks the database row, so a forged or stale
+    // cookie stops here. If it ever stopped being the first thing this
+    // action did, this is the test that notices.
     state.adminThrows = true;
     state.deleteRows = deletedRow();
 
@@ -177,7 +180,7 @@ describe('deleteAccessCode removes a retired code with a durable record', () => 
 
     expect(result.error).toBeUndefined();
     expect(result.message).toContain('footy forum wave 1');
-    expect(requireAdmin).toHaveBeenCalled();
+    expect(requireCapability).toHaveBeenCalledWith('people.betaAccess');
   });
 
   it('writes access.code_deleted naming what was destroyed, and no secret', async () => {

@@ -20,7 +20,7 @@ import { resolve } from 'node:path';
  */
 
 const mocks = vi.hoisted(() => ({
-  requireSuperAdmin: vi.fn(),
+  requireCapability: vi.fn(),
   audit: vi.fn(),
   startSettleRun: vi.fn(),
   readSettleRunStatus: vi.fn(),
@@ -28,7 +28,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  requireSuperAdmin: mocks.requireSuperAdmin,
+  // acquisition.currentSeason (super-admin-only) since AFLDB-ISSUE-158.
+  requireCapability: mocks.requireCapability,
   audit: mocks.audit,
 }));
 
@@ -122,7 +123,7 @@ const STATUS = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireSuperAdmin.mockResolvedValue(SUPER_ADMIN);
+  mocks.requireCapability.mockResolvedValue(SUPER_ADMIN);
   mocks.audit.mockResolvedValue(undefined);
   mocks.readSettleRunStatus.mockResolvedValue(STATUS);
   mocks.getLatestSettleRun.mockResolvedValue(RUN);
@@ -137,15 +138,17 @@ describe('authorization', () => {
   it('lets a super admin start the approved pipeline', async () => {
     const state = await startSettleRunAction();
 
-    expect(mocks.requireSuperAdmin).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledOnce();
+    expect(mocks.requireCapability).toHaveBeenCalledWith('acquisition.currentSeason');
     expect(mocks.startSettleRun).toHaveBeenCalledOnce();
     expect(state.outcome).toBe('started');
     expect(state.error).toBeUndefined();
   });
 
   it('stops an ordinary admin at the guard, before the host boundary', async () => {
-    // requireSuperAdmin() redirects a plain admin, which in Next is a throw.
-    mocks.requireSuperAdmin.mockRejectedValue(new Error('NEXT_REDIRECT /admin'));
+    // requireCapability('acquisition.currentSeason') redirects a plain
+    // admin, which in Next is a throw.
+    mocks.requireCapability.mockRejectedValue(new Error('NEXT_REDIRECT /admin'));
 
     await expect(startSettleRunAction()).rejects.toThrow('NEXT_REDIRECT');
     expect(mocks.startSettleRun).not.toHaveBeenCalled();
@@ -153,14 +156,14 @@ describe('authorization', () => {
   });
 
   it('stops an unauthenticated visitor at the guard, before the host boundary', async () => {
-    mocks.requireSuperAdmin.mockRejectedValue(new Error('NEXT_REDIRECT /admin/login'));
+    mocks.requireCapability.mockRejectedValue(new Error('NEXT_REDIRECT /admin/login'));
 
     await expect(startSettleRunAction()).rejects.toThrow('NEXT_REDIRECT');
     expect(mocks.startSettleRun).not.toHaveBeenCalled();
   });
 
   it('guards the status refresh with the same super-admin check', async () => {
-    mocks.requireSuperAdmin.mockRejectedValue(new Error('NEXT_REDIRECT /admin'));
+    mocks.requireCapability.mockRejectedValue(new Error('NEXT_REDIRECT /admin'));
 
     await expect(refreshSettleRunStatusAction()).rejects.toThrow('NEXT_REDIRECT');
     expect(mocks.readSettleRunStatus).not.toHaveBeenCalled();

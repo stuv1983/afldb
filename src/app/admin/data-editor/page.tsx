@@ -17,7 +17,7 @@ import { getEditableRow } from '@/db/queries/data-edits';
 import { listDraftPicks } from '@/db/queries/draft';
 import { searchAdminMatches } from '@/db/queries/match-admin';
 import { listSeasons } from '@/db/queries/seasons';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { formatDate, formatRoundShort } from '@/lib/format';
 import { firstValue, parseSeason } from '@/lib/params';
 import { isEditableEntity } from '@/lib/edit/spec';
@@ -37,7 +37,7 @@ export const dynamic = 'force-dynamic';
 export default async function DataEditorPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
-  await requireSuperAdmin();
+  await requireCapability('data.dataEditor');
   const params = await searchParams;
 
   const mode = firstValue(params.mode) ?? '';

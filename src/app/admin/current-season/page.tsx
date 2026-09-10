@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { readSettleRunStatus, type SettleRunStatus } from '@/lib/acquisition/settle-status';
-import { requireSuperAdmin } from '@/lib/auth/session';
+import { requireCapability } from '@/lib/auth/session';
 import { getCurrentSeasonReport } from '@/lib/external-afl/current-season-import';
 
 import {
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CurrentSeasonPage() {
-  await requireSuperAdmin();
+  await requireCapability('acquisition.currentSeason');
 
   const year = new Date().getFullYear();
 

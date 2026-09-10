@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { authSql } from '@/db/authClient';
 import type { LifecycleRole } from '@/lib/auth/admin-lifecycle';
-import { audit, hasAdminManagementAccess, requireAdmin } from '@/lib/auth/session';
+import { audit, hasAdminManagementAccess, requireCapability } from '@/lib/auth/session';
 
 export type AdminSessionState = {
   error?: string;
@@ -26,12 +26,17 @@ export type AdminSessionState = {
  *
  * The target's role is read from the database rather than taken from the
  * form, so a promotion since the page rendered cannot be raced past it.
+ *
+ * The door is people.admins.read (Admin-and-up, what requireAdmin() drew
+ * before AFLDB-ISSUE-158): the action belongs to the account list every
+ * admin may read, and the who-may-revoke-whom rule above is decided here
+ * per target, not by the capability table.
  */
 export async function revokeSession(
   _previous: AdminSessionState,
   formData: FormData,
 ): Promise<AdminSessionState> {
-  const admin = await requireAdmin();
+  const admin = await requireCapability('people.admins.read');
   const sessionId = Number(formData.get('sessionId'));
   if (!Number.isInteger(sessionId)) return { error: 'Bad session id.' };
 

@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { authSql } from '@/db/authClient';
 import { saveNlSearchReview } from '@/db/queries/nl-search-log';
 import { clearNlSearchTelemetry, type NlTelemetryClearCounts } from '@/db/queries/nl-search-telemetry-clear';
-import { audit, auditInTransaction, requireSuperAdmin } from '@/lib/auth/session';
+import { audit, auditInTransaction, requireCapability } from '@/lib/auth/session';
 import { isNlReviewCategory, isNlReviewStatus, type NlReviewCategory } from '@/search/nl/review-spec';
 
 import { NL_TELEMETRY_CLEAR_PHRASE } from './telemetry-clear-phrase';
@@ -28,7 +28,7 @@ export async function saveReview(
   _previous: NlReviewState,
   formData: FormData,
 ): Promise<NlReviewState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('operations.nlTelemetry');
 
   const searchLogId = Number(formData.get('searchLogId'));
   if (!Number.isInteger(searchLogId) || searchLogId <= 0) {
@@ -81,10 +81,12 @@ export type NlClearTelemetryState = {
  * Delete disposable nl_search_log rows and audit the deletion, atomically
  * (AFLDB-ISSUE-119 §6, §8, §9, §11).
  *
- * requireSuperAdmin() runs before anything else, including confirmation
- * parsing, so a forged direct call to this action stops at the guard
- * rather than at the phrase check -- rendering the control conditionally
- * on the page is not itself an authorisation boundary.
+ * requireCapability('operations.nlTelemetry') -- super-admin-only, the
+ * boundary requireSuperAdmin() drew before AFLDB-ISSUE-158 -- runs before
+ * anything else, including confirmation parsing, so a forged direct call
+ * to this action stops at the guard rather than at the phrase check --
+ * rendering the control conditionally on the page is not itself an
+ * authorisation boundary.
  *
  * The confirmation phrase is re-checked here independently of the client:
  * a wrong or missing value returns before any transaction opens, so it
@@ -104,7 +106,7 @@ export async function clearTelemetry(
   _previous: NlClearTelemetryState,
   formData: FormData,
 ): Promise<NlClearTelemetryState> {
-  const admin = await requireSuperAdmin();
+  const admin = await requireCapability('operations.nlTelemetry');
 
   const confirmation = String(formData.get('confirmation') ?? '');
   if (confirmation !== NL_TELEMETRY_CLEAR_PHRASE) {
