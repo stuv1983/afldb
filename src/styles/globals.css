@@ -476,6 +476,25 @@ td.audit-wrap code, td.audit-payload code { font-size: 0.75rem; }
 .audit-change .audit-before { color: var(--text-muted); }
 .audit-change .audit-arrow { color: var(--text-faint); }
 .audit-change .audit-after { font-weight: 600; }
+/* The filter form. A grid item's automatic minimum is its min-content
+   width, so a select whose longest option outgrows its track would spill
+   past the grid rather than shrink; min-width: 0 lets `width: 100%` win.
+   The site's form rule (above) styles text, search, number and select
+   controls but not date inputs, which otherwise render at their intrinsic
+   width in the browser's default chrome. */
+.audit-filters .filter-grid > div { min-width: 0; }
+.audit-filters input[type='date'] {
+  font: inherit;
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  min-height: 42px;
+  padding: 0.55rem 0.7rem;
+  width: 100%;
+  min-width: 0;
+}
 
 /* Collapsible table sections ------------------------------------------ */
 details.table-details {

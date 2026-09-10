@@ -333,7 +333,7 @@ function FilterPanel({ view, actions }: { view: AuditView; actions: string[] }) 
         <span className="filter-details-title">Filter</span>
         <span className="filter-details-note">{note}</span>
       </summary>
-      <form method="get" action={AUDIT_PATH}>
+      <form method="get" action={AUDIT_PATH} className="audit-filters">
         {!isAuth && <input type="hidden" name="tab" value="edits" />}
         <div className="filter-grid">
           <div>
