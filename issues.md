@@ -20849,7 +20849,7 @@ on DEV.
 
 ## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
 
-**Status:** Open / In progress — Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented and validated, including the §27.27 browser acceptance (A–K, all PASS) and the post-C2 stale-tab/focus fixes; the promotion-contract implementation for the two Phase C tables is complete in the working tree (uncommitted). Remaining before close: commit, full regression, promotion-check and deploy validation. Phases D–I not started.
+**Status:** Open / In progress — Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented, committed at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` (branch `codex/issue-155-admin-overhaul`), and **DEPLOYED TO DEV, fully accepted** (migrations 092/093/094 applied, privileges reconciled, schema/privilege verified, pre-deploy `_test` suites green, live-DB reconciliation clean, Super Admin/Admin/Contributor capability-boundary and Save Draft browser acceptance all PASS on the deployed service — full record below). **DEV is COMPLETE. PROD is PENDING** — not started, not scheduled in this entry. Phases D–I not started.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition
 **Found:** 2026-09-10
@@ -21648,10 +21648,112 @@ screenshots were ever cited by filename in this record. Kept as reusable operato
 `issue155-acceptance-start-dev.ps1`, `issue155-acceptance-start-prod.ps1` (`afldb_test`-only,
 safety-guarded, generically reusable for future acceptance passes). Nothing was committed.
 
-**Exact next action:** commit the reviewed working tree (10 tracked modifications, the 5 required
-new source/test files, the 4 acceptance tooling scripts, and this documentation); then run the
-full regression sequence fresh against the committed tree — unit suites, `db-promotion-check`,
-`admin-brownlow` + `admin-brownlow-actions` integration, `privileges` + `release-gates`, typecheck
-— followed by cleaning the disposable `issue155-acceptance-*` fixtures in `afldb_test`
-(seasons 2085/2089), then the §27.21 deploy sequence. Do not close ISSUE-155 until that full
-sequence and the deploy are complete and recorded.
+**Exact next action (superseded — see the DEV deployment record below):** commit the reviewed
+working tree (10 tracked modifications, the 5 required new source/test files, the 4 acceptance
+tooling scripts, and this documentation); then run the full regression sequence fresh against the
+committed tree — unit suites, `db-promotion-check`, `admin-brownlow` + `admin-brownlow-actions`
+integration, `privileges` + `release-gates`, typecheck — followed by cleaning the disposable
+`issue155-acceptance-*` fixtures in `afldb_test` (seasons 2085/2089), then the §27.21 deploy
+sequence. Do not close ISSUE-155 until that full sequence and the deploy are complete and recorded.
+
+### Committed (2026-09-10) and DEV §27.21 deployment complete (2026-09-11)
+
+**Committed** at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` on `codex/issue-155-admin-overhaul`:
+the post-C2 stale-tab/`startTransition`/focus-restore fixes, the `fingerprint.ts` client/server
+split, the `PROMOTION_CONTRACT` implementation for `brownlow_vote_entry_state` /
+`brownlow_season_authority`, four warning-only lint cleanups (an unused `PublishPanel` prop, two
+stale `eslint-disable-next-line no-console` comments), and this documentation. `git diff --check`
+clean; the disposable acceptance PNGs and one-off diagnostic scripts were deleted, not committed
+(see the worktree-hygiene entry above).
+
+**§27.20 DEV preflight — P1–P12, all complete on `afldb_dev` (2026-09-10/11), matching the
+reference `afldb_test` evidence exactly:** P1 320,861 round rows 1984–2025; P2 zero ambiguity
+(320,861/320,861 resolvable, 0/0 zero/many-candidate); **P3 HARD GATE PASS** (0 duplicate
+match/vote groups, 0 duplicate match/player groups); P4 zero `manual_admin_edit` season rows; P5
+44,478 round votes = 44,478 season votes, 0 mismatches; P6 7,413 textbook H&A matches, 0
+other-positive, 0 none (range corrected to 1984–2025, see the runbook fix below); P7 0 exception
+matches; P8 16,327 H&A matches 1897–2026, 7 under-18 — all seven are incomplete 2026
+current-season imports, zero genuine historical exceptions, §27.6 threshold stays at 18; P9
+16,120 rows, 0 disagreement against `player_season_stats.games - finals` (6,507 disagree against
+the rejected all-games reading, confirming the adopted formula); P10 16,120/16,120 Brownlow
+season rows trusted (`unique`/`resolved`); **P11 HARD GATE PASS** (all four `afldb_import`
+privilege checks true). Two genuine range/wording defects in the §27.20 table itself were found
+and fixed during this pass (not defects in the data or the migration) — see "Runbook corrections"
+below.
+
+**Migration + privilege reconciliation on `afldb_dev` (2026-09-11).** Discovered en route:
+`db:status` showed three pending migrations, not one — `092_nl_search_log_coach_record_grain.sql`
+and `093_nl_search_log_after_siren_grain.sql` (AFLDB-ISSUE-152 Phase B/C, already merged to
+`origin/main`, confirmed additive CHECK-widening only, genuinely never reached `afldb_dev`) ahead
+of `094_brownlow_admin_workflow.sql` (ISSUE-155, branch-local). All three applied via
+`tools/db/migrate.ts --target dev`, in filename order, `094` requiring the explicit
+`--allow-branch-local` acknowledgement. Result: **94/94 applied, 0 pending.** `npm run
+db:privileges` (dev target) reconciled: `afldb_app` 52 public relations readable / 21 revoked,
+`afldb_import` 44 registered tables writable / 29 revoked, `afldb_auth` grants applied on 35/35
+tables / 38 other relations revoked, `nl_search_telemetry_clear()` PUBLIC revoked / `afldb_auth`
+EXECUTE granted, `afldb_backup` unchanged. Independently re-verified read-only afterward (not
+just trusted the reconciler's own summary): `brownlow_round_votes.match_id` exists, nullable,
+correct FK; `brownlow_vote_entry_state` and `brownlow_season_authority` both exist with every
+named CHECK/PK constraint and both partial unique indexes present; neither table registered in
+`afldb_meta.import_writable_tables` (confirmed narrow-grant, not registry-grant, as migration
+094's own §7 requires); `afldb_app` SELECT-only, `afldb_import` SELECT/INSERT/UPDATE/DELETE with
+**no TRUNCATE**, `afldb_auth` zero privileges on either table; zero `PUBLIC` grants anywhere in
+the Brownlow domain.
+
+**Pre-deploy `_test` validation, Linux-local against the exact committed tree:**
+`tests/integration/admin-brownlow.test.ts` **44/44 PASS**; `tests/admin-brownlow-actions.test.ts`
+**32/32 PASS**; `tests/integration/privileges.test.ts` **35/36** — the sole failure is the
+pre-existing, already-tracked `external_grid_axes`/`external_grids` "WRITABLE BUT NOT REGISTERED"
+drift (AFLDB-ISSUE-138), explicitly unrelated to ISSUE-155; every Brownlow-workflow-table
+privilege assertion passed.
+
+**DEV deployment (2026-09-11), `deploy/sync-dev.ps1 -RemoteRef codex/issue-155-admin-overhaul`.**
+First attempt failed at `npm run db:migrate` for the same branch-local reason as the manual
+preflight run (`checkMigrationSafety()` runs unconditionally regardless of what's actually
+pending); resolved by independently re-confirming `db:status` = 0 pending on `afldb_dev`, then
+re-running with `-SkipMigrate` (an existing, narrow, already-supported switch — no deploy script
+was modified, and no migration-safety check was weakened globally). Result: `npm ci` PASS,
+Next.js production build PASS, standalone preparation PASS, `afldb.service` restarted
+successfully, `/api/health` PASS (`{"status":"ok","database":"ok","latencyMs":29}`) at the exact
+committed revision, `codex/issue-155-admin-overhaul` @ `3eb6739`.
+
+**Live-database reconciliation on `afldb_dev` post-deploy (§27.21 step 6), reproducing
+`db-health.ts::reconcileCareerTotals()`'s five checks exactly plus the P2-baseline comparison:**
+games 0, goals 0, finals 0, brownlow_votes 0, missing_career_rows 0 mismatches;
+`brownlow_round_votes` rows with `match_id IS NULL` = **0**, matching the P2 baseline
+(`candidates_zero = 0`) exactly.
+
+**Browser acceptance on the deployed DEV service (`http://10.0.40.100:8090`).** Super Admin
+login PASS, Admin Centre nav renders with Brownlow visible in Data; `/admin/brownlow`,
+`/admin/brownlow/2025`, 2025 Round 1 all PASS — fixtures, selections, line-ups and workflow
+controls render correctly, zero console errors, no beta-gate/permission issues. Admin capability
+boundary PASS. Contributor capability boundary PASS. **Mutation acceptance: Save Draft**, chosen
+specifically because `runMatchMutation()` (`src/db/queries/admin-brownlow.ts:996-1109`) proves in
+source that `action === 'saveDraft'` never calls `writeMatchFacts` and never touches
+`brownlow_season_authority` — a draft is structurally incapable of reaching any public table, so
+no designated disposable target was needed (that concept only ever applied to the `afldb_test`
+fixture, which doesn't exist on `afldb_dev`). Result: PASS — `/brownlow/2025` public rendering
+confirmed unchanged after the draft save.
+
+**Runbook corrections applied to `AFLDB-ISSUE-155.md` §27.20 (2026-09-11), all found by DEV
+preflight cross-checks against the actual migration/data, not assumed:**
+- **P6** — "1984+" corrected to **1984–2025**: `brownlow_round_votes` has zero rows outside that
+  span (confirmed by P1), so driving the match-grain sum check from `matches` past 2025 would
+  wrongly classify every in-progress current-season H&A match as a "none" exception.
+- **P8** — "expect 0 for 1899+" corrected to reflect the actual accepted state: zero genuine
+  historical exceptions, but 7 incomplete 2026 current-season matches under the 18-per-side floor
+  is expected and benign (they correctly refuse finalisation until repaired by the normal
+  current-season pipeline); the measured span is 1897–2026, not "1899+".
+- **P12** — split into two populations instead of one "1984+" range: the genuine 1984–2025
+  mirror-vs-round comparison, and the separate pre-1984 mirror-only population (exactly
+  1931–1934), which has no `rv` counterpart and must never be compared against one.
+
+**DEV is COMPLETE. PROD is PENDING** — not started, not scheduled here. ISSUE-155 remains OPEN.
+No PROD command has been given or run at any point in this deployment. No new implementation was
+started on this branch.
+
+**Exact next action:** none scheduled — DEV acceptance is the last completed milestone. The next
+session should plan the PROD promotion/deploy sequence (equivalent §27.21 steps against
+production, plus whatever additional promotion/restore-lineage considerations the ISSUE-151
+pipeline requires for a production host, which was never part of this DEV pass) as its own
+deliberate, separately-scoped piece of work — not a continuation to start automatically.
