@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { AdminPager } from '@/components/admin/AdminPager';
 import { DATA_EDIT_TABLE_NAMES } from '@/db/queries/audit-log';
@@ -167,7 +168,6 @@ function AuthLedger(
                   <th scope="col">Action</th>
                   <th scope="col">Actor</th>
                   <th scope="col">Detail</th>
-                  <th scope="col">IP</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,28 +186,35 @@ function AuthLedger(
 function AuthEventRow({ event }: { event: AuthAuditEvent }) {
   const entries = detailEntries(event.detail);
   const showCurrentEmail = event.actorEmail !== null && event.actorEmail !== event.actorLabel;
+  // Four columns, not five: the user id and the IP sit under the actor,
+  // so the detail payload keeps the width a desktop has to give it.
   return (
     <tr>
       <td className="nowrap muted">{formatAuditTimestamp(event.at)}</td>
       <td className="nowrap"><code>{event.action}</code></td>
-      <td className="wide">
+      <td className="audit-wrap">
         {event.actorLabel ?? <span className="muted">—</span>}
         {event.actorUserId !== null && (
-          <div className="muted" style={{ fontSize: '0.8rem' }}>
+          <span className="audit-meta">
             #{event.actorUserId}{showCurrentEmail ? ` · now ${event.actorEmail}` : ''}
-          </div>
+          </span>
         )}
+        {event.ip && <span className="audit-meta">{event.ip}</span>}
       </td>
-      <td className="wide">
+      <td className="audit-payload">
         {entries.length === 0
           ? <span className="muted">—</span>
-          : entries.map(([key, value]) => (
-            <div key={key} style={{ fontSize: '0.85rem' }}>
-              <code>{key}</code>{' '}{value}
+          : (
+            <div className="audit-kv">
+              {entries.map(([key, value]) => (
+                <Fragment key={key}>
+                  <code>{key}</code>
+                  <span>{value}</span>
+                </Fragment>
+              ))}
             </div>
-          ))}
+          )}
       </td>
-      <td className="nowrap muted">{event.ip ?? '—'}</td>
     </tr>
   );
 }
@@ -231,10 +238,8 @@ function EditsLedger({ view, result, pageHref, summaryFor }: LedgerProps<DataEdi
                 <tr>
                   <th scope="col">When (UTC)</th>
                   <th scope="col">Entity</th>
-                  <th scope="col">Field group</th>
                   <th scope="col">Change</th>
                   <th scope="col">By</th>
-                  <th scope="col">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -258,32 +263,37 @@ function DataEditRow({ edit }: { edit: DataEditRecord }) {
   const changes = diffValues(edit.oldValues, edit.newValues).filter((change) => change.changed);
   const shown = changes.slice(0, INLINE_CHANGE_LIMIT);
   const historyHref = entityHistoryHref(edit.tableName, edit.rowId);
+  // Four columns: the field group rides under the entity and the note under
+  // the changes, so the Change column has the room each before → after pair
+  // needs to read as two lines rather than one compressed run.
   return (
     <tr>
       <td className="nowrap muted">{formatAuditTimestamp(edit.createdAt)}</td>
-      <td className="nowrap">
+      <td className="audit-wrap">
         <Link href={historyHref}>
           {DATA_EDIT_TABLE_LABELS[edit.tableName]} #{edit.rowId}
         </Link>
+        <span className="audit-meta"><code>{edit.fieldGroup}</code></span>
       </td>
-      <td className="nowrap"><code>{edit.fieldGroup}</code></td>
-      <td className="wide">
+      <td className="audit-payload">
         {shown.length === 0 ? (
           <span className="muted">Recorded without a field-level change</span>
         ) : shown.map((change) => (
-          <div key={change.field} style={{ fontSize: '0.85rem' }}>
-            <code>{change.field}</code>{' '}
-            <span className="muted">{change.before}</span>{' → '}{change.after}
+          <div key={change.field} className="audit-change">
+            <code className="audit-field">{change.field}</code>
+            <span className="audit-before">{change.before}</span>
+            <span className="audit-arrow" aria-hidden="true">→</span>
+            <span className="audit-after">{change.after}</span>
           </div>
         ))}
         {changes.length > shown.length && (
-          <div style={{ fontSize: '0.85rem' }}>
+          <span className="audit-meta">
             <Link href={historyHref}>+{changes.length - shown.length} more…</Link>
-          </div>
+          </span>
         )}
+        {edit.note && <span className="audit-meta">Note: {edit.note}</span>}
       </td>
-      <td className="wide muted">{edit.adminEmail ?? `#${edit.adminUserId}`}</td>
-      <td className="wide muted">{edit.note ?? ''}</td>
+      <td className="audit-wrap muted">{edit.adminEmail ?? `#${edit.adminUserId}`}</td>
     </tr>
   );
 }

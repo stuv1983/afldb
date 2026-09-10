@@ -32,8 +32,8 @@ export function ValueDiff({
           {rows.map((row) => (
             <tr key={row.field} className={row.changed ? undefined : 'muted'}>
               <td className="nowrap"><code>{row.field}</code></td>
-              <td className="wide">{row.before}</td>
-              <td className="wide">{row.changed ? <strong>{row.after}</strong> : row.after}</td>
+              <td className="audit-wrap">{row.before}</td>
+              <td className="audit-wrap">{row.changed ? <strong>{row.after}</strong> : row.after}</td>
             </tr>
           ))}
         </tbody>

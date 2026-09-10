@@ -443,6 +443,40 @@ td.num, th.num { text-align: right; font-family: var(--font-mono); }
 td.wide { white-space: normal; min-width: 12rem; }
 .not-recorded { color: var(--text-faint); }
 
+/* Admin audit viewer (AFLDB-ISSUE-157). The ledgers hold emails, JSON
+   payloads and before/after values with no natural break point; `normal`
+   white space alone cannot wrap those, so a long value used to widen the
+   whole table past its wrapper. `overflow-wrap: anywhere` lets them break
+   inside their own column instead. A table that is still too wide (a phone)
+   scrolls inside .table-wrap, never the page. */
+td.audit-wrap { white-space: normal; min-width: 10rem; overflow-wrap: anywhere; }
+td.audit-payload { white-space: normal; min-width: 16rem; width: 45%; overflow-wrap: anywhere; }
+td.audit-wrap code, td.audit-payload code { font-size: 0.75rem; }
+/* A second line under a cell's main value: user id, IP, field group, note. */
+.audit-meta { display: block; font-size: 0.78rem; color: var(--text-muted); }
+/* auth_audit_log.detail as `key value` pairs, keys in a column of their own. */
+.audit-kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0.6rem;
+  row-gap: 0.1rem;
+  font-size: 0.8125rem;
+}
+/* One data_edits field change: the field on its own line, then before → after. */
+.audit-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  font-size: 0.8125rem;
+}
+.audit-change + .audit-change { border-top: 1px dotted var(--border); }
+.audit-change .audit-field { grid-column: 1 / -1; color: var(--text-muted); }
+.audit-change .audit-before { color: var(--text-muted); }
+.audit-change .audit-arrow { color: var(--text-faint); }
+.audit-change .audit-after { font-weight: 600; }
+
 /* Collapsible table sections ------------------------------------------ */
 details.table-details {
   margin: 1.5rem 0;
