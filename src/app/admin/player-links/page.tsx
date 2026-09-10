@@ -6,6 +6,7 @@ import { RefreshSuggestionsControls } from '@/app/admin/player-links/RefreshSugg
 import { ResolvePanel } from '@/app/admin/player-links/ResolvePanel';
 import { SuggestionControls } from '@/app/admin/player-links/SuggestionControls';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { AdminPager } from '@/components/admin/AdminPager';
 import {
   isLinkTargetTable,
   LINK_TARGET_TABLES,
@@ -292,21 +293,22 @@ export default async function PlayerLinksPage(
     [...new Set(pageRows.map((r) => suggestionOf(r)?.playerId).filter((id): id is number => !!id))],
   );
 
-  const pager = totalPages > 1 && (
-    <nav className="section" aria-label="Queue pages" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      {page > 1
-        ? <Link href={pageHref(page - 1)}>← Previous</Link>
-        : <span className="muted">← Previous</span>}
-      <span className="muted">
-        Page {formatNumber(page)} of {formatNumber(totalPages)}
-        {' · '}{formatNumber(filteredQueue.length)} unresolved
-        {query ? ` matching "${query}"` : ''}
-        {table ? ` in ${TABLE_LABELS[table]}` : ''}
-      </span>
-      {page < totalPages
-        ? <Link href={pageHref(page + 1)}>Next →</Link>
-        : <span className="muted">Next →</span>}
-    </nav>
+  // The shared admin pager (src/components/admin/AdminPager.tsx) is this
+  // control, extracted when /admin/audit needed the same one.
+  const pager = (
+    <AdminPager
+      page={page}
+      totalPages={totalPages}
+      pageHref={pageHref}
+      label="Queue pages"
+      summary={(
+        <>
+          {' · '}{formatNumber(filteredQueue.length)} unresolved
+          {query ? ` matching "${query}"` : ''}
+          {table ? ` in ${TABLE_LABELS[table]}` : ''}
+        </>
+      )}
+    />
   );
 
   return (

@@ -112,6 +112,7 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     { href: '/admin/app-health', label: 'Application health', capability: 'operations.appHealth' },
     { href: '/admin/nl-search', label: 'Search telemetry', capability: 'operations.nlTelemetry' },
     { href: '/admin/nl-search/feedback', label: 'Reader feedback', capability: 'operations.nlTelemetry' },
+    { href: '/admin/audit', label: 'Audit trail', capability: 'operations.audit.read' },
   ]);
   if (operationsLinks.length > 0) groups.push({ id: 'operations', label: 'Operations', links: operationsLinks });
 

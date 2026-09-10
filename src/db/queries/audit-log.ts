@@ -34,6 +34,27 @@ export type DataEditTableName =
   | 'brownlow_vote_entry_state'
   | 'brownlow_season_authority';
 
+/**
+ * The same allowlist as a runtime value, for the read side
+ * (`src/db/queries/audit-reader.ts`, AFLDB-ISSUE-157): a URL-supplied
+ * table name is accepted only if it names a member, so the filter can
+ * never bind a value the CHECK constraint would not have admitted.
+ */
+export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
+  'players',
+  'matches',
+  'draft_picks',
+  'award_winners',
+  'hall_of_fame',
+  'honour_team_members',
+  'brownlow_vote_entry_state',
+  'brownlow_season_authority',
+];
+
+export function isDataEditTableName(value: string): value is DataEditTableName {
+  return (DATA_EDIT_TABLE_NAMES as readonly string[]).includes(value);
+}
+
 export type DataEditAuditInput = {
   tableName: DataEditTableName;
   rowId: number;

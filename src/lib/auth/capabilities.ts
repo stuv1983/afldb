@@ -42,7 +42,8 @@ export type Capability =
   | 'operations.queryBuilder'
   | 'operations.dbHealth'
   | 'operations.appHealth'
-  | 'operations.nlTelemetry';
+  | 'operations.nlTelemetry'
+  | 'operations.audit.read';
 
 const ALL_STAFF: readonly CapabilityRole[] = ['contributor', 'admin', 'super_admin'];
 const ADMIN_AND_UP: readonly CapabilityRole[] = ['admin', 'super_admin'];
@@ -84,6 +85,15 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   'operations.dbHealth': SUPER_ADMIN_ONLY,
   'operations.appHealth': SUPER_ADMIN_ONLY,
   'operations.nlTelemetry': SUPER_ADMIN_ONLY,
+  // The read-only audit viewer over auth_audit_log and data_edits
+  // (AFLDB-ISSUE-157, ISSUE-156 §2 row `ops.audit.read`; the identifier
+  // takes this file's `operations.` prefix and the `.read` suffix of
+  // `data.brownlow.read` / `people.admins.read`). Open to any Admin, not
+  // only a Super Admin: the /admin dashboard already shows every admin the
+  // fifteen most recent auth_audit_log rows for every actor, and an Admin's
+  // own Brownlow drafts land in data_edits, so a full-scope read here
+  // widens no boundary that exists today. The viewer has no write path.
+  'operations.audit.read': ADMIN_AND_UP,
 };
 
 export function hasCapability(viewer: CapabilityViewer, capability: Capability): boolean {

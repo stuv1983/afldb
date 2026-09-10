@@ -21887,7 +21887,7 @@ worktree: `npm run worktree:bootstrap -- --issue 157 --branch <agent>/issue-157`
 
 ## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
 
-**Status:** Open / Not started
+**Status:** Open / Implemented — verification in progress (2026-09-11)
 **Severity:** Medium
 **Area:** Admin / Authentication / Operations
 **Found:** 2026-09-11
@@ -21930,11 +21930,53 @@ desktop → typecheck. Nav contract extends `tests/auth.test.ts`.
 
 Any write path introduced; any privilege or migration found necessary for the default scope.
 
+### Implementation (2026-09-11, worktree `fable/issue-157-admin-audit`)
+
+Preflight re-verified before editing: `privileges.sql:441` (`auth_audit_log` SELECT, INSERT) and
+`:463` (`data_edits` SELECT, INSERT) unchanged; highest migration `094`, none added; the
+`Capability` union (17 members) and `nav-model.ts` grouped-link shape unchanged since `e27e985`.
+No stop condition was met: no write path, no migration, no privilege change, `data_overrides`
+untouched.
+
+- **Capability** `operations.audit.read` (the runbook's working name `ops.audit.read`, renamed
+  at preflight to the union's existing `operations.` prefix and the `.read` suffix of
+  `data.brownlow.read` / `people.admins.read`). Roles: ADMIN_AND_UP, resolving the §2 "own-scope
+  TBD" as full scope — the `/admin` dashboard already shows every admin the last fifteen
+  `auth_audit_log` rows for every actor, and an Admin's own Brownlow drafts land in `data_edits`,
+  so no existing boundary is widened. Enforced by `requireCapability()` as the first await of
+  both routes; a contributor is redirected before any query is issued.
+- **Routes** `/admin/audit` (Operations group; tabs "Sign-ins & administration" over
+  `auth_audit_log` and "Data edits" over `data_edits`; GET filter form for actor, action /
+  table + row id + field group, UTC date range; server-side paging of 50) and
+  `/admin/audit/entity/[table]/[rowId]` (one entity's edits newest first, each rendered
+  field-by-field before/after via `ValueDiff`). Route segments validated against the
+  `data_edits` allowlist and a digits-only row id before any read; otherwise 404.
+- **Readers** `src/db/queries/audit-reader.ts` (SELECT-only, auth pool, handle-injectable):
+  `listAuthAuditEvents`, `listAuthAuditActions`, `listDataEdits`, `listDataEditHistory`. Bigint
+  columns selected `::text` and typed as strings end to end; jsonb passed through untouched
+  (`normaliseDetail` never calls `JSON.parse`). Date bounds are half-open UTC instants so the
+  filter agrees with the rendered `YYYY-MM-DD HH:MM:SS` timestamps regardless of session
+  time zone. Actor search is ILIKE with LIKE metacharacters escaped, plus `= id` for digits.
+- **Pure helpers** `src/lib/audit-view.ts`: URL parsing (`parseAuditView`), `diffValues`,
+  `normaliseDetail`, href builders. `audit-log.ts` gains the runtime allowlist
+  `DATA_EDIT_TABLE_NAMES` / `isDataEditTableName` beside the type it already declared.
+- **Shared component** `src/components/admin/AdminPager.tsx`, extracted from the inline
+  player-links pager (behaviour-preserving; `flexWrap` added for 320 px) and used by both
+  routes. The filter form stays route-local: no second admin route has a date-ranged filter.
+- **Dashboard**: "Recent activity" now links to the full audit trail.
+- **Tests**: `tests/auth.test.ts` (capability per role; nav contract — a plain admin now has an
+  Operations group holding exactly `/admin/audit`); new `tests/admin-audit-viewer.test.ts`
+  (helpers, reader SQL through a fake pool: SELECT-only, `::text` ids exact past 2^53, jsonb not
+  re-decoded, bound filters, LIKE escaping, paging clamp; route boundary for Contributor / Admin /
+  Super Admin on both routes, 404 paths); new `tests/integration/admin-audit.test.ts`
+  (filter correctness on `afldb_test` inside an always-rolled-back transaction: label vs current
+  email vs id actor matching, inclusive UTC date bounds at 23:59:59Z, paging, entity history).
+
 ### Next action
 
-Fresh implementation session: bootstrap worktree for issue 157, run
-`npm run preflight -- --mode implementation --issue 157`, re-verify the privilege grants and
-the `Capability` union, then implement per the §11 P1 contract.
+Run the validation sequence and record the evidence here: unit suites → integration on
+`afldb_test` → responsive browser pass at 320 px / tablet / desktop on DEV → typecheck. Then
+resolve, sync `IssuesIndex.md` and `CHANGELOG.md`, and start ISSUE-158 in a fresh session.
 
 ## AFLDB-ISSUE-158 — Capability enforcement (ISSUE-156 P2)
 
