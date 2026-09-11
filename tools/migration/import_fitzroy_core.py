@@ -3538,6 +3538,14 @@ def main() -> int:
         elif group == "matches":
             import_matches(pg, rep, matches, clubs, refs)
             replay_admin_overrides(pg, "matches")
+            # AFLDB-ISSUE-162 §20. Grouped with matches to keep every
+            # match-shaped thing together, but the ORDER IS NOT BINDING: a
+            # fixture names its clubs and its venue by SLUG -- tracked
+            # reference data loaded long before any replay -- and names no
+            # player, no match and no draft selection. It needs no matches row
+            # at all, because a fixture is what was SCHEDULED and "played" is
+            # resolved at read time, never stored.
+            replay_admin_overrides(pg, "fixtures")
         elif group == "stats":
             # `corrections` is threaded explicitly, never read from module scope:
             # both of these functions call iter_player_stats(files, corrections) and

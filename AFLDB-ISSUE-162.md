@@ -1,6 +1,10 @@
 # AFLDB-ISSUE-162 — Fixture / season schedule administration (ISSUE-156 P3d)
 
-- **Status:** Planning complete 2026-09-11 — **no code, no migration, no commit, no deployment.**
+- **Status:** **Stage 1 EXECUTED 2026-09-11 (Opus 5 high, 1M context) — uncommitted, unvalidated by
+  a run, not deployed; DEV and PROD untouched.** Migration **097 re-checked free and allocated**.
+  See **§37 Stage 1 implementation record** for exactly what was built, the two deviations, and the
+  validation the operator must run before committing. Stage 2 (the `/admin/fixtures` surface) is
+  not built. Planning complete 2026-09-11.
   **Operator decisions D-1…D-7 DECIDED 2026-09-11 (§35); D-6 approved with a condition and one
   additional implementation constraint. Stage 1 is authorised.**
 - **Severity:** Medium
@@ -1034,3 +1038,325 @@ routes (§28), stage split (§33), no settle/current-season change (§19), promo
     `Execute AFLDB-ISSUE-162 Stage 1 according to AFLDB-ISSUE-162.md` from
     `D:\dev\afldb-issue-162` on `opus/issue-162-fixture-admin`; first actions are the preflight and
     the migration-number re-check. No DEV, no PROD, no merge, no deploy.
+
+---
+
+## 37. Stage 1 implementation record (2026-09-11, Opus 5 high 1M, UNCOMMITTED)
+
+Executed against this document as the implementation contract. Nothing was re-planned; D-1…D-7 and
+the §6 `fixture_key` constraint were treated as binding throughout, and no stop condition fired.
+
+### 37.1 Migration-number re-check
+
+`src/db/migrations/` ends at `096_season_list_members.sql` on this branch, so **097 was free and is
+allocated** as `097_fixtures.sql`. The all-refs cross-check (`git log --all --oneline --
+src/db/migrations/097_*.sql`) is in §37.7 and is the operator's to run; nothing is committed, so a
+renumber is trivial if it comes back occupied.
+
+### 37.2 What was built
+
+| File | Change |
+|---|---|
+| `src/db/migrations/097_fixtures.sql` | **new** — §26 in full: `fixtures` + 6 indexes + 6 CHECKs, `data_overrides.entity_type` += `'fixtures'`, `data_edits.table_name` += `'fixtures'`, `grant_app_read` + `grant_import_write`, table/column comments. No backfill, no destructive statement, no `privileges.sql` edit |
+| `src/db/queries/admin-fixtures.ts` | **new** — the ONE fixture mutation contract (§13, §14, §15, §16), the read-time played resolution (§18), the season/summary/orphan/diagnostics readers (§27) and the import-role override reader |
+| `src/db/queries/audit-log.ts` | `DataEditTableName` and `DATA_EDIT_TABLE_NAMES` += `'fixtures'` |
+| `src/lib/acquisition/manual-authority.ts` | `OVERRIDE_ENTITY_TYPES` += `'fixtures'` (inventory only; the proof still consults nothing) |
+| `tools/migration/common.py` | `FIXTURE_STATUSES`, `FIXTURE_ROUND_TYPES`, and the fail-closed `replay_admin_overrides('fixtures')` branch (§20) |
+| `tools/migration/import_fitzroy_core.py` | call site after `replay_admin_overrides(pg, "matches")` |
+| `tools/db/promotion-inventory.ts` | `fixture_key` `LineageIdentityRule` + its by-id/by-identity SQL, the `data_edits` target, remediation text, acceptance-checklist wording |
+| `docs/production-promotion.md` | §8 replay loop += `'fixtures'`, with the ordering and venue-degrade notes |
+| `tests/admin-fixture-actions.test.ts` | **new** — the pure half |
+| `tests/integration/admin-fixtures.test.ts` | **new** — the PostgreSQL half, incl. the real Python replay |
+| `tests/db-promotion-check.test.ts` | `fixtures` in `PINNED_FOOTBALL_TABLES`, the lineage target, the `fixture_key` rule, the no-`PROMOTION_CONTRACT`-entry classification, the checklist |
+| `tests/current-season-import.test.ts` | `CHECK_AFTER_097`, the 097 widening, the settle-target absence, order-independence in both directions |
+| `tests/data-overrides-source-contract.test.ts` | one-writer grep, the derived-safety contract in both directions, the replay contract, the importer call site, the frozen enumerations |
+
+### 37.3 The invariants the schema now enforces rather than merely documents
+
+- **No result fact can exist on a fixture.** There is no score, goals, behinds, result, margin,
+  winner, attendance, period, lineup or statistic column, so "0–0 means not played" is
+  unrepresentable rather than forbidden.
+- **D-6 and the operator constraint are structural.** `fixtures` has no `match_id` and no
+  `match_key` column and no FK to `matches`; the resolution is a `SELECT` in a LATERAL, and the
+  module's code (comments stripped) contains neither string.
+- **A time cannot be stored without a date** (`fixtures_time_needs_date_ck`), so no writer, replay
+  or future importer can invent a midnight.
+- **A terminal state cannot be unexplained** (`fixtures_status_reason_ck`).
+- **A home-and-away fixture cannot disagree with itself about its round**
+  (`fixtures_round_number_ck` includes `round_code = round_number::text`), which is what would make
+  the played resolution silently miss.
+
+### 37.4 Deviations from this runbook
+
+Both are strengthenings; neither contradicts a decision or widens scope.
+
+1. **`fixtures_time_needs_date_ck` is a CHECK.** §10 states "a time requires a date" as a *writer*
+   rule. It is enforced in both the writer and the database so the replay and any future importer
+   are bound by it too.
+2. **Stage 1 ships `classifyFixtureDiagnostics()` / `readFixtureDiagnostics()`.** §27 places the
+   diagnostics *panel* in Stage 2, but §33 Stage 1 item 3 lists "diagnostics readers". The
+   classification is a pure function over rows, so it is unit-testable now and the Stage 2 panel
+   becomes rendering. Nothing refuses: shape is reported, never enforced, and per-round byes are
+   listed as **information** because a bye and an incomplete round are not distinguishable from the
+   data.
+
+**Also recorded, because §15/§16 name it in neither direction:** `cancelled → void` is permitted (a
+cancelled fixture may still turn out to have been mis-entered); `void` is terminal in every
+direction, accepting notes only. Restated as a binding semantic, with the Stage 2 obligation it
+carries, in §37.8 item 8.
+
+### 37.5 A tail risk worth stating
+
+The replay resolves each club slug through `afldb_season_list_clubs(season)`, exactly as §20
+requires, and refuses when it does not resolve. Once the register advances past a fixture's season
+that function takes its historical arm, which requires a `club_seasons` row — so a fixture naming a
+club that never played in that season (an expansion club whose fixture was voided, say) would fail
+the replay closed years later. That is the specified behaviour and the correct default for a durable
+human decision, but it is a real edge and belongs in the record rather than being discovered during
+a promotion.
+
+### 37.6 Not built (Stage 2)
+
+`/admin/fixtures` routes and panels; `data.fixtures.read` / `data.fixtures.edit`; the Data-group nav
+entry; the batch-entry UI with client-side paste pre-fill; the diagnostics panel; the
+`src/db/queries/data-edits.ts` entity-link case; `tests/auth.test.ts` coverage; Playwright and the
+responsive matrix (deferred to the combined Admin Centre DEV batch, §34).
+
+Stage 2 also owes the **void control a destructive-confirmation step** — an explicit confirm plus the
+mandatory reason, in the ISSUE-155 pattern — because `void` says the record should never have existed
+and is terminal. It must not be rendered as an equivalent sibling of cancel. See §37.8 item 8.
+
+### 37.7 Validation — NOT YET RUN
+
+Nothing below has been executed. Every command is the operator's, in this order, from
+`D:\dev\afldb-issue-162`:
+
+1. `npm run preflight -- --mode implementation --issue 162`
+2. `git log --all --oneline -- src/db/migrations/097_*.sql` (expect no output)
+3. apply migration 097 to **`afldb_test` only**, then `npm run db:privileges` against it
+4. `npx tsc --noEmit`
+5. `npx vitest run tests/admin-fixture-actions.test.ts tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts`
+6. `npx vitest run tests/integration/admin-fixtures.test.ts`
+7. `npx vitest run tests/admin-season-list-actions.test.ts tests/integration/admin-season-lists.test.ts tests/reference-data.test.ts tests/admin-match-mutations.test.ts`
+8. `npx eslint` over the changed source and test files
+9. `git diff --check` and `git status --short`
+
+Stage 1 is complete as designed but **unproven** until those are green; a failure there is a Stage 1
+defect, not a Stage 2 item.
+
+### 37.8 Stage 1 validation repair (2026-09-11, second pass — STILL UNCOMMITTED, STILL UNVALIDATED)
+
+The operator ran the §37.7 typecheck and unit suites. They found two REAL product defects, one
+missing audit label and a set of brittle source-contract extractions. All are repaired below; the
+§37.7 gates remain the gates, and none of them has been re-run by this pass.
+
+**1. `DATA_EDIT_TABLE_LABELS` had no `fixtures` entry (typecheck failure).** `DataEditTableName`
+gained `'fixtures'` in §37.2, and `src/lib/audit-view.ts` maps that union exhaustively.
+`fixtures: 'Fixtures'` added — the label only, matching the existing Admin Centre vocabulary
+(`Coaches`, `Draft picks`). The ISSUE-157 viewer therefore names the table correctly in its filter
+and its applied-filter line. Stage 2's entity-link case in `src/db/queries/data-edits.ts` is still
+**not** built (§37.6): this is the type's label, not the navigation.
+
+**2. `normaliseSchedule()` accepted impossible calendar dates (REAL DEFECT, D-5).** The rule was the
+`YYYY-MM-DD` shape plus `Date.parse()`. `Date.parse()` is not a calendar check: it NORMALISES an
+impossible day rather than rejecting it, so `2027-02-30` parsed — as 2 March — and was accepted. A
+fixture could have been stored on a day that does not exist, or the operator's typo silently accepted
+as a different day. Replaced with `isRealCalendarDate()`: build the day in UTC and require all three
+components to survive the round trip, which is exactly the arithmetic `parseAuditDate()` already uses
+(`src/lib/audit-view.ts`). `2027-02-30`, `2027-02-29`, `2027-04-31`, month `00`/`13` and day
+`00`/`32` now refuse; `2028-02-29` and `2000-02-29` are accepted. No time-zone conversion is
+introduced — `Date.UTC` is calendar arithmetic only, and the value stored remains the operator's
+string (§10: a fixture's date and local start time are AFL local facts, never an instant). NULL/TBC
+semantics and the `HH:MM` rule are untouched. `fixtures.match_date` is a `date` column, so PostgreSQL
+would have refused `2027-02-30` at the write; the defect was that the writer told the operator it had
+accepted it, and the same rule now holds in both places.
+
+**3. `resolvePlayed()` could link a fixture on a contested candidate (REAL DEFECT, D-6).** The first
+arm was `exactCount === 1`, tested before the swapped count, so `exact 1 / swapped 1` resolved to
+`played` on the exact row. That is the tie-break D-6 forbids: two different `matches` rows could each
+be the fixture, and choosing one would lock the fixture against every edit, claim a result it may not
+have, and report a schedule disagreement against a row picked by preference rather than identity. The
+truth table is now exactly, and only:
+
+| exact | swapped | state | matchId |
+|---|---|---|---|
+| 1 | 0 | `played` | `exactMatchId` |
+| 0 | 1 | `played_home_away_differs` | `swappedMatchId` |
+| 0 | 0 | `unplayed` | null |
+| anything else | | `ambiguous` | **null** |
+
+`void` still short-circuits to `unplayed`. Ambiguity remains an `invalid` diagnostic
+(`ambiguous_played_resolution`) that reports and never merges, and it deliberately does NOT lock
+edits — an unlinked fixture is still an ordinary fixture.
+
+**4. `PLAYED_RESULT_FACTS` chose a result row independently of the resolution (same defect's other
+half).** It read `ORDER BY m.id LIMIT 1` over every candidate, so `scheduleDiffersFromResult` could
+compare the fixture against a row the resolution had not linked. Its candidate set is the same set
+`PLAYED_RESOLUTION_LATERAL` counts, so the guard is one scalar predicate —
+`pl."exactCount" + pl."swappedCount" = 1` — rather than a second copy of the truth table that could
+drift from it: exactly one candidate means the only row it can yield IS the resolved one, and every
+ambiguous shape yields no row at all. `ORDER BY`/`LIMIT` removed with it, and
+`withPlayedResolution()` additionally requires `matchId !== null` before comparing. Two guards, in
+the two languages, deliberately; `PLAYED_RESOLUTION_LATERAL` itself is unchanged. **No `match_id` or
+`match_key` is persisted or compared anywhere** — the association is still read-time only.
+
+**5. ISSUE-159's `match_coaches` source contracts were extracted brittly (test repair, no semantic
+change).** Both tests sliced `common.py` from `elif table == "match_coaches":` to the END OF FILE,
+which was correct only while that branch was last. ISSUE-161 and ISSUE-162 appended branches after
+it, so the assertions "no `COALESCE(`" and "no `split_part(entity_key ...)`" began reading code that
+is not their subject — the fixtures branch legitimately `COALESCE`s and legitimately decodes its own
+`manual_admin_edit:<token>` key with `split_part` on `':'`. A `replayBranch(source, table)` helper now
+isolates ONE branch, from its own `elif` to the next sibling at the same indentation or to the end of
+the function. The ISSUE-159 guarantees are unchanged and are still asserted in full against the
+isolated executable branch: absent-vs-explicit-null refusal, last-delimiter composite-key decode, no
+`split_part(entity_key ...)`, resolution by path rather than by id or name, and fail-closed-before-
+write. `coaches`, `season_list_members` and `fixtures` now use the same helper, so the next branch
+added cannot silently widen any of them again.
+
+**6. The ISSUE-162 source contracts read raw text, so the module's own commentary failed them (test
+repair, no semantic change).** `src/db/queries/admin-fixtures.ts` documents that it creates no venue
+by writing out the `INSERT INTO venues` it will never contain, and the replay branch explains D-6 by
+naming `match_key` and `match_id`. Asserting over raw source made each explanation a violation of the
+rule it explains. Both are now asserted against EXECUTABLE code — comments stripped — and the
+contracts were strengthened rather than weakened while the extraction was repaired: the mutation
+module still proves no write to `matches`, `venues`, `venue_aliases`, `seasons`, `clubs`,
+`club_seasons` or any derived table, and now also proves that no executable line names `match_key` or
+`match_id` at all; the fixtures replay branch still proves no `DELETE FROM fixtures`, fail-closed
+refusal before any write, `NOT EXISTS` rather than `ON CONFLICT`, `fixture_key` never in a `SET`
+list, and no result fact.
+
+**7. The unresolved-venue replay contract is PROVED, not assumed (§11).** Checked end to end.
+`resolveVenue()` copies `venues.canonical_name` into `venue_raw` whenever it resolves a `venue_id`
+(the `createMatch()` convention), and `fixtureOverridePayload()` writes `venue_slug` and `venue_raw`
+together, so a durable payload can never carry a slug without the human-readable name beside it.
+When a rebuilt or promoted database does not have that slug, the replay's
+`CASE WHEN f.venue_id IS NOT NULL THEN f.venue_canonical_name ELSE f.v->>'venue_raw' END` — present
+identically in both the INSERT and the idempotent UPDATE — keeps the stored name, leaves `venue_id`
+NULL, and the branch prints a counted WARNING. The venue is NOT refused (a rename must not stop a
+promotion), NOT silently downgraded to TBC, and NOT fuzzy-matched to a replacement. No payload or
+replay change was needed; three regressions now pin it: the payload carries both facts for a mapped
+venue, a typed-but-unmapped venue carries a name and no slug, and the replay's two venue expressions
+are identical, warn, and appear in no refusal arm.
+
+**Known limit, stated rather than fixed:** a fixture whose canonical row was re-created by a replay
+in a database that could not resolve its slug holds `venue_id NULL` + the name, so a LATER admin edit
+rewrites the durable payload from that row and the `venue_slug` key is not carried forward. The
+human-readable venue fact always survives; the slug binding does not survive that particular
+sequence. It is a degradation of enrichment, not a loss of a fact, and re-selecting the venue in
+Stage 2's venue panel restores it.
+
+**8. `cancelled` → `void` — the binding semantics (§16, restated because it is a classification
+change, not a lifecycle change).**
+
+- `cancelled` — a GENUINE scheduled event that was cancelled in the real world. Reversible via
+  `reinstateFixture()`, which re-runs the §13 collision checks.
+- `void` — the AFLDB RECORD was erroneous and should never have represented a valid fixture. It is
+  not a statement about the real world at all.
+- `cancelled → void` is permitted, and ONLY as an explicit, audited correction of classification: a
+  fixture cancelled in good faith may later turn out to have been mis-entered. It is audited under
+  `fixture_void` with a required `status_reason`, like any other void.
+- `fixture_key` is unchanged by either transition, in both directions: identity survives the
+  lifecycle (§6), which is what keeps the `data_edits` rows resolvable at the next promotion remap.
+- `void` is TERMINAL in every direction. `reinstateFixture()` refuses anything that is not
+  `cancelled`, and the only edit a void row accepts is `fixture_notes`, so the record of WHY can be
+  completed.
+- Neither state deletes a row, and neither is a delete in disguise (D-2).
+- **Stage 2 obligation:** the void control is destructive-confirmation UI — an explicit confirm step
+  plus the mandatory reason, in the ISSUE-155 pattern — and must never sit next to cancel as an
+  equivalent button. Recorded in §37.6 as a Stage 2 requirement, not built here.
+
+**9. The integration suite did not run, and that is an ENVIRONMENT gap, not a failure.**
+`tests/integration/admin-fixtures.test.ts` aborted in `tests/integration/guard.ts` with
+"`AFLDB_TEST_DATABASE_URL` must be set to run integration tests." Zero tests executed, so nothing
+about the fixture integration contract is yet known either way. This worktree has no `.env` — only
+`.env.example` — while `tests/setup.ts` loads the gitignored `.env` from the worktree root; the
+ISSUE-161 worktree had one and this one was never given it. See §37.7 step 6 for the rerun; the
+condition is stated in §37.9.
+
+**Files changed by this pass:** `src/lib/audit-view.ts`, `src/db/queries/admin-fixtures.ts`,
+`tests/admin-fixture-actions.test.ts`, `tests/data-overrides-source-contract.test.ts`, and this
+record. No migration change, no `common.py` change, no schema change, nothing committed.
+
+### 37.9 Integration-test environment requirement (operator)
+
+`tests/setup.ts` reads a **gitignored `.env` at the worktree root** (`D:\dev\afldb-issue-162\.env`)
+and only then falls back to variables already exported in the shell. This worktree contains
+`.env.example` and no `.env`, which is the whole reason step 6 ran zero tests.
+
+Before rerunning `npx vitest run tests/integration/admin-fixtures.test.ts`, exactly one condition
+must hold — copy the ISSUE-161 worktree's `.env`, or write one from `.env.example`, carrying at
+least:
+
+- `AFLDB_TEST_DATABASE_URL` — the owner credential for **`afldb_test`** through the local **55432**
+  tunnel. `tests/setup.ts` refuses any database whose name does not end in `_test` and redirects
+  `DATABASE_URL` to it; the suite additionally redirects `AFLDB_IMPORT_DATABASE_URL` to the same
+  value at module load, because the repository `.env` points that at `afldb_dev` and every fixture
+  mutation opens the import connection.
+- Optional: `AFLDB_TEST_IMPORT_DATABASE_URL` (same `_test` database, `afldb_import` login) for the
+  role-parity suites. Absent, those skip explicitly; they never fall back to the owner credential.
+
+Also required before the suite can pass, and separate from the variable: **migration 097 applied to
+`afldb_test` only**, then `npm run db:privileges` against it (§37.7 step 3) — `fixtures` needs its
+`grant_app_read` / `grant_import_write`, and `data_overrides` / `data_edits` need the widened CHECKs.
+The replay-backed cases also need `.venv` with `psycopg`; without it they skip via
+`it.runIf(canReplay)` rather than fail, which would leave the replay contract unproven.
+
+**Never** `afldb_dev`, **never** PROD, and no credential is printed here or anywhere in this record.
+
+### 37.10 Still-required gates NOT met
+
+`npm run preflight -- --mode implementation --issue 162` and
+`git log --all --oneline -- src/db/migrations/097_*.sql` (the migration-097 collision check across
+all refs) have **not** been supplied. Both remain binding §37.7 gates and neither is treated as
+passed. Migration 097 is allocated on the strength of §37.1's local re-check only.
+
+### 37.11 Second validation run, and the integration-test ordering repair (2026-09-11, third pass)
+
+The operator supplied the `.env` of §37.9 and re-ran. **Green:** `npx tsc --noEmit`;
+`tests/admin-fixture-actions.test.ts` 69/69; `data-overrides-source-contract` +
+`db-promotion-check` + `current-season-import` 383 passed / 4 skipped; the ISSUE-161 / reference /
+match regression set 124/124; targeted ESLint; `git diff --check` (only the expected LF→CRLF
+warning). Every §37.8 repair therefore holds. The 31 passing integration tests are also the first
+evidence that §37.7 step 3 was done — migration 097 is applied to `afldb_test` and its privileges
+reconciled, or no fixture could be written or read at all.
+
+**Not green: `tests/integration/admin-fixtures.test.ts`, 31 passed / 5 failed** — every failure in
+the read-time played-resolution group, and every one of them a TEST defect, not a product defect.
+
+**Root cause: the five tests modelled the wrong chronology.** Each called `seedMarkerMatch()` — which
+writes a played `matches` row — BEFORE `mustCreate()`. §13's I-3 precondition then refused the
+create with `already_played`, correctly: AFLDB already held the game as a result, so there was
+nothing left to schedule, and the test died before it reached the resolution it was written to
+prove. The failure message named the refusal exactly. It was **not** leakage and not isolation: each
+test cleans up after itself, `beforeAll` clears earlier debris and asserts the marker round is empty,
+and the sibling test that DOES want the result first (`refuses to schedule a game AFLDB already holds
+as a result`) passed throughout — which is the same guard, observed from the other side.
+
+**The repair, in the tests only.** The five now follow the chronology §18 is about: the fixture
+exists while the game is scheduled, the played row arrives later, and reads resolve against it.
+`seedMarkerMatch()` is renamed **`insertPlayedMatch()`** — a seed sounds like setup, and calling it
+as setup is the mistake — and its doc states the ordering rule, spells out the two-line sequence, and
+says why the two calls are deliberately NOT folded into one helper: their order is the thing under
+test. Strengthenings that the corrected order made possible, none of which relaxes anything:
+
+- the exact case now asserts the fixture reads `unplayed` BEFORE the result exists and `played`
+  after, with no write in between — which is what "derived, never stored" means;
+- the reschedule case now really reschedules: the fixture is moved twice (date, time, then venue)
+  while unplayed, and only then is a result played on a different day again, so all three facts
+  disagree at the moment of resolution;
+- the swapped case asserts the §27 diagnostic as well as the state, so "never silently" is proved
+  rather than asserted, and that nothing was written onto the fixture;
+- the ambiguous case schedules the fixture for a day NEITHER result was played on, so a resolution
+  borrowing an arbitrary candidate row would report a schedule disagreement — it must report none.
+  It pins `scheduleDiffersFromResult === false` on both read paths plus the `invalid` diagnostic,
+  which is the §37.8 item 4 guard proved end to end against real rows;
+- the played-lock case edits the fixture successfully while unplayed, then has the game played, then
+  proves every schedule edit refuses `played_locked` and notes still succeed.
+
+`createFixture()` is unchanged; `resolvePlayed()`, `PLAYED_RESOLUTION_LATERAL` and
+`PLAYED_RESULT_FACTS` are unchanged; no `NODE_ENV` special case, no `match_id`/`match_key`, no
+date or venue matching, no relaxed ambiguity. **No production file was touched by this pass.**
+
+Next: `npx vitest run tests/integration/admin-fixtures.test.ts`, expecting **36/36**, then the
+compact re-gate of §37.7 (typecheck, the unit and contract suites, the ISSUE-161 regressions, ESLint,
+`git diff --check`) plus the two §37.10 gates that have still never run.

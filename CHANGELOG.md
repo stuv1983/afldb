@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
+
+- Until now AFLDB could not represent a match that had not been played. `matches` requires
+  `home_score`, `away_score`, `result` and `margin` to be present, and every consumer of it -- the
+  club ladder, season metadata, round ladders, club and venue records, natural-language search and
+  the Grid Solver -- reads "a row exists" as "this game was played". A scheduled game put in there
+  with placeholder scores would have counted as a 0-0 draw. Migration 097 adds `fixtures`: one row
+  asserts *this match is scheduled to occur*. It holds a season, a round, two clubs, and optionally
+  a date, a local start time and a venue -- and **no score, result, margin, attendance, lineup or
+  statistic column at all**, so a fixture cannot be mistaken for a result by any query, now or later.
+- **"Played" is worked out when you look, never stored.** A fixture is played when exactly one
+  `matches` row exists for the same season, the same round and the same two clubs. The rule uses
+  only those exact facts, so a game that is moved to a different day, a different time or a
+  different ground still resolves -- and when two results could be the same fixture, it links
+  neither and says so, rather than guessing.
+- **A fixture keeps its identity for life.** Its key is minted once when it is created and is never
+  changed by a reschedule, a venue change, a round correction, a club correction, a cancellation or
+  by the game eventually being played.
+- **Nothing is ever deleted.** A game that was really called off is `cancelled` and can be
+  reinstated; a row entered by mistake is `void` and stays for the record. Both keep their history
+  and their audit trail.
+- Unknown means unknown: a date, time or venue that has not been announced is stored as empty, never
+  as midnight or as a made-up "TBC" ground. No placeholder clubs are invented for finals either -- a
+  final is entered once its two teams are known.
+- Every fixture is durably recorded and is re-created by the same replay that restores administered
+  coaches, players, draft selections and playing lists, so a rebuild or a production promotion
+  cannot lose one -- including the cancelled and void ones.
+- `matches` itself is untouched, and no ladder, record, statistic, search answer or Grid Solver
+  answer can move because a fixture was entered. AFL Tables ingestion is unchanged and never reads
+  or writes fixtures.
+- Backend only in this stage: there is no public fixture page and no admin screen yet. Deploying it
+  requires migration 097, then `npm run db:privileges`, then the application code, in that order.
+
 ### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
 
 - Until now AFLDB held no concept of a **playing list**. Every player-club relationship it stored

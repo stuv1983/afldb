@@ -2,6 +2,46 @@ import { expect, test, describe } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * ONE `replay_admin_overrides()` branch out of `tools/migration/common.py`,
+ * isolated from its siblings: from its own `elif table == "<name>":` down to the
+ * NEXT branch at the same indentation, or to the end of the function when it is
+ * the last one.
+ *
+ * Slicing to the end of the file — which is what these assertions used to do —
+ * is only correct for whichever branch happens to be last, so every branch added
+ * afterwards silently widened the ones before it: an ISSUE-159 assertion that
+ * `match_coaches` contains no COALESCE and no `split_part(entity_key ...)` began
+ * failing on ISSUE-161's and ISSUE-162's code, which are not its subject. The
+ * guarantee is unchanged and still exact; only the extraction is repaired.
+ */
+function replayBranch(source: string, table: string): string {
+  const start = source.indexOf(`elif table == "${table}":`);
+  if (start < 0) throw new Error(`replay_admin_overrides has no "${table}" branch`);
+  const body = source.slice(start);
+  // Eight spaces is the branch indentation inside replay_admin_overrides; the
+  // offset of one skips this branch's own header.
+  const next = /\n {8}elif table == "/.exec(body.slice(1));
+  return next ? body.slice(0, next.index + 1) : body;
+}
+
+/**
+ * Python source with its `#` commentary removed, for "the CODE never does X"
+ * claims. A branch that explains at length what it must not do — naming the
+ * broken call, or naming `match_id` to say the column does not exist — must not
+ * fail its own test for saying so.
+ */
+function executablePython(source: string): string {
+  return source.split('\n').filter((line) => !line.trim().startsWith('#')).join('\n');
+}
+
+/** TypeScript source with its comments removed, for the same reason. */
+function executableTypeScript(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
 describe('AFLDB-ISSUE-086 Source Contract', () => {
   const root = process.cwd();
   const tsContent = fs.readFileSync(path.join(root, 'src/db/queries/data-edits.ts'), 'utf-8');
@@ -63,10 +103,7 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
 
     // Identity is never carried in the payload: afltables_coach_path and name_key
     // are what BIND an override to a row, so an override must not be able to move one.
-    const coachesBranch = pyCommon.slice(
-      pyCommon.indexOf('elif table == "coaches":'),
-      pyCommon.indexOf('elif table == "match_coaches":'),
-    );
+    const coachesBranch = replayBranch(pyCommon, 'coaches');
     expect(coachesBranch.length).toBeGreaterThan(0);
     expect(coachesBranch).not.toMatch(/SET[\s\S]*?afltables_coach_path\s*=/);
     expect(coachesBranch).not.toMatch(/SET[\s\S]*?\bname_key\s*=/);
@@ -77,7 +114,7 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   });
 
   test('AFLDB-ISSUE-159: match_coaches replay keeps absent-vs-explicit-null semantics', () => {
-    const branch = pyCommon.slice(pyCommon.indexOf('elif table == "match_coaches":'));
+    const branch = replayBranch(pyCommon, 'match_coaches');
     expect(branch.length).toBeGreaterThan(0);
 
     // Every column of match_coaches is a key or provenance; the single mutable
@@ -116,15 +153,16 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
       /def match_key_of\([\s\S]{0,200}?return "\|"\.join\(\[[\s\S]{0,200}?match\.match_date\.isoformat\(\)/,
     );
 
-    const branch = pyCommon.slice(pyCommon.indexOf('elif table == "match_coaches":'));
+    const branch = replayBranch(pyCommon, 'match_coaches');
     expect(branch.length).toBeGreaterThan(0);
 
     // (b) The broken decoder must not come back, in either statement. Asserted
-    //     against the CODE with the Python commentary stripped: the branch
-    //     explains at length what it must not do, naming the broken call, and
-    //     that explanation must not fail its own test.
-    const branchCode = branch.split('\n')
-      .filter((line) => !line.trim().startsWith('#')).join('\n');
+    //     against THIS branch's code with the Python commentary stripped: the
+    //     branch explains at length what it must not do, naming the broken call,
+    //     and that explanation must not fail its own test. Sibling branches are
+    //     out of scope — the fixtures replay legitimately decodes its own
+    //     'manual_admin_edit:<token>' key with split_part on ':'.
+    const branchCode = executablePython(branch);
     expect(branchCode).not.toMatch(/split_part\([^)]*entity_key/);
 
     // (c) The decode is last-delimiter, and single-sourced: ONE CTE feeds both the
@@ -158,12 +196,8 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   });
 
   test('AFLDB-ISSUE-159: both new replay branches fail closed, never skipping', () => {
-    for (const [entity, next] of [
-      ['coaches', 'elif table == "match_coaches":'],
-      ['match_coaches', ''],
-    ] as const) {
-      const start = pyCommon.indexOf(`elif table == "${entity}":`);
-      const branch = next ? pyCommon.slice(start, pyCommon.indexOf(next)) : pyCommon.slice(start);
+    for (const entity of ['coaches', 'match_coaches'] as const) {
+      const branch = replayBranch(pyCommon, entity);
       // The refusal is computed over the WHOLE active set and raised BEFORE any
       // write, so a reload either honours every human decision or does none of it.
       expect(branch, entity).toMatch(
@@ -472,7 +506,7 @@ describe('AFLDB-ISSUE-160 source contract', () => {
     expect(pyCommon).toContain('no club identity of that organisation is eligible in that season');
     expect(pyCommon).toContain('membership override carries no valid origin');
 
-    const branch = pyCommon.slice(pyCommon.indexOf('elif table == "season_list_members":'));
+    const branch = replayBranch(pyCommon, 'season_list_members');
     // The pre-check reads EVERY override for the entity type, active and inactive:
     // an unresolvable TOMBSTONE is as serious as an unresolvable membership,
     // because failing to apply it resurrects a deliberately removed player.
@@ -525,6 +559,166 @@ describe('AFLDB-ISSUE-160 source contract', () => {
       .map((m) => m[1]).sort();
     expect(declared).toEqual(expected);
     expect(declared).not.toContain('seeded_appearances');
+  });
+
+  test('AFLDB-ISSUE-162: exactly one INSERT INTO fixtures in src/', () => {
+    // I-1. A fixture is administrative intent about a match that has not been
+    // played, and ONE writer is what makes "nothing else may create one"
+    // checkable at all. A grep is the only check that stays true as the tree
+    // grows.
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        const code = fs.readFileSync(full, 'utf-8').replace(/\r\n/g, '\n')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        if (/INSERT\s+INTO\s+fixtures/i.test(code)) {
+          found.push(path.relative(root, full).split(path.sep).join('/'));
+        }
+      }
+    };
+    walk(path.join(root, 'src'));
+    expect(found).toEqual(['src/db/queries/admin-fixtures.ts']);
+  });
+
+  test('AFLDB-ISSUE-162: a fixture is never a played match, and never becomes one', () => {
+    // §3, §21, S-1. The whole point of a separate canonical table: `matches`
+    // means PLAYED, and every derived figure in AFLDB reads it. If a fixture
+    // could reach any of these, a scheduled game would count as a 0-0 draw.
+    // Asserted against the EXECUTABLE code. The contract is about what the
+    // module does, not about which concepts its commentary is allowed to name —
+    // and it names them deliberately: the file explains that it creates no venue
+    // by writing out the `INSERT INTO venues` it will never contain, and states
+    // that a fixture stores no `match_id` and compares no `match_key`. Asserting
+    // over the raw text would make the module's own explanation of a rule a
+    // violation of it.
+    const code = executableTypeScript(readSource('src/db/queries/admin-fixtures.ts'));
+    for (const table of [
+      'matches', 'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
+      'club_seasons', 'seasons', 'clubs', 'venues', 'venue_aliases',
+    ]) {
+      expect(code, table).not.toMatch(new RegExp(
+        `INSERT\\s+INTO\\s+${table}\\b|UPDATE\\s+${table}\\b|DELETE\\s+FROM\\s+${table}\\b`, 'i',
+      ));
+    }
+
+    // D-6, and the operator constraint of 2026-09-11: the played association is
+    // resolved at READ TIME and is never persisted or compared as an identity.
+    // No column, payload key or SQL fragment in the module names either one.
+    expect(code).not.toContain('match_key');
+    expect(code).not.toContain('match_id');
+
+    // And the mirror: nothing that derives a played-match fact may read
+    // `fixtures`. These are the consumers AFLDB-ISSUE-162 §21 audited.
+    for (const consumer of [
+      'tools/migration/rebuild_derived.py',
+      'src/lib/acquisition/settle-afltables.ts',
+      'src/lib/acquisition/canonical-apply.ts',
+      'src/db/queries/rounds.ts',
+      'src/db/queries/venues.ts',
+      'src/db/queries/clubs.ts',
+      'src/db/queries/grid-solver.ts',
+    ]) {
+      expect(readSource(consumer), consumer).not.toMatch(/\bFROM\s+fixtures\b|\bJOIN\s+fixtures\b/i);
+    }
+
+    // The settle never writes fixtures either, so no twin can arise: the two
+    // tables never hold the same fact (§19).
+    expect(readSource('src/lib/acquisition/settle-afltables.ts'))
+      .not.toMatch(/INSERT\s+INTO\s+fixtures|UPDATE\s+fixtures/i);
+  });
+
+  test('AFLDB-ISSUE-162: the fixtures replay fails closed and never deletes', () => {
+    expect(pyCommon).toContain('replay_admin_overrides(fixtures): refusing to commit');
+    expect(pyCommon).toContain('home_club_slug does not resolve to exactly one club');
+    expect(pyCommon).toContain('no home club identity is eligible in that season');
+    expect(pyCommon).toContain('payload carries no valid status');
+    expect(pyCommon).toContain('payload fixture_key does not match the entity_key token');
+
+    const branch = replayBranch(pyCommon, 'fixtures');
+    expect(branch.length).toBeGreaterThan(0);
+    // The branch's own SQL and Python, with its commentary removed: the comments
+    // state the D-6 rule by naming `match_key` and `match_id`, and must not fail
+    // the assertion that the CODE never touches either.
+    const branchCode = executablePython(branch);
+    // The refusal is computed over EVERY override and raised BEFORE any write,
+    // so a reload either honours every human decision or does none of it.
+    expect(branch.indexOf('raise RuntimeError')).toBeLessThan(branch.indexOf('INSERT INTO'));
+    expect(branch).toContain('unresolvable = [(key, problem)');
+
+    // NEVER deletes. A fixture row persists through `cancelled` and `void`
+    // precisely so its data_edits rows stay resolvable at the lineage remap, so
+    // a replay that dropped one would break the promotion contract (§16, §20).
+    expect(branchCode).not.toMatch(/DELETE\s+FROM\s+fixtures/i);
+    // Guarded by NOT EXISTS, never ON CONFLICT: a contradiction between two
+    // durable records must surface through the uniqueness constraint.
+    expect(branch).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM fixtures x/);
+    expect(branch).not.toMatch(/INSERT INTO fixtures[\s\S]{0,1500}ON CONFLICT/);
+    // The identity is the one thing a replay may not move: fixture_key is never
+    // in a SET list, and the UPDATE that carries every other fact is still there.
+    expect(branchCode).not.toMatch(/SET[\s\S]{0,600}fixture_key\s*=/);
+    expect(branchCode).toMatch(/UPDATE fixtures x\s*\n\s*SET season =/);
+    // It writes no result fact, because there is no column it could write one to.
+    expect(branchCode).not.toMatch(/home_score|away_score|margin|attendance|winner/);
+    // And it never renders, stores or compares a match_key or a match_id (D-6).
+    // The commentary names both to say so; the executable branch touches neither.
+    expect(branchCode).not.toContain('match_key');
+    expect(branchCode).not.toContain('match_id');
+
+    // The VENUE contract (§11, operator clarification 2026-09-11). A venue slug
+    // this database cannot resolve must not silently become TBC and must not be
+    // fuzzy-matched to a replacement: the fixture keeps the canonical NAME the
+    // payload carries, venue_id stays NULL, and the degradation is REPORTED.
+    // Both statements carry the identical expression, so the INSERT and the
+    // idempotent re-UPDATE cannot disagree about what happened to the venue.
+    expect((branchCode.match(
+      /CASE WHEN f\.venue_id IS NOT NULL THEN f\.venue_canonical_name\s*\n?\s*ELSE f\.v->>'venue_raw' END/g,
+    ) ?? [])).toHaveLength(2);
+    expect(branch).toContain('kept as an unmapped venue name (venue_id NULL)');
+    expect(branchCode).toMatch(/WHERE f\.v->>'venue_slug' IS NOT NULL AND f\.venue_id IS NULL/);
+    // No fuzzy fallback: an unresolved venue is never guessed at by name.
+    expect(branchCode).not.toMatch(/ILIKE|similarity\(|soundex|levenshtein/i);
+    // An unresolvable venue is a WARNING, never a refusal: a promotion is not
+    // stopped by a venue rename, and the fixture is still re-created.
+    const problemCase = branchCode.slice(
+      branchCode.indexOf('SELECT f.entity_key,'), branchCode.indexOf('END AS problem'),
+    );
+    expect(problemCase.length).toBeGreaterThan(0);
+    expect(problemCase).not.toContain('venue');
+  });
+
+  test('AFLDB-ISSUE-162: the importer calls the fixtures replay', () => {
+    expect(pyFitzroy).toMatch(
+      /replay_admin_overrides\(pg, "matches"\)[\s\S]{0,800}replay_admin_overrides\(pg, "fixtures"\)/,
+    );
+    // And the promotion runbook's replay loop names it, or a promoted database
+    // would hold no administered schedule at all.
+    const promotion = readSource('docs/production-promotion.md');
+    expect(promotion).toMatch(/for table in \([^)]*'fixtures'\)/);
+  });
+
+  test('AFLDB-ISSUE-162: the frozen fixture enumerations in the replay equal the migration', () => {
+    // common.py cannot read the database schema and still fail closed, so it
+    // carries copies. These are the assertions that stop them drifting.
+    const migration = readSource('src/db/migrations/097_fixtures.sql');
+    const statusCheck = /CHECK \(status IN \(([^)]*)\)\)/.exec(migration)![1];
+    const expectedStatuses = [...statusCheck.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
+    const statusBlock = pyCommon.slice(pyCommon.indexOf('FIXTURE_STATUSES = ('));
+    expect([...statusBlock.slice(0, statusBlock.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort()).toEqual(expectedStatuses);
+
+    const enumBody = /CREATE TYPE round_type AS ENUM \(([\s\S]*?)\)/
+      .exec(readSource('src/db/migrations/003_matches.sql'))![1];
+    const added = [...readSource('src/db/migrations/084_round_type_wildcard_final.sql')
+      .matchAll(/ALTER TYPE round_type ADD VALUE IF NOT EXISTS '([a-z_]+)'/g)].map((m) => m[1]);
+    const expectedTypes = [...enumBody.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
+      .concat(added).sort();
+    const typeBlock = pyCommon.slice(pyCommon.indexOf('FIXTURE_ROUND_TYPES = ('));
+    expect([...typeBlock.slice(0, typeBlock.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort()).toEqual(expectedTypes);
   });
 
   test('§8.3: a manual player is named by token in the ledger, never seeded twice', () => {

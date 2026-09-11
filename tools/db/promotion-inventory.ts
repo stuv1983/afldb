@@ -75,6 +75,14 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  *                          an admin-created coach (AFLDB-ISSUE-159 §1). Minted once and
  *                          never edited, so it survives a rebuild on both databases.
  *                          Deliberately NOT `coaches.name_key`: that is a name.
+ *   fixture_key            fixtures.fixture_key — NOT NULL UNIQUE since migration 097, the
+ *                          UUID token `createFixture()` mints once and never edits. It
+ *                          denotes the same scheduled match on both databases across every
+ *                          reschedule, venue change, round correction and club correction,
+ *                          and it is NOT replaced by a `match_key` when the game is played
+ *                          (AFLDB-ISSUE-162 D-6): `fixtures` carries no `match_key` and no
+ *                          `match_id` column at all, so this is the only identity a fixture
+ *                          audit row can resolve through.
  *   none                   NO stable identity exists in this repository for the entity this
  *                          column points at. The column therefore CANNOT be remapped, and
  *                          across a lineage change the checker refuses rather than
@@ -87,7 +95,7 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  */
 export type LineageIdentityRule =
   'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path'
-  | 'draft_pick_key' | 'none';
+  | 'draft_pick_key' | 'fixture_key' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -346,10 +354,22 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         // FAIL and the promotion stops before the swap. On a shared lineage the
         // gate passes unchanged, as today.
         { kind: 'draft_picks', entity: 'draft_picks', identity: 'draft_pick_key' },
+        // AFLDB-ISSUE-162 §20. Migration 097 admits 'fixtures' into
+        // data_edits_table_name_check, which OBLIGES a lineage target for it:
+        // fixtures is an import-writable registry table, so it is rebuilt on
+        // promotion and its ids are renumbered by the swap. Without the target
+        // a fixture audit row would be reinstated with its row_id integer
+        // unchanged and would silently name a DIFFERENT fixture — the exact
+        // AFLDB-ISSUE-142 (B) failure. Every fixture resolves, because a
+        // fixture is never deleted (cancelled and void keep the row) and the
+        // data_overrides replay (§8) re-creates every one of them in the
+        // candidate — void and cancelled included — before this remap runs.
+        { kind: 'fixtures', entity: 'fixtures', identity: 'fixture_key' },
       ],
       remediation: 'Every entity here has a stable identity, so every row is remappable in '
         + 'principle: resolve row_id through the AFL Tables profile url (players), '
-        + 'matches.match_key, coaches.afltables_coach_path, or the draft selection key '
+        + 'matches.match_key, coaches.afltables_coach_path, fixtures.fixture_key, or the '
+        + 'draft selection key '
         + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), and apply the "
         + 'generated per-row UPDATEs after the reinstate. A draft audit row whose selection '
         + 'carries no source_id at all (a pre-AFLDB-ISSUE-160 admin row) has NO stable key and '
@@ -1528,6 +1548,28 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
          AND dp.draft_kind IS NOT NULL
          AND s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
              = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  fixture_key: {
+    entity: 'fixtures',
+    description: 'fixtures.fixture_key — NOT NULL UNIQUE (migration 097), the UUID token '
+      + 'createFixture() mints once and never edits (AFLDB-ISSUE-162 §6). It denotes the '
+      + 'same scheduled match on both databases across every reschedule, venue change, '
+      + 'round correction and club correction, and is NEVER replaced by a match_key when '
+      + 'the game is played (D-6, the operator constraint of 2026-09-11) — fixtures carries '
+      + 'no match_key and no match_id column, so "played" is resolved at read time and this '
+      + 'token is the only identity a fixture audit row can resolve through. Every fixture '
+      + 'has one: the column is NOT NULL and a fixture is never deleted, so cancelled and '
+      + 'void rows resolve exactly as scheduled ones do',
+    byId: `
+      SELECT id::bigint AS id, fixture_key AS identity
+        FROM public.fixtures
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, fixture_key AS identity
+        FROM public.fixtures
+       WHERE fixture_key = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {
@@ -2894,7 +2936,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase production` passed on the live afldb_prod (same gates as candidate).',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
-  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path.',
+  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key.',
   'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
   'Rollback rehearsed on paper: stop service, rename afldb_prod back to the candidate name, rename afldb_prod_pre_rebuild_<stamp> to afldb_prod, start service.',

@@ -926,6 +926,32 @@ SEASON_LIST_ORIGINS = (
     "imported",
 )
 
+# The fixtures.status enumeration (migration 097, AFLDB-ISSUE-162 D-2) and the
+# round_type enum as migrations 003 and 084 leave it. The ONE authority for each
+# is the database itself; these copies exist because the replay must fail closed
+# WITHOUT reading the schema, and tests/data-overrides-source-contract.test.ts
+# asserts they agree with the migrations so they cannot drift.
+#
+# 'cancelled' (a real scheduled event that did not happen) and 'void' (a row
+# entered in error that was never a real event) are deliberately distinct and
+# neither is a DELETE: a fixture row persists forever so its data_edits audit
+# rows stay resolvable at the next promotion lineage remap.
+FIXTURE_STATUSES = (
+    "scheduled",
+    "cancelled",
+    "void",
+)
+
+FIXTURE_ROUND_TYPES = (
+    "home_and_away",
+    "wildcard_final",
+    "elimination_final",
+    "qualifying_final",
+    "semi_final",
+    "preliminary_final",
+    "grand_final",
+)
+
 
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
@@ -1797,4 +1823,236 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                    AND m.season = d.season
                    AND m.club_id = d.club_id
                    AND m.player_id = d.player_id
+            """)
+
+        elif table == "fixtures":
+            # AFLDB-ISSUE-162 §20. ONE key shape, and it is a MINTED TOKEN
+            # rather than a natural key:
+            #
+            #   'manual_admin_edit:<fixture_key>'
+            #
+            #      manual_admin_edit:3f8c2b1e-....-9d2a
+            #
+            # That is the OPPOSITE of the season_list_members choice above, and
+            # for the opposite reason. A membership HAS a natural key (club,
+            # season, player) that no edit can change. Every candidate natural
+            # key for a fixture -- the date, the venue, even the round and the
+            # club pair -- is a fact an administrator is EXPECTED to correct,
+            # so a natural key would change identity on a reschedule, which is
+            # exactly what fixture_key exists to prevent. The token is minted
+            # once by createFixture() and never edited, and a played-match
+            # association never replaces it with a match_key (the operator
+            # constraint of 2026-09-11): fixtures carries no match_key and no
+            # match_id column, and nothing in this branch renders, copies or
+            # compares one.
+            #
+            # fixtures is an import-writable registry table: a promotion
+            # rebuilds it and a destructive reload can empty it, so without
+            # this branch an administered schedule simply does not exist in the
+            # promoted or rebuilt database. This is the only thing that puts it
+            # back, and it is not derivable from anything else -- a fixture is
+            # what was SCHEDULED, matches holds what was PLAYED, and no source
+            # publishes AFLDB-normalised historical schedules.
+            #
+            # ORDERING IS NOT BINDING. A fixture names its clubs by SLUG and
+            # its venue by SLUG -- both tracked reference data loaded long
+            # before any replay -- and it names no player, no match and no
+            # draft selection. It therefore depends on no other replay branch
+            # and may run anywhere in the loop. It is grouped with 'matches' at
+            # the call site only to keep every match-shaped thing together.
+            #
+            # NO TOMBSTONES. Unlike season_list_members, every fixture override
+            # is ACTIVE: the lifecycle lives in the payload's status, because a
+            # cancelled or void fixture must be RE-CREATED here, not suppressed.
+            # A fixture is never deleted (§16) precisely so that its data_edits
+            # rows stay resolvable at the next promotion lineage remap, and a
+            # replay that dropped the void rows would break that the moment it
+            # ran.
+            fixture_decoded = """
+                raw AS (
+                    SELECT o.entity_key,
+                           o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1) AS token
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'fixtures'
+                       AND o.field_group = 'fixture'
+                ),
+                -- The season is decoded ONCE, guarded, before anything joins on
+                -- it: an unparseable season must be reported as the refusal it
+                -- is, not crash the replay with a cast error that names no key.
+                decoded AS (
+                    SELECT r.entity_key, r.v, r.namespace, r.token,
+                           CASE WHEN (r.v->>'season') ~ '^[0-9]{4}$'
+                                THEN (r.v->>'season')::smallint END AS season,
+                           count(*) OVER (PARTITION BY r.token) AS token_count
+                      FROM raw r
+                ),
+                -- The eligible identities per season, taken from the ONE rule
+                -- the writers use (migration 096, AFLDB-ISSUE-161). LATERAL
+                -- against a preceding FROM item, so the set-returning function
+                -- is never called with an outer reference. A club renamed
+                -- between the dump and the replay therefore resolves to the
+                -- identity that is era-correct NOW.
+                seasons_in_play AS (
+                    SELECT DISTINCT season FROM decoded WHERE season IS NOT NULL
+                ),
+                eligible AS (
+                    SELECT sp.season, e.id, e.organization_id
+                      FROM seasons_in_play sp, LATERAL afldb_season_list_clubs(sp.season) e
+                ),
+                fixture AS (
+                    SELECT d.entity_key, d.v, d.namespace, d.token, d.season, d.token_count,
+                           hsrc.id AS home_source_club_id,
+                           asrc.id AS away_source_club_id,
+                           hel.id  AS home_club_id,
+                           ael.id  AS away_club_id,
+                           -- Venue is ENRICHMENT, not identity (003:74-75): an
+                           -- unresolved slug degrades to the stored name and is
+                           -- REPORTED, never fatal. A promotion is not stopped
+                           -- by a venue rename.
+                           ven.id  AS venue_id,
+                           ven.canonical_name AS venue_canonical_name
+                      FROM decoded d
+                      LEFT JOIN clubs hsrc ON hsrc.slug = d.v->>'home_club_slug'
+                      LEFT JOIN clubs asrc ON asrc.slug = d.v->>'away_club_slug'
+                      LEFT JOIN eligible hel ON hel.season = d.season
+                                            AND hel.organization_id = hsrc.organization_id
+                      LEFT JOIN eligible ael ON ael.season = d.season
+                                            AND ael.organization_id = asrc.organization_id
+                      LEFT JOIN venues ven ON ven.slug = d.v->>'venue_slug'
+                )
+            """
+
+            # Fail closed FIRST, over EVERY override, and before anything is
+            # written. An override whose payload cannot re-create a row is a
+            # human decision this reload cannot honour, and a reload that
+            # silently drops one is worse than a reload that stops. There is no
+            # fuzzy fallback anywhere: no name matching, no date tolerance and
+            # no "nearest round".
+            cur.execute("WITH " + fixture_decoded + """
+                SELECT f.entity_key,
+                       CASE
+                           WHEN f.namespace <> 'manual_admin_edit' OR length(f.token) = 0
+                               THEN 'entity_key is not manual_admin_edit:<token>'
+                           WHEN f.token_count > 1
+                               THEN 'more than one durable record claims this fixture_key'
+                           WHEN f.v->>'fixture_key' IS DISTINCT FROM f.token
+                               THEN 'payload fixture_key does not match the entity_key token'
+                           WHEN f.season IS NULL OR f.season NOT BETWEEN 1897 AND 2100
+                               THEN 'payload names no season in the supported range'
+                           WHEN f.v->>'round_type' IS NULL
+                                 OR NOT (f.v->>'round_type' = ANY(%(round_types)s))
+                               THEN 'payload carries no valid round_type'
+                           WHEN COALESCE(f.v->>'round_code', '') = ''
+                               THEN 'payload carries no round_code'
+                           WHEN f.v->>'round_type' = 'home_and_away'
+                                 AND (f.v->>'round_number' IS NULL
+                                      OR f.v->>'round_number' !~ '^[0-9]+$'
+                                      OR f.v->>'round_code' <> f.v->>'round_number')
+                               THEN 'a home-and-away fixture needs a round_number whose text is the round_code'
+                           WHEN f.v->>'round_type' <> 'home_and_away'
+                                 AND f.v->>'round_number' IS NOT NULL
+                               THEN 'a finals fixture carries no round_number'
+                           WHEN f.v->>'status' IS NULL
+                                 OR NOT (f.v->>'status' = ANY(%(statuses)s))
+                               THEN 'payload carries no valid status'
+                           WHEN f.v->>'status' <> 'scheduled'
+                                 AND COALESCE(f.v->>'status_reason', '') = ''
+                               THEN 'a cancelled or void fixture needs a status_reason'
+                           WHEN f.v->>'match_date' IS NOT NULL
+                                 AND f.v->>'match_date' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                               THEN 'match_date is not YYYY-MM-DD'
+                           WHEN f.v->>'match_time' IS NOT NULL AND f.v->>'match_date' IS NULL
+                               THEN 'a start time cannot be stored without a date'
+                           WHEN f.home_source_club_id IS NULL
+                               THEN 'home_club_slug does not resolve to exactly one club'
+                           WHEN f.away_source_club_id IS NULL
+                               THEN 'away_club_slug does not resolve to exactly one club'
+                           WHEN f.home_club_id IS NULL
+                               THEN 'no home club identity is eligible in that season'
+                           WHEN f.away_club_id IS NULL
+                               THEN 'no away club identity is eligible in that season'
+                           WHEN f.home_club_id = f.away_club_id
+                               THEN 'both club slugs resolve to the same identity'
+                       END AS problem
+                  FROM fixture f
+            """, {
+                "round_types": list(FIXTURE_ROUND_TYPES),
+                "statuses": list(FIXTURE_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(fixtures): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # Venue degrades LOUDLY rather than silently: the fixture is still
+            # re-created and its name still renders, and the count says how many
+            # need a venue mapping in this database.
+            cur.execute("WITH " + fixture_decoded + """
+                SELECT count(*) FROM fixture f
+                 WHERE f.v->>'venue_slug' IS NOT NULL AND f.venue_id IS NULL
+            """)
+            degraded = cur.fetchone()[0]
+            if degraded:
+                print("    WARNING: replay_admin_overrides(fixtures): "
+                      + f"{degraded:,} fixture(s) name a venue slug this database does not "
+                      + "have; kept as an unmapped venue name (venue_id NULL).", flush=True)
+
+            # 1. Re-create every fixture the reload removed, or that a rebuilt
+            #    database never had. Guarded by NOT EXISTS on fixture_key rather
+            #    than ON CONFLICT so that a contradiction between two durable
+            #    records surfaces through the uniqueness constraint as the error
+            #    it is, instead of being silently swallowed.
+            cur.execute("WITH " + fixture_decoded + """
+                INSERT INTO fixtures
+                      (fixture_key, season, round_code, round_number, round_type,
+                       match_date, match_time, venue_id, venue_raw,
+                       home_club_id, away_club_id, status, status_reason, notes,
+                       source_id, source_record_id)
+                SELECT f.token, f.season, f.v->>'round_code',
+                       (f.v->>'round_number')::smallint,
+                       (f.v->>'round_type')::round_type,
+                       (f.v->>'match_date')::date,
+                       f.v->>'match_time',
+                       f.venue_id,
+                       CASE WHEN f.venue_id IS NOT NULL THEN f.venue_canonical_name
+                            ELSE f.v->>'venue_raw' END,
+                       f.home_club_id, f.away_club_id,
+                       f.v->>'status', f.v->>'status_reason', f.v->>'notes',
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       f.token
+                  FROM fixture f
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM fixtures x WHERE x.fixture_key = f.token)
+            """)
+
+            # 2. The override IS the row for a fixture -- there is no
+            #    source-owned delta to preserve -- so this is an unconditional
+            #    whole-row UPDATE, not a jsonb_exists patch. It makes the replay
+            #    idempotent, and it is what carries a reschedule, a venue
+            #    change, a round correction, a club correction, a cancellation
+            #    and a voiding across a rebuild. fixture_key is never in the SET
+            #    list: the identity is the one thing a replay may not move.
+            cur.execute("WITH " + fixture_decoded + """
+                UPDATE fixtures x
+                   SET season = f.season,
+                       round_code = f.v->>'round_code',
+                       round_number = (f.v->>'round_number')::smallint,
+                       round_type = (f.v->>'round_type')::round_type,
+                       match_date = (f.v->>'match_date')::date,
+                       match_time = f.v->>'match_time',
+                       venue_id = f.venue_id,
+                       venue_raw = CASE WHEN f.venue_id IS NOT NULL THEN f.venue_canonical_name
+                                        ELSE f.v->>'venue_raw' END,
+                       home_club_id = f.home_club_id,
+                       away_club_id = f.away_club_id,
+                       status = f.v->>'status',
+                       status_reason = f.v->>'status_reason',
+                       notes = f.v->>'notes',
+                       updated_at = now()
+                  FROM fixture f
+                 WHERE x.fixture_key = f.token
             """)

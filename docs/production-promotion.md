@@ -645,7 +645,9 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    Tables path or a `manual_admin_edit` token; `coaches` before `match_coaches`, because
    an assignment resolves its coach by path; `players` before `season_list_members`, because
    a playing-list membership names its player by that same identity. `matches` is independent
-   and may go anywhere:
+   and may go anywhere, and so is `fixtures`: a fixture names its clubs and its venue by
+   **slug** — tracked reference data loaded long before any replay — and names no player, no
+   match and no selection, so it depends on no other branch:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -654,7 +656,7 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    load_env()
    with connect_pg() as pg:
        for table in ('players', 'matches', 'draft_picks', 'season_list_members',
-                     'coaches', 'match_coaches'):
+                     'coaches', 'match_coaches', 'fixtures'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
@@ -665,7 +667,14 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    `AFLDB-ISSUE-161` (migration 096) and is the only branch that also acts on INACTIVE
    overrides — an inactive membership override is a **tombstone**, the decision that a
    player is deliberately not on a list, so the replay deletes any row it finds for that
-   key before it re-creates the active ones. For `matches`, and for a
+   key before it re-creates the active ones. `fixtures` is `AFLDB-ISSUE-162` (migration
+   097): every fixture override is ACTIVE and carries a whole row, because the lifecycle
+   lives in the payload's `status` and a **cancelled** or **void** fixture must be
+   re-created rather than suppressed — a fixture is never deleted precisely so its
+   `data_edits` rows stay resolvable, and dropping the void rows here would break that. An
+   unresolvable **club** slug stops the replay; an unresolvable **venue** slug degrades to
+   the stored venue name and is reported, because venue is enrichment and a promotion must
+   not be stopped by a venue rename. For `matches`, and for a
    source-owned player or selection, an override patches fields of a row the rebuild
    already produced. For a manual one it carries an **entire row**: an administrator can
    create a footballer and their draft selection before any source has published either,

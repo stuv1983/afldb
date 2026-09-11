@@ -3645,6 +3645,7 @@ import {
 const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
 const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
 const seasonListMigration = readSource('src/db/migrations/096_season_list_members.sql');
+const fixtureMigration = readSource('src/db/migrations/097_fixtures.sql');
 
 /** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
 function entityTypeCheck(...entities: readonly string[]): string {
@@ -3661,6 +3662,11 @@ const CHECK_AFTER_095 = entityTypeCheck(
 /** The CHECK as migration 096 leaves it — the post-096 database (AFLDB-ISSUE-161). */
 const CHECK_AFTER_096 = entityTypeCheck(
   'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+);
+/** The CHECK as migration 097 leaves it — the post-097 database (AFLDB-ISSUE-162). */
+const CHECK_AFTER_097 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures',
 );
 
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
@@ -3689,6 +3695,23 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect(seasonListMigration).toMatch(
       /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members'\s*\)\)/,
     );
+    // 097 widens it forward again, retaining every literal 096 left
+    // (AFLDB-ISSUE-162 §26). `fixtures` is a SCHEDULED match, not a settle
+    // target — the settle writes `matches` and never reads or writes
+    // `fixtures` — so admitting it changes no answer below.
+    expect(fixtureMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures'\s*\)\)/,
+    );
+    // And the three unrepresentable settle targets are still absent from it.
+    for (const settleTarget of [
+      'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
+    ]) {
+      const widening = fixtureMigration.slice(
+        fixtureMigration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
+      );
+      expect(widening.slice(0, widening.indexOf('));')), settleTarget)
+        .not.toContain(settleTarget);
+    }
     // The documented inventory names the same entities the database now admits.
     // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
     // `checkAdmittedEntities()` returns ASCII order ('match_coaches' sorts before
@@ -3696,15 +3719,17 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     // may — an order-sensitive comparison is an exact-set proof wearing a
     // different hat, and it would re-create the deploy window §3.1 removed.
     expect([...OVERRIDE_ENTITY_TYPES])
-      .toEqual(['coaches', 'draft_picks', 'matches', 'match_coaches', 'players',
+      .toEqual(['coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
         'season_list_members']);
     expect([...OVERRIDE_ENTITY_TYPES].sort())
-      .toEqual(checkAdmittedEntities([CHECK_AFTER_096]));
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_097]));
     // And the order-independence D-1 requires, stated as a fact rather than a
-    // hope: the settle's answer is identical against the pre-096 constraint, so
-    // the migration and the code may deploy in either order.
+    // hope: the settle's answer is identical against the pre-096 and pre-097
+    // constraints, so each migration and its code may deploy in either order.
     expect(overrideScopeProvenFrom([CHECK_AFTER_095])).toBe(
       overrideScopeProvenFrom([CHECK_AFTER_096]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_096])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_097]));
     // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
     // exact-set proof has no safe deploy order in either direction, so the proof
     // itself must not consult this list at all.
