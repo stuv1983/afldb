@@ -165,7 +165,9 @@ commit.
   identity, schedule and notes and no schedule, venue, round or club control, so no screen offers
   an edit the server will refuse. Returning a date to TBC returns its start time to TBC with it,
   on the single form, in the batch and on reschedule -- AFLDB stores an unknown time as unknown,
-  never as a time attached to no day.
+  never as a time attached to no day. On the single-fixture form the cleared time now also
+  *disappears* (found by the 2026-09-12 DEV browser acceptance): the control was disabled but kept
+  displaying the old value, so the screen showed a start time the stored record would not carry.
 
 ### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
 
@@ -342,6 +344,15 @@ commit.
   `src/components/admin/action-submit.ts` and shared with draft administration; coaches'
   own files became thin, behaviour-preserving wrappers over the shared modules. Each domain
   keeps its own capability guard and its own path allowlist -- nothing became more permissive.
+- **Fixed before release (found by the 2026-09-12 DEV browser acceptance):** every
+  `/admin/draft/[id]` render failed with the site error boundary, for every selection and for
+  both Admin and Super Admin. The concurrency revision each edit form carries is the highest
+  `data_edits` id recorded about the selection, and both the page and the compare-and-swap read
+  it on a role that may not: `data_edits` is an operational audit table registered to
+  `afldb_auth` alone -- `afldb_app` is not in `afldb_meta.app_readable_tables` and `afldb_import`
+  holds `INSERT` on it and nothing more -- so the read was `permission denied for table
+  data_edits`. Both now read it on the audit pool. No schema, capability, authority-model or
+  privilege change: the grants were already right and the code was asking the wrong role.
 
 ### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
 

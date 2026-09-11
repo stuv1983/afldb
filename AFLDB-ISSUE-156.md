@@ -684,6 +684,25 @@ Inherits `AFLDB-ISSUE-155.md` §21 in full. Additionally:
 
 ## Next action
 
+**2026-09-12 — the first combined DEV browser acceptance of the Admin Centre batch (160 + 161 +
+162 + 163) found one BLOCKING defect and one cosmetic one; both are fixed, uncommitted and
+unvalidated.** The blocker: every `/admin/draft/[id]` render failed, for every selection and for
+both Admin and Super Admin, because ISSUE-160's J-18 concurrency revision reads
+`max(data_edits.id)` on roles that may not read that audit table — `afldb_app` on the page and
+`afldb_import` inside the mutation transaction, where `data_edits` is granted to `afldb_auth`
+alone (057/066/039). Fixed by reading it on the audit pool; no migration, grant, capability or
+authority-model change. Full record `AFLDB-ISSUE-160.md` §20. The cosmetic one is ISSUE-162's
+single-fixture form leaving a stale start time visible after the date is cleared
+(`AFLDB-ISSUE-162.md` §41).
+
+**Umbrella lesson worth carrying into P4–P12.** Two of the three defects this batch has produced
+were *layer* defects that no local gate could see: a Client Component value-importing a
+`server-only` module (only the production bundler enforces it — `AFLDB-ISSUE-162.md` §40), and an
+admin page reading an operational table on the wrong pool (only a real role enforces it; the
+integration suites connect as the owner). Both are cheap to check while writing: a new Admin page
+that reads a table outside `afldb_meta.app_readable_tables` must use `authSql` or the narrow
+import-role helper, exactly as `src/db/queries/audit-reader.ts` does.
+
 **P1 is complete.** `AFLDB-ISSUE-157` resolved 2026-09-11 on `fable/issue-157-admin-audit`
 (deployed to DEV, unmerged): capability `operations.audit.read` (the §2 working name
 `ops.audit.read`, renamed to the union's `operations.` prefix; Admin-and-up, resolving the

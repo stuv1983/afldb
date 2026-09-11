@@ -32,6 +32,12 @@ export function SingleFixtureForm({
   const [awayClubId, setAwayClubId] = useState('');
   const [venueSelect, setVenueSelect] = useState('');
   const [matchDate, setMatchDate] = useState('');
+  // Controlled, so that clearing the date can clear the time it qualified.
+  // An uncontrolled time input keeps showing a value the disabled control can
+  // no longer be used to correct, and the row is stored as TBC/TBC regardless
+  // — what is shown has to be what is sent. Same rule as `updateRow()` in
+  // RoundBatchForm.
+  const [matchTime, setMatchTime] = useState('');
 
   const sameClub = homeClubId !== '' && homeClubId === awayClubId;
 
@@ -104,11 +110,28 @@ export function SingleFixtureForm({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
           <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Date (leave blank for TBC)
-            <input type="date" name="matchDate" value={matchDate} onChange={(event) => setMatchDate(event.target.value)} disabled={create.isPending} />
+            <input
+              type="date"
+              name="matchDate"
+              value={matchDate}
+              onChange={(event) => {
+                setMatchDate(event.target.value);
+                if (event.target.value === '') setMatchTime('');
+              }}
+              disabled={create.isPending}
+            />
           </label>
           <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Local start time (HH:MM, leave blank for TBC)
-            <input type="text" name="matchTime" placeholder="19:40" pattern="[0-9]{2}:[0-9]{2}" disabled={create.isPending || !matchDate} />
+            <input
+              type="text"
+              name="matchTime"
+              placeholder="19:40"
+              pattern="[0-9]{2}:[0-9]{2}"
+              value={matchTime}
+              onChange={(event) => setMatchTime(event.target.value)}
+              disabled={create.isPending || !matchDate}
+            />
           </label>
         </div>
 

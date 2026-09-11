@@ -43,6 +43,7 @@ import {
   playerLinksHref,
   readActiveDraftOverrideKeys,
   readDraftOverrides,
+  readDraftPickRevision,
   retireManualPick,
   retireSourcePickOverride,
   saveManualPick,
@@ -61,6 +62,13 @@ import { lockDraftTables, unlockDraftTables } from './draft-lock';
  * module-level redirect is the established convention in this directory.
  */
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+/*
+ * J-18's revision is read from `data_edits` on the AUTH pool -- afldb_auth is
+ * the only application role granted SELECT on that audit table. The same
+ * redirect therefore has to cover it, or the compare-and-swap would read
+ * afldb_dev (or fail on an unset variable) instead of afldb_test.
+ */
+process.env.AFLDB_AUTH_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
 
 const root = process.cwd();
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
@@ -724,6 +732,78 @@ describe('source-owned corrections (6.1, 6.2)', () => {
     expect(detail?.clubSlug).toBe(otherClubSlug);
     const record = await overrideRow(entityKey(), 'selection_facts');
     expect(record?.overrideValues).toEqual({ pick_number: 2, club_slug: otherClubSlug });
+  });
+
+  it('J-18 refuses a save whose expected revision is no longer current', async () => {
+    /*
+     * The compare-and-swap reads `data_edits` -- an audit table afldb_import
+     * (which owns the mutation transaction) may INSERT into and may NOT read,
+     * and the page's own afldb_app may not read either. This is the case that
+     * runs that read against a real PostgreSQL and a real audit row rather
+     * than a fake transaction, in both the page's and the mutation's caller.
+     */
+    const detail = await getDraftPickAdminDetail(sourcePickId);
+    const stale = await readDraftPickRevision(sourcePickId, detail?.playerId ?? null);
+
+    /*
+     * This is the only case that writes the `notes` group of the SHARED fixture
+     * selection, and gate 8's 6.1 proves a forced failure leaves NO `notes`
+     * record against that same selection -- so everything written here (the
+     * durable record, the two canonical columns and the audit rows) is removed
+     * again in the `finally` below. The audit floor is read FIRST so the
+     * cleanup deletes only the rows this case adds: `readDraftPickRevision` is
+     * max(data_edits.id), so both leaving those rows behind and deleting more
+     * than this case wrote would hand a later reader a revision no test here
+     * established.
+     */
+    const [floor] = await admin<{ id: string | null }[]>`
+      SELECT max(id)::text AS id FROM data_edits
+       WHERE table_name = 'draft_picks' AND row_id = ${sourcePickId}`;
+    const auditFloor = floor?.id ?? '0';
+
+    try {
+      const first = await saveSourcePickFields({
+        pickId: sourcePickId, groupKey: 'notes',
+        raw: { pick_note: `${MARKER} first note`, detail: '' },
+        adminUserId: actorId, expectedRevision: stale,
+      });
+      expect(first.ok, JSON.stringify(first)).toBe(true);
+
+      // That save wrote its own audit row, so the form's value is now stale.
+      const current = await readDraftPickRevision(sourcePickId, detail?.playerId ?? null);
+      expect(current).not.toBe(stale);
+
+      const replayed = await saveSourcePickFields({
+        pickId: sourcePickId, groupKey: 'notes',
+        raw: { pick_note: `${MARKER} second note`, detail: '' },
+        adminUserId: actorId, expectedRevision: stale,
+      });
+      expect(replayed).toMatchObject({ ok: false, reason: 'stale' });
+      expect((await getDraftPickAdminDetail(sourcePickId))?.pickNote)
+        .toBe(`${MARKER} first note`);
+
+      const reopened = await saveSourcePickFields({
+        pickId: sourcePickId, groupKey: 'notes',
+        raw: { pick_note: `${MARKER} second note`, detail: '' },
+        adminUserId: actorId, expectedRevision: current,
+      });
+      expect(reopened.ok, JSON.stringify(reopened)).toBe(true);
+    } finally {
+      // Restore the fixture whether or not the assertions above held: a failure
+      // here must report ITSELF, not cascade into gate 8.
+      await admin`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey()}
+           AND field_group = 'notes'`;
+      await admin`
+        UPDATE draft_picks
+           SET pick_note = ${detail?.pickNote ?? null}, detail = ${detail?.detail ?? null}
+         WHERE id = ${sourcePickId}`;
+      await admin`
+        DELETE FROM data_edits
+         WHERE table_name = 'draft_picks' AND row_id = ${sourcePickId}
+           AND id > ${auditFloor}::bigint`;
+    }
   });
 
   it('refuses to edit a manual selection through the source path', async () => {

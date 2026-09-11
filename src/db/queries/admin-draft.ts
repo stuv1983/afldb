@@ -7,6 +7,7 @@ import 'server-only';
 import postgres from 'postgres';
 
 import { recordDataEdit } from '@/db/queries/audit-log';
+import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
   MANUAL_SOURCE_KEY,
@@ -337,14 +338,32 @@ async function lockPick(tx: Tx, pickId: number): Promise<PickRow | null> {
  * ABOUT this selection, under either audit subject. Every audited mutation
  * here writes one, so the value changes on every change -- which is exactly
  * what the J-18 compare-and-swap needs, and it needs no new column.
+ *
+ * It reads on `authSql`, and must: `data_edits` (057) is an OPERATIONAL audit
+ * table, and afldb_auth is the only application role granted SELECT on it.
+ * afldb_app is not in `afldb_meta.app_readable_tables` at all (039 inverted
+ * the schema default, so an unregistered table is unreadable), and afldb_import
+ * holds INSERT alone (066) so that a mutation's required audit can commit with
+ * it. Reading this table on either of those roles is `permission denied for
+ * table data_edits` -- which is exactly what made every `/admin/draft/[id]`
+ * render, and every J-18 compare-and-swap, fail.
+ *
+ * Reading outside the mutation's own transaction does not weaken the
+ * compare-and-swap. Every audited draft mutation takes `lockPick()`'s
+ * `FOR UPDATE` on the selection row FIRST, so a competing edit has either
+ * already committed -- and its `data_edits` row is visible to this read -- or
+ * is still blocked on that lock and cannot yet have written one.
  */
-export async function draftPickRevision(tx: Tx, pick: PickRow): Promise<string> {
-  const [row] = await tx<{ revision: string | null }[]>`
+export async function readDraftPickRevision(
+  pickId: number,
+  playerId: number | null,
+): Promise<string> {
+  const [row] = await authSql<{ revision: string | null }[]>`
     SELECT max(id)::text AS revision
       FROM data_edits
-     WHERE (table_name = 'draft_picks' AND row_id = ${pick.id})
+     WHERE (table_name = 'draft_picks' AND row_id = ${pickId})
         OR (table_name = 'players'
-            AND row_id = ${pick.playerId}
+            AND row_id = ${playerId}
             AND field_group LIKE 'draft_selection%')
   `;
   return row?.revision ?? '0';
@@ -691,7 +710,7 @@ export async function saveSourcePickFields(
             + 'never be replayed.');
         }
         if (input.expectedRevision != null) {
-          const revision = await draftPickRevision(tx, pick);
+          const revision = await readDraftPickRevision(pick.id, pick.playerId);
           if (revision !== input.expectedRevision) {
             return refuse('stale', 'That selection changed since this form was opened. Reload and try again.');
           }
@@ -1123,7 +1142,7 @@ export async function saveManualPick(
             + 'field group by field group, and its player link is changed only in Player links.');
         }
         if (input.expectedRevision != null) {
-          const revision = await draftPickRevision(tx, pick);
+          const revision = await readDraftPickRevision(pick.id, pick.playerId);
           if (revision !== input.expectedRevision) {
             return refuse('stale', 'That selection changed since this form was opened. Reload and try again.');
           }
@@ -1545,7 +1564,7 @@ export async function retireManualPick(input: {
           return refuse('conflict', 'That manual selection names no player, so it has no audit subject.');
         }
         if (input.expectedRevision != null) {
-          const revision = await draftPickRevision(tx, pick);
+          const revision = await readDraftPickRevision(pick.id, pick.playerId);
           if (revision !== input.expectedRevision) {
             return refuse('stale', 'That selection changed since this form was opened. Reload and try again.');
           }

@@ -745,7 +745,101 @@ data editor (P8); PROD deploy; DEV update/rebuild.
 The operator is deliberately holding DEV until the Admin Centre batch is complete. Gates 15–16
 run only then. Stage 1 and Stage 2 are committed on `afldb_test` + typecheck evidence alone.
 
+## 20. DEV acceptance defect: `/admin/draft/[id]` read the audit log as the wrong role (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+
+### 20.1 What DEV acceptance found
+
+Combined ISSUE-160/161/162/163 DEV browser acceptance, build `01f94a1`, migrations 001–098 applied,
+0 pending, privileges reconciled, `afldb.service` healthy, `/api/health` 200.
+
+| Fact | Value |
+|---|---|
+| Route | `/admin/draft/[id]` |
+| Ids tried | 1, 6669, 6670, 6793 — **all** failed |
+| Roles | Admin **and** Super Admin — both failed; Contributor correctly refused before the page |
+| Viewport | 1440×900 |
+| Symptom | site error boundary, reference `4230168678`; console `Minified React error #441` + `[render] page failed 4230168678` |
+| Unaffected | `/admin/draft` and `/admin/draft/new` rendered correctly |
+
+`#441` is React's production stand-in for "an error occurred in the Server Components render", and
+`4230168678` is that render's Next digest, so the failure was a **server-side throw**, not a
+serialization, invalid-child, `params`-contract or Client-Component-boundary problem. That it failed
+for every id and both roles located it **above** every provenance and capability branch.
+
+### 20.2 Root cause
+
+J-18's concurrency revision is `max(data_edits.id)` for the selection under either audit subject
+(the `draft_picks` row, or the `players` row for a `draft_selection%` field group). It was read in
+two places, on two roles, **neither of which may SELECT `data_edits`**:
+
+| Caller | Pool / role | Grant it holds on `data_edits` |
+|---|---|---|
+| `currentRevision()` in `src/app/admin/draft/[id]/page.tsx` | `@/db/client` → **afldb_app** | none — 039 inverted the schema-wide default, so afldb_app reads only what `afldb_meta.app_readable_tables` registers, and `data_edits` is deliberately not registered |
+| `draftPickRevision(tx, pick)` in `src/db/queries/admin-draft.ts` | the mutation's own transaction → **afldb_import** | `INSERT` only (066), so a mutation's required audit can commit atomically with it |
+| `audit-reader.ts` (the working precedent) | `@/db/authClient` → **afldb_auth** | `SELECT, INSERT` (057) |
+
+So the page threw `permission denied for table data_edits` on every request, before rendering
+anything. `tests/integration/privileges.test.ts` already pins both halves of this (afldb_app "reads
+exactly the tables the registry allows"; afldb_auth holds `data_edits` `SELECT, INSERT`), and
+`tools/maintenance/privileges.sql` reconciles the same shape — **the grants were correct; the code
+asked the wrong role.**
+
+Nothing local could have caught it: the integration suite connects as the owner, and no test passed
+`expectedRevision`, so the compare-and-swap read had never executed against PostgreSQL at all. The
+detail page was its only producer, so the second call site would have failed on the first Save the
+moment the page rendered — one defect, two call sites.
+
+### 20.3 Fix
+
+One exported `readDraftPickRevision(pickId, playerId)` in `src/db/queries/admin-draft.ts`, reading
+on `authSql`, used by the page and by all three compare-and-swap call sites
+(`saveSourcePickFields`, `saveManualPick`, `retireManualPick`).
+
+Reading outside the mutation transaction does not weaken J-18: every audited draft mutation takes
+`lockPick()`'s `FOR UPDATE` on the selection row **first**, so a competing edit has either already
+committed — and its `data_edits` row is visible to this read — or is still blocked on that lock and
+cannot yet have written one.
+
+**No migration. No grant or privilege change. No schema change. No capability change
+(`data.draft.read` Admin+, `data.draft.edit` Super Admin only, unchanged, Admin still read-only).
+No change to the draft authority model, source-owned/manual ownership, durable manual identity,
+attach-rather-than-duplicate, override correction, retire/supersede semantics or replay/promotion
+lineage.** No stop condition fired.
+
+### 20.4 Regressions added
+
+- `tests/admin-draft-actions.test.ts` — the revision read runs on the **auth** pool and never on
+  the page pool, carries `FROM data_edits` and both parameterised audit subjects, and returns `'0'`
+  for a selection nothing has been audited about (and for an empty result). This pins the root
+  cause itself, not a token.
+- `tests/integration/admin-draft.test.ts` — a real-PostgreSQL J-18 round trip in
+  *source-owned corrections (6.1, 6.2)*: read the revision, save with it (accepted), re-read (it
+  moved), replay the stale value (refused `stale`, canonical value unchanged), save with the current
+  value (accepted). The suite also now redirects `AFLDB_AUTH_DATABASE_URL` to
+  `AFLDB_TEST_DATABASE_URL`, the same protection it already applied to the import DSN.
+
+### 20.5 Validation and what remains
+
+Nothing was run: no `tsc`, no vitest, no ESLint, no `npm run build`, no commit, no deploy. Operator
+commands are listed under *Next action*. A local production build is **not** final acceptance for a
+rendered-route crash — DEV must be redeployed and `/admin/draft/[id]` re-tested in the browser.
+**ISSUE-160 stays OPEN.**
+
 ## Next action
+
+**FIRST, validate the 2026-09-12 `/admin/draft/[id]` crash fix (§20):**
+
+```text
+npx tsc --noEmit
+npx vitest run tests/admin-draft-actions.test.ts
+npx vitest run tests/integration/admin-draft.test.ts     # needs AFLDB_TEST_DATABASE_URL
+npx eslint src/db/queries/admin-draft.ts "src/app/admin/draft/[id]/page.tsx" src/app/admin/fixtures/SingleFixtureForm.tsx tests/admin-draft-actions.test.ts tests/integration/admin-draft.test.ts
+npm run build
+```
+
+Then commit, redeploy DEV, and re-run the focused browser acceptance of `/admin/draft/[id]` for
+both Admin and Super Admin over a DraftGuru row, a manual row and an unlinked row, including one
+Save to prove the compare-and-swap now completes.
 
 **Stage 1 and Stage 2 are implemented and committed** (`91935b9`, `a947e52`, 2026-09-11) **and
 audited locally** (2026-09-11). The audit's two narrow fixes and this tracking update are

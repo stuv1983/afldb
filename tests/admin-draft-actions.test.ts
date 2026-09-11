@@ -25,9 +25,10 @@ import {
   requiredText,
 } from '@/app/admin/draft/validation';
 
-const mocks = vi.hoisted(() => ({ postgres: vi.fn(), sql: vi.fn() }));
+const mocks = vi.hoisted(() => ({ postgres: vi.fn(), sql: vi.fn(), authSql: vi.fn() }));
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
+vi.mock('@/db/authClient', () => ({ authSql: mocks.authSql }));
 
 import {
   AFLTABLES_PROFILE_PATH_RE,
@@ -46,6 +47,7 @@ import {
   needsPlayerLinkReview,
   playerLinksHref,
   provenanceOf,
+  readDraftPickRevision,
   sourcePickEntityKey,
   trackedProfilePaths,
 } from '@/db/queries/admin-draft';
@@ -492,5 +494,41 @@ describe('Stage 2: needsPlayerLinkReview / playerLinksHref (the §18 deep link)'
     const url = new URL(href, 'https://example.invalid');
     expect([...url.searchParams.keys()]).toEqual(['table', 'q']);
     expect(url.searchParams.get('q')).toBe("O'Brien & Sons #1");
+  });
+});
+
+describe('the J-18 revision read (§18)', () => {
+  /*
+   * `data_edits` (057) is an OPERATIONAL audit table. afldb_auth is the only
+   * application role granted SELECT on it; afldb_app is not in
+   * `afldb_meta.app_readable_tables` at all (039 inverted the schema-wide
+   * default) and afldb_import holds INSERT alone (066). Reading it on either
+   * of those roles is `permission denied for table data_edits` -- which is
+   * what made EVERY `/admin/draft/[id]` render fail on DEV, for every id and
+   * for both Admin and Super Admin, and would have failed every J-18
+   * compare-and-swap the moment the page rendered. The pool this read runs on
+   * is therefore the contract, not an implementation detail.
+   */
+  it('reads the audit log on the auth pool and never on the page pool', async () => {
+    mocks.authSql.mockResolvedValue([{ revision: '42' }]);
+
+    await expect(readDraftPickRevision(17, 99)).resolves.toBe('42');
+
+    expect(mocks.sql).not.toHaveBeenCalled();
+    expect(mocks.authSql).toHaveBeenCalledTimes(1);
+    const [strings, ...values] = mocks.authSql.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    expect(strings.join('?').replace(/\s+/g, ' ')).toContain('FROM data_edits');
+    // Both audit subjects, parameterised: the selection itself and the player
+    // its draft-selection field groups are recorded against.
+    expect(values).toEqual([17, 99]);
+  });
+
+  it('is 0 for a selection nothing has been audited about, and for an unlinked row', async () => {
+    mocks.authSql.mockResolvedValue([{ revision: null }]);
+    await expect(readDraftPickRevision(17, null)).resolves.toBe('0');
+
+    mocks.authSql.mockResolvedValue([]);
+    await expect(readDraftPickRevision(17, null)).resolves.toBe('0');
+    expect(mocks.sql).not.toHaveBeenCalled();
   });
 });

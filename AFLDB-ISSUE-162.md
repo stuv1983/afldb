@@ -1788,3 +1788,37 @@ npm run build        # the decisive gate
 - **DEV database unchanged by this work**: 096/097/098 stay applied, 98/98, privileges reconciled.
   **No DEV service was deployed or restarted. PROD untouched.**
 - ISSUE-162 remains **OPEN**; ISSUE-163 remains **OPEN**. Rendered DEV acceptance has not happened.
+
+## 41. DEV acceptance defect: a cleared date left a stale visible start time (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+
+Found by the combined ISSUE-160/161/162/163 DEV browser acceptance, alongside the blocking
+`/admin/draft/[id]` crash (`AFLDB-ISSUE-160.md` §20). **Non-blocking, presentation only.**
+
+**Route.** `/admin/fixtures/[season]/new` (tested at `/admin/fixtures/2027/new`).
+
+**Repro.** Enter a date; enter a time; clear the date.
+
+**Expected.** The start-time control disables **and** the visible stale value clears.
+
+**Actual.** The control disabled but still displayed the old time, e.g. `19:25`.
+
+**No integrity defect.** The server stored the fixture as TBC date and TBC time, which is correct;
+`renderSchedule`/`normaliseSchedule` were never involved, and nothing in the Stage 1 mutation
+contract, the lifecycle, the fingerprint gate or the played resolution is implicated.
+
+**Cause.** `SingleFixtureForm`'s `matchTime` input was **uncontrolled** — `disabled` was bound to
+`!matchDate` but `value` was not bound at all, so the DOM kept the text the operator had typed. The
+sibling batch form never had the defect: `RoundBatchForm.updateRow()` already carries the rule
+(`if (patch.matchDate === '') next.matchTime = ''`).
+
+**Fix.** `matchTime` becomes React state; the time input is controlled; clearing the date clears it.
+One file, `src/app/admin/fixtures/SingleFixtureForm.tsx`. No server, query, action, validation or
+schema change, and no change to `RoundBatchForm` or `ReschedulePanel`.
+
+**No automated regression.** There is no DOM/component test harness in `tests/` for these forms
+(`tests/admin-fixture-actions.test.ts` is a pure/source-contract suite), and inventing one for a
+one-line state reset was judged out of proportion — the §39.7 browser re-test covers it. The
+client/server boundary guard added in §40 still passes: this change adds no import.
+
+**State.** UNCOMMITTED and UNVALIDATED — no `tsc`, vitest, ESLint or `npm run build` run, no
+commit, no deploy, DEV database and PROD untouched. ISSUE-162 remains **OPEN**.

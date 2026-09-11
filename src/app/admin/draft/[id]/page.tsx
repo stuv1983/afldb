@@ -19,6 +19,7 @@ import {
   needsPlayerLinkReview,
   playerLinksHref,
   readDraftOverrides,
+  readDraftPickRevision,
 } from '@/db/queries/admin-draft';
 import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
@@ -32,17 +33,6 @@ const PROVENANCE_LABELS: Record<string, string> = {
   manual: 'Manual (AFLDB-ISSUE-160)',
   legacy: 'Legacy — no provenance (pre-160)',
 };
-
-/** The stable revision value J-18's compare-and-swap checks -- see `draftPickRevision` in `admin-draft.ts`; recomputed here read-only, outside a transaction, purely for display/hidden-field use. */
-async function currentRevision(pickId: number, playerId: number | null): Promise<string> {
-  const [row] = await sql<{ revision: string | null }[]>`
-    SELECT max(id)::text AS revision
-      FROM data_edits
-     WHERE (table_name = 'draft_picks' AND row_id = ${pickId})
-        OR (table_name = 'players' AND row_id = ${playerId} AND field_group LIKE 'draft_selection%')
-  `;
-  return row?.revision ?? '0';
-}
 
 /**
  * `/admin/draft/[id]` -- identity/provenance (read-only), then exactly the
@@ -66,7 +56,12 @@ export default async function DraftPickAdminDetailPage(
   // Navigation only; /admin/player-links enforces its own capability and owns
   // the person-grained decision (J-17 refuses relinking a source row here).
   const canReviewLinks = hasCapability(admin, 'data.playerLinks');
-  const [clubs, revision] = await Promise.all([listClubs(), currentRevision(detail.id, detail.playerId)]);
+  // The same value J-18's compare-and-swap re-reads, on the same pool: the
+  // audit log is readable by afldb_auth alone, never by the page's own role.
+  const [clubs, revision] = await Promise.all([
+    listClubs(),
+    readDraftPickRevision(detail.id, detail.playerId),
+  ]);
 
   const overrides = detail.entityKey ? await readDraftOverrides(detail.entityKey) : [];
   const activeGroups = new Set(overrides.filter((o) => o.isActive).map((o) => o.fieldGroup));
