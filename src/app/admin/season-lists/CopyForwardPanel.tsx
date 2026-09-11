@@ -25,6 +25,16 @@ export function CopyForwardPanel({
 }) {
   const copy = useSeasonListActionSubmit<CopyForwardActionState>(copySeasonListsForwardAction, {});
   const [selected, setSelected] = useState<Set<string>>(new Set(emptyClubs.map((club) => club.slug)));
+  /**
+   * The selection the displayed preview was RUN FOR. The confirm control is
+   * bound to it, so a preview can only ever be confirmed into the clubs it
+   * actually planned: changing the selection afterwards retires the preview
+   * and asks for a new one rather than silently confirming a different, larger
+   * bulk write than the operator read (§11a -- preview before confirm is this
+   * mutation's safety control, and it is the one bulk write in the feature).
+   */
+  const [previewedKey, setPreviewedKey] = useState<string | null>(null);
+  const selectionKey = [...selected].sort().join(',');
 
   const toggle = (slug: string) => setSelected((current) => {
     const next = new Set(current);
@@ -42,6 +52,7 @@ export function CopyForwardPanel({
 
   const handlePreview = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (selected.size === 0) return;
+    setPreviewedKey(selectionKey);
     copy.submit(buildForm(true), event.currentTarget);
   };
 
@@ -49,7 +60,9 @@ export function CopyForwardPanel({
     copy.submit(buildForm(false), event.currentTarget);
   };
 
-  const previewed = copy.state.ok === true && copy.state.dryRun === true;
+  const hasPreview = copy.state.ok === true && copy.state.dryRun === true;
+  const previewed = hasPreview && previewedKey === selectionKey;
+  const previewStale = hasPreview && previewedKey !== selectionKey;
   const done = copy.state.ok === true && copy.state.dryRun === false;
 
   if (done) {
@@ -120,6 +133,12 @@ export function CopyForwardPanel({
         </div>
       ) : (
         <div style={{ marginTop: '0.6rem' }}>
+          {previewStale && (
+            <p className="notice" role="status">
+              The club selection changed since that preview, so it no longer describes what would be
+              written. Preview again before confirming.
+            </p>
+          )}
           <button
             type="button"
             className="btn btn-secondary"

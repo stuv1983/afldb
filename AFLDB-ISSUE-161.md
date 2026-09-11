@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-**Status:** **Stage 1 AND Stage 2 COMPLETE 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high) — implemented; not committed, not deployed (§32, §33).** The D-3 evidence gate **passed** and migration **096** is allocated. Planning complete; **Operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)**: D-2 approved with modification (2027 is the first authoritative season; 2026 appearances are never promoted into authoritative membership), D-3 approved subject to Stage 1 evidence (stop on contrary evidence), all others approved as recommended. Additional operator boundary: ISSUE-161 does not own fixture creation/scheduling (likely ISSUE-162) and must not depend on a fixture existing (§9.4, §27). Both stages await operator review/commit and the combined ISSUE-160 + ISSUE-161 DEV acceptance; **neither ISSUE-160 nor ISSUE-161 is resolved.**
+**Status:** **Stage 1 AND Stage 2 COMPLETE 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high), committed at `97af605` / `1441a5b`, LOCALLY AUDITED AND VALIDATED 2026-09-11 (Opus 5 high, §33.5) — not pushed, not merged, not deployed (§32, §33, §33.5).** The D-3 evidence gate **passed** and migration **096** is allocated. Planning complete; **Operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)**: D-2 approved with modification (2027 is the first authoritative season; 2026 appearances are never promoted into authoritative membership), D-3 approved subject to Stage 1 evidence (stop on contrary evidence), all others approved as recommended. Additional operator boundary: ISSUE-161 does not own fixture creation/scheduling (likely ISSUE-162) and must not depend on a fixture existing (§9.4, §27). Both stages await operator review/commit and the combined ISSUE-160 + ISSUE-161 DEV acceptance; **neither ISSUE-160 nor ISSUE-161 is resolved.**
 **Severity:** Medium
 **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 **Created:** 2026-09-11
@@ -1021,6 +1021,61 @@ add/remove/transfer/copy mutation functions, the replay branch, `FIRST_LIST_SEAS
 ISSUE-160 no-auto-membership rule are all unchanged. The two new functions are plain, read-only
 `SELECT`s.
 
+### 33.5 Local completion audit — 2026-09-11 (Opus 5, high)
+
+The §33.4 repair pass had never been re-validated. It now has been, together with a full local
+audit of Stage 1 + Stage 2 as one feature. The operator explicitly authorised command execution
+for this task (CLAUDE.md §9 exception); nothing was committed, pushed, merged or deployed, DEV and
+PROD were untouched, and no ISSUE-162 work was started.
+
+Tree clean at audit start (HEAD `1441a5b`). Preflight `--mode implementation --issue 161`:
+**READY, 0 blockers, 3 expected warnings** (096 branch-local; `psql`/`pg_restore` unavailable and
+not required in this mode).
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | PASS |
+| `auth` + `admin-season-list-actions` + `admin-draft-actions` | **204 passed** (201 + this audit's 3 new tests) |
+| `integration/admin-season-lists` + `integration/admin-draft` | **85 passed** (40 + 45) |
+| `data-overrides-source-contract` + `db-promotion-check` + `current-season-import` + `reference-data` | **420 passed, 4 skipped** |
+| `integration/fk-indexes` | **2 passed** |
+| `eslint` over every ISSUE-161-authored file | **0 problems** |
+| `git diff --check` | PASS |
+
+The 4 skips are the ISSUE-130 R-runtime "alternate checkout" cases, which do not run on the
+Windows workstation. Two lint findings elsewhere (`no-assign-module-variable` in
+`tests/current-season-import.test.ts`, two `_total` unused-var warnings in `players.ts`) were
+proved pre-existing at `436d0c9` rather than assumed so.
+
+**One concrete defect, fixed narrowly.** `CopyForwardPanel.tsx` left the club checkboxes live
+after a dry run returned while replacing the Preview control with Confirm, so changing the
+selection afterwards offered only Confirm — which builds its form from the live selection and
+would have written a club set the displayed plan did not describe, with no route back to a
+preview. Copy-forward is this feature's only bulk write and §11a/§20 make preview-before-confirm
+its safety control. The confirm branch is now gated on the preview still describing the live
+selection (`previewedKey`); a changed selection retires the preview, says so in a `role="status"`
+notice, and offers Preview again. Client-only — no action, query, transaction, invariant or
+migration changed. Three regression cases added to `tests/admin-season-list-actions.test.ts`.
+
+Everything else audited clean: canonical semantics, no retired/lifecycle state, I-1 and the D-3
+evidence, fixture independence, the eligibility rule, add/remove/transfer/copy-forward contracts,
+the appearances review surface, the ISSUE-160 handoff (navigation only), the departed/changes
+content §33.4 added, guard-first permissions on every page/`generateMetadata`/action, nav, the
+behaviour-preserving `player-identity.ts` extraction, the stable key, the `data_overrides`
+contract, the fail-closed replay and its binding order, single-writer source authority, promotion
+classification and deploy order, transaction atomicity, UI freshness, and the static responsive/
+keyboard review. No unrecorded deviation was found. **No rendered acceptance is claimed.**
+
+**Files changed by the audit (uncommitted):** `src/app/admin/season-lists/CopyForwardPanel.tsx`,
+`tests/admin-season-list-actions.test.ts`, plus this section, `issues.md` and `IssuesIndex.md`.
+
+Remaining gates are all external/batch-deployment: DEV migration 096, DEV `npm run db:privileges`,
+DEV rebuild/deploy, live three-role Playwright, rendered responsive/focus acceptance, later PROD
+promotion/probes, and the release-time S-1 decision inherited from ISSUE-160. ISSUE-161 stays
+**OPEN** and code-complete pending the combined Admin Centre DEV acceptance.
+
+---
+
 <!-- afldb-merge-readiness
-{"status":"in-progress","hardBlockers":["Stage 2 validation repair pass applied (nav test fix, generateMetadata guard fix, AddPlayerPanel Link fix, departed/+added--departed contract gap filled) but NOT yet re-validated by the operator -- rerun the AFTER FIXES command block and confirm auth/unit batch all-green, 85/85 integration, zero new lint errors, clean typecheck and diff-check (CLAUDE.md §9 -- Claude does not execute shell commands by default)","ISSUE-161 ships with ISSUE-160 as one Admin Centre batch and neither has DEV acceptance yet"],"expectedFiles":["AFLDB-ISSUE-161.md","issues.md","IssuesIndex.md","AFLDB-ISSUE-156.md","CHANGELOG.md","src/db/migrations/096_season_list_members.sql","src/db/queries/admin-season-lists.ts","src/db/queries/player-identity.ts","src/db/queries/admin-draft.ts","src/db/queries/players.ts","src/lib/acquisition/manual-authority.ts","tools/migration/common.py","tools/migration/import_fitzroy_core.py","tools/db/promotion-inventory.ts","docs/production-promotion.md","tests/admin-season-list-actions.test.ts","tests/integration/admin-season-lists.test.ts","tests/data-overrides-source-contract.test.ts","tests/db-promotion-check.test.ts","tests/current-season-import.test.ts","src/lib/auth/capabilities.ts","src/app/admin/nav-model.ts","src/app/admin/season-lists/page.tsx","src/app/admin/season-lists/[season]/page.tsx","src/app/admin/season-lists/[season]/[club]/page.tsx","src/app/admin/season-lists/actions.ts","src/app/admin/season-lists/validation.ts","src/app/admin/season-lists/submit-helper.ts","src/app/admin/season-lists/AddPlayerPanel.tsx","src/app/admin/season-lists/AppearancesReviewPanel.tsx","src/app/admin/season-lists/DraftSuggestionsPanel.tsx","src/app/admin/season-lists/MemberActions.tsx","src/app/admin/season-lists/CopyForwardPanel.tsx","src/app/admin/draft/submit-helper.ts","src/app/admin/draft/actions.ts","src/app/admin/draft/NewPickWizard.tsx","src/app/admin/draft/[id]/page.tsx","tests/auth.test.ts"],"validation":["Stage 1: npx tsc --noEmit: clean","Stage 1: tests/admin-season-list-actions.test.ts: 25 passed","Stage 1: tests/integration/admin-season-lists.test.ts: 40 passed (twice, idempotent teardown)","Stage 1: tests/integration/admin-draft.test.ts (ISSUE-160 regression): 45 passed","Stage 1: data-overrides-source-contract + db-promotion-check + current-season-import: 382 passed","Stage 1: fk-indexes + auth: 132 passed","Stage 1: all tests/*.test.ts: 4227 passed, 14 skipped, 1 pre-existing Windows-CRLF-only failure (finals-semantics-contract, untouched file)","Stage 1: eslint on every changed file: clean","Stage 1: git diff --check: clean","D-3 probes: (a) 249 multi-club player-seasons, latest 1992; (b) season >= 2000 = 0 rows","Stage 2 (first operator run): npx tsc --noEmit PASS; tests/integration/admin-season-lists.test.ts 40/40 PASS; tests/integration/admin-draft.test.ts 45/45 PASS; git diff --check PASS; auth/unit batch 198 passed, 3 failed (2 stale nav expectations + 1 real generateMetadata guard defect x2 files); eslint 1 new error (AddPlayerPanel.tsx internal <a>)","Stage 2 repair pass applied 2026-09-11: all four findings fixed, plus a genuine missed mandatory contract item (+added/-departed vs S-1, departed-since-S-1 panel) found on re-inspection and implemented -- operator re-run of the AFTER FIXES commands NOT YET reported back"]}
+{"status": "in-progress", "hardBlockers": ["ISSUE-161 ships with ISSUE-160 as one Admin Centre batch and neither has DEV acceptance yet"], "expectedFiles": ["AFLDB-ISSUE-161.md", "issues.md", "IssuesIndex.md", "AFLDB-ISSUE-156.md", "CHANGELOG.md", "src/db/migrations/096_season_list_members.sql", "src/db/queries/admin-season-lists.ts", "src/db/queries/player-identity.ts", "src/db/queries/admin-draft.ts", "src/db/queries/players.ts", "src/lib/acquisition/manual-authority.ts", "tools/migration/common.py", "tools/migration/import_fitzroy_core.py", "tools/db/promotion-inventory.ts", "docs/production-promotion.md", "tests/admin-season-list-actions.test.ts", "tests/integration/admin-season-lists.test.ts", "tests/data-overrides-source-contract.test.ts", "tests/db-promotion-check.test.ts", "tests/current-season-import.test.ts", "src/lib/auth/capabilities.ts", "src/app/admin/nav-model.ts", "src/app/admin/season-lists/page.tsx", "src/app/admin/season-lists/[season]/page.tsx", "src/app/admin/season-lists/[season]/[club]/page.tsx", "src/app/admin/season-lists/actions.ts", "src/app/admin/season-lists/validation.ts", "src/app/admin/season-lists/submit-helper.ts", "src/app/admin/season-lists/AddPlayerPanel.tsx", "src/app/admin/season-lists/AppearancesReviewPanel.tsx", "src/app/admin/season-lists/DraftSuggestionsPanel.tsx", "src/app/admin/season-lists/MemberActions.tsx", "src/app/admin/season-lists/CopyForwardPanel.tsx", "src/app/admin/draft/submit-helper.ts", "src/app/admin/draft/actions.ts", "src/app/admin/draft/NewPickWizard.tsx", "src/app/admin/draft/[id]/page.tsx", "tests/auth.test.ts"], "validation": ["Stage 1: npx tsc --noEmit: clean", "Stage 1: tests/admin-season-list-actions.test.ts: 25 passed", "Stage 1: tests/integration/admin-season-lists.test.ts: 40 passed (twice, idempotent teardown)", "Stage 1: tests/integration/admin-draft.test.ts (ISSUE-160 regression): 45 passed", "Stage 1: data-overrides-source-contract + db-promotion-check + current-season-import: 382 passed", "Stage 1: fk-indexes + auth: 132 passed", "Stage 1: all tests/*.test.ts: 4227 passed, 14 skipped, 1 pre-existing Windows-CRLF-only failure (finals-semantics-contract, untouched file)", "Stage 1: eslint on every changed file: clean", "Stage 1: git diff --check: clean", "D-3 probes: (a) 249 multi-club player-seasons, latest 1992; (b) season >= 2000 = 0 rows", "Stage 2 (first operator run): npx tsc --noEmit PASS; tests/integration/admin-season-lists.test.ts 40/40 PASS; tests/integration/admin-draft.test.ts 45/45 PASS; git diff --check PASS; auth/unit batch 198 passed, 3 failed (2 stale nav expectations + 1 real generateMetadata guard defect x2 files); eslint 1 new error (AddPlayerPanel.tsx internal <a>)", "Stage 2 repair pass applied 2026-09-11: all four findings fixed, plus a genuine missed mandatory contract item (+added/-departed vs S-1, departed-since-S-1 panel) found on re-inspection and implemented -- operator re-run of the AFTER FIXES commands NOT YET reported back", "Local completion audit 2026-09-11 (Opus 5 high, operator-authorised commands): preflight READY (0 blockers, 3 expected warnings); npx tsc --noEmit PASS; auth + admin-season-list-actions + admin-draft-actions 204 passed; integration/admin-season-lists + integration/admin-draft 85 passed; data-overrides-source-contract + db-promotion-check + current-season-import + reference-data 420 passed / 4 skipped (ISSUE-130 R-runtime, platform-gated); integration/fk-indexes 2 passed; eslint clean over every ISSUE-161-authored file (the no-assign-module-variable error and two _total warnings are pre-existing at 436d0c9); git diff --check PASS. The Stage 2 repair pass is re-validated.", "Local completion audit found and fixed ONE concrete defect: CopyForwardPanel could confirm a copy-forward the operator never previewed (checkboxes stayed live after a dry run while only Confirm was offered). Confirm is now gated on the preview still describing the live selection; 3 regression cases added to tests/admin-season-list-actions.test.ts. Client-only -- no action, query, transaction, invariant or migration changed."]}
 -->

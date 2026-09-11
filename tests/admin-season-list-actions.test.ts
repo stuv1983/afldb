@@ -427,3 +427,39 @@ describe('a successful add writes exactly the three rows the contract names (§1
     expect(result.reason).toBe('duplicate');
   });
 });
+
+describe('copy-forward can only confirm the selection it previewed (§11a)', () => {
+  // Copy-forward is the one BULK write in season-list administration, and the
+  // runbook makes preview-before-confirm its safety control. The panel left the
+  // club checkboxes live after a preview returned while replacing the Preview
+  // control with Confirm, so changing the selection afterwards offered no way
+  // back to a preview and confirmed a set the operator had never read. The
+  // confirm control is now bound to the selection the displayed preview was run
+  // for; a changed selection retires the preview and asks for a new one.
+  const panel = readFileSync(
+    join(process.cwd(), 'src/app/admin/season-lists/CopyForwardPanel.tsx'), 'utf8',
+  ).replace(/\r\n/g, '\n');
+
+  it('records the previewed selection when the preview is dispatched', () => {
+    expect(panel).toMatch(/setPreviewedKey\(selectionKey\);\s*\n\s*copy\.submit\(buildForm\(true\)/);
+  });
+
+  it('gates the confirm control on the preview still describing this selection', () => {
+    expect(panel).toContain('const previewed = hasPreview && previewedKey === selectionKey;');
+    expect(panel).toContain('const previewStale = hasPreview && previewedKey !== selectionKey;');
+    // The confirm branch is reachable only through `previewed`, so a stale
+    // preview falls back to the Preview control rather than to Confirm.
+    expect(panel).toMatch(/\{previewed \?/);
+    expect(panel).toMatch(/\{previewStale &&/);
+  });
+
+  it('offers the confirm control from the previewed branch alone', () => {
+    // The write form is built from the live selection, which is only safe
+    // because the control that submits it exists in one place: inside the
+    // branch `previewed` guards. One Confirm control, and it sits after the
+    // branch opens.
+    expect(panel.match(/Confirm copy forward/g)).toHaveLength(1);
+    expect(panel.indexOf('Confirm copy forward')).toBeGreaterThan(panel.indexOf('{previewed ?'));
+    expect(panel.match(/buildForm\(false\)/g)).toHaveLength(1);
+  });
+});
