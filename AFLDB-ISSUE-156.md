@@ -472,17 +472,18 @@ P9 starts and is **not** folded into 159.
 
 ### P3b handoff contract — AFLDB-ISSUE-160: Draft administration and new-player draft intake
 
-**Allocated 2026-09-11. Status: Stage 1 IMPLEMENTED 2026-09-11 (backend and data contract),
-uncommitted, not deployed, not merged; Stage 2 not started.** Operator decisions D-1…D-9 were
+**Allocated 2026-09-11. Status: Stage 1 and Stage 2 IMPLEMENTED 2026-09-11,
+uncommitted, not deployed, not merged.** Operator decisions D-1…D-9 were
 decided 2026-09-11 (D-2 symmetric-DOB importer guard; D-3 conditional on read-only PROD probes
 and a pre-deploy sequencing decision S-1 against the paused ISSUE-151 promotion; D-7 adoption
 also mints an identity-less legacy player's identity; D-8 both J-3 branches pre-authorised;
 D-9 Stage 2 only) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch**:
 the gate-2 probe measured zero `(draft_year, draft_kind, pick_number)` collisions across all
-6,810 source selections on `afldb_test` and `afldb_dev`. Capabilities (D-6) are deliberately
-deferred to Stage 2, because `tests/auth.test.ts` fails on a capability declared but enforced
-at no page, route or action and Stage 1 ships no route. The probe table, the gate results and
-the two real defects found during implementation are in `issues.md`. The authoritative contract is `AFLDB-ISSUE-160.md`; this
+6,810 source selections on `afldb_test` and `afldb_dev`. Capabilities (D-6) were deliberately
+deferred out of Stage 1 (`tests/auth.test.ts` fails on a capability declared but enforced at no
+page, route or action, and Stage 1 shipped no route) and delivered in Stage 2 instead, with
+`/admin/draft` as the enforcing surface. The probe table, the gate results and
+the real defects found during implementation are in `issues.md`. The authoritative contract is `AFLDB-ISSUE-160.md`; this
 is the umbrella's summary. Draft administration was part of the original Admin Centre intent
 but had no phase of its own; it is restored here as a supplemental child after P3 so P4–P12
 keep their labels.
@@ -567,17 +568,26 @@ contract. Evidence and the validation commands are in `issues.md` under ISSUE-15
 to `main` at `af6379e` (migration 095, `/admin/coaches`, Stage 1 + Stage 2 gates all passed on
 DEV). Coach reconciliation stays P9-class.
 
-**P3b Stage 1 is implemented and awaiting operator review.** `AFLDB-ISSUE-160` (Draft
-administration and new-player draft intake), branch `opus/issue-160-draft-admin`, Stage 1
-completed 2026-09-11 — uncommitted, not deployed, not merged, neither DEV nor PROD touched. No
-migration (096 still free), no privilege change, no capability declared yet. Draft selections
-now have exactly one mutation contract (`src/db/queries/admin-draft.ts`, the only
-`INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a
-`manual_admin_edit` identity and a whole-row durable record; both players and selections are
-re-created on a rebuilt database by new fail-closed `replay_admin_overrides` branches; the D-2
-symmetric name+DOB refusal ships in the operator-run fitzRoy importer; and `data_edits` rows
-about a selection are remapped through a stable `draft_pick_key` instead of being reinstated by
-integer. Stop condition W-3 is cleared and verified at gate 10.
+**P3b Stage 1 and Stage 2 are implemented and awaiting operator review.** `AFLDB-ISSUE-160`
+(Draft administration and new-player draft intake), branch `opus/issue-160-draft-admin`, both
+stages completed 2026-09-11 — uncommitted, not deployed, not merged, neither DEV nor PROD
+touched. No migration (096 still free), no privilege change. Draft selections have exactly one
+mutation contract (`src/db/queries/admin-draft.ts`, the only `INSERT INTO draft_picks` in
+`src/`); every admin-created player is minted with a `manual_admin_edit` identity and a
+whole-row durable record; both players and selections are re-created on a rebuilt database by
+fail-closed `replay_admin_overrides` branches; the D-2 symmetric name+DOB refusal ships in the
+operator-run fitzRoy importer; `data_edits` rows about a selection are remapped through a stable
+`draft_pick_key` instead of being reinstated by integer. Stop condition W-3 is cleared and
+verified at gate 10.
+
+Stage 2 (a fresh Sonnet 5 high session) added `/admin/draft`, `/admin/draft/new`,
+`/admin/draft/[id]` and `/admin/draft/revalidate`; capabilities `data.draft.read` (Admin+) /
+`data.draft.edit` (Super Admin) declared and enforced at every page/route/action boundary
+(`tests/auth.test.ts` green); the Data-group nav entry; the D-9 shared
+`src/lib/admin/revalidate-route.ts` / `src/components/admin/action-submit.ts` extraction, with
+coaches switched to it behaviour-preservingly; and the `/admin/data-editor` draft-slice UI
+removal. No Stage 1 backend defect was found; `npx tsc --noEmit` is clean and 399 tests pass
+across the Stage 2-affected and Stage 1-adjacent suites.
 
 Still open: the gate-2 **PROD** read-only probes (d)/(e)/(g)/(h) — not run, PROD deliberately
 untouched — and the real-importer half of gate 9, which needs a host carrying `.venv`, the
@@ -586,8 +596,6 @@ accepted DraftGuru Stage A snapshot and `AFLDB_TEST_IMPORT_DATABASE_URL`. Operat
 resumes under the new `draft_pick_key` gate) stays a **pre-deploy** decision (runbook §11.1),
 not a commit gate.
 
-Next: the operator reviews and commits Stage 1, then a fresh session executes **ISSUE-160
-Stage 2** (`/admin/draft` routes and wizard, `data.draft.read` / `data.draft.edit` and the nav
-entry, the D-9 shared revalidate/submit extraction, the remaining `/admin/data-editor` page
-removal) against `AFLDB-ISSUE-160.md` §17/§18. DEV is deliberately not updated until the Admin
-Centre batch is complete; gates 15–16 wait for that. P4–P12 remain unallocated placeholders.
+Next: the operator reviews and commits Stage 1 and Stage 2 together, then DEV deploy + gate 16
+Playwright (three roles × 320/768/1000/1280/1920) once the operator updates DEV for the Admin
+Centre batch — deliberately deferred, not a defect. P4–P12 remain unallocated placeholders.

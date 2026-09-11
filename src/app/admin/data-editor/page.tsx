@@ -14,7 +14,6 @@ import { listClubs } from '@/db/queries/clubs';
 import { listVenues } from '@/db/queries/venues';
 import { getMatch, getMatchPlayers, getRecentClubLineup } from '@/db/queries/matches';
 import { getEditableRow } from '@/db/queries/data-edits';
-import { listDraftPicks } from '@/db/queries/draft';
 import { searchAdminMatches } from '@/db/queries/match-admin';
 import { listSeasons } from '@/db/queries/seasons';
 import { requireCapability } from '@/lib/auth/session';
@@ -22,7 +21,6 @@ import { formatDate, formatRoundShort } from '@/lib/format';
 import { firstValue, parseSeason } from '@/lib/params';
 import { isEditableEntity } from '@/lib/edit/spec';
 import { MatchBrowser } from '@/app/admin/data-editor/MatchBrowser';
-import { RouteSortHeader } from '@/components/RouteSortHeader';
 
 export const metadata: Metadata = { title: 'Data editor', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -30,8 +28,9 @@ export const dynamic = 'force-dynamic';
 /**
  * Manual corrections, player bio creation, match creation & sheet editing, and awards/honours management (see changeLog.md).
  *
- * Find or create a player, find or create a match, edit draft pick details, edit match player statistics,
- * or record award winners and representative team selections.
+ * Find or create a player, find or create a match, edit match player statistics, or record award
+ * winners and representative team selections. Draft selections moved to `/admin/draft`
+ * (AFLDB-ISSUE-160 D-5) -- this page refuses them rather than editing them.
  * Every save is audited in data_edits; the CSV pipeline remains the path for bulk jobs.
  */
 export default async function DataEditorPage(
@@ -48,8 +47,6 @@ export default async function DataEditorPage(
   const clubIdParam = Number(firstValue(params.club_id)) || null;
   const roundParam = Number(firstValue(params.round)) || null;
   const matchQueryParam = firstValue(params.match_q)?.trim() ?? '';
-  const draftQueryParam = firstValue(params.draft_q)?.trim() ?? '';
-  const draftYearParam = parseSeason(firstValue(params.draft_year) ?? '');
 
   const [clubs, venues, awards, honourTeams, seasonsList] = await Promise.all([
     listClubs(),
@@ -76,7 +73,7 @@ export default async function DataEditorPage(
     ? await getEditableRow(entity, id)
     : null;
 
-  const adminMatchesResult = (!matchForSheet && !row)
+  const adminMatchesResult = (!matchForSheet && !row && entity !== 'draft_picks')
     ? await searchAdminMatches({
         season: seasonParam,
         clubId: clubIdParam,
@@ -85,20 +82,6 @@ export default async function DataEditorPage(
         limit: 35,
       })
     : { rows: [], total: 0 };
-
-  const sort = firstValue(params.sort);
-  const dir = firstValue(params.dir);
-
-  const draftResults = (draftQueryParam || draftYearParam)
-    ? await listDraftPicks({
-        year: draftYearParam ?? undefined,
-        q: draftQueryParam || undefined,
-        page: 1,
-        pageSize: 50,
-        sort,
-        dir,
-      })
-    : null;
 
   return (
     <>
@@ -154,87 +137,15 @@ export default async function DataEditorPage(
 
         <div>
           <h2>Draft picks</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'end' }}>
-            <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-              <input type="hidden" name="entity" value="draft_picks" />
-              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Draft pick id
-                <input type="number" name="id" min={1} defaultValue={entity === 'draft_picks' && id > 0 ? id : undefined} />
-              </label>
-              <button type="submit">Open</button>
-            </form>
-            <form method="get" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Search draft by name
-                <input
-                  type="text"
-                  name="draft_q"
-                  placeholder="e.g. Onley or Rodriguez"
-                  defaultValue={draftQueryParam}
-                />
-              </label>
-              <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
-                Year
-                <input
-                  type="number"
-                  name="draft_year"
-                  min={1981}
-                  max={2100}
-                  placeholder="e.g. 2025"
-                  defaultValue={draftYearParam ?? undefined}
-                />
-              </label>
-              <button type="submit">Search draft</button>
-            </form>
-          </div>
+          <p className="muted">
+            Draft selections and new-player-through-draft intake moved to their own surface
+            (AFLDB-ISSUE-160): <Link href="/admin/draft">Draft administration</Link>. This page no
+            longer edits them.
+          </p>
         </div>
       </section>
 
-      {draftResults && draftResults.rows.length > 0 && (
-        <section className="section">
-          <h2>Matching draft selections ({draftResults.total})</h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col" className="num">ID</th>
-                  <RouteSortHeader sortKey="year" defaultSort="pick" defaultDir="asc" className="num">Year</RouteSortHeader>
-                  <RouteSortHeader sortKey="pick" defaultSort="pick" defaultDir="asc" className="num">Pick</RouteSortHeader>
-                  <RouteSortHeader sortKey="player" defaultSort="pick" defaultDir="asc">Player name</RouteSortHeader>
-                  <RouteSortHeader sortKey="club" defaultSort="pick" defaultDir="asc">Club</RouteSortHeader>
-                  <RouteSortHeader sortKey="from" defaultSort="pick" defaultDir="asc">Recruited from</RouteSortHeader>
-                  <th scope="col">Status</th>
-                  <th scope="col" />
-                </tr>
-              </thead>
-              <tbody>
-                {draftResults.rows.map((dp) => (
-                  <tr key={dp.id}>
-                    <td className="num">{dp.id}</td>
-                    <td className="num">{dp.draftYear}</td>
-                    <td className="num">{dp.pickNumber ?? '—'}</td>
-                    <td className="wide"><strong>{dp.playerNameRaw}</strong></td>
-                    <td>{dp.clubName ?? dp.clubNameRaw ?? '—'}</td>
-                    <td className="muted">{dp.originClub ?? '—'}</td>
-                    <td><span className="badge">{dp.linkStatus}</span></td>
-                    <td>
-                      <Link href={`/admin/data-editor?entity=draft_picks&id=${dp.id}`}>Edit pick</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {draftResults && draftResults.rows.length === 0 && (
-        <section className="section">
-          <div className="empty"><h3>No draft picks found matching criteria</h3></div>
-        </section>
-      )}
-
-      {!matchForSheet && !row && (
+      {!matchForSheet && !row && entity !== 'draft_picks' && (
         <MatchBrowser
           matches={adminMatchesResult.rows}
           total={adminMatchesResult.total}
@@ -262,9 +173,18 @@ export default async function DataEditorPage(
         </section>
       )}
 
-      {mode !== 'match-sheet' && entity && id > 0 && !row && (
+      {mode !== 'match-sheet' && entity === 'draft_picks' && id > 0 && (
         <section className="section">
-          <div className="empty"><h3>No {entity === 'players' ? 'player' : entity === 'draft_picks' ? 'draft pick' : 'match'} with id {id}</h3></div>
+          <div className="empty">
+            <h3>Draft selections are edited in Draft administration</h3>
+            <p><Link href={`/admin/draft/${id}`}>Open selection #{id} in Draft administration</Link></p>
+          </div>
+        </section>
+      )}
+
+      {mode !== 'match-sheet' && entity && entity !== 'draft_picks' && id > 0 && !row && (
+        <section className="section">
+          <div className="empty"><h3>No {entity === 'players' ? 'player' : 'match'} with id {id}</h3></div>
         </section>
       )}
 

@@ -16,6 +16,15 @@ import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { isAllowedRevalidatePath } from '@/app/admin/draft/revalidate-paths';
+import {
+  optionalText,
+  parseEventPair,
+  parseNullablePickNumber,
+  parsePositiveInt,
+  requiredText,
+} from '@/app/admin/draft/validation';
+
 const mocks = vi.hoisted(() => ({ postgres: vi.fn(), sql: vi.fn() }));
 vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
@@ -344,5 +353,89 @@ describe('checkNewPlayerDuplicates — J-10 … J-13', () => {
     const undated = fakeTx(emptyDb({ [SAME_NAME]: [namesake] }));
     expect(await checkNewPlayerDuplicates(undated.tx, facts, { confirmed: true }))
       .toMatchObject({ ok: false, reason: 'duplicate' });
+  });
+});
+
+/**
+ * Stage 2 additions (AFLDB-ISSUE-160 §18): form-parsing helpers behind
+ * `/admin/draft`'s actions, and the `/admin/draft/revalidate` allowlist.
+ * Pure, DB-free, matching the ISSUE-159 `admin-coach-actions.test.ts`
+ * pattern. Action-level DB proofs live in `tests/integration/admin-draft.test.ts`.
+ */
+describe('Stage 2: parsePositiveInt / optionalText / requiredText', () => {
+  it('parsePositiveInt accepts a positive integer and rejects the rest', () => {
+    expect(parsePositiveInt('7')).toBe(7);
+    expect(parsePositiveInt('0')).toBeNull();
+    expect(parsePositiveInt('-3')).toBeNull();
+    expect(parsePositiveInt('1.5')).toBeNull();
+    expect(parsePositiveInt('')).toBeNull();
+    expect(parsePositiveInt(null)).toBeNull();
+  });
+
+  it('optionalText / requiredText trim, truncate, and treat blank as absent', () => {
+    expect(optionalText('  hello  ', 100)).toBe('hello');
+    expect(requiredText('  hello  ', 100)).toBe('hello');
+    expect(optionalText('   ', 100)).toBeNull();
+    expect(requiredText('   ', 100)).toBeNull();
+    expect(optionalText('abcdef', 3)).toBe('abc');
+  });
+});
+
+describe('Stage 2: parseNullablePickNumber', () => {
+  it('treats a blank value as a valid NULL pick number, never a parse failure', () => {
+    expect(parseNullablePickNumber('')).toEqual({ ok: true, value: null });
+    expect(parseNullablePickNumber(null)).toEqual({ ok: true, value: null });
+  });
+
+  it('accepts a positive integer and refuses zero, negative or non-integer text', () => {
+    expect(parseNullablePickNumber('12')).toEqual({ ok: true, value: 12 });
+    expect(parseNullablePickNumber('0')).toEqual({ ok: false });
+    expect(parseNullablePickNumber('-1')).toEqual({ ok: false });
+    expect(parseNullablePickNumber('abc')).toEqual({ ok: false });
+  });
+});
+
+describe('Stage 2: parseEventPair', () => {
+  it('splits the posted "type|kind" select value', () => {
+    expect(parseEventPair('National|national')).toEqual({ draftType: 'National', draftKind: 'national' });
+    expect(parseEventPair('Pre-Draft|pre_draft')).toEqual({ draftType: 'Pre-Draft', draftKind: 'pre_draft' });
+  });
+
+  it('refuses a value with no separator, an empty half, or nothing at all', () => {
+    expect(parseEventPair('National')).toBeNull();
+    expect(parseEventPair('|national')).toBeNull();
+    expect(parseEventPair('National|')).toBeNull();
+    expect(parseEventPair('')).toBeNull();
+    expect(parseEventPair(null)).toBeNull();
+  });
+});
+
+describe('Stage 2: isAllowedRevalidatePath (/admin/draft/revalidate)', () => {
+  it('accepts the two cached public shapes a draft mutation can touch', () => {
+    expect(isAllowedRevalidatePath('/players/chris-fagan-123')).toBe(true);
+    expect(isAllowedRevalidatePath('/sitemap.xml')).toBe(true);
+  });
+
+  it('refuses every force-dynamic draft/player surface -- they need no revalidation', () => {
+    expect(isAllowedRevalidatePath('/draft')).toBe(false);
+    expect(isAllowedRevalidatePath('/draft/2025')).toBe(false);
+    expect(isAllowedRevalidatePath('/players')).toBe(false);
+    expect(isAllowedRevalidatePath('/admin/draft')).toBe(false);
+  });
+
+  it('refuses a path with no matching shape, path traversal, a scheme/host, or a query/fragment', () => {
+    expect(isAllowedRevalidatePath('/players/chris-fagan')).toBe(false);
+    expect(isAllowedRevalidatePath('/players/../../etc/passwd')).toBe(false);
+    expect(isAllowedRevalidatePath('//evil.example.com')).toBe(false);
+    expect(isAllowedRevalidatePath('https://evil.example.com/players/x-1')).toBe(false);
+    expect(isAllowedRevalidatePath('/players/chris-fagan-123?x=1')).toBe(false);
+    expect(isAllowedRevalidatePath('/players/chris-fagan-123#x')).toBe(false);
+    expect(isAllowedRevalidatePath('')).toBe(false);
+    expect(isAllowedRevalidatePath('/')).toBe(false);
+  });
+
+  it('refuses a case mismatch rather than normalising it', () => {
+    expect(isAllowedRevalidatePath('/Players/chris-fagan-123')).toBe(false);
+    expect(isAllowedRevalidatePath('/Sitemap.xml')).toBe(false);
   });
 });

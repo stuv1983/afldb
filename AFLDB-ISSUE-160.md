@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** **Stage 1 IMPLEMENTED 2026-09-11 (backend and data contract) — uncommitted, not deployed, not merged. Stage 2 NOT started.** Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gate 4 (deferred to Stage 2 with the routes that enforce the capabilities), gates 15–16, and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record* and *Validation*.
+**Status:** **Stage 1 and Stage 2 IMPLEMENTED 2026-09-11 — uncommitted, not deployed, not merged.** Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Stage 2 delivers `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, `/admin/draft/revalidate`; capabilities `data.draft.read`/`data.draft.edit` (gate 4, now done); the Data-group nav entry; the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving); and the `/admin/data-editor` draft-slice UI removal (D-5 UI half). Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gates 15–16 (deferred by the operator's Admin Centre release-batching decision, not by any defect), and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record*, *Stage 2 implementation record* and *Validation*.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Created:** 2026-09-11
@@ -747,17 +747,19 @@ run only then. Stage 1 and Stage 2 are committed on `afldb_test` + typecheck evi
 
 ## Next action
 
-**Stage 1 is implemented and awaiting operator review and commit** (2026-09-11). The
-implementation record — preflight result, the gate-2 probe table, the D-8 branch selection and
-why, the two real defects found during implementation, the deviations above, and the gate-by-gate
-result — is in `issues.md` under AFLDB-ISSUE-160. Nothing is committed, pushed, merged or
-deployed, and neither DEV nor PROD was touched.
+**Stage 1 and Stage 2 are implemented and awaiting operator review and commit** (2026-09-11).
+The implementation record for both stages — preflight results, the gate-2 probe table, the D-8
+branch selection and why, the real defects found (and, for Stage 2, the one self-caught test-file
+overwrite corrected before commit), the deviations above, and the gate-by-gate result — is in
+`issues.md` under AFLDB-ISSUE-160. Nothing is committed, pushed, merged or deployed, and neither
+DEV nor PROD was touched.
 
-After the commit, a fresh session executes **Stage 2** (§17, §18): `/admin/draft`,
-`/admin/draft/new`, `/admin/draft/[id]` and the create-player wizard; `data.draft.read` and
-`data.draft.edit` plus the nav entry (gate 4 lands here, with the routes that enforce them);
-the D-9 shared revalidate/submit extraction; the remaining `/admin/data-editor` page removal;
-and gate 16 when the operator updates DEV.
+Stage 2 delivered `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]` and the create-player
+wizard; `data.draft.read` and `data.draft.edit` plus the nav entry (gate 4); the D-9 shared
+revalidate/submit extraction (also applied to coaches, behaviour-preserving); and the remaining
+`/admin/data-editor` page removal. Gate 16 (Playwright, three roles × 320/768/1000/1280/1920)
+remains deferred until the operator updates DEV for the Admin Centre batch — this is a release
+-batching decision, not a blocker found during implementation.
 
 Operator decision **S-1** (§11.1, ISSUE-151 sequencing) is required before **deployment** of
-the promotion-tooling change, not before the Stage 1 commit.
+the promotion-tooling change, not before this commit.

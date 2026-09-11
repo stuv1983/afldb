@@ -41,6 +41,8 @@ export type Capability =
   | 'data.brownlow.finalise'
   | 'data.coaches.read'
   | 'data.coaches.edit'
+  | 'data.draft.read'
+  | 'data.draft.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -83,6 +85,15 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // data.dataEditor and data.playerLinks.
   'data.coaches.read': ADMIN_AND_UP,
   'data.coaches.edit': SUPER_ADMIN_ONLY,
+  // Draft administration (AFLDB-ISSUE-160 D-6). Reading draft provenance and
+  // override state widens no boundary an Admin does not already have -- draft
+  // selections are public, and operations.audit.read already gives an Admin
+  // the full edit trail. New-player-through-draft creation and AFL Tables
+  // identity attachment are covered by data.draft.edit, not a third
+  // capability: both are person-identity decisions, exactly the class of
+  // mutation data.draft.edit already gates.
+  'data.draft.read': ADMIN_AND_UP,
+  'data.draft.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

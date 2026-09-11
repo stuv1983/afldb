@@ -86,6 +86,7 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     { href: '/admin/brownlow', label: 'Brownlow', capability: 'data.brownlow.read' },
     { href: '/admin/player-links', label: 'Player links', capability: 'data.playerLinks' },
     { href: '/admin/coaches', label: 'Coaches', capability: 'data.coaches.read' },
+    { href: '/admin/draft', label: 'Draft administration', capability: 'data.draft.read' },
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 

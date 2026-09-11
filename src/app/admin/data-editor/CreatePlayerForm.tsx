@@ -190,9 +190,9 @@ export function CreatePlayerForm() {
             selections, including creating the player through one, are recorded
             in /admin/draft, which is the one draft mutation contract. */}
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-          Recording a draft selection? Use the draft administration surface — it creates the
-          player and the selection together, with the provenance both need to survive a
-          source reload and a promotion.
+          Recording a draft selection? Use <Link href="/admin/draft/new">Draft administration</Link> —
+          it creates the player and the selection together, with the provenance both need to
+          survive a source reload and a promotion.
         </p>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>

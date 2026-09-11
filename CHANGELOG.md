@@ -78,6 +78,38 @@ commit.
   valid one already exists. There is no bulk backfill, because a durable record needs an
   administrator to attribute it to and a migration cannot supply one.
 
+### Draft administration ships an admin surface (AFLDB-ISSUE-160 Stage 2, ISSUE-156 P3b) - 11 September 2026
+
+- `/admin/draft`, `/admin/draft/new` and `/admin/draft/[id]` give Admin and Super Admin a
+  supported way to see, search and (Super Admin only) correct every draft selection AFLDB
+  holds, whatever its provenance: filter by year/kind/club/name/provenance/link-state, never
+  render a NULL pick number as `0`, and see provenance and override state on every row. The
+  detail page shows exactly the mutation panel the row's provenance admits under Stage 1's
+  contract -- source-field-group corrections and override retirement for a DraftGuru row;
+  whole-row edit, relink, AFL Tables identity attach, supersede and retirement for a manual row;
+  adoption for a pre-ISSUE-160 legacy row -- never a generic form that suggests more is editable
+  than actually is.
+- The new-selection wizard makes search-before-create real: the operator searches existing
+  players first, and creating a new person is a separate, explicit control that reveals its own
+  sub-form -- there is no default fallthrough from "no result yet" into "create anyway". Every
+  duplicate/conflict refusal and confirmation Stage 1's contract can produce (a likely duplicate
+  with no distinguishing date of birth, a distinct namesake, an unlinked source selection
+  already listing this person, a NULL pick number on a numbered board) is surfaced inline, with
+  focus restored to the control that triggered it on a refusal.
+- New capabilities `data.draft.read` (Admin and Super Admin) and `data.draft.edit` (Super Admin
+  only) are declared and enforced by `requireCapability()` at every page, route and Server
+  Action boundary this issue adds -- new-player creation and AFL Tables identity attachment sit
+  under `.edit`, not a third capability. A Draft administration link appears in the Admin Centre
+  sidebar's Data group, after Coaches, for anyone who holds `data.draft.read`.
+- `/admin/data-editor` no longer shows a draft search form or results table: the "Draft picks"
+  section is a single link to `/admin/draft`, and opening a stale `?entity=draft_picks&id=`
+  bookmark now shows a link to the selection's new home instead of a false "not found".
+- The ISSUE-159 coach admin surface's revalidate-route and submit-helper machinery is
+  generalised into `src/lib/admin/revalidate-route.ts` and
+  `src/components/admin/action-submit.ts` and shared with draft administration; coaches'
+  own files became thin, behaviour-preserving wrappers over the shared modules. Each domain
+  keeps its own capability guard and its own path allowlist -- nothing became more permissive.
+
 ### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
 
 - The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`
