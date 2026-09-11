@@ -982,6 +982,60 @@ deployment and rendered Playwright acceptance are still ahead (§28).
 
 ---
 
+### 33.1 Stage 2 — second-session re-verification (2026-09-12, Sonnet 5 high, resumed after §33.0)
+
+**Closes the §33.0 interrupted checkpoint.** This session made no code change. Its task was to
+re-read every Stage 2 file a second time (including the four §33.0 flagged as not yet re-read —
+`leadership-actions.ts`, `leadership-labels.ts`, `revalidate-paths.ts`, `revalidate/route.ts` — plus
+the panels, both season-list pages, the public club page, `ClubLeadership.tsx` and the test file) and
+compare every behaviour against §30 D-1…D-18 and the Stage 1 contract, per CLAUDE.md §9 with **no
+shell, Git, SQL, test, lint, typecheck, DEV or PROD command executed**.
+
+**Result: no defect found.** By inspection, every claim in §33 holds against the current file
+contents: the six Server Actions each `requireCapability('data.seasonLists.edit')` first; the
+revalidate route additionally enforces the same capability on itself (not just the preceding action)
+before calling `applyRevalidateRequest`, and its allowlist (`revalidate-paths.ts`) is anchored
+(`^/clubs/[a-z0-9-]+$`) and server-computed inside `admin-club-leadership.ts`'s `clubPublicPaths()`,
+never client-supplied; the Correct-form pre-fill fix from §33.0 is real (`LeadershipActions.tsx`
+initialises `correctStartedOn`/`correctEndedOn`/`correctNote` from the row's own current values, so
+an untouched field resubmits unchanged rather than clearing); co-captaincy is never confirmed
+silently for Appoint or Reinstate (`appointLeader`/`reinstateAppointment` both gate on
+`role === 'captain' && !confirmCoCaptaincy` via `sittingCaptains()`); Void is reason-required,
+confirmation-required and rendered as `null` for an already-void row; the season overview Captain
+column reads `readLeadershipOverview()` directly and never includes vice-captains; the public
+`ClubLeadership` block is gated on `isContinuing && club.isCurrent` and omits itself when both arrays
+are empty; the Captains history union (`getClubCaptains` in `awards.ts`) keys on the row's own id
+(negated for canonical rows), excludes void, and the 2027+ half of `getPlayerHonours` independently
+excludes vice-captains and void the same way; `tests/admin-club-leadership-actions.test.ts` genuinely
+covers the key shape, vocab, date validation and the revalidate allowlist, including refusing a
+traversal attempt, a query string and a scheme-qualified URL.
+
+**One observation, not a defect: dead code in `LeadershipActions.tsx`'s Replace flow.**
+`replaceLeader()`'s contract (`ReplaceLeaderInput`) has no `confirmCoCaptaincy` field and its
+implementation never calls `sittingCaptains()` — only `appointLeader` and `reinstateAppointment` do.
+This is architecturally correct: Replace ends the outgoing row and inserts the incoming one for the
+same role/club in one transaction, so the active headcount for that role never increases and a
+genuinely new co-captaincy can never result from it (only `duplicate_active`, if the incoming player
+already holds an active appointment elsewhere, can refuse it). But the Replace panel still renders a
+`replace.state.reason === 'co_captaincy_unconfirmed'` branch (a "Confirm co-captaincy and replace
+anyway" button) that can never be reached, because the backend never returns that reason for Replace.
+It causes no wrong behaviour — the branch is simply unreachable — so this was left as an observation
+rather than an edit: touching it was not required to close verification, and CLAUDE.md's scope
+discipline (§13) counsels against incidental cleanup during a verification-only pass. Worth removing
+whenever Replace is next touched for another reason.
+
+**Not run, still operator-reserved (CLAUDE.md §9):** `npx tsc --noEmit`, both listed `vitest run`
+targets, the listed `eslint` invocation, `git diff --check`, and Stage 1's own §32.11 gates (still the
+precondition). The exact commands are unchanged from the block above this subsection.
+
+**DEV/PROD:** both untouched. No migration applied anywhere. No command executed this session either.
+
+**ISSUE-163 remains OPEN.** Stage 2 is implementation-complete and internally re-verified twice by
+inspection (§33 first pass, §33.1 second pass); it has not been confirmed by any tool. Next action is
+the operator validation command block above, Stage 1's gates first.
+
+---
+
 <!-- afldb-merge-readiness
 {"status": "in-progress", "hardBlockers": ["Stage 1 validation has NOT been run: apply migration 098 to afldb_test only, then db:privileges, then the suites in AFLDB-ISSUE-163.md §32.11", "git log --all -- 'src/db/migrations/098*' still to be confirmed empty by the operator", "Stage 2 validation has NOT been run: tsc, tests/admin-club-leadership-actions.test.ts, tests/auth.test.ts, eslint, git diff --check (AFLDB-ISSUE-163.md §33)", "ISSUE-163 ships only with the combined ISSUE-160 + 161 + 162 + 163 Admin Centre DEV batch, deploy order 096 -> 097 -> 098 -> db:privileges -> code"], "expectedFiles": ["src/db/migrations/098_club_leadership.sql", "src/db/queries/admin-club-leadership.ts", "src/db/queries/club-leadership.ts", "src/db/queries/admin-season-lists.ts", "src/db/queries/awards.ts", "src/db/queries/audit-log.ts", "src/lib/audit-view.ts", "src/lib/acquisition/manual-authority.ts", "tools/migration/common.py", "tools/migration/import_fitzroy_core.py", "tools/db/promotion-inventory.ts", "docs/production-promotion.md", "tests/integration/admin-club-leadership.test.ts", "tests/data-overrides-source-contract.test.ts", "tests/db-promotion-check.test.ts", "tests/current-season-import.test.ts", "src/app/admin/season-lists/leadership-actions.ts", "src/app/admin/season-lists/leadership-labels.ts", "src/app/admin/season-lists/revalidate-paths.ts", "src/app/admin/season-lists/revalidate/route.ts", "src/app/admin/season-lists/LeadershipPanel.tsx", "src/app/admin/season-lists/LeadershipActions.tsx", "src/app/admin/season-lists/AppointLeaderPanel.tsx", "src/app/admin/season-lists/MemberActions.tsx", "src/app/admin/season-lists/submit-helper.ts", "src/app/admin/season-lists/[season]/[club]/page.tsx", "src/app/admin/season-lists/[season]/page.tsx", "src/components/ClubLeadership.tsx", "src/app/clubs/[slug]/page.tsx", "tests/admin-club-leadership-actions.test.ts", "AFLDB-ISSUE-163.md", "AFLDB-ISSUE-156.md", "issues.md", "IssuesIndex.md", "CHANGELOG.md"], "validation": ["Stage 1 built 2026-09-12 (Opus 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution. Migration 098 has been applied to no database.", "Stage 2 built 2026-09-12 (Sonnet 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution."]}
 -->

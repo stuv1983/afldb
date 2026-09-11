@@ -24298,6 +24298,16 @@ A public all-time captains page; converting `captaincies` into `club_leadership`
 - **No stop condition fired.** The Leadership section fit the existing club-season page; no new capability was needed; revalidation never widened past the affected organisation; the public block and Captains union came from Stage 1's existing queries unchanged; player honours needed no further change; the overview needed no duplicated captain truth; every action is a thin wrapper with no direct SQL; no wider Admin redesign was needed for mobile.
 - **Not run (operator-reserved):** every shell, Git, SQL, test, lint and typecheck command.
 
+### Stage 2 re-verification (2026-09-12, Sonnet 5 high, resumed session — no code change)
+
+A resumed session re-read every Stage 2 file a second time against §30 D-1…D-18, closing out the
+prior session's usage-lockout checkpoint (`AFLDB-ISSUE-163.md` §33.0). No defect found. One dead-code
+observation: `LeadershipActions.tsx`'s Replace panel renders an unreachable `co_captaincy_unconfirmed`
+confirm branch — `replaceLeader()` has no `confirmCoCaptaincy` field and never checks sitting
+captains, correctly, since Replace ends one row and starts another in the same role/club so headcount
+never increases. Left as-is (no defect, and this session's task was verification, not cleanup). No
+command run. Full record `AFLDB-ISSUE-163.md` §33.1.
+
 ### Next action
 
 Operator validation, Stage 1 first (it is a precondition): apply migration 098 to **afldb_test only**, then `npm run db:privileges` against it (app read is fail-closed until it reconciles), then `npx tsc --noEmit`; `npx vitest run tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts`; `npx vitest run tests/integration/admin-club-leadership.test.ts tests/integration/admin-season-lists.test.ts tests/integration/admin-fixtures.test.ts`; ESLint over the Stage 1 changed files. Then Stage 2: `npx vitest run tests/admin-club-leadership-actions.test.ts tests/auth.test.ts`; ESLint over the Stage 2 changed files (`AFLDB-ISSUE-163.md` §33 lists them); `git diff --check`. Then commit Stage 1 and Stage 2 separately (`AFLDB-ISSUE-163.md` §31.11 checkpoints), and the operator's planned local audit/finalise pass mirroring 161/162 before the combined 160+161+162+163 DEV batch. No DEV, no PROD, no merge, no deploy. ISSUE-163 is **not resolved**.

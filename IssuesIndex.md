@@ -9,6 +9,16 @@
 **Last updated:** 2026-09-12
 **Open issues:** 20 tracked here â€” `AFLDB-ISSUE-117`, `AFLDB-ISSUE-137`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-142`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-149`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-153`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`, `AFLDB-ISSUE-160`, `AFLDB-ISSUE-161`, `AFLDB-ISSUE-162`, `AFLDB-ISSUE-163`.
 
+<!-- UPDATE 2026-09-12 (`AFLDB-ISSUE-163` STAGE 2 RE-VERIFIED BY INSPECTION — STILL UNCOMMITTED, NOT
+     YET VALIDATED, NOT MERGED, NOT DEPLOYED, DEV AND PROD UNTOUCHED): a resumed Sonnet 5 high session
+     re-read every Stage 2 file a second time (no command run) after the prior session's §33.0
+     usage-lockout checkpoint, and found no defect against §30 D-1…D-18. One dead-code observation
+     only: `LeadershipActions.tsx`'s Replace panel has an unreachable `co_captaincy_unconfirmed`
+     confirm branch — `replaceLeader()` never returns that reason, correctly, since Replace ends one
+     row and starts another in the same role/club so headcount never increases. Full record
+     `AFLDB-ISSUE-163.md` §33.1. Next action is unchanged: run Stage 1's §32.11 gates, then Stage 2's
+     own `tsc`/`vitest`/`eslint`/`git diff --check` block (§33). -->
+
 <!-- UPDATE 2026-09-12 (`AFLDB-ISSUE-163` STAGE 2 BUILT — UNCOMMITTED, NOT YET VALIDATED, NOT
      MERGED, NOT DEPLOYED, DEV AND PROD UNTOUCHED): Sonnet 5 high built the admin/public UI against
      the Stage 1 backend contract. Leadership section (`LeadershipPanel.tsx`) + per-row lifecycle
