@@ -22231,9 +22231,9 @@ Operator: commit the reviewed working tree, `npm run merge:ready -- --issue 158`
 (2026-09-11). Stage 1 code, migration and tests are written, committed (`dbef4c2`) and
 deployed to DEV (migration 095 applied, 95/0 pending, service healthy); every Stage 1 gate
 has passed, **G4 on real `afldb_dev` as legs A+B+C under operator decision D-5**, with G4-D
-carried forward as a non-blocking obligation. Not merged to `main`. Nothing beyond what the Validation
-section records is claimed as validated. Stage 2 (the `/admin/coaches` surface) is NOT
-started and is blocked on G4. Not resolved.
+carried forward as a non-blocking obligation. Not merged to `main`. **Stage 2 (the
+`/admin/coaches` surface) is IMPLEMENTED (2026-09-11) but NOT VALIDATED** — no gate in
+§10.2 has been run. See "Stage 2 implementation" below. Not resolved.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition / Promotion lineage
 **Found:** 2026-09-11
@@ -22533,6 +22533,47 @@ The gates are `AFLDB-ISSUE-159.md` §17.
   `manual:` identity namespace rules hold.
 - **G8 PASSED** — `npx tsc --noEmit`: exit 0, no output, no TypeScript errors.
 
+### Stage 2 implementation (2026-09-11)
+
+Written against `AFLDB-ISSUE-159.md` §9 (UI structure and interaction contract), §14 (files
+expected to change) and the admission matrix in §8.2. **No gate has been run against this
+work: it is implemented, not validated.**
+
+| File | Change |
+|---|---|
+| `src/lib/auth/capabilities.ts` | `data.coaches.read` (`ADMIN_AND_UP`), `data.coaches.edit` (`SUPER_ADMIN_ONLY`) |
+| `src/app/admin/nav-model.ts` | Data group gains `{ href: '/admin/coaches', label: 'Coaches', capability: 'data.coaches.read' }` |
+| `src/db/queries/admin-coaches.ts` | **new.** Public-client reads (list/search, detail, club+season-bounded assignment matches); the D-2 narrow SELECT-only import-role helper for `data_overrides` (`readCoachOverrides`, `readAllActiveAssignmentOverrides`); `coachOverrideEntityKey()` / `assignmentOverrideEntityKey()` mirroring `tools/migration/common.py`'s replay decode exactly; seven mutations, each one import-role transaction writing the canonical row + `data_overrides` upsert + `recordDataEdit()` together (§4.2); duplicate-prevention on create (§4.4: hard refusal on same-name-same/absent-dob or an existing player-linked coach, soft confirmable refusal on same-name-different-dob); `profile_link_corrections` read from `tools/rebuild/afltables/afltables-contract.json` and checked before any link (S-9) |
+| `src/app/admin/coaches/page.tsx` | **new.** List/search/filter (name, provenance, link status, has-an-active-override) + the bounded create panel, Super Admin only |
+| `src/app/admin/coaches/[id]/page.tsx` | **new.** Four panels: identity/provenance (read-only), editable metadata, player linkage, coaching assignments |
+| `src/app/admin/coaches/actions.ts` | **new.** Seven Server Actions, each `requireCapability('data.coaches.edit')` as the literal first awaited step (the `tests/auth.test.ts` guard-order contract) |
+| `src/app/admin/coaches/validation.ts` | **new.** Pure form-parsing helpers, kept out of `actions.ts` because a `'use server'` module may export only async functions |
+| `src/app/admin/coaches/submit-helper.ts` | **new.** The one `useActionState` + `startTransition` + `useActionFocusRestore` dispatch helper every panel uses (§9 interaction contract) |
+| `src/app/admin/coaches/revalidate/route.ts` | **new.** The only place any coach-admin `revalidatePath` call happens (S-6) — allowlisted paths only, its own `requireCapability('data.coaches.edit')` guard, invoked by the browser after an action has already resolved, never from inside one |
+| `src/app/admin/coaches/{CreatePanel,MetadataPanel,LinkagePanel,AssignmentPanel}.tsx` | **new.** Client panels. `AssignmentPanel`'s "apply to every listed match" expands `setCoachAssignment`'s plural `assignments` field into one transaction (§9.4) rather than a separate bulk action |
+| `tests/auth.test.ts` | `EQUIVALENT_ROLE_GUARD` gains `data.coaches.read: requireAdmin`, `data.coaches.edit: requireSuperAdmin`; every other Stage-2-relevant assertion (capability-enforced-somewhere, nav-link-enforces-its-capability, guard-is-first-await, `DECLARED_CAPABILITIES` cardinality) is structural and reads the new source directly |
+| `tests/coach-slug.test.ts` | Extended with 2 cases; `coachSlug()` itself is unchanged, per §14 |
+| `tests/admin-coach-actions.test.ts` | **new**, DB-free: `entity_key` shapes, form-parsing validation |
+| `tests/integration/admin-coaches.test.ts` | **new**, needs `AFLDB_TEST_DATABASE_URL`: create/edit/link/assign atomicity (a forced FK failure on the override write proves the canonical write does not survive without its companions), override persistence, linkage-through-`external_identities`, assignment club-membership refusal |
+
+**S-6 deviates from current practice, deliberately, per the runbook's binding text.**
+`src/app/admin/brownlow/actions.ts` and `src/app/admin/player-links/actions.ts` both still
+call `revalidatePath` synchronously inside their own Server Actions today. §9 states "No
+`revalidatePath` inside a Server Action" as binding for this phase regardless, so Stage 2
+does not follow that existing pattern: a coach action returns the public paths it changed
+(`revalidatePaths`) and `submit-helper.ts` posts them to `/admin/coaches/revalidate` in a
+plain follow-up `fetch`, strictly after the action's own response, with `router.refresh()`
+covering the `force-dynamic` admin surface itself. This is new, unexercised machinery and is
+exactly the kind of thing browser acceptance (gate 12) must actually click through.
+
+**Deviation from the admission matrix's literal reading, recorded:** §8.2 lists
+`setCoachAssignment` / `clearCoachAssignment` as one row of two actions. The "apply to every
+listed match" bulk control (§9.4) is implemented as the SAME `setCoachAssignment` action
+accepting a comma-separated list of `matchId:clubId` pairs (mirroring the `targets` parsing
+convention in `player-links/actions.ts`) rather than an eighth named action, so the
+transaction really is one for the whole selection as §9.4 requires, and the action count
+stays at seven.
+
 ### Stop conditions
 
 S-1 the settle degrading to propose-only (G4 must pass before any UI work); S-2 a missing
@@ -22548,20 +22589,16 @@ browser; S-9 an admin link silently defeating a tracked `afltables-contract.json
 
 ### Next action
 
-**Stage 1 is COMPLETE and validated — G0 through G8 all passed. The next action is the
-operator's Stage 1 closeout commit and push on `opus/issue-159-coach-admin`; `main` is NOT
-merged.** Merge readiness is a separate operator step (`npm run merge:ready -- --issue 159`)
-and ISSUE-151 promotion/restore lineage stays untouched. **Stage 2 (the `/admin/coaches`
-surface) is UNBLOCKED but NOT STARTED** and belongs in a fresh session against
-`AFLDB-ISSUE-159.md` §9/§15, with D-2, D-3 and D-4 binding on it and the P9-class coach
-reconciliation stop (§13) out of scope. **G4-D stays OPEN**: when the 2026 Brownlow count
+**Stage 2 is written but UNVALIDATED.** In order: `npx tsc --noEmit`; `npx vitest run
+tests/auth.test.ts tests/coach-slug.test.ts tests/admin-coach-actions.test.ts`; `npx vitest
+run tests/integration/admin-coaches.test.ts` against `AFLDB_TEST_DATABASE_URL`; then browser
+acceptance on DEV covering §10.2 gates 6 (the Contributor/Admin/Super-Admin permission matrix
+against all seven surfaces in §8.2, by direct URL and direct Server Action invocation), 12
+(320/768/1000/1280/1920 across the index, detail, create panel and a refused action, with
+focus verified to stay on the control per the inherited §27.27 H-1 contract), and 13 (`tsc`
+clean, full affected suites green). Only after all of that is `AFLDB-ISSUE-159` eligible to
+close. **Do not merge to `main` before this**; merge readiness is a separate operator step
+(`npm run merge:ready -- --issue 159`) and ISSUE-151 promotion/restore lineage stays
+untouched. **G4-D stays OPEN and is unrelated to Stage 2**: when the 2026 Brownlow count
 publishes, the next real DEV settle must positively show `brownlow_round_votes` traversing
-the canonical apply path. It blocks nothing. The superseded pre-implementation next
-action was:
-
-**Stage 1, fresh session, Opus 5 / high effort**, on `opus/issue-159-coach-admin` in
-`D:\dev\afldb-issue-159`, with `AFLDB-ISSUE-159.md` as the implementation contract (§16
-deliverables, §17 gates) — verify current code where the contract requires it, do not redesign
-or broaden it, and stop and report if material evidence contradicts it. Stage 2 (the admin
-surface, Sonnet 5 / medium escalating to Opus for the assignment transaction and the permission
-matrix) does not begin until gate **G4** passes on DEV.
+the canonical apply path.
