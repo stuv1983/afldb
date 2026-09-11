@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 12 September 2026
+### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
 
 - The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`
   CHECK as an exact set. `src/lib/acquisition/manual-authority.ts` now proves only what the
