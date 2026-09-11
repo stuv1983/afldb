@@ -83,7 +83,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  checkAdmitsExactly,
+  overrideScopeProvenFrom,
   loadManualAuthority,
   MANUAL_ATTENDANCE_SOURCE_KEY,
   UNREPRESENTABLE_OVERRIDE_ENTITIES,
@@ -1960,7 +1960,7 @@ describe('AFLDB-ISSUE-122 §8 — manual authority read from data_overrides', ()
          AND c.contype = 'c'
          AND pg_get_constraintdef(c.oid) LIKE '%entity_type%'
     `;
-    expect(checkAdmitsExactly([check.def])).toBe(true);
+    expect(overrideScopeProvenFrom([check.def])).toBe(true);
 
     // And the database refuses to store one, which is what makes it a proof.
     await expect(sql`

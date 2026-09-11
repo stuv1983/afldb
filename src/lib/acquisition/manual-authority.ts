@@ -15,18 +15,35 @@
  * authority question is answerable from a table the settle role can already
  * read. No grant is widened to build this.
  *
- * **Two contracts are pinned at load time, not assumed.**
+ * **The proposition is proven at load time, not assumed.**
  *
- * 1. Migration 073's `data_overrides.entity_type` CHECK admits only
- *    `players`, `matches`, `draft_picks` (`073_data_overrides.sql:13`).
- * 2. `src/lib/edit/spec.ts` exposes editor entities for exactly those three.
+ * The proposition is exactly this: an override for `match_period_scores`,
+ * `player_match_stats` or `brownlow_round_votes` is unrepresentable at the
+ * database level — not merely unobserved. Those three targets answer `'clear'`
+ * on proof rather than on optimism, and `AFLDB-ISSUE-099` A4 is satisfied
+ * without widening the `data_overrides` CHECK to admit them. When the proof
+ * cannot be established the targets answer `'indeterminate'` instead, which
+ * refuses.
  *
- * While both hold, an override for `match_period_scores`, `player_match_stats`
- * or `brownlow_round_votes` is unrepresentable at the database level — not
- * merely unobserved — so those three targets answer `'clear'` on proof rather
- * than on optimism, and `AFLDB-ISSUE-099` A4 is satisfied without widening the
- * 073 CHECK. If either contract ever changes, or cannot be established, the
- * proof is gone and those targets answer `'indeterminate'` instead.
+ * `overrideScopeProven` is true only when ALL FOUR of these hold
+ * (`AFLDB-ISSUE-159` §3.1, decision D-1):
+ *
+ * 1. the live `data_overrides.entity_type` CHECK is readable and unambiguous —
+ *    exactly one matching constraint definition, carrying at least one literal;
+ * 2. none of `UNREPRESENTABLE_OVERRIDE_ENTITIES` is among its literals;
+ * 3. none of `UNREPRESENTABLE_OVERRIDE_ENTITIES` is among
+ *    `Object.keys(EDITABLE_ENTITIES)`;
+ * 4. every editor entity is admitted by the CHECK (editor ⊆ CHECK).
+ *
+ * This is deliberately NOT an exact-set comparison against a pinned literal
+ * list. An exact-set proof has no safe deploy order in either direction: the
+ * migration that widens the CHECK breaks the running code, and the code that
+ * expects the widened CHECK breaks against the un-migrated database — and the
+ * breakage is a silent degradation of the nightly settle from apply to
+ * propose-only. The four conditions above are order-independent: widening the
+ * CHECK with an entity that is not a settle target (`AFLDB-ISSUE-159` widens it
+ * with `coaches` and `match_coaches`) changes no answer, in either sequence,
+ * while every original refusal is retained.
  *
  * **Snapshot timing.** `ManualAuthorityProvider` is synchronous by contract
  * (`observations.ts:391`), so the authority state is read once and answered
@@ -47,11 +64,20 @@ import type {
 } from './observations';
 
 /**
- * The entity types migration 073's CHECK admits, sorted. Pinned here and in
- * `tests/current-season-import.test.ts`; verified against the live constraint
- * by `loadManualAuthority()`.
+ * The entity types the `data_overrides.entity_type` CHECK admits — migration 073
+ * as widened by migration 095 (`AFLDB-ISSUE-159` §5.1). Listed in the order
+ * §3.1 / §16.1 write it, which is NOT the ASCII order `checkAdmittedEntities()`
+ * returns: nothing compares the two as sequences, and nothing may.
+ *
+ * **Inventory and documentation only.** This list is NOT the proof and must
+ * never be compared for equality against the live constraint: doing so is the
+ * exact-set coupling `AFLDB-ISSUE-159` §3.1 removed, and it re-creates a deploy
+ * window in which widening the CHECK silently degrades the settle. The proof is
+ * `overrideScopeProvenFrom()`, which asks only what the proposition needs.
  */
-export const OVERRIDE_ENTITY_TYPES = ['draft_picks', 'matches', 'players'] as const;
+export const OVERRIDE_ENTITY_TYPES = [
+  'coaches', 'draft_picks', 'matches', 'match_coaches', 'players',
+] as const;
 
 /**
  * The settle targets for which a human override is unrepresentable while both
@@ -71,9 +97,9 @@ export const MANUAL_ATTENDANCE_SOURCE_KEY = 'manual_admin_edit';
  */
 export type ManualAuthoritySnapshot = {
   /**
-   * `true` only while BOTH pinned contracts above hold. It gates ONLY the
-   * three unrepresentable entities; `matches` is answered from rows and does
-   * not depend on it.
+   * `true` only while all four conditions above hold. It gates ONLY the three
+   * unrepresentable entities; `matches` is answered from rows and does not
+   * depend on it.
    */
   overrideScopeProven: boolean;
   /** `match_key` -> the `field_group`s carrying an ACTIVE override. */
@@ -82,7 +108,7 @@ export type ManualAuthoritySnapshot = {
   manualAttendanceMatches: ReadonlySet<string>;
 };
 
-/** The editor's entity keys, sorted — contract 2 above, read from the spec. */
+/** The editor's entity keys, sorted — conditions 3 and 4 above, read from the spec. */
 export function editorEntityKeys(): readonly string[] {
   return Object.keys(EDITABLE_ENTITIES).sort();
 }
@@ -92,17 +118,18 @@ export function matchGroupKeys(): readonly string[] {
   return Object.keys(EDITABLE_ENTITIES.matches.groups).sort();
 }
 
-function sameSet(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
 /**
- * Contract 2: the editor exposes exactly the three entities 073 admits, and
- * none of the three unrepresentable settle targets.
+ * Condition 3: the editor exposes none of the three unrepresentable settle
+ * targets. An editor entity that IS one of them would make an override for it
+ * reachable from the browser, and the proposition would be false however narrow
+ * the CHECK happened to be.
+ *
+ * The editor is deliberately NOT required to expose every admitted entity:
+ * `coaches` is admitted by the CHECK and has its own admin route rather than a
+ * `spec.ts` entry (`AFLDB-ISSUE-159` §3.1, §16.2).
  */
-export function editorSpecMatchesOverrideScope(): boolean {
+export function editorExposesNoUnrepresentableEntity(): boolean {
   const keys = editorEntityKeys();
-  if (!sameSet(keys, [...OVERRIDE_ENTITY_TYPES])) return false;
   return UNREPRESENTABLE_OVERRIDE_ENTITIES.every((entity) => !keys.includes(entity));
 }
 
@@ -183,17 +210,48 @@ export function refusingProvider(): ManualAuthorityProvider {
 }
 
 /**
- * Contract 1: read the live `data_overrides.entity_type` CHECK and compare it
- * to `OVERRIDE_ENTITY_TYPES`. An unreadable, absent, ambiguous or widened
- * constraint returns `false`, which fails the three unrepresentable targets
- * closed.
+ * Condition 1: the entity types the live `data_overrides.entity_type` CHECK
+ * admits, de-duplicated and sorted — or `null` when the constraint cannot be
+ * read as a single unambiguous entity-type allowlist.
+ *
+ * `null` is returned for an absent constraint, for more than one constraint
+ * definition mentioning `entity_type` (ambiguous: which one is the allowlist?),
+ * and for a definition carrying no quoted literal at all. Every one of those is
+ * an unreadable authority contract, and unreadable is not absent.
  */
-export function checkAdmitsExactly(definitions: readonly string[]): boolean {
+export function checkAdmittedEntities(definitions: readonly string[]): readonly string[] | null {
   const entityChecks = definitions.filter((def) => /\bentity_type\b/.test(def));
-  if (entityChecks.length !== 1) return false;
+  if (entityChecks.length !== 1) return null;
   const literals = [...entityChecks[0].matchAll(/'([^']*)'/g)].map((match) => match[1]);
-  if (literals.length === 0) return false;
-  return sameSet([...new Set(literals)].sort(), [...OVERRIDE_ENTITY_TYPES]);
+  if (literals.length === 0) return null;
+  return [...new Set(literals)].sort();
+}
+
+/**
+ * The whole four-condition proof (`AFLDB-ISSUE-159` §3.1), pure and
+ * order-independent. `false` fails the three unrepresentable targets closed.
+ *
+ * Widening the CHECK with an entity that is not a settle target does not move
+ * this answer in either deploy order, which is what makes the migration safe to
+ * ship before or after the code (D-1).
+ */
+export function overrideScopeProvenFrom(definitions: readonly string[]): boolean {
+  // 1. Readable and unambiguous.
+  const admitted = checkAdmittedEntities(definitions);
+  if (admitted === null) return false;
+
+  const unrepresentable = new Set<string>(UNREPRESENTABLE_OVERRIDE_ENTITIES);
+  // 2. The CHECK admits no settle target — this is the proposition itself.
+  if (admitted.some((entity) => unrepresentable.has(entity))) return false;
+
+  // 3. The editor exposes no settle target either.
+  if (!editorExposesNoUnrepresentableEntity()) return false;
+
+  // 4. editor ⊆ CHECK. An editor entity the database would refuse means the two
+  // authority contracts disagree about what an override even is, and a
+  // disagreement is ambiguity, not absence.
+  const admittedSet = new Set(admitted);
+  return editorEntityKeys().every((entity) => admittedSet.has(entity));
 }
 
 /**
@@ -248,9 +306,7 @@ export async function loadManualAuthority(
     }
 
     snapshot = {
-      overrideScopeProven:
-        checkAdmitsExactly(definitions.map((row) => row.def))
-        && editorSpecMatchesOverrideScope(),
+      overrideScopeProven: overrideScopeProvenFrom(definitions.map((row) => row.def)),
       matchOverrides,
       manualAttendanceMatches,
     };

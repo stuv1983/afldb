@@ -56,7 +56,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from common import connect_pg, import_batch, load_env, require_env, safe_dsn  # noqa: E402
+from common import connect_pg, import_batch, load_env, replay_admin_overrides, require_env, safe_dsn  # noqa: E402
 from enrich_heights import verified_files as verified_fitzroy_files  # noqa: E402
 from enrich_heights import SNAPSHOT_ROOT as FITZROY_SNAPSHOT_ROOT  # noqa: E402
 from import_fitzroy_core import (  # noqa: E402
@@ -411,6 +411,15 @@ def main() -> int:
                              source_record_id = EXCLUDED.source_record_id, import_batch_id = EXCLUDED.import_batch_id,
                              notes = EXCLUDED.notes""", (batch.id,))
             coaches_written = cur.rowcount
+            # AFLDB-ISSUE-159 §6.2. Inside this batch's transaction, and in this
+            # order. The count above is already captured, so the replay cannot
+            # perturb the coaches_written guard below; it counts rows affected by
+            # the INSERT over tmp_coaches alone, and a manual coach is not in it.
+            #
+            # Immediately after the coaches upsert and BEFORE any match_coaches
+            # work, so every admin-created coach exists as a row before the
+            # assignment join needs it.
+            replay_admin_overrides(pg, "coaches")
             cur.execute("""CREATE TEMP TABLE tmp_match_coaches (
                              match_id integer NOT NULL, club_id integer NOT NULL, coach_path text NOT NULL,
                              source_record_id text NOT NULL, PRIMARY KEY (match_id, club_id)) ON COMMIT DROP""")
@@ -431,6 +440,13 @@ def main() -> int:
                              source_record_id = EXCLUDED.source_record_id, import_batch_id = EXCLUDED.import_batch_id""",
                         (source_id, batch.id))
             assignments_written = cur.rowcount
+            # After the assignment upsert and BEFORE the integrity checks. The
+            # (match_id, club_id) primary key carries no source, so the upsert
+            # above WILL have overwritten a manual assignment on a team-match the
+            # source now covers; replaying here restores the human decision, and
+            # puts it inside the same integrity checks as everything else
+            # (AFLDB-ISSUE-159 §6.2, D-4). Both counts are already captured.
+            replay_admin_overrides(pg, "match_coaches")
             if coaches_written != len(coach_rows) or assignments_written != len(assignment_rows):
                 raise RuntimeError(f"wrote {coaches_written} coaches / {assignments_written} assignments, "
                                    f"expected {len(coach_rows)} / {len(assignment_rows)}")

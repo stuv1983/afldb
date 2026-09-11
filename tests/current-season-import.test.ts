@@ -3628,9 +3628,10 @@ describe('import-batch ids are opaque identifiers at the driver boundary', () =>
  * than silently converting a proof into an assumption.
  */
 import {
-  checkAdmitsExactly,
+  checkAdmittedEntities,
   editorEntityKeys,
-  editorSpecMatchesOverrideScope,
+  editorExposesNoUnrepresentableEntity,
+  overrideScopeProvenFrom,
   manualAuthorityVerdict,
   matchFieldGroupsFor,
   matchGroupKeys,
@@ -3642,6 +3643,20 @@ import {
 } from '@/lib/acquisition/manual-authority';
 
 const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
+const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
+
+/** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
+function entityTypeCheck(...entities: readonly string[]): string {
+  const array = entities.map((entity) => `'${entity}'::text`).join(', ');
+  return `CHECK ((entity_type = ANY (ARRAY[${array}])))`;
+}
+
+/** The CHECK as migration 073 left it — the pre-095 database. */
+const CHECK_BEFORE_095 = entityTypeCheck('players', 'matches', 'draft_picks');
+/** The CHECK as migration 095 leaves it — the post-095 database. */
+const CHECK_AFTER_095 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches',
+);
 
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
   return {
@@ -3657,18 +3672,97 @@ function matchQuery(fields: readonly string[], matchKey = '2026|1|CARL|COLL') {
 }
 
 describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', () => {
-  it('pins migration 073 entity_type CHECK to exactly three entity types', () => {
+  it('pins the entity_type CHECK as the migrations actually leave it', () => {
+    // 073 is never edited; 095 widens it forward, retaining every literal.
     expect(overridesMigration).toContain(
       "entity_type     text   NOT NULL CHECK (entity_type IN ('players', 'matches', 'draft_picks'))",
     );
-    expect([...OVERRIDE_ENTITY_TYPES]).toEqual(['draft_picks', 'matches', 'players']);
+    expect(coachAdminMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches'\s*\)\)/,
+    );
+    // The documented inventory names the same entities the database now admits.
+    // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
+    // `checkAdmittedEntities()` returns ASCII order ('match_coaches' sorts before
+    // 'matches'). Nothing compares the two as sequences, and under D-1 nothing
+    // may — an order-sensitive comparison is an exact-set proof wearing a
+    // different hat, and it would re-create the deploy window §3.1 removed.
+    expect([...OVERRIDE_ENTITY_TYPES])
+      .toEqual(['coaches', 'draft_picks', 'matches', 'match_coaches', 'players']);
+    expect([...OVERRIDE_ENTITY_TYPES].sort())
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_095]));
+    // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
+    // exact-set proof has no safe deploy order in either direction, so the proof
+    // itself must not consult this list at all.
+    const module = readSource('src/lib/acquisition/manual-authority.ts');
+    const proof = module.slice(module.indexOf('export function overrideScopeProvenFrom'));
+    expect(proof.length).toBeGreaterThan(0);
+    expect(proof.slice(0, proof.indexOf('\n}'))).not.toContain('OVERRIDE_ENTITY_TYPES');
   });
 
-  it('pins the editor spec to exactly the same three entities', () => {
-    expect(editorEntityKeys()).toEqual([...OVERRIDE_ENTITY_TYPES]);
-    expect(editorSpecMatchesOverrideScope()).toBe(true);
+  it('keeps every settle target out of the editor, and needs nothing more of it', () => {
+    expect(editorExposesNoUnrepresentableEntity()).toBe(true);
     for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
       expect(editorEntityKeys()).not.toContain(entity);
+    }
+    // The editor is a SUBSET of what the CHECK admits, not equal to it: 'coaches'
+    // and 'match_coaches' are admitted overrides with their own admin route and
+    // deliberately no spec.ts entry (AFLDB-ISSUE-159 §16.2).
+    const admitted = new Set(checkAdmittedEntities([CHECK_AFTER_095])!);
+    for (const entity of editorEntityKeys()) expect(admitted.has(entity)).toBe(true);
+    expect(editorEntityKeys()).not.toContain('coaches');
+    expect(editorEntityKeys()).not.toContain('match_coaches');
+  });
+
+  it('proves the scope in BOTH deploy orders — the widening is never a silent settle change', () => {
+    // AFLDB-ISSUE-159 D-1. This is the whole point of the rewrite: there must be
+    // no window, in either sequence, where the proof is lost and the nightly
+    // settle quietly drops from apply to propose-only.
+    //
+    // migration-before-code: the database is already widened, the running code is
+    // the old deployment.
+    expect(overrideScopeProvenFrom([CHECK_AFTER_095])).toBe(true);
+    // code-before-migration: this code is deployed, the database is still 073.
+    expect(overrideScopeProvenFrom([CHECK_BEFORE_095])).toBe(true);
+    // And an intermediate state, if the two literals ever landed in two migrations.
+    expect(overrideScopeProvenFrom([
+      entityTypeCheck('players', 'matches', 'draft_picks', 'coaches'),
+    ])).toBe(true);
+  });
+
+  it('never lets migration 095 itself admit a settle target', () => {
+    // The live-CHECK cases are above; this is the source-side half of the same
+    // guarantee, so a future edit to the migration cannot quietly make the
+    // database admit what the proof then has to refuse.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(coachAdminMigration, entity).not.toContain(`'${entity}'`);
+      // Narrow but wrong refuses too: admitting one is fatal on its own, whatever
+      // else the CHECK does or does not carry.
+      expect(overrideScopeProvenFrom([entityTypeCheck('players', entity)]), entity).toBe(false);
+    }
+  });
+
+  it('refuses when the editor exposes an entity the CHECK does not admit', () => {
+    // Condition 4, editor ⊆ CHECK: the two authority contracts disagreeing about
+    // what an override is, is ambiguity — not absence.
+    const missingAnEditorEntity = entityTypeCheck(
+      ...editorEntityKeys().slice(1), 'coaches', 'match_coaches',
+    );
+    expect(overrideScopeProvenFrom([missingAnEditorEntity])).toBe(false);
+    // A CHECK that admits nothing the editor exposes refuses for the same reason.
+    expect(overrideScopeProvenFrom([entityTypeCheck('coaches', 'match_coaches')])).toBe(false);
+  });
+
+  it('keeps the three settle-critical targets apply-capable under the widened CHECK', () => {
+    // The consequence the gate actually cares about (S-1): with the post-095
+    // database, these three still answer 'clear', which is what lets the nightly
+    // settle APPLY them rather than merely propose.
+    const snapshot = authoritySnapshot({
+      overrideScopeProven: overrideScopeProvenFrom([CHECK_AFTER_095]),
+    });
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(manualAuthorityVerdict(snapshot, {
+        entity, targetKey: { match_id: 1 }, fields: ['goals'],
+      }), entity).toBe('clear');
     }
   });
 
@@ -3677,21 +3771,49 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
       .toEqual(['attendance', 'match_event', 'match_time', 'notes', 'score']);
   });
 
-  it('reads a live CHECK definition and refuses a widened or unreadable one', () => {
+  it('reads a live CHECK definition: a safe widening is accepted, everything else refuses', () => {
+    // AFLDB-ISSUE-159 §3.1 / D-1. This test previously required the live CHECK to
+    // equal a pinned list exactly, which made a WIDENING a refusal — and that is
+    // precisely the coupling D-1 removed, because it leaves no safe deploy order
+    // in either direction and the failure mode is the nightly settle silently
+    // dropping from apply to propose-only. Every OTHER refusal it asserted is
+    // kept below, unchanged in effect.
     const admitted = "CHECK ((entity_type = ANY (ARRAY['players'::text, "
       + "'matches'::text, 'draft_picks'::text])))";
-    expect(checkAdmitsExactly([admitted])).toBe(true);
+
+    // Both deploy orders. Pre-095 (this code, un-migrated database) and post-095
+    // (migrated database, any code) both prove the scope.
+    expect(overrideScopeProvenFrom([admitted])).toBe(true);
+    expect(overrideScopeProvenFrom([
+      admitted.replace("'draft_picks'::text", "'draft_picks'::text, 'coaches'::text, 'match_coaches'::text"),
+    ])).toBe(true);
+
     // Widened to admit a settle target: the unrepresentability proof is gone.
-    expect(checkAdmitsExactly([
-      admitted.replace("'draft_picks'::text", "'draft_picks'::text, 'player_match_stats'::text"),
-    ])).toBe(false);
-    // Narrowed, absent, or ambiguous — every one of them refuses.
-    expect(checkAdmitsExactly([
+    // This is the one widening that must still refuse, and it refuses because it
+    // makes the proposition FALSE — not because the literal set changed.
+    for (const entity of UNREPRESENTABLE_OVERRIDE_ENTITIES) {
+      expect(overrideScopeProvenFrom([
+        admitted.replace("'draft_picks'::text", `'draft_picks'::text, '${entity}'::text`),
+      ]), entity).toBe(false);
+    }
+
+    // Narrowed past an editor entity: the two authority contracts now disagree
+    // about what an override is, and a disagreement refuses (condition 4).
+    expect(overrideScopeProvenFrom([
       "CHECK ((entity_type = ANY (ARRAY['players'::text, 'matches'::text])))",
     ])).toBe(false);
-    expect(checkAdmitsExactly([])).toBe(false);
-    expect(checkAdmitsExactly(['CHECK ((is_active IS NOT NULL))'])).toBe(false);
-    expect(checkAdmitsExactly([admitted, admitted])).toBe(false);
+
+    // Absent, unreadable, ambiguous, or carrying no literal — every one refuses,
+    // and `checkAdmittedEntities()` reports why by returning null rather than a set.
+    for (const definitions of [
+      [] as string[],
+      ['CHECK ((is_active IS NOT NULL))'],
+      [admitted, admitted],
+      ['CHECK ((entity_type IS NOT NULL))'],
+    ]) {
+      expect(checkAdmittedEntities(definitions)).toBeNull();
+      expect(overrideScopeProvenFrom(definitions)).toBe(false);
+    }
   });
 
   it('maps only fields the editor actually exposes onto a field group', () => {

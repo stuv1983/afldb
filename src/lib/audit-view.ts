@@ -67,6 +67,7 @@ export const DATA_EDIT_TABLE_LABELS: Record<DataEditTableName, string> = {
   honour_team_members: 'Honour teams',
   brownlow_vote_entry_state: 'Brownlow match entries',
   brownlow_season_authority: 'Brownlow season authority',
+  coaches: 'Coaches',
 };
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

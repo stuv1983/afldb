@@ -66,8 +66,8 @@ promoted by accident.
 | `beta_login_tokens` | beta | yes | reset | Short-lived single-use magic links. |
 | `site_settings` | admin | yes | reinstate | Deliberate super-admin choices; the app silently falls back to defaults without them. |
 | `site_media` | admin | yes | reinstate | Uploaded images. Not in the original issue list — found in the schema. |
-| `data_edits` | data editor | yes | reinstate (**dev: historical-only**) | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`, not a FK → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
-| `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). |
+| `data_edits` | data editor | yes | reinstate (**dev: historical-only**) | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`/`coaches`, not a FK → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
+| `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). Replay covers `players`, `matches`, `draft_picks`, `coaches`, `match_coaches`; the `coaches` replay re-creates whole admin-created rows, not just field patches (§8). |
 | `data_submissions` | uploads | yes | reinstate | `import_batch_id` may dangle → probed (§7.4). |
 | `data_submission_rows` | uploads | yes | reinstate | After `data_submissions`. |
 | `player_link_suggestions` | player links | yes | reinstate | Reader suggestions; `target_id` is deliberately not a FK. |
@@ -492,8 +492,11 @@ reinstated:
    Tables profile url (`external_identities`, source `afltables`, `match_method`
    `afltables_profile_url`, status unique/resolved: the identity every `AFLDB-ISSUE-118` loader
    already resolves people through); for a match, `matches.match_key` (NOT NULL UNIQUE since
-   migration 003). **A display name is never used, in either direction** — two footballers
-   share a name often enough that a name match would silently retarget a human decision;
+   migration 003); for a coach, `coaches.afltables_coach_path` (NOT NULL UNIQUE since
+   migration 087 — the AFL Tables coach page path, or `manual:<token>` for an admin-created
+   coach, `AFLDB-ISSUE-159`). **A display name is never used, in either direction** — two
+   footballers share a name often enough that a name match would silently retarget a human
+   decision, and `coaches.name_key` is a name, which is why it is not the coach identity;
 2. identities equal on every comparable sample → one lineage → id-keyed reinstatement is sound
    and the gate PASSES, generating nothing. **Nothing comparable also counts as a change**, so
    a missing identity layer can never read as "safe";
@@ -633,7 +636,12 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
 
 1. **Replay human overrides.** The rebuild ran on `afldb_test`, which had no
    `data_overrides`; the reinstated rows are authority that has not yet been applied to the
-   promoted canonical rows. Replay them with the importer's own function, as the import role:
+   promoted canonical rows. Replay them with the importer's own function, as the import role.
+
+   Replay **every** entity type the `data_overrides.entity_type` CHECK admits, in this
+   order — `coaches` before `match_coaches`, because an assignment resolves its coach by
+   path and an admin-created coach does not exist in the candidate until the `coaches`
+   replay re-creates it:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -641,14 +649,30 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    from common import load_env, connect_pg, replay_admin_overrides
    load_env()
    with connect_pg() as pg:
-       for table in ('players', 'matches'):
+       for table in ('players', 'matches', 'coaches', 'match_coaches'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
    ```
 
+   `coaches` and `match_coaches` are `AFLDB-ISSUE-159` (migration 095), and they are not
+   like the others. For `players` and `matches` an override patches fields of a row the
+   rebuild already produced. For `coaches` it can carry an **entire row**: an
+   admin-created coach has no AFL Tables page, so the rebuilt source database has never
+   heard of them, and this replay is the only thing that puts them back. Between the swap
+   and this step a manual coach does not exist in the promoted database at all — every
+   `/coaches/<slug>-<id>` URL for one 404s, and the ids change across the window. Run this
+   step promptly, and run it **before** the `data_edits.row_id` remap, whose `'coaches'`
+   rows resolve through `coaches.afltables_coach_path`.
+
+   The function refuses rather than skipping: an override whose match key, club slug,
+   coach path or player profile path does not resolve raises and rolls the replay back,
+   with the offending `entity_key`s named. That is a real stop — resolve it, do not
+   re-run past it.
+
    If it changed player or match rows, recompute the derived tables:
-   `./.venv/bin/python tools/migration/rebuild_derived.py`.
+   `./.venv/bin/python tools/migration/rebuild_derived.py`. If it changed coach rows or
+   assignments, the derived club/coach records recompute from `match_coaches` the same way.
 2. **Regenerate `player_link_match_candidates`** from `/admin/player-links` (refresh) once
    signed in — the table was reset because its `player_id` is NOT NULL against rebuilt players.
 3. **Health:** `curl -fsS http://127.0.0.1:3100/api/health`, then a season page, a player

@@ -1,7 +1,14 @@
 # AFLDB-ISSUE-159 — Coach administration (AFLDB-ISSUE-156 P3)
 
-**Status:** Planning / **Approved for Stage 1** (operator approval 2026-09-11) — no implementation
-started, not Implemented, not Resolved.
+**Status:** **Stage 1 IN PROGRESS — G0–G3 PASSED, G4 OPEN (Steps 1–2 passed), G5–G8 NOT RUN.**
+Not Resolved. Stage 2 not started and blocked on G4. Stage 1 was written 2026-09-12; G1 passed;
+G2 passed (the §5.3 pre-check with the `total` expectation corrected from 383 to 386, then
+migration 095 applied to `afldb_test`); G3 passed after catching and fixing a composite-key
+decode defect (§6.1). G4’s two read-only pre-steps passed against the real `afldb_dev`, but G4
+itself is OPEN: it is not satisfied until a real DEV settle proves the three unrepresentable
+targets still APPLY. Deliverables and prohibitions are §16; gates and their recorded results are
+§17; the per-file record of what was written is the Stage 1 implementation table in the
+`issues.md` entry.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition / Promotion lineage
 **Created:** 2026-09-11
@@ -413,7 +420,17 @@ SELECT count(*) FILTER (WHERE afltables_coach_path NOT LIKE 'coaches/%') AS bad_
   FROM coaches;
 ```
 
-Expected `bad_path = 0`, `bad_name_key = 0`, `total = 383`.
+Expected `bad_path = 0`, `bad_name_key = 0`, ~~`total = 383`~~ **`total = 386`**.
+
+> **Correction, Stage 1 (2026-09-12).** `383` was wrong. It is
+> `tools/rebuild/afltables/afltables-contract.json`'s count of accepted-baseline fitzRoy `Coach`
+> **strings** (`:74`, `:183`), not coach rows. The same file pins
+> `coaches.accepted_snapshot.measured.coaches = 386` (`:186`) and the tracked snapshot
+> `data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv` holds exactly 386
+> rows. The operator's run on `afldb_test` returned `bad_path = 0`, `bad_name_key = 0`,
+> `total = 386`, all 386 sourced `afltables` — agreeing with the repository exactly. The two
+> **migration-gating** invariants are the two zeros; `total` is a snapshot-size observation and
+> never gated the `ALTER`.
 
 ### 5.4 Comments
 
@@ -491,6 +508,18 @@ For `entity_type = 'match_coaches'`, `entity_key = '<match_key>|<club slug>'`,
 (`clubs.slug` is `NOT NULL UNIQUE`, 002:36), `override_values.coach_identity` → `coaches.id`,
 then upsert `match_coaches` with `source_id = manual_admin_edit`. An unresolvable key raises
 rather than silently skipping.
+
+> **Decode rule, added at Stage 1 (2026-09-12) after G3 caught it.** `matches.match_key` is
+> **itself pipe-delimited** — `season|round|date|home|away` (migration 003, built by
+> `import_fitzroy_core.match_key_of()`), so `'<match_key>|<club slug>'` carries **five**
+> delimiters, not one. A real key is
+> `1902|1|1902-05-03|Carlton|Geelong|carlton`. The club slug is therefore the segment after
+> the **last** delimiter, and `split_part(entity_key, '|', 1)` / `(…, 2)` — which reads
+> `'1902'` and `'1'` — is wrong: it refuses a valid human decision. `clubs.slug` carries no
+> `'|'`, so the last delimiter is the only unambiguous split point. The key **shape is
+> unchanged**; only the decode is specified here. The decode is single-sourced in one CTE so
+> the refusal query and the write query cannot diverge, and a key with no final delimiter, or
+> an empty trailing slug, still refuses.
 
 ### 6.2 Call sites and ordering — this is load-bearing
 
@@ -844,7 +873,8 @@ states exactly what Stage 1 delivers and what it must not touch.
    `['coaches','draft_picks','matches','match_coaches','players']` as documented inventory only,
    never as the proof. **Order-independent in both directions** (D-1).
 2. **Operator pre-check before writing the migration** (§5.3 SQL): expect `bad_path = 0`,
-   `bad_name_key = 0`, `total = 383`.
+   `bad_name_key = 0`, `total = 386` (corrected from `383` at Stage 1 — see the note in §5.3).
+   **PASSED 2026-09-12.**
 3. **`src/db/migrations/095_coach_admin_overrides.sql`** — §5.1 (`data_overrides.entity_type`
    += `'coaches'`, `'match_coaches'`), §5.2 (`data_edits.table_name` += `'coaches'` only —
    `match_coaches` deliberately absent), §5.3 (`coaches_path_namespace_ck`,
@@ -899,14 +929,14 @@ and 5 may be re-run freely, but **UI work does not begin until gate 4 passes**.
 | # | Gate | Command / evidence | Pass condition |
 |---|---|---|---|
 | **G0** | Preflight and migration number | `npm run preflight -- --mode implementation --issue 159` | READY; 095 still free (re-number and proceed if not — S-8) |
-| **G1** | Override-scope proof unit contract | `npx vitest run tests/current-season-import.test.ts` | `'clear'` with the widened CHECK; still `'indeterminate'` on an unreadable CHECK, an ambiguous CHECK, a CHECK admitting any `UNREPRESENTABLE_OVERRIDE_ENTITIES` literal, and an editor entity the CHECK does not admit. **Both deploy orders proven** (code-before-migration and migration-before-code) |
-| **G2** | Pre-check + migration on `afldb_test` | §5.3 SQL, then `npm run db:migrate` against `AFLDB_TEST_DATABASE_URL` | `bad_path = 0`, `bad_name_key = 0`, `total = 383`; migration applies; both new CHECKs present |
-| **G3** | Reload safety on `afldb_test` | seed a manual coach row + identity override, run `tools/migration/import_match_coaches.py` against the tracked snapshot | manual coach survives; manual assignment survives; **batch does not abort**; the `coaches_written != len(coach_rows)` guard is unperturbed (proven, not assumed); a would-have-collided real `name_key` is refused by `coaches_manual_identity_ck` |
-| **G4** | **DEV settle still applies (HARD GATE)** | a real settle run on DEV after deploying the Stage 1 change | `match_period_scores`, `player_match_stats` and `brownlow_round_votes` all **apply**, not merely propose. Anything else → **STOP** (S-1) |
-| **G5** | Source contract for the new replay branches | `npx vitest run tests/data-overrides-source-contract.test.ts` | absent-vs-explicit-null preserved on both new branches; the 078 narrow column grants still pinned |
-| **G6** | Promotion contract | `npx vitest run tests/db-promotion-check.test.ts` | new identity rule + `data_edits` coach target green; `assertContractCoherent()` accepts the DEV `historicalOnly` declaration (S-4) |
-| **G7** | Coach identity/collision rules | `npx vitest run tests/coach-reconciliation.test.ts` | `manual:` namespace rules hold |
-| **G8** | Typecheck | `npx tsc --noEmit` | clean |
+| **G1** | Override-scope proof unit contract | `npx vitest run tests/current-season-import.test.ts` | `'clear'` with the widened CHECK; still `'indeterminate'` on an unreadable CHECK, an ambiguous CHECK, a CHECK admitting any `UNREPRESENTABLE_OVERRIDE_ENTITIES` literal, and an editor entity the CHECK does not admit. **Both deploy orders proven** (code-before-migration and migration-before-code). **PASSED 2026-09-12** — 254 passed, 4 pre-existing POSIX skips, 0 failures |
+| **G2** | Pre-check + migration on `afldb_test` | §5.3 SQL, then `npm run db:migrate` against `AFLDB_TEST_DATABASE_URL` | `bad_path = 0`, `bad_name_key = 0`, `total = 386` (corrected from `383`, §5.3) — **pre-check PASSED 2026-09-12**; migration 095 then applied to `afldb_test` via `npm run db:migrate:test`, both new CHECKs present — **G2 PASSED 2026-09-12** |
+| **G3** | Reload safety on `afldb_test` | seed a manual coach row + identity override, run `tools/migration/import_match_coaches.py` against the tracked snapshot | manual coach survives; manual assignment survives; **batch does not abort**; the `coaches_written != len(coach_rows)` guard is unperturbed (proven, not assumed); a would-have-collided real `name_key` is refused by `coaches_manual_identity_ck`. **PASSED 2026-09-12 (A–E)**, against the exact accepted fitzRoy `full-history-20260902` snapshot restored from DEV (validator PASS: seasons 1897–2025, 16,838 matches, 685,471 player match rows). **The first G3-B run failed closed on a real defect** — the §6.1 composite-key decode — and the batch rolled back with nothing written; read-only verification confirmed the rollback (386 sourced + 1 manual = 387, three overrides intact) and demonstrated the broken and fixed decodes live; the decoder now splits on the LAST `|`, single-sourced for both the refusal check and the write, with the Stage 1 regression coverage updated. Rerun G3-B: batch 255, coaches 386, match_coaches 32,452, 0 stale removed. G3-C: sourced coach survived the reload, manual coach reconstructed from its override, D-4 manual Carlton assignment won after a source refresh (386 sourced + 2 manual = 388; 32,451 source + 1 manual = 32,452), migration-095 invariants clean. G3-D: all four identity/namespace collision cases refused, transaction rolled back. G3-E: fixture cleaned, `afldb_test` restored to 386 sourced coaches. **Do not re-run G3.** |
+| **G4** | **DEV settle still applies (HARD GATE)** | a real settle run on DEV after deploying the Stage 1 change | `match_period_scores`, `player_match_stats` and `brownlow_round_votes` all **apply**, not merely propose. Anything else → **STOP** (S-1). **OPEN.** Step 1 **PASSED 2026-09-12** — `npm run db:status` against `afldb_dev`: 95 migration files, 94 applied, only `095_coach_admin_overrides.sql` pending. Step 2 **PASSED 2026-09-12** — a read-only pre-check on the real `afldb_dev` (a `BEGIN READ ONLY` transaction ending in `ROLLBACK`, refusing any database but `afldb_dev`) proved DEV data compatible with 095: both CHECK names present with their 073/094 definitions matching verbatim, neither new `coaches` constraint already present, 386 coach rows with 0 null-identity, 0 namespace and 0 half-namespaced violations and 0 rows already in the `manual:` namespace, and the 1 `data_overrides` row (`matches`) and 5 `data_edits` rows (`brownlow_vote_entry_state`) both inside the widened allowlists. Nothing was mutated; 095 was NOT applied to DEV. **The gate itself is unsatisfied until the branch is deployed to DEV and a real settle run proves APPLY.** |
+| **G5** | Source contract for the new replay branches | `npx vitest run tests/data-overrides-source-contract.test.ts` | absent-vs-explicit-null preserved on both new branches; the 078 narrow column grants still pinned — **NOT RUN** |
+| **G6** | Promotion contract | `npx vitest run tests/db-promotion-check.test.ts` | new identity rule + `data_edits` coach target green; `assertContractCoherent()` accepts the DEV `historicalOnly` declaration (S-4) — **NOT RUN** |
+| **G7** | Coach identity/collision rules | `npx vitest run tests/coach-reconciliation.test.ts` | `manual:` namespace rules hold — **NOT RUN** |
+| **G8** | Typecheck | `npx tsc --noEmit` | clean — **NOT RUN** |
 
 No full-suite or `npm run build` run is required by Stage 1; escalate only if a gate implicates
 framework or build behaviour.
@@ -919,5 +949,22 @@ framework or build behaviour.
 (detail entry + Open Issues row), `IssuesIndex.md`, and `AFLDB-ISSUE-156.md` (§10 C-1 decided,
 §11 P3 = 159, P3 handoff contract).
 
-Start **Stage 1** in a fresh session on this branch and worktree, with this document as the
-implementation contract (§16, §17). Do not start Stage 2 until G4 passes.
+*Superseded — Stage 1 has been written and G0–G3 have passed.*
+
+**Current next action (2026-09-12).** G4 Steps 1 and 2 passed read-only against the real
+`afldb_dev`: 095 is the only pending migration, and existing DEV data satisfies every invariant
+095 enforces. G4 itself is OPEN. The remaining sequence, one operator gate at a time:
+
+1. commit and push this feature branch — **no merge to `main`** — because DEV deploys by git
+   ref and G4 needs the Stage 1 change on DEV;
+2. deploy the branch to DEV with `deploy/sync-dev.ps1`, whose existing order (`git fetch` →
+   `checkout` → `pull --ff-only` → `npm ci` → `npm run db:migrate` → `npm run build` →
+   `systemctl restart afldb`) must not be improvised around; the §3.1 proof rewrite is
+   order-independent precisely so both the pre-095 and the post-095 CHECK set preserve settle
+   APPLY authority. No `privileges.sql` run and no rebuild/promotion run is required to deploy
+   Stage 1, and ISSUE-151 promotion/restore lineage stays untouched;
+3. run a real settle on DEV and prove `match_period_scores`, `player_match_stats` and
+   `brownlow_round_votes` all APPLY — propose-only is S-1, a stop, not expected drift;
+4. then G5, G6, G7, G8.
+
+Stage 2 does not begin until G4 passes.

@@ -591,7 +591,7 @@ created, reopened, resolved, or materially reclassified.
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
 | **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: ISSUE-159 Stage 1 in a fresh implementation session |
-| **ID:** AFLDB-ISSUE-159 — Coach administration (ISSUE-156 P3) | **Status:** Open / **Planning — Approved for Stage 1** 2026-09-11. NOT implemented, NOT resolved. No `src/`, `tools/`, `tests/`, migration or privilege change exists. Plan `AFLDB-ISSUE-159.md`; branch `opus/issue-159-coach-admin`, worktree `D:\dev\afldb-issue-159`. C-1 decided: a manually created coach is a real `coaches` row with a synthetic `manual:<token>` `afltables_coach_path` **and** `name_key` under the existing `manual_admin_edit` source, whose durable record is a `data_overrides` row — no `NOT NULL` relaxed, no `UNIQUE` dropped, no merge tooling. Blocking prerequisite found in planning: `src/lib/acquisition/manual-authority.ts` pins the `data_overrides` `entity_type` CHECK as an **exact set**, so widening it in either deploy order turns the nightly settle's three unrepresentable targets `'indeterminate'` and degrades it to propose-only; the approved fix (D-1) is an order-independent proof rewrite, gated on a real DEV settle proving apply. Two gated stages: Stage 1 = proof rewrite + migration 095 + reload replay + promotion lineage (no UI); Stage 2 = the `/admin/coaches` surface. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; migration **095** allocated; next: **Stage 1 in a fresh Opus 5 / high-effort session**, hard gate G4 (DEV settle still applies) before any Stage 2 work |
+| **ID:** AFLDB-ISSUE-159 — Coach administration (ISSUE-156 P3) | **Status:** Open / **Stage 1 in progress — G0–G3 PASSED, G4 OPEN (its two read-only pre-steps passed on `afldb_dev`), G5–G8 NOT RUN** 2026-09-12. NOT resolved; Stage 2 NOT started. Written: the order-independent `manual-authority.ts` proof rewrite (D-1), migration **095** (`data_overrides.entity_type` += `coaches`/`match_coaches`; `data_edits.table_name` += `coaches` only; `coaches_path_namespace_ck`; `coaches_manual_identity_ck`), the two `replay_admin_overrides` branches + their two ordered call sites in `import_match_coaches.py`, the `afltables_coach_path` promotion lineage rule and `data_edits` coach target, `DataEditTableName` += `coaches`, the promotion runbook replay step, and four existing test suites extended. Untouched as required: `src/lib/edit/spec.ts`, `privileges.sql`, migration 087, `coaches_link_ck`, `PROMOTION_CONTRACT`. C-1 shape as approved: a manually created coach is a real `coaches` row with a synthetic `manual:<token>` `afltables_coach_path` **and** `name_key` under `manual_admin_edit`, durable as a `data_overrides` row. **G0 PASSED** (095 free); **G2 pre-check PASSED** (`bad_path = 0`, `bad_name_key = 0`, `total = 386` — the plan's 383 was a mis-transcription of the fitzRoy `Coach`-string count; `afltables-contract.json` pins 386 and the tracked snapshot holds 386). G1, G2 migration apply, G3, **G4**, G5–G8 unrun. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; migration **095** written; next: **run G1–G8 through the operator**; hard gate **G4** (DEV settle still APPLIES `match_period_scores`, `player_match_stats`, `brownlow_round_votes`) blocks all Stage 2 work |
 <!-- RETIRED 2026-09-04 — `AFLDB-ISSUE-131` (an upstream match rekey duplicates the canonical match)
      is **Resolved** and is NO LONGER an open issue. The fail-closed rekey-in-place fix is merged
      (`657a875`) and deployed; runbook §8's production acceptance is reconstructed and accepted in
@@ -22227,8 +22227,10 @@ Operator: commit the reviewed working tree, `npm run merge:ready -- --issue 158`
 
 ## AFLDB-ISSUE-159 — Coach administration (ISSUE-156 P3)
 
-**Status:** Open / **Planning — Approved for Stage 1** (2026-09-11). Not implemented, not
-resolved. No application code, migration, privilege, test or deployment change exists.
+**Status:** Open / **Stage 1 implemented — awaiting gates G1–G8** (2026-09-12). Stage 1 code,
+migration and tests are written; no gate has been run by the operator yet, so nothing is claimed
+as validated. Stage 2 (the `/admin/coaches` surface) is NOT started and is blocked on G4. Not
+resolved.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition / Promotion lineage
 **Found:** 2026-09-11
@@ -22236,8 +22238,9 @@ resolved. No application code, migration, privilege, test or deployment change e
 **Runbook:** `AFLDB-ISSUE-159.md` (the implementation contract; §16 Stage 1 deliverables,
 §17 Stage 1 gates)
 **Branch:** `opus/issue-159-coach-admin` · worktree `D:\dev\afldb-issue-159`
-**Migration:** **095** allocated (highest on every branch at allocation was
-`094_brownlow_admin_workflow.sql`); re-confirmed at implementation preflight
+**Migration:** **095** allocated and written as `095_coach_admin_overrides.sql`; re-confirmed
+free at implementation preflight and again at Stage 1 start (highest on this branch was
+`094_brownlow_admin_workflow.sql`)
 
 ### Problem
 
@@ -22376,18 +22379,86 @@ of recorded `origin/main`; `git branch -a --contains main` = `main`,
 and branch search for `issue-159` both empty; the only changed/untracked path is the planning
 artefact `AFLDB-ISSUE-159.md`.
 
+### Stage 1 implementation (2026-09-12)
+
+Written against `AFLDB-ISSUE-159.md` §16, in the contract's order. No route, page, component,
+Server Action or capability; `src/lib/edit/spec.ts`, `tools/maintenance/privileges.sql` and
+migration 087 are untouched; `coaches_link_ck` is not widened; no `PROMOTION_CONTRACT` entry was
+added for `coaches` / `match_coaches`.
+
+| File | Change |
+|---|---|
+| `src/lib/acquisition/manual-authority.ts` | `overrideScopeProven`'s exact-set proof replaced by the §3.1 four-condition, order-independent proof. `checkAdmitsExactly()` → `checkAdmittedEntities()` (returns the admitted set, or `null` for unreadable/absent/ambiguous/literal-free) plus `overrideScopeProvenFrom()`; `editorSpecMatchesOverrideScope()` → `editorExposesNoUnrepresentableEntity()` (condition 3 only — the editor is now a SUBSET of the CHECK, not equal to it). `OVERRIDE_ENTITY_TYPES` widened to the documented inventory and no longer consulted by the proof |
+| `src/db/migrations/095_coach_admin_overrides.sql` | **new.** `data_overrides.entity_type` += `coaches`, `match_coaches`; `data_edits.table_name` += `coaches` only; `coaches_path_namespace_ck`; `coaches_manual_identity_ck`; constraint/column comments. Forward-only, no new table/column, no `NOT NULL` relaxed, no backfill |
+| `tools/migration/common.py` | `replay_admin_overrides` gains the `coaches` and `match_coaches` branches. `COALESCE` for `display_name` (NOT NULL), `jsonb_exists` for every nullable field, linkage moved as one fact across `player_id` / `link_status_value` / `afltables_profile_path`. Each branch computes its refusals over the whole active set and raises **before any write**; `player_id_identity` must resolve to exactly one player |
+| `tools/migration/import_match_coaches.py` | the two replay calls at the §6.2 positions, inside the existing `with import_batch(...)`; both row counts are captured before either call, so the `coaches_written` guard is unperturbed |
+| `tools/db/promotion-inventory.ts` | `'afltables_coach_path'` added to `LineageIdentityRule` with its `LINEAGE_IDENTITY_SQL` entry; `{ kind: 'coaches', entity: 'coaches', identity: 'afltables_coach_path' }` added to the existing `data_edits` `row_id` ref, remediation extended; acceptance-checklist replay item names all five entity types and the coaches-before-`data_edits`-remap ordering |
+| `src/db/queries/audit-log.ts` | `DataEditTableName` / `DATA_EDIT_TABLE_NAMES` += `'coaches'`; `match_coaches` deliberately absent |
+| `src/lib/audit-view.ts` | `DATA_EDIT_TABLE_LABELS` gains `coaches: 'Coaches'` — forced by `Record<DataEditTableName, string>`, without which G8 cannot pass |
+| `docs/production-promotion.md` | §8 replay step names `coaches` and `match_coaches` and their ordering; §1 table and §7.4c gate updated for the coach identity |
+| `tests/` | `current-season-import` (G1), `data-overrides-source-contract` (G5), `db-promotion-check` (G6), `coach-reconciliation` (G7) extended in place; `tests/integration/settle-afltables.test.ts` updated for the renamed proof function. No new test file |
+
+**S-4 verified explicitly.** `historicalOnlyProblems()` reconciles a disposition against the
+lineage-bound **columns** of its table (`promotion-inventory.ts`), and the coach target is a
+third target on the existing `row_id` column, not a new column. The DEV `historicalOnly`
+declaration still names every lineage-bound column, so `assertContractCoherent()` is unaffected —
+pinned by a new `db-promotion-check` case rather than left to inspection.
+
+**Deviation from the contract, recorded:** §5.3/§17 expected `total = 383` coach rows. The
+operator's pre-check on `afldb_test` returned `bad_path = 0`, `bad_name_key = 0`, **`total =
+386`**, with all 386 rows sourced `afltables` and no manual-namespace squatting. This is not
+drift: `tools/rebuild/afltables/afltables-contract.json` pins `accepted_snapshot.measured.coaches
+= 386`, and the tracked snapshot `coaches-20260905/parsed/coach_pages.csv` holds exactly 386 rows
+including the three beyond the stated baseline (`George_McLaren`, `Frank_Goode`, `Frank_Curcio`,
+each with a real Player Stats profile). **383** is that same file's count of accepted-baseline
+fitzRoy `Coach` **strings** — a different quantity the plan mis-transcribed as a row count. The
+two migration-gating invariants were both 0, so the migration was written as specified; the
+expectation is corrected to 386 here, in `AFLDB-ISSUE-159.md` §5.3/§17 and in `IssuesIndex.md`.
+No row was altered or deleted.
+
 ### Validation
 
-**None run — nothing has been implemented.** The approved Stage 1 gates are `AFLDB-ISSUE-159.md`
-§17: G0 implementation preflight and migration-number re-check; G1 the rewritten
-`overrideScopeProven` proof, **both deploy orders**; G2 the §5.3 pre-check (`bad_path = 0`,
-`bad_name_key = 0`, `total = 383`) then migration 095 on `afldb_test`; G3 reload safety on
-`afldb_test` (manual coach and manual assignment survive a real `import_match_coaches.py` run,
-batch does not abort, a colliding `name_key` is refused); **G4 the hard gate — a real DEV settle
-run proving `match_period_scores`, `player_match_stats` and `brownlow_round_votes` still APPLY,
-not merely propose**; G5 the 086 source contract on the new replay branches; G6
-`tests/db-promotion-check.test.ts` including `assertContractCoherent()` against the DEV
-`historicalOnly` declaration; G7 `tests/coach-reconciliation.test.ts`; G8 `tsc --noEmit`.
+**Gate record, operator-run 2026-09-12. G0–G3 PASSED. G4 is OPEN — its two read-only pre-steps
+passed against the real `afldb_dev`, but the gate itself is not satisfied until a real DEV settle
+run proves APPLY. G5–G8 NOT RUN. Stage 1 is therefore NOT complete and Stage 2 stays blocked.**
+The gates are `AFLDB-ISSUE-159.md` §17.
+
+- **G0 PASSED** — implementation preflight READY, 0 blockers, 095 still free.
+- **G1 PASSED** — `npx vitest run tests/current-season-import.test.ts`: 254 passed, 4 pre-existing
+  POSIX skips, 0 failures. Both deploy orders proven.
+- **G2 PASSED** — the §5.3 pre-check (`bad_path = 0`, `bad_name_key = 0`, **`total = 386`**, see
+  the deviation above), then `npm run db:migrate:test` applied migration 095 to `afldb_test`.
+- **G3 PASSED (A–E) on `afldb_test`**, against the exact accepted fitzRoy
+  `full-history-20260902` snapshot restored from DEV (validator PASS: seasons 1897–2025, 16,838
+  matches, 685,471 player match rows, full-history gates passed). G3-A seeded. **The first G3-B
+  run failed closed on a real defect, and is the reason this gate exists:** the replay decoded
+  `match_coaches` override keys with `split_part(entity_key, '|', 1/2)`, which reads `1902` and
+  `1` out of `1902|1|1902-05-03|Carlton|Geelong|carlton`, because `matches.match_key` is itself
+  pipe-delimited (`season|round|date|home|away`, migration 003). The importer refused and the
+  batch rolled back — nothing was written. Read-only verification confirmed the rollback (386
+  sourced + 1 manual = 387 coaches, all three overrides intact) and demonstrated the broken and
+  fixed decodes side by side. The decoder now splits on the **last** `|` and is single-sourced
+  from one CTE that both the refusal check and the write read, so the two can never disagree;
+  the Stage 1 regression coverage was updated with it. Rerun G3-B: batch 255, coaches 386,
+  match_coaches 32,452, 0 stale removed. G3-C: the sourced coach survived the reload, the manual
+  coach was reconstructed from its override, and the D-4 manual Carlton assignment won after a
+  source refresh (386 sourced + 2 manual = 388; 32,451 source + 1 manual = 32,452); the
+  migration-095 invariants were clean. G3-D: all four identity/namespace collision cases were
+  refused and the transaction rolled back. G3-E: the fixture was cleaned and `afldb_test`
+  restored to 386 sourced coaches. **G3 is not to be re-run.**
+- **G4 OPEN.** Step 1 **PASSED** — `npm run db:status` against `afldb_dev`: 95 migration files,
+  94 applied, only `095_coach_admin_overrides.sql` pending. Step 2 **PASSED** — a read-only
+  pre-check on the real `afldb_dev` (a `BEGIN READ ONLY` transaction ending in `ROLLBACK`, and
+  refusing any database but `afldb_dev`) proved DEV data compatible with 095: both CHECK names
+  present with their 073/094 definitions matching verbatim, neither new `coaches` constraint
+  already present, 386 coach rows with 0 null-identity, 0 namespace and 0 half-namespaced
+  violations and 0 rows already in the `manual:` namespace, and the single `data_overrides` row
+  (`matches`) and the 5 `data_edits` rows (`brownlow_vote_entry_state`) both inside the widened
+  allowlists. **Nothing was mutated and migration 095 was NOT applied to DEV.** The gate is
+  unsatisfied until the branch is deployed to DEV and a real settle proves
+  `match_period_scores`, `player_match_stats` and `brownlow_round_votes` all APPLY, not merely
+  propose.
+- **G5, G6, G7, G8 NOT RUN.**
 
 ### Stop conditions
 
@@ -22403,6 +22474,19 @@ browser; S-9 an admin link silently defeating a tracked `afltables-contract.json
 `AFLDB-ISSUE-159.md` §11.
 
 ### Next action
+
+**G0–G3 have passed and G4’s two read-only pre-steps have passed. The next action is to commit
+and push this feature branch — no merge to `main` — because DEV deploys by git ref and G4 needs
+the Stage 1 change on DEV.** Then, one operator gate at a time: deploy to DEV with
+`deploy/sync-dev.ps1` in its existing order (`git fetch` → `checkout` → `pull --ff-only` →
+`npm ci` → `npm run db:migrate` → `npm run build` → `systemctl restart afldb`), which must not
+be improvised around — the §3.1 proof rewrite is order-independent precisely so both the
+pre-095 and the post-095 CHECK set preserve settle APPLY authority; no `privileges.sql` run, no
+rebuild/promotion run, ISSUE-151 promotion/restore lineage untouched. Then run a real settle on
+DEV and prove `match_period_scores`, `player_match_stats` and `brownlow_round_votes` all APPLY
+— propose-only is **stop** (S-1), not expected drift. Then G5, G6, G7, G8. Stage 1 is not
+complete and Stage 2 is not cleared until G4 passes. The superseded pre-implementation next
+action was:
 
 **Stage 1, fresh session, Opus 5 / high effort**, on `opus/issue-159-coach-admin` in
 `D:\dev\afldb-issue-159`, with `AFLDB-ISSUE-159.md` as the implementation contract (§16
