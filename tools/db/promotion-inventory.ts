@@ -70,6 +70,11 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  *                          natural key migration 076's settle projections link on.
  *   source_key             sources.key — the stable acquisition-source key used across
  *                          rebuilt id lineages (for example `gridley`).
+ *   afltables_coach_path   coaches.afltables_coach_path — NOT NULL UNIQUE since migration
+ *                          087, the AFL Tables coach page path, and `manual:<token>` for
+ *                          an admin-created coach (AFLDB-ISSUE-159 §1). Minted once and
+ *                          never edited, so it survives a rebuild on both databases.
+ *                          Deliberately NOT `coaches.name_key`: that is a name.
  *   none                   NO stable identity exists in this repository for the entity this
  *                          column points at. The column therefore CANNOT be remapped, and
  *                          across a lineage change the checker refuses rather than
@@ -80,7 +85,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  * match would silently retarget a human decision — the exact failure this type exists to
  * prevent.
  */
-export type LineageIdentityRule = 'afltables_profile_url' | 'match_key' | 'source_key' | 'none';
+export type LineageIdentityRule =
+  'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -324,10 +330,19 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       targets: [
         { kind: 'players', entity: 'players', identity: 'afltables_profile_url' },
         { kind: 'matches', entity: 'matches', identity: 'match_key' },
+        // AFLDB-ISSUE-159 §5.6. Admitting 'coaches' into data_edits.table_name
+        // (migration 095) obliges a lineage target for it, because coaches is
+        // rebuilt on promotion and its ids are renumbered by the swap.
+        { kind: 'coaches', entity: 'coaches', identity: 'afltables_coach_path' },
       ],
-      remediation: 'Both entities have a stable identity, so every row is remappable in '
-        + 'principle: resolve row_id through the AFL Tables profile url (players) or '
-        + 'matches.match_key, and apply the generated per-row UPDATEs after the reinstate. '
+      remediation: 'Every entity here has a stable identity, so every row is remappable in '
+        + 'principle: resolve row_id through the AFL Tables profile url (players), '
+        + 'matches.match_key, or coaches.afltables_coach_path, and apply the generated '
+        + 'per-row UPDATEs after the reinstate. A coach edit resolves the same way whether '
+        + 'the coach is source-owned or admin-created: the path is the identity either way, '
+        + "'coaches/<Given>_<Surname><n>.html' or 'manual:<token>', and an admin-created "
+        + 'coach is re-created in the candidate by the data_overrides replay step (§8) '
+        + 'before that remap can resolve, so the replay runs first. '
         + 'A row that does not resolve is NOT dropped and NOT left pointing at the old id: '
         + 'the promotion stops and the operator records the decision. The common case is a '
         + 'CURRENT-SEASON match edit — the rebuild carries seasons to the accepted baseline '
@@ -357,7 +372,7 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         + 'weaken the pre-swap gate nor be forgotten silently.',
     },
     note: 'Append-only audit of every human canonical edit (before/after snapshots). '
-      + 'table_name + row_id is a row id in players or matches, NOT a foreign key: it '
+      + 'table_name + row_id is a row id in players, matches or coaches, NOT a foreign key: it '
       + 'reinstates without tripping a constraint, and therefore without noticing a lineage '
       + 'change. AFLDB-ISSUE-142 (B): remapped through a stable identity, never by id. '
       + 'References auth_users.',
@@ -1431,6 +1446,23 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
          AND ei.status IN ('unique', 'resolved')
          AND ei.player_id IS NOT NULL
          AND ei.external_id = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  afltables_coach_path: {
+    entity: 'coaches',
+    description: 'coaches.afltables_coach_path — NOT NULL UNIQUE (migration 087), the AFL '
+      + "Tables coach page path; 'manual:<token>' for an admin-created coach "
+      + '(AFLDB-ISSUE-159). Minted once and never edited, so it denotes the same person on '
+      + 'both databases; migration 095 makes the two namespaces non-overlapping by CHECK',
+    byId: `
+      SELECT id::bigint AS id, afltables_coach_path AS identity
+        FROM public.coaches
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, afltables_coach_path AS identity
+        FROM public.coaches
+       WHERE afltables_coach_path = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {
@@ -2797,7 +2829,8 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase production` passed on the live afldb_prod (same gates as candidate).',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
-  'data_overrides replayed onto the promoted canonical rows; player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
+  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, coaches, match_coaches — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path.',
+  'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
   'Rollback rehearsed on paper: stop service, rename afldb_prod back to the candidate name, rename afldb_prod_pre_rebuild_<stamp> to afldb_prod, start service.',
   'Cleanup deferred: the pre-rebuild database and the dumps are kept until the operator closes the promotion record; nothing is dropped the same day.',

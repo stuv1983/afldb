@@ -19,7 +19,7 @@ import type postgres from 'postgres';
  * system and stays on the auth pool; do not route it through here.
  */
 
-/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094). */
+/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094/095). */
 export type DataEditTableName =
   | 'players'
   | 'matches'
@@ -32,7 +32,13 @@ export type DataEditTableName =
   // match_id, the season authority keyed by season -- not the fact rows
   // it writes, which carry their own provenance quartet.
   | 'brownlow_vote_entry_state'
-  | 'brownlow_season_authority';
+  | 'brownlow_season_authority'
+  // Coach administration (migration 095, AFLDB-ISSUE-159 §5.2). 'match_coaches'
+  // is deliberately absent: its primary key is composite (match_id, club_id)
+  // and row_id is a single bigint, so a coaching-assignment edit is audited
+  // against its match instead -- table_name 'matches', field_group
+  // 'coach_assignment'.
+  | 'coaches';
 
 /**
  * The same allowlist as a runtime value, for the read side
@@ -49,6 +55,7 @@ export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
   'honour_team_members',
   'brownlow_vote_entry_state',
   'brownlow_season_authority',
+  'coaches',
 ];
 
 export function isDataEditTableName(value: string): value is DataEditTableName {

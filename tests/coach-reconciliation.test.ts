@@ -218,3 +218,117 @@ describe('the tracked coaches snapshot (contract pin)', () => {
     expect(byPath.get('coaches/Ron_Barassi0.html')![header.indexOf('profile_path')]).toBe('players/R/Ron_Barassi0.html');
   });
 });
+
+/*
+ * AFLDB-ISSUE-159 §1.3 / §5.3 — the manual coach identity namespace.
+ *
+ * coaches.afltables_coach_path and coaches.name_key are both NOT NULL UNIQUE
+ * (087:38,41), and the importer's coach upsert conflicts on the PATH ALONE. So a
+ * manually created coach holding the real "Surname, Given" string would raise a
+ * unique violation on a NON-target constraint the first time AFL Tables published
+ * a page for that person -- which is not an upsert, it aborts the whole nightly
+ * batch. Migration 095 removes that class of failure by construction rather than
+ * by convention, and these tests are what keep it structural.
+ */
+describe('the manual coach identity namespace (migration 095)', () => {
+  const migration = readFileSync(
+    join(repositoryRoot, 'src', 'db', 'migrations', '095_coach_admin_overrides.sql'), 'utf8',
+  ).replace(/\r\n/g, '\n');
+  /**
+   * The migration's STATEMENTS, with every `--` comment line stripped. The
+   * prohibitions below are about what the migration does, not about which words
+   * its commentary is allowed to contain — it explains at length what it
+   * deliberately does not do, and that explanation must not fail its own test.
+   */
+  const statements = migration.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n');
+  const contract = JSON.parse(readFileSync(join(repositoryRoot, 'tools', 'rebuild', 'afltables', 'afltables-contract.json'), 'utf8'));
+  const label: string = contract.coaches.accepted_snapshot.label;
+  const snapshotRoot = join(repositoryRoot, 'data', 'sources', 'afltables', 'coaches', label, 'parsed');
+
+  /** The two CHECKs, as PostgreSQL will enforce them, evaluated in JS. */
+  const pathNamespaceOk = (path: string) =>
+    path.startsWith('coaches/') || path.startsWith('manual:');
+  const manualIdentityOk = (path: string, nameKey: string) =>
+    path.startsWith('manual:') === nameKey.startsWith('manual:');
+
+  it('declares both CHECKs, on the right columns, in the right shape', () => {
+    expect(migration).toMatch(
+      /ADD CONSTRAINT coaches_path_namespace_ck\s*\n\s*CHECK \(afltables_coach_path LIKE 'coaches\/%' OR afltables_coach_path LIKE 'manual:%'\)/,
+    );
+    expect(migration).toMatch(
+      /ADD CONSTRAINT coaches_manual_identity_ck\s*\n\s*CHECK \(\(afltables_coach_path LIKE 'manual:%'\) = \(name_key LIKE 'manual:%'\)\)/,
+    );
+    // Forward-only, and 087 is not edited: no column added, none relaxed, and
+    // coaches_link_ck is not widened (D-3).
+    expect(statements).not.toMatch(/DROP NOT NULL|DROP COLUMN|ADD COLUMN|CREATE TABLE/i);
+    expect(statements).not.toMatch(/coaches_link_ck/);
+    expect(statements).not.toMatch(/DROP CONSTRAINT coaches_/);
+  });
+
+  it('accepts a minted manual identity and refuses every half-namespaced shape', () => {
+    const token = '01JBQ2Z4M7F3K8W6YV5N9RTPQD';
+    expect(pathNamespaceOk(`manual:${token}`)).toBe(true);
+    expect(manualIdentityOk(`manual:${token}`, `manual:${token}`)).toBe(true);
+
+    // The batch-aborting shape: a manual path carrying a real index string.
+    expect(manualIdentityOk(`manual:${token}`, 'Fagan, Chris')).toBe(false);
+    // And its mirror: a real page path carrying a manual name_key.
+    expect(manualIdentityOk('coaches/Chris_Fagan0.html', `manual:${token}`)).toBe(false);
+    // An identity from neither namespace is not an identity.
+    for (const path of ['', 'Fagan, Chris', 'players/C/Chris_Fagan0.html', 'coaches', 'manual', 'MANUAL:x']) {
+      expect(pathNamespaceOk(path), path).toBe(false);
+    }
+  });
+
+  it('cannot collide with any real AFL Tables coach identity in the tracked snapshot', () => {
+    const pages = readFileSync(join(snapshotRoot, 'coach_pages.csv'), 'utf8').split('\n').filter(Boolean);
+    const header = pages[0].split(',');
+    const paths = pages.slice(1).map((line) => line.split(',')[header.indexOf('coach_path')]);
+    expect(paths.length).toBe(contract.coaches.accepted_snapshot.measured.coaches);
+    expect(paths.length).toBeGreaterThan(380);
+
+    for (const path of paths) {
+      // Every real path is in the sourced namespace, so both CHECKs hold for
+      // every existing row -- the precondition the migration's ALTER needs.
+      expect(path.startsWith('coaches/'), path).toBe(true);
+      expect(path.startsWith('manual:'), path).toBe(false);
+      expect(pathNamespaceOk(path), path).toBe(true);
+    }
+
+    // And the index strings the per-match Coach column joins on are "Surname,
+    // Given" -- a shape that can never equal 'manual:<token>'.
+    const indexRows = readFileSync(join(snapshotRoot, 'coaches_index.csv'), 'utf8').split('\n').filter(Boolean);
+    expect(indexRows[0].split(',')).toEqual(contract.coaches.index_columns);
+    expect(indexRows[0].startsWith('name_raw,')).toBe(true);
+    // name_raw is the leading column and is quoted precisely because it contains
+    // a comma -- it is "Surname, Given".
+    const nameKeys = indexRows.slice(1).map((line) => /^"([^"]*)"/.exec(line)?.[1]);
+    expect(nameKeys.length).toBe(paths.length);
+    for (const nameKey of nameKeys) {
+      expect(nameKey, String(nameKey)).toBeDefined();
+      // The shape itself is the collision-freedom argument: a ':' -namespaced
+      // token is not a "Surname, Given" string and never can be.
+      expect(nameKey, nameKey).toMatch(/^[^,]+, .+$/);
+      expect(nameKey!.startsWith('manual:'), nameKey).toBe(false);
+      expect(manualIdentityOk('coaches/x.html', nameKey!), nameKey).toBe(true);
+    }
+  });
+
+  it('introduces no merge, no supersession and no delete path for a coach', () => {
+    // AFLDB-ISSUE-159 §13 / S-3. A manual coach that later gains an AFL Tables
+    // identity is P9-class identity lifecycle work, reported and stopped. Stage 1
+    // delivers duplicate PREVENTION only -- and the row must never be deletable,
+    // because its data_edits rows carry its id and an id that resolves to nothing
+    // stops the promotion.
+    expect(statements).not.toMatch(/superseded_by|\bmerge\b/i);
+    expect(statements).not.toMatch(/DELETE FROM coaches|ON DELETE CASCADE/i);
+    // The prose says so too, deliberately — this is a reported stop, not an omission.
+    expect(migration).toContain('P9-class identity');
+    const replay = readFileSync(join(repositoryRoot, 'tools', 'migration', 'common.py'), 'utf8');
+    const coachesBranch = replay.slice(
+      replay.indexOf('elif table == "coaches":'), replay.indexOf('elif table == "match_coaches":'),
+    );
+    expect(coachesBranch.length).toBeGreaterThan(0);
+    expect(coachesBranch).not.toMatch(/DELETE FROM|superseded/i);
+  });
+});

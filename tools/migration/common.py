@@ -1031,3 +1031,227 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                    AND o.entity_key = d.source_id::text || '|' || d.player_url || '|' || d.draft_year::text || '|' || d.draft_kind
                    AND o.is_active = true
             """)
+
+        elif table == "coaches":
+            # AFLDB-ISSUE-159 §6.1. Two key shapes, one entity_type:
+            #
+            #   'afltables:coaches/Chris_Fagan0.html'  a source-owned coach whose
+            #                                          fields a human corrected
+            #   'manual_admin_edit:<token>'            an admin-CREATED coach, whose
+            #                                          canonical row this replay is
+            #                                          what re-creates after a
+            #                                          destructive reload or a promotion
+            #
+            # The manual branch is the only place in this function that INSERTs a
+            # canonical row, and it must be: coaches is rebuilt on promotion, so
+            # without it a manually created coach does not survive the swap.
+            #
+            # Identity is never name-derived. A manual coach's path and name_key are
+            # both 'manual:' || <the token from the entity_key>, which migration 095's
+            # coaches_path_namespace_ck / coaches_manual_identity_ck enforce.
+
+            # Fail closed FIRST, on the whole active set, before anything is written.
+            # An override whose key does not resolve is not skipped: it is a human
+            # decision this reload cannot honour, and a reload that silently drops one
+            # is worse than a reload that stops.
+            cur.execute("""
+                SELECT o.entity_key,
+                       CASE
+                           WHEN split_part(o.entity_key, ':', 1) NOT IN ('afltables', 'manual_admin_edit')
+                               THEN 'entity_key does not name a known source'
+                           WHEN position(':' in o.entity_key) = 0
+                                 OR length(substring(o.entity_key from position(':' in o.entity_key) + 1)) = 0
+                               THEN 'entity_key carries no external id'
+                           WHEN split_part(o.entity_key, ':', 1) = 'afltables'
+                                 AND NOT EXISTS (
+                                     SELECT 1 FROM coaches c
+                                      WHERE c.afltables_coach_path
+                                            = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                                 )
+                               THEN 'no coaches row carries that AFL Tables path'
+                           WHEN split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                                 AND o.override_values->>'display_name' IS NULL
+                               THEN 'manual coach override carries no display_name to re-create the row with'
+                           WHEN jsonb_exists(o.override_values, 'player_id_identity')
+                                 AND o.override_values->>'player_id_identity' IS NOT NULL
+                                 AND (SELECT count(DISTINCT e.player_id)
+                                        FROM external_identities e
+                                        JOIN sources s ON s.id = e.source_id
+                                       WHERE s.key = 'afltables'
+                                         AND e.status IN ('unique', 'resolved')
+                                         AND e.player_id IS NOT NULL
+                                         AND e.external_id = o.override_values->>'player_id_identity') <> 1
+                               THEN 'player_id_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'coaches' AND o.is_active = true
+            """)
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(coaches): refusing to commit, "
+                    + str(len(unresolvable)) + " active override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # 1. Re-create every admin-created coach that the reload removed or that a
+            #    rebuilt database never had. display_name is NOT NULL, so it is required
+            #    rather than COALESCEd; everything else is nullable and absent-vs-explicit-
+            #    null is preserved by jsonb_exists on the UPDATE arm.
+            cur.execute("""
+                INSERT INTO coaches (afltables_coach_path, name_key, display_name, given_name, surname, dob,
+                                     source_id, source_record_id, notes)
+                SELECT 'manual:' || substring(o.entity_key from position(':' in o.entity_key) + 1),
+                       'manual:' || substring(o.entity_key from position(':' in o.entity_key) + 1),
+                       o.override_values->>'display_name',
+                       o.override_values->>'given_name',
+                       o.override_values->>'surname',
+                       (o.override_values->>'dob')::date,
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       substring(o.entity_key from position(':' in o.entity_key) + 1),
+                       o.override_values->>'notes'
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'coaches' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                ON CONFLICT (afltables_coach_path) DO NOTHING
+            """)
+
+            # 2. Apply the overridden fields to both shapes. afltables_coach_path and
+            #    name_key are identity and are never in override_values: the WHERE is
+            #    what binds a decision to a row, so an override cannot move one.
+            #    display_name is NOT NULL (COALESCE); the rest are nullable, so an
+            #    explicit JSON null must clear the column and an ABSENT key must leave
+            #    it alone -- the migration-086 discipline, jsonb_exists.
+            cur.execute("""
+                WITH active_overrides AS (
+                    SELECT c.id AS coach_id, o.override_values
+                      FROM data_overrides o
+                      JOIN coaches c
+                        ON c.afltables_coach_path = CASE split_part(o.entity_key, ':', 1)
+                               WHEN 'manual_admin_edit'
+                                   THEN 'manual:' || substring(o.entity_key from position(':' in o.entity_key) + 1)
+                               ELSE substring(o.entity_key from position(':' in o.entity_key) + 1)
+                           END
+                     WHERE o.entity_type = 'coaches' AND o.is_active = true
+                )
+                UPDATE coaches c
+                   SET display_name = COALESCE(o.override_values->>'display_name', c.display_name),
+                       given_name = CASE WHEN jsonb_exists(o.override_values, 'given_name') THEN o.override_values->>'given_name' ELSE c.given_name END,
+                       surname = CASE WHEN jsonb_exists(o.override_values, 'surname') THEN o.override_values->>'surname' ELSE c.surname END,
+                       dob = CASE WHEN jsonb_exists(o.override_values, 'dob') THEN (o.override_values->>'dob')::date ELSE c.dob END,
+                       notes = CASE WHEN jsonb_exists(o.override_values, 'notes') THEN o.override_values->>'notes' ELSE c.notes END,
+                       -- Linkage moves as one fact or not at all: coaches_link_ck admits
+                       -- only (player_id, 'unique') or (NULL, <> 'unique'), and
+                       -- coaches_profile_link_ck requires a profile path alongside a
+                       -- player. The decision is stored as the profile PATH, never a
+                       -- player id -- player ids are rebuilt on promotion, paths are not.
+                       player_id = CASE
+                           WHEN NOT jsonb_exists(o.override_values, 'player_id_identity') THEN c.player_id
+                           WHEN o.override_values->>'player_id_identity' IS NULL THEN NULL
+                           -- Exactly one player, proven by the refusal above; no LIMIT,
+                           -- so a second one would raise rather than be picked silently.
+                           ELSE (SELECT DISTINCT e.player_id
+                                   FROM external_identities e
+                                   JOIN sources s ON s.id = e.source_id
+                                  WHERE s.key = 'afltables'
+                                    AND e.status IN ('unique', 'resolved')
+                                    AND e.player_id IS NOT NULL
+                                    AND e.external_id = o.override_values->>'player_id_identity')
+                       END,
+                       link_status_value = CASE
+                           WHEN NOT jsonb_exists(o.override_values, 'player_id_identity') THEN c.link_status_value
+                           WHEN o.override_values->>'player_id_identity' IS NULL THEN 'unmatched'::link_status
+                           ELSE 'unique'::link_status
+                       END,
+                       afltables_profile_path = CASE
+                           WHEN NOT jsonb_exists(o.override_values, 'player_id_identity') THEN c.afltables_profile_path
+                           WHEN o.override_values->>'player_id_identity' IS NULL THEN NULL
+                           ELSE o.override_values->>'player_id_identity'
+                       END
+                  FROM active_overrides o
+                 WHERE c.id = o.coach_id
+            """)
+
+        elif table == "match_coaches":
+            # AFLDB-ISSUE-159 §6.1 / D-4. entity_key is '<match_key>|<club slug>' and
+            # override_values.coach_identity is an afltables_coach_path (a real one or a
+            # 'manual:<token>' one) -- never a coach id, which a rebuild renumbers.
+            #
+            # This replay runs AFTER the source's own assignment upsert
+            # (import_match_coaches.py §6.2) precisely so the human decision wins: the
+            # (match_id, club_id) primary key carries no source, so the snapshot WILL
+            # overwrite a manual assignment on a team-match the source later covers.
+            # Replaying afterwards restores it, visibly and durably.
+            #
+            # DECODING THE COMPOSITE KEY. matches.match_key is ITSELF pipe-delimited --
+            # 'season|round|date|home|away' (migration 003) -- so '<match_key>|<club
+            # slug>' carries five delimiters, not one, and the club slug is the segment
+            # after the LAST of them. split_part(entity_key, '|', 1) / (..., 2) reads
+            # '1902' and '1' out of '1902|1|1902-05-03|Carlton|Geelong|carlton', which
+            # resolves to nothing and refuses a perfectly good override.
+            #
+            # clubs.slug carries no '|', so the last delimiter is the only unambiguous
+            # split point. The decode lives HERE, once, and both statements below read
+            # it from the CTE: the refusal check and the write must never be able to
+            # disagree about what a key means.
+            decoded_overrides = """
+                decoded AS (
+                    SELECT o.entity_key,
+                           o.override_values,
+                           strpos(reverse(o.entity_key), '|')                          AS tail,
+                           left(o.entity_key,
+                                length(o.entity_key) - strpos(reverse(o.entity_key), '|')) AS match_key,
+                           right(o.entity_key, strpos(reverse(o.entity_key), '|') - 1) AS club_slug
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'match_coaches' AND o.is_active = true
+                )
+            """
+            cur.execute("WITH " + decoded_overrides + """
+                SELECT d.entity_key,
+                       CASE
+                           -- No final delimiter at all: the key is not a composite key,
+                           -- so there is no club slug to read and nothing to resolve.
+                           WHEN d.tail = 0
+                               THEN 'entity_key is not <match_key>|<club slug>'
+                           WHEN d.club_slug = ''
+                               THEN 'entity_key ends in the delimiter and names no club'
+                           WHEN NOT EXISTS (SELECT 1 FROM matches m WHERE m.match_key = d.match_key)
+                               THEN 'no match carries that match_key'
+                           WHEN NOT EXISTS (SELECT 1 FROM clubs cl WHERE cl.slug = d.club_slug)
+                               THEN 'no club carries that slug'
+                           WHEN NOT jsonb_exists(d.override_values, 'coach_identity')
+                                 OR d.override_values->>'coach_identity' IS NULL
+                               THEN 'override carries no coach_identity'
+                           WHEN NOT EXISTS (SELECT 1 FROM coaches c
+                                             WHERE c.afltables_coach_path = d.override_values->>'coach_identity')
+                               THEN 'coach_identity resolves to no coach'
+                       END AS problem
+                  FROM decoded d
+            """)
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(match_coaches): refusing to commit, "
+                    + str(len(unresolvable)) + " active override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # Every column of match_coaches is a key or provenance, so there is no
+            # absent-vs-explicit-null field here: the one mutable fact is WHICH coach,
+            # and it is required above. source_id names manual_admin_edit, which is also
+            # what keeps the importer's stale-delete (scoped to the afltables source)
+            # from ever removing a human assignment.
+            cur.execute("WITH " + decoded_overrides + """
+                INSERT INTO match_coaches (match_id, club_id, coach_id, source_id, source_record_id, import_batch_id)
+                SELECT m.id, cl.id, c.id,
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       d.entity_key,
+                       NULL
+                  FROM decoded d
+                  JOIN matches m ON m.match_key = d.match_key
+                  JOIN clubs cl ON cl.slug = d.club_slug
+                  JOIN coaches c ON c.afltables_coach_path = d.override_values->>'coach_identity'
+                ON CONFLICT (match_id, club_id) DO UPDATE SET
+                  coach_id = EXCLUDED.coach_id,
+                  source_id = EXCLUDED.source_id,
+                  source_record_id = EXCLUDED.source_record_id,
+                  import_batch_id = EXCLUDED.import_batch_id
+            """)

@@ -39,6 +39,8 @@ export type Capability =
   | 'data.brownlow.read'
   | 'data.brownlow.draft'
   | 'data.brownlow.finalise'
+  | 'data.coaches.read'
+  | 'data.coaches.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -73,6 +75,14 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   'data.brownlow.read': ADMIN_AND_UP,
   'data.brownlow.draft': ADMIN_AND_UP,
   'data.brownlow.finalise': SUPER_ADMIN_ONLY,
+  // Coach administration (AFLDB-ISSUE-159 §8.1). Reading coach provenance
+  // widens no boundary an Admin does not already have -- coach data is
+  // public, and operations.audit.read already gives an Admin the full edit
+  // trail. A coach edit becomes a public statistical fact immediately, with
+  // no draft stage, so only a Super Admin may mutate -- matching
+  // data.dataEditor and data.playerLinks.
+  'data.coaches.read': ADMIN_AND_UP,
+  'data.coaches.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

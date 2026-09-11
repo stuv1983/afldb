@@ -624,15 +624,17 @@ describe('adminNavFor', () => {
 
   it('omits a group entirely for a viewer with no capability it contains, rather than showing it empty', () => {
     // A plain admin holds no capability in Site, so that group is absent. The
-    // Data group appears from AFLDB-ISSUE-155 Phase C2: an Admin may read and
-    // draft Brownlow votes (§27.8), so it holds exactly that link. Operations
-    // appears from AFLDB-ISSUE-157 and holds exactly the audit trail: every
-    // other Operations link is still super-admin-only.
+    // Data group holds Brownlow (AFLDB-ISSUE-155 Phase C2: an Admin may read
+    // and draft Brownlow votes, §27.8) and Coaches (AFLDB-ISSUE-159 Stage 2:
+    // data.coaches.read is ADMIN_AND_UP, §8.1) -- an Admin reaches both but
+    // neither's mutating capability. Operations appears from AFLDB-ISSUE-157
+    // and holds exactly the audit trail: every other Operations link is
+    // still super-admin-only.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
       'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
-    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow']);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
   });
 
@@ -661,10 +663,10 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
   });
 
-  it('keeps the Data group in section order: data editor, Brownlow, player links', () => {
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches', () => {
     const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
     expect(data?.links.map((l) => l.href)).toEqual([
-      '/admin/data-editor', '/admin/brownlow', '/admin/player-links',
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches',
     ]);
   });
 
@@ -1120,6 +1122,8 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'data.brownlow.read': 'requireAdmin',
   'data.brownlow.draft': 'requireAdmin',
   'data.brownlow.finalise': 'requireSuperAdmin',
+  'data.coaches.read': 'requireAdmin',
+  'data.coaches.edit': 'requireSuperAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',

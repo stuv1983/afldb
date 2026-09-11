@@ -15,6 +15,79 @@ commit.
 
 ## [Unreleased]
 
+### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
+
+- The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`
+  CHECK as an exact set. `src/lib/acquisition/manual-authority.ts` now proves only what the
+  proposition needs — the CHECK is readable and unambiguous, it admits none of
+  `match_period_scores` / `player_match_stats` / `brownlow_round_votes`, the editor spec exposes
+  none of them either, and every editor entity is admitted by the CHECK. Every previous refusal
+  is retained. This is behavioural: under the old exact-set proof, widening the CHECK degraded
+  those three targets from **apply** to propose-only in *either* deploy order, with no safe
+  sequence in either direction. There is now no such window.
+- Migration 095 admits `coaches` and `match_coaches` as `data_overrides` entity types, and
+  `coaches` (only) as a `data_edits` table name, so a human decision about a coach or a coaching
+  assignment has a durable record that destructive reloads replay and an audit row written in
+  the same transaction as the write. A coaching-assignment edit is audited against its match
+  (`table_name = 'matches'`, `field_group = 'coach_assignment'`) because `match_coaches` has a
+  composite primary key and `data_edits.row_id` is a single bigint.
+- An administrator-created coach — a person AFL Tables publishes no page for — is an ordinary
+  `coaches` row carrying a synthetic `manual:<opaque permanent token>` in **both**
+  `afltables_coach_path` and `name_key`, under the existing `manual_admin_edit` source. Two new
+  CHECKs make that structural rather than conventional: `coaches_path_namespace_ck` confines
+  every identity to one of the two namespaces, and `coaches_manual_identity_ck` forbids a
+  half-namespaced row. The half-namespaced shape is the one that matters — a manual row holding
+  a real `"Surname, Given"` string would raise a unique violation on a *non-target* constraint
+  the first time AFL Tables published that person, which is not an upsert: it aborts the whole
+  nightly coach import batch. No column was relaxed, no unique constraint dropped, no table or
+  column added, and no data was backfilled.
+- `replay_admin_overrides` gains `coaches` and `match_coaches` branches, called from
+  `import_match_coaches.py` at two ordered positions inside the import transaction: coaches
+  immediately after the coaches upsert, assignments after the assignment upsert. The ordering is
+  load-bearing — the `(match_id, club_id)` primary key carries no source, so a source refresh
+  *will* overwrite a manual assignment on a team-match it later covers, and replaying afterwards
+  is what makes the human decision win visibly and durably. Both branches refuse rather than
+  skip: an override whose match key, club slug, coach path or player profile path does not
+  resolve raises before anything is written, naming the offending keys. A coaching-assignment
+  override is keyed `<match_key>|<club slug>`, and because `matches.match_key` is itself
+  pipe-delimited (`season|round|date|home|away`), that key decodes on its **last** delimiter —
+  one decode, read by both the refusal check and the write.
+- Promotion lineage gains a coach identity rule. `coaches.afltables_coach_path` — NOT NULL
+  UNIQUE, minted once, never name-derived — is how a `data_edits` coach row is remapped when the
+  candidate does not share the replaced database's id lineage, and it resolves an
+  administrator-created coach exactly as it resolves a sourced one. The promotion runbook's
+  replay step now names every entity type the CHECK admits and the order they must run in: the
+  `coaches` replay carries an entire row rather than a field patch, so until it runs, a manually
+  created coach does not exist in the promoted database at all.
+
+### Coach administration ships an admin surface, and AFLDB-ISSUE-159 closes (Stage 2, ISSUE-156 P3) - 11 September 2026
+
+- `/admin/coaches` (search by name, filter by provenance / link status / active override, a
+  bounded create panel) and `/admin/coaches/[id]` (read-only identity and provenance, editable
+  metadata, player linkage, club-and-season-bounded coaching assignments) give AFLDB its first
+  coach administration surface. Reading is `data.coaches.read` (Admin and up); every mutation
+  is `data.coaches.edit` (Super Admin only) — a coach edit becomes a public statistical fact
+  immediately, with no draft stage.
+- Creating a coach AFL Tables never published a page for refuses a duplicate outright when an
+  existing coach shares the name and the same-or-unrecorded date of birth, and asks for an
+  explicit confirmation (never a silent guess) when the name matches but the date of birth
+  differs. Player linkage resolves only through the tracked AFL Tables identity
+  (`external_identities`), never by name, and a link a tracked
+  `afltables-contract.json` correction already governs is refused rather than silently
+  overridden.
+- Every mutation — create, edit, link/unlink, assign/clear, retire an override — writes the
+  canonical row, the durable `data_overrides` record and the `data_edits` audit row as one
+  transaction: none of the three survives without the other two.
+- No coach Server Action calls `revalidatePath` in-action (a deliberately more conservative
+  choice than the existing Brownlow/player-links actions): a dedicated
+  `/admin/coaches/revalidate` route does, invoked by the browser only after an action has
+  already resolved.
+- Validated end to end on real DEV (`6299bf8`): a live three-role Playwright permission matrix
+  (Super Admin / Admin / Contributor), responsive and keyboard-focus acceptance at
+  320/768/1000/1280/1920, and the full create/edit/link/assign/override-retirement flow,
+  alongside `npx tsc --noEmit` and 161 affected automated tests, all green. `AFLDB-ISSUE-159`
+  is Resolved; not yet merged to `main`.
+
 ### Admin Centre capabilities are enforced, not decorative (AFLDB-ISSUE-158, ISSUE-156 P2) - 11 September 2026
 
 - Every admin page, route handler and Server Action under `/admin` now authorises through

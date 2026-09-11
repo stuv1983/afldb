@@ -1062,7 +1062,22 @@ describe('lineage-safe reinstatement', () => {
 
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
-      .toEqual(['matches:match_key', 'players:afltables_profile_url']);
+      .toEqual([
+        'coaches:afltables_coach_path', 'matches:match_key', 'players:afltables_profile_url',
+      ]);
+    // AFLDB-ISSUE-159 §5.6. Migration 095 admits 'coaches' into
+    // data_edits.table_name, which obliges a lineage target for it: coaches is
+    // rebuilt on promotion, so the swap renumbers every coach id a human edit
+    // names. 'match_coaches' is deliberately NOT admitted and therefore needs no
+    // target -- a coaching-assignment edit is audited against its match.
+    const coachTarget = edits.find((x) => x.target.kind === 'coaches')!;
+    expect(coachTarget.target).toMatchObject({
+      kind: 'coaches', entity: 'coaches', identity: 'afltables_coach_path',
+    });
+    expect(coachTarget.ref.column).toBe('row_id');
+    expect(coachTarget.ref.kindColumn).toBe('table_name');
+    expect(edits.some((x) => x.target.kind === 'match_coaches')).toBe(false);
+    expect(edits.every((x) => x.target.identity !== 'none')).toBe(true);
     const gridSource = contractByName('external_grid_sources')!;
     const gridTarget = stableLineageTargetForFootballRef(gridSource, 'ingest_source_id', 'sources');
     expect(gridTarget).toMatchObject({ entity: 'sources', identity: 'source_key' });
@@ -1096,7 +1111,9 @@ describe('lineage-safe reinstatement', () => {
   });
 
   it('identifies rows by a stable external key only — never by a name', () => {
-    for (const rule of ['afltables_profile_url', 'match_key', 'source_key'] as const) {
+    for (const rule of [
+      'afltables_profile_url', 'match_key', 'source_key', 'afltables_coach_path',
+    ] as const) {
       const sql = `${LINEAGE_IDENTITY_SQL[rule].byId}\n${LINEAGE_IDENTITY_SQL[rule].byIdentity}`;
       expect(sql).not.toMatch(/display_name|search_name|given_name|surname|full_name/i);
       expect(sql).not.toMatch(/\bilike\b|similarity|levenshtein|soundex/i);
@@ -1109,6 +1126,45 @@ describe('lineage-safe reinstatement', () => {
     expect(LINEAGE_IDENTITY_SQL.afltables_profile_url.byId).toContain("status IN ('unique', 'resolved')");
     expect(LINEAGE_IDENTITY_SQL.match_key.byId).toContain('match_key');
     expect(LINEAGE_IDENTITY_SQL.source_key.byId).toContain('key AS identity');
+
+    // AFLDB-ISSUE-159. The coach identity is the PATH, on a column that is NOT
+    // NULL UNIQUE since migration 087 and is minted once and never edited, so it
+    // denotes the same person on both databases. coaches.name_key is a name, and
+    // the exclusion above must keep catching it if anyone ever swaps them.
+    const coach = LINEAGE_IDENTITY_SQL.afltables_coach_path;
+    expect(coach.entity).toBe('coaches');
+    expect(coach.byId).toContain('afltables_coach_path AS identity');
+    expect(coach.byIdentity).toContain('afltables_coach_path = ANY ($1::text[])');
+    expect(`${coach.byId}\n${coach.byIdentity}`).not.toContain('name_key');
+    // It resolves an admin-created coach exactly as it resolves a sourced one:
+    // no namespace is special-cased, because 'manual:<token>' IS the identity.
+    expect(`${coach.byId}\n${coach.byIdentity}`).not.toMatch(/manual|LIKE/i);
+    expect(coach.description).toContain('manual:<token>');
+  });
+
+  it('AFLDB-ISSUE-159 S-4: the coach target leaves the DEV historical-only declaration coherent', () => {
+    // The refusal this guards against: historicalOnlyProblems() requires a
+    // withheld table's disposition to name EVERY lineage-bound COLUMN of that
+    // table. The coach target is a third target on the EXISTING row_id column,
+    // not a new column, so the DEV declaration still names all of them.
+    const edits = contractByName('data_edits')!;
+    expect(edits.historicalOnly!.environments).toEqual(['dev']);
+    expect(edits.historicalOnly!.columns).toEqual(['row_id']);
+    expect([...new Set((edits.lineageRefs ?? []).map((r) => r.column))]).toEqual(['row_id']);
+    expect(historicalOnlyProblems(edits)).toEqual([]);
+    expect(() => assertContractCoherent()).not.toThrow();
+
+    // And §5.6: coaches / match_coaches get NO PROMOTION_CONTRACT entry. Both are
+    // already registered in afldb_meta.import_writable_tables (087:114-115), so
+    // they are rebuilt data; declaring them here as well would classify them
+    // {kind:'both'}, which is a refusal.
+    for (const name of ['coaches', 'match_coaches']) {
+      expect(contractByName(name), name).toBeUndefined();
+    }
+    // The acceptance checklist names both new entity types in the replay step.
+    const checklist = ACCEPTANCE_CHECKLIST.join('\n');
+    expect(checklist).toContain('coaches');
+    expect(checklist).toContain('match_coaches');
   });
 
   it('remaps Gridley preservation by source key when source and candidate ids differ', () => {
