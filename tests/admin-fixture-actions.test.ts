@@ -15,7 +15,7 @@
  * its cancelled and void states, and that entering a fixture moves no derived
  * statistic — is `tests/integration/admin-fixtures.test.ts`.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1015,5 +1015,78 @@ describe('the frozen vocabularies equal the migration', () => {
     const types = py.slice(py.indexOf('FIXTURE_ROUND_TYPES = ('));
     expect([...types.slice(0, types.indexOf(')')).matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort())
       .toEqual([...FIXTURE_ROUND_TYPES].sort());
+  });
+});
+
+describe('the client/server module boundary', () => {
+  /*
+   * The defect this exists to prevent, found by the combined ISSUE-160..163 DEV
+   * rollout: `SingleFixtureForm.tsx` is a Client Component and imported the
+   * VALUE `MAX_HOME_AND_AWAY_ROUND` from `src/db/queries/admin-fixtures.ts`,
+   * which carries `import 'server-only'`. `npm run build` refused the whole
+   * batch — after the DEV migrations had already been applied — and no unit
+   * test could have caught it, because vitest aliases `server-only` to a stub.
+   *
+   * A `import type` is erased by the compiler and is harmless; only a VALUE
+   * import reaches the bundler, where it would drag `postgres` and
+   * `@/db/client` into the browser. That is the distinction asserted below.
+   *
+   * Scanned over all of `src` rather than the fixture surface alone: four
+   * stacked Admin Centre issues shipped Client Components together and the
+   * failure mode is identical in each, so the guard is worth no more than one
+   * directory walk.
+   */
+  const tsSources = (relativeDir: string): string[] =>
+    readdirSync(join(root, relativeDir), { withFileTypes: true }).flatMap((entry) => {
+      const relative = `${relativeDir}/${entry.name}`;
+      if (entry.isDirectory()) return tsSources(relative);
+      return /\.tsx?$/.test(entry.name) ? [relative] : [];
+    });
+
+  /** Each `import <clause> from '<module>';`, clause and module captured. */
+  const IMPORTS = /^import\s+([^;]*?)from\s+'([^']+)';/gm;
+
+  /** True when nothing in the clause survives compilation. */
+  const typeOnly = (clause: string): boolean => {
+    const trimmed = clause.trim();
+    if (trimmed.startsWith('type ')) return true;
+    const named = /^\{([\s\S]*)\}$/.exec(trimmed);
+    if (!named) return false;
+    return named[1].split(',').every((specifier) => {
+      const s = specifier.trim();
+      return s === '' || s.startsWith('type ');
+    });
+  };
+
+  it('lets no Client Component import a `server-only` database module', () => {
+    const offenders: string[] = [];
+    for (const relative of tsSources('src')) {
+      const source = readSource(relative);
+      if (!/^['"]use client['"];?$/m.test(source)) continue;
+      for (const [, clause, importPath] of source.matchAll(IMPORTS)) {
+        if (importPath.startsWith('@/db/') && !typeOnly(clause)) {
+          offenders.push(`${relative} -> ${importPath}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps the shared fixture vocabulary importable from either side', () => {
+    // The whole point of `@/lib/fixtures/spec`: one definition that the
+    // `<select>` a human sees and the transaction that judges their submission
+    // both read. It earns that only by depending on nothing server-side.
+    // Comments stripped, as everywhere else here: the file EXPLAINS the
+    // `server-only` rule it obeys, and its prose must not read as a breach.
+    const spec = readSource('src/lib/fixtures/spec.ts')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    expect(spec).not.toMatch(/^import\s+'server-only';/m);
+    expect(spec).not.toMatch(/from\s+'@\/db\//);
+    expect(spec).not.toMatch(/\bsql`/);
+    // And it is not a second copy: the server contract re-exports it, so the
+    // vocabulary assertions above — which import from `admin-fixtures` — are
+    // reading exactly these values.
+    expect(moduleCode).toMatch(/export\s*\{[\s\S]*?\}\s*from\s*'@\/lib\/fixtures\/spec';/);
   });
 });

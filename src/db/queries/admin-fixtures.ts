@@ -6,6 +6,14 @@ import postgres from 'postgres';
 
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
+import {
+  FINALS_ROUND_CODES,
+  MAX_BATCH_ROWS,
+  MAX_HOME_AND_AWAY_ROUND,
+  isFixtureRoundType,
+  type FixtureRoundType,
+  type FixtureStatus,
+} from '@/lib/fixtures/spec';
 
 /**
  * Fixture administration: THE fixture mutation contract
@@ -102,60 +110,28 @@ export const FIXTURE_SOURCE_KEY = 'manual_admin_edit';
  */
 export const FIXTURE_LOCK_NAMESPACE = 717275;
 
-/** Every `fixtures.status` the CHECK admits (migration 097). */
-export const FIXTURE_STATUSES = ['scheduled', 'cancelled', 'void'] as const;
-export type FixtureStatus = (typeof FIXTURE_STATUSES)[number];
-
 /**
- * The `round_type` enum exactly as migrations 003 and 084 leave it. The order
- * is the enum's own; nothing depends on it, but it keeps the two readable side
- * by side.
+ * The enum members, finals codes and bounds §9 defines live in
+ * `@/lib/fixtures/spec` and are re-exported here unchanged, so every server
+ * consumer still imports the whole fixture contract from this one module.
+ *
+ * They are kept in a separate, `server-only`-free file because the Stage 2
+ * admin forms are Client Components and need the same values: importing them
+ * from here would drag this module — `postgres`, `@/db/client`, every
+ * transaction — into the browser bundle, which the production build refuses.
+ * Re-exporting rather than duplicating means the `<select>` a human sees and
+ * the transaction that judges their submission read one definition.
  */
-export const FIXTURE_ROUND_TYPES = [
-  'home_and_away',
-  'wildcard_final',
-  'elimination_final',
-  'qualifying_final',
-  'semi_final',
-  'preliminary_final',
-  'grand_final',
-] as const;
-export type FixtureRoundType = (typeof FIXTURE_ROUND_TYPES)[number];
-
-/**
- * The finals `round_code` for each finals `round_type` — the `FINALS_CODES`
- * keys of `tools/migration/import_fitzroy_core.py:166-173`, which is what
- * `matches.round_code` actually holds. The played resolution compares this
- * string to `matches.round_code` verbatim, so it must be that vocabulary and
- * not, for example, the `R<n>`/`Final` rendering `createMatch()` invents
- * (`match-admin.ts:143-159`).
- */
-export const FINALS_ROUND_CODES: Readonly<Record<Exclude<FixtureRoundType, 'home_and_away'>, string>> = {
-  wildcard_final: 'WF',
-  elimination_final: 'EF',
-  qualifying_final: 'QF',
-  semi_final: 'SF',
-  preliminary_final: 'PF',
-  grand_final: 'GF',
-};
-
-/**
- * The highest home-and-away round a fixture may be entered for. Not an
- * assertion that a season HAS 30 rounds — §9 forbids hard-coding a season
- * shape — only the point past which a typed number is certainly a mistake.
- */
-export const MAX_HOME_AND_AWAY_ROUND = 30;
-
-/** The most fixtures one round-batch submission may carry (§14). */
-export const MAX_BATCH_ROWS = 20;
-
-export function isFixtureRoundType(value: unknown): value is FixtureRoundType {
-  return typeof value === 'string' && (FIXTURE_ROUND_TYPES as readonly string[]).includes(value);
-}
-
-export function isFixtureStatus(value: unknown): value is FixtureStatus {
-  return typeof value === 'string' && (FIXTURE_STATUSES as readonly string[]).includes(value);
-}
+export {
+  FINALS_ROUND_CODES,
+  FIXTURE_ROUND_TYPES,
+  FIXTURE_STATUSES,
+  MAX_BATCH_ROWS,
+  MAX_HOME_AND_AWAY_ROUND,
+  isFixtureRoundType,
+  isFixtureStatus,
+} from '@/lib/fixtures/spec';
+export type { FixtureRoundType, FixtureStatus } from '@/lib/fixtures/spec';
 
 // --- entity_key shape (§20) ----------------------------------------------
 

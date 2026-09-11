@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { cancelFixtureAction, reinstateFixtureAction, voidFixtureAction } from '@/app/admin/fixtures/actions';
 import { useFixtureActionSubmit } from '@/app/admin/fixtures/submit-helper';
-import type { FixtureStatus } from '@/db/queries/admin-fixtures';
+import type { FixtureStatus } from '@/lib/fixtures/spec';
 
 /**
  * Lifecycle (AFLDB-ISSUE-162 §16, §37.8 item 8). Three visibly distinct

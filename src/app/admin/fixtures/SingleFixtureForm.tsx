@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 
 import { createFixtureAction } from '@/app/admin/fixtures/actions';
 import { useFixtureActionSubmit } from '@/app/admin/fixtures/submit-helper';
-import { MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/db/queries/admin-fixtures';
+import { MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/lib/fixtures/spec';
 
 const OTHER_VENUE = 'other';
 

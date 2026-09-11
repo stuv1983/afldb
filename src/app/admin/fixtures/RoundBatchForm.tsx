@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { submitFixtureBatchAction } from '@/app/admin/fixtures/actions';
 import { type RoundBatchActionState, useFixtureActionSubmit } from '@/app/admin/fixtures/submit-helper';
-import { MAX_BATCH_ROWS, MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/db/queries/admin-fixtures';
+import { MAX_BATCH_ROWS, MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/lib/fixtures/spec';
 
 const OTHER_VENUE = 'other';
 

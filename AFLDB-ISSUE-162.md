@@ -1659,3 +1659,132 @@ unaffected (no capability, nav or boundary changed); step 5 should be unaffected
   which begins only on the operator's confirmation that no further Admin/Super Admin addition joins it.
 - PROD promotion **deferred**. No public fixture exposure. No DEV or PROD mutation was performed or
   requested at any point in Stage 1, Stage 2 or this audit.
+
+---
+
+## 40. DEV build defect: a Client Component imported the `server-only` fixture module (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+
+### 40.1 What happened
+
+The combined ISSUE-160 + 161 + 162 + 163 DEV rollout reached the production build step on
+`streamanator`. **The database half had already succeeded**: migrations `096_season_list_members`,
+`097_fixtures` and `098_club_leadership` applied, `db:privileges` reconciled, migration status
+98/98 applied / 0 pending. `npm run build` then failed **before any service restart**:
+
+```text
+./src/db/queries/admin-fixtures.ts
+You're importing a module that depends on "server-only".
+This API is only available in Server Components...
+
+Import trace:
+  src/db/queries/admin-fixtures.ts
+  src/app/admin/fixtures/SingleFixtureForm.tsx
+```
+
+### 40.2 Root cause
+
+`admin-fixtures.ts` is the fixture mutation contract; it opens `postgres` transactions and
+`import 'server-only'` is correct and stays. Three §28 Stage 2 Client Components imported *values*
+from it to build their round `<select>` and enforce the batch row cap:
+
+| File | Imported |
+|---|---|
+| `SingleFixtureForm.tsx` | `MAX_HOME_AND_AWAY_ROUND` (+ `type FixtureRoundType`) |
+| `RoundPanel.tsx` | `MAX_HOME_AND_AWAY_ROUND` (+ `type FixtureRoundType`) |
+| `RoundBatchForm.tsx` | `MAX_BATCH_ROWS`, `MAX_HOME_AND_AWAY_ROUND` (+ `type FixtureRoundType`) |
+
+A `import type` is erased by the compiler and never reaches the bundler; a **value** import does,
+and would pull `postgres` and `@/db/client` toward the browser. **No local gate could have caught
+it.** `npx tsc --noEmit` only resolves the alias, and vitest maps `server-only` to
+`tests/stubs/server-only.ts` — only the production bundler enforces the layer. The defect was
+latent from `6a9fbc4`: §38.5 ran `tsc`, four vitest suites, ESLint and `preflight`, none of which
+builds. It is the same reason `src/app/admin/fixtures/validation.ts` was written free of any
+`admin-fixtures.ts` import — the rule was known and applied to the parsing helpers, and missed on
+the vocabulary.
+
+### 40.3 The fix — one shared definition, not a copy
+
+New, deliberately `server-only`-free **`src/lib/fixtures/spec.ts`**, on the `src/lib/edit/spec.ts`
+precedent ("No `server-only`: the admin form renders labels and kinds from this file. It contains
+nothing secret"). It holds the pure §9 vocabulary and nothing else:
+
+`FIXTURE_ROUND_TYPES` / `FixtureRoundType` · `FINALS_ROUND_CODES` · `FIXTURE_STATUSES` /
+`FixtureStatus` · `MAX_HOME_AND_AWAY_ROUND` · `MAX_BATCH_ROWS` · `isFixtureRoundType` ·
+`isFixtureStatus`.
+
+`admin-fixtures.ts` imports the four symbols it uses and **re-exports all eight unchanged**, so
+every existing server consumer — `actions.ts`, the four pages, `tests/admin-fixture-actions.test.ts`
+(including §39's frozen-vocabulary and Python-parity assertions) — keeps importing the whole
+fixture contract from the one module it always did. Re-export rather than duplication is the point:
+a second copy of `FIXTURE_ROUND_TYPES` or `MAX_HOME_AND_AWAY_ROUND` could drift from the one the
+transaction enforces, and the browser would offer a choice the server refuses.
+
+**What deliberately did NOT move:** `import 'server-only'` stays on `admin-fixtures.ts`; no SQL, no
+query function, no transaction, no `PLAYED_RESOLUTION_LATERAL`, no `PlayedState`, no
+`FixtureSeasonBounds`, no `FIXTURE_LOCK_NAMESPACE`, no entity-key or override shape. Vocabulary
+moved; **policy did not**. `renderRound()`, `normaliseSchedule()`, `resolvePlayed()`,
+`isFixtureEditAllowed()` and every precondition are byte-equivalent in behaviour.
+`labels.ts` was left alone: its `PlayedState` import is `import type` and is erased.
+
+**No schema change. Migrations 096-098 were not touched, not re-run and not re-generated.**
+
+### 40.4 Audit for the same defect across the whole stacked batch
+
+Every `'use client'` file in `src/` (88) was checked for a value import of a `server-only` module,
+not only the §28 fixture surface:
+
+- **Offenders: exactly the three above.** All fixed.
+- `LifecyclePanel.tsx` imported `type FixtureStatus` — erased, harmless, and repointed at the spec
+  anyway so the status vocabulary is not split across two modules.
+- `ClubsPanel`, `ReschedulePanel`, `NotesPanel`, `VenuePanel` import nothing from `@/db/` at all.
+- **ISSUE-163**: `AppointLeaderPanel`, `LeadershipPanel`, `LeadershipActions`, `MemberActions` all
+  use `import type` from `admin-club-leadership`; `leadership-labels.ts` likewise. Clean.
+- **ISSUE-160/161** and the rest of `/admin` (Brownlow, data-editor, coaches, content, draft,
+  player-links, access, admins) — every client `@/db/` import is `import type`. Clean.
+- No Client Component imports any `server-only` module under `src/lib/` either: all 83 importers of
+  `auth/session`, `auth/audience`, `auth/rate-limit`, `email/send`, `ingest/*`, `apex-publish`,
+  `brownlow/fingerprint` and `acquisition/settle-status` are Server Components, Server Actions or
+  route handlers.
+- The shared client helpers are clean: both `submit-helper`s, `components/admin/action-submit.ts`,
+  `fixtures/labels.ts`, `fixtures/validation.ts`, `season-lists/validation.ts`.
+
+### 40.5 Regression added
+
+One `describe('the client/server module boundary')` appended to the existing
+`tests/admin-fixture-actions.test.ts` — **no new test file**, per §10 of CLAUDE.md:
+
+1. Walk `src/`; for every file containing `'use client'`, fail on any import from `@/db/` whose
+   clause is not wholly `type`. The type/value distinction is asserted deliberately, because that is
+   exactly what the bundler enforces and what a future reviewer will otherwise get wrong.
+2. `src/lib/fixtures/spec.ts` imports no `@/db/` module, no `server-only` and uses no `sql` tag, and
+   `admin-fixtures.ts` re-exports from it rather than redefining it — so the vocabulary/parity
+   assertions above cannot silently start reading a second copy.
+
+It scans all of `src/` rather than the fixture tree because four stacked Admin Centre issues shipped
+Client Components into one batch and the failure mode is identical in each.
+
+### 40.6 Operator re-gate (the build is the acceptance criterion)
+
+```text
+npx tsc --noEmit
+npx vitest run tests/admin-fixture-actions.test.ts
+npx vitest run tests/data-overrides-source-contract.test.ts
+npx eslint src/lib/fixtures/spec.ts src/db/queries/admin-fixtures.ts \
+  src/app/admin/fixtures/SingleFixtureForm.tsx src/app/admin/fixtures/RoundPanel.tsx \
+  src/app/admin/fixtures/RoundBatchForm.tsx src/app/admin/fixtures/LifecyclePanel.tsx \
+  tests/admin-fixture-actions.test.ts
+npm run build        # the decisive gate
+```
+
+`tests/integration/admin-fixtures.test.ts` is optional here (no behaviour moved) and needs
+`AFLDB_TEST_DATABASE_URL`. `npm run build` is the only step that proves the layer.
+
+### 40.7 State after this fix
+
+- The fix is **uncommitted** and **not validated by any run** — no command was executed for it
+  (CLAUDE.md §9/§12).
+- It was made in the `opus/issue-163-club-leadership` worktree (`D:\dev\afldb-issue-163`). If the
+  rollout builds from `main` at `db96948`, it must be landed there before rebuilding.
+- **DEV database unchanged by this work**: 096/097/098 stay applied, 98/98, privileges reconciled.
+  **No DEV service was deployed or restarted. PROD untouched.**
+- ISSUE-162 remains **OPEN**; ISSUE-163 remains **OPEN**. Rendered DEV acceptance has not happened.

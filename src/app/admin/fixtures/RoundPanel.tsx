@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { changeFixtureRoundAction } from '@/app/admin/fixtures/actions';
 import { useFixtureActionSubmit } from '@/app/admin/fixtures/submit-helper';
-import { MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/db/queries/admin-fixtures';
+import { MAX_HOME_AND_AWAY_ROUND, type FixtureRoundType } from '@/lib/fixtures/spec';
 
 /**
  * Round change (AFLDB-ISSUE-162 §15). Moving round re-runs the §13
