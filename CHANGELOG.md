@@ -48,8 +48,53 @@ commit.
 - Every appointment is durably recorded and is re-created by the same replay that restores
   administered coaches, players, draft selections and playing lists, so a rebuild or a production
   promotion cannot lose one -- including the ended and void ones.
-- Backend only so far: the administration screens and the club page's leadership block are the next
-  stage, and nothing is user-visible yet.
+- Backend only in this stage: see the Stage 2 entry immediately below for the administration
+  screens and the public club page block.
+
+### Club leadership ships an admin surface and a public club page block (AFLDB-ISSUE-163 Stage 2, ISSUE-156 P3e) - 12 September 2026
+
+- A **Leadership** section on the existing `/admin/season-lists/[season]/[club]` page lets Admin
+  (read) and Super Admin (appoint/replace/end/reinstate/correct/void) see and maintain a club's
+  captains and vice-captains: a "Current" grouping (Captain/Co-captains, Vice-captain/Vice-captains),
+  a collapsed History of ended appointments, and voided appointments behind their own "show voided"
+  toggle, kept visually distinct rather than hidden. Every row links to its own audit trail. No new
+  route, no new nav item and no new capability -- `data.seasonLists.read`/`.edit` are reused exactly
+  as planned.
+- The player selector for appointing or replacing a leader is the club's own season-list membership
+  only -- never a global player search and never free text -- with each candidate's own current role
+  annotated so a second captain is never chosen by accident.
+- **A second active captain is never recorded silently.** Appointing or reinstating a captain
+  alongside a sitting one is refused until the operator explicitly confirms the co-captaincy; the
+  refusal names who is already captain, and the interface's only next step is a clearly-worded
+  "confirm co-captaincy" action -- there is no checkbox that defaults to checked and no automatic
+  retry.
+- **Replacing a leader is one workflow, not two separate edits.** Replace shows what will happen --
+  which appointment ends, who begins, from when -- before anything is submitted, and always leaves
+  both the outgoing and incoming appointment as their own honest rows.
+- End and Void are two different concepts, never sibling buttons: ending says an appointment was
+  valid and has ceased; voiding says the record should never have existed, requires a mandatory
+  reason, and is terminal -- a voided appointment offers no further controls, exactly as an
+  already-void fixture record does. Correcting an appointment can only change its dates and note;
+  changing who held a role, or which club or season it was for, is deliberately not offered here --
+  that is a void plus a new appointment.
+- Every mutation carries the appointment's last-seen `updatedAt`; a page left open while someone
+  else changed the same appointment is refused with a plain "reload and try again" rather than
+  silently overwriting the other change.
+- The season overview (`/admin/season-lists/[season]`) gains a Captain column -- one name, "Co-
+  captains" for two or more, or an empty state, with a marker when an active leader is no longer on
+  the club's list. Vice-captains are deliberately not shown in this column.
+- The public club page gains a compact current-leadership block, directly below the club's season
+  totals, for the continuing identity only: Captain/Co-captains and Vice-captain/Vice-captains, each
+  name linking to the player, omitted entirely when nothing is currently active. A leadership change
+  revalidates only the affected organisation's own `/clubs/<slug>` paths, through a new
+  capability-gated `/admin/season-lists/revalidate` route that admits nothing else -- the first
+  season-list mutation with a public consumer.
+- The club page's existing Captains history table was fixed to key each row on its own database id
+  rather than on `season` + player name, which could collide when the same player held two
+  appointments in one season (ended, then re-appointed) -- a rendering fix, not a data change.
+- Responsive: the Leadership section uses stacked controls rather than a wide table, and remains
+  usable at 375px; rendered browser acceptance across roles and widths is deferred to the combined
+  Admin Centre DEV batch, per the operator's release-batching decision.
 
 ### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
 

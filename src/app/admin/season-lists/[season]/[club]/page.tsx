@@ -5,8 +5,11 @@ import { notFound } from 'next/navigation';
 import { AddPlayerPanel } from '@/app/admin/season-lists/AddPlayerPanel';
 import { AppearancesReviewPanel } from '@/app/admin/season-lists/AppearancesReviewPanel';
 import { DraftSuggestionsPanel } from '@/app/admin/season-lists/DraftSuggestionsPanel';
+import { LeadershipPanel } from '@/app/admin/season-lists/LeadershipPanel';
+import { LEADERSHIP_ROLE_LABELS } from '@/app/admin/season-lists/leadership-labels';
 import { MemberActions } from '@/app/admin/season-lists/MemberActions';
 import { sql } from '@/db/client';
+import { readClubSeasonLeadership } from '@/db/queries/admin-club-leadership';
 import {
   administrableListSeasons,
   eligibleClubsForSeason,
@@ -95,7 +98,7 @@ export default async function SeasonListClubPage(
   });
 
   const isFirstSeason = season === FIRST_LIST_SEASON;
-  const [playedNotListed, appearances, draftees, departed] = await Promise.all([
+  const [playedNotListed, appearances, draftees, departed, leadership] = await Promise.all([
     readPlayedNotListed(season, clubSlug),
     isFirstSeason ? readAppearanceReviewCandidates(season, clubSlug) : Promise.resolve([]),
     canEdit ? readDraftSuggestions(season, clubSlug) : Promise.resolve([]),
@@ -103,7 +106,18 @@ export default async function SeasonListClubPage(
     // against an earlier AUTHORITATIVE list -- for 2027 the appearances
     // review panel below already shows this exact set, clearly labelled.
     isFirstSeason ? Promise.resolve([]) : readDepartedSincePreviousList(season, clubSlug),
+    // AFLDB-ISSUE-163 §17: every appointment for this club-season, active,
+    // ended and void, already ordered current-first.
+    readClubSeasonLeadership(season, clubSlug),
   ]);
+
+  // The Appoint/Replace candidate pool is exactly this club-season's own
+  // list membership (§9, L-8, L-11) -- never the global player picker.
+  const leadershipCandidates = members.map((member) => ({
+    playerId: member.playerId,
+    displayName: member.displayName,
+    activeLeadershipRole: member.activeLeadershipRole,
+  }));
 
   // The ISSUE-160 handoff (§14): `?add=<playerId>` pre-fills the Add panel;
   // the add itself is still an explicit Super Admin confirmation below.
@@ -166,6 +180,9 @@ export default async function SeasonListClubPage(
                     <a href={playerPath(member.playerSlug, member.playerId)}>{member.displayName}</a>
                     {member.draftPickId !== null && <> <span className="badge">Draftee</span></>}
                     {member.awaitingIdentity && <> <span className="badge">Awaiting AFL Tables identity</span></>}
+                    {member.activeLeadershipRole && (
+                      <> <span className="badge">{LEADERSHIP_ROLE_LABELS[member.activeLeadershipRole]}</span></>
+                    )}
                   </td>
                   <td>
                     {ORIGIN_LABELS[member.origin] ?? member.origin}
@@ -186,6 +203,7 @@ export default async function SeasonListClubPage(
                         currentClubSlug={member.clubSlug}
                         expectedUpdatedAt={member.updatedAt}
                         eligibleClubs={eligible.map((c) => ({ slug: c.slug, name: c.name }))}
+                        activeLeadershipRole={member.activeLeadershipRole}
                       />
                     </td>
                   )}
@@ -198,6 +216,14 @@ export default async function SeasonListClubPage(
           </table>
         </div>
       </section>
+
+      <LeadershipPanel
+        season={season}
+        clubSlug={clubSlug}
+        canEdit={canEdit}
+        rows={leadership}
+        members={leadershipCandidates}
+      />
 
       {playedNotListed.length > 0 && (
         <section className="section">

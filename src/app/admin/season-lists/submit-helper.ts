@@ -18,6 +18,15 @@ import { type AdminActionState, useAdminActionSubmit } from '@/components/admin/
  */
 export type SeasonListActionState = AdminActionState;
 
+/**
+ * Club leadership action state (AFLDB-ISSUE-163 Stage 2). Adds `reason` —
+ * the backend's `LeadershipRefusalReason` enum value, not the refusal
+ * sentence — so a panel can distinguish `co_captaincy_unconfirmed` (offer a
+ * deliberate "confirm co-captaincy" step) from every other refusal (show the
+ * message and stop), without parsing prose.
+ */
+export type LeadershipActionState = SeasonListActionState & { reason?: string };
+
 export type CopyForwardClubPlan = {
   clubSlug: string;
   clubName: string;
@@ -33,14 +42,16 @@ export type CopyForwardActionState = AdminActionState & {
 };
 
 /**
- * AFLDB-ISSUE-161 §10/§20 (binding): no public consumer of a season list
- * exists yet, so every season-list Server Action returns
- * `revalidatePaths: []` and no `/admin/season-lists/revalidate` route is
- * created in this issue. `useAdminActionSubmit`'s `postRevalidate()` returns
- * before it ever fetches when `paths.length === 0`, so this endpoint is
- * NEVER requested -- it is named as the route a future public consumer
- * would add, not left as an empty string, so that addition has an
- * unambiguous, already-agreed home.
+ * AFLDB-ISSUE-161 §10/§20 reserved this endpoint while no public consumer of
+ * a season list existed, so every ISSUE-161 action returned
+ * `revalidatePaths: []` and the route itself did not exist yet.
+ * AFLDB-ISSUE-163 Stage 2 is that public consumer: `/admin/season-lists/
+ * revalidate/route.ts` now exists, and the club leadership actions
+ * (`leadership-actions.ts`) are the first to return a non-empty
+ * `revalidatePaths`. Every other season-list action still returns `[]`, and
+ * `useAdminActionSubmit`'s `postRevalidate()` returns before it ever fetches
+ * when `paths.length === 0`, so this endpoint is requested only after a
+ * leadership mutation actually changes a public club page.
  */
 const REVALIDATE_ENDPOINT = '/admin/season-lists/revalidate';
 

@@ -827,10 +827,14 @@ is now `('players', 'matches', 'draft_picks', 'season_list_members', 'club_leade
 does **not** depend on `season_list_members`, so there is no ordering cycle. Deploy order for the
 batch is now **096 → 097 → 098 → `npm run db:privileges` → code**.
 
+**Stage 2 built 2026-09-12 (Sonnet 5 high), uncommitted, not yet validated.** The Leadership
+section and Appoint panel on the season-list club page, the Captain column on the season overview,
+the capability-gated `/admin/season-lists/revalidate` route, the public `ClubLeadership` block, and
+`tests/admin-club-leadership-actions.test.ts` are all now in the working tree — see
+`AFLDB-ISSUE-163.md` §33 for the full record. No new capability, no stop condition fired.
+
 Next: the operator runs the Stage 1 validation of `AFLDB-ISSUE-163.md` §32.11 (apply 098 to
-`afldb_test` only, `db:privileges`, tsc, the contract suites, the integration suites, ESLint),
-reviews and commits, then Stage 2 (Leadership section and Appoint panel on the season-list club
-page, the Captain column on the season overview, the capability-gated
-`/admin/season-lists/revalidate` route, the public `ClubLeadership` block, and
-`tests/admin-club-leadership-actions.test.ts`) in a fresh session. P4–P12 remain unallocated
-placeholders.
+`afldb_test` only, `db:privileges`, tsc, the contract suites, the integration suites, ESLint) —
+Stage 1 remains a precondition for Stage 2's own validation (§33) — reviews and commits both stages
+separately, then the operator's local completion audit mirroring P3c/P3d before the combined
+160+161+162+163 DEV batch. P4–P12 remain unallocated placeholders.

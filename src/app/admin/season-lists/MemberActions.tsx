@@ -3,7 +3,9 @@
 import { useState } from 'react';
 
 import { removeSeasonListMemberAction, transferSeasonListMemberAction } from '@/app/admin/season-lists/actions';
+import { LEADERSHIP_ROLE_LABELS } from '@/app/admin/season-lists/leadership-labels';
 import { useSeasonListActionSubmit } from '@/app/admin/season-lists/submit-helper';
+import type { LeadershipRole } from '@/db/queries/admin-club-leadership';
 
 /**
  * Remove or transfer ONE membership row (AFLDB-ISSUE-161 §12.2, §13). One
@@ -19,6 +21,7 @@ import { useSeasonListActionSubmit } from '@/app/admin/season-lists/submit-helpe
  */
 export function MemberActions({
   season, membershipId, playerName, currentClubSlug, expectedUpdatedAt, eligibleClubs,
+  activeLeadershipRole,
 }: {
   season: number;
   membershipId: number;
@@ -26,7 +29,13 @@ export function MemberActions({
   currentClubSlug: string;
   expectedUpdatedAt: string;
   eligibleClubs: { slug: string; name: string }[];
+  /** AFLDB-ISSUE-163 §9: warns, never blocks — 161's contract is unchanged. */
+  activeLeadershipRole?: LeadershipRole | null;
 }) {
+  const leadershipWarning = activeLeadershipRole && (
+    <> {playerName} is the active {season} {LEADERSHIP_ROLE_LABELS[activeLeadershipRole].toLowerCase()};
+    the appointment stays recorded until you end it.</>
+  );
   const remove = useSeasonListActionSubmit(removeSeasonListMemberAction, {});
   const transfer = useSeasonListActionSubmit(transferSeasonListMemberAction, {});
   const [mode, setMode] = useState<'none' | 'remove' | 'transfer'>('none');
@@ -62,6 +71,7 @@ export function MemberActions({
       <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.8rem', minWidth: '12rem' }}>
         <p role="alert">
           Remove {playerName} from the {season} list? This cannot be undone from this page.
+          {leadershipWarning}
         </p>
         {remove.state.error && <p className="notice" role="alert">{remove.state.error}</p>}
         <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -80,6 +90,7 @@ export function MemberActions({
     const destinations = eligibleClubs.filter((club) => club.slug !== currentClubSlug);
     return (
       <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.8rem', minWidth: '12rem' }}>
+        {leadershipWarning && <p role="alert">Transferring {playerName}?{leadershipWarning}</p>}
         <label style={{ display: 'grid', gap: '0.2rem' }}>
           Transfer to
           <select value={toClub} onChange={(event) => setToClub(event.target.value)} disabled={isPending}>

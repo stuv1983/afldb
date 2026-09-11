@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { ClubCoachRecords } from '@/components/ClubCoachRecords';
 import { ClubCrowdRecords } from '@/components/ClubCrowdRecords';
 import { ClubHonours } from '@/components/ClubHonours';
+import { ClubLeadership } from '@/components/ClubLeadership';
 import { ClubMatchRecords } from '@/components/ClubMatchRecords';
 import { ClubPlayers } from '@/components/ClubPlayers';
 import { ClubPremierships } from '@/components/ClubPremierships';
@@ -21,6 +22,7 @@ import {
   getClubCaptains,
   getClubHonours,
 } from '@/db/queries/awards';
+import { getClubCurrentLeadership } from '@/db/queries/club-leadership';
 import {
   getClub,
   getClubCrowdRecords,
@@ -111,11 +113,16 @@ export default async function ClubPage({
   // a page headed "Footscray" must not list 2016.
   const isContinuing = club.currentIdentityId === club.id;
 
+  // AFLDB-ISSUE-163 §20.1 (D-12): the current-leadership block belongs only
+  // to the continuing identity's page — an era page keeps its Captains
+  // history table but never carries a "current" statement.
+  const showsCurrentLeadership = isContinuing && club.isCurrent;
+
   const [
     totals, eraTotals, seasons, leaders, goalkickers, lineage, relations,
     bestAndFairest, captains, coachRecords, premierships,
     matchRecords, crowdRecords, clubPlayers, premiershipPlayers,
-    brownlowMedallists, honours,
+    brownlowMedallists, honours, currentLeadership,
   ] = await Promise.all([
     getClubTotals(club.id),
     getClubEraTotals(club.id),
@@ -134,6 +141,7 @@ export default async function ClubPage({
     getClubPremiershipPlayers(club.id),
     getClubBrownlowMedallists(club.id),
     getClubHonours(club.id),
+    showsCurrentLeadership ? getClubCurrentLeadership(club.id) : Promise.resolve(null),
   ]);
 
   const winRate = totals.played > 0
@@ -379,14 +387,21 @@ export default async function ClubPage({
                 ...(hasLineage ? [{ key: 'played_as', label: 'Played as', sortType: 'text' as const }] : []),
               ]}
               items={captains.map((c) => ({
-                id: `${c.season}-${c.playerName}`,
+                // AFLDB-ISSUE-163 §32.12 known limitation, fixed: keying on
+                // `${season}-${playerName}` collided when the same player
+                // held two appointments in one season (ended, re-appointed).
+                // `c.id` is already unique -- legacy rows keep their
+                // `captaincies.id`, canonical rows carry a negated
+                // `club_leadership.id` (opaque UI identity; never rely on
+                // the sign) -- so it can never collide.
+                id: String(c.id),
                 values: {
                   season: c.season,
                   captain: c.playerName,
                   ...(hasLineage ? { played_as: c.identityName } : {}),
                 },
                 element: (
-                  <tr key={`${c.season}-${c.playerName}`}>
+                  <tr key={c.id}>
                     <td>{c.season}</td>
                     <td className="wide">
                       {c.playerId && isLinked(c.linkStatus) ? (
@@ -666,6 +681,8 @@ export default async function ClubPage({
           <div className="label">Wooden spoons</div>
         </div>
       </div>
+
+      {currentLeadership && <ClubLeadership leadership={currentLeadership} />}
 
       <ReorderableSections storageKey={`/clubs/${club.slug}`} sections={sections} />
     </>

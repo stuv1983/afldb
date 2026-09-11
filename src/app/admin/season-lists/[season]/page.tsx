@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CopyForwardPanel } from '@/app/admin/season-lists/CopyForwardPanel';
+import { readLeadershipOverview } from '@/db/queries/admin-club-leadership';
 import {
   administrableListSeasons,
   FIRST_LIST_SEASON,
@@ -49,16 +50,22 @@ export default async function SeasonListOverviewPage(
   // §9.1: the eligibility rule needs no fixture and no club_seasons row for a
   // future season, so this page renders correctly for a season with zero
   // matches (§9.4).
-  const [overview, changes] = await Promise.all([
+  const [overview, changes, leadership] = await Promise.all([
     readSeasonListOverview(season),
     readSeasonListChanges(season),
+    // AFLDB-ISSUE-163 §18: the Captain column reads the leadership overview
+    // query directly -- never re-derived here, so admin and public can never
+    // disagree about who is captain.
+    readLeadershipOverview(season),
   ]);
   const isFirstSeason = season === FIRST_LIST_SEASON;
   const changesBySlug = new Map(changes.map((entry) => [entry.clubSlug, entry]));
+  const leadershipBySlug = new Map(leadership.map((entry) => [entry.clubSlug, entry]));
 
   const populated = overview.filter((club) => club.members > 0).length;
   const emptyClubs = overview.filter((club) => club.members === 0)
     .map((club) => ({ slug: club.clubSlug, name: club.clubName }));
+  const captainsRecorded = leadership.filter((club) => club.captains.length > 0).length;
 
   return (
     <>
@@ -68,6 +75,7 @@ export default async function SeasonListOverviewPage(
         <p className="subtitle">
           {populated} of {overview.length} clubs have a {season} list. Until every eligible club is
           populated, an empty club is UNKNOWN rather than confirmed empty (§8).
+          {' '}{captainsRecorded} of {overview.length} clubs have a {season} captain recorded.
         </p>
       </div>
 
@@ -94,18 +102,38 @@ export default async function SeasonListOverviewPage(
                 <th scope="col" className="num">
                   {isFirstSeason ? `Change vs ${season - 1} appearances (non-authoritative)` : `Change vs ${season - 1} list`}
                 </th>
+                <th scope="col">Captain</th>
                 <th scope="col"></th>
               </tr>
             </thead>
             <tbody>
               {overview.map((club) => {
                 const change = changesBySlug.get(club.clubSlug);
+                const clubLeadership = leadershipBySlug.get(club.clubSlug);
                 return (
                   <tr key={club.clubSlug}>
                     <td>{club.clubName}</td>
                     <td className="num">{formatNumber(club.members)}</td>
                     <td className="num">
                       {change ? `+${formatNumber(change.added)} / −${formatNumber(change.departed)}` : '—'}
+                    </td>
+                    <td>
+                      {!clubLeadership || clubLeadership.captains.length === 0
+                        ? '—'
+                        : clubLeadership.captains.join(' · ')}
+                      {clubLeadership && clubLeadership.unlistedActive > 0 && (
+                        <>
+                          {' '}
+                          <span
+                            className="badge badge-warn"
+                            role="img"
+                            aria-label="An active leader is no longer on this club's list"
+                            title="An active leader is no longer on this club's list"
+                          >
+                            !
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td>
                       <Link href={`/admin/season-lists/${season}/${club.clubSlug}`} className="btn btn-secondary">
