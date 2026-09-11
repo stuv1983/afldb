@@ -24045,13 +24045,47 @@ file was touched:** `createFixture()`, `resolvePlayed()`, `PLAYED_RESOLUTION_LAT
 `PLAYED_RESULT_FACTS` are unchanged, and no `NODE_ENV` special case, stored `match_id`/`match_key`,
 date/venue matching or relaxed ambiguity was introduced.
 
+### Stage 1 committed
+
+Stage 1 (backend, migration 097, replay, promotion classification) is committed on this branch at
+`cb98c67` ("Implement AFLDB-ISSUE-162 Stage 1 fixture backend"), per the operator's Stage 2
+briefing. Not merged, not deployed, DEV and PROD untouched.
+
+### Stage 2 implementation (2026-09-11, Sonnet 5 high, UNCOMMITTED)
+
+Built the `/admin/fixtures` admin surface against `AFLDB-ISSUE-162.md` §28 (routes), §23
+(capabilities), §14 (batch preview/confirm), §16/§37.8 item 8 (lifecycle) and §27 (diagnostics).
+Full record: `AFLDB-ISSUE-162.md` §38. Summary: capabilities `data.fixtures.read` (Admin+) /
+`data.fixtures.edit` (Super Admin) declared and enforced at every new page/action boundary; a
+"Fixtures" nav entry after "Season lists"; four routes (`/admin/fixtures`, `/[season]`,
+`/[season]/new`, `/[season]/[fixtureKey]`); a single-fixture form and a round-batch form sharing
+one Server Action for preview and confirm, Confirm bound to the exact previewed row snapshot (the
+`CopyForwardPanel` lesson); one panel per §15 field group (reschedule, venue, round, clubs, notes)
+so each panel maps to exactly one mutation and one audit `field_group`; cancel/reinstate/void
+rendered as three visibly different controls, cancel and void each requiring an explicit
+confirmation and a mandatory reason, void described as more severe than cancelling and, when the
+current state is `cancelled`, explicitly named as a reclassification; a played fixture shows only
+its identity, schedule and Notes, with the other panels omitted (convenience only — the backend's
+`played_locked` gate is the real boundary). `tests/auth.test.ts` extended: `EQUIVALENT_ROLE_GUARD`
+gains both capabilities (the file would not typecheck otherwise) and the three hard-coded
+Data-group nav-order assertions now include `/admin/fixtures`. No Stage 1 file was touched and no
+true Stage 1 defect was found. No new test file: matching the ISSUE-161 Stage 2 precedent exactly,
+`validation.ts`'s form-parsing helpers are trivial pass-throughs and get no dedicated suite: the
+gate is `tests/auth.test.ts` plus typecheck/eslint/build, with live Playwright and the responsive
+matrix deferred to the combined Admin Centre DEV batch (§34). One clarification recorded (§38.2
+item 1): §24's "entity-link helper in `data-edits.ts`" does not describe a real extension point —
+that module is the unrelated `/admin/data-editor` reader/writer, and the audit entity page is
+already fully generic; the fixture detail page links to `/admin/audit/entity/fixtures/<id>` inline,
+exactly as the coach and draft detail pages already do.
+
 ### Next action
 
-**Operator runs `npx vitest run tests/integration/admin-fixtures.test.ts`, expecting 36/36**, then
-the compact re-gate: `npx tsc --noEmit`; `tests/admin-fixture-actions.test.ts`; the three contract
-suites; the ISSUE-161 / reference / match regressions; ESLint over the changed files;
-`git diff --check` and `git status --short`. Steps 1 and 2 of §Validation — preflight and the
-all-refs migration-097 collision check — have **still never run** and remain binding. Then the
-operator reviews the diff and commits. Stage 2 (`/admin/fixtures` surface, including the
-destructive-confirmation void control) is a fresh session. No DEV update, no deploy, no PROD, no
-merge of ISSUE-160/161 first. ISSUE-162 is **not resolved**.
+**Operator runs the Stage 2 validation** (`AFLDB-ISSUE-162.md` §38.5): `npm run preflight --
+mode implementation --issue 162`; `npx tsc --noEmit`; `npx vitest run tests/auth.test.ts`; the
+Stage 1 regression set (`admin-fixture-actions`, the three contract suites,
+`tests/integration/admin-fixtures.test.ts` expecting 36/36 per the prior pass) to confirm Stage 2
+did not disturb it; ESLint over every Stage 2 file; `git diff --check` and `git status --short`.
+Steps 1 and 2 of the Stage 1 §Validation record — preflight and the all-refs migration-097
+collision check — have **still never run** and remain binding alongside the Stage 2 gates. Then the
+operator reviews the diff and commits. No DEV update, no deploy, no PROD, no merge of ISSUE-160/161
+first. ISSUE-162 is **not resolved**: Stage 2 is code-complete but unvalidated by a run.

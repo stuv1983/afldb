@@ -1360,3 +1360,118 @@ date or venue matching, no relaxed ambiguity. **No production file was touched b
 Next: `npx vitest run tests/integration/admin-fixtures.test.ts`, expecting **36/36**, then the
 compact re-gate of §37.7 (typecheck, the unit and contract suites, the ISSUE-161 regressions, ESLint,
 `git diff --check`) plus the two §37.10 gates that have still never run.
+
+---
+
+## 38. Stage 2 implementation record (2026-09-11, Sonnet 5 high, UNCOMMITTED)
+
+Stage 1 is committed on this branch (`cb98c67`, per the operator's Stage 2 briefing) and treated as
+pinned. Executed against §28 (routes), §23 (capabilities), §14 (batch UX), §16/§37.8 item 8
+(lifecycle) and §27 (diagnostics) as the implementation contract. No Stage 1 file
+(`src/db/queries/admin-fixtures.ts`, `097_fixtures.sql`, `tools/migration/common.py`,
+`promotion-inventory.ts`) was touched; no true Stage 1 defect was found.
+
+### 38.1 What was built
+
+| File | Change |
+|---|---|
+| `src/lib/auth/capabilities.ts` | **changed** — `data.fixtures.read` (Admin+) / `data.fixtures.edit` (Super Admin) added to the `Capability` union and `CAPABILITY_ROLES` |
+| `src/app/admin/nav-model.ts` | **changed** — "Fixtures" added to the Data group, after "Season lists" |
+| `src/app/admin/fixtures/validation.ts` | **new** — pure form-parsing helpers, mirroring `season-lists/validation.ts` |
+| `src/app/admin/fixtures/submit-helper.ts` | **new** — `useFixtureActionSubmit`, wrapping the shared `useAdminActionSubmit` (ISSUE-160 D-9); `RoundBatchActionState` mirrors `CopyForwardActionState` |
+| `src/app/admin/fixtures/labels.ts` | **new** — round/played-state/status display strings, presentation-only |
+| `src/app/admin/fixtures/actions.ts` | **new** — 10 Server Actions: create, submit-batch (preview+confirm share one action, the `copySeasonListsForwardAction` shape), reschedule, change-venue, change-round, change-clubs, update-notes, cancel, reinstate, void. Every action asserts `data.fixtures.edit` as the first awaited call; every refusal returns `revalidatePaths: []` |
+| `src/app/admin/fixtures/page.tsx` | **new** — `/admin/fixtures`, `data.fixtures.read` |
+| `src/app/admin/fixtures/[season]/page.tsx` | **new** — `/admin/fixtures/[season]`, `data.fixtures.read` |
+| `src/app/admin/fixtures/[season]/new/page.tsx` | **new** — `/admin/fixtures/[season]/new`, `data.fixtures.edit` |
+| `src/app/admin/fixtures/[season]/[fixtureKey]/page.tsx` | **new** — `/admin/fixtures/[season]/[fixtureKey]`, `data.fixtures.read` (edit reveals panels) |
+| `src/app/admin/fixtures/SingleFixtureForm.tsx` | **new** — round-at-a-time single-row create |
+| `src/app/admin/fixtures/RoundBatchForm.tsx` | **new** — the batch entry flow: header, up to `MAX_BATCH_ROWS` rows, paste pre-fill, preview, fingerprint-gated confirm |
+| `src/app/admin/fixtures/ReschedulePanel.tsx`, `VenuePanel.tsx`, `RoundPanel.tsx`, `ClubsPanel.tsx`, `NotesPanel.tsx`, `LifecyclePanel.tsx` | **new** — one panel per §15/§16 field group, so the UI boundary matches the audit boundary exactly |
+| `tests/auth.test.ts` | **changed** — `EQUIVALENT_ROLE_GUARD` gains both capabilities (required for the file to typecheck, since it is a `Record<Capability, …>`); the three hard-coded nav-order assertions extended with `/admin/fixtures` |
+| `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`, `AFLDB-ISSUE-162.md`, `AFLDB-ISSUE-156.md` | tracking |
+
+No new test *file* was added for Stage 2. This mirrors the ISSUE-161 Stage 2 precedent exactly:
+`season-lists/validation.ts` has never had a dedicated test file, `tests/admin-season-list-actions.test.ts`
+is Stage 1's pure-backend suite, and Stage 2's own gate there was `tests/auth.test.ts` plus typecheck/
+eslint/build — never a new UI test file. The fixture form-parsing helpers are the same shape
+(trivial pass-throughs; business validation stays server-side in Stage 1). Live Playwright and the
+responsive matrix are deferred to §34's combined Admin Centre DEV batch, as planned.
+
+### 38.2 Deviations / clarifications from the runbook
+
+1. **§24's "entity-link helper in `src/db/queries/data-edits.ts` gains a `fixtures` case" does not
+   describe a real extension point.** `data-edits.ts` is the generic `/admin/data-editor` read/write
+   module (players and matches only, pre-dating the entity-link pattern); the audit viewer's entity
+   page (`/admin/audit/entity/[table]/[rowId]`) is already fully generic over `DataEditTableName`
+   (which gained `'fixtures'` in Stage 1, `audit-view.ts`'s `fixtures: 'Fixtures'` label included) and
+   needs no per-table code. Every existing detail page (`coaches/[id]`, `draft/[id]`) links to it by
+   building the href inline, not through a shared helper function. The fixture detail page does
+   exactly the same: `Link href={/admin/audit/entity/fixtures/${fixture.id}}`. §24 is satisfied; no
+   `data-edits.ts` change was needed or made.
+2. **Panel-per-field-group, not fewer, larger panels.** §15's table names six distinct field groups
+   (`fixture_schedule`, `fixture_venue`, `fixture_round`, `fixture_clubs`, plus lifecycle and notes).
+   Six panels were built instead of combining them, so each panel's one submit button maps to
+   exactly one backend mutation and one audit `field_group` — no panel can accidentally bundle two
+   unrelated changes into one CAS-guarded request.
+3. **Round-batch row transport is one hidden JSON field (`rowsJson`), not N sets of named fields.**
+   The row count is dynamic (1..20, add/remove client-side); a fixed-name-per-row scheme would need
+   either 20 always-present field sets or index-juggling. The server parses the JSON narrowly (shape
+   only: every id must already be a JS `number`, never a coerced string) before it ever reaches
+   `createFixtures()` — a row missing a club selection fails the parse rather than being coerced to
+   club id 0, and the client additionally disables Preview until every row has both clubs chosen.
+4. **The paste-to-rows parser resolves names to ids by exact case-insensitive match only, client-side,
+   as §14 requires** ("the server never receives free text as a fixture; it receives ids"). An
+   unresolved club or venue name is left blank in the row rather than guessed; the operator finishes
+   it from the `<select>`s.
+5. **The "Opening Round is round 1" note (§9) is surfaced once, on the single-fixture form's round-
+   number label, for `season >= 2024`.** It is not repeated on every round heading in the season list
+   or the batch form, to avoid cluttering a table that already reads unambiguously ("Round 1").
+6. **The played-match link goes to the public `/matches/[id]` page** (§28's own wording), not an
+   admin match-edit route — there is no established Admin route for viewing a single match by id
+   outside the data editor's match-sheet mode, and the public page is the "existing… view" §28 names.
+7. **The season page's diagnostics badge and per-season landing-page counts both call
+   `classifyFixtureDiagnostics()` directly** (via the same three reads `readFixtureDiagnostics()`
+   composes) rather than the composed helper, so the landing page's per-season `played` count can be
+   derived from the same already-fetched fixture rows without a second season read. No diagnostic
+   rule was duplicated or changed.
+
+### 38.3 Played-fixture UX
+
+Once `isPlayedState(fixture.playedState)` is true, the detail page renders only the identity/
+schedule table, Notes and a one-line explanation — Reschedule, Venue, Round, Clubs and Lifecycle
+are not rendered at all. This is UI convenience only, never the boundary: every action still
+asserts `data.fixtures.edit` first, and `editFixture()`'s `isFixtureEditAllowed()` gate still
+refuses `played_locked` on its own account for any field group but `fixture_notes`, so a forged
+request against a hidden panel's action is refused by the backend exactly as ISSUE-155 §27.27 K
+proved for Brownlow. `played_home_away_differs` and `scheduleDiffersFromResult` render as explicit
+warnings beside the played badge; `ambiguous` renders as an `alert`-role notice stating AFLDB
+deliberately linked nothing, with no match link and no lock (an unlinked fixture stays an ordinary,
+editable fixture, per §18/D-6).
+
+### 38.4 Not built / deferred
+
+Everything §37.6 named stays deferred to the combined Admin Centre DEV batch (§34): live Playwright,
+the three-role rendered permission matrix, and responsive acceptance at 320/768/1000/1280/1920 (the
+CSS is written to the same stacked-card conventions as `season-lists`/`draft`, but has not been
+opened in a browser). No DEV/PROD mutation was made or requested.
+
+### 38.5 Validation — NOT YET RUN
+
+Nothing below has executed. In order, from `D:\dev\afldb-issue-162`:
+
+1. `npm run preflight -- --mode implementation --issue 162`
+2. `npx tsc --noEmit`
+3. `npx vitest run tests/auth.test.ts`
+4. `npx vitest run tests/admin-fixture-actions.test.ts tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts` (Stage 1 regression, unchanged)
+5. `npx vitest run tests/integration/admin-fixtures.test.ts` (Stage 1 regression, unchanged — expect 36/36 per §37.11)
+6. `npx eslint` over every file listed in §38.1
+7. `git diff --check` and `git status --short`
+8. `npm run build` (local, no deploy) if the operator wants build-level confidence beyond `tsc`
+
+A failure in 3 most likely means a nav-order or capability-table assertion this record missed;
+a failure in 2 most likely means a type mismatch between an action's `FormData` parsing and a
+Stage 1 mutation's input type. Neither should require touching Stage 1.
+
+ISSUE-162 remains **not resolved**: Stage 2 is code-complete but unvalidated by a run, uncommitted,
+not merged, not deployed to DEV, PROD untouched.

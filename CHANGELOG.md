@@ -48,6 +48,34 @@ commit.
 - Backend only in this stage: there is no public fixture page and no admin screen yet. Deploying it
   requires migration 097, then `npm run db:privileges`, then the application code, in that order.
 
+### Fixture administration ships an admin surface (AFLDB-ISSUE-162 Stage 2, ISSUE-156 P3d) - 11 September 2026
+
+- `/admin/fixtures`, `/admin/fixtures/[season]`, `/admin/fixtures/[season]/new` and
+  `/admin/fixtures/[season]/[fixtureKey]` give Admin (read) and Super Admin (edit) a supported way
+  to see and maintain a season's schedule: the season selector shows every administrable season
+  with its fixture, round, played, TBC and cancelled counts and a diagnostics badge; the season
+  page groups fixtures by round with filters (round, club, status, TBC-only, played/unplayed, show
+  voided) and a diagnostics panel that only ever reports; the detail page shows the read-time played
+  resolution with a link to the match once it uniquely resolves, and locks every schedule/round/
+  venue/club control once played -- notes remain editable regardless of state.
+- Two entry paths: a single-fixture form, and a round-at-a-time batch with an optional
+  paste-to-prefill textarea. The batch is previewed server-side before anything is written, and
+  Confirm is bound to the exact rows that preview described -- any change to a row or the round
+  header after previewing retires it and asks for a fresh preview, the `CopyForwardPanel` lesson
+  from season-list administration. A round is written all-or-nothing: one invalid row leaves the
+  whole round uncommitted.
+- Cancel, reinstate and void render as three visibly different actions, never equivalent buttons.
+  Cancel and void each require an explicit confirmation and a reason; void is described as more
+  severe than cancelling -- "this record should never have existed", not "this game did not
+  happen" -- and voiding an already-cancelled fixture says plainly that it reclassifies a real
+  cancellation as a data-entry error. Void is terminal and offers no reinstate.
+- New capabilities `data.fixtures.read` (Admin and Super Admin) and `data.fixtures.edit` (Super
+  Admin only) are declared and enforced at every page and Server Action boundary this issue adds;
+  entering a score or result is not among them -- that stays with match administration. A Fixtures
+  link appears in the Admin Centre sidebar's Data group, after Season lists, for anyone who holds
+  `data.fixtures.read`. No public page changes and no revalidation route was added: every action
+  here returns no paths to revalidate.
+
 ### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
 
 - Until now AFLDB held no concept of a **playing list**. Every player-club relationship it stored

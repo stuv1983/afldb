@@ -45,6 +45,8 @@ export type Capability =
   | 'data.draft.edit'
   | 'data.seasonLists.read'
   | 'data.seasonLists.edit'
+  | 'data.fixtures.read'
+  | 'data.fixtures.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -104,6 +106,16 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // matching data.coaches.edit / data.draft.edit. No Admin mutation.
   'data.seasonLists.read': ADMIN_AND_UP,
   'data.seasonLists.edit': SUPER_ADMIN_ONLY,
+  // Fixture / season schedule administration (AFLDB-ISSUE-162 §23). Reading
+  // a scheduled fixture, its diagnostics and its played resolution widens no
+  // boundary an Admin does not already have -- fixtures are never public
+  // (D-7) and operations.audit.read already gives an Admin the full edit
+  // trail. Creating, rescheduling, cancelling or voiding a fixture has no
+  // draft stage and is the class of mutation data.seasonLists.edit /
+  // data.draft.edit already gate. Result entry is NOT a fixture capability:
+  // scores live in matches and stay owned by data.dataEditor / the settle.
+  'data.fixtures.read': ADMIN_AND_UP,
+  'data.fixtures.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

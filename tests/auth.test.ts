@@ -631,12 +631,14 @@ describe('adminNavFor', () => {
     // lists (AFLDB-ISSUE-161 §16: data.seasonLists.read is ADMIN_AND_UP too)
     // -- an Admin reaches all four but none of their mutating capabilities.
     // Operations appears from AFLDB-ISSUE-157 and holds exactly the audit
-    // trail: every other Operations link is still super-admin-only.
+    // trail: every other Operations link is still super-admin-only. Fixtures
+    // (AFLDB-ISSUE-162 §23: data.fixtures.read is ADMIN_AND_UP too) joins the
+    // same four.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
       'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
-    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists']);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
   });
 
@@ -665,10 +667,10 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
   });
 
-  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists', () => {
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures', () => {
     const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
     expect(data?.links.map((l) => l.href)).toEqual([
-      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists',
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures',
     ]);
   });
 
@@ -1130,6 +1132,8 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'data.draft.edit': 'requireSuperAdmin',
   'data.seasonLists.read': 'requireAdmin',
   'data.seasonLists.edit': 'requireSuperAdmin',
+  'data.fixtures.read': 'requireAdmin',
+  'data.fixtures.edit': 'requireSuperAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',
