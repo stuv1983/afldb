@@ -881,6 +881,11 @@ label {
   vertical-align: middle;
 }
 .badge-warn { background: transparent; color: var(--draw); }
+/* The severity above warn: an `invalid` diagnostic, an ambiguous played
+   resolution, a refused batch row (AFLDB-ISSUE-162 §27). Colour is never the
+   only signal -- every one of these badges spells its state out in the label
+   -- so this reinforces the text rather than carrying it. */
+.badge-danger { background: transparent; color: var(--loss); border-color: var(--loss); }
 /* A badge that follows something in the same cell needs air before it; one
    standing alone in a cell does not. */
 * + .badge { margin-left: 0.35rem; }

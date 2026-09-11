@@ -6,7 +6,7 @@ import { createAwardWinner, createHallOfFameInductee, createHonourTeamMember } f
 import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch } from '@/db/queries/match-admin';
 import { saveMatchSheet } from '@/db/queries/match-sheet';
-import { createPlayer, type DraftPickInput } from '@/db/queries/players';
+import { createPlayer } from '@/db/queries/players';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 import { EDITABLE_ENTITIES } from '@/lib/edit/spec';
 import { audit, requireCapability } from '@/lib/auth/session';
@@ -77,38 +77,19 @@ export async function createPlayerAction(
 
   const notes = String(formData.get('notes') ?? '').trim() || null;
 
-  // Draft information (optional)
-  const recruitedFrom = String(formData.get('recruitedFrom') ?? '').trim() || null;
-  const rawDraftYear = formData.get('draftYear');
-  const draftYear = rawDraftYear !== null && rawDraftYear !== ''
-    && Number.isInteger(Number(rawDraftYear)) ? Number(rawDraftYear) : null;
-  const draftType = String(formData.get('draftType') ?? '').trim() || null;
-  const rawPickNumber = formData.get('pickNumber');
-  const pickNumber = rawPickNumber && Number.isInteger(Number(rawPickNumber)) ? Number(rawPickNumber) : null;
-  const rawDraftClubId = formData.get('draftClubId');
-  const draftClubId = rawDraftClubId && Number.isInteger(Number(rawDraftClubId)) ? Number(rawDraftClubId) : null;
-  const rawDraftAge = formData.get('draftAge');
-  const draftAge = rawDraftAge && Number.isInteger(Number(rawDraftAge)) ? Number(rawDraftAge) : null;
-  const pickNote = String(formData.get('pickNote') ?? '').trim() || null;
-
-  const hasDraftInfo = Boolean(
-    recruitedFrom || rawDraftYear || draftType || rawPickNumber
-    || rawDraftClubId || rawDraftAge || pickNote,
-  );
-  let draftInfo: DraftPickInput | null = null;
-  if (hasDraftInfo) {
-    if (draftYear === null || draftYear < 1981 || draftYear > 2100) {
-      return { error: 'A valid draft year (1981–2100) is required with draft details.' };
-    }
-    draftInfo = {
-      recruitedFrom,
-      draftYear,
-      draftType,
-      pickNumber,
-      clubId: draftClubId,
-      draftAge,
-      pickNote,
-    };
+  // AFLDB-ISSUE-160 D-5. Draft selections have exactly one mutation contract
+  // now (`src/db/queries/admin-draft.ts`), reached from /admin/draft. This
+  // form created a `draft_picks` row with `source_id`, `player_url` and
+  // `source_record_id` all NULL: outside every identity, absent from a
+  // promoted database, and reachable by the generic editor only under a
+  // shared `null|null|<year>|null` override key. Rejecting the fields here --
+  // rather than ignoring them -- means a stale client cannot silently drop a
+  // selection an administrator believed they had recorded.
+  const DRAFT_FIELDS = [
+    'recruitedFrom', 'draftYear', 'draftType', 'pickNumber', 'draftClubId', 'draftAge', 'pickNote',
+  ];
+  if (DRAFT_FIELDS.some((field) => String(formData.get(field) ?? '').trim() !== '')) {
+    return { error: 'Draft selections are edited in /admin/draft.' };
   }
 
   try {
@@ -124,7 +105,6 @@ export async function createPlayerAction(
       heightCm,
       weightKg,
       notes,
-      draftInfo,
     }, { adminUserId: admin.id, note: notes });
 
     let warning: string | undefined;
@@ -132,7 +112,6 @@ export async function createPlayerAction(
       await audit('player.created', {
         playerId: player.id,
         displayName: player.displayName,
-        hasDraftInfo: Boolean(draftInfo),
       }, { userId: admin.id, label: admin.email });
     } catch (error) {
       console.error('Failed to log administrative audit for player creation', error);
@@ -142,7 +121,7 @@ export async function createPlayerAction(
     revalidatePath('/', 'layout');
 
     return {
-      message: `Created player "${player.displayName}" (ID #${player.id})${draftInfo ? ' with draft selection record' : ''}.`,
+      message: `Created player "${player.displayName}" (ID #${player.id}).`,
       createdId: player.id,
       warning,
     };
@@ -415,6 +394,12 @@ export async function saveDataEdit(
   const entityKey = String(formData.get('entity') ?? '');
   const entity = EDITABLE_ENTITIES[entityKey];
   if (!entity) return { error: 'Unknown entity.' };
+  // AFLDB-ISSUE-160 D-5: one draft mutation contract, and it is not this one.
+  // Refused here as well as in saveEdit() so the boundary is visible at the
+  // Server Action, which is what a stale client actually reaches.
+  if (entityKey === 'draft_picks') {
+    return { error: 'Draft selections are edited in /admin/draft.' };
+  }
 
   const rowId = Number(formData.get('rowId'));
   if (!Number.isInteger(rowId) || rowId <= 0) return { error: 'Bad row id.' };

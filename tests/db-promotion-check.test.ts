@@ -176,14 +176,17 @@ function migrationImportWritableTables(): Set<string> {
  */
 const PINNED_FOOTBALL_TABLES = [
   'after_siren_kicks', 'award_nominations', 'award_winners', 'awards', 'brownlow_round_votes',
-  'brownlow_season_votes', 'captaincies', 'club_aliases', 'club_organization_relations',
+  'brownlow_season_votes', 'captaincies', 'club_aliases', 'club_leadership',
+  'club_organization_relations',
   'club_organizations', 'club_seasons', 'coaches',
   'clubs', 'data_issues', 'derived_rebuilds', 'draft_persons', 'draft_picks', 'external_identities',
-  'father_son_selections', 'hall_of_fame', 'honour_team_members', 'import_batches', 'import_rejections',
+  'father_son_selections', 'fixtures',
+  'hall_of_fame', 'honour_team_members', 'import_batches', 'import_rejections',
   'match_coaches', 'match_period_scores', 'matches', 'player_achievements', 'player_birth_evidence',
   'player_career_stats', 'player_height_evidence',
   'player_club_season_stats', 'player_clubs', 'player_match_stats',
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
+  'season_list_members',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',
 ];
 
@@ -1063,8 +1066,22 @@ describe('lineage-safe reinstatement', () => {
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
       .toEqual([
-        'coaches:afltables_coach_path', 'matches:match_key', 'players:afltables_profile_url',
+        'club_leadership:appointment_key',
+        'coaches:afltables_coach_path', 'draft_picks:draft_pick_key',
+        'fixtures:fixture_key',
+        'matches:match_key', 'players:afltables_profile_url',
       ]);
+    // AFLDB-ISSUE-160 D-3. 'draft_picks' had been admitted by
+    // data_edits_table_name_check since migration 057 with NO lineage target, so a
+    // draft audit row was reinstated with its integer row_id unchanged and was never
+    // counted, listed or remapped -- on a lineage-changing promotion that integer names
+    // a different selection. The target makes the gate remap it or stop.
+    const draftTarget = edits.find((x) => x.target.kind === 'draft_picks')!;
+    expect(draftTarget.target).toMatchObject({
+      kind: 'draft_picks', entity: 'draft_picks', identity: 'draft_pick_key',
+    });
+    expect(draftTarget.ref.column).toBe('row_id');
+    expect(draftTarget.ref.kindColumn).toBe('table_name');
     // AFLDB-ISSUE-159 §5.6. Migration 095 admits 'coaches' into
     // data_edits.table_name, which obliges a lineage target for it: coaches is
     // rebuilt on promotion, so the swap renumbers every coach id a human edit
@@ -1077,6 +1094,34 @@ describe('lineage-safe reinstatement', () => {
     expect(coachTarget.ref.column).toBe('row_id');
     expect(coachTarget.ref.kindColumn).toBe('table_name');
     expect(edits.some((x) => x.target.kind === 'match_coaches')).toBe(false);
+    // AFLDB-ISSUE-162 §20/§24. Migration 097 admits 'fixtures' into
+    // data_edits.table_name, which obliges a lineage target for the same
+    // reason: fixtures is an import-writable registry table, so the swap
+    // renumbers every fixture id a human edit names. Unlike a season-list
+    // membership — which is DELETABLE and is therefore audited against its
+    // player instead — a fixture is NEVER deleted (cancelled and void keep the
+    // row) and the override replay re-creates every one of them in the
+    // candidate before this remap runs, so every fixture audit row resolves.
+    const fixtureTarget = edits.find((x) => x.target.kind === 'fixtures')!;
+    expect(fixtureTarget.target).toMatchObject({
+      kind: 'fixtures', entity: 'fixtures', identity: 'fixture_key',
+    });
+    expect(fixtureTarget.ref.column).toBe('row_id');
+    expect(fixtureTarget.ref.kindColumn).toBe('table_name');
+    // AFLDB-ISSUE-163 §19. Migration 098 admits 'club_leadership' into
+    // data_edits.table_name, which obliges a lineage target for the same
+    // reason once more: club_leadership is an import-writable registry table,
+    // so the swap renumbers every appointment id a human edit names. An
+    // appointment is never deleted (ended and void keep the row) and the
+    // override replay re-creates every one of them in the candidate before
+    // this remap runs, so every leadership audit row resolves.
+    const leadershipTarget = edits.find((x) => x.target.kind === 'club_leadership')!;
+    expect(leadershipTarget.target).toMatchObject({
+      kind: 'club_leadership', entity: 'club_leadership', identity: 'appointment_key',
+    });
+    expect(leadershipTarget.ref.column).toBe('row_id');
+    expect(leadershipTarget.ref.kindColumn).toBe('table_name');
+    expect(edits.some((x) => x.target.kind === 'season_list_members')).toBe(false);
     expect(edits.every((x) => x.target.identity !== 'none')).toBe(true);
     const gridSource = contractByName('external_grid_sources')!;
     const gridTarget = stableLineageTargetForFootballRef(gridSource, 'ingest_source_id', 'sources');
@@ -1113,6 +1158,7 @@ describe('lineage-safe reinstatement', () => {
   it('identifies rows by a stable external key only — never by a name', () => {
     for (const rule of [
       'afltables_profile_url', 'match_key', 'source_key', 'afltables_coach_path',
+      'draft_pick_key', 'fixture_key',
     ] as const) {
       const sql = `${LINEAGE_IDENTITY_SQL[rule].byId}\n${LINEAGE_IDENTITY_SQL[rule].byIdentity}`;
       expect(sql).not.toMatch(/display_name|search_name|given_name|surname|full_name/i);
@@ -1140,6 +1186,125 @@ describe('lineage-safe reinstatement', () => {
     // no namespace is special-cased, because 'manual:<token>' IS the identity.
     expect(`${coach.byId}\n${coach.byIdentity}`).not.toMatch(/manual|LIKE/i);
     expect(coach.description).toContain('manual:<token>');
+
+    // AFLDB-ISSUE-160. The players rule admits a SECOND identity namespace -- the
+    // manual token an admin-created player is minted with -- without ever admitting a
+    // name. DISTINCT ON with the AFL Tables path ordered first keeps one player to one
+    // identity, so a player known by token on the replaced side and by path in the
+    // candidate still resolves.
+    const players = LINEAGE_IDENTITY_SQL.afltables_profile_url;
+    expect(players.byId).toContain("s.key = 'manual_admin_edit'");
+    expect(players.byId).toContain("match_method = 'manual_admin_edit'");
+    expect(players.byId).toContain('DISTINCT ON (ei.player_id)');
+    expect(players.byIdentity).toContain('DISTINCT ON (ei.player_id)');
+    expect(players.byId).toContain("ORDER BY ei.player_id, (s.key <> 'afltables')");
+    expect(players.byIdentity).toContain("ORDER BY ei.player_id, (s.key <> 'afltables')");
+
+    // AFLDB-ISSUE-160 D-3. The draft key is the SOURCE KEY, never the per-database
+    // sources.id -- the id is renumbered by a rebuild and would silently rename every
+    // selection. A selection with no source_id has no key at all and is absent from
+    // both directions, so it reports unresolved instead of being carried by an integer.
+    const draft = LINEAGE_IDENTITY_SQL.draft_pick_key;
+    expect(draft.entity).toBe('draft_picks');
+    expect(draft.byId).toContain("s.key || '|' || dp.player_url");
+    expect(draft.byIdentity).toContain("s.key || '|' || dp.player_url");
+    expect(`${draft.byId}\n${draft.byIdentity}`).not.toMatch(/player_name_raw|club_name_raw/);
+    expect(`${draft.byId}\n${draft.byIdentity}`).toContain('JOIN public.sources s ON s.id = dp.source_id');
+    expect(draft.description).toContain('manual:<token>');
+
+    // AFLDB-ISSUE-162 D-6 and the operator constraint of 2026-09-11. A fixture
+    // resolves through the UUID token it was minted with and never through a
+    // match_key: `fixtures` carries no match_key and no match_id column at all,
+    // because "played" is a read-time resolution rather than a stored link.
+    // The column is NOT NULL and a fixture is never deleted, so a cancelled or
+    // void row resolves exactly as a scheduled one does.
+    const fixture = LINEAGE_IDENTITY_SQL.fixture_key;
+    expect(fixture.entity).toBe('fixtures');
+    expect(fixture.byId).toContain('fixture_key AS identity');
+    expect(fixture.byIdentity).toContain('fixture_key = ANY ($1::text[])');
+    const fixtureSql = `${fixture.byId}\n${fixture.byIdentity}`;
+    expect(fixtureSql).not.toContain('match_key');
+    expect(fixtureSql).not.toContain('match_id');
+    expect(fixtureSql).not.toMatch(/round_code|match_date|venue|club/i);
+
+    // AFLDB-ISSUE-163 §5. An appointment resolves through the UUID token it
+    // was minted with, never through (club, season, player, role): that tuple
+    // recurs when a player is re-appointed later in the same season, and every
+    // other candidate component is a fact an administrator may correct. The
+    // column is NOT NULL and an appointment is never deleted, so an ended or
+    // void row resolves exactly as an active one does.
+    const appointment = LINEAGE_IDENTITY_SQL.appointment_key;
+    expect(appointment.entity).toBe('club_leadership');
+    expect(appointment.byId).toContain('appointment_key AS identity');
+    expect(appointment.byIdentity).toContain('appointment_key = ANY ($1::text[])');
+    const appointmentSql = `${appointment.byId}\n${appointment.byIdentity}`;
+    // (The table's own name contains "club", so the exclusion names the FACTS a
+    // natural key would have been built from, not that substring.)
+    expect(appointmentSql).not.toMatch(/display_name|player_name|\bseason\b|\brole\b|club_id/i);
+  });
+
+  it('AFLDB-ISSUE-160 D-3: draft selections remap by identity, and a NULL-source row refuses', () => {
+    // Source-owned and manual selections both resolve; the pre-ISSUE-160 admin row,
+    // which carries no key on either side, is 'no_identity_in_replaced' -- reported,
+    // never dropped and never carried by its old integer.
+    const remap = resolveLineageRemap({
+      entity: 'draft_picks',
+      rule: 'draft_pick_key',
+      referencedIds: [10, 11, 12],
+      replacedIdentities: [
+        { id: 10, identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national' },
+        { id: 11, identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie' },
+      ],
+      candidateIdentities: [
+        { id: 900, identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national' },
+        { id: 901, identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie' },
+      ],
+    });
+    expect(remap.mapped).toEqual([
+      {
+        oldId: 10, newId: 900,
+        identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national',
+      },
+      {
+        oldId: 11, newId: 901,
+        identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie',
+      },
+    ]);
+    expect(remap.unresolved).toEqual([{ oldId: 12, reason: 'no_identity_in_replaced' }]);
+    expect(remap.merges).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-160: a manual player resolves by token, and by path once it is attached', () => {
+    // The token-only player (never debuted) and the path+token player (debuted, the
+    // identity attached by 6.5 and bound onto the candidate by the §8.1 replay) both
+    // map to exactly one candidate row, and neither is ambiguous despite holding two
+    // identity rows -- that is what DISTINCT ON with the path ordered first buys.
+    const remap = resolveLineageRemap({
+      entity: 'players',
+      rule: 'afltables_profile_url',
+      referencedIds: [4, 5],
+      replacedIdentities: [
+        { id: 4, identity: 'aa11bb22-cc33-dd44-ee55-ff6677889900' },
+        { id: 5, identity: 'players/S/Some_Player0.html' },
+      ],
+      candidateIdentities: [
+        { id: 7004, identity: 'aa11bb22-cc33-dd44-ee55-ff6677889900' },
+        { id: 7005, identity: 'players/S/Some_Player0.html' },
+      ],
+    });
+    expect(remap.unresolved).toEqual([]);
+    expect(remap.mapped.map((m) => `${m.oldId}->${m.newId}`)).toEqual(['4->7004', '5->7005']);
+  });
+
+  it('AFLDB-ISSUE-160 W-16: the draft target leaves the DEV historical-only declaration coherent', () => {
+    // data_edits is historical-only on DEV and names row_id. The new target is a third
+    // KIND on that same column, not a new column, so the disposition still names every
+    // lineage-bound column -- and assertContractCoherent() is the thing that says so.
+    const edits = contractByName('data_edits')!;
+    expect(edits.historicalOnly!.columns).toEqual(['row_id']);
+    expect([...new Set(lineageTargetsOf(edits).map((x) => x.ref.column))]).toEqual(['row_id']);
+    expect(() => assertContractCoherent()).not.toThrow();
+    expect(promotionContractProblems()).toEqual([]);
   });
 
   it('AFLDB-ISSUE-159 S-4: the coach target leaves the DEV historical-only declaration coherent', () => {
@@ -1158,13 +1323,30 @@ describe('lineage-safe reinstatement', () => {
     // already registered in afldb_meta.import_writable_tables (087:114-115), so
     // they are rebuilt data; declaring them here as well would classify them
     // {kind:'both'}, which is a refusal.
-    for (const name of ['coaches', 'match_coaches']) {
+    // AFLDB-ISSUE-161 §19 / W-8 is the same shape: season_list_members is
+    // registered by migration 096's grant_import_write, so it is rebuilt data
+    // and must have NO PROMOTION_CONTRACT entry. An unclassified table refuses
+    // every promotion phase (R-3) and a doubly-classified one is {kind:'both'},
+    // which also refuses — so this assertion and its presence in
+    // PINNED_FOOTBALL_TABLES above are the two halves of the classification.
+    // AFLDB-ISSUE-162 §20 / R-1 is the same shape again: fixtures is registered
+    // by migration 097's grant_import_write, so it is rebuilt data and must
+    // have NO PROMOTION_CONTRACT entry.
+    // AFLDB-ISSUE-163 §19 / R-20 is the same shape once more: club_leadership
+    // is registered by migration 098's grant_import_write, so it is rebuilt
+    // data and must have NO PROMOTION_CONTRACT entry.
+    for (const name of [
+      'coaches', 'match_coaches', 'season_list_members', 'fixtures', 'club_leadership',
+    ]) {
       expect(contractByName(name), name).toBeUndefined();
     }
-    // The acceptance checklist names both new entity types in the replay step.
+    // The acceptance checklist names every new entity type in the replay step.
     const checklist = ACCEPTANCE_CHECKLIST.join('\n');
     expect(checklist).toContain('coaches');
     expect(checklist).toContain('match_coaches');
+    expect(checklist).toContain('season_list_members');
+    expect(checklist).toContain('fixtures');
+    expect(checklist).toContain('club_leadership');
   });
 
   it('remaps Gridley preservation by source key when source and candidate ids differ', () => {

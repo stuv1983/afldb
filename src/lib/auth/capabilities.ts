@@ -41,6 +41,12 @@ export type Capability =
   | 'data.brownlow.finalise'
   | 'data.coaches.read'
   | 'data.coaches.edit'
+  | 'data.draft.read'
+  | 'data.draft.edit'
+  | 'data.seasonLists.read'
+  | 'data.seasonLists.edit'
+  | 'data.fixtures.read'
+  | 'data.fixtures.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -83,6 +89,33 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // data.dataEditor and data.playerLinks.
   'data.coaches.read': ADMIN_AND_UP,
   'data.coaches.edit': SUPER_ADMIN_ONLY,
+  // Draft administration (AFLDB-ISSUE-160 D-6). Reading draft provenance and
+  // override state widens no boundary an Admin does not already have -- draft
+  // selections are public, and operations.audit.read already gives an Admin
+  // the full edit trail. New-player-through-draft creation and AFL Tables
+  // identity attachment are covered by data.draft.edit, not a third
+  // capability: both are person-identity decisions, exactly the class of
+  // mutation data.draft.edit already gates.
+  'data.draft.read': ADMIN_AND_UP,
+  'data.draft.edit': SUPER_ADMIN_ONLY,
+  // Season list administration (AFLDB-ISSUE-161 §16). Reading a club's list
+  // widens no boundary an Admin does not already have -- lists are (future)
+  // public facts and operations.audit.read already gives an Admin the full
+  // edit trail. A list change becomes a public fact the moment a consumer
+  // ships, there is no draft stage, and copy-forward is a bulk write --
+  // matching data.coaches.edit / data.draft.edit. No Admin mutation.
+  'data.seasonLists.read': ADMIN_AND_UP,
+  'data.seasonLists.edit': SUPER_ADMIN_ONLY,
+  // Fixture / season schedule administration (AFLDB-ISSUE-162 §23). Reading
+  // a scheduled fixture, its diagnostics and its played resolution widens no
+  // boundary an Admin does not already have -- fixtures are never public
+  // (D-7) and operations.audit.read already gives an Admin the full edit
+  // trail. Creating, rescheduling, cancelling or voiding a fixture has no
+  // draft stage and is the class of mutation data.seasonLists.edit /
+  // data.draft.edit already gate. Result entry is NOT a fixture capability:
+  // scores live in matches and stay owned by data.dataEditor / the settle.
+  'data.fixtures.read': ADMIN_AND_UP,
+  'data.fixtures.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

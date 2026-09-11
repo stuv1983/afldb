@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { EDITABLE_ENTITIES, validateFieldValue } from '@/lib/edit/spec';
@@ -71,5 +74,41 @@ describe('EDITABLE_ENTITIES integrity', () => {
         expect(forbidden, `${entity.key}.${key}`).not.toContain(key);
       }
     }
+  });
+});
+
+describe('AFLDB-ISSUE-160 D-5: the draft spec survives, the draft WRITER does not', () => {
+  const draft = EDITABLE_ENTITIES.draft_picks;
+
+  it('keeps draft_picks as the field spec the new surface validates with', () => {
+    // The spec entry is not the writer. /admin/draft validates against exactly this
+    // catalogue, so removing it would move field bounds into a second place.
+    expect(draft).toBeDefined();
+    expect(draft.table).toBe('draft_picks');
+    expect(Object.keys(draft.groups).sort())
+      .toEqual(['measurements', 'notes', 'player_info', 'selection_facts']);
+  });
+
+  it('adds the selection_facts group the generic editor never had', () => {
+    // Pick number and club are the two source facts most often wrong, and correcting
+    // either was impossible without inventing a second draft writer.
+    expect(draft.groups.selection_facts.fields).toEqual(['pick_number', 'club_slug']);
+    expect(draft.fields.pick_number).toMatchObject({ kind: 'integer', nullable: true });
+    // The club travels as a SLUG. A club id posted by a browser is meaningless the
+    // moment a promotion renumbers it, and the era-correct identity has to be resolved
+    // against draft_year server-side anyway (J-6/J-7).
+    expect(draft.fields.club_slug).toMatchObject({ kind: 'text', nullable: false });
+    expect(Object.keys(draft.fields)).not.toContain('club_id');
+  });
+
+  it('refuses a draft edit at the generic editor, rather than writing a second contract', () => {
+    const source = readFileSync(join(process.cwd(), 'src/db/queries/data-edits.ts'), 'utf8');
+    expect(source).toContain("if (input.entityKey === 'draft_picks') {");
+    expect(source).toContain("return { ok: false, error: 'Draft selections are edited in /admin/draft.' };");
+    // The natural-key branch that produced 'null|null|<year>|null' is gone with it
+    // (DEF-1): one key shared by every admin pick of a year, which the UNIQUE made the
+    // second edit overwrite and which no replay could ever match.
+    expect(source).not.toContain('applyDraftPickEdit');
+    expect(source).not.toMatch(/row\.source_id\}\|\$\{row\.player_url/);
   });
 });

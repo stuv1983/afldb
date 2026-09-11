@@ -75,6 +75,22 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  *                          an admin-created coach (AFLDB-ISSUE-159 §1). Minted once and
  *                          never edited, so it survives a rebuild on both databases.
  *                          Deliberately NOT `coaches.name_key`: that is a name.
+ *   fixture_key            fixtures.fixture_key — NOT NULL UNIQUE since migration 097, the
+ *                          UUID token `createFixture()` mints once and never edits. It
+ *                          denotes the same scheduled match on both databases across every
+ *                          reschedule, venue change, round correction and club correction,
+ *                          and it is NOT replaced by a `match_key` when the game is played
+ *                          (AFLDB-ISSUE-162 D-6): `fixtures` carries no `match_key` and no
+ *                          `match_id` column at all, so this is the only identity a fixture
+ *                          audit row can resolve through.
+ *   appointment_key        club_leadership.appointment_key — NOT NULL UNIQUE since migration
+ *                          098, the UUID token appointLeader()/replaceLeader() mints once and
+ *                          never edits. It denotes the same leadership appointment on both
+ *                          databases across every date correction, note, end, reinstatement
+ *                          and voiding (AFLDB-ISSUE-163 §5). Deliberately NOT derived from
+ *                          (club, season, player, role): that tuple RECURS when a player is
+ *                          re-appointed later in the same season, and every other candidate
+ *                          component is a fact an administrator is expected to change.
  *   none                   NO stable identity exists in this repository for the entity this
  *                          column points at. The column therefore CANNOT be remapped, and
  *                          across a lineage change the checker refuses rather than
@@ -86,7 +102,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  * prevent.
  */
 export type LineageIdentityRule =
-  'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path' | 'none';
+  'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path'
+  | 'draft_pick_key' | 'fixture_key' | 'appointment_key' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -334,11 +351,50 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         // (migration 095) obliges a lineage target for it, because coaches is
         // rebuilt on promotion and its ids are renumbered by the swap.
         { kind: 'coaches', entity: 'coaches', identity: 'afltables_coach_path' },
+        // AFLDB-ISSUE-160 D-3. 'draft_picks' has been admitted by
+        // data_edits_table_name_check since migration 057, but it had no lineage
+        // target -- so a draft audit row was reinstated with its row_id integer
+        // unchanged and was never counted, listed or remapped, because the gate
+        // enumerates only the declared targets. On a lineage-changing promotion
+        // that integer then names a DIFFERENT selection: silent misattribution,
+        // exactly what AFLDB-ISSUE-142 (B) exists to prevent. With the target the
+        // row is remapped through the selection's stable key, or the gate reports
+        // FAIL and the promotion stops before the swap. On a shared lineage the
+        // gate passes unchanged, as today.
+        { kind: 'draft_picks', entity: 'draft_picks', identity: 'draft_pick_key' },
+        // AFLDB-ISSUE-162 §20. Migration 097 admits 'fixtures' into
+        // data_edits_table_name_check, which OBLIGES a lineage target for it:
+        // fixtures is an import-writable registry table, so it is rebuilt on
+        // promotion and its ids are renumbered by the swap. Without the target
+        // a fixture audit row would be reinstated with its row_id integer
+        // unchanged and would silently name a DIFFERENT fixture — the exact
+        // AFLDB-ISSUE-142 (B) failure. Every fixture resolves, because a
+        // fixture is never deleted (cancelled and void keep the row) and the
+        // data_overrides replay (§8) re-creates every one of them in the
+        // candidate — void and cancelled included — before this remap runs.
+        { kind: 'fixtures', entity: 'fixtures', identity: 'fixture_key' },
+        // AFLDB-ISSUE-163 §19. Migration 098 admits 'club_leadership' into
+        // data_edits_table_name_check, which OBLIGES a lineage target for it
+        // for the same reason again: club_leadership is an import-writable
+        // registry table, so it is rebuilt on promotion and its ids are
+        // renumbered by the swap. Unlike a season-list membership — which is
+        // DELETABLE and is therefore audited against its player — an
+        // appointment is NEVER deleted (ended and void keep the row), and the
+        // data_overrides replay (§8) re-creates every one of them in the
+        // candidate — ended and void included — before this remap runs, so
+        // every leadership audit row resolves.
+        { kind: 'club_leadership', entity: 'club_leadership', identity: 'appointment_key' },
       ],
       remediation: 'Every entity here has a stable identity, so every row is remappable in '
         + 'principle: resolve row_id through the AFL Tables profile url (players), '
-        + 'matches.match_key, or coaches.afltables_coach_path, and apply the generated '
-        + 'per-row UPDATEs after the reinstate. A coach edit resolves the same way whether '
+        + 'matches.match_key, coaches.afltables_coach_path, fixtures.fixture_key, '
+        + 'club_leadership.appointment_key, or the '
+        + 'draft selection key '
+        + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), and apply the "
+        + 'generated per-row UPDATEs after the reinstate. A draft audit row whose selection '
+        + 'carries no source_id at all (a pre-AFLDB-ISSUE-160 admin row) has NO stable key and '
+        + 'is reported unresolved: adopt that selection in /admin/draft first, which mints its '
+        + 'identity, or decide it explicitly. A coach edit resolves the same way whether '
         + 'the coach is source-owned or admin-created: the path is the identity either way, '
         + "'coaches/<Given>_<Surname><n>.html' or 'manual:<token>', and an admin-created "
         + 'coach is re-created in the candidate by the data_overrides replay step (§8) '
@@ -1425,28 +1481,45 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
 >> = {
   afltables_profile_url: {
     entity: 'players',
-    description: "external_identities: source 'afltables', match_method "
-      + "'afltables_profile_url', status unique/resolved — the AFL Tables profile path",
+    description: "external_identities: source 'afltables' + match_method "
+      + "'afltables_profile_url' (the AFL Tables profile path), or, for a player an "
+      + "administrator created, source 'manual_admin_edit' + match_method "
+      + "'manual_admin_edit' (the token minted once at creation). Status unique/resolved. "
+      + 'ONE identity per player: the AFL Tables path is ordered first, so a player known '
+      + 'by token on the replaced side and by path in the candidate still resolves — '
+      + 'the players override replay binds the token onto the path-player BEFORE the '
+      + 'remap runs (AFLDB-ISSUE-160 §8.1, the same ordering rule as coaches)',
+    // AFLDB-ISSUE-160. Before this, an administrator-created player carried no identity
+    // at all, so its data_edits rows were 'no_identity_in_replaced' and STOPPED a PROD
+    // promotion (DEF-4a). DISTINCT ON (player_id) with the path ordered first is what
+    // keeps one player to one identity while admitting the second namespace.
     byId: `
-      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+      SELECT DISTINCT ON (ei.player_id) ei.player_id::bigint AS id, ei.external_id AS identity
         FROM external_identities ei
         JOIN sources s ON s.id = ei.source_id
-       WHERE s.key = 'afltables'
-         AND ei.match_method = 'afltables_profile_url'
+       WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+              OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
          AND ei.status IN ('unique', 'resolved')
          AND ei.player_id IS NOT NULL
          AND ei.player_id = ANY ($1::bigint[])
-       ORDER BY 1, 2`,
+       ORDER BY ei.player_id, (s.key <> 'afltables'), ei.external_id`,
     byIdentity: `
-      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+      SELECT DISTINCT ON (ei.player_id) ei.player_id::bigint AS id, ei.external_id AS identity
         FROM external_identities ei
         JOIN sources s ON s.id = ei.source_id
-       WHERE s.key = 'afltables'
-         AND ei.match_method = 'afltables_profile_url'
+       WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+              OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
          AND ei.status IN ('unique', 'resolved')
          AND ei.player_id IS NOT NULL
-         AND ei.external_id = ANY ($1::text[])
-       ORDER BY 1, 2`,
+         AND ei.player_id IN (
+               SELECT inner_ei.player_id
+                 FROM external_identities inner_ei
+                 JOIN sources inner_s ON inner_s.id = inner_ei.source_id
+                WHERE ((inner_s.key = 'afltables' AND inner_ei.match_method = 'afltables_profile_url')
+                       OR (inner_s.key = 'manual_admin_edit' AND inner_ei.match_method = 'manual_admin_edit'))
+                  AND inner_ei.status IN ('unique', 'resolved')
+                  AND inner_ei.external_id = ANY ($1::text[]))
+       ORDER BY ei.player_id, (s.key <> 'afltables'), ei.external_id`,
   },
   afltables_coach_path: {
     entity: 'coaches',
@@ -1463,6 +1536,82 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
       SELECT id::bigint AS id, afltables_coach_path AS identity
         FROM public.coaches
        WHERE afltables_coach_path = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  draft_pick_key: {
+    entity: 'draft_picks',
+    description: "the selection's stable acquisition key, "
+      + "'<sources.key>|<player_url>|<draft_year>|<draft_kind>' — migration 069's reload "
+      + 'key, written with the source KEY rather than the per-database sources.id so it '
+      + "denotes the same selection on both databases. A manual selection's player_url is "
+      + "'manual:<token>', minted once and never edited. A selection with source_id NULL "
+      + '(a pre-AFLDB-ISSUE-160 admin row) has NO key and is deliberately absent here, so '
+      + 'it reports as unresolved rather than being carried by an integer that now names '
+      + 'someone else (AFLDB-ISSUE-160 D-3)',
+    byId: `
+      SELECT dp.id::bigint AS id,
+             s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+               AS identity
+        FROM public.draft_picks dp
+        JOIN public.sources s ON s.id = dp.source_id
+       WHERE dp.player_url IS NOT NULL
+         AND dp.draft_kind IS NOT NULL
+         AND dp.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT dp.id::bigint AS id,
+             s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+               AS identity
+        FROM public.draft_picks dp
+        JOIN public.sources s ON s.id = dp.source_id
+       WHERE dp.player_url IS NOT NULL
+         AND dp.draft_kind IS NOT NULL
+         AND s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+             = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  appointment_key: {
+    entity: 'club_leadership',
+    description: 'club_leadership.appointment_key — NOT NULL UNIQUE (migration 098), the UUID '
+      + 'token appointLeader()/replaceLeader() mints once and never edits (AFLDB-ISSUE-163 §5). '
+      + 'It denotes the same leadership appointment on both databases across every date '
+      + 'correction, note, end, reinstatement and voiding. Deliberately not a natural key over '
+      + '(club, season, player, role): that tuple RECURS when a player is re-appointed later in '
+      + 'the same season — a second, genuinely different appointment — and the dates, status, '
+      + 'reason and note are all facts an administrator is expected to change. Every appointment '
+      + 'has one: the column is NOT NULL and an appointment is never deleted, so ended and void '
+      + 'rows resolve exactly as active ones do',
+    byId: `
+      SELECT id::bigint AS id, appointment_key AS identity
+        FROM public.club_leadership
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, appointment_key AS identity
+        FROM public.club_leadership
+       WHERE appointment_key = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  fixture_key: {
+    entity: 'fixtures',
+    description: 'fixtures.fixture_key — NOT NULL UNIQUE (migration 097), the UUID token '
+      + 'createFixture() mints once and never edits (AFLDB-ISSUE-162 §6). It denotes the '
+      + 'same scheduled match on both databases across every reschedule, venue change, '
+      + 'round correction and club correction, and is NEVER replaced by a match_key when '
+      + 'the game is played (D-6, the operator constraint of 2026-09-11) — fixtures carries '
+      + 'no match_key and no match_id column, so "played" is resolved at read time and this '
+      + 'token is the only identity a fixture audit row can resolve through. Every fixture '
+      + 'has one: the column is NOT NULL and a fixture is never deleted, so cancelled and '
+      + 'void rows resolve exactly as scheduled ones do',
+    byId: `
+      SELECT id::bigint AS id, fixture_key AS identity
+        FROM public.fixtures
+       WHERE id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT id::bigint AS id, fixture_key AS identity
+        FROM public.fixtures
+       WHERE fixture_key = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {
@@ -2829,7 +2978,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase production` passed on the live afldb_prod (same gates as candidate).',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
-  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, coaches, match_coaches — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path.',
+  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season.',
   'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
   'Rollback rehearsed on paper: stop service, rename afldb_prod back to the candidate name, rename afldb_prod_pre_rebuild_<stamp> to afldb_prod, start service.',

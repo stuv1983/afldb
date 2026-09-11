@@ -120,7 +120,27 @@ SELECT o.player_url,
           JOIN sources es ON es.id = ei.source_id AND es.key = 'afltables'
          WHERE ei.player_id = o.player_id
            AND ei.match_method = 'afltables_profile_url'
-           AND ei.status IN ('unique','resolved'))             AS afltables_identity_count
+           AND ei.status IN ('unique','resolved'))             AS afltables_identity_count,
+       -- AFLDB-ISSUE-160 §8.3. A player an administrator created through their draft
+       -- selection holds a manual_admin_edit token and nothing else. Without it in the
+       -- ledger, the decision would export as a `draftguru` target, apply_authority
+       -- would SEED a fresh canonical player for the person on a rebuilt database, and
+       -- the players override replay would separately re-create the manual one -- two
+       -- rows for one footballer. The token is the durable identity that stops that.
+       (SELECT ei.external_id
+          FROM external_identities ei
+          JOIN sources es ON es.id = ei.source_id AND es.key = 'manual_admin_edit'
+         WHERE ei.player_id = o.player_id
+           AND ei.match_method = 'manual_admin_edit'
+           AND ei.status IN ('unique','resolved')
+         ORDER BY ei.external_id
+         LIMIT 1)                                              AS manual_external_id,
+       (SELECT count(*)
+          FROM external_identities ei
+          JOIN sources es ON es.id = ei.source_id AND es.key = 'manual_admin_edit'
+         WHERE ei.player_id = o.player_id
+           AND ei.match_method = 'manual_admin_edit'
+           AND ei.status IN ('unique','resolved'))             AS manual_identity_count
 FROM operative o
 ORDER BY o.player_url
 """
@@ -247,7 +267,8 @@ def build_ledger(rows, admit_b1: bool, bridges: dict[str, str]) -> tuple[dict, l
     claimed_afltables: dict[str, int] = {}
     promotions = 0
 
-    for i, (player_url, action, has_games, afl_id, afl_count) in enumerate(rows):
+    for i, (player_url, action, has_games, afl_id, afl_count,
+            manual_id, manual_count) in enumerate(rows):
         where = f"decision #{i + 1} (ordinal only — no identifying value is printed)"
 
         if player_url is None:
@@ -268,6 +289,22 @@ def build_ledger(rows, admit_b1: bool, bridges: dict[str, str]) -> tuple[dict, l
             continue
         if action != "linked":
             problems.append(f"{where}: unknown action {action!r}")
+            continue
+
+        # AFLDB-ISSUE-160 §8.3. Preference order for the durable target: an AFL Tables
+        # path if the player has one, then an administrator-minted manual token, then
+        # the pre-existing behaviour. A player with an AFL Tables identity never reaches
+        # here through this arm, so this is purely additive: on a database with no
+        # manual players (every database before ISSUE-160) manual_count is 0 for every
+        # row and nothing changes.
+        if afl_count == 0 and manual_count > 0:
+            if manual_count > 1:
+                problems.append(f"{where}: target player holds {manual_count} manual identities "
+                                "-- ambiguous, refusing to choose")
+                continue
+            decisions.append({"player_url": player_url,
+                              "decision": "linked",
+                              "target": {"source": "manual_admin_edit", "external_id": manual_id}})
             continue
 
         if not has_games:

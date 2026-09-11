@@ -1,12 +1,13 @@
-import { revalidatePath } from 'next/cache';
-import { NextResponse } from 'next/server';
-
 import { isAllowedRevalidatePath } from '@/app/admin/coaches/revalidate-paths';
+import { applyRevalidateRequest } from '@/lib/admin/revalidate-route';
 import { requireCapability } from '@/lib/auth/session';
 
 /**
  * The one place any coach-admin `revalidatePath` call actually happens
- * (AFLDB-ISSUE-159 §9, S-6).
+ * (AFLDB-ISSUE-159 §9, S-6). The parse-and-loop body is shared with every
+ * other domain's revalidate route (AFLDB-ISSUE-160 D-9,
+ * `src/lib/admin/revalidate-route.ts`); the guard and the allowlist stay
+ * here, one per domain.
  *
  * Never called from inside a coach Server Action — see
  * `src/app/admin/coaches/submit-helper.ts` for why. The browser posts here
@@ -26,18 +27,5 @@ import { requireCapability } from '@/lib/auth/session';
 
 export async function POST(request: Request): Promise<Response> {
   await requireCapability('data.coaches.edit');
-
-  const body = await request.json().catch(() => null) as { paths?: unknown } | null;
-  const requested = Array.isArray(body?.paths)
-    ? body.paths.filter((p): p is string => typeof p === 'string')
-    : [];
-
-  const revalidated: string[] = [];
-  for (const path of requested) {
-    if (!isAllowedRevalidatePath(path)) continue;
-    revalidatePath(path);
-    revalidated.push(path);
-  }
-
-  return NextResponse.json({ ok: true, revalidated });
+  return applyRevalidateRequest(request, isAllowedRevalidatePath);
 }

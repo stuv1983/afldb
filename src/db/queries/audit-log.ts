@@ -19,7 +19,7 @@ import type postgres from 'postgres';
  * system and stays on the auth pool; do not route it through here.
  */
 
-/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094/095). */
+/** Mirrors the data_edits_table_name_check constraint (migrations 057/058/094/095/097). */
 export type DataEditTableName =
   | 'players'
   | 'matches'
@@ -38,7 +38,25 @@ export type DataEditTableName =
   // and row_id is a single bigint, so a coaching-assignment edit is audited
   // against its match instead -- table_name 'matches', field_group
   // 'coach_assignment'.
-  | 'coaches';
+  | 'coaches'
+  // Fixture administration (migration 097, AFLDB-ISSUE-162 §24). The audited
+  // row is the FIXTURE itself, which is the AFLDB-ISSUE-160 draft_picks shape
+  // rather than AFLDB-ISSUE-161's audit-on-the-parent: a season-list membership
+  // is DELETABLE, so its audit row was pointed at the player instead, but a
+  // fixture is NEVER deleted (cancelled and void keep the row) and it has no
+  // allowlisted parent -- it is deliberately not a property of a match, because
+  // the whole point is that the match may not exist. row_id = fixtures.id
+  // therefore always resolves, through the fixture_key lineage rule in
+  // tools/db/promotion-inventory.ts.
+  | 'fixtures'
+  // Club leadership administration (migration 098, AFLDB-ISSUE-163 §15). The
+  // fixtures shape again, and for the same two reasons: an appointment is NEVER
+  // deleted (ended and void keep the row), and it has no allowlisted parent row
+  // to be a property OF -- it is deliberately not a property of the player,
+  // because the row is about a club, a season and an office, and one person may
+  // hold several. row_id = club_leadership.id therefore always resolves,
+  // through the appointment_key lineage rule in tools/db/promotion-inventory.ts.
+  | 'club_leadership';
 
 /**
  * The same allowlist as a runtime value, for the read side
@@ -56,6 +74,8 @@ export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
   'brownlow_vote_entry_state',
   'brownlow_season_authority',
   'coaches',
+  'fixtures',
+  'club_leadership',
 ];
 
 export function isDataEditTableName(value: string): value is DataEditTableName {

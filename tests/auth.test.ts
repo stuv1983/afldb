@@ -625,16 +625,20 @@ describe('adminNavFor', () => {
   it('omits a group entirely for a viewer with no capability it contains, rather than showing it empty', () => {
     // A plain admin holds no capability in Site, so that group is absent. The
     // Data group holds Brownlow (AFLDB-ISSUE-155 Phase C2: an Admin may read
-    // and draft Brownlow votes, §27.8) and Coaches (AFLDB-ISSUE-159 Stage 2:
-    // data.coaches.read is ADMIN_AND_UP, §8.1) -- an Admin reaches both but
-    // neither's mutating capability. Operations appears from AFLDB-ISSUE-157
-    // and holds exactly the audit trail: every other Operations link is
-    // still super-admin-only.
+    // and draft Brownlow votes, §27.8), Coaches (AFLDB-ISSUE-159 Stage 2:
+    // data.coaches.read is ADMIN_AND_UP, §8.1), Draft administration
+    // (AFLDB-ISSUE-160 D-6: data.draft.read is ADMIN_AND_UP too) and Season
+    // lists (AFLDB-ISSUE-161 §16: data.seasonLists.read is ADMIN_AND_UP too)
+    // -- an Admin reaches all four but none of their mutating capabilities.
+    // Operations appears from AFLDB-ISSUE-157 and holds exactly the audit
+    // trail: every other Operations link is still super-admin-only. Fixtures
+    // (AFLDB-ISSUE-162 §23: data.fixtures.read is ADMIN_AND_UP too) joins the
+    // same four.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
       'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
-    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches']);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
   });
 
@@ -663,10 +667,10 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
   });
 
-  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches', () => {
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures', () => {
     const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
     expect(data?.links.map((l) => l.href)).toEqual([
-      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches',
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures',
     ]);
   });
 
@@ -1124,6 +1128,12 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'data.brownlow.finalise': 'requireSuperAdmin',
   'data.coaches.read': 'requireAdmin',
   'data.coaches.edit': 'requireSuperAdmin',
+  'data.draft.read': 'requireAdmin',
+  'data.draft.edit': 'requireSuperAdmin',
+  'data.seasonLists.read': 'requireAdmin',
+  'data.seasonLists.edit': 'requireSuperAdmin',
+  'data.fixtures.read': 'requireAdmin',
+  'data.fixtures.edit': 'requireSuperAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',

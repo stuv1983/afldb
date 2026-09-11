@@ -51,7 +51,17 @@ export function isLinkTargetTable(value: string): value is LinkTargetTable {
 }
 
 /** Statuses that mean "no confirmed link" and so belong in the queue. */
-const UNRESOLVED = ['ambiguous', 'unmatched', 'implausible'] as const;
+/**
+ * The link statuses the review queue holds -- everything that is neither an
+ * importer-confirmed 'unique' nor a human-decided 'resolved'.
+ *
+ * Exported for AFLDB-ISSUE-160's `/admin/draft` deep link, so that surface
+ * decides whether a selection belongs in this queue by reading THIS list
+ * rather than restating it (`needsPlayerLinkReview`, `admin-draft.ts`).
+ */
+export const UNRESOLVED_LINK_STATUSES = ['ambiguous', 'unmatched', 'implausible'] as const;
+
+const UNRESOLVED = UNRESOLVED_LINK_STATUSES;
 
 export type UnresolvedLinkRow = {
   targetTable: LinkTargetTable;
@@ -524,7 +534,9 @@ export async function createPlayerAndResolveLink(input: {
       if (decision.type === 'confirmed_unlinked') return 'stale_unlinked';
       if (decision.type === 'linked') return 'already_resolved';
 
-      const player = await createPlayerInTransaction(tx, input.player);
+      const player = await createPlayerInTransaction(tx, input.player, {
+        adminUserId: input.adminUserId,
+      });
       await applyLockedLink(
         tx,
         input.targetTable,

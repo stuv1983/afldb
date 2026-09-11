@@ -7,7 +7,121 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 17 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-159`.
+**Open issues:** 20 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-160`, `-161`, `-162`, `-163`.
+
+<!-- 2026-09-12 (`AFLDB-ISSUE-163` STAGE 1 BUILT — UNCOMMITTED, NOT YET VALIDATED, NOT MERGED, NOT
+     DEPLOYED; MIGRATION 098 APPLIED NOWHERE; DEV AND PROD UNTOUCHED): operator signed off
+     D-1…D-18 with four clarifications (capability reuse; a HARD public source boundary — legacy
+     `captaincies` answers seasons <= 2026 and canonical `club_leadership` answers >= 2027, never
+     both; explicit lifecycle/date consistency; and NO silent 2027+ hole in player honours), and
+     Stage 1 is implemented. Migration **098** allocated as `098_club_leadership.sql`: the
+     canonical registry with the role/status/interval CHECKs, `club_leadership_active_open_ck`
+     putting clarification 3 in SQL, and the partial `UNIQUE (season, player_id) WHERE
+     status='active'` that keeps co-captains representable while making a second active
+     appointment for one player unrepresentable; both CHECK widenings retain every literal; both
+     role registries. `src/db/queries/admin-club-leadership.ts` is the ONE writer (source-contract
+     test): appoint / replace / end / reinstate / correct / void, one import-role transaction
+     each, CAS on `updated_at`, `FOR KEY SHARE` on the season-list membership, `RollbackRefusal`
+     for every post-write refusal, real-calendar date validation, server-enforced co-captaincy
+     confirmation, and `revalidatePaths` returned rather than performed. Public: new
+     `src/db/queries/club-leadership.ts` owns the single boundary constant and
+     `getClubCurrentLeadership()`; `getClubCaptains()` and — per clarification 4 —
+     `getPlayerHonours()` both became season-boundary unions, so a 2027 captain holds a Captain
+     honour with no Stage 2 rendering change, no write to `captaincies` and no name matching.
+     Replay: fail-closed `replay_admin_overrides('club_leadership')` after `players`, re-creating
+     active, ended AND void rows, idempotent, never deleting, and deliberately never reading
+     `season_list_members` — so ISSUE-161's removal stays non-destructive and there is no ordering
+     cycle. Promotion: `appointment_key` lineage rule, `data_edits` target, checklist and §8
+     runbook text; registry classification only. Tests: new
+     `tests/integration/admin-club-leadership.test.ts` plus extensions to
+     `data-overrides-source-contract`, `db-promotion-check` and `current-season-import` — WRITTEN,
+     NOT RUN. NO STOP CONDITION FIRED. Stage 2 (admin section, panels, revalidate route, public
+     block) NOT built. Entry at the foot of this file. -->
+
+<!-- 2026-09-12 (ISSUE-156 P3e ALLOCATED AS `AFLDB-ISSUE-163` — PLANNING ONLY, NO CODE, NO MIGRATION,
+     NO COMMIT, NO DEPLOYMENT): Club leadership administration and current-captain display. Runbook
+     `AFLDB-ISSUE-163.md`; operator decisions D-1…D-18 RECOMMENDED, awaiting sign-off; Stage 1 NOT
+     authorised. Key finding: a captaincy model ALREADY EXISTS — `captaincies` (005), 1,774 Wikipedia
+     rows 1897–2026 loaded from `data/awards/captaincies.csv`, `Captain`-only vocabulary, natural
+     UNIQUE on `player_name_raw`, `season` FK to the register, free-text `period`, no vice-captains,
+     no lifecycle — already public on club pages (Captains table) and player pages (honours). It is a
+     historical honours import and cannot be the canonical administered record (season FK forbids
+     2027, name-keyed identity, reload-collision refusal, frozen count gates). Chosen: new registry
+     table `club_leadership` (one row = one appointment; roles `captain`/`vice_captain`; lifecycle
+     `active`/`ended`/`void`, never deleted; optional `started_on`/`ended_on`, NULL = unknown;
+     minted `appointment_key`; whole-row always-active `data_overrides`; `data_edits` on the
+     appointment with an `appointment_key` lineage rule; fail-closed replay after `players`).
+     Season-list precondition enforced at write time with `FOR KEY SHARE`, never a FK; list removal
+     warns, never blocks. Capabilities reused (`data.seasonLists.*`); admin = Leadership section on
+     `/admin/season-lists/[season]/[club]`; public = compact current-leadership block on
+     `/clubs/[slug]` + Captains history union from 2027; path revalidation of the organisation's
+     `/clubs/<slug>` paths via a new capability-gated `/admin/season-lists/revalidate`. Migration
+     **098** expected, not allocated. Stacked on ISSUE-162 at `f80a1df`; ships in the combined
+     Admin Centre DEV batch. Entry at the foot of this file. -->
+
+<!-- 2026-09-12 (`AFLDB-ISSUE-162` FINAL LOCAL AUDIT — STILL OPEN; AUDIT FIXES UNCOMMITTED AND NOT
+     RE-RUN; NOT MERGED, NOT DEPLOYED, DEV AND PROD UNTOUCHED): whole-issue audit of Stage 1 +
+     Stage 2 at `6a9fbc4`. Stage 2 was validated green by the operator (tsc; auth 138/138; fixture
+     + contract 452 passed / 4 skipped; integration 36/36; ESLint; preflight READY) and committed
+     `6a9fbc4`. NO stop condition fired and NO Stage 1 file was changed. 8 Stage 2 defects fixed —
+     a void fixture was offered four edit panels the backend can only refuse; a cleared date left
+     an invisible start time that refused the submission (and the whole round, in the batch);
+     `ClubsPanel` could display a club the fixture does not name; duplicate diagnostics keys;
+     `badge-danger` was undefined CSS; a coerced venue id in the batch parser; missing accessible
+     names on batch row controls; a 320px grid overflow guard. Fingerprint regression extended to
+     season, round type, clubs, date, venue, notes and row count. Known deviation recorded, not
+     fixed: §28's per-row batch card layout under 768px is not implemented. Full record
+     `AFLDB-ISSUE-162.md` §39; re-gate `AFLDB-ISSUE-162.md` §39.7. Entry at the foot of this
+     file. -->
+
+<!-- 2026-09-11 (`AFLDB-ISSUE-162` STAGE 1 EXECUTED — superseded by the audit block above; Stage 2
+     is now built, validated and committed. Retained as the Stage 1 record.
+     UNCOMMITTED, UNVALIDATED, NOT DEPLOYED):
+     Fixture / season schedule administration Stage 1 built against the approved runbook in
+     worktree `D:\dev\afldb-issue-162`. **Migration 097 re-checked free and ALLOCATED** as
+     `097_fixtures.sql` — the first `src/db/migrations/`, `src/`, `tools/` and `tests/` change this
+     issue has made. New canonical `fixtures` registry holding SCHEDULE facts only: it has no
+     score, result, margin, attendance, period, lineup or statistic column, and deliberately no
+     `match_id` and no `match_key`, so D-6 and the `fixture_key` constraint are enforced by the
+     schema rather than by discipline. "Played" is a read-time, fail-closed resolution over exact
+     season + exact round code + club ids that never writes. Never-delete lifecycle
+     (`scheduled`/`cancelled`/`void`), whole-row `data_overrides` keyed `manual_admin_edit:<token>`,
+     fail-closed `replay_admin_overrides('fixtures')`, and a `fixture_key` lineage rule so every
+     fixture audit row remaps at a promotion. No `matches`, `seasons`, `clubs`, `club_seasons` or
+     `venues` write anywhere; no settle, current-season or rekey change; no public exposure (D-7).
+     Deploy order binding: **migration 097 → `npm run db:privileges` → code**. Tests are written
+     but have NOT been run; the exact validation commands are in the ledger entry. Stage 2 (the
+     `/admin/fixtures` surface) NOT built. DEV and PROD untouched; nothing committed, merged or
+     deployed. `CHANGELOG.md` Unreleased updated. -->
+
+<!-- 2026-09-11 (ISSUE-156 P3d ALLOCATED AS `AFLDB-ISSUE-162` — PLANNING ONLY, NO CODE):
+     `AFLDB-ISSUE-162` (Fixture / season schedule administration, ISSUE-156 P3d) allocated by
+     operator direction in worktree `D:\dev\afldb-issue-162`, branch `opus/issue-162-fixture-admin`
+     cut from `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161 on ISSUE-160; neither
+     parent merged first; the three deploy to DEV together as the Admin Centre batch). Highest
+     migration on the branch `096_season_list_members.sql`; **097 is the next free number, NOT
+     allocated — one additive migration is planned**. Runbook `AFLDB-ISSUE-162.md`; operator
+     decisions D-1…D-7 pending, D-1/D-2/D-6 block Stage 1. Count line corrected at the same time:
+     `-161` had a row in this table but was missing from the count (17 → 19 with `-161` and
+     `-162`). No `src/`, `tools/`, `tests/`, `deploy/`, migration, privilege or `CHANGELOG.md`
+     change in this allocation; no database read or written. -->
+
+<!-- 2026-09-11 (ISSUE-156 P3b ALLOCATED AS `AFLDB-ISSUE-160` — PLANNING ONLY, NO CODE):
+     `AFLDB-ISSUE-160` (Draft administration and new-player intake through the draft, ISSUE-156
+     P3b) allocated after confirming the ID appears nowhere in `issues.md`, `IssuesIndex.md`,
+     any `AFLDB-ISSUE-*.md`, `issues/open/**`, `issues/closed/**`, `CHANGELOG.md`, `git log --all`
+     (only commit hash `0160d66` matches), branches or worktrees. Worktree `D:\dev\afldb-issue-160`,
+     branch `opus/issue-160-draft-admin` at `main` `af6379e` (ISSUE-159 already merged; highest
+     migration `095_coach_admin_overrides.sql`, **096 free, NOT allocated — no migration needed**).
+     Draft administration was original Admin Centre intent with no ISSUE-156 phase; restored as a
+     supplemental child P3b after P3 so P4–P12 keep their labels. Status Planning complete /
+     Approved for Stage 1 pending operator decisions D-1..D-9 (`AFLDB-ISSUE-160.md` §12) — NOT
+     implemented. Stop condition W-3 (a manual player is duplicated when the operator-run AFL
+     Tables importer first sees them) fires on the current architecture and is cleared only by
+     D-2. `-159` removed from the count above: it is Resolved 2026-09-11 and merged at `af6379e`
+     (`IssuesIndex.md` had already dropped it). No `src/`, `tools/`, `tests/`, `deploy/`,
+     migration, privilege or `CHANGELOG.md` change in this allocation. -->
+
 
 <!-- 2026-09-11 (ISSUE-156 P3 ALLOCATED AS `AFLDB-ISSUE-159` — PLANNING ONLY, NO CODE):
      `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) allocated after operator preflight
@@ -590,7 +704,11 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
-| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; next: ISSUE-159 Stage 1 in a fresh implementation session |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), locally audited**; next: operator review + commit of the ISSUE-160 audit fixes, then DEV acceptance when the operator updates DEV |
+| **ID:** AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`; **operator decisions D-1…D-8 DECIDED 2026-09-11** (D-2 with modification: 2027 is the first authoritative list season and 2026 appearances are never promoted into membership; D-3 subject to a Stage 1 evidence gate; fixtures boundary: ISSUE-161 never depends on a fixture, likely ISSUE-162 owns them). **Stage 1 authorised.** Stacked on ISSUE-160 (not merged first; both deploy to DEV together as the Admin Centre batch). Chosen model: new canonical registry table `season_list_members` (`UNIQUE (season, player_id)`) with whole-row `data_overrides` keyed `<club_slug>|<season>|<player identity>`, per-mutation import-role transactions, `data_edits` on the player, fail-closed replay branch, inactive override = removal tombstone; no `retired` flag (not-current = no membership in the current list season); no `seasons`/`clubs`/`club_seasons` writes (list season ≤ `max(seasons.year)+1`, eligible clubs = `is_current_afl_club` identities beyond the register). **Stage 1 executed 2026-09-11 (Opus 5 high): D-3 gate PASSED (modern-era probe = 0 rows; 249 historical multi-club player-seasons, latest 1992), migration 096 allocated and applied to `afldb_test`, `season_list_members` + `afldb_season_list_clubs()` + `data_overrides` widening shipped, `admin-season-lists.ts` (add / multi-add / remove+tombstone / transfer / copy-forward / appearances review / diagnostics), `player-identity.ts` extracted behaviour-preservingly, fail-closed replay branch + fitzRoy call site + promotion doc/checklist. 25 pure + 40 integration tests green; ISSUE-160 regressions 45 + 120 green; tsc and lint clean.** **Stage 2 executed 2026-09-11 (Sonnet 5 high):** `/admin/season-lists` + `/[season]` + `/[season]/[club]`, capabilities `data.seasonLists.read`/`.edit`, Data-group nav entry, the five panels, and the ISSUE-160 handoff link (navigation only; no draft mutation writes `season_list_members`); `revalidatePaths: []` always and no revalidate route. **Local completion audit 2026-09-11 (Opus 5 high, operator-authorised commands): preflight READY (0 blockers), tsc clean, 204 unit + 85 integration + 420 contract + 2 FK-index tests pass, eslint clean over every ISSUE-161-authored file, `git diff --check` clean; the §33.4 repair pass is now re-validated. One concrete defect found and fixed narrowly (`CopyForwardPanel` could confirm a copy the operator never previewed) with 3 regression tests added.** NOT committed, NOT deployed; DEV and PROD untouched. Next: operator review/commit, then the combined Admin Centre DEV batch. | **Severity:** Medium | **Area:** Admin / Data management / Player–club–season model / Promotion lineage; runbook `AFLDB-ISSUE-161.md`; branch `opus/issue-161-season-lists` |
+| **ID:** AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d) | **Status:** Open / **Stage 1 code-complete 2026-09-11 (Opus 5 high, 1M) — UNCOMMITTED, UNVALIDATED BY A RUN, not deployed; DEV and PROD untouched.** Migration **097** re-checked free and allocated (`fixtures` registry with no score/result/margin/attendance column and deliberately no `match_id` and no `match_key`; `data_overrides.entity_type` and `data_edits.table_name` widened; both role registries). `src/db/queries/admin-fixtures.ts` ships the ONE fixture mutation contract (create, fingerprint-gated round batch, reschedule, venue, round, clubs, notes, cancel, reinstate, void) plus the read-time fail-closed played resolution and the season/diagnostics readers; fail-closed `replay_admin_overrides('fixtures')`, fitzRoy call site, promotion §8 loop and the `fixture_key` lineage rule + `data_edits` target all shipped. Two new test suites and four contract-suite extensions are **written but not run** — validation is the operator's next step (ledger entry lists the exact commands). Stage 2 (the `/admin/fixtures` surface) NOT built. Deploy order binding: **migration 097 → `npm run db:privileges` → code.** Planning complete 2026-09-11; runbook `AFLDB-ISSUE-162.md`. Finding: `matches` requires NOT NULL scores/result/margin (003) and every ladder/season/venue/NL/Grid consumer reads "row exists" as "played", so an unplayed fixture cannot live there without contaminating derived data; the repository's own precedent is AFLW's separate `staging_aflw.fixtures` (025). Chosen model: a new canonical registry table `fixtures` (schedule facts only — no score column can exist), `matches` untouched, "played" derived by a deterministic season + round code + club-pair resolution, identity = a minted `fixture_key` token under `manual_admin_edit`, whole-row `data_overrides` + fail-closed `replay_admin_overrides('fixtures')`, `data_edits` widened to `'fixtures'` with a `fixture_key` lineage rule, never-delete lifecycle (`scheduled` / `cancelled` / `void`), no `seasons`/`clubs`/`club_seasons` write (window `max(seasons.year)..max+1`, clubs from `afldb_season_list_clubs()`), no settle/current-season change. One additive migration (next free 097, not allocated). **Operator decisions D-1…D-7 DECIDED 2026-09-11 (D-6 with a fail-closed/unlinked-on-ambiguity condition; `fixture_key` never replaced by `match_key`); Stage 1 authorised and now executed.** Stacked on ISSUE-161 (`opus/issue-162-fixture-admin` from `34858ce`); deploys to DEV only with the Admin Centre batch. | **Severity:** Medium | **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage; runbook `AFLDB-ISSUE-162.md`; next: operator runs the Stage 1 validation, reviews and commits, then Stage 2 in a fresh session |
+| **ID:** AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e) | **Status:** Open / **Stage 1 AND Stage 2 BUILT, VALIDATED and COMMITTED 2026-09-12 (`8ed32b3`, `c28ea60`, `ea9f3dd`); FINAL LOCAL AUDIT 2026-09-12 (Opus 5 high) — three Stage 2 defects fixed, UNCOMMITTED; not merged, not deployed; migration 098 applied to `afldb_test` ONLY; DEV and PROD untouched.** Planning complete 2026-09-12; runbook `AFLDB-ISSUE-163.md`; **operator SIGNED OFF D-1…D-18 on 2026-09-12 with four clarifications** (capability reuse; a HARD ≤2026-legacy / ≥2027-canonical public source boundary; explicit lifecycle/date consistency; and no 2027+ hole in player honours). Migration **098** allocated as `098_club_leadership.sql`; the canonical registry, the one writer `src/db/queries/admin-club-leadership.ts`, the public reads `src/db/queries/club-leadership.ts`, the season-boundary union in BOTH `getClubCaptains` and `getPlayerHonours`, the additive `activeLeadershipRole` column, the fail-closed `replay_admin_overrides('club_leadership')` branch + fitzRoy call site, the `appointment_key` lineage rule + `data_edits` target + promotion §8 text, the Stage 2 Leadership section / Appoint panel / gated revalidate route / public `ClubLeadership` block, and the two test layers are all shipped and green (Stage 1: 390+4-skipped contract, 37/37 integration incl. the real Python replay, 367/367 stacked regressions; Stage 2: 150/150 + ESLint + `tsc`). **Final audit (§34): backend integrity, lifecycle/CAS, co-captaincy, replacement, the season-list invariant, replay/durability, the public source boundary, player honours, auth, revalidation security and both UIs all hold; no deviation from D-1…D-18 and no stop condition.** Three Stage 2 fixes: the Appoint form no longer collapses into a receipt on success (the `AddPlayerPanel` precedent — a club names a captain and several vice-captains in one sitting); the co-captaincy confirm step is now bound to the exact `(role, player)` it was refused for, so a confirmation cannot be spent on a different appointment; the unreachable Replace co-captaincy branch was removed with the reason recorded. Deploy order binding: **096 → 097 → 098 → `npm run db:privileges` → code.** Finding: `captaincies` (005, 1,774 Wikipedia rows 1897–2026, `Captain` only, name-keyed, season FK to the register, free-text periods) already exists and is public on club/player pages, but is a historical honours import, not canonical operational truth. Chosen: new registry table `club_leadership` (one row per appointment; roles `captain`/`vice_captain`, co-captaincy = concurrent captain rows; lifecycle `active`/`ended`/`void`, never deleted; optional dates, NULL = unknown; minted `appointment_key`; always-active whole-row `data_overrides`; `data_edits` on the appointment + lineage rule; fail-closed replay after `players`); write-time season-list precondition (locked, never a FK; removal warns, never blocks); `data.seasonLists.*` reused; Leadership section on the season-list club page; public current-leadership block on `/clubs/[slug]` + Captains history union from 2027; per-organisation `/clubs/<slug>` path revalidation via a new gated route. Stacked on ISSUE-162 (`opus/issue-163-club-leadership` from `f80a1df`); deploys only with the Admin Centre batch. | **Severity:** Medium | **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage; runbook `AFLDB-ISSUE-163.md`; next: operator re-runs the Stage 2-only gates (`tsc`, `admin-club-leadership-actions`, `auth`, ESLint over the two changed panels and the test file, `git diff --check`), commits the audit fixes, then the combined 160+161+162+163 DEV deployment and the rendered Playwright acceptance |
+| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), not deployed, not merged; locally audited 2026-09-11 — one atomicity defect and eight new ESLint errors found and fixed, uncommitted for operator review.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit of the audit fixes, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; two runbook §18 list affordances (the `state` filter and the Player-links deep link) reported undelivered; S-1 before deploy |
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
      gate on 2026-09-11; Stage 2 validated live on real DEV at `6299bf8` including the
@@ -21932,11 +22050,36 @@ did not anticipate — the exact-set override-scope proof in `src/lib/acquisitio
 (see the ISSUE-159 entry) — which is why P3 is split into two gated stages. Details:
 `AFLDB-ISSUE-159.md`, ledger entry below.
 
+### P3 complete (2026-09-11)
+
+`AFLDB-ISSUE-159` resolved 2026-09-11 and merged to `main` at `af6379e` (migration 095,
+`/admin/coaches`, all Stage 1 and Stage 2 gates passed on DEV). Evidence under ISSUE-159.
+
+### P3b allocated (2026-09-11) — `AFLDB-ISSUE-160`
+
+Draft administration was part of the original Admin Centre intent but had no phase of its own.
+It is restored as a **supplemental child P3b after P3** (P4–P12 keep their labels) and allocated
+as `AFLDB-ISSUE-160` — Draft administration and new-player intake through the draft. Status
+Planning complete / Approved for Stage 1; operator decisions D-1..D-9 decided 2026-09-11
+(D-2, D-7, D-8 with modifications, D-3 with rollout conditions — see the ISSUE-160 entry). Planning found
+that admin-created players and picks have **no promotion identity today** (both vanish on
+promotion; a manual player's `players` audit rows stop a PROD promotion) and that editing an
+admin-created pick writes a `data_overrides` key of `null|null|<year>|null`; ISSUE-160 fixes both
+by the ISSUE-159 pattern (minted `manual_admin_edit` token in existing columns, whole-row
+override, replay re-create branches) with **no migration and no privilege change**. The one
+stop condition that fires — a manually created player would be duplicated when the
+operator-run AFL Tables importer first sees them (the nightly settle never creates players) —
+is cleared only by decision D-2 (a fail-closed name+dob refusal in `import_players()`, never a
+link). Merging two existing players and relinking a source-owned selection stay P9. Details:
+`AFLDB-ISSUE-160.md`, ledger entry below.
+
 ### Next action
 
-P1 and P2 are complete and merged (`3bbcab0`, `92a898f`). The umbrella's next phase is P3,
-now `AFLDB-ISSUE-159`: start its **Stage 1** in a fresh Opus 5 / high-effort session against
-`AFLDB-ISSUE-159.md` §16/§17. P4–P12 remain unallocated placeholders.
+P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). The umbrella's next
+phase is P3b, `AFLDB-ISSUE-160`: D-1..D-9 are decided (2026-09-11), so a fresh Opus 5 /
+high-effort session executes its **Stage 1** against `AFLDB-ISSUE-160.md` §16/§17. DEV is
+deliberately not updated until the Admin Centre batch is complete. P4–P12 remain unallocated
+placeholders.
 
 ## AFLDB-ISSUE-157 — Admin foundation and audit viewer (ISSUE-156 P1)
 
@@ -22684,3 +22827,1542 @@ history per operator instruction, since it has no home of its own and is explici
 Stage 2 obligation. Coach reconciliation (merge/supersession for a manual coach later
 acquiring an AFL Tables identity) remains the reported P9-class stop from "Out of scope"
 above; no ID is allocated for it here.
+
+---
+
+## AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
+
+**Status:** Open — **Stage 1 and Stage 2 CODE-COMPLETE and locally validated. Committed
+2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`, branch `opus/issue-160-draft-admin`); not
+deployed, not merged.** A local completion audit (2026-09-11, Opus 5 high) re-ran every local
+gate and found one real atomicity defect, eight new ESLint errors and two undelivered runbook
+§18 list items. The defects are fixed and, on the operator's direction, **both §18 gaps are now
+implemented** — all of it uncommitted for operator review; see *Local completion audit* and
+*§18 list-contract closure* below. Only the deliberately deferred external gates remain. Stage 2 delivers the `/admin/draft` surface (list/new/detail/revalidate),
+`data.draft.read`/`data.draft.edit` capabilities enforced at every boundary, the Data-group nav
+entry, the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving),
+and the `/admin/data-editor` draft-slice UI removal — see *Stage 2 implementation record* below.
+DEV/Playwright acceptance (gates 15–16) remains deferred by the operator's Admin Centre
+release-batching decision, not by any defect. Operator decisions D-1..D-9 decided 2026-09-11
+(`AFLDB-ISSUE-160.md` §12) and implemented as decided; none open. Operator decision S-1
+(§11.1) remains open and gates DEPLOYMENT of the promotion-tooling change, not the commit.
+**Severity:** Medium
+**Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
+**Found:** 2026-09-11
+**Parent:** `AFLDB-ISSUE-156` (umbrella) supplemental child **P3b**, inserted after P3
+(`AFLDB-ISSUE-159`); restored original Admin Centre scope with no ISSUE-155 phase
+**Runbook:** `AFLDB-ISSUE-160.md` (the implementation contract)
+**Branch:** `opus/issue-160-draft-admin` · worktree `D:\dev\afldb-issue-160` (from `main`
+`af6379e`, which contains merged ISSUE-159)
+**Migration:** **none required.** Highest on this branch is `095_coach_admin_overrides.sql`;
+096 is free and NOT allocated
+
+### Problem
+
+Draft data enters or changes only through the DraftGuru importer, the generic
+`/admin/data-editor` draft slice (seven text/measurement fields; no year, pick, club or player
+change; no creation) and the optional draft block of `CreatePlayerForm`. There is no supported
+way to add a missing selection, correct pick or club, or onboard a genuinely new draftee as a
+first-class player. The two admin write paths that exist are unsafe:
+
+- an admin-created pick (`createPlayerInTransaction`, `src/db/queries/players.ts:386-412`)
+  has `source_id`, `source_record_id`, `player_url` and `draft_person_id` all NULL — outside the
+  reload key by design (069) and **absent from any promoted database**, because `draft_picks`
+  is rebuilt and no replay re-creates it;
+- an admin-created player has **no promotion identity**: nothing in `external_identities`
+  names it, the `players` replay cannot patch it, no replay re-creates it, and its
+  `data_edits` rows (`player_creation`) are unresolvable by `afltables_profile_url`, which stops
+  a PROD promotion (`tools/db/promotion-inventory.ts` remediation text);
+- `saveEdit()` for an admin-created pick writes `data_overrides.entity_key =
+  'null|null|<year>|null'` (`src/db/queries/data-edits.ts:149-157`): shared by every admin pick
+  of that year (the UNIQUE key makes the second edit overwrite the first's override) and never
+  matched by `replay_admin_overrides` (whose key expression is NULL for those rows).
+
+### Scope (approved plan, summary)
+
+- **Identity.** A manual selection is an ordinary `draft_picks` row under `manual_admin_edit`
+  with `player_url = 'manual:<token>'`, `source_record_id = <token>`, `link_status_value =
+  'resolved'`, `player_id` always set; durable record is one whole-row `data_overrides`
+  (`'draft_picks'`, `'manual_admin_edit:<token>'`, `'selection'`). A manual player is an ordinary
+  `players` row plus `external_identities (manual_admin_edit, <token>, 'resolved',
+  match_method 'manual_admin_edit')` and a whole-row `data_overrides ('players',
+  'manual_admin_edit:<token>', 'identity')`, minted inside `createPlayerInTransaction()` so all
+  three callers gain identity. Tokens are `randomUUID()`, minted once, never name-derived.
+- **Replay.** `replay_admin_overrides` gains manual re-create branches for `players` (bind the
+  token onto an existing AFL Tables player when the override already carries that player's
+  profile path — so a promotion after debut yields one row, not two) and `draft_picks`
+  (insert-where-missing, then update from payload). Order `players` → `draft_picks` →
+  `coaches` → `match_coaches`; `docs/production-promotion.md` §8 loop gains `draft_picks`
+  (it omits it today).
+- **Lineage.** `LINEAGE_IDENTITY_SQL.afltables_profile_url` widened to resolve a manual token
+  (AFL Tables path preferred when both exist); new rule `draft_pick_key` and a `data_edits`
+  target for `draft_picks` (D-3). Manual-selection mutations are audited **against the player**
+  (`table_name 'players'`, `field_group 'draft_selection*'`) so an audited DELETE on retirement
+  can never leave an unresolvable audit row.
+- **Existing-player selection / new player.** Search-first through the existing
+  `searchPlayers()`; identity re-read server-side in the transaction. New player: hard refusal
+  when a same-name player exists and no distinguishing dob is supplied or dobs agree; explicit
+  confirmation for distinct namesakes; one import-role transaction for player + identity +
+  selection + both overrides + both audits.
+- **Future source identity.** AFL Tables: admin action attaches the profile path
+  (`external_identities`, `'resolved'`, `afltables_profile_url`); the nightly settle then
+  resolves the debutant to that player immediately (it never creates players,
+  `settle-afltables.ts:1684-1692`) and the operator-run `import_fitzroy_core.py` UPDATEs
+  instead of inserting. Backed by **D-2**: a fail-closed name+dob refusal in `import_players()`
+  for a new profile matching a manual player awaiting identity — a refusal, never a link;
+  settle untouched. DraftGuru: the person arrives unlinked; linked via `/admin/player-links`;
+  ledger/exporter gain a `manual_admin_edit` target.
+- **One write path.** `/admin/data-editor` loses its draft slice and `CreatePlayerForm` its
+  draft block; `saveEdit` refuses `draft_picks`; `createPlayerInTransaction` stops inserting
+  `draft_picks`; `EDITABLE_ENTITIES.draft_picks` stays as the validation spec (+
+  `selection_facts` = pick number, club slug).
+- **Capabilities** `data.draft.read` (Admin-and-up) and `data.draft.edit` (Super Admin);
+  routes `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, `/admin/draft/revalidate`
+  (bounded allowlist: `/players/<slug>-<id>`, `/sitemap.xml`; `/draft*` is force-dynamic).
+- **Out of scope / P9:** merging two existing players; relinking or unlinking a source-owned
+  selection (J-17); supersession of a source row.
+
+### Operator decisions — decided 2026-09-11 (binding text in `AFLDB-ISSUE-160.md` §12)
+
+- **D-1 APPROVED** — zero migration; the optional `draft_picks.player_url` namespace CHECK is
+  not added; 096 stays unallocated.
+- **D-2 APPROVED WITH MODIFICATION** — the fail-closed `import_players()` guard uses a
+  **symmetric** DOB rule: unregistered AFL Tables profile whose normalised name matches a
+  `manual_admin_edit` player with no AFL Tables identity → either DOB unknown: REFUSE; both
+  known and equal: REFUSE; both known and different: allow as a distinct namesake. Runs only in
+  the new-player INSERT branch; never writes `external_identities`, never attaches or decides
+  identity; returns only "safe to insert" or fails closed. A refusal throws, rolls back the
+  **entire** fitzRoy players batch, records the batch failure/error, and needs operator
+  correction (attach in `/admin/draft` or record a distinguishing DOB) then a rerun. W-3 cleared.
+- **D-3 APPROVED WITH CONDITIONS** — `draft_pick_key` lineage rule, `data_edits` target for
+  `draft_picks`, remap-or-stop. Before it governs a PROD lineage-changing promotion: read-only
+  PROD probe of `data_edits` rows with `table_name='draft_picks'`; each resolvable row has a
+  source-backed stable key; the candidate holds exactly one matching key; every unresolved row
+  reported before cutover. The paused ISSUE-151 PROD promotion `20260907-234124` is sequenced by
+  pre-deploy **operator decision S-1** (complete under the current contract, or resume under
+  the new gate), recorded before deployment and never inferred during it (runbook §11.1, W-18).
+- **D-4 APPROVED** — retirement = audited DELETE of the manual row, override `is_active=false`,
+  audit against the player; no tombstone column, no migration.
+- **D-5 APPROVED** — data-editor draft slice and `CreatePlayerForm` draft block removed;
+  `saveDataEdit`/`getEditableRow` refuse `draft_picks`; field spec kept for validation only;
+  one authoritative draft mutation path.
+- **D-6 APPROVED** — `data.draft.read` (Admin and Super Admin), `data.draft.edit` (Super Admin);
+  new-player creation and identity attach under `.edit`; no third capability.
+- **D-7 APPROVED WITH MODIFICATION** — legacy `source_id IS NULL` picks adopted by the explicit
+  Super Admin action 6.8, never a migration; adoption mints the pick's identity/override/audit
+  **and**, when the linked player has no durable identity, that player's `manual_admin_edit`
+  token, `external_identities` row, whole-row `identity` override and `identity_adopted` audit
+  in the same transaction; never a second identity when one exists; both rows leave promotable
+  and replayable; no bulk backfill.
+- **D-8 APPROVED WITH MODIFICATION** — both J-3 outcomes pre-authorised: probe (a) finds zero
+  valid collisions → hard refusal; collisions exist → explicit confirmation naming the colliding
+  selection(s). Probe result recorded in the evidence; branch followed automatically; no second
+  decision round.
+- **D-9 APPROVED** — shared revalidate route / submit helper extraction in **Stage 2 only**,
+  domain-bounded allowlists kept; not mixed into Stage 1.
+
+Latent-defect handling corrected in the runbook §13: identity-less admin-created players
+(DEF-4a) — new occurrences prevented, per-row repair only through D-7 adoption when a legacy
+pick references the player, no blanket backfill; identity-less admin-created picks (DEF-4b) —
+new occurrences prevented, explicit per-row adoption, no migration backfill;
+`null|null|<year>|null` override keys (DEF-1) — new keys impossible after D-5, existing rows are
+inert and cannot be attributed automatically, gate-2 probe (e) enumerates them, and they are
+**left as frozen historical residue** (not deleted, not deactivated); any retirement is a
+separate operator-reviewed step outside ISSUE-160.
+
+### Confirmed current-state evidence (2026-09-11 snapshot)
+
+- `draft_picks_source_uq` partial on `source_id IS NOT NULL`, `NULLS NOT DISTINCT`
+  (`069:56-59`); `draft_picks_link_ck` (`019:109-113`); no `players.source_id`; `players.slug`
+  not UNIQUE (URLs are id-authoritative, `src/lib/format.ts:187`).
+- `data_overrides.entity_type` and `data_edits.table_name` CHECKs both already admit `players`
+  and `draft_picks` (`095:75-83,105-117`).
+- DraftGuru importer never links by name and seeds a player only for a tracked ledger decision
+  (`import_draftguru.py:27-33,536-577,579-684`); write scope `source_id = draftguru`.
+- AFL Tables importer resolves existing players through `external_identities` before inserting
+  and refuses a path mapped to a different player (`import_fitzroy_core.py:2477-2497,2638-2688`).
+- Only three sites insert `players`: `players.ts:351`, `import_fitzroy_core.py:2523`,
+  `import_draftguru.py:563` (`seed_player`). The settle (`tools/current-season/settle-afltables.ts`)
+  inserts none.
+- `data_edits` lineage targets today: `players`, `matches`, `coaches`; `draft_picks` audit rows
+  reinstate unremapped and unflagged (`promotion-inventory.ts:325-380,1530-1576`).
+- `tests/integration/draftguru-import.test.ts` spawns the real importer as the import role and
+  already proves the admin-owned-row ownership boundary (`:576`) and override replay (`:779`).
+
+### Stage 1 implementation record — 2026-09-11
+
+**Preflight.** `npm run preflight -- --mode implementation --issue 160` = **READY**, 0 blockers,
+3 non-blocking warnings (no local `.env` in the worktree, `psql` unavailable, `pg_restore`
+unavailable — none required for this mode). ISSUE-160 re-confirmed as the only allocation and
+migration 096 re-confirmed free (`git log --all -- 'src/db/migrations/096*'` empty).
+
+**Gate 2 — historical probes, read-only, recorded verbatim.** Run against `afldb_test`
+(rebuilt) and `afldb_dev` through the operator's existing SSH tunnel; **the PROD probes were
+NOT run — PROD was deliberately untouched this session — and (d), (e), (g), (h) on PROD remain
+OPEN as the §11.1 pre-deploy evidence.** One correction to the runbook's probe text: probe (g)
+names `data_edits.edited_at`, which does not exist; the column is `created_at`.
+
+| Probe | `afldb_test` | `afldb_dev` |
+|---|---|---|
+| (a) `(draft_year, draft_kind, pick_number)` collisions, source rows | **0 rows** | **0 rows** |
+| (b) NULL `pick_number` by kind, source rows | `free_agency` 138/138, `post_draft` 188/188, `pre_draft` 370/370, `trade` 990/990 **all NULL**; `national` 0/3089, `rookie` 0/1209, `preseason` 0/541, `midseason` 0/280, `mini_draft` 0/4, `training_squad_selection` 0/1 | — |
+| (c) same player + year + kind duplicates | **0** | **0** |
+| (d) selections with `source_id IS NULL` | **0** | **0** |
+| (e) DEF-1 residue (`entity_key LIKE 'null|%'`) | **0** (and 0 `draft_picks` overrides of any shape) | **0** |
+| (f) players with no `external_identities` | 65 | 0 |
+| (g) `data_edits` rows with `table_name='draft_picks'` | **0** | **0** |
+| (h) `draft_pick_key` for those rows | n/a (0 rows) | n/a (0 rows) |
+
+**D-8 / J-3 branch selected: HARD REFUSAL.** Probe (a) returned zero valid historical
+collisions at the `(draft_year, draft_kind, pick_number)` grain across all 6,810 source
+selections, on both databases, so the pre-authorised refusal branch is the one implemented and
+the confirmation branch is deliberately absent. The refusal names the colliding selection
+(year, kind, pick, club, player) so it is actionable.
+
+Consequences of the other probe results, recorded rather than inferred: **D-7 adoption has no
+backlog on `afldb_test` or `afldb_dev`** (probe (d) = 0 on both), so the adopt action ships
+proven by fixtures rather than by real rows, and the PROD count is unknown until probe (d) runs
+there. **The DEF-1 residue is empty on both** (probe (e) = 0), so the "frozen historical
+residue" disposition has nothing to freeze on either; PROD is unknown. **There are no
+`draft_picks` audit rows on either database** (probe (g) = 0), so D-3's new lineage target
+changes nothing about a promotion from either today — its value is preventing the silent
+misattribution the moment the new surface writes its first such row.
+
+**What was implemented.** §3, §5, §6.1–6.8, §7 (J-1…J-16), §8.1–8.4, §9, §11 and the backend
+half of §15 — see `CHANGELOG.md` for the behavioural summary. Files changed: `players.ts`,
+`player-links.ts`, new `admin-draft.ts`, `data-edits.ts`, `spec.ts`,
+`data-editor/{actions.ts,CreatePlayerForm.tsx,page.tsx}`, `tools/migration/common.py`,
+`tools/migration/import_fitzroy_core.py`, `tools/rebuild/draftguru/import_draftguru.py`,
+`tools/rebuild/draftguru/export_link_decisions.py`, `tools/db/promotion-inventory.ts`,
+`docs/production-promotion.md`, `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`,
+`AFLDB-ISSUE-156.md`, `AFLDB-ISSUE-160.md`; tests new
+(`tests/admin-draft-actions.test.ts`, `tests/integration/admin-draft.test.ts`,
+`tools/migration/test_manual_insert_guard.py`) and extended
+(`player-link-mutations`, `edit-spec`, `data-overrides-source-contract`, `db-promotion-check`,
+`integration/draftguru-import`). **No migration (096 still free), no privilege change.**
+
+**Two real defects found and fixed during implementation, neither in the plan.**
+
+1. `createPlayerInTransaction`'s new SQL slug derivation was written as `'\s+'` inside a
+   TypeScript template literal, where `\s` is simply the letter `s` — so PostgreSQL received
+   `regexp_replace(..., 's+', '-', 'g')` and every run of `s` in a name became a hyphen
+   (`afldb-issue-160-test-new-draftee` came back as `afldb i-ue 160 te-t new draftee`). The
+   integration gate caught it by comparing against the same expression evaluated in SQL. Fixed
+   by escaping for both layers.
+2. The `draft_picks` manual replay's whole-row UPDATE joined `sources` in its `FROM` list and
+   referenced the UPDATE target from it (`JOIN sources s ON s.id = d.source_id`), which
+   PostgreSQL rejects outright — the replay could not run at all. Fixed by resolving the source
+   id in a scalar subquery in the `WHERE`.
+
+A third was added to the `players` replay pre-check rather than discovered in production:
+migration 018 requires `dob IS NULL OR dob_confidence <> 'unknown'`, so a durable record
+carrying a date of birth and no confidence would have aborted the replay mid-INSERT with a
+constraint error. It now refuses in the fail-closed pre-check, naming the record.
+
+**Two deviations from the runbook text, both deliberate and both narrower than the plan.**
+
+- **Capabilities (D-6) are NOT declared in Stage 1.** `tests/auth.test.ts` fails on any
+  capability declared in `capabilities.ts` but enforced at no page, route or action, and Stage 1
+  ships no route. Declaring `data.draft.read` / `data.draft.edit` now would break a green suite
+  to no benefit. Gate 4 is therefore Stage 2, where the routes that enforce them are built.
+- **§15's UI half is split.** The backend half shipped (`saveEdit` and `saveDataEdit` refuse
+  `draft_picks`; `getEditableRow` returns nothing for it; the natural-key branch is gone; the
+  spec keeps `draft_picks` and gains `selection_facts`). `CreatePlayerForm`'s draft block was
+  also removed, because the action now rejects those fields and leaving them would ship a form
+  that always errors. The `/admin/data-editor` page's draft SEARCH section and its
+  `entity=draft_picks` notice are Stage 2: the notice links to `/admin/draft/[id]`, which does
+  not exist yet. Until then a draft id renders the page's existing "no row with that id" empty
+  state — honest, and with no dangling link.
+
+**A product constraint worth recording.** J-8 admits a draft year up to `max(season) + 1`, but
+J-6 requires a club identity active in that year and `clubs.last_season` is populated (2026 on
+`afldb_test`), so a selection for a draft one season ahead of the club table is refused by J-6.
+Neither rule is wrong; the two bounds simply do not coincide, and an administrator recording
+next year's draft early will need the club table advanced first.
+
+### Validation
+
+**Executed 2026-09-11 on this branch, against `afldb_test` only (`afldb_dev` was never
+mutated).**
+
+| Gate | Result |
+|---|---|
+| 1 Preflight | **PASS** — READY, 0 blockers |
+| 2 Historical probes | **PARTIAL** — `afldb_test` + `afldb_dev` done and recorded above; PROD (d)/(e)/(g)/(h) **OPEN** |
+| 3 Player-creation contract | **PASS** — `tests/player-link-mutations.test.ts`, 36 tests |
+| 4 Capability matrix | **DEFERRED to Stage 2** (no route enforces a draft capability yet) |
+| 5 Duplicate/conflict unit contracts | **PASS** — new `tests/admin-draft-actions.test.ts`, 25 tests |
+| 6 Existing-player creation + 6.8 adoption | **PASS** — `tests/integration/admin-draft.test.ts` |
+| 7 New player through the draft | **PASS** — one player, one identity, two records, two audits, zero orphans |
+| 8 Atomicity | **PASS** — both forced-failure triggers, every family in §9.3 |
+| 9 Source-owned correction replay | **WRITTEN, SKIPPED HERE** — `tests/integration/draftguru-import.test.ts` needs `.venv`, the accepted DraftGuru Stage A snapshot and `AFLDB_TEST_IMPORT_DATABASE_URL`; none is present in this worktree, so the whole suite skips |
+| 10 D-2 guard | **PASS** — `tools/migration/test_manual_insert_guard.py` (all four DOB shapes, both directions, string/date, the raising wrapper, and a static proof the guard writes nothing) plus a live case running the REAL candidate query and verdict against `afldb_test`, and the settle-shaped identity lookup after 6.5 |
+| 11 Manual reload / reconciliation | **PASS** — the REAL `replay_admin_overrides` re-creates the deleted player and selection with the same tokens and no twin, replays a corrected year and club, BINDS the token onto a debuted player instead of inserting one, refuses an unresolvable record, and is idempotent; 6.7 supersede leaves one selection and one player |
+| 12 Promotion lineage | **PASS** — `tests/db-promotion-check.test.ts` (100 tests) plus live checks that `draft_pick_key` names a source row and a manual row, skips a NULL-source row, round-trips, and that the widened `players` rule returns exactly one identity, path-first |
+| 13 Data-editor transition | **PASS** — `tests/edit-spec.test.ts` and `tests/data-overrides-source-contract.test.ts`, including the source grep proving exactly one `INSERT INTO draft_picks` in `src/` |
+| 14 Typecheck + affected suites | **PASS** — `npx tsc --noEmit` clean; 605 tests across the nine affected unit suites, 38 in the new integration suite, 51 across the affected integration suites |
+| 15–16 DEV deploy + Playwright | **DEFERRED** — the operator is holding DEV for the Admin Centre batch |
+
+`npx eslint` on every changed file reports no new finding; the four remaining errors and four
+warnings are pre-existing at `HEAD` (`data-edits.ts` `Record<string, any>`,
+`player-link-mutations.test.ts`'s fake transaction, `players.ts` `_total`,
+`data-editor/page.tsx`'s unused `formatDate`/`formatRoundShort` imports).
+
+One unrelated pre-existing failure was observed and is NOT a regression:
+`tests/integration/data-editor.test.ts` → "refuses to build a ladder for a season it has no
+matches for" requires a season in `seasons` with no non-final `matches`, and the current
+`afldb_test` has 207 non-final 2026 matches, so no such season exists. Nothing in ISSUE-160
+touches `seasons`, `matches`, `club_seasons` or `recomputeClubSeasons`.
+
+### Stage 2 implementation record — 2026-09-11
+
+Built on the Stage 1 commit (`91935b9`) in a fresh Sonnet 5 high session, against `AFLDB-ISSUE-160.md`
+§17/§18. No Stage 1 defect found; `admin-draft.ts`, `players.ts`, `data-edits.ts` and `spec.ts`
+are unchanged from Stage 1 except for the read-only pages that now call them.
+
+**Routes** (Data group, after Coaches): `/admin/draft` (list — filters by year/kind/club/name/
+provenance/link-state, never renders a NULL pick number as 0, override badge from
+`readActiveDraftOverrideKeys()`); `/admin/draft/new` (Step 1 draft facts in one form, Step 2
+search-first via `searchPlayersForDraftAction`, Step 3 an explicit two-button choice — "Add
+selection for …" per result, or "Create a new player…" revealing the atomic 6.3b sub-form — with
+no fallthrough between them); `/admin/draft/[id]` (identity/provenance always shown; exactly the
+panel the row's provenance admits: `SourceFieldsPanel` for a DraftGuru row — four groups, each its
+own override + retire control; `ManualPickPanel` + `AttachIdentityPanel` (only when the linked
+player is manual and awaiting one, reusing `listManualPlayersAwaitingIdentity()`) +
+`SupersedePanel` (only when a J-14 duplicate source row is found) + `RetirePanel` for a manual
+row; `AdoptPanel` for a legacy row); `/admin/draft/revalidate` (POST, allowlist: `/players/<slug>
+-<id>`, `/sitemap.xml` — every public draft page is `force-dynamic` and needs neither).
+
+**Capabilities (D-6):** `data.draft.read` (Admin+) / `data.draft.edit` (Super Admin) added to the
+`Capability` union and `CAPABILITY_ROLES`; every draft page, the revalidate route, and every
+Server Action in `src/app/admin/draft/actions.ts` calls `requireCapability()` as its first
+awaited statement — `tests/auth.test.ts`'s source-reading contract (capability declared-and-
+enforced, guard-is-first, role-guard-equivalence, nav-enforces-the-same-capability) passes
+unmodified except for the two capabilities' own table rows and the widened Data-group nav
+assertions.
+
+**D-9 (Stage 2 only, as decided):** `src/lib/admin/revalidate-route.ts` (`applyRevalidateRequest`
+— parse + allowlist-filter + `revalidatePath` loop) and `src/components/admin/action-submit.ts`
+(`useAdminActionSubmit` — `useActionState` + `startTransition` + focus-restore + post-commit
+revalidate fetch + `router.refresh()`) extracted from the ISSUE-159 coach precedent. The capability
+guard and the domain allowlist deliberately stay in each domain's own `route.ts` /
+`revalidate-paths.ts`, not in the shared module, because `tests/auth.test.ts`'s `firstGuard`
+walker requires the guard to be the literal first awaited call in the boundary's own source.
+Coaches' `submit-helper.ts` and `revalidate/route.ts` were switched to the shared modules,
+behaviour-preserving (same exported names, same dispatch shape); its own suite
+(`admin-coach-actions`, `integration/admin-coaches`, 29 tests) passes unchanged.
+
+**Data-editor transition (D-5 UI half):** `/admin/data-editor/page.tsx`'s "Draft picks" section,
+its search form and results table, and the `listDraftPicks` import removed; `entity=draft_picks`
+now renders a notice linking to `/admin/draft/[id]` instead of a false "no draft pick with id"
+message; `CreatePlayerForm.tsx`'s draft-block placeholder text now links to `/admin/draft/new`.
+The backend refusals (`saveDataEdit`, `data-edits.ts`) were already in place from Stage 1 and are
+untouched.
+
+**Self-caught defect during Stage 2 (not a Stage 1 defect):** the first draft of this session's
+`tests/admin-draft-actions.test.ts` and `tests/integration/admin-draft.test.ts` used `Write`
+against files that Stage 1 had already committed (348 and 1440 lines respectively — the J-1..J-16
+pure contract suite and the full backend-mutation integration suite), overwriting them. Caught
+before commit by `git diff --stat` showing large deletions; restored with `git checkout HEAD --
+<path>` and the Stage 2 additions re-applied as new `describe` blocks appended to the restored
+Stage 1 files instead. No new DB integration tests were added for the mutation contract itself:
+Stage 1's own gates 6/7/8/10/11 already prove `createManualPick`/`createPlayerAndDraftPick`/
+`adoptLegacyPick`/the D-2 guard/6.7 supersede end-to-end against `afldb_test`, and Stage 2 calls
+those exact same functions unchanged, so re-proving them would duplicate Stage 1 coverage against
+the runbook's own instruction not to. Stage 2's test additions are therefore the pure parsing/
+allowlist unit tests plus the generic capability/nav contract in `tests/auth.test.ts`, which
+already exercises every new action/route boundary structurally.
+
+**Validation:** `npx tsc --noEmit` clean; `git diff --check` clean. 399 tests pass across
+`admin-draft-actions` (73 with `integration/admin-draft`), `admin-coach-actions` +
+`integration/admin-coaches` (29), `auth` (extended), `edit-spec`, `data-overrides-source-contract`,
+`player-link-mutations`, `db-promotion-check`. `db:privileges` unnecessary (no privilege change);
+no migration (096 still free).
+
+### Local completion audit — 2026-09-11
+
+Run from the committed Stage 2 checkpoint (`a947e52`) on a clean tree, Opus 5 high. Scope: the
+implemented surface against the runbook, especially the Stage 1 / Stage 2 boundary. No DEV, no
+PROD, no deploy, no merge.
+
+**One real defect, fixed.** *A refusal returned after a write COMMITTED the partial mutation.*
+`postgres.js` commits when the `begin()` callback **resolves** and rolls back only when it
+**rejects**, so a `return refuse(...)` placed past the transaction's first write commits the
+half-done mutation while telling the operator it failed — which §9.1 forbids. Two sites had it:
+
+- `attachAflTablesIdentity()` — the `external_identities` INSERT runs, then the `identity`
+  override UPDATE matches 0 rows and the function returned `conflict`. Net effect: the AFL
+  Tables identity **was attached, with no `data_edits` row at all**, and the admin was told it
+  failed; a retry then refused with J-16 "already holds the AFL Tables identity". Reachable
+  whenever a player holds a `manual_admin_edit` identity with no `('players',
+  'manual_admin_edit:<token>', 'identity')` override row.
+- `adoptLegacyPick()` — the `stale` refusal when the `WHERE source_id IS NULL` compare-and-swap
+  matches 0 rows, reached after the transaction may already have minted the linked player's
+  token, `external_identities` row, `identity` override and `identity_adopted` audit. In
+  practice unreachable because `lockPick()` takes `FOR UPDATE` first and a second adopt refuses
+  at the early `source_id IS NOT NULL` check, but it is the same bug.
+
+Neither was a plan defect: Stage 1's own `createPlayerAndDraftPick` already **throws** at its
+analogous cannot-happen branch precisely so the transaction rolls back. The fix names that
+pattern — a private `RollbackRefusal` carrying `(reason, detail)`, thrown at both late sites and
+converted back to the identical refusal by each mutation's existing `catch`. The success paths,
+the refusal reasons and the action-layer contract are unchanged.
+
+Regression coverage: `tests/integration/admin-draft.test.ts` gains "6.5 rolls the identity back
+when the refusal is found AFTER the insert", which builds the reachable state (delete the
+player's `identity` override), calls the real `attachAflTablesIdentity`, and asserts the refusal
+leaves **zero** `external_identities` rows for the path and **zero** `source_identity` audit
+rows. Proven to catch it: with the fix reverted the test fails on `identities` 1 ≠ 0.
+
+**Eight new ESLint errors, fixed.** Stage 2 introduced them and the Stage 1 note that "`npx
+eslint` on every changed file reports no new finding" was not re-run for Stage 2:
+`react/no-unescaped-entities` in `RetirePanel.tsx` (2), `SupersedePanel.tsx` (2) and
+`NewPickWizard.tsx` (2), plus `@next/next/no-html-link-for-pages` in `NewPickWizard.tsx` (2) —
+two `<a href="/admin/draft">` post-success links that would have forced a full page reload
+instead of a client navigation. Next 16 no longer lints during `next build`, so gate 15 was not
+at risk; `npm run lint` was. After the fix the only findings on changed files are 6 errors and 4
+warnings, **all verified pre-existing at `af6379e`** (`data-edits.ts` `Record<string, any>` ×2,
+`player-link-mutations.test.ts` `any` ×4, `players.ts` `_total` ×2, `data-editor/page.tsx`
+unused `formatDate`/`formatRoundShort` ×2). The Stage 1 record said "four remaining errors"; the
+measured figure is six, same disposition.
+
+**Two runbook §18 items were found not delivered and were not previously recorded as
+deviations. The operator directed both to be implemented immediately (2026-09-11), and they
+are now CLOSED -- see *§18 list-contract closure* below:**
+
+- the list `state` filter (`override` | `duplicate` | `awaiting-identity`). The list carried an
+  *Overridden* badge column sourced from `readActiveDraftOverrideKeys()`, but
+  `DraftAdminListFilters` had no `state` member and the form offered no such control;
+- "unresolved source rows deep-link to `/admin/player-links`". `/admin/draft/[id]` renders
+  "Unresolved — link in Player links" as plain muted text and the list links only to the detail
+  page; there is no `/admin/player-links` href anywhere under `src/app/admin/draft/`.
+
+**Everything else audited clean.** All nine Stage 1 mutation primitives are exposed by exactly
+one action each and no Stage 2 action bypasses `admin-draft.ts`; `requireCapability` is the
+first awaited statement of every draft page, the revalidate route and all ten actions;
+`admin-draft.ts` holds the only `INSERT INTO`/`DELETE FROM draft_picks` in `src/`
+(`player-links.ts:375` is `applyLockedLink`'s sanctioned link UPDATE); the new-player path
+re-reads the player and resolves identity server-side, so D-2's "name/DOB may refuse but never
+decide identity" invariant holds in the wizard, in `checkNewPlayerDuplicates` and in the
+importer guard, which is called only in the new-player INSERT branch; J-3 ships as the hard
+refusal with no dormant confirmation branch; NULL pick numbers never render or store as zero;
+adoption's identity preference order and its `stale` compare-and-swap are as §6.8 specifies;
+`/admin/data-editor` refuses `draft_picks` in `saveDataEdit`, `getEditableRow` and `saveEdit`,
+its draft section is gone and `entity=draft_picks&id=N` now points at `/admin/draft/N`; no code
+path can produce a `null|null|<year>|null` override key; the `draft_picks` replay's manual
+branches read only `is_active` overrides, so a retired selection is never resurrected; the
+widened `afltables_profile_url` rule and `draft_pick_key` are as D-3 specifies and
+`docs/production-promotion.md` §8 now replays `draft_picks` in the binding order; the D-9
+extraction is behaviour-preserving for coaches, both allowlists stay domain-local, and no
+Server Action calls `revalidatePath`.
+
+**S-1 is untouched and cannot be applied by accident.** The `promotion-inventory.ts` change is
+unconditional by design, so the only thing standing between it and the paused ISSUE-151 PROD
+promotion `20260907-234124` is that this branch is unmerged and undeployed — which is exactly
+what §11.1 option (a) describes. There is no in-code guard and the runbook asks for none.
+
+**Gates re-run from the committed checkpoint** (afldb_test only; `afldb_dev` never touched):
+`npx tsc --noEmit` clean; `git diff --check` clean; 9 unit suites / 619 tests pass
+(`admin-draft-actions`, `auth`, `edit-spec`, `data-overrides-source-contract`,
+`player-link-mutations`, `db-promotion-check`, `admin-coach-actions`, `coach-reconciliation`,
+`current-season-import`); `tests/integration/admin-draft.test.ts` 39/39 (38 before the new
+regression test); `tests/integration/admin-coaches.test.ts` 13/13;
+`tools/migration/test_manual_insert_guard.py` ok. `tests/integration/draftguru-import.test.ts`
+**skips whole (21 tests)** — the precise blockers are the missing Stage A snapshot
+(`data/sources/draftguru/annual-html-20260826/raw/years`) and the unset
+`AFLDB_TEST_IMPORT_DATABASE_URL`; `psycopg` **is** importable from the system Python here, so
+the earlier ".venv" wording overstated that half. `tests/integration/data-editor.test.ts` still
+has its one unrelated pre-existing failure ("refuses to build a ladder for a season it has no
+matches for"): it needs a season with no non-final matches and `afldb_test` has none — neither
+ISSUE-160 commit touches that file, `seasons`, `matches` or `recomputeClubSeasons`. No fixture
+residue is left on `afldb_test`.
+
+### §18 list-contract closure — 2026-09-11
+
+Both gaps the audit reported are implemented. No migration, no new persisted state, no new
+mutation path: the whole change is read-side plus one navigation link.
+
+**1. The `state` filter (`override` | `duplicate` | `awaiting-identity`).** Added to
+`listDraftPicksForAdmin()` as a SQL predicate rather than a filter over the rendered page, so
+the count, the pager and the table describe the same set. Each state is derived from rows this
+database already holds, and none of them is a name comparison:
+
+| State | Exact meaning | Derived from |
+|---|---|---|
+| `override` | the selection's own `data_overrides` entity key carries an **active** row | the key set `readActiveDraftOverrideKeys()` already reads for the *Overridden* badge, passed into the query — `data_overrides` has no `grant_app_read`, so the public client this list reads on cannot join it, and it is not read twice under two roles |
+| `duplicate` | **J-14 exactly**: a MANUAL selection whose player *also* holds a source-owned selection for the same `(draft_year, draft_kind)` — the state 6.6 retirement and 6.7 supersession exist to resolve | canonical `draft_picks` only, the same predicate `/admin/draft/[id]` uses to decide whether to offer `SupersedePanel` |
+| `awaiting-identity` | the row's player holds a `manual_admin_edit` identity and **no** `afltables` identity | `external_identities`, the same predicate as `listManualPlayersAwaitingIdentity()` and the same candidate set the D-2 importer guard measures itself against |
+
+`isDraftListState()` gates the query-string value, so a hand-typed `?state=` cannot widen the
+filter, and an unknown value falls back to no filter rather than an error. A row may legitimately
+satisfy more than one state (a newly created player's selection is both `override` and
+`awaiting-identity`); the filter selects, it does not classify, so nothing has to choose between
+them.
+
+The `override` predicate is the only place the `entity_key` shape is written twice — once in SQL
+for the filter, once in `entityKeyFor()` for the rendered badge. The gate-18 integration case
+pins them together by asserting that `state=override` returns **exactly** the rows whose
+returned `entityKey` is in the active key set, so a divergence fails the suite rather than
+quietly filtering the wrong rows.
+
+**2. The Player-links deep link.** An unresolved source-owned selection now links to
+`/admin/player-links?table=draft_picks&q=<player_name_raw>`, from both the list's Link-status
+cell and the detail page's Player row. Both parameters are ones that page already supports and
+are used as it defines them: `table` is validated by `isLinkTargetTable()` and `q` is matched
+case-insensitively against the queue row's `playerName`, which for a draft pick **is**
+`draft_picks.player_name_raw` (`listUnresolvedLinks`). Nothing was invented, and no parameter
+was added to the destination.
+
+`needsPlayerLinkReview()` is the single rule: source-owned provenance **and** a link status in
+`UNRESOLVED_LINK_STATUSES`, which is now exported from `player-links.ts` so the draft surface
+reads the destination's own list instead of restating it. Manual rows (relinked by 6.4), legacy
+rows (repaired by 6.8) and already-linked source rows are excluded — J-17 refuses relinking a
+source row from this surface at all, so offering the link there would be offering a door that
+does not open. The affordance is rendered only to a viewer holding `data.playerLinks`; it is
+navigation only, and `/admin/player-links` enforces its own capability and owns every mutation
+on arrival.
+
+**No new mutation path.** The diff adds no Server Action, no route, no `INSERT`/`UPDATE`/`DELETE`
+and no call into any `admin-draft.ts` mutation. `admin-draft.ts` still holds the only
+`INSERT INTO`/`DELETE FROM draft_picks` in `src/`, and the ten existing actions are unchanged.
+
+**Coverage.** Seven unit cases in `tests/admin-draft-actions.test.ts` pin the state enumeration
+(a hand-typed `?state=` cannot widen it) and every branch of `needsPlayerLinkReview()` /
+`playerLinksHref()`, including that a name which would otherwise alter the query string survives
+a round trip with no injected parameter. Six integration cases in
+`tests/integration/admin-draft.test.ts` prove the three states against real rows: `override`
+returns **exactly** the rows whose `entityKey` is in the active key set (the pin described
+above) and returns **nothing** when the key set is empty — the failure mode that matters, a
+predicate silently ignored, would return everything; `duplicate` finds the manual half of a
+J-14 pair and not the source half, and not a manual selection without one; `awaiting-identity`
+matches `listManualPlayersAwaitingIdentity()` row for row and drops a selection the moment 6.5
+attaches the identity; and the deep link is offered for an unlinked source row and for no other
+shape. One fixture lesson worth recording: the first draft of the block reused the suite's
+shared `sourcedPlayerId`, and J-1 correctly refused the second selection because an earlier test
+had already moved one onto that player — the block now mints its own player, so its fixtures do
+not depend on what ran before it.
+
+**Gates re-run after the closure** (`afldb_test` only; `afldb_dev` and PROD untouched):
+`npx tsc --noEmit` clean; `git diff --check` clean; **9 unit suites / 626 tests pass, 0
+skipped**; `tests/integration/admin-draft.test.ts` **45/45** (39 before, +6);
+`tests/integration/admin-coaches.test.ts` **13/13**;
+`tools/migration/test_manual_insert_guard.py` ok. ESLint over every ISSUE-160 changed file
+reports **6 errors and 4 warnings, all of them the set already verified pre-existing at
+`af6379e`** — zero new findings from this change. `tests/integration/draftguru-import.test.ts`
+still skips whole (21 tests, no Stage A snapshot and no `AFLDB_TEST_IMPORT_DATABASE_URL`) and
+`tests/integration/data-editor.test.ts` still has its one unrelated pre-existing ladder failure
+(1 failed / 9 passed / 2 skipped). No fixture residue is left on `afldb_test`.
+
+### Next action
+
+Operator reviews and commits one uncommitted working tree carrying both the audit fixes and the
+§18 closure: `src/db/queries/admin-draft.ts`, `src/db/queries/player-links.ts`,
+`src/app/admin/draft/{page.tsx,[id]/page.tsx,NewPickWizard.tsx,RetirePanel.tsx,SupersedePanel.tsx}`,
+`tests/admin-draft-actions.test.ts`, `tests/integration/admin-draft.test.ts`, and the tracking
+(`CHANGELOG.md`, `issues.md`, `IssuesIndex.md`, `AFLDB-ISSUE-160.md`, `AFLDB-ISSUE-156.md`).
+Stage 1 and Stage 2 are already committed at `91935b9` and `a947e52`. ISSUE-160 is
+**code-complete and locally validated**; every non-deferred requirement is met.
+ISSUE-160 stays **open** pending deferred DEV acceptance: gate 15 (DEV deploy/build) and gate 16
+(three-role Playwright at 320/768/1000/1280/1920 on `/admin/draft`, `/admin/draft/new`,
+`/admin/draft/[id]`) run only when the operator updates DEV for the Admin Centre batch. Still open
+from Stage 1: the gate-2 **PROD** read-only probes (d), (e), (g), (h) —
+not run because PROD was deliberately untouched — and the real-importer half of gate 9, which
+runs on a host carrying `.venv`, the accepted DraftGuru Stage A snapshot and
+`AFLDB_TEST_IMPORT_DATABASE_URL`. Operator decision **S-1** (§11.1, sequencing this
+`promotion-inventory.ts` change against the paused ISSUE-151 PROD promotion `20260907-234124`)
+is required before the promotion-tooling change DEPLOYS, and must be recorded in the ISSUE-151
+promotion record and the ISSUE-160 evidence before `merge:ready`.
+
+## AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
+
+- **Status:** Open / **Stage 1 AND Stage 2 code-complete 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high) — implemented on `afldb_test` / statically for Stage 2, NOT committed, NOT deployed.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Stage 2 delivers `/admin/season-lists`, `/admin/season-lists/[season]`, `/admin/season-lists/[season]/[club]`; capabilities `data.seasonLists.read`/`.edit`; the Data-group nav entry; the ISSUE-160 handoff link (`/admin/draft/[id]` and the new-selection success panel); no revalidate route (`revalidatePaths: []` always, per §10); DEV Playwright deferred to the combined Admin Centre batch. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Both stages await operator review/commit and the combined ISSUE-160+ISSUE-161 DEV acceptance; neither issue is resolved.**
+- **Severity:** Medium
+- **Area:** Admin / Data management / Player–club–season model / Promotion lineage
+- **Branch:** `opus/issue-161-season-lists`, worktree `D:\dev\afldb-issue-161`, cut from `opus/issue-160-draft-admin` @ `1295d3d` (stacked on ISSUE-160 by operator direction; ISSUE-160 is not merged first).
+- **Planning model:** Fable 5.1, high.
+
+### Problem
+
+AFLDB has no concept of a club's playing list. Every player–club and player–season relationship
+(`player_clubs`, `player_club_season_stats`, `player_season_stats`, `player_career_stats`,
+`club_seasons`) is DERIVED from `player_match_stats`/`matches` and `TRUNCATE`-rebuilt by
+`tools/migration/rebuild_derived.py` (migration 007; `promotion-inventory.ts:816-819`). A listed
+player who has not played has no club anywhere; "current player" is a question nothing answers.
+ISSUE-152 measured zero zero-game `player_clubs` rows, so the table cannot carry a listing. AFLDB
+therefore depends on external match data to say who is at a club, and cannot represent a draftee,
+a rookie who never plays, or a delisting.
+
+### Planning findings (2026-09-11, all verified natively; full evidence in `AFLDB-ISSUE-161.md` §2)
+
+- `player_clubs` is the wrong table by semantics, not by name: derived, aggregate, match-based.
+  Reusing it, `player_club_season_stats` or `club_seasons` (derived from `matches`, NOT NULL
+  ladder columns, witness-checked, row-count-gated) is rejected; the minimum correct change is a
+  new canonical registry table `season_list_members` (season, club identity, player, source,
+  origin; `UNIQUE (season, player_id)`), with the ISSUE-159/160 durability shape: a whole-row
+  `data_overrides` record keyed by the natural, rebuild-stable key
+  `<club_slug>|<season>|<player identity>`, one import-role transaction per mutation with
+  `data_edits` audited against the **player**, and a fail-closed
+  `replay_admin_overrides('season_list_members')` branch (after `players`) that re-creates active
+  memberships and deletes tombstoned ones. No token minting, no `null|null|…` key class possible.
+- **No `retired` flag.** Retired/delisted = absence of a membership in the current list season
+  (`max(season)` over memberships); "unknown" while that season's eligible clubs are not all
+  populated; a returning player is simply listed again.
+- **Season boundary (Q15):** `seasons` rows and `clubs.last_season` are reference-loaded from
+  `data/reference/seasons.json`/`clubs.json` (`TRUNCATE`-and-copy); `afldb_identity_for_season()`
+  returns NULL for `max(year)+1` (the ISSUE-160 J-6 constraint); the ISSUE-101 rollover advances
+  the register as tracked files only and its `assertCoherent()` refuses an early `seasons.json`
+  advance; `club_seasons` is derived. ISSUE-161 therefore writes **none** of them: list season
+  validity is `FIRST_LIST_SEASON <= S <= max(seasons.year)+1` (no FK to `seasons`), and for
+  `S >= max(year)` the eligible clubs are exactly the `is_current_afl_club` identities (a new SQL
+  helper; `afldb_identity_for_season()` untouched). "Opening a season" is not an initialisation
+  step. The stop condition "season initialisation has an unclear production side effect" was
+  avoided by design.
+- **Public impact:** none required — no public page, NL plan, Grid Solver axis or admin surface
+  asserts list membership or current status today (`retired` in NL vocab means "last game").
+  Consumers are enumerated as separate follow-ups. Server Actions return `revalidatePaths: []`.
+- **ISSUE-160 integration:** option C — a handoff link from `/admin/draft/[id]` and the
+  new-selection success panel, plus a draftee suggestion panel on the club list page; the add is
+  always an explicit audited action; no automatic membership. `resolvePlayerIdentity` is
+  extracted behaviour-preservingly into a shared `src/db/queries/player-identity.ts`.
+- **Migration:** one required (next free 096 on this branch, allocated at Stage 1 preflight):
+  table + indexes + `afldb_season_list_clubs(season)` helper + `data_overrides.entity_type`
+  widened with `'season_list_members'` (order-independent for the settle per
+  `manual-authority.ts`) + `grant_app_read`/`grant_import_write`. No backfill, no `data_edits`
+  CHECK change, no `privileges.sql` edit, no `PROMOTION_CONTRACT` entry, no new lineage target.
+- **Permissions:** `data.seasonLists.read` (Admin+), `data.seasonLists.edit` (Super Admin).
+  **Routes:** `/admin/season-lists`, `/[season]`, `/[season]/[club]`. **Stages:** 1 backend/replay
+  (Opus 5 high), 2 admin surface (Fable 5.1 high); no Stage 3.
+- **Bootstrap (D-2, as decided):** `FIRST_LIST_SEASON = 2027`; no bulk seed action and no
+  `seeded_appearances` origin; the 2027 club page shows a non-authoritative 2026 appearances review
+  panel from which each add is an explicit audited decision (`origin = 'added'`,
+  `candidate_source = 'appearances:2026'`). No 2026 list, no historical backfill.
+
+### Release constraint (recorded)
+
+ISSUE-161 is developed locally on top of ISSUE-160. No Admin/Super Admin change is deployed to DEV
+until ISSUE-161 is complete and the operator confirms there is no further Admin Centre addition to
+batch. Then: merge/integrate the stack → update/rebuild DEV → combined ISSUE-160 + ISSUE-161 DEV
+acceptance → role-based Playwright → fix defects → close both when green. Deferred DEV acceptance
+during implementation is not a failure.
+
+### Stage 1 execution — 2026-09-11 (Opus 5 high), code-complete, uncommitted
+
+**Preflight.** `npm run preflight -- --mode implementation --issue 161` → **READY, 0 blockers, 3
+warnings**: `.env` absent in this worktree (created locally, untracked, DSNs rewritten to the
+`55432` tunnel), `psql`/`pg_restore` unavailable on the workstation (not required for this mode).
+Branch `opus/issue-161-season-lists` at `436d0c9`, tree clean, contains local `main`.
+
+**Migration number re-check.** `git log --all -- 'src/db/migrations/096*'` returned nothing and no
+`096*` file existed; highest was `095_coach_admin_overrides.sql`. **096 allocated.**
+
+**D-3 evidence gate — PASSED, invariant upheld.** Both runbook §21 probes run READ-ONLY against the
+rebuilt `afldb_test` (59,002 `player_club_season_stats` rows, seasons 1897–2026, `max(seasons.year)
+= 2026`):
+
+- **Probe (a)** — multi-club player-seasons by decade: 1890s 2, 1900s 1, 1910s 30, 1920s 21,
+  1930s 53, 1940s 30, 1950s 25, 1960s 10, 1970s 34, 1980s 39, 1990s 4. **Total 249**, and the
+  **latest is 1992** — the residue of the pre-1993 clearance era, entirely outside the
+  authoritative list domain, whose first season is 2027.
+- **Probe (b)** — `season >= 2000`: **ZERO rows.**
+- No repository or rules evidence of a legitimate second same-season AFL list place was found.
+
+`UNIQUE (season, player_id)` was therefore implemented as designed, with the measurements recorded
+in the migration beside the constraint.
+
+### Validation (Stage 1, on `afldb_test` only)
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `tests/admin-season-list-actions.test.ts` (new, pure) | **25 passed** |
+| `tests/integration/admin-season-lists.test.ts` (new, real PostgreSQL + real replay) | **40 passed**, and re-runnable: a second consecutive run passed and left zero rows behind |
+| `tests/data-overrides-source-contract.test.ts` (extended) | 24 passed |
+| `tests/db-promotion-check.test.ts` (extended) | passed — `season_list_members` classified registry, no `PROMOTION_CONTRACT` entry, `assertContractCoherent()` does not throw (W-8 cleared) |
+| `tests/current-season-import.test.ts` (extended, manual authority) | passed — `overrideScopeProvenFrom()` returns the same answer against the pre-096 and post-096 CHECK, so the widening is order-independent (W-10 cleared) |
+| ISSUE-160 regression: `tests/integration/admin-draft.test.ts` | **45 passed** (W-6 cleared — the shared identity extraction changed no result) |
+| ISSUE-160 regression: `admin-draft-actions`, `player-link-mutations`, `reference-data` | 120 passed |
+| `tests/integration/fk-indexes.test.ts`, `tests/auth.test.ts` | 132 passed |
+| Broad unit run (all 115 `tests/*.test.ts`) | 4,227 passed, 14 skipped, **1 failed: `finals-semantics-contract.test.ts`** — the known Windows-CRLF-only failure on an untouched file; passes on Linux |
+| `npx eslint` on every changed/new file | clean (2 findings remain in untouched code, both present at `HEAD`) |
+| `git diff --check` | clean |
+
+Database writes were confined to `afldb_test` (migration 096 applied there; every test fixture
+marker-tagged and removed in `afterAll`). **DEV and PROD were not touched, nothing was committed,
+pushed, merged or deployed.**
+
+### Stage 1 deviations from the runbook (3, all recorded deliberately)
+
+1. **Replay step order.** §19 lists the tombstone `DELETE` fourth; it is executed **first**, before
+   the active inserts. A stale row for the same `(season, player)` at the club a player was moved
+   away from would otherwise collide with `UNIQUE (season, player_id)` and abort a reload that was
+   about to become correct. Every behaviour §19 specifies is still performed, and tombstone-first
+   matches §7, which ranks the tombstone above every other authority.
+2. **"Membership persists through a real `rebuild_derived.py` run" (§24)** is proved as an exact
+   source contract instead of by running the job: `rebuild_derived.py` contains no reference to
+   `season_list_members`, `DERIVED_FOOTBALL_TABLES` is asserted equal to its five members, and
+   `settle-afltables.ts` names the table nowhere. That is a stronger and deterministic statement of
+   the same claim, and it avoids a full derived rebuild of the only rebuilt test database.
+3. **The §24 "test-scoped bound override"** is an env var read only when `NODE_ENV === 'test'`
+   (asserted inert under `NODE_ENV=production` by a unit test), rather than a throwaway `seasons`
+   row. It raises the CEILING only and can never lower `FIRST_LIST_SEASON`, so no test can write an
+   authoritative row below 2027 — and D-6's "ISSUE-161 writes no `seasons` row" holds even in the
+   fixtures.
+
+### Stage 2 execution — 2026-09-11 (Sonnet 5 high), code-complete, uncommitted
+
+Implemented on top of the uncommitted Stage 1 tree, from this same worktree. **Not committed, not
+pushed, not merged, not deployed.** No shell/Git/database/deployment command was executed by
+Claude during Stage 2 (CLAUDE.md §9); the Stage 1 checkpoint (`97af605`) and a clean tree were
+confirmed from the session's own git-status context rather than by running `npm run preflight`.
+
+**Capabilities (§16).** `data.seasonLists.read` (`ADMIN_AND_UP`), `data.seasonLists.edit`
+(`SUPER_ADMIN_ONLY`) added to `src/lib/auth/capabilities.ts`'s `Capability` union and
+`CAPABILITY_ROLES`. Nav: Data group, after "Draft administration", label "Season lists", gated on
+`.read` (`src/app/admin/nav-model.ts`). `tests/auth.test.ts`'s `EQUIVALENT_ROLE_GUARD` map extended
+with both capabilities (`requireAdmin` / `requireSuperAdmin`) — the file's existing generic
+boundary-scanner (guard-first, capability↔nav↔declaration cross-checks) covers the new routes and
+actions automatically; no new test cases were hand-written for the mechanical parts of that
+contract.
+
+**Routes delivered exactly as the runbook (§20):** `/admin/season-lists` (season selector: every
+administrable season from 2027, member/completeness counts), `/admin/season-lists/[season]`
+(eligible-club cards, previous-season comparison — list-to-list from 2028, explicitly-labelled
+non-authoritative 2026 appearances for 2027 — and, for a copyable season, the Copy-forward panel),
+`/admin/season-lists/[season]/[club]` (member table with filters, Add/Remove/Transfer, the
+draftee-suggestion panel, the appearances-review panel for 2027, and the §15.1 "played but not
+listed" diagnostic). No `/admin/season-lists/[season]/[club]/[player]` detail route and no
+`/admin/season-lists/revalidate` route, matching §10/§20.
+
+**One Stage 2 backend addition (read-only, additive):** `readDraftSuggestions(season, clubSlug)` in
+`src/db/queries/admin-season-lists.ts` — Stage 1 delivered every mutation and the appearances
+projection but no read for "this club's draft selections not yet listed" (§14); this is a plain
+`SELECT` against `draft_picks`/`season_list_members`, changes no Stage 1 invariant, mutates nothing,
+and needed no migration.
+
+**Add / Remove / Transfer / Copy-forward:** thin Server Actions in
+`src/app/admin/season-lists/actions.ts`, each `requireCapability('data.seasonLists.edit')` as the
+literal first statement, calling exactly one Stage 1 primitive, returning `revalidatePaths: []`
+always. Remove and Transfer are per-row client controls (`MemberActions.tsx`) with an explicit
+two-step confirmation ("Remove from the season list", never "retire"); Transfer offers only
+eligible destination clubs and calls the atomic `transferSeasonListMember` primitive (never
+client-side remove-then-add). Copy-forward (`CopyForwardPanel.tsx`) is dry-run-then-confirm,
+club-selectable, and is not rendered at all for 2027 (D-2: nothing to copy) — the season page shows
+an explanatory note pointing at the appearances review panel instead.
+
+**Appearances review / draftee suggestions:** both read-only projections, rendered with a per-row
+explicit "Add" (own `candidate_source`, e.g. `draft:<pick id>` or `appearances:2026`) plus, for
+appearances only, an optional multi-select "Add selected" using the Stage 1 batch primitive — still
+one explicit reviewed submission, never an automatic seed. Nothing is written by either panel's
+read.
+
+**ISSUE-160 handoff (§14, option C):** a link only, added to `src/app/admin/draft/submit-helper.ts`
+(`SeasonListHandoff` type on `DraftActionState`), computed in `src/app/admin/draft/actions.ts`
+(`seasonListHandoffFor`, called from `createManualPickAction` and `createPlayerAndDraftPickAction`
+after their own write succeeds) and rendered in `NewPickWizard.tsx`'s two success panels and in
+`/admin/draft/[id]/page.tsx`'s header line. The link deep-links to
+`/admin/season-lists/<draftYear+1>/<clubSlug>?add=<playerId>`, hides itself when the target season
+is outside the administrable range, and never writes `season_list_members` — the destination Add
+panel still requires an explicit Super Admin confirmation.
+
+**No retired flag; fixture independence.** Neither introduced anywhere: "listed" / "not listed" is
+read directly from `season_list_members` per season, and every route/read above depends only on
+`clubs`, `players`, `draft_picks`, `season_list_members` and `seasons.year` — none of them needs a
+`matches` row, a fixture or a `club_seasons` row for a future season (verified by inspection against
+the Stage 1 query bodies, which the runbook's §9.4 already established are fixture-independent).
+
+**Deviations from the runbook (recorded, not stopped on):**
+
+1. The club-page filter set implements `all | draftees | unresolved | no-games` as filters on the
+   MEMBER table (rows that ARE listed); `departed` is not implemented as a fourth filter value
+   because a departed player is, by definition, absent from that table and cannot be filtered into
+   it — the runbook's own `"departed(S-1 panel)"` annotation reads as a note that departure is a
+   separate panel, not a table filter. No separate "departed since previous season" panel was built
+   in this pass (diminishing return against the season overview's own previous-vs-current member
+   counts); this is a scope trim, not a defect, and is a candidate follow-up if the operator wants
+   it.
+2. The draftee suggestion panel offers only a per-row "Add" (exact `candidate_source =
+   'draft:<pick id>'` per player), not a multi-select batch add: `addSeasonListMembers` accepts one
+   shared `candidateSource` for the whole batch, which would blur the per-pick evidence a per-row
+   call preserves. The appearances review panel, where `candidate_source` is genuinely uniform
+   across a batch (`appearances:<season-1>`), keeps both the per-row and the multi-select path.
+
+**Validation not yet run by Claude (CLAUDE.md §9 — Claude does not execute shell commands by
+default; none was authorised for Stage 2).** The exact commands for the operator to run:
+
+```
+npx tsc --noEmit
+npx vitest run tests/auth.test.ts tests/admin-season-list-actions.test.ts tests/admin-draft-actions.test.ts
+npx vitest run tests/integration/admin-season-lists.test.ts tests/integration/admin-draft.test.ts
+npx eslint src/app/admin/season-lists src/app/admin/draft src/lib/auth/capabilities.ts src/app/admin/nav-model.ts src/db/queries/admin-season-lists.ts
+git diff --check
+```
+
+### Stage 2 validation repair pass — 2026-09-11 (Sonnet 5, high)
+
+The operator ran the block above. Results: `npx tsc --noEmit` PASS; `tests/integration/
+admin-season-lists.test.ts` 40/40 PASS; `tests/integration/admin-draft.test.ts` 45/45 PASS;
+`git diff --check` PASS; auth/unit batch **198 passed, 3 failed**; eslint **1 new error**.
+
+Fixed, scope held to exactly these findings plus one genuine contract gap surfaced by
+re-inspecting the runbook (§33.4's own inspection instruction, not a reported failure):
+
+1. **`tests/auth.test.ts`** — two nav expectations still asserted the Data group's href list from
+   before `/admin/season-lists` existed (`omits a group entirely for a viewer with no capability`
+   and `keeps the Data group in section order`). Both updated to append `/admin/season-lists`
+   after `/admin/draft`; no capability test weakened, `/admin/season-lists` not removed anywhere.
+2. **`generateMetadata` guard defect (real).** Neither
+   `src/app/admin/season-lists/[season]/page.tsx` nor `.../[season]/[club]/page.tsx` guarded its
+   `generateMetadata` — an oversight from the first Stage 2 pass: no other admin page in the
+   repository uses `generateMetadata` at all (every other dynamic-route admin page, including this
+   repo's own `/admin/draft/[id]`, uses a static `export const metadata`), so there was no existing
+   pattern to copy from when these two files were written. Fixed by adding
+   `await requireCapability('data.seasonLists.read')` as the literal first statement in both
+   functions, before `await params` — the same contract the pages' own default exports already
+   meet. `tests/auth.test.ts`'s generic boundary scanner was not special-cased.
+3. **`AddPlayerPanel.tsx` lint error (real).** One internal admin link (`/admin/draft/new`) used a
+   plain `<a>`; replaced with `next/link`'s `Link`. The file's two links to public
+   `/players/<slug>-<id>` pages were untouched — they already match the exact pattern
+   `/admin/draft/[id]` and `/admin/draft` use for "view public page" links, which is why they were
+   not flagged.
+4. **`+added/-departed vs S-1` and "departed since S-1" (mandatory, not optional — confirmed by
+   re-reading §11 and §20, which state `"changes vs S-1 (+added / -departed, computed by
+   organisation)"` as explicit season-overview content, and §13/§15.1's own references to a
+   "departed since S-1" panel).** The first Stage 2 pass's deviation note calling this optional was
+   wrong. Fixed with two additive, read-only Stage 2 queries in `admin-season-lists.ts`
+   (`readSeasonListChanges(season)`, `readDepartedSincePreviousList(season, clubSlug)`; no
+   migration, no invariant touched, per-club with the S-1 side organisation-scoped so a rename
+   never double-counts): the season overview's club cards now show `+X / −Y` instead of a raw
+   count; the club page gained a "Departed since S-1" panel for `season > FIRST_LIST_SEASON` (2027
+   itself already shows the identical set via the existing appearances review panel, so a second
+   copy was not built there).
+
+`revalidatePaths: []` freshness was also traced and confirmed correct with no code change needed:
+`useAdminActionSubmit` (`src/components/admin/action-submit.ts`) calls `router.refresh()`
+unconditionally on every successful action result, independent of `revalidatePaths` — that call
+alone is what refreshes the CURRENT admin page's server-rendered data (every season-list page is
+`export const dynamic = 'force-dynamic'`, so `router.refresh()` always re-executes the page's own
+server reads against the database). `revalidatePath`/`postRevalidate` is a separate mechanism that
+exists only for PUBLIC, cached (ISR) pages outside `/admin` needing explicit cache invalidation —
+`revalidatePaths: []` is correct because no such public consumer exists yet (§10). This is the same
+mechanism every other admin mutation surface in the repo (coaches, draft) already relies on
+identically, not a new or untested path.
+
+No backend semantics were touched by this pass: migration 096, `season_list_members` invariants,
+add/remove/transfer/copy-forward, the replay branch, `FIRST_LIST_SEASON` and the ISSUE-160
+no-auto-membership rule are all unchanged; the two new queries are plain `SELECT`s.
+
+**Files changed by the repair pass:** `tests/auth.test.ts`, `src/app/admin/season-lists/
+[season]/page.tsx`, `src/app/admin/season-lists/[season]/[club]/page.tsx`,
+`src/app/admin/season-lists/AddPlayerPanel.tsx`, `src/db/queries/admin-season-lists.ts`.
+
+**Re-run for the operator to confirm before commit:**
+
+```
+npx tsc --noEmit
+npx vitest run tests/auth.test.ts tests/admin-season-list-actions.test.ts tests/admin-draft-actions.test.ts
+npx vitest run tests/integration/admin-season-lists.test.ts tests/integration/admin-draft.test.ts
+npx eslint src/app/admin/season-lists src/app/admin/draft src/lib/auth/capabilities.ts src/app/admin/nav-model.ts src/db/queries/admin-season-lists.ts
+git diff --check
+git status --short
+```
+
+### Local completion audit — 2026-09-11 (Opus 5, high), operator-authorised command execution
+
+A final LOCAL audit of Stage 1 + Stage 2 as one feature, with the operator explicitly authorising
+Claude to run the validation commands for this task (CLAUDE.md §9 exception). No commit, push,
+merge, DEV update, PROD action or ISSUE-162 work. Tree clean at audit start
+(`git status --short` empty, HEAD `1441a5b`).
+
+**Preflight** `npm run preflight -- --mode implementation --issue 161` → **READY, 0 blockers, 3
+warnings**, all expected: migration `096_season_list_members.sql` branch-local (not on
+`origin/main`), `psql` unavailable, `pg_restore` unavailable — the last two "not required for this
+preflight mode". The clean-tree gate now passes on the committed tree.
+
+**Validation results (all re-run after the §33.4 repair pass, which had never been re-validated):**
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **PASS** (exit 0, no output) |
+| `tests/auth.test.ts` + `admin-season-list-actions` + `admin-draft-actions` | **204 passed / 3 files** (201 before this audit's 3 new regression tests) — the §33.4 pass's three reported failures are gone |
+| `tests/integration/admin-season-lists.test.ts` + `integration/admin-draft.test.ts` | **85 passed / 2 files** (40 season-list incl. the real Python replay + 45 ISSUE-160 regression), 93.5 s |
+| `data-overrides-source-contract` + `db-promotion-check` + `current-season-import` + `reference-data` | **420 passed, 4 skipped / 4 files** |
+| `tests/integration/fk-indexes.test.ts` | **2 passed** — every FK column on `season_list_members` is indexed |
+| `npx eslint` over every ISSUE-161-authored file | **0 problems** |
+| `git diff --check` | **PASS** |
+
+**The 4 skips are unrelated and platform-gated:** all four are `tests/current-season-import.test.ts`
+→ *AFLDB-ISSUE-130 — the R runtime declaration* → "the settle script, executed from a temporary
+alternate checkout" cases, which do not run on the Windows workstation. The suite's own
+`is not silently skipped on the supported runtime` guard passes.
+
+**Two pre-existing lint findings are NOT ISSUE-161's** and were proved so rather than assumed:
+`tests/current-season-import.test.ts` `no-assign-module-variable` (the `const module =
+readSource(...)` line) and two `_total` unused-var warnings in `src/db/queries/players.ts` are all
+present at `436d0c9`, the planning commit, before any ISSUE-161 implementation. ISSUE-161 only
+shifted the first one's line number. Linting the ISSUE-161-authored set alone is clean.
+
+**Audit findings — one concrete defect, fixed narrowly:**
+
+1. **`CopyForwardPanel.tsx` could confirm a copy the operator never previewed (fixed).** After a
+   dry run returned, the club checkboxes stayed enabled while the "Preview copy forward" control
+   was replaced by "Confirm copy forward". Changing the selection at that point left
+   `copy.state.dryRun === true`, so the only control on screen was Confirm, which built its form
+   from the *current* selection — writing a club set the displayed plan did not describe, with no
+   route back to a preview short of reloading the page. Copy-forward is the feature's only bulk
+   write and §11a/§20 make preview-before-confirm its safety control. Fixed by recording the
+   selection each preview was dispatched for (`previewedKey`) and gating the confirm branch on it
+   still matching the live selection; a changed selection now retires the preview, explains why in
+   a `role="status"` notice, and offers Preview again. Client-only: no action, query, transaction,
+   invariant or migration changed. Regression coverage added to
+   `tests/admin-season-list-actions.test.ts` (3 cases, source-contract style matching the suite).
+
+No other defect was found. Everything else below verified as implemented and matching the runbook.
+
+**Audit coverage, all confirmed:** canonical semantics (membership is administrative intent, never
+inferred from matches/statistics/`player_clubs`/`player_club_season_stats`/draft selections;
+listed-but-never-played representable; `FIRST_LIST_SEASON = 2027` enforced on every authoritative
+write with no path able to create an authoritative 2026 membership); **no retired/lifecycle state
+anywhere** — a grep over the whole two-commit diff finds `retired`/`delisted` only in prose, UI copy
+and the migration comment that forbids such a column; I-1 (`UNIQUE (season, player_id)`, the server
+precondition, transfer and copy-forward all hold it) with the D-3 evidence recorded accurately
+(249 historical multi-club player-seasons, latest 1992, zero since 2000); fixture independence
+(every route/query/action path reads only `clubs`, `players`, `seasons.year`, `external_identities`,
+`draft_picks`, `season_list_members` — `matches`/`player_club_season_stats` appear only as
+`LEFT JOIN`/`EXISTS` display columns that render "No matches recorded"); eligible clubs (the one
+`afldb_season_list_clubs()` rule, forward-extension arm and era arm, no `clubs.last_season`,
+`seasons` or rollover mutation); add (capability-gated, stable-ID resolution, server-side identity,
+identity-less and ambiguous both refused, no minting, one canonical membership, durable override,
+audit, atomic, and the ISSUE-160-created manual player path works normally through its token
+identity); the 2026 appearances surface (labelled "not a list, review and add", read-only, no
+bulk seed, no `seeded_appearances` origin, `candidate_source='appearances:2026'` evidence only,
+per-row and multi-select both explicit); the ISSUE-160 handoff (navigation only —
+`seasonListHandoffFor` returns a link shape, hides itself when the target season is not
+administrable, and no draft mutation writes `season_list_members`); remove (says "Remove from the
+{season} list", never "retire"; two-step confirmation; canonical DELETE; tombstone; audit; CAS on
+`updated_at`; re-add lifts the same key); transfer (one backend atomic primitive, never client-side
+remove+add, names both clubs, confirmation, paired audits sharing a `transfer_id`); copy-forward
+(no 2026→2027 path exists, 2027 explains why, preview writes nothing, populated/ineligible/
+duplicate all refuse before any write, `origin = 'copied_list'`, no silent merge); departed/changes
+UI (`+added/−departed` by organisation on the season overview, "Departed since S-1" panel on the
+club page for `season > FIRST_LIST_SEASON`, 2027 labelled non-authoritative appearances rather than
+called a list); permissions (`tests/auth.test.ts`'s generic `walk(src/app/admin)` scanner enforces
+guard-first on every page, `generateMetadata` and Server Action — including both `generateMetadata`
+fixes from §33.4 — and passes; no route handler exists to guard); nav (Data group, after Draft
+administration, capability matches the route, `if (dataLinks.length > 0)` prevents empty-group
+leakage); the `player-identity.ts` extraction (`resolvePlayerIdentity`'s body is byte-identical to
+the pre-extraction version at `436d0c9`; only its `reason` type narrowed from `DraftRefusalReason`
+to the `'ambiguous_identity'` literal it always returned, and ISSUE-160's 45 integration + unit
+regressions pass); the stable key (`<club_slug>|<season>|<player identity>`, every component
+non-null at write time, no display name, no mutable statistic, parser rejects malformed keys);
+the `data_overrides` contract (widening retains all five prior literals verbatim, active = truth,
+inactive = tombstone, re-add reactivates the same key); replay (players resolve first at
+`import_fitzroy_core.py:3526` → `season_list_members` at `:3532`, fail-closed pre-check over active
+**and** inactive overrides, tombstone `DELETE` first, `NOT EXISTS` insert, unresolved player/club/
+tombstone/origin all abort the batch, no name fallback, no fixture dependency — the tombstone-first
+deviation is implemented as documented and for the documented reason); import/source authority
+(exactly one `INSERT INTO season_list_members` and one `DELETE` in `src/`, both in
+`admin-season-lists.ts`, plus the replay branch; `rebuild_derived.py`, `settle-afltables.ts` and
+every importer name the table nowhere); promotion (registry-classified, no `PROMOTION_CONTRACT`
+entry, deploy order documented as migration 096 → `db:privileges` → code, app read fail-closed
+until privileges run, promotion doc §8 loop and inventory checklist both updated); transaction
+atomicity (every mutation family checks preconditions before the first write, throws
+`RollbackRefusal` for any post-write refusal, keeps override and audit inside the transaction, and
+uses one `withImportConnection` transaction per request — the exact ISSUE-160 class of defect,
+proved absent by the suite's own `rejected === true` case); UI freshness (`useAdminActionSubmit` →
+`router.refresh()` on every success, every page `force-dynamic`, `postRevalidate` returns before
+fetching when `revalidatePaths` is empty, and no public cached page reads `season_list_members`);
+static responsive/UI review at 320/768/1000/1280/1920 (every table inside `.table-wrap`, no fixed
+widths outside a scrollable wrap, no hover-only state — badges are text, real `<button>`/`<input>`/
+`<select>` controls with labels or `aria-label` throughout, confirmations reachable by keyboard,
+focus restored after a refusal via `useActionFocusRestore`, internal links use `next/link` and only
+public `/players/...` links use `<a>`, matching the repo's own `/admin/draft` pattern).
+**No rendered acceptance is claimed** — that is the deferred Playwright gate.
+
+**Runbook completeness:** every non-deferred ISSUE-161 requirement is implemented. Deferred by
+design and recorded: no publication/workflow state (D-7), no external reconciliation view (D-8), no
+club-list importer, no public consumers (§10), no fixture work (the ISSUE-162 boundary), no list
+season before 2027 (D-2). The three Stage 1 deviations (§32.3) and the one Stage 2 deviation
+(§33.2, per-row draftee add) stand as recorded; the earlier Stage 2 "departed panel is optional"
+note was already corrected by the §33.4 repair pass and is not an open deviation. No unrecorded
+deviation was found.
+
+**Files changed by this audit (uncommitted, for operator review):**
+`src/app/admin/season-lists/CopyForwardPanel.tsx`, `tests/admin-season-list-actions.test.ts`,
+plus this entry, `IssuesIndex.md` and `AFLDB-ISSUE-161.md` §33.5.
+
+**Remaining gates are all genuinely external/batch-deployment:** DEV migration 096, DEV
+`npm run db:privileges`, DEV application rebuild/deploy, live three-role Playwright, rendered
+responsive/focus acceptance, later PROD promotion/probes, and the release-time S-1 decision
+inherited from ISSUE-160. None is an implementation failure.
+
+### Next action
+
+Both stages are code-complete, locally validated and awaiting operator review and commit. DEV deploy order when the
+combined Admin Centre batch ships: **migration 096 → `npm run db:privileges` → code**
+(`db:privileges` could not be run from the workstation — no `psql` — and the table's app read is
+fail-closed until it does), then the combined ISSUE-160 + ISSUE-161 DEV acceptance and role-based
+Playwright (runbook §24's deferred UI row). Neither ISSUE-160 nor ISSUE-161 is resolved.
+
+## AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d)
+
+- **Status:** Open / **Stage 1 code-complete 2026-09-11 (Opus 5 high, 1M context) — UNCOMMITTED, UNVALIDATED BY A RUN, NOT DEPLOYED; DEV and PROD untouched, no database written.** See **Stage 1 implementation (2026-09-11)** below for what was built, what remains and the exact validation the operator must run. Stage 2 (the `/admin/fixtures` surface) is a separate session. Planning complete 2026-09-11; runbook `AFLDB-ISSUE-162.md` (36 sections). **Operator decisions D-1…D-7 DECIDED 2026-09-11** (runbook §35): all approved as recommended — separate `fixtures` registry (D-1), never hard-deleted with `scheduled`/`cancelled`/`void` (D-2), forward window without touching the season register (D-3), round-batch entry with preview + atomic commit (D-4), NULL = genuinely TBC (D-5), no public exposure (D-7); **D-6 approved with condition**: played linkage is derived/read-time but deterministic and fail-closed, no name/date guessing, ambiguity leaves the fixture unlinked, `fixture_key` stays the identity after play; plus the constraint that a played association never replaces `fixture_key` with `match_key`. **Stage 1 authorised.**
+- **Severity:** Medium
+- **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
+- **Branch:** `opus/issue-162-fixture-admin`, worktree `D:\dev\afldb-issue-162`, cut from `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161 on ISSUE-160 by operator direction; neither parent merged first; all three deploy to DEV together as the Admin Centre batch).
+- **Planning model:** Fable 5.1, high.
+- **Parent:** `AFLDB-ISSUE-156`, allocated as supplemental child **P3d**; P10 (played-match identity correction, `match-rekey.ts`) is not absorbed.
+
+### Problem
+
+AFLDB must be able to create and maintain a future season's fixture (e.g. 2027) without depending
+operationally on AFL Tables or another external site. Today it cannot represent an unplayed match at
+all: `matches.home_score`, `away_score`, `result` and `margin` are `NOT NULL` (`003_matches.sql:45-52`)
+and reconciled by CHECKs (`003:60-70`, `022:25-55`), so every row is a result; ISSUE-100 L3A already
+recorded "an unplayed fixture cannot exist there" (`IssuesIndex.md:2299-2300`). Every consumer —
+`club_seasons` (`rebuild_derived.py:340-356`, `player-derived.ts:413-458`), season metadata
+(`player-derived.ts:515-560`), round ladders (`rounds.ts:44-105`), venue records, NL plans, the Grid
+Solver — reads "row exists" as "played". The only manual creator, `createMatch()`
+(`match-admin.ts:101-320`), writes a fully scored row under a third incompatible `match_key`
+rendering and inserts a `seasons` row the reference loader reverts.
+
+### Planning findings (2026-09-11, verified natively; full evidence in `AFLDB-ISSUE-162.md` §2)
+
+- `match_key` (`season|round_code|date|home|away`) is a content address over exactly the fields a
+  fixture changes (`match-rekey.ts:4-13`) and is unusable as a fixture identity; the ISSUE-131 rekey
+  and the settle's `matchIdsByKey` lookup both key on it.
+- The AFL Tables settle inserts `matches` rows by `match_key` (`canonical-apply.ts:651-688`); the
+  Squiggle/Kali refresh "cannot create a partial `matches` row" (`current-season-import.ts:475-484`);
+  neither reads any fixture table. The historical importer upserts by `match_key` and never
+  deletes/truncates `matches`; the test rebuild starts empty, so a registry table must be replayed.
+- The repository already separates schedule from result for AFLW: `staging_aflw.fixtures`
+  (`fixture_status IN ('played','scheduled','cancelled')`, scores CHECK-forced NULL unless played,
+  `025:80-125`) versus `staging_aflw.matches` (one row per played fixture).
+- Season boundary: `seasons`/`clubs`/`club_seasons` are reference-loaded or derived and must not be
+  written (ISSUE-161 D-6, `096:33-57`); `afldb_season_list_clubs(season)` (`096:166-185`) is the one
+  future-season eligibility rule and is reused unchanged.
+- Rounds: `round_code` = decimal `round_number` for home-and-away, `FINALS_CODES` `EF QF SF PF GF WF`
+  for finals (`import_fitzroy_core.py:166-173,1213-1221`); AFLDB numbers the Opening Round as round 1
+  (ISSUE-140 measured the cost of mixing conventions). Byes are absence (`rounds.ts:36-42`).
+- Time: `matches.match_time` is local venue time text from `Local.start.time`; `scheduled_at` has had
+  no reader or writer since migration 003.
+
+### Chosen model (recommended; D-1)
+
+A new canonical registry table **`fixtures`**: season (CHECK range, no FK), round type/number/code
+(the `matches` vocabulary), home/away club ids (eligible identities only), nullable date / local time
+/ venue (NULL = TBC; unmapped venue name kept in `venue_raw`), `status IN ('scheduled','cancelled',
+'void')` with a required reason for the terminal states, `fixture_key` = a UUID minted once under
+`manual_admin_edit`, provenance columns. **No score, result, attendance or statistic column exists**,
+so a fixture cannot be read as a played match; `matches` is untouched. "Played" is derived at read
+time: exactly one `matches` row for the same season, round code and club pair (a swapped home/away
+resolves with a warning; two candidates are `ambiguous` and never merged). Durability is the
+ISSUE-159/160/161 shape — whole-row `data_overrides ('fixtures', 'manual_admin_edit:<token>',
+'fixture')`, one import-role transaction per mutation with an in-transaction `data_edits` row,
+fail-closed `replay_admin_overrides('fixtures')` (venue degrades with a report), registry
+classification via `grant_import_write`, a new `fixture_key` lineage rule and `data_edits` target in
+`promotion-inventory.ts`. Rows are never deleted (`void` = data-entry mistake, `cancelled` =
+real-world, reversible) so every audit row stays resolvable across a lineage change. Played fixtures
+accept only a notes edit; correcting a played match stays ISSUE-156 P10. Bulk entry = a
+round-at-a-time batch form with structured-paste pre-fill, server-side preview and a
+fingerprint-gated all-or-nothing confirm. No settle, current-season or rekey code changes. No public
+exposure in this issue. Capabilities `data.fixtures.read` (Admin+) / `data.fixtures.edit` (Super
+Admin); routes `/admin/fixtures`, `/[season]`, `/[season]/new`, `/[season]/[fixtureKey]`.
+
+### Migration
+
+One additive migration required (next free **097** at planning, not allocated; re-check at Stage 1):
+`fixtures` + indexes; `data_overrides.entity_type` += `'fixtures'`; `data_edits.table_name` +=
+`'fixtures'`; `grant_app_read` + `grant_import_write`. No backfill. Deploy order migration →
+`db:privileges` → code.
+
+### Stop conditions evaluated
+
+S-1 (scheduled rows in `matches` contaminate derivation) and S-5 (schema cannot represent TBC without
+fake values) **fire for the rejected `matches`-based options** and are the reason for the design;
+none fires against the recommended model. S-2/S-3/S-4/S-6/S-7/S-8/S-9/S-10 resolved by evidence
+(runbook §32). Stage 1 hard stops: replay not byte-exact, promotion classification refusal, any code
+path writing `matches`.
+
+### Stage 1 implementation (2026-09-11, Opus 5 high 1M, uncommitted)
+
+Executed against `AFLDB-ISSUE-162.md` as the implementation contract. No re-planning; D-1…D-7 and
+the `fixture_key` constraint were treated as binding throughout.
+
+**Migration number re-check.** `src/db/migrations/` ends at `096_season_list_members.sql` on this
+branch, so **097 was free and is allocated** as `097_fixtures.sql`. The cross-ref check across all
+refs is listed in Validation below and is the operator's to run; if it comes back occupied, nothing
+has been committed and the number is trivially moved.
+
+**Migration 097** (additive, forward-only, no backfill, no destructive statement):
+
+1. `CREATE TABLE fixtures` — `fixture_key text NOT NULL UNIQUE`, `season smallint` with a range
+   CHECK and **no FK to `seasons`** (migration 096's reasoning: a fixture is intent about a season
+   the register has not reached), `round_code`/`round_number`/`round_type` in the `matches`
+   vocabulary, `is_final` GENERATED, nullable `match_date`/`match_time`, nullable
+   `venue_id`/`venue_raw`, `home_club_id`/`away_club_id`, `status` CHECK
+   (`scheduled`|`cancelled`|`void`), `status_reason`, `notes`, the provenance quartet, and six
+   indexes (every FK column carries a leading-column index). Constraints:
+   `fixtures_clubs_differ_ck`, `fixtures_round_number_ck` (the `matches` rule plus
+   `round_code = round_number::text`), `fixtures_time_needs_date_ck`, `fixtures_venue_ck`,
+   `fixtures_status_reason_ck`, `fixtures_source_record_uq`.
+   **There is no score, goals, behinds, result, margin, winner, attendance, period, lineup or
+   statistic column, and no `match_id` and no `match_key`** — the D-6 constraint is enforced by the
+   schema, not by discipline.
+2. `data_overrides.entity_type` += `'fixtures'` (every prior literal retained verbatim; the three
+   unrepresentable settle targets still absent).
+3. `data_edits.table_name` += `'fixtures'` (the ISSUE-160 `draft_picks` shape: a fixture is never
+   deleted and has no allowlisted parent, so it is its own audit subject and `row_id` always
+   resolves).
+4. `grant_app_read('fixtures')` + `grant_import_write('fixtures')`. **No `privileges.sql` edit** —
+   the registries drive it. Deploy order is binding: **migration → `npm run db:privileges` → code.**
+
+**`src/db/queries/admin-fixtures.ts`** — the ONE fixture mutation contract:
+`createFixture`, `createFixtures` (dry-run preview + SHA-256 `previewFingerprint`-gated commit),
+`rescheduleFixture`, `changeFixtureVenue`, `changeFixtureRound`, `changeFixtureClubs`,
+`updateFixtureNotes`, `cancelFixture`, `reinstateFixture`, `voidFixture`; reads
+`administrableFixtureSeasons`, `eligibleFixtureClubs`, `readSeasonFixtures`, `readFixture`,
+`readFixtureSeasonSummary`, `readPlayedMatchesWithoutFixture`, `readFixtureDiagnostics`,
+`readFixtureOverrides`; pure helpers `renderRound`, `normaliseSchedule`, `fixtureSeasonBounds`,
+`resolvePlayed`, `isFixtureEditAllowed`, `classifyFixtureDiagnostics`, `fixtureBatchFingerprint`,
+`fixtureOverridePayload`, `fixtureEntityKey`/`parseFixtureEntityKey`.
+
+- **Identity.** `fixture_key` is a `randomUUID()` minted once at creation and never edited; it is
+  also `source_record_id` and the `data_overrides` key `manual_admin_edit:<token>`. A minted token
+  rather than ISSUE-161's natural key precisely because every candidate natural key for a fixture is
+  a fact an administrator is expected to correct.
+- **Played is derived.** `resolvePlayed()` is pure over four counts produced by a LATERAL that
+  touches `matches` on **exact** season, **exact** `round_code` and the two club **ids** only:
+  1 exact → `played`; 0 exact and 1 swapped → `played_home_away_differs` (warning); 0 and 0 →
+  `unplayed`; anything else → `ambiguous`, linked to nothing. A `void` fixture never claims a
+  result. The resolution never writes and no `matches.id` is ever persisted.
+- **Season window** `max(seasons.year) ≤ S ≤ max + 1`, empty when the register is empty. Eligible
+  clubs come from `afldb_season_list_clubs(season)` — ISSUE-161's ONE rule, reused and unmodified.
+  No `seasons`, `clubs`, `club_seasons`, `venues` or `venue_aliases` row is written anywhere.
+- **Transactions.** One `AFLDB_IMPORT_DATABASE_URL` transaction per operation taking
+  `pg_advisory_xact_lock(717275, season)` first; every precondition before the first write; canonical
+  row → `data_overrides` → `recordDataEdit()` in one transaction; every post-write refusal is
+  THROWN as `RollbackRefusal`; `expectedUpdatedAt` CAS on every edit; a round batch is
+  all-or-nothing under one `batch_id`.
+- **Lifecycle.** No `DELETE FROM fixtures` exists in `src/` or `tools/`. `cancelled` is a real event
+  that did not happen (reversible via `reinstateFixture`, which re-runs the §13 checks); `void` is a
+  data-entry correction and is terminal; both keep the row, and both are excluded from the
+  uniqueness rules. A played fixture accepts **notes only**.
+
+**Durability and promotion.** `replay_admin_overrides('fixtures')` added to
+`tools/migration/common.py` with `FIXTURE_STATUSES`/`FIXTURE_ROUND_TYPES` frozen copies: it fails
+closed over every override before writing anything (bad namespace/token, duplicate token, payload
+key mismatch, bad season, bad round vocabulary or `round_code`/`round_number` disagreement, bad
+status, missing `status_reason`, malformed date, time without date, unresolvable club slug,
+club ineligible for the season, both clubs the same); an unresolvable **venue** slug degrades to the
+stored name and is REPORTED rather than stopping a promotion; then `INSERT … WHERE NOT EXISTS
+(fixture_key)` (never `ON CONFLICT`) and an unconditional whole-row `UPDATE` that never touches
+`fixture_key`, so a replay is idempotent and re-creates `void` and `cancelled` rows too. Call site
+added to `import_fitzroy_core.py` after `replay_admin_overrides(pg, "matches")` (ordering NOT
+binding — a fixture names clubs and venues by slug and names no player, match or selection).
+`docs/production-promotion.md` §8 loop extended. `tools/db/promotion-inventory.ts` gains the
+`fixture_key` `LineageIdentityRule` with its by-id/by-identity SQL, the
+`{kind:'fixtures', entity:'fixtures', identity:'fixture_key'}` `data_edits` target, the remediation
+text and the acceptance-checklist wording. **No `PROMOTION_CONTRACT` entry** (that would classify it
+`both` and refuse every phase); not a `DERIVED_FOOTBALL_TABLE`.
+
+**Derived safety.** ISSUE-162 writes `fixtures`, `data_overrides` and `data_edits` and nothing else.
+Proved three ways: a source contract that no `INSERT`/`UPDATE`/`DELETE` of `matches`,
+`match_period_scores`, `player_match_stats`, `brownlow_round_votes`, `club_seasons`, `seasons`,
+`clubs` or `venues` exists in the module; the mirror contract that `rebuild_derived.py`,
+`settle-afltables.ts`, `canonical-apply.ts`, `rounds.ts`, `venues.ts`, `clubs.ts` and
+`grid-solver.ts` never read `fixtures`; and an integration proof that a create + reschedule +
+cancel + void leaves the `matches`, `match_period_scores` and `player_match_stats` counts, the
+in-progress season's `club_seasons` ladder digest and its `seasons.match_count` byte-identical.
+
+**Deliberately NOT built (Stage 2):** `/admin/fixtures` routes and panels, `data.fixtures.read/.edit`
+capabilities, the nav entry, the batch-entry UI with paste pre-fill, the diagnostics panel, the
+`src/db/queries/data-edits.ts` entity-link case, `tests/auth.test.ts` coverage, Playwright.
+
+**Deviations from the runbook** (both strengthenings, neither contradicts a decision):
+
+1. `fixtures_time_needs_date_ck` is a CHECK. §10 stated "a time requires a date" as a *writer rule*;
+   it is enforced in both places so no replay or future importer can bypass it.
+2. Stage 1 ships `classifyFixtureDiagnostics()`/`readFixtureDiagnostics()` — §27's classification as
+   a pure function plus its reader. §27 places the diagnostics *panel* in Stage 2; §33 item 3 lists
+   "diagnostics readers" in Stage 1. Nothing refuses; shape is reported, never enforced, and byes
+   are listed as information because a bye and an incomplete round are not distinguishable.
+
+**Also recorded:** `cancelled → void` is permitted (a cancelled fixture may still turn out to have
+been mis-entered); `void` is terminal in every direction. The runbook's §15/§16 tables do not name
+this transition either way.
+
+### Validation
+
+**NOT YET RUN — nothing here has been executed.** The tests and contracts are written; every command
+below is the operator's. Run in this order, from `D:\dev\afldb-issue-162`:
+
+1. `npm run preflight -- --mode implementation --issue 162`
+2. Migration-number cross-ref: `git log --all --oneline -- src/db/migrations/097_*.sql` (expect no
+   output). **If 097 is occupied on another ref, stop and renumber before committing.**
+3. Apply migration 097 to **`afldb_test` only** (`npm run db:migrate` against
+   `AFLDB_TEST_DATABASE_URL`), then `npm run db:privileges` against that database.
+4. `npx tsc --noEmit`
+5. `npx vitest run tests/admin-fixture-actions.test.ts tests/data-overrides-source-contract.test.ts
+   tests/db-promotion-check.test.ts tests/current-season-import.test.ts`
+6. `npx vitest run tests/integration/admin-fixtures.test.ts` (needs `AFLDB_TEST_DATABASE_URL` and
+   the repository `.venv` for the real Python replay; the replay cases self-skip without `psycopg`)
+7. Regressions for the shared code touched: `npx vitest run tests/admin-season-list-actions.test.ts
+   tests/integration/admin-season-lists.test.ts tests/reference-data.test.ts
+   tests/admin-match-mutations.test.ts`
+8. `npx eslint src/db/queries/admin-fixtures.ts src/db/queries/audit-log.ts
+   src/lib/acquisition/manual-authority.ts tools/db/promotion-inventory.ts
+   tests/admin-fixture-actions.test.ts tests/integration/admin-fixtures.test.ts`
+9. `git diff --check` and `git status --short`
+
+Playwright and the three-role matrix are deferred to the combined Admin Centre DEV batch (§34).
+
+### First validation run and Stage 1 repair — 2026-09-11 (steps 4 and 5 only)
+
+The operator ran the typecheck and the unit/contract suites. Steps 1, 2, 3, 6, 7, 8 and 9 were **not**
+run, and remain gates. What steps 4 and 5 found, and what was repaired the same day — full detail in
+`AFLDB-ISSUE-162.md` §37.8:
+
+1. **Typecheck failure.** `src/lib/audit-view.ts`'s `DATA_EDIT_TABLE_LABELS` maps `DataEditTableName`
+   exhaustively and had no `fixtures` entry after §37.2 widened the union. Added `fixtures:
+   'Fixtures'` — the label only; Stage 2 still owes the entity-link case in
+   `src/db/queries/data-edits.ts`.
+2. **Real defect — impossible calendar dates accepted (D-5).** `normaliseSchedule()` validated the
+   `YYYY-MM-DD` shape and then called `Date.parse()`, which NORMALISES an impossible day instead of
+   rejecting it: `2027-02-30` parsed as 2 March and was accepted. Replaced with a real-calendar round
+   trip (build in UTC, require all three components to survive) — the arithmetic `parseAuditDate()`
+   already uses. `2027-02-30`, `2027-02-29`, `2027-04-31`, month `00`/`13` and day `00`/`32` now
+   refuse; `2028-02-29` is accepted. No time-zone conversion is introduced and the stored value is
+   still the operator's string. `fixtures.match_date` is a `date` column, so PostgreSQL would have
+   refused the write; the defect was that the writer reported success.
+3. **Real defect — played resolution linked on a contested candidate (D-6).** `resolvePlayed()`
+   tested `exactCount === 1` before consulting the swapped count, so one exact **and** one swapped
+   candidate resolved to `played` on the exact row. That is the tie-break D-6 forbids: it would lock
+   the fixture against edits, claim a result it may not have, and compare the schedule against a row
+   chosen by preference. Now: `1/0` → played, `0/1` → played_home_away_differs, `0/0` → unplayed,
+   **everything else → ambiguous with a null match id**.
+4. **Real defect — result facts read independently of that resolution.** `PLAYED_RESULT_FACTS` took
+   `ORDER BY m.id LIMIT 1` over every candidate, so `scheduleDiffersFromResult` could be reported
+   against an unlinked match. Its candidate set is the one `PLAYED_RESOLUTION_LATERAL` counts, so it
+   is now guarded by `pl."exactCount" + pl."swappedCount" = 1` — one scalar predicate, not a second
+   copy of the truth table that could drift from it — and `withPlayedResolution()` additionally
+   requires a non-null match id. No `match_id`/`match_key` is persisted anywhere; the association is
+   still read-time only.
+5. **Brittle source-contract extractions repaired, no guarantee weakened.** ISSUE-159's
+   `match_coaches` assertions sliced `common.py` to the end of file, so ISSUE-161's and ISSUE-162's
+   branches were being read as if they were `match_coaches` code (hence spurious `COALESCE` and
+   `split_part(entity_key ...)` hits). A `replayBranch()` helper now isolates one branch from its
+   `elif` to the next sibling; every ISSUE-159 guarantee is still asserted in full. The ISSUE-162
+   contracts read raw source, so the module's own comments — which state the rules by naming
+   `INSERT INTO venues`, `match_key` and `match_id` — failed them; they now assert over
+   comment-stripped executable code and additionally prove no executable line names `match_key` or
+   `match_id` at all.
+6. **Venue replay contract proved, not assumed (§11).** `resolveVenue()` copies
+   `venues.canonical_name` into `venue_raw` whenever it resolves a venue, and the payload writes
+   `venue_slug` and `venue_raw` together, so a durable record never carries a slug without the name.
+   A slug the rebuilt database cannot resolve therefore keeps the NAME, leaves `venue_id` NULL and
+   prints a counted warning — never TBC, never fuzzy-matched, never a refusal. No code change was
+   needed; three regressions now pin it. Known limit recorded: a fixture re-created by a replay that
+   could not resolve its slug, and then edited, loses the `venue_slug` key from its payload (the name
+   survives; re-selecting the venue restores the binding).
+7. **The integration suite (step 6) has never executed.** `tests/integration/guard.ts` refused
+   because `AFLDB_TEST_DATABASE_URL` is unset: this worktree has `.env.example` and no gitignored
+   `.env`, which `tests/setup.ts` reads. That is an environment gap, not an integration failure —
+   nothing about the fixture integration contract is yet known. Condition for the rerun in
+   `AFLDB-ISSUE-162.md` §37.9: an `.env` at the worktree root carrying `AFLDB_TEST_DATABASE_URL` for
+   **`afldb_test`** through the local 55432 tunnel (never `afldb_dev`, never PROD), plus migration
+   097 applied to that database and `npm run db:privileges` run against it.
+
+Files changed by the repair pass: `src/lib/audit-view.ts`, `src/db/queries/admin-fixtures.ts`,
+`tests/admin-fixture-actions.test.ts`, `tests/data-overrides-source-contract.test.ts`,
+`AFLDB-ISSUE-162.md`, `AFLDB-ISSUE-156.md`, `IssuesIndex.md`, this entry. No migration, schema or
+`common.py` change. Nothing committed.
+
+### Second validation run and integration-test repair — 2026-09-11 (steps 3, 4, 5, 6, 7, 8, 9)
+
+With the `.env` of §37.9 in place the operator re-ran. **Green:** `npx tsc --noEmit`;
+`tests/admin-fixture-actions.test.ts` 69/69; `data-overrides-source-contract` +
+`db-promotion-check` + `current-season-import` 383 passed / 4 skipped; the ISSUE-161 / reference /
+match regression set 124/124; targeted ESLint; `git diff --check` (only the expected LF→CRLF
+warning). The 31 passing integration tests are also the first evidence that step 3 was carried out:
+migration 097 is applied to `afldb_test` and its privileges reconciled, or nothing could read or
+write a fixture at all.
+
+**`tests/integration/admin-fixtures.test.ts`: 31 passed, 5 failed — all five a TEST defect.** Every
+failure was in the read-time played-resolution group, and every one died inside `mustCreate()` with
+`already_played` before reaching the resolution it existed to prove.
+
+**Root cause: the tests modelled the wrong chronology.** Each called `seedMarkerMatch()` — which
+writes a played `matches` row — BEFORE creating the fixture, so §13's I-3 precondition refused the
+create, correctly: AFLDB already held the game as a result and there was nothing left to schedule.
+Not leakage and not isolation — each test cleans up after itself, `beforeAll` clears earlier debris
+and asserts the marker round is empty, and the sibling test that WANTS the result first (`refuses to
+schedule a game AFLDB already holds as a result`) passed throughout, which is the same guard seen
+from the other side.
+
+**Repair, in `tests/integration/admin-fixtures.test.ts` only.** The five now follow the §18
+chronology — fixture first, played row second, reads resolve against it. `seedMarkerMatch()` renamed
+`insertPlayedMatch()` with the ordering rule, the two-line sequence and the reason the two calls are
+deliberately not folded into one helper stated in its doc. The corrected order also allowed real
+strengthening: the exact case proves `unplayed` before and `played` after with no write in between;
+the reschedule case actually reschedules twice before the game is played elsewhere; the swapped case
+asserts the §27 warning and that nothing was written onto the fixture; the ambiguous case schedules
+for a day neither result was played on and pins `scheduleDiffersFromResult === false` on both read
+paths plus the `invalid` diagnostic — the §37.8 item 4 guard proved against real rows; the lock case
+edits successfully while unplayed, then proves `played_locked` and notes-only after. **No production
+file was touched:** `createFixture()`, `resolvePlayed()`, `PLAYED_RESOLUTION_LATERAL` and
+`PLAYED_RESULT_FACTS` are unchanged, and no `NODE_ENV` special case, stored `match_id`/`match_key`,
+date/venue matching or relaxed ambiguity was introduced.
+
+### Stage 1 committed
+
+Stage 1 (backend, migration 097, replay, promotion classification) is committed on this branch at
+`cb98c67` ("Implement AFLDB-ISSUE-162 Stage 1 fixture backend"), per the operator's Stage 2
+briefing. Not merged, not deployed, DEV and PROD untouched.
+
+### Stage 2 implementation (2026-09-11, Sonnet 5 high, UNCOMMITTED)
+
+Built the `/admin/fixtures` admin surface against `AFLDB-ISSUE-162.md` §28 (routes), §23
+(capabilities), §14 (batch preview/confirm), §16/§37.8 item 8 (lifecycle) and §27 (diagnostics).
+Full record: `AFLDB-ISSUE-162.md` §38. Summary: capabilities `data.fixtures.read` (Admin+) /
+`data.fixtures.edit` (Super Admin) declared and enforced at every new page/action boundary; a
+"Fixtures" nav entry after "Season lists"; four routes (`/admin/fixtures`, `/[season]`,
+`/[season]/new`, `/[season]/[fixtureKey]`); a single-fixture form and a round-batch form sharing
+one Server Action for preview and confirm, Confirm bound to the exact previewed row snapshot (the
+`CopyForwardPanel` lesson); one panel per §15 field group (reschedule, venue, round, clubs, notes)
+so each panel maps to exactly one mutation and one audit `field_group`; cancel/reinstate/void
+rendered as three visibly different controls, cancel and void each requiring an explicit
+confirmation and a mandatory reason, void described as more severe than cancelling and, when the
+current state is `cancelled`, explicitly named as a reclassification; a played fixture shows only
+its identity, schedule and Notes, with the other panels omitted (convenience only — the backend's
+`played_locked` gate is the real boundary). `tests/auth.test.ts` extended: `EQUIVALENT_ROLE_GUARD`
+gains both capabilities (the file would not typecheck otherwise) and the three hard-coded
+Data-group nav-order assertions now include `/admin/fixtures`. No Stage 1 file was touched and no
+true Stage 1 defect was found. No new test file: matching the ISSUE-161 Stage 2 precedent exactly,
+`validation.ts`'s form-parsing helpers are trivial pass-throughs and get no dedicated suite: the
+gate is `tests/auth.test.ts` plus typecheck/eslint/build, with live Playwright and the responsive
+matrix deferred to the combined Admin Centre DEV batch (§34). One clarification recorded (§38.2
+item 1): §24's "entity-link helper in `data-edits.ts`" does not describe a real extension point —
+that module is the unrelated `/admin/data-editor` reader/writer, and the audit entity page is
+already fully generic; the fixture detail page links to `/admin/audit/entity/fixtures/<id>` inline,
+exactly as the coach and draft detail pages already do.
+
+### Stage 2 validated and committed (2026-09-11)
+
+The operator ran `AFLDB-ISSUE-162.md` §38.5 green: `npx tsc --noEmit` clean; `tests/auth.test.ts`
+138/138; the fixture unit + contract bundle 452 passed / 4 skipped;
+`tests/integration/admin-fixtures.test.ts` 36/36 (so the §37.11 test-ordering repair holds and no
+Stage 1 behaviour moved); ESLint clean across every changed and new TS/TSX file; `git diff --check`
+clean but for the expected LF→CRLF warning; `preflight` READY. Stage 2 is committed at `6a9fbc4`
+("Implement AFLDB-ISSUE-162 Stage 2 fixture admin UI"). Not merged, not deployed, DEV and PROD
+untouched.
+
+### Final local audit (2026-09-12, Opus 5 high 1M, UNCOMMITTED)
+
+A whole-issue audit of Stage 1 and Stage 2 together at `6a9fbc4`, against §§3–28, D-1…D-7 and the
+§6 identity constraint. Read natively; no shell, Git, database or deployment command was executed
+(CLAUDE.md §9/§12). Full record: `AFLDB-ISSUE-162.md` §39.
+
+**No stop condition fired.** No migration 098 is needed, `fixture_key` needs no redesign, Stage 2
+needs no persisted match linkage, the played resolution needs no fuzzy/date/venue matching, the
+batch fingerprint contract is safe as designed, the capability contract agrees with the ISSUE-156
+umbrella, nothing requires public exposure, the replay contract is unchanged, no code path writes
+`matches`, and no `seasons` row is required. **No Stage 1 file was changed** — `097_fixtures.sql`,
+`src/db/queries/admin-fixtures.ts`, `tools/migration/common.py`, `import_fitzroy_core.py` and
+`tools/db/promotion-inventory.ts` are byte-unchanged.
+
+**Eight Stage 2 defects, fixed.** Two behavioural: (1) a **void** fixture was offered the
+Reschedule, Venue, Round and Clubs panels, all four of which `isFixtureEditAllowed()` can only
+refuse `invalid_transition` — `LifecyclePanel` already handled `void`, the detail page was the one
+place the rule was missing; hiding them is convenience only, and the backend gate is unchanged and
+still refuses a forged request against a hidden panel. (2) Clearing a date disabled the start-time
+input but left its value in state and still submitted it, so returning a date to TBC refused
+`invalid_schedule` about a value the operator could no longer see — and in the round batch one such
+row refused the WHOLE round; the time now clears with the date in the UI and is dropped on the wire
+by `toWireRow()`, so preview and confirm still serialise identically. Six smaller: `ClubsPanel`
+rendered its first option when a fixture's club was no longer in the season's eligible list (a
+`<select>` whose value matches no option), so it could display one club and save that one — the
+current pair is now always present and labelled; duplicate React keys on the per-round `round_byes`
+diagnostics; `badge-danger` used in three fixture files and defined nowhere in `globals.css`; the
+batch parser coerced `venueId` where it held club ids strictly; batch row controls had no
+accessible names; `minWidth: 0` added to the two-column inline grids against a 320px overflow.
+`fixtureBatchFingerprint`'s regression now pins season, round type, both club ids, date, venue id,
+an unmapped venue name, notes and the row count.
+
+**Confirmed clean.** Authorisation: `tests/auth.test.ts`'s generic ISSUE-158 walker requires
+`requireCapability()` to be the first awaited call of every admin page, route and Server Action, so
+all four fixture pages, both `generateMetadata`s and all ten actions are covered by construction; no
+role helper is used anywhere in the fixture tree, so no capability/legacy-guard mismatch is
+possible; nav visibility is furniture over the same capability the route enforces. Batch staleness:
+two independent gates, and the server fingerprint is the real one because the client snapshot omits
+the season. CAS: every edit locks `FOR UPDATE`, takes the season advisory lock and refuses `stale`
+before the lifecycle gate, the precheck and any write. Played resolution: one decision function for
+reads and for the write-time lock, ambiguity links nothing and deliberately does not lock, no
+`match_id`/`match_key` exists or is compared, and `PLAYED_RESULT_FACTS` yields a row only when
+exactly one candidate exists. Venue: mapped, unmapped-by-name and TBC are three distinct
+renderings, and an edit to an unrelated field carries `venue_raw` forward untouched — the §37.8
+item 7 slug-degradation limit is unchanged, non-blocking, and surfaced rather than hidden. Audit
+link: `/admin/audit/entity/fixtures/<fixtures.id>`, the numeric id `data_edits.row_id` holds, with
+`operations.audit.read` the same ADMIN_AND_UP audience as `data.fixtures.read` — the `coaches/[id]`
+shape exactly. Promotion/replay: Stage 2 added no persisted state, so the whole-row override and
+the `fixture_key` lineage rule still cover every fixture mutation.
+
+**Known deviation recorded, not fixed:** §28's "the batch form becomes one card per row under
+768px" is not implemented — the batch is a scrolling table at every width. Flagged for the DEV
+responsive pass rather than redesigned without a browser. Responsive and accessibility review here
+was source-level only; no rendered acceptance is claimed.
+
+### Next action
+
+**Operator re-gates the audit fixes, then reviews and commits them** (`AFLDB-ISSUE-162.md` §39.7):
+`npm run preflight -- --mode implementation --issue 162`; `npx tsc --noEmit`;
+`npx vitest run tests/auth.test.ts`; `npx vitest run tests/admin-fixture-actions.test.ts
+tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts
+tests/current-season-import.test.ts`; `npx vitest run tests/integration/admin-fixtures.test.ts`
+(expect 36/36 — no Stage 1 file changed); the ISSUE-160/161 regression set
+(`admin-season-list-actions`, `integration/admin-season-lists`, `reference-data`,
+`admin-match-mutations`), because `src/styles/globals.css` is the only shared file the audit
+touched and its change is one additive rule; ESLint over the eight changed TS/TSX files;
+`git diff --check` and `git status --short`. The all-refs migration-097 collision check
+(`git log --all --oneline -- src/db/migrations/097_*.sql`) has **still never run** and remains
+binding. After that ISSUE-162 is locally complete and waits on the operator's confirmation that no
+further Admin/Super Admin addition joins the batch, then combined ISSUE-160 + 161 + 162 DEV
+deployment and acceptance. No DEV update, no deploy, no PROD, no merge of ISSUE-160/161 first.
+ISSUE-162 is **not resolved**.
+
+---
+
+## AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e)
+
+- **Status:** Open / **Stage 1 AND Stage 2 BUILT, VALIDATED and COMMITTED 2026-09-12 (`ea9f3dd`); FINAL LOCAL AUDIT DONE 2026-09-12 (three Stage 2 defects fixed, uncommitted) — not merged, not deployed; migration 098 applied to `afldb_test` ONLY; DEV and PROD untouched.** Planning complete 2026-09-12 (Fable 5.1 high), runbook `AFLDB-ISSUE-163.md` (34 sections). **Operator SIGNED OFF D-1…D-18 on 2026-09-12 with four clarifications** (§30 record below). Stage 2 (admin Leadership section/Appoint panel, Captain overview column, public `ClubLeadership` block, revalidate route, unit tests) is built (Sonnet 5 high) — see the Stage 2 record below.
+- **Severity:** Medium
+- **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage
+- **Branch:** `opus/issue-163-club-leadership`, worktree `D:\dev\afldb-issue-163`, cut from `opus/issue-162-fixture-admin` @ `f80a1df` (stacked on ISSUE-162 on 161 on 160; nothing merges first; all four deploy to DEV together as the Admin Centre batch).
+- **Planning model:** Fable 5.1, high.
+- **Parent:** `AFLDB-ISSUE-156`, allocated as supplemental child **P3e**.
+
+### Problem
+
+A Super Admin must be able to assign and change a club's leadership (captain, co-captains, vice-captains) for a season, with the outgoing appointment preserved as history and the public club page showing the current leadership from canonical rows. Captaincy must be contextual (club, season, player, role, period), never a permanent player attribute.
+
+### Planning findings (2026-09-12, verified natively; full evidence in `AFLDB-ISSUE-163.md` §2)
+
+- **A captaincy model already exists and is public.** `captaincies` (`005_brownlow_awards.sql:177-194`): `season` FK to `seasons(year)`, `player_id` nullable with `link_status`, `role text DEFAULT 'Captain'`, `period text`, `captaincies_natural_uq UNIQUE (season, club_id, player_name_raw, role)` (`042:55-74`). Loaded by `import_awards.py:2373-2429` from `data/awards/captaincies.csv` under source `wikipedia` (`captaincies.py:61-106`: `EXPECTED_TOTAL 1774`, 1897–2026, `ROLES = {"Captain"}`); `_refuse_captaincy_natural_key_collisions` refuses the whole honours reload on a collision with a foreign-source row; `rebuild-test.ts:854` pins 1,774 rows. Rendered as the club page "Captains" table (`awards.ts:615-635`, `clubs/[slug]/page.tsx:361-411`) and in player honours (`awards.ts:469-474`, `players/[slug]/page.tsx:183-188`); a `player_link_resolutions` target with promotion identity `'none'` (`promotion-inventory.ts:464-479`). CSV sampling: every 2026 row is `Captain` with free-text periods (`2020–`, `2022–present`); 30 rows carry a `co-captain` annotation; 0 mention vice/acting/interim; Brisbane 2026 holds three `Captain` rows.
+- Extending `captaincies` is rejected: the season FK makes a 2027 row impossible until the ISSUE-101 rollover; identity is name-keyed; a manual 2027 row plus a later curated CSV row would brick the awards reload; no lifecycle; frozen count gates (runbook §3).
+- `award_winners.is_captain`/`is_vice_captain` are representative-team flags, not club leadership.
+- No vice-captain, co-captain, current-captain, leadership admin surface, capability, route or query exists anywhere in `src/`, `tools/`, `tests/`.
+- Reusable foundations on this branch: `season_list_members` + `afldb_season_list_clubs()` + `FIRST_LIST_SEASON = 2027` (161); `resolvePlayerIdentity` (160); the fixture never-delete lifecycle, minted key, always-active whole-row override, `data_edits` lineage-target obligation and fail-closed replay (162); the S-6/D-9 revalidation contract (`action-submit.ts`, `revalidate-route.ts`); the reserved `/admin/season-lists/revalidate` endpoint (`season-lists/submit-helper.ts:35-52`, never requested today).
+
+### Recommended architecture (runbook §5–§21; decisions §30)
+
+- **D-1** new registry table `club_leadership` — one row = one appointment: `appointment_key` (UUID, minted once), `season` (no FK), `club_id`, `player_id NOT NULL`, `role IN ('captain','vice_captain')`, `status IN ('active','ended','void')`, `status_reason`, `started_on`/`ended_on` (NULL = unknown), `note`, `source_id`/`source_record_id`/`import_batch_id`; partial `UNIQUE (season, player_id) WHERE status = 'active'`; CHECKs for interval, active-has-no-end, void-needs-reason. `captaincies` untouched.
+- **D-2** roles `captain`, `vice_captain` only; co-captaincy = ≥2 concurrent active captain rows (the existing data models it exactly so). **D-3** lifecycle status + optional evidence dates; "current" = `status = 'active'`, never a clock or a round. **D-4** public current season = organisation-scoped `max(non-void season)`; active rows of that season; omitted when none; "Co-captains" when >1; vice-captains separate; no block on historical era pages. **D-5** appoint/replace/reinstate require the player's membership at that club-season, locked `FOR KEY SHARE`; no FK; not re-checked on replay; list removal/transfer **warns** (additive `activeLeadershipRole` column + confirm text), never blocks — 161 untouched. **D-6** partial unique + server-enforced co-captain confirmation (`co_captaincy_unconfirmed`) so a replacement cannot accidentally become a co-captaincy. **D-7** `end`, `replace` (end + appoint, one transaction), `correct` (dates/note only), `reinstate`, `void` (terminal, reason mandatory); no hard delete, no tombstones. **D-8** override key `manual_admin_edit:<appointment_key>`, whole-row payload (club slug, player identity), `is_active` always true. **D-9** fail-closed replay re-creating active, ended and void rows (`NOT EXISTS`, never `ON CONFLICT`), after `players`. **D-10** reuse `data.seasonLists.read/.edit` — no role set could differ. **D-11** Leadership section + Appoint panel (list-members-only `<select>`) on `/admin/season-lists/[season]/[club]`; Captain column on `/admin/season-lists/[season]`; no new nav item. **D-12** compact `ClubLeadership` block after the stat strip, outside `ReorderableSections`, continuing current identity only; the Captains history table becomes a season-boundary union (`captaincies` < 2027, canonical captain rows ≥ 2027). **D-13** path-based `revalidatePath('/clubs/<slug>')` for every identity of the affected organisation, computed server-side, POSTed to the new capability-gated allowlisted `/admin/season-lists/revalidate`; nothing else. **D-14** no backfill; forward from 2027; `captaincies.py MAX_SEASON < 2027` pinned by test; Wikipedia→canonical conversion is a follow-up. **D-15** registry classification, `appointment_key` lineage rule + `data_edits` target, `OVERRIDE_ENTITY_TYPES`, §8 loop `('players','matches','draft_picks','season_list_members','club_leadership','coaches','match_coaches','fixtures')`. **D-16** migration **098**, allocated at Stage 1 preflight. **D-17** `tests/admin-club-leadership-actions.test.ts` + `tests/integration/admin-club-leadership.test.ts` (real Python replay) + extensions to `auth`, `data-overrides-source-contract`, `db-promotion-check`, `current-season-import`, manual-authority; Playwright in the DEV batch. **D-18** ships in the combined 160+161+162+163 batch; deploy order 096 → 097 → 098 → `db:privileges` → code; the batch acceptance gains the public club-page and revalidation proofs.
+
+### Out of scope (follow-ups)
+
+A public all-time captains page; converting `captaincies` into `club_leadership` (and retiring the union); any scraping/import pipeline; match-level captaincy; awards/Brownlow; fixtures/coaches/season-list contract changes; leadership groups/acting roles; NL/Grid Solver; tag-based revalidation; DEV/PROD/merge.
+
+*(Player-page leadership honours moved IN scope by operator clarification 4 and are implemented in Stage 1 — see below. What remains a follow-up there is a richer per-player leadership history, e.g. vice-captaincies shown as their own honour.)*
+
+### Operator sign-off, 2026-09-12 — four clarifications on top of D-1…D-18
+
+1. **D-10 capability reuse approved** — `data.seasonLists.read` = Admin+, `data.seasonLists.edit` = Super Admin. No leadership-specific capability.
+2. **D-12 approved with a HARD source boundary** — legacy `captaincies` supplies seasons ≤ 2026, canonical `club_leadership` supplies seasons ≥ 2027, and the two must never both answer one season. Built into each query, not applied afterwards as a de-duplication.
+3. **Lifecycle/date consistency must be explicit** — `status` is authoritative for current state; an active appointment may not carry contradictory ended-state data; ended/void lifecycle and effective dates must agree; NULL dates mean genuinely unknown, never a fabricated boundary.
+4. **Player honours must not develop a 2027+ hole** — existing captaincies appear under player honours today, and canonical 2027+ captain rows must be answerable there. Implement the read model in Stage 1 if it can be done safely; otherwise establish the backend contract and document the Stage 2 hook.
+
+### Stage 1 implementation record (2026-09-12, Opus 5 high — uncommitted, unvalidated)
+
+- **Migration 098 allocated** as `src/db/migrations/098_club_leadership.sql`. The all-refs check was done natively over the working tree: no `src/db/migrations/098*` file exists and every textual "098" hit is either this runbook, planning text, or the unrelated issue id `AFLDB-ISSUE-098`. The `git log --all -- 'src/db/migrations/098*'` half is an operator command and was **not** run (CLAUDE.md §12).
+- **Schema.** `club_leadership`: `appointment_key text NOT NULL UNIQUE` (minted UUID, never edited, never in a SET list), `season smallint NOT NULL CHECK (season BETWEEN 1897 AND 2100)` with **no FK to `seasons`**, `club_id`/`player_id` plain FKs with no cascade, `role IN ('captain','vice_captain')`, `status IN ('active','ended','void') DEFAULT 'active'`, `status_reason`, `started_on`/`ended_on` dates, `note`, source quartet, timestamps. CHECKs: `club_leadership_dates_ck` (end ≥ start), `club_leadership_active_open_ck` (an active row carries no end date — clarification 3, in SQL), `club_leadership_void_reason_ck` (a void row carries a reason), `club_leadership_source_record_uq`. Partial `UNIQUE (season, player_id) WHERE status = 'active'` — which makes co-captains representable (they are different players) while a second active appointment for one player, in any role at any club, is unrepresentable; ended and void rows leave the index so a re-appointment in the same season is a new record. `data_overrides.entity_type` and `data_edits.table_name` widened retaining every literal; `grant_app_read` + `grant_import_write`. **No `players.is_captain`, no `club_seasons.captain_player_id`, no match-level captaincy, no free-text identity, no FK to `seasons` or `season_list_members`, no DELETE path, no change to `captaincies` or `season_list_members`.**
+- **Writer.** `src/db/queries/admin-club-leadership.ts` is the ONE writer (source-contract test). `appointLeader`, `replaceLeader`, `endAppointment`, `reinstateAppointment`, `correctAppointment`, `voidAppointment` — one import-role transaction each, every precondition before the first write, `RollbackRefusal` for every post-write refusal, `FOR UPDATE` + `updated_at` CAS on the appointment, `FOR KEY SHARE` on the season-list membership so a concurrent ISSUE-161 removal cannot commit in the gap, real-calendar date validation (`2027-02-30` refused), server-enforced `co_captaincy_unconfirmed`, and `revalidatePaths` (the organisation's `/clubs/<slug>` paths) **returned, never performed**. Role, player, club and season are deliberately not correctable: a wrong one is void + a new appointment.
+- **Public read model.** `src/db/queries/club-leadership.ts` owns the single boundary constant `FIRST_LEADERSHIP_SEASON = FIRST_LIST_SEASON` and `getClubCurrentLeadership()` (organisation-scoped `max(non-void season)`, active rows only, captains and vice-captains separate, all co-captains returned, `null` when nothing is active). `getClubCaptains()` in `awards.ts` became the season-boundary union; canonical ids are negated so they can never collide with a `captaincies.id`; void rows never appear, ended rows do (with `to <date>` in the period slot), vice-captains never do.
+- **Player honours (clarification 4) — implemented, not deferred.** `getPlayerHonours()`'s captaincy query is now the same union under the same boundary, with canonical rows rendered as the identical `'Captain'` literal the legacy table stores and DISTINCT by (season, club). The player page groups `honours.captaincies` by club slug and never reads `role`, so **2027+ captaincies render with no Stage 2 change**, no write to `captaincies`, no name matching and no duplication at the boundary. Vice-captaincies are excluded.
+- **Durability and replay.** Whole-row `data_overrides` payload keyed `manual_admin_edit:<appointment_key>`, `field_group = 'appointment'`, `is_active` always true, naming the club by SLUG and the player by IDENTITY STRING (never ids, never a display name). `replay_admin_overrides('club_leadership')` in `common.py`: fail-closed pre-check over every override before anything is written (key shape, single claimant, payload/token agreement, season range, role, status, void reason, both date formats, interval order, active-with-end-date, club slug → era-correct identity via `afldb_season_list_clubs`, identity → exactly one player), then `NOT EXISTS` insert of active, ended AND void rows and an unconditional whole-row UPDATE. Never deletes, never `ON CONFLICT`, never moves `appointment_key`, and **never reads `season_list_members`** — membership is a precondition of making an appointment, not a property of a recorded one, which is what keeps ISSUE-161's removal non-destructive and leaves no ordering cycle. Called in `import_fitzroy_core.py` after `players` (binding) and after `season_list_members` (reading order only). Frozen `LEADERSHIP_ROLES`/`LEADERSHIP_STATUSES` pinned equal to the migration by test.
+- **Audit and promotion.** `data_edits` is written against the appointment itself (`leadership_appointed` / `_ended` / `_reinstated` / `_corrected` / `_voided`), which obliges — and gets — the `appointment_key` lineage rule and the `{kind:'club_leadership', entity:'club_leadership', identity:'appointment_key'}` target in `promotion-inventory.ts`, the acceptance-checklist replay line, and the §8 text in `docs/production-promotion.md` (including the post-replay club-page revalidation note and the window in which a promoted club page shows no leadership). Registry classification only: no `PROMOTION_CONTRACT` entry, not a `DERIVED_FOOTBALL_TABLE`, `OVERRIDE_ENTITY_TYPES` widened, `PINNED_FOOTBALL_TABLES` updated.
+- **ISSUE-161 relation.** One additive read-only column, `activeLeadershipRole`, in `readClubSeasonList()`. No 161 invariant, action, contract or refusal changed; removal and transfer remain permitted, and `readLeadershipDiagnostics()` / `readLeadershipOverview().unlistedActive` surface the consequence instead.
+- **Files changed:** `src/db/migrations/098_club_leadership.sql` (new), `src/db/queries/admin-club-leadership.ts` (new), `src/db/queries/club-leadership.ts` (new), `tests/integration/admin-club-leadership.test.ts` (new); `src/db/queries/admin-season-lists.ts`, `src/db/queries/awards.ts`, `src/db/queries/audit-log.ts`, `src/lib/audit-view.ts`, `src/lib/acquisition/manual-authority.ts`, `tools/migration/common.py`, `tools/migration/import_fitzroy_core.py`, `tools/db/promotion-inventory.ts`, `docs/production-promotion.md`, `tests/data-overrides-source-contract.test.ts`, `tests/db-promotion-check.test.ts`, `tests/current-season-import.test.ts`, plus tracking (`AFLDB-ISSUE-163.md`, `AFLDB-ISSUE-156.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`).
+- **No stop condition fired.** 098 did not collide; `captaincies` was not altered; player honours support the boundary without architectural change; no FK to `seasons` was needed; co-captains are representable unchanged; the replay order has no cycle; durability needs no display name; revalidation stayed per-organisation; ISSUE-161 was not weakened; no new capability; no `matches`/stats write; no external dependency.
+- **Not run (operator-reserved):** every shell, Git, SQL, test, lint and typecheck command. Migration 098 has been applied to nothing.
+
+### Stage 2 implementation record (2026-09-12, Sonnet 5 high — uncommitted, unvalidated)
+
+- **Admin.** A Leadership section (new `LeadershipPanel.tsx`) on `/admin/season-lists/[season]/[club]`, placed after the member table and before the "Played but not listed"/"Departed" diagnostics: a Current grouping (Captain/Co-captains, Vice-captain/Vice-captains), a collapsed History of ended appointments, void appointments behind their own "show voided" toggle, and a per-row link to `/admin/audit/entity/club_leadership/<id>`. Per-row lifecycle controls (`LeadershipActions.tsx`): Replace… / End… / Correct dates-note… / Void… for an active row, Reinstate / Correct / Void for an ended one, nothing at all for a void row (the ISSUE-162 §39 "no control that can only fail" lesson). The Appoint panel (`AppointLeaderPanel.tsx`) offers a role radio and a player `<select>` sourced from the SAME `readClubSeasonList()` rows the page already loaded — never a second query, never the global player picker. The member table gained the same role badge `readClubSeasonList().activeLeadershipRole` already carried; `MemberActions.tsx` gained the §9 warning sentence on Remove/Transfer. The season overview (`[season]/page.tsx`) gained a Captain column from `readLeadershipOverview()` directly, with an "unlisted active leader" marker and vice-captains deliberately excluded.
+- **Co-captaincy (L-3).** Appoint and Reinstate submit with no `confirmCoCaptaincy` the first time; a `co_captaincy_unconfirmed` refusal (which already names the sitting captain(s)) is rendered as a distinct follow-up action that resubmits with the literal string `'1'` — never a checkbox defaulting to checked, never an automatic retry. `submit-helper.ts`'s `LeadershipActionState` adds an optional `reason` field carrying the backend's refusal enum so a panel can detect this case without parsing the sentence.
+- **Replace/End/Void/Correct (§12).** Replace previews the consequence before submitting and never edits `playerId` on the existing row. Void lives in its own destructive block with mandatory reason text distinguishing "ceased" from "should never have existed" (mirroring `LifecyclePanel.tsx`'s fixture wording), and is never offered on an already-void row. Correct exposes only dates and note, pre-filled from the row's own current values — a real defect caught while writing this: an unfilled End-date field on Correct would otherwise have silently cleared an already-recorded end date on save.
+- **CAS.** Every mutation sends the row's `updatedAt`; a `stale` refusal is a plain message, never a silent retry.
+- **Revalidation.** `leadership-actions.ts` returns the mutation's own server-computed `revalidatePaths`; the reserved `/admin/season-lists/revalidate` endpoint now has a route (`revalidate/route.ts` + `revalidate-paths.ts`, admitting only `^/clubs/[a-z0-9-]+$`) and is requested for the first time — every other season-list action still returns `revalidatePaths: []` and never calls it.
+- **Public club page.** `ClubLeadership.tsx` renders after the stat strip and before `ReorderableSections`, gated on `isContinuing && club.isCurrent` and a non-null `getClubCurrentLeadership()` result; omitted entirely otherwise. The existing Captains history table's React key changed from `${season}-${playerName}` to the row's own `id` — the §32.12 known limitation, now fixed (a rendering fix, no data change).
+- **Auth.** No new capability; `data.seasonLists.read`/`.edit` reused exactly as planned. `tests/auth.test.ts`'s generic scanner (unmodified) covers the new route and all six actions because each begins with an awaited `requireCapability()` call.
+- **Files changed:** new `src/app/admin/season-lists/leadership-actions.ts`, `leadership-labels.ts`, `revalidate-paths.ts`, `revalidate/route.ts`, `LeadershipPanel.tsx`, `LeadershipActions.tsx`, `AppointLeaderPanel.tsx`, `src/components/ClubLeadership.tsx`, `tests/admin-club-leadership-actions.test.ts`; changed `src/app/admin/season-lists/[season]/[club]/page.tsx`, `MemberActions.tsx`, `[season]/page.tsx`, `submit-helper.ts`, `src/app/clubs/[slug]/page.tsx`, plus tracking (`AFLDB-ISSUE-163.md` §33, `CHANGELOG.md`, this entry, `IssuesIndex.md`).
+- **Tests.** `tests/admin-club-leadership-actions.test.ts` (new, pure layer only): the `appointment_key` shape/parser, the closed role/status vocabularies, `normaliseLeadershipDates` (real-calendar rejection, interval rule), and the new `revalidate-paths.ts` allowlist. It deliberately does not re-prove mutation refusal-before-write or server-computed `revalidatePaths` — both already proven end-to-end by Stage 1's `tests/integration/admin-club-leadership.test.ts` against a real database; a shallow mock of `resolvePlayerIdentity()` here would be a weaker second copy, not an additional proof.
+- **No stop condition fired.** The Leadership section fit the existing club-season page; no new capability was needed; revalidation never widened past the affected organisation; the public block and Captains union came from Stage 1's existing queries unchanged; player honours needed no further change; the overview needed no duplicated captain truth; every action is a thin wrapper with no direct SQL; no wider Admin redesign was needed for mobile.
+- **Not run (operator-reserved):** every shell, Git, SQL, test, lint and typecheck command.
+
+### Stage 2 re-verification (2026-09-12, Sonnet 5 high, resumed session — no code change)
+
+A resumed session re-read every Stage 2 file a second time against §30 D-1…D-18, closing out the
+prior session's usage-lockout checkpoint (`AFLDB-ISSUE-163.md` §33.0). No defect found. One dead-code
+observation: `LeadershipActions.tsx`'s Replace panel renders an unreachable `co_captaincy_unconfirmed`
+confirm branch — `replaceLeader()` has no `confirmCoCaptaincy` field and never checks sitting
+captains, correctly, since Replace ends one row and starts another in the same role/club so headcount
+never increases. Left as-is (no defect, and this session's task was verification, not cleanup). No
+command run. Full record `AFLDB-ISSUE-163.md` §33.1.
+
+### Operator validation (2026-09-12) — both stages GREEN
+
+Stage 1: migration 098 applied to **afldb_test only** + `db:privileges:test`; `tsc` green;
+source-contract/promotion/current-season 390 passed, 4 skipped; `tests/integration/admin-club-leadership.test.ts`
+37/37 including the real Python replay; stacked regressions 367/367; focused current-season 254 passed,
+4 skipped; ESLint green after one local test-variable rename; `git diff --check` clean apart from the
+expected LF/CRLF warning. Stage 2: `tsc` green; `admin-club-leadership-actions` + `auth` 150/150;
+ESLint green over every Stage 2 file; `git diff --check` clean; working tree clean; preflight READY.
+Stage 1 and Stage 2 were then committed (`8ed32b3`, `c28ea60`, `ea9f3dd`).
+
+### Final local audit (2026-09-12, Opus 5 high) — three Stage 2 defects fixed, backend unchanged
+
+Source audit of the whole implementation (migration → writer → replay → promotion → actions →
+revalidation → panels → public block → tests) against §30 D-1…D-18, with **no** shell, Git, SQL, test,
+lint, typecheck, DEV or PROD command executed. Backend integrity, lifecycle/CAS, co-captaincy,
+replacement, the season-list invariant, replay/durability, the public source boundary, player honours,
+Server Action/auth, revalidation security, Admin UI and public UI **all hold as specified**; **no
+deviation from D-1…D-18 and no stop condition**. Three Stage 2 defects were found and fixed — none in
+schema, queries, replay, promotion or capability shape:
+
+1. *(Medium)* `AppointLeaderPanel` replaced its whole form with a receipt on success, so appointing a
+   captain and then two vice-captains cost a page reload each. It now follows the `AddPlayerPanel`
+   precedent: the notice renders inline and the form stays.
+2. *(Medium)* After a `co_captaincy_unconfirmed` refusal the panel's only submit control was "Appoint
+   as co-captain alongside them", so changing the player or role and pressing it spent a confirmation
+   asked about a different appointment. The confirm step is now bound to the exact `(role, playerId)`
+   that was refused.
+3. *(Low)* The unreachable Replace co-captaincy branch (the §33.1 observation) was removed, with the
+   reason Replace can never need one recorded in the module header. Backend replacement semantics were
+   **not** changed to make it reachable.
+
+Three narrow cases were added to the existing pure suite (`parsePositiveInt` never turns a blank/zero/
+junk field into a number; an omitted optional field reads as absent, which is what lets a blank date
+mean "unknown"; `club_leadership` is an accepted `data_edits` entity with a label, so the per-row audit
+link cannot silently become a 404). Recorded but deliberately not fixed, each with its reasoning in
+`AFLDB-ISSUE-163.md` §34.4: the appoint-path audit `new_values` omits the derivable `entity_key`; the
+public Captains table renders no `period` column (and never has, for legacy rows either), so
+co-captains and a replacement show as two undifferentiated same-season rows; the replay validates date
+SHAPE not the calendar (unreachable through the writer, and still fails closed); a successful per-row
+mutation leaves `LeadershipActions` showing a terminal message until reload (deliberate — re-offering
+the controls would re-introduce the stale Correct pre-fill defect); `readLeadershipDiagnostics()` is
+exported but unused by any page.
+
+- **Files changed by the audit:** `src/app/admin/season-lists/AppointLeaderPanel.tsx`,
+  `src/app/admin/season-lists/LeadershipActions.tsx`, `tests/admin-club-leadership-actions.test.ts`,
+  plus tracking (`AFLDB-ISSUE-163.md` §34, `AFLDB-ISSUE-156.md`, `CHANGELOG.md`, this entry,
+  `IssuesIndex.md`).
+- **Re-validation needed:** Stage 2 only — `npx tsc --noEmit`; `npx vitest run tests/admin-club-leadership-actions.test.ts`;
+  `npx vitest run tests/auth.test.ts`; ESLint over the two panels and the test file; `git diff --check`.
+  Stage 1's expensive suites do **not** need re-running: no Stage 1 file was touched.
+
+### Next action
+
+Operator: run the Stage 2 re-validation block above, commit the audit fixes, then the combined
+160+161+162+163 DEV deployment (migrations 096 → 097 → 098 → `npm run db:privileges` → code) and the
+rendered Playwright/browser acceptance, which is the only thing that can prove the leadership surface,
+the confirm flows, focus restore and the public block at real widths. PROD promotion after that. No
+DEV, no PROD, no merge, no deploy has happened. ISSUE-163 is **not resolved**.

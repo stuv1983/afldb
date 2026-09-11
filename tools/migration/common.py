@@ -890,6 +890,94 @@ class Reporter:
     def warn(self, message: str) -> None:
         print(f"    WARNING: {message}", flush=True)
 
+# The frozen DraftGuru event-kind enumeration (migration 069). The ONE authority
+# is data/reference/draftguru-event-kinds.json; this copy exists because the
+# replay must fail closed WITHOUT reading a repository file at import time, and
+# tests/data-overrides-source-contract.test.ts asserts the two are equal so they
+# cannot drift. draft_kind is an enumeration and is NEVER derived from
+# draft_type -- the 1981/1982/1987 pages carry no Draft column at all, and those
+# 113 rows are ('National Draft', 'national') while every other national row is
+# ('National', 'national').
+MANUAL_DRAFT_KINDS = (
+    "free_agency",
+    "midseason",
+    "mini_draft",
+    "national",
+    "post_draft",
+    "pre_draft",
+    "preseason",
+    "rookie",
+    "trade",
+    "training_squad_selection",
+)
+
+# The season_list_members.origin enumeration (migration 096, AFLDB-ISSUE-161).
+# The ONE authority is the CHECK constraint in that migration; this copy exists
+# because the replay must fail closed WITHOUT reading the database schema, and
+# tests/data-overrides-source-contract.test.ts asserts the two are equal so they
+# cannot drift. There is deliberately no appearance-derived origin: D-2 forbids
+# promoting match appearances into authoritative membership, so a player picked
+# out of the non-authoritative appearances review panel is an ordinary 'added'
+# row whose payload records candidate_source as evidence only.
+SEASON_LIST_ORIGINS = (
+    "added",
+    "copied_list",
+    "transferred",
+    "imported",
+)
+
+# The fixtures.status enumeration (migration 097, AFLDB-ISSUE-162 D-2) and the
+# round_type enum as migrations 003 and 084 leave it. The ONE authority for each
+# is the database itself; these copies exist because the replay must fail closed
+# WITHOUT reading the schema, and tests/data-overrides-source-contract.test.ts
+# asserts they agree with the migrations so they cannot drift.
+#
+# 'cancelled' (a real scheduled event that did not happen) and 'void' (a row
+# entered in error that was never a real event) are deliberately distinct and
+# neither is a DELETE: a fixture row persists forever so its data_edits audit
+# rows stay resolvable at the next promotion lineage remap.
+FIXTURE_STATUSES = (
+    "scheduled",
+    "cancelled",
+    "void",
+)
+
+FIXTURE_ROUND_TYPES = (
+    "home_and_away",
+    "wildcard_final",
+    "elimination_final",
+    "qualifying_final",
+    "semi_final",
+    "preliminary_final",
+    "grand_final",
+)
+
+# The club_leadership.role and .status enumerations (migration 098,
+# AFLDB-ISSUE-163 D-2/D-3). The ONE authority for each is the CHECK constraint
+# in that migration; these copies exist because the replay must fail closed
+# WITHOUT reading the database schema, and
+# tests/data-overrides-source-contract.test.ts asserts they agree with the
+# migration so they cannot drift.
+#
+# There is deliberately no 'co_captain': the AFL office is "captain" and
+# co-captaincy is two or more concurrent active 'captain' appointments, which is
+# how the existing captaincies data already models it. 'ended' (a valid
+# appointment that ceased) and 'void' (a row entered in error that was never
+# valid) are distinct and neither is a DELETE: a leadership row persists forever
+# so its data_edits audit rows stay resolvable at the next promotion lineage
+# remap.
+LEADERSHIP_ROLES = (
+    "captain",
+    "vice_captain",
+)
+
+LEADERSHIP_STATUSES = (
+    "active",
+    "ended",
+    "void",
+)
+
+
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
 
@@ -899,6 +987,180 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """
     with conn.cursor() as cur:
         if table == "players":
+            # AFLDB-ISSUE-160 §8.1. Two key shapes share entity_type 'players':
+            #
+            #   'afltables:players/S/Some_Player0.html'  a source-owned player whose
+            #                                            fields a human corrected
+            #   'manual_admin_edit:<token>'              an admin-CREATED player, whose
+            #                                            canonical row this replay is
+            #                                            what re-creates after a
+            #                                            destructive reload or a
+            #                                            promotion
+            #
+            # The manual branch is the only place in the players replay that INSERTs a
+            # canonical row, and it must be: players is rebuilt on promotion, so without
+            # it an admin-created footballer does not survive the swap, and their
+            # data_edits rows resolve to nothing and STOP the promotion (DEF-4a).
+            #
+            # Identity is never name-derived. The token is a randomUUID minted once by
+            # createPlayerInTransaction() and never edited.
+            #
+            # Fail closed FIRST, over the whole active manual set, before anything is
+            # written. An override whose payload cannot re-create a row is a human
+            # decision this reload cannot honour, and a reload that silently drops one
+            # is worse than a reload that stops.
+            cur.execute("""
+                SELECT o.entity_key,
+                       CASE
+                           WHEN o.override_values->>'display_name' IS NULL
+                               THEN 'manual player override carries no display_name to re-create the row with'
+                           WHEN length(substring(o.entity_key from position(':' in o.entity_key) + 1)) = 0
+                               THEN 'entity_key carries no token'
+                           WHEN o.override_values->>'dob' IS NOT NULL
+                                 AND COALESCE(o.override_values->>'dob_confidence', 'unknown') = 'unknown'
+                               THEN 'manual player override carries a dob with no dob_confidence '
+                                    '(players_dob_confidence_ck, migration 018)'
+                           WHEN jsonb_exists(o.override_values, 'afltables_profile_path')
+                                 AND o.override_values->>'afltables_profile_path' IS NOT NULL
+                                 AND (SELECT count(DISTINCT e.player_id)
+                                        FROM external_identities e
+                                        JOIN sources s ON s.id = e.source_id
+                                       WHERE s.key = 'afltables'
+                                         AND e.match_method = 'afltables_profile_url'
+                                         AND e.status IN ('unique', 'resolved')
+                                         AND e.player_id IS NOT NULL
+                                         AND e.external_id = o.override_values->>'afltables_profile_path') > 1
+                               THEN 'afltables_profile_path resolves to more than one player'
+                       END AS problem
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'players' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+            """)
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(players): refusing to commit, "
+                    + str(len(unresolvable)) + " active manual override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # Every manual override whose token names no identity in THIS database --
+            # i.e. the player is missing, which is exactly the state a rebuilt candidate
+            # is in. Guarded by NOT EXISTS rather than ON CONFLICT: players has no
+            # natural unique key for a conflict target to name.
+            cur.execute("""
+                SELECT substring(o.entity_key from position(':' in o.entity_key) + 1) AS token,
+                       o.override_values,
+                       (SELECT min(e.player_id)
+                          FROM external_identities e
+                          JOIN sources s ON s.id = e.source_id
+                         WHERE s.key = 'afltables'
+                           AND e.match_method = 'afltables_profile_url'
+                           AND e.status IN ('unique', 'resolved')
+                           AND e.player_id IS NOT NULL
+                           AND e.external_id = o.override_values->>'afltables_profile_path')
+                           AS bound_player_id
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'players' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                   AND NOT EXISTS (
+                         SELECT 1 FROM external_identities e
+                           JOIN sources s ON s.id = e.source_id
+                          WHERE s.key = 'manual_admin_edit'
+                            AND e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                            AND e.player_id IS NOT NULL)
+                 ORDER BY o.entity_key
+            """)
+            pending_manual_players = cur.fetchall()
+
+            for token, payload, bound_player_id in pending_manual_players:
+                if bound_player_id is not None:
+                    # The player ALREADY exists in this database under their AFL Tables
+                    # profile, because they debuted and the rebuild created them from the
+                    # source. Bind the token onto that row instead of creating a twin.
+                    # This is what makes a promotion AFTER the debut produce one player,
+                    # not two -- and it must happen before the data_edits remap, which is
+                    # why the ordering players -> draft_picks is binding.
+                    player_id = bound_player_id
+                else:
+                    # search_name, slug and sort_name are derived by the SAME expressions
+                    # import_fitzroy_core.import_players() and createPlayerInTransaction()
+                    # use, so a replayed twin is byte-identical to the row the admin typed.
+                    cur.execute("""
+                        INSERT INTO players
+                              (display_name, given_name, surname, sort_name, search_name, slug,
+                               dob, dob_confidence, birth_year, birth_year_confidence,
+                               height_cm, weight_kg, notes)
+                        SELECT %(display_name)s, %(given_name)s, %(surname)s,
+                               CASE
+                                   WHEN %(surname)s::text IS NULL THEN %(display_name)s::text
+                                   WHEN %(given_name)s::text IS NULL THEN %(surname)s::text
+                                   ELSE %(surname)s::text || ', ' || %(given_name)s::text
+                               END,
+                               afldb_normalise_name(%(display_name)s),
+                               regexp_replace(afldb_normalise_name(%(display_name)s), '\\s+', '-', 'g'),
+                               %(dob)s::date,
+                               COALESCE(%(dob_confidence)s::value_confidence, 'unknown'),
+                               %(birth_year)s::smallint,
+                               COALESCE(%(dob_confidence)s::value_confidence, 'unknown'),
+                               %(height_cm)s::smallint, %(weight_kg)s::smallint, %(notes)s
+                        RETURNING id
+                    """, {
+                        "display_name": payload.get("display_name"),
+                        "given_name": payload.get("given_name"),
+                        "surname": payload.get("surname"),
+                        "dob": payload.get("dob"),
+                        "dob_confidence": payload.get("dob_confidence"),
+                        "birth_year": payload.get("birth_year"),
+                        "height_cm": payload.get("height_cm"),
+                        "weight_kg": payload.get("weight_kg"),
+                        "notes": payload.get("notes"),
+                    })
+                    player_id = cur.fetchone()[0]
+                    # The derived rebuild regenerates the real figures; this is the same
+                    # zero row createPlayerInTransaction() seeds.
+                    cur.execute("""
+                        INSERT INTO player_career_stats
+                              (player_id, games, goals, finals, premierships, wins, draws, losses,
+                               brownlow_votes, brownlow_medals, clubs_played, seasons_played,
+                               behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
+                               disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
+                               hitouts_recorded_games)
+                        VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+                        ON CONFLICT (player_id) DO NOTHING
+                    """, (player_id,))
+
+                cur.execute("""
+                    INSERT INTO external_identities
+                          (source_id, external_id, external_name, player_id,
+                           status, candidate_count, match_method, notes)
+                    VALUES ((SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                            %s, %s, %s, 'resolved', 0, 'manual_admin_edit',
+                            'Re-created from the durable admin record (AFLDB-ISSUE-160 §8.1).')
+                    ON CONFLICT (source_id, external_id) DO NOTHING
+                """, (token, payload.get("display_name"), player_id))
+
+                # An attached AFL Tables path is a human decision too, and a rebuilt
+                # candidate that lacks it would leave the player unreachable by the
+                # source on the next import. Registered only when no other player
+                # already holds it -- the pre-check proved at most one does.
+                afl_path = payload.get("afltables_profile_path")
+                if afl_path and bound_player_id is None:
+                    cur.execute("""
+                        INSERT INTO external_identities
+                              (source_id, external_id, external_name, external_url, player_id,
+                               status, candidate_count, match_method, notes)
+                        SELECT (SELECT id FROM sources WHERE key = 'afltables'),
+                               %(path)s, %(name)s,
+                               'https://afltables.com/afl/stats/' || %(path)s, %(player_id)s,
+                               'resolved', 0, 'afltables_profile_url',
+                               'Re-created from the durable admin record (AFLDB-ISSUE-160 §8.1).'
+                         WHERE NOT EXISTS (
+                                 SELECT 1 FROM external_identities e
+                                   JOIN sources s ON s.id = e.source_id
+                                  WHERE s.key = 'afltables' AND e.external_id = %(path)s)
+                    """, {"path": afl_path, "name": payload.get("display_name"),
+                          "player_id": player_id})
+
             # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
             # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
             # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
@@ -1017,6 +1279,148 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
             """)
 
         elif table == "draft_picks":
+            # AFLDB-ISSUE-160 §8.2. Two key shapes share entity_type 'draft_picks':
+            #
+            #   '<source_id>|<player_url>|<year>|<kind>'  a source-owned DraftGuru
+            #                                             selection a human corrected
+            #                                             (migration 069's reload key,
+            #                                             unchanged -- R-7)
+            #   'manual_admin_edit:<token>'               an admin-CREATED selection,
+            #                                             whose canonical row this
+            #                                             replay is what re-creates
+            #
+            # draft_picks is rebuilt on promotion, so without the manual branch an
+            # admin-recorded selection simply does not exist in the promoted database
+            # (DEF-4b). The manual row carries player_url = 'manual:<token>', which the
+            # DraftGuru URL contract regex cannot match, so it lives inside 069's
+            # partial unique index without ever colliding with a source row.
+            #
+            # ORDERING IS BINDING: replay_admin_overrides(players) runs FIRST, because a
+            # manual selection's payload names its player by IDENTITY -- a token or an
+            # AFL Tables path -- and that identity has to exist before this can resolve it.
+            #
+            # Fail closed FIRST, over the whole active manual set.
+            cur.execute("""
+                SELECT o.entity_key,
+                       CASE
+                           WHEN length(substring(o.entity_key from position(':' in o.entity_key) + 1)) = 0
+                               THEN 'entity_key carries no token'
+                           WHEN o.override_values->>'player_identity' IS NULL
+                               THEN 'manual selection override names no player identity'
+                           WHEN o.override_values->>'club_slug' IS NULL
+                               THEN 'manual selection override names no club'
+                           WHEN (SELECT count(*) FROM clubs c
+                                  WHERE c.slug = o.override_values->>'club_slug') <> 1
+                               THEN 'club_slug does not resolve to exactly one club'
+                           WHEN o.override_values->>'draft_year' IS NULL
+                                 OR o.override_values->>'draft_kind' IS NULL
+                                 OR o.override_values->>'draft_type' IS NULL
+                               THEN 'manual selection override is missing draft_year, draft_kind or draft_type'
+                           WHEN NOT (o.override_values->>'draft_kind' = ANY(%(kinds)s))
+                               THEN 'draft_kind is not one of the frozen draft event kinds'
+                           WHEN (SELECT count(DISTINCT e.player_id)
+                                   FROM external_identities e
+                                   JOIN sources s ON s.id = e.source_id
+                                  WHERE e.status IN ('unique', 'resolved')
+                                    AND e.player_id IS NOT NULL
+                                    AND s.key = split_part(o.override_values->>'player_identity', ':', 1)
+                                    AND e.external_id = substring(o.override_values->>'player_identity'
+                                                                  from position(':' in o.override_values->>'player_identity') + 1)
+                                 ) <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'draft_picks' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+            """, {"kinds": list(MANUAL_DRAFT_KINDS)})
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(draft_picks): refusing to commit, "
+                    + str(len(unresolvable)) + " active manual override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # The manual set, decoded once: the identity resolution and the two writes
+            # below must never be able to disagree about what a key means.
+            manual_decoded = """
+                manual AS (
+                    SELECT substring(o.entity_key from position(':' in o.entity_key) + 1) AS token,
+                           o.override_values AS v,
+                           (SELECT DISTINCT e.player_id
+                              FROM external_identities e
+                              JOIN sources s ON s.id = e.source_id
+                             WHERE e.status IN ('unique', 'resolved')
+                               AND e.player_id IS NOT NULL
+                               AND s.key = split_part(o.override_values->>'player_identity', ':', 1)
+                               AND e.external_id = substring(o.override_values->>'player_identity'
+                                                             from position(':' in o.override_values->>'player_identity') + 1)
+                           ) AS player_id,
+                           (SELECT c.id FROM clubs c WHERE c.slug = o.override_values->>'club_slug') AS club_id,
+                           (SELECT c.name FROM clubs c WHERE c.slug = o.override_values->>'club_slug') AS club_name
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'draft_picks' AND o.is_active = true
+                       AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                )
+            """
+
+            # 1. Re-create every admin-created selection the reload removed or that a
+            #    rebuilt database never had.
+            cur.execute("WITH " + manual_decoded + """
+                INSERT INTO draft_picks
+                      (draft_year, draft_type, draft_kind, pick_number, pick_note,
+                       player_id, player_name_raw, link_status_value, candidate_count, match_method,
+                       club_id, club_name_raw, original_club_raw,
+                       draft_age, height_cm, weight_kg, detail,
+                       source_id, source_record_id, player_url)
+                SELECT (m.v->>'draft_year')::smallint, m.v->>'draft_type', m.v->>'draft_kind',
+                       (m.v->>'pick_number')::smallint, m.v->>'pick_note',
+                       m.player_id, COALESCE(m.v->>'player_name_raw', p.display_name),
+                       'resolved', 0, 'manual_admin_edit',
+                       m.club_id, m.club_name, m.v->>'original_club_raw',
+                       (m.v->>'draft_age')::smallint, (m.v->>'height_cm')::smallint,
+                       (m.v->>'weight_kg')::smallint, m.v->>'detail',
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       m.token, 'manual:' || m.token
+                  FROM manual m
+                  JOIN players p ON p.id = m.player_id
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM draft_picks d
+                           JOIN sources s ON s.id = d.source_id
+                          WHERE s.key = 'manual_admin_edit'
+                            AND d.player_url = 'manual:' || m.token)
+            """)
+
+            # 2. Apply the payload to every manual row, so a corrected year, kind, pick,
+            #    club or player link replays too. The override IS the row for a manual
+            #    selection -- unlike a source-owned correction, which is a delta -- so
+            #    this is an unconditional whole-row UPDATE, not a jsonb_exists patch.
+            cur.execute("WITH " + manual_decoded + """
+                UPDATE draft_picks d
+                   SET draft_year = (m.v->>'draft_year')::smallint,
+                       draft_type = m.v->>'draft_type',
+                       draft_kind = m.v->>'draft_kind',
+                       pick_number = (m.v->>'pick_number')::smallint,
+                       pick_note = m.v->>'pick_note',
+                       player_id = m.player_id,
+                       player_name_raw = COALESCE(m.v->>'player_name_raw', d.player_name_raw),
+                       link_status_value = 'resolved',
+                       club_id = m.club_id,
+                       club_name_raw = m.club_name,
+                       original_club_raw = m.v->>'original_club_raw',
+                       draft_age = (m.v->>'draft_age')::smallint,
+                       height_cm = (m.v->>'height_cm')::smallint,
+                       weight_kg = (m.v->>'weight_kg')::smallint,
+                       detail = m.v->>'detail'
+                  FROM manual m
+                 WHERE d.player_url = 'manual:' || m.token
+                   AND d.source_id = (SELECT id FROM sources WHERE key = 'manual_admin_edit')
+            """)
+
+            # 3. The source-owned patch, unchanged in shape and extended with the
+            #    selection_facts group (pick_number, club) ISSUE-160 added to the editor
+            #    spec. Every field is nullable, so absent-vs-explicit-null is preserved
+            #    by jsonb_exists -- the migration-086 discipline. player_name_raw is
+            #    NOT NULL, so it COALESCEs.
             cur.execute("""
                 UPDATE draft_picks d
                    SET player_name_raw = COALESCE(o.override_values->>'player_name_raw', d.player_name_raw),
@@ -1025,7 +1429,18 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                        height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::integer ELSE d.height_cm END,
                        weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::integer ELSE d.weight_kg END,
                        pick_note = CASE WHEN jsonb_exists(o.override_values, 'pick_note') THEN o.override_values->>'pick_note' ELSE d.pick_note END,
-                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END
+                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END,
+                       pick_number = CASE WHEN jsonb_exists(o.override_values, 'pick_number') THEN (o.override_values->>'pick_number')::smallint ELSE d.pick_number END,
+                       club_id = CASE
+                           WHEN jsonb_exists(o.override_values, 'club_slug')
+                                AND o.override_values->>'club_slug' IS NOT NULL
+                               THEN COALESCE((SELECT c.id FROM clubs c WHERE c.slug = o.override_values->>'club_slug'), d.club_id)
+                           ELSE d.club_id END,
+                       club_name_raw = CASE
+                           WHEN jsonb_exists(o.override_values, 'club_slug')
+                                AND o.override_values->>'club_slug' IS NOT NULL
+                               THEN COALESCE((SELECT c.name FROM clubs c WHERE c.slug = o.override_values->>'club_slug'), d.club_name_raw)
+                           ELSE d.club_name_raw END
                   FROM data_overrides o
                  WHERE o.entity_type = 'draft_picks'
                    AND o.entity_key = d.source_id::text || '|' || d.player_url || '|' || d.draft_year::text || '|' || d.draft_kind
@@ -1254,4 +1669,639 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                   source_id = EXCLUDED.source_id,
                   source_record_id = EXCLUDED.source_record_id,
                   import_batch_id = EXCLUDED.import_batch_id
+            """)
+
+        elif table == "season_list_members":
+            # AFLDB-ISSUE-161 §19. ONE key shape, and it is NATURAL rather than a
+            # minted token:
+            #
+            #   '<club_slug>|<season>|<player identity>'
+            #
+            #      richmond|2027|afltables:players/D/Dustin_Martin0.html
+            #      gold-coast|2027|manual_admin_edit:2f6c...
+            #
+            # A membership HAS a natural key, so minting one per row would let the
+            # same player be recorded twice under two tokens and would make
+            # copy-forward non-idempotent. Because the key is natural, re-adding a
+            # removed player reactivates the SAME record instead of creating a
+            # second one.
+            #
+            # season_list_members is an import-writable registry table: a promotion
+            # rebuilds it and a destructive reload can empty it, so without this
+            # branch an admin-authored playing list simply does not exist in the
+            # promoted or rebuilt database. This is the only thing that puts it
+            # back, and the list is not derivable from anything else -- "listed" is
+            # not "played", and no source publishes historical lists.
+            #
+            # ORDERING IS BINDING: replay_admin_overrides(players) runs FIRST,
+            # because a membership names its player by IDENTITY -- an AFL Tables
+            # profile path or a manual_admin_edit token -- and that identity has to
+            # exist before this can resolve it. It is independent of draft_picks,
+            # coaches and match_coaches, and it needs no matches, no fixture and no
+            # club_seasons row for the season: a list is administrative intent
+            # about a season that may not have been played yet (§9.4).
+            #
+            # TOMBSTONES. Unlike every other branch in this function, this one acts
+            # on INACTIVE overrides too. An inactive membership override is not an
+            # absence of a decision -- it is the decision "this player is
+            # deliberately NOT on that list", and it outranks every source (§7
+            # precedence rule 1). So the replay DELETES any row it finds for a
+            # tombstoned key, including one a future importer wrote, and it does so
+            # BEFORE the active inserts: a stale row for the same (season, player)
+            # at the club the player was moved away from would otherwise collide
+            # with the UNIQUE and abort a reload that was about to become correct.
+            membership_decoded = """
+                raw AS (
+                    SELECT o.is_active,
+                           o.override_values AS v,
+                           regexp_match(o.entity_key, '^([^|]+)\\|([0-9]{4})\\|(.+)$') AS parts,
+                           o.entity_key
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'season_list_members'
+                ),
+                -- The eligible identities per season, taken from the ONE rule the
+                -- writers use (migration 096). LATERAL against a preceding FROM
+                -- item, so the set-returning function is never called with an
+                -- outer reference. A club renamed between the dump and the replay
+                -- therefore resolves to the identity that is era-correct NOW.
+                seasons_in_play AS (
+                    SELECT DISTINCT (parts)[2]::smallint AS season FROM raw WHERE parts IS NOT NULL
+                ),
+                eligible AS (
+                    SELECT sp.season, e.id, e.organization_id
+                      FROM seasons_in_play sp, LATERAL afldb_season_list_clubs(sp.season) e
+                ),
+                membership AS (
+                    SELECT r.entity_key, r.is_active, r.v, r.parts,
+                           (r.parts)[2]::smallint AS season,
+                           src.id AS source_club_id,
+                           el.id AS club_id,
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources s ON s.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND s.key = split_part((r.parts)[3], ':', 1)
+                               AND ei.external_id = substring((r.parts)[3]
+                                                              from position(':' in (r.parts)[3]) + 1)
+                           ) AS identity_matches,
+                           -- min(), not SELECT DISTINCT: the refusal above has
+                           -- already proven there is exactly one, and min() cannot
+                           -- raise a cardinality error that would be reported as a
+                           -- crash instead of as the refusal it really is.
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources s ON s.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND s.key = split_part((r.parts)[3], ':', 1)
+                               AND ei.external_id = substring((r.parts)[3]
+                                                              from position(':' in (r.parts)[3]) + 1)
+                           ) AS player_id
+                      FROM raw r
+                      LEFT JOIN clubs src ON src.slug = (r.parts)[1]
+                      LEFT JOIN eligible el ON el.season = (r.parts)[2]::smallint
+                                           AND el.organization_id = src.organization_id
+                )
+            """
+
+            # Fail closed FIRST, over EVERY override -- active AND inactive -- and
+            # before anything is written. An override whose key does not resolve is
+            # not skipped: it is a human decision this reload cannot honour, and a
+            # reload that silently drops one is worse than a reload that stops.
+            # A tombstone that cannot be resolved is just as serious as a membership
+            # that cannot: failing to apply it RESURRECTS a player somebody
+            # deliberately removed.
+            cur.execute("WITH " + membership_decoded + """
+                SELECT d.entity_key,
+                       CASE
+                           WHEN d.parts IS NULL
+                               THEN 'entity_key is not <club_slug>|<season>|<player identity>'
+                           WHEN d.season NOT BETWEEN 1897 AND 2100
+                               THEN 'entity_key names a season outside the supported range'
+                           WHEN d.source_club_id IS NULL
+                               THEN 'club_slug does not resolve to exactly one club'
+                           WHEN d.club_id IS NULL
+                               THEN 'no club identity of that organisation is eligible in that season'
+                           WHEN d.v->>'origin' IS NULL
+                                 OR NOT (d.v->>'origin' = ANY(%(origins)s))
+                               THEN 'membership override carries no valid origin'
+                           WHEN d.identity_matches <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM membership d
+            """, {"origins": list(SEASON_LIST_ORIGINS)})
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(season_list_members): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # 1. Tombstones win, and win first. Any row for an intentionally removed
+            #    key goes -- whoever wrote it.
+            cur.execute("WITH " + membership_decoded + """
+                DELETE FROM season_list_members m
+                 USING membership d
+                 WHERE d.is_active = false
+                   AND m.season = d.season
+                   AND m.club_id = d.club_id
+                   AND m.player_id = d.player_id
+            """)
+
+            # 2. Re-create every membership the reload removed, or that a rebuilt
+            #    database never had. Guarded by NOT EXISTS on the (season, club,
+            #    player) triple rather than ON CONFLICT: the UNIQUE is on (season,
+            #    player), so a row for the SAME player at a DIFFERENT club is not a
+            #    conflict to swallow -- it is a contradiction between two durable
+            #    records, and it must surface as the error it is instead of being
+            #    silently skipped.
+            cur.execute("WITH " + membership_decoded + """
+                INSERT INTO season_list_members
+                      (season, club_id, player_id, source_id, origin, copied_from_season, note)
+                SELECT d.season, d.club_id, d.player_id,
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       d.v->>'origin',
+                       (d.v->>'copied_from_season')::smallint,
+                       d.v->>'note'
+                  FROM membership d
+                 WHERE d.is_active = true
+                   AND NOT EXISTS (
+                         SELECT 1 FROM season_list_members m
+                          WHERE m.season = d.season
+                            AND m.club_id = d.club_id
+                            AND m.player_id = d.player_id)
+            """)
+
+            # 3. The override IS the row for a membership -- there is no
+            #    source-owned delta to preserve -- so this is an unconditional
+            #    whole-row UPDATE of the three carried fields, not a jsonb_exists
+            #    patch. A corrected origin or note replays too.
+            cur.execute("WITH " + membership_decoded + """
+                UPDATE season_list_members m
+                   SET origin = d.v->>'origin',
+                       copied_from_season = (d.v->>'copied_from_season')::smallint,
+                       note = d.v->>'note',
+                       updated_at = now()
+                  FROM membership d
+                 WHERE d.is_active = true
+                   AND m.season = d.season
+                   AND m.club_id = d.club_id
+                   AND m.player_id = d.player_id
+            """)
+
+        elif table == "fixtures":
+            # AFLDB-ISSUE-162 §20. ONE key shape, and it is a MINTED TOKEN
+            # rather than a natural key:
+            #
+            #   'manual_admin_edit:<fixture_key>'
+            #
+            #      manual_admin_edit:3f8c2b1e-....-9d2a
+            #
+            # That is the OPPOSITE of the season_list_members choice above, and
+            # for the opposite reason. A membership HAS a natural key (club,
+            # season, player) that no edit can change. Every candidate natural
+            # key for a fixture -- the date, the venue, even the round and the
+            # club pair -- is a fact an administrator is EXPECTED to correct,
+            # so a natural key would change identity on a reschedule, which is
+            # exactly what fixture_key exists to prevent. The token is minted
+            # once by createFixture() and never edited, and a played-match
+            # association never replaces it with a match_key (the operator
+            # constraint of 2026-09-11): fixtures carries no match_key and no
+            # match_id column, and nothing in this branch renders, copies or
+            # compares one.
+            #
+            # fixtures is an import-writable registry table: a promotion
+            # rebuilds it and a destructive reload can empty it, so without
+            # this branch an administered schedule simply does not exist in the
+            # promoted or rebuilt database. This is the only thing that puts it
+            # back, and it is not derivable from anything else -- a fixture is
+            # what was SCHEDULED, matches holds what was PLAYED, and no source
+            # publishes AFLDB-normalised historical schedules.
+            #
+            # ORDERING IS NOT BINDING. A fixture names its clubs by SLUG and
+            # its venue by SLUG -- both tracked reference data loaded long
+            # before any replay -- and it names no player, no match and no
+            # draft selection. It therefore depends on no other replay branch
+            # and may run anywhere in the loop. It is grouped with 'matches' at
+            # the call site only to keep every match-shaped thing together.
+            #
+            # NO TOMBSTONES. Unlike season_list_members, every fixture override
+            # is ACTIVE: the lifecycle lives in the payload's status, because a
+            # cancelled or void fixture must be RE-CREATED here, not suppressed.
+            # A fixture is never deleted (§16) precisely so that its data_edits
+            # rows stay resolvable at the next promotion lineage remap, and a
+            # replay that dropped the void rows would break that the moment it
+            # ran.
+            fixture_decoded = """
+                raw AS (
+                    SELECT o.entity_key,
+                           o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1) AS token
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'fixtures'
+                       AND o.field_group = 'fixture'
+                ),
+                -- The season is decoded ONCE, guarded, before anything joins on
+                -- it: an unparseable season must be reported as the refusal it
+                -- is, not crash the replay with a cast error that names no key.
+                decoded AS (
+                    SELECT r.entity_key, r.v, r.namespace, r.token,
+                           CASE WHEN (r.v->>'season') ~ '^[0-9]{4}$'
+                                THEN (r.v->>'season')::smallint END AS season,
+                           count(*) OVER (PARTITION BY r.token) AS token_count
+                      FROM raw r
+                ),
+                -- The eligible identities per season, taken from the ONE rule
+                -- the writers use (migration 096, AFLDB-ISSUE-161). LATERAL
+                -- against a preceding FROM item, so the set-returning function
+                -- is never called with an outer reference. A club renamed
+                -- between the dump and the replay therefore resolves to the
+                -- identity that is era-correct NOW.
+                seasons_in_play AS (
+                    SELECT DISTINCT season FROM decoded WHERE season IS NOT NULL
+                ),
+                eligible AS (
+                    SELECT sp.season, e.id, e.organization_id
+                      FROM seasons_in_play sp, LATERAL afldb_season_list_clubs(sp.season) e
+                ),
+                fixture AS (
+                    SELECT d.entity_key, d.v, d.namespace, d.token, d.season, d.token_count,
+                           hsrc.id AS home_source_club_id,
+                           asrc.id AS away_source_club_id,
+                           hel.id  AS home_club_id,
+                           ael.id  AS away_club_id,
+                           -- Venue is ENRICHMENT, not identity (003:74-75): an
+                           -- unresolved slug degrades to the stored name and is
+                           -- REPORTED, never fatal. A promotion is not stopped
+                           -- by a venue rename.
+                           ven.id  AS venue_id,
+                           ven.canonical_name AS venue_canonical_name
+                      FROM decoded d
+                      LEFT JOIN clubs hsrc ON hsrc.slug = d.v->>'home_club_slug'
+                      LEFT JOIN clubs asrc ON asrc.slug = d.v->>'away_club_slug'
+                      LEFT JOIN eligible hel ON hel.season = d.season
+                                            AND hel.organization_id = hsrc.organization_id
+                      LEFT JOIN eligible ael ON ael.season = d.season
+                                            AND ael.organization_id = asrc.organization_id
+                      LEFT JOIN venues ven ON ven.slug = d.v->>'venue_slug'
+                )
+            """
+
+            # Fail closed FIRST, over EVERY override, and before anything is
+            # written. An override whose payload cannot re-create a row is a
+            # human decision this reload cannot honour, and a reload that
+            # silently drops one is worse than a reload that stops. There is no
+            # fuzzy fallback anywhere: no name matching, no date tolerance and
+            # no "nearest round".
+            cur.execute("WITH " + fixture_decoded + """
+                SELECT f.entity_key,
+                       CASE
+                           WHEN f.namespace <> 'manual_admin_edit' OR length(f.token) = 0
+                               THEN 'entity_key is not manual_admin_edit:<token>'
+                           WHEN f.token_count > 1
+                               THEN 'more than one durable record claims this fixture_key'
+                           WHEN f.v->>'fixture_key' IS DISTINCT FROM f.token
+                               THEN 'payload fixture_key does not match the entity_key token'
+                           WHEN f.season IS NULL OR f.season NOT BETWEEN 1897 AND 2100
+                               THEN 'payload names no season in the supported range'
+                           WHEN f.v->>'round_type' IS NULL
+                                 OR NOT (f.v->>'round_type' = ANY(%(round_types)s))
+                               THEN 'payload carries no valid round_type'
+                           WHEN COALESCE(f.v->>'round_code', '') = ''
+                               THEN 'payload carries no round_code'
+                           WHEN f.v->>'round_type' = 'home_and_away'
+                                 AND (f.v->>'round_number' IS NULL
+                                      OR f.v->>'round_number' !~ '^[0-9]+$'
+                                      OR f.v->>'round_code' <> f.v->>'round_number')
+                               THEN 'a home-and-away fixture needs a round_number whose text is the round_code'
+                           WHEN f.v->>'round_type' <> 'home_and_away'
+                                 AND f.v->>'round_number' IS NOT NULL
+                               THEN 'a finals fixture carries no round_number'
+                           WHEN f.v->>'status' IS NULL
+                                 OR NOT (f.v->>'status' = ANY(%(statuses)s))
+                               THEN 'payload carries no valid status'
+                           WHEN f.v->>'status' <> 'scheduled'
+                                 AND COALESCE(f.v->>'status_reason', '') = ''
+                               THEN 'a cancelled or void fixture needs a status_reason'
+                           WHEN f.v->>'match_date' IS NOT NULL
+                                 AND f.v->>'match_date' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                               THEN 'match_date is not YYYY-MM-DD'
+                           WHEN f.v->>'match_time' IS NOT NULL AND f.v->>'match_date' IS NULL
+                               THEN 'a start time cannot be stored without a date'
+                           WHEN f.home_source_club_id IS NULL
+                               THEN 'home_club_slug does not resolve to exactly one club'
+                           WHEN f.away_source_club_id IS NULL
+                               THEN 'away_club_slug does not resolve to exactly one club'
+                           WHEN f.home_club_id IS NULL
+                               THEN 'no home club identity is eligible in that season'
+                           WHEN f.away_club_id IS NULL
+                               THEN 'no away club identity is eligible in that season'
+                           WHEN f.home_club_id = f.away_club_id
+                               THEN 'both club slugs resolve to the same identity'
+                       END AS problem
+                  FROM fixture f
+            """, {
+                "round_types": list(FIXTURE_ROUND_TYPES),
+                "statuses": list(FIXTURE_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(fixtures): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # Venue degrades LOUDLY rather than silently: the fixture is still
+            # re-created and its name still renders, and the count says how many
+            # need a venue mapping in this database.
+            cur.execute("WITH " + fixture_decoded + """
+                SELECT count(*) FROM fixture f
+                 WHERE f.v->>'venue_slug' IS NOT NULL AND f.venue_id IS NULL
+            """)
+            degraded = cur.fetchone()[0]
+            if degraded:
+                print("    WARNING: replay_admin_overrides(fixtures): "
+                      + f"{degraded:,} fixture(s) name a venue slug this database does not "
+                      + "have; kept as an unmapped venue name (venue_id NULL).", flush=True)
+
+            # 1. Re-create every fixture the reload removed, or that a rebuilt
+            #    database never had. Guarded by NOT EXISTS on fixture_key rather
+            #    than ON CONFLICT so that a contradiction between two durable
+            #    records surfaces through the uniqueness constraint as the error
+            #    it is, instead of being silently swallowed.
+            cur.execute("WITH " + fixture_decoded + """
+                INSERT INTO fixtures
+                      (fixture_key, season, round_code, round_number, round_type,
+                       match_date, match_time, venue_id, venue_raw,
+                       home_club_id, away_club_id, status, status_reason, notes,
+                       source_id, source_record_id)
+                SELECT f.token, f.season, f.v->>'round_code',
+                       (f.v->>'round_number')::smallint,
+                       (f.v->>'round_type')::round_type,
+                       (f.v->>'match_date')::date,
+                       f.v->>'match_time',
+                       f.venue_id,
+                       CASE WHEN f.venue_id IS NOT NULL THEN f.venue_canonical_name
+                            ELSE f.v->>'venue_raw' END,
+                       f.home_club_id, f.away_club_id,
+                       f.v->>'status', f.v->>'status_reason', f.v->>'notes',
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       f.token
+                  FROM fixture f
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM fixtures x WHERE x.fixture_key = f.token)
+            """)
+
+            # 2. The override IS the row for a fixture -- there is no
+            #    source-owned delta to preserve -- so this is an unconditional
+            #    whole-row UPDATE, not a jsonb_exists patch. It makes the replay
+            #    idempotent, and it is what carries a reschedule, a venue
+            #    change, a round correction, a club correction, a cancellation
+            #    and a voiding across a rebuild. fixture_key is never in the SET
+            #    list: the identity is the one thing a replay may not move.
+            cur.execute("WITH " + fixture_decoded + """
+                UPDATE fixtures x
+                   SET season = f.season,
+                       round_code = f.v->>'round_code',
+                       round_number = (f.v->>'round_number')::smallint,
+                       round_type = (f.v->>'round_type')::round_type,
+                       match_date = (f.v->>'match_date')::date,
+                       match_time = f.v->>'match_time',
+                       venue_id = f.venue_id,
+                       venue_raw = CASE WHEN f.venue_id IS NOT NULL THEN f.venue_canonical_name
+                                        ELSE f.v->>'venue_raw' END,
+                       home_club_id = f.home_club_id,
+                       away_club_id = f.away_club_id,
+                       status = f.v->>'status',
+                       status_reason = f.v->>'status_reason',
+                       notes = f.v->>'notes',
+                       updated_at = now()
+                  FROM fixture f
+                 WHERE x.fixture_key = f.token
+            """)
+
+        elif table == "club_leadership":
+            # AFLDB-ISSUE-163 §19. ONE key shape, and it is a MINTED TOKEN, the
+            # AFLDB-ISSUE-162 choice for the AFLDB-ISSUE-162 reason:
+            #
+            #   'manual_admin_edit:<appointment_key>'
+            #
+            # A season_list_members key is natural (club, season, player)
+            # because a membership has no history and no edit can move it. An
+            # appointment has both: the same (club, season, player, role) tuple
+            # RECURS when a player is re-appointed later in the same season --
+            # genuinely a second appointment -- and every other candidate
+            # component (the dates, the status, the reason, the note) is a fact
+            # an administrator is expected to correct. The token is minted once
+            # by appointLeader()/replaceLeader() and never edited.
+            #
+            # club_leadership is an import-writable registry table: a promotion
+            # rebuilds it and a destructive reload can empty it, so without this
+            # branch every administered captain and vice-captain simply does not
+            # exist in the promoted or rebuilt database. This is the only thing
+            # that puts them back, and they are not derivable from anything
+            # else: captaincies is a curated Wikipedia import that stops at
+            # 2026, and no source publishes AFLDB-normalised leadership.
+            #
+            # ORDERING IS BINDING AFTER players, and after nothing else. An
+            # appointment names its player by IDENTITY -- an AFL Tables profile
+            # path or a manual_admin_edit token -- so replay_admin_overrides
+            # (players) must have run. It names its club by SLUG (tracked
+            # reference data) and names no match, no fixture and no draft
+            # selection. It is grouped after season_list_members at the call
+            # site for reading order only; it does NOT depend on that branch,
+            # and there is therefore no ordering cycle between the two.
+            #
+            # MEMBERSHIP IS DELIBERATELY NOT RE-CHECKED (§9, D-5). Holding the
+            # club's season-list place is a precondition of MAKING an
+            # appointment, enforced in the writer's transaction under FOR KEY
+            # SHARE. It is not a property of a RECORDED one: a player may later
+            # be removed from the list or transferred, and the appointment
+            # remains the true record that they held the office. A replay that
+            # re-checked membership would silently destroy valid leadership
+            # history on any database where a list was corrected afterwards --
+            # and would make AFLDB-ISSUE-161's removal destructive, which its
+            # contract forbids. Nothing in this branch reads
+            # season_list_members.
+            #
+            # NO TOMBSTONES, and NO DELETE. Every leadership override is ACTIVE:
+            # the lifecycle lives in the payload's status, because an ENDED or
+            # VOID appointment must be RE-CREATED here, not suppressed. A row is
+            # never deleted (§12) precisely so its data_edits rows stay
+            # resolvable at the next promotion lineage remap, and a replay that
+            # dropped the void rows would break that the moment it ran.
+            leadership_decoded = """
+                raw AS (
+                    SELECT o.entity_key,
+                           o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1) AS token
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'club_leadership'
+                       AND o.field_group = 'appointment'
+                ),
+                -- The season is decoded ONCE, guarded, before anything joins on
+                -- it: an unparseable season must be reported as the refusal it
+                -- is, not crash the replay with a cast error that names no key.
+                decoded AS (
+                    SELECT r.entity_key, r.v, r.namespace, r.token,
+                           CASE WHEN (r.v->>'season') ~ '^[0-9]{4}$'
+                                THEN (r.v->>'season')::smallint END AS season,
+                           r.v->>'player_identity' AS identity,
+                           count(*) OVER (PARTITION BY r.token) AS token_count
+                      FROM raw r
+                ),
+                -- The eligible identities per season, taken from the ONE rule
+                -- the writers use (migration 096, AFLDB-ISSUE-161). LATERAL
+                -- against a preceding FROM item, so the set-returning function
+                -- is never called with an outer reference. A club renamed
+                -- between the dump and the replay therefore resolves to the
+                -- identity that is era-correct NOW.
+                seasons_in_play AS (
+                    SELECT DISTINCT season FROM decoded WHERE season IS NOT NULL
+                ),
+                eligible AS (
+                    SELECT sp.season, e.id, e.organization_id
+                      FROM seasons_in_play sp, LATERAL afldb_season_list_clubs(sp.season) e
+                ),
+                appointment AS (
+                    SELECT d.entity_key, d.v, d.namespace, d.token, d.season, d.token_count,
+                           d.identity,
+                           src.id AS source_club_id,
+                           el.id AS club_id,
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources s ON s.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND s.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS identity_matches,
+                           -- min(), not SELECT DISTINCT: the refusal below has
+                           -- already proven there is exactly one, and min()
+                           -- cannot raise a cardinality error that would be
+                           -- reported as a crash instead of as the refusal it
+                           -- really is.
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources s ON s.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND s.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS player_id
+                      FROM decoded d
+                      LEFT JOIN clubs src ON src.slug = d.v->>'club_slug'
+                      LEFT JOIN eligible el ON el.season = d.season
+                                           AND el.organization_id = src.organization_id
+                )
+            """
+
+            # Fail closed FIRST, over EVERY override, and before anything is
+            # written. An override whose payload cannot re-create a row is a
+            # human decision this reload cannot honour, and a reload that
+            # silently drops one is worse than a reload that stops. There is no
+            # fuzzy fallback anywhere: an identity that resolves to zero players
+            # or to more than one is a REFUSAL, never an attachment to the
+            # closest or the first, and no display name is read at all.
+            cur.execute("WITH " + leadership_decoded + """
+                SELECT a.entity_key,
+                       CASE
+                           WHEN a.namespace <> 'manual_admin_edit' OR length(a.token) = 0
+                               THEN 'entity_key is not manual_admin_edit:<token>'
+                           WHEN a.token_count > 1
+                               THEN 'more than one durable record claims this appointment_key'
+                           WHEN a.v->>'appointment_key' IS DISTINCT FROM a.token
+                               THEN 'payload appointment_key does not match the entity_key token'
+                           WHEN a.season IS NULL OR a.season NOT BETWEEN 1897 AND 2100
+                               THEN 'payload names no season in the supported range'
+                           WHEN a.v->>'role' IS NULL
+                                 OR NOT (a.v->>'role' = ANY(%(roles)s))
+                               THEN 'payload carries no valid role'
+                           WHEN a.v->>'status' IS NULL
+                                 OR NOT (a.v->>'status' = ANY(%(statuses)s))
+                               THEN 'payload carries no valid status'
+                           WHEN a.v->>'status' = 'void'
+                                 AND COALESCE(a.v->>'status_reason', '') = ''
+                               THEN 'a void appointment needs a status_reason'
+                           WHEN a.v->>'started_on' IS NOT NULL
+                                 AND a.v->>'started_on' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                               THEN 'started_on is not YYYY-MM-DD'
+                           WHEN a.v->>'ended_on' IS NOT NULL
+                                 AND a.v->>'ended_on' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                               THEN 'ended_on is not YYYY-MM-DD'
+                           WHEN a.v->>'started_on' IS NOT NULL AND a.v->>'ended_on' IS NOT NULL
+                                 AND a.v->>'ended_on' < a.v->>'started_on'
+                               THEN 'the appointment ends before it starts'
+                           WHEN a.v->>'status' = 'active' AND a.v->>'ended_on' IS NOT NULL
+                               THEN 'an active appointment cannot carry an end date'
+                           WHEN a.source_club_id IS NULL
+                               THEN 'club_slug does not resolve to exactly one club'
+                           WHEN a.club_id IS NULL
+                               THEN 'no club identity of that organisation is eligible in that season'
+                           WHEN a.identity IS NULL OR length(a.identity) = 0
+                               THEN 'payload carries no player_identity'
+                           WHEN a.identity_matches <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM appointment a
+            """, {
+                "roles": list(LEADERSHIP_ROLES),
+                "statuses": list(LEADERSHIP_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(club_leadership): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # 1. Re-create every appointment the reload removed, or that a
+            #    rebuilt database never had -- ACTIVE, ENDED AND VOID alike.
+            #    Guarded by NOT EXISTS on appointment_key rather than ON
+            #    CONFLICT so that a contradiction between two durable records --
+            #    two active payloads naming one player in one season -- surfaces
+            #    through ux_club_leadership_active_player as the error it is,
+            #    instead of being silently swallowed.
+            cur.execute("WITH " + leadership_decoded + """
+                INSERT INTO club_leadership
+                      (appointment_key, season, club_id, player_id, role, status,
+                       status_reason, started_on, ended_on, note,
+                       source_id, source_record_id)
+                SELECT a.token, a.season, a.club_id, a.player_id,
+                       a.v->>'role', a.v->>'status', a.v->>'status_reason',
+                       (a.v->>'started_on')::date, (a.v->>'ended_on')::date,
+                       a.v->>'note',
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       a.token
+                  FROM appointment a
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM club_leadership x WHERE x.appointment_key = a.token)
+            """)
+
+            # 2. The override IS the row for an appointment -- there is no
+            #    source-owned delta to preserve -- so this is an unconditional
+            #    whole-row UPDATE, not a jsonb_exists patch. It makes the replay
+            #    idempotent, and it is what carries a date correction, an end, a
+            #    reinstatement and a voiding across a rebuild.
+            #    appointment_key is never in the SET list: the identity is the
+            #    one thing a replay may not move.
+            cur.execute("WITH " + leadership_decoded + """
+                UPDATE club_leadership x
+                   SET season = a.season,
+                       club_id = a.club_id,
+                       player_id = a.player_id,
+                       role = a.v->>'role',
+                       status = a.v->>'status',
+                       status_reason = a.v->>'status_reason',
+                       started_on = (a.v->>'started_on')::date,
+                       ended_on = (a.v->>'ended_on')::date,
+                       note = a.v->>'note',
+                       updated_at = now()
+                  FROM appointment a
+                 WHERE x.appointment_key = a.token
             """)

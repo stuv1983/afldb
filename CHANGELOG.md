@@ -15,6 +15,334 @@ commit.
 
 ## [Unreleased]
 
+### Club captains and vice-captains become real records (AFLDB-ISSUE-163 Stage 1, ISSUE-156 P3e) - 12 September 2026
+
+- AFLDB has always shown club captains, but only as an imported honours list: 1,774 rows
+  transcribed from Wikipedia covering 1897-2026, captains only, matched by the spelling of a
+  person's name, with a free-text period such as "2022 (co-captain), 2023- (sole captain)". There
+  was no way to record who the captain *is*, to change one mid-season, to record a vice-captain, or
+  to say that a recorded captaincy had ended. Migration 098 adds `club_leadership`: one row asserts
+  *this player was appointed to this role, at this club, for this season*.
+- **Co-captains are simply two captains.** The role vocabulary is `captain` and `vice_captain`, and
+  nothing else. Two people holding the office at once is two captain appointments -- which is how
+  the existing data already describes it -- so a co-captaincy needs no special row type, and a
+  co-captain who becomes the sole captain needs no rewriting. A club may name as many vice-captains
+  as it actually has.
+- **"Current" means the record says so, not that a date has passed.** An appointment is `active`,
+  `ended` or `void`, and the public page reads the status. Start and end dates are evidence and are
+  optional: a captain announced in December with no date attached is stored with no date, never with
+  an invented 1 January.
+- **Nothing is ever deleted, and a mistake is not the same as a change.** An appointment that really
+  finished is `ended` and stays as history; a row entered in error is `void` and also stays, marked
+  as never having been valid, with the reason recorded. A mid-season change of captain keeps both
+  people: the outgoing appointment ends, the incoming one begins, and both remain true.
+- **A leader is chosen from the club's own list.** A player can only be appointed while they hold
+  that club's playing-list place for that season. If they are later removed from the list or
+  transferred, the appointment stands -- it is the record of who held the office, and it is not
+  silently rewritten by a later correction to the list.
+- **Public pages never answer one season from two sources.** Seasons before 2027 come from the
+  historical honours record exactly as they do today; 2027 onwards comes from the new one. The club
+  page's captains table and a player's captaincy honours both use that same boundary, so nothing is
+  duplicated at the join and a 2027 captaincy is a captaincy honour like any other. The honours
+  import itself is untouched, and a vice-captaincy never appears as a captaincy.
+- Every appointment is durably recorded and is re-created by the same replay that restores
+  administered coaches, players, draft selections and playing lists, so a rebuild or a production
+  promotion cannot lose one -- including the ended and void ones.
+- Backend only in this stage: see the Stage 2 entry immediately below for the administration
+  screens and the public club page block.
+
+### Club leadership ships an admin surface and a public club page block (AFLDB-ISSUE-163 Stage 2, ISSUE-156 P3e) - 12 September 2026
+
+- A **Leadership** section on the existing `/admin/season-lists/[season]/[club]` page lets Admin
+  (read) and Super Admin (appoint/replace/end/reinstate/correct/void) see and maintain a club's
+  captains and vice-captains: a "Current" grouping (Captain/Co-captains, Vice-captain/Vice-captains),
+  a collapsed History of ended appointments, and voided appointments behind their own "show voided"
+  toggle, kept visually distinct rather than hidden. Every row links to its own audit trail. No new
+  route, no new nav item and no new capability -- `data.seasonLists.read`/`.edit` are reused exactly
+  as planned.
+- The player selector for appointing or replacing a leader is the club's own season-list membership
+  only -- never a global player search and never free text -- with each candidate's own current role
+  annotated so a second captain is never chosen by accident.
+- **A second active captain is never recorded silently.** Appointing or reinstating a captain
+  alongside a sitting one is refused until the operator explicitly confirms the co-captaincy; the
+  refusal names who is already captain, and the interface's only next step is a clearly-worded
+  "confirm co-captaincy" action -- there is no checkbox that defaults to checked and no automatic
+  retry.
+- **Replacing a leader is one workflow, not two separate edits.** Replace shows what will happen --
+  which appointment ends, who begins, from when -- before anything is submitted, and always leaves
+  both the outgoing and incoming appointment as their own honest rows.
+- End and Void are two different concepts, never sibling buttons: ending says an appointment was
+  valid and has ceased; voiding says the record should never have existed, requires a mandatory
+  reason, and is terminal -- a voided appointment offers no further controls, exactly as an
+  already-void fixture record does. Correcting an appointment can only change its dates and note;
+  changing who held a role, or which club or season it was for, is deliberately not offered here --
+  that is a void plus a new appointment.
+- Every mutation carries the appointment's last-seen `updatedAt`; a page left open while someone
+  else changed the same appointment is refused with a plain "reload and try again" rather than
+  silently overwriting the other change.
+- The season overview (`/admin/season-lists/[season]`) gains a Captain column -- one name, "Co-
+  captains" for two or more, or an empty state, with a marker when an active leader is no longer on
+  the club's list. Vice-captains are deliberately not shown in this column.
+- The public club page gains a compact current-leadership block, directly below the club's season
+  totals, for the continuing identity only: Captain/Co-captains and Vice-captain/Vice-captains, each
+  name linking to the player, omitted entirely when nothing is currently active. A leadership change
+  revalidates only the affected organisation's own `/clubs/<slug>` paths, through a new
+  capability-gated `/admin/season-lists/revalidate` route that admits nothing else -- the first
+  season-list mutation with a public consumer.
+- The club page's existing Captains history table was fixed to key each row on its own database id
+  rather than on `season` + player name, which could collide when the same player held two
+  appointments in one season (ended, then re-appointed) -- a rendering fix, not a data change.
+- A co-captaincy confirmation belongs to the exact appointment it was asked about: changing the role
+  or the player after a refusal withdraws the confirm step and asks again, so a warning given about
+  one player can never be spent on another. Recording an appointment also leaves the Appoint form
+  standing rather than replacing it with a receipt -- a club normally names a captain and two or
+  three vice-captains in one sitting, and each of those should not cost a page reload.
+- Responsive: the Leadership section uses stacked controls rather than a wide table, and remains
+  usable at 375px; rendered browser acceptance across roles and widths is deferred to the combined
+  Admin Centre DEV batch, per the operator's release-batching decision.
+
+### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
+
+- Until now AFLDB could not represent a match that had not been played. `matches` requires
+  `home_score`, `away_score`, `result` and `margin` to be present, and every consumer of it -- the
+  club ladder, season metadata, round ladders, club and venue records, natural-language search and
+  the Grid Solver -- reads "a row exists" as "this game was played". A scheduled game put in there
+  with placeholder scores would have counted as a 0-0 draw. Migration 097 adds `fixtures`: one row
+  asserts *this match is scheduled to occur*. It holds a season, a round, two clubs, and optionally
+  a date, a local start time and a venue -- and **no score, result, margin, attendance, lineup or
+  statistic column at all**, so a fixture cannot be mistaken for a result by any query, now or later.
+- **"Played" is worked out when you look, never stored.** A fixture is played when exactly one
+  `matches` row exists for the same season, the same round and the same two clubs. The rule uses
+  only those exact facts, so a game that is moved to a different day, a different time or a
+  different ground still resolves -- and when two results could be the same fixture, it links
+  neither and says so, rather than guessing.
+- **A fixture keeps its identity for life.** Its key is minted once when it is created and is never
+  changed by a reschedule, a venue change, a round correction, a club correction, a cancellation or
+  by the game eventually being played.
+- **Nothing is ever deleted.** A game that was really called off is `cancelled` and can be
+  reinstated; a row entered by mistake is `void` and stays for the record. Both keep their history
+  and their audit trail.
+- Unknown means unknown: a date, time or venue that has not been announced is stored as empty, never
+  as midnight or as a made-up "TBC" ground. No placeholder clubs are invented for finals either -- a
+  final is entered once its two teams are known.
+- Every fixture is durably recorded and is re-created by the same replay that restores administered
+  coaches, players, draft selections and playing lists, so a rebuild or a production promotion
+  cannot lose one -- including the cancelled and void ones.
+- `matches` itself is untouched, and no ladder, record, statistic, search answer or Grid Solver
+  answer can move because a fixture was entered. AFL Tables ingestion is unchanged and never reads
+  or writes fixtures.
+- Backend only in this stage: there is no public fixture page and no admin screen yet. Deploying it
+  requires migration 097, then `npm run db:privileges`, then the application code, in that order.
+
+### Fixture administration ships an admin surface (AFLDB-ISSUE-162 Stage 2, ISSUE-156 P3d) - 11 September 2026
+
+- `/admin/fixtures`, `/admin/fixtures/[season]`, `/admin/fixtures/[season]/new` and
+  `/admin/fixtures/[season]/[fixtureKey]` give Admin (read) and Super Admin (edit) a supported way
+  to see and maintain a season's schedule: the season selector shows every administrable season
+  with its fixture, round, played, TBC and cancelled counts and a diagnostics badge; the season
+  page groups fixtures by round with filters (round, club, status, TBC-only, played/unplayed, show
+  voided) and a diagnostics panel that only ever reports; the detail page shows the read-time played
+  resolution with a link to the match once it uniquely resolves, and locks every schedule/round/
+  venue/club control once played -- notes remain editable regardless of state.
+- Two entry paths: a single-fixture form, and a round-at-a-time batch with an optional
+  paste-to-prefill textarea. The batch is previewed server-side before anything is written, and
+  Confirm is bound to the exact rows that preview described -- any change to a row or the round
+  header after previewing retires it and asks for a fresh preview, the `CopyForwardPanel` lesson
+  from season-list administration. A round is written all-or-nothing: one invalid row leaves the
+  whole round uncommitted.
+- Cancel, reinstate and void render as three visibly different actions, never equivalent buttons.
+  Cancel and void each require an explicit confirmation and a reason; void is described as more
+  severe than cancelling -- "this record should never have existed", not "this game did not
+  happen" -- and voiding an already-cancelled fixture says plainly that it reclassifies a real
+  cancellation as a data-entry error. Void is terminal and offers no reinstate.
+- New capabilities `data.fixtures.read` (Admin and Super Admin) and `data.fixtures.edit` (Super
+  Admin only) are declared and enforced at every page and Server Action boundary this issue adds;
+  entering a score or result is not among them -- that stays with match administration. A Fixtures
+  link appears in the Admin Centre sidebar's Data group, after Season lists, for anyone who holds
+  `data.fixtures.read`. No public page changes and no revalidation route was added: every action
+  here returns no paths to revalidate.
+- A voided fixture is presented as the terminal record it is: like a played one it shows its
+  identity, schedule and notes and no schedule, venue, round or club control, so no screen offers
+  an edit the server will refuse. Returning a date to TBC returns its start time to TBC with it,
+  on the single form, in the batch and on reschedule -- AFLDB stores an unknown time as unknown,
+  never as a time attached to no day.
+
+### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
+
+- Until now AFLDB held no concept of a **playing list**. Every player-club relationship it stored
+  was inferred from matches actually played -- `player_clubs`, `player_club_season_stats`,
+  `player_season_stats`, `player_career_stats` and `club_seasons` are all truncated and rebuilt
+  from `player_match_stats` -- so a player who was *listed* but had not *played* had no club
+  anywhere in the model, and "who is currently on this club's list" was not a question any query
+  could answer. Migration 096 adds `season_list_members`: one row asserts *this player was a
+  member of this club's list for this season*. It is administrative intent, never participation;
+  `player_club_season_stats` continues to mean "played for", and nothing derived changes meaning.
+- A listed player may have played no games and hold no statistics at all -- the point of the new
+  table, and impossible in every table that existed before it.
+- **2027 is the first authoritative list season.** Earlier seasons are represented by matches
+  played, not by lists, and match appearances are never promoted into membership: there is no
+  bulk seed and no appearance-derived provenance. The 2026 appearances a club page shows while
+  building its first list are a clearly-labelled review panel, and each player added from it is an
+  explicit decision recorded as an ordinary addition that merely notes where the administrator was
+  looking.
+- **"Retired" is not stored anywhere, and nothing new about a player is.** Removing a player from
+  a list means only that they are not on that club's list for that season: no player flag moves,
+  no earlier season is touched, and no career statistic, draft row or link changes. A player who
+  returns is simply listed again. While a season's clubs are not all populated, "no membership"
+  means *unknown*, not *retired*, and the season overview shows which clubs are still empty.
+- A player holds **at most one** club's list place per season, enforced by the database. Measured
+  on the rebuilt test database before the constraint was written: across 1897-2026 only 249
+  player-seasons ever involved two clubs and the latest is 1992, the residue of the pre-1993
+  clearance era; from 2000 onward there are none.
+- Season lists need no fixture, no match and no season row to exist. A list for next season can be
+  built before anything about that season has been scheduled, and the clubs offered are the ones
+  currently competing -- so the tracked season register, the club table and the ladder tables are
+  never written to in order to make administration possible.
+- Administered lists survive a database rebuild and a production promotion: each membership carries
+  a durable record keyed by club, season and the player's permanent identity, replayed
+  fail-closed after players are restored. A removal is durable too -- it is recorded as an
+  intentional removal that no later import and no replay may undo.
+- Backend only in this stage: the administration screens, their permissions and the draft
+  handoff arrive with the Admin Centre batch.
+
+### Season list administration ships an admin surface (AFLDB-ISSUE-161 Stage 2, ISSUE-156 P3c) - 11 September 2026
+
+- `/admin/season-lists`, `/admin/season-lists/[season]` and `/admin/season-lists/[season]/[club]`
+  give Admin (read) and Super Admin (edit) a supported way to see and manage every club's playing
+  list: the season selector shows every administrable season from 2027 with its completeness; the
+  season overview shows each eligible club's member count against the previous season -- list-to-
+  list from 2028, explicitly labelled non-authoritative appearances for 2027, never called "the
+  2026 list"; the club page is the operational surface -- members whether or not they have played,
+  filters, and (Super Admin) Add, Remove and Transfer.
+- Removing a player says exactly what happens -- "Remove from the season list" -- never "retire":
+  no career, draft or global-retirement state moves, and a mistaken removal is reversed by adding
+  the player again. Transfer is the atomic backend primitive end to end, never a client-side
+  remove followed by an add, so a failure never leaves a player unlisted.
+- Copy-forward carries a season's lists onto the next season's identities, previewed before
+  anything is written and refused by name if a target club already holds rows or has no identity
+  in the target season. It is not offered for 2027: the season page explains why and points at the
+  club page's 2026 appearances review panel instead, where every addition is an explicit,
+  individually audited decision -- never a bulk seed from participation data.
+- The draft administration screens now offer a season-list handoff: after recording a selection,
+  or from an existing selection's detail page, a link offers to add that player to next season's
+  list at the club they were selected by. It is a link only -- nothing about a draft selection
+  ever writes a list membership, and the link hides itself when the following season is not yet
+  administrable.
+- New capabilities `data.seasonLists.read` (Admin and Super Admin) and `data.seasonLists.edit`
+  (Super Admin only) are declared and enforced at every page and Server Action boundary this issue
+  adds; no Admin mutation exists. A Season lists link appears in the Admin Centre sidebar's Data
+  group, after Draft administration, for anyone who holds `data.seasonLists.read`. No public page
+  changes and no revalidation route was added: every action here returns no paths to revalidate.
+
+### Draft administration gains one mutation contract, and admin-created people become promotable (AFLDB-ISSUE-160 Stage 1, ISSUE-156 P3b) - 11 September 2026
+
+- `createPlayerInTransaction()` -- the one player-creation primitive in `src/` -- now mints a
+  durable identity for every player it creates: an `external_identities (manual_admin_edit,
+  <token>)` row and a whole-row `data_overrides ('players', 'manual_admin_edit:<token>',
+  'identity')` record, in the same transaction. This is behavioural and it closes a real gap:
+  before it, an admin-created player was named by nothing outside its own id, so
+  `replay_admin_overrides` could not patch it, no replay re-created it after a destructive
+  reload, and its `player_creation` audit rows resolved to nothing on a promotion -- which
+  STOPS a PROD promotion. It also derives `search_name`, `slug` and `sort_name` in SQL, by the
+  same expressions the fitzRoy importer and the replay use, so a replayed player is
+  byte-identical to the one the administrator typed. (Deriving the slug in JavaScript was also
+  producing a wrong one: the `'\s+'` in the old template literal was the letter `s`, so every
+  run of `s` in a name became a hyphen.)
+- New `src/db/queries/admin-draft.ts` is the only `INSERT INTO draft_picks` in `src/`, and the
+  only place draft selections are created, corrected, relinked, adopted or retired. A manual
+  selection is an ordinary `draft_picks` row under the `manual_admin_edit` source with
+  `player_url = 'manual:<token>'` -- inside migration 069's partial reload key, and unable to
+  collide with the DraftGuru URL contract. Its durable record names its player by IDENTITY and
+  its club by SLUG, never by an id a promotion renumbers. Every mutation is one import-role
+  transaction: canonical write, `data_overrides`, `recordDataEdit()`, all or nothing.
+- Draft selections can now be created for a player who does not exist yet, atomically. The
+  duplicate contract refuses rather than guesses: an existing player with the same normalised
+  name and no distinguishing date of birth is a hard refusal, a namesake with a different
+  recorded date needs an explicit confirmation, and an unlinked DraftGuru selection for the
+  same event is surfaced so the administrator links it instead. No fuzzy score decides identity
+  anywhere. A pick number already held in the same draft and kind is refused outright --
+  measured: zero such collisions exist across all 6,810 source selections.
+- `replay_admin_overrides()` gains manual branches for `players` and `draft_picks`, each
+  fail-closed over the whole active set before it writes: an administrator-created footballer
+  and their selections are re-created on a rebuilt database rather than vanishing at the swap.
+  When the player has since debuted and their AFL Tables profile was attached, the replay
+  BINDS the token onto the existing source-created row instead of inserting a twin. The
+  ordering `players` -> `draft_picks` is binding, and `docs/production-promotion.md` §8 now
+  says so and includes `draft_picks` in the replay loop.
+- `tools/migration/import_fitzroy_core.py` refuses, fail-closed, to insert a new canonical
+  player whose normalised name matches an administrator-created player still awaiting an AFL
+  Tables identity, unless both dates of birth are known and different. The rule is symmetric:
+  an unknown date on either side refuses, because an unknown date distinguishes nobody. The
+  guard runs only in the new-player INSERT branch, never writes `external_identities`, never
+  sets a `player_id`, and has exactly two outcomes -- safe to insert, or fail the whole players
+  batch with the manual player named. A name and a date may refuse an unsafe insert here; they
+  may never link a player.
+- Promotion lineage: `data_edits` rows with `table_name = 'draft_picks'` now have a stable
+  identity (`<source key>|<player_url>|<draft_year>|<draft_kind>`) and are remapped or refused.
+  They were previously reinstated with their integer `row_id` unchanged and never counted,
+  listed or remapped -- silent misattribution on any lineage-changing promotion. The `players`
+  rule admits the manual token alongside the AFL Tables path, one identity per player, path
+  first. A selection carrying no `source_id` has no key and reports unresolved rather than
+  being carried across by an integer that now names someone else.
+- `/admin/data-editor` is no longer a second draft writer: `saveDataEdit` and `saveEdit` refuse
+  `draft_picks`, `getEditableRow` returns nothing for it, and `CreatePlayerForm` has lost its
+  draft block. `EDITABLE_ENTITIES.draft_picks` stays as the field spec the new surface
+  validates with, and gains a `selection_facts` group (pick number, club) the generic editor
+  never had. This also removes the writer that produced `null|null|<year>|null` override keys
+  for admin-created selections -- one key shared by every admin pick of a year, which the
+  UNIQUE made the second edit silently overwrite and which no replay could ever match.
+- A pre-ISSUE-160 selection with no provenance can be adopted, one row at a time, by an
+  explicit Super Admin action that mints its identity and durable record -- and the linked
+  player's identity too, when that player has none. A second identity is never minted when a
+  valid one already exists. There is no bulk backfill, because a durable record needs an
+  administrator to attribute it to and a migration cannot supply one.
+
+### Draft administration ships an admin surface (AFLDB-ISSUE-160 Stage 2, ISSUE-156 P3b) - 11 September 2026
+
+- `/admin/draft`, `/admin/draft/new` and `/admin/draft/[id]` give Admin and Super Admin a
+  supported way to see, search and (Super Admin only) correct every draft selection AFLDB
+  holds, whatever its provenance: filter by year/kind/club/name/provenance/link-state, never
+  render a NULL pick number as `0`, and see provenance and override state on every row. The
+  detail page shows exactly the mutation panel the row's provenance admits under Stage 1's
+  contract -- source-field-group corrections and override retirement for a DraftGuru row;
+  whole-row edit, relink, AFL Tables identity attach, supersede and retirement for a manual row;
+  adoption for a pre-ISSUE-160 legacy row -- never a generic form that suggests more is editable
+  than actually is.
+- The new-selection wizard makes search-before-create real: the operator searches existing
+  players first, and creating a new person is a separate, explicit control that reveals its own
+  sub-form -- there is no default fallthrough from "no result yet" into "create anyway". Every
+  duplicate/conflict refusal and confirmation Stage 1's contract can produce (a likely duplicate
+  with no distinguishing date of birth, a distinct namesake, an unlinked source selection
+  already listing this person, a NULL pick number on a numbered board) is surfaced inline, with
+  focus restored to the control that triggered it on a refusal.
+- New capabilities `data.draft.read` (Admin and Super Admin) and `data.draft.edit` (Super Admin
+  only) are declared and enforced by `requireCapability()` at every page, route and Server
+  Action boundary this issue adds -- new-player creation and AFL Tables identity attachment sit
+  under `.edit`, not a third capability. A Draft administration link appears in the Admin Centre
+  sidebar's Data group, after Coaches, for anyone who holds `data.draft.read`.
+- `/admin/data-editor` no longer shows a draft search form or results table: the "Draft picks"
+  section is a single link to `/admin/draft`, and opening a stale `?entity=draft_picks&id=`
+  bookmark now shows a link to the selection's new home instead of a false "not found".
+- The list also filters by review state, so the selections that need a human are reachable
+  without reading every page: `override` (the selection carries an active durable
+  correction), `duplicate` (a manual selection whose player now also holds a source-owned
+  selection for the same draft event -- the state retirement and supersession exist to
+  resolve), and `awaiting-identity` (the selection's player holds an admin-created identity
+  and no AFL Tables profile yet, so a future source import would otherwise split them in
+  two). Every one is derived from rows the database already holds -- an override row, a
+  second selection, an identity row -- never from a name comparison, and nothing new is
+  stored to support them.
+- An unresolved DraftGuru selection now links straight to its decision in Player links.
+  Linking a source-owned selection to a player is person-grained and stays where it already
+  lives; draft administration points at it rather than offering a second way to do it. The
+  link is offered only for rows Player links actually owns -- never for a manual selection,
+  a legacy row, or an already-linked one -- and only to a viewer who may open that page.
+- The ISSUE-159 coach admin surface's revalidate-route and submit-helper machinery is
+  generalised into `src/lib/admin/revalidate-route.ts` and
+  `src/components/admin/action-submit.ts` and shared with draft administration; coaches'
+  own files became thin, behaviour-preserving wrappers over the shared modules. Each domain
+  keeps its own capability guard and its own path allowlist -- nothing became more permissive.
+
 ### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
 
 - The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`

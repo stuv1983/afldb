@@ -878,6 +878,196 @@ describe.skipIf(!canRun)(
 
       expect(reset.note).not.toBe(OVERRIDE_NOTE);
     }, 900_000);
+
+    // -------------------------------------------------------------------
+    // AFLDB-ISSUE-160 §8.5 / gate 9. The override above was written by hand;
+    // these two go through the REAL mutation functions, so what survives the
+    // reload is what an administrator would actually have created.
+    // -------------------------------------------------------------------
+
+    it('replays a real selection_facts correction, and leaves every other source field alone',
+      async () => {
+      const { saveSourcePickFields, sourcePickEntityKey } = await import('@/db/queries/admin-draft');
+
+      const [victim] = await sql<{
+        id: number; sourceId: number; playerUrl: string; draftYear: number; draftKind: string;
+        pickNumber: number | null; nameRaw: string; originalClub: string | null;
+        playerId: number | null;
+      }[]>`
+        SELECT id, source_id AS "sourceId", player_url AS "playerUrl",
+               draft_year AS "draftYear", draft_kind AS "draftKind",
+               pick_number AS "pickNumber", player_name_raw AS "nameRaw",
+               original_club_raw AS "originalClub", player_id AS "playerId"
+          FROM draft_picks
+         WHERE source_id = ${draftguruSourceId} AND pick_number IS NOT NULL
+         ORDER BY id LIMIT 1`;
+      expect(victim, 'need a numbered DraftGuru-owned pick').toBeDefined();
+      const entityKey = sourcePickEntityKey(victim);
+
+      const [club] = await sql<{ slug: string }[]>`
+        SELECT c.slug FROM clubs c
+          JOIN draft_picks dp ON dp.club_id = c.id
+         WHERE dp.id = ${victim.id}`;
+      expect(club, 'need the pick to name a club').toBeDefined();
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('issue-160-source-replay@example.invalid', 'super_admin')
+        ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
+        RETURNING id`;
+
+      try {
+        // A pick number nothing else in this draft and kind holds, so J-3 admits it.
+        const [free] = await sql<{ next: number }[]>`
+          SELECT COALESCE(max(pick_number), 0) + 1 AS next FROM draft_picks
+           WHERE draft_year = ${victim.draftYear} AND draft_kind = ${victim.draftKind}`;
+
+        const saved = await saveSourcePickFields({
+          pickId: victim.id, groupKey: 'selection_facts',
+          raw: { pick_number: String(free.next), club_slug: club.slug },
+          adminUserId: admin.id, note: 'AFLDB-ISSUE-160 gate 9',
+        });
+        expect(saved.ok, JSON.stringify(saved)).toBe(true);
+
+        const [written] = await sql<{ values: Record<string, unknown> }[]>`
+          SELECT override_values AS values FROM data_overrides
+           WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey}
+             AND field_group = 'selection_facts'`;
+        // Delta only: the club did not change, so it is NOT in the payload and
+        // keeps tracking the source across every future reload.
+        expect(written.values).toEqual({ pick_number: free.next });
+
+        const run = runImporter();
+        expect(run.stdout + run.stderr).not.toMatch(/Traceback/);
+        expect(run.status).toBe(0);
+
+        const [after] = await sql<{
+          pickNumber: number | null; nameRaw: string; originalClub: string | null;
+          playerId: number | null; status: string;
+        }[]>`
+          SELECT pick_number AS "pickNumber", player_name_raw AS "nameRaw",
+                 original_club_raw AS "originalClub", player_id AS "playerId",
+                 link_status_value::text AS status
+            FROM draft_picks WHERE id = ${victim.id}`;
+        expect(after.pickNumber, 'the correction must survive the reload').toBe(free.next);
+        // An unrelated source field still equals the source: the override is a
+        // delta, not a whole-row freeze.
+        expect(after.nameRaw).toBe(victim.nameRaw);
+        expect(after.originalClub).toBe(victim.originalClub);
+
+        // Explicit JSON null CLEARS a nullable column; an absent key does not.
+        await sql`
+          UPDATE data_overrides
+             SET override_values = ${sql.json({ original_club_raw: null })}
+           WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey}
+             AND field_group = 'player_info'`;
+        await sql`
+          INSERT INTO data_overrides
+                (entity_type, entity_key, field_group, override_values, is_active, admin_user_id)
+          VALUES ('draft_picks', ${entityKey}, 'player_info',
+                  ${sql.json({ original_club_raw: null })}, true, ${admin.id})
+          ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE
+            SET override_values = EXCLUDED.override_values, is_active = true`;
+        const cleared = runImporter();
+        expect(cleared.status).toBe(0);
+        const [afterNull] = await sql<{ originalClub: string | null; nameRaw: string }[]>`
+          SELECT original_club_raw AS "originalClub", player_name_raw AS "nameRaw"
+            FROM draft_picks WHERE id = ${victim.id}`;
+        expect(afterNull.originalClub, 'an explicit null must clear the column').toBeNull();
+        expect(afterNull.nameRaw, 'an absent key must leave the source value').toBe(victim.nameRaw);
+
+        // The reload changed no population and no linkage.
+        const [counts] = await sql<{ picks: number; dupes: number }[]>`
+          SELECT (SELECT count(*) FROM draft_picks WHERE source_id = ${draftguruSourceId})::int AS picks,
+                 (SELECT count(*) FROM (
+                    SELECT source_id, player_url, draft_year, draft_kind
+                      FROM draft_picks WHERE source_id IS NOT NULL
+                     GROUP BY 1,2,3,4 HAVING count(*) > 1) x)::int AS dupes`;
+        expect(counts.dupes).toBe(0);
+        expect(after.playerId).toBe(victim.playerId ?? after.playerId);
+        expect(['resolved', 'unique', 'unmatched']).toContain(after.status);
+      } finally {
+        await sql`
+          DELETE FROM data_overrides
+           WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey}`;
+        await sql`DELETE FROM data_edits WHERE admin_user_id = ${admin.id}`;
+        await sql`DELETE FROM auth_users WHERE id = ${admin.id}`;
+      }
+      const restored = runImporter();
+      expect(restored.status).toBe(0);
+    }, 900_000);
+
+    it('leaves an administrator-created player and selection standing through a reload',
+      async () => {
+      // The manual row is outside the importer's scope (source_id = manual_admin_edit,
+      // not draftguru), so a destructive DraftGuru reload must simply not see it.
+      const { createPlayerAndDraftPick } = await import('@/db/queries/admin-draft');
+      const MARKER = 'AFLDB-ISSUE-160-DG-RELOAD';
+
+      const [admin] = await sql<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('issue-160-dg-reload@example.invalid', 'super_admin')
+        ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
+        RETURNING id`;
+
+      const [bound] = await sql<{ maxSeason: number }[]>`
+        SELECT max(season)::int AS "maxSeason" FROM matches`;
+      let year = 0;
+      let clubSlug = '';
+      for (let candidate = bound.maxSeason + 1; candidate > bound.maxSeason - 4; candidate -= 1) {
+        const [picks] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM draft_picks WHERE draft_year = ${candidate}`;
+        if (picks.n > 0) continue;
+        const [club] = await sql<{ slug: string }[]>`
+          SELECT slug FROM clubs
+           WHERE afldb_identity_for_season(organization_id, ${candidate}) = id
+           ORDER BY id LIMIT 1`;
+        if (!club) continue;
+        year = candidate;
+        clubSlug = club.slug;
+        break;
+      }
+      expect(year, 'need an empty draft year with an active club identity').toBeGreaterThan(0);
+
+      let playerId = 0;
+      try {
+        const created = await createPlayerAndDraftPick({
+          draftYear: year, draftType: 'National', draftKind: 'national',
+          pickNumber: 1, clubSlug,
+          player: { displayName: `${MARKER} Player`, dob: '2006-09-09' },
+          adminUserId: admin.id,
+        });
+        expect(created.ok, JSON.stringify(created)).toBe(true);
+        if (!created.ok) return;
+        playerId = created.playerId;
+
+        const run = runImporter();
+        expect(run.stdout + run.stderr).not.toMatch(/Traceback/);
+        expect(run.status).toBe(0);
+
+        const [after] = await sql<{ picks: number; players: number; identities: number }[]>`
+          SELECT (SELECT count(*) FROM draft_picks
+                   WHERE player_url = ${`manual:${created.pickToken}`})::int AS picks,
+                 (SELECT count(*) FROM players WHERE id = ${playerId})::int AS players,
+                 (SELECT count(*) FROM external_identities
+                   WHERE external_id = ${created.playerToken})::int AS identities`;
+        expect(after).toEqual({ picks: 1, players: 1, identities: 1 });
+      } finally {
+        if (playerId) {
+          await sql`DELETE FROM draft_picks WHERE player_id = ${playerId}`;
+          await sql`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ${playerId}`;
+          await sql`DELETE FROM external_identities WHERE player_id = ${playerId}`;
+          await sql`DELETE FROM player_career_stats WHERE player_id = ${playerId}`;
+          await sql`DELETE FROM players WHERE id = ${playerId}`;
+        }
+        await sql`
+          DELETE FROM data_overrides
+           WHERE entity_key LIKE 'manual_admin_edit:%'
+             AND (override_values->>'display_name' LIKE ${`%${MARKER}%`}
+                  OR override_values->>'player_name_raw' LIKE ${`%${MARKER}%`})`;
+        await sql`DELETE FROM auth_users WHERE id = ${admin.id}`;
+      }
+    }, 900_000);
   });
 
   // -----------------------------------------------------------------------
