@@ -65,7 +65,9 @@ import type {
 
 /**
  * The entity types the `data_overrides.entity_type` CHECK admits — migration 073
- * as widened by migration 095 (`AFLDB-ISSUE-159` §5.1). Listed in the order
+ * as widened by migration 095 (`AFLDB-ISSUE-159` §5.1) and migration 096
+ * (`AFLDB-ISSUE-161` §5: `season_list_members`, a playing-list membership, which
+ * is not a settle target and changes no answer here). Listed in the order
  * §3.1 / §16.1 write it, which is NOT the ASCII order `checkAdmittedEntities()`
  * returns: nothing compares the two as sequences, and nothing may.
  *
@@ -76,7 +78,7 @@ import type {
  * `overrideScopeProvenFrom()`, which asks only what the proposition needs.
  */
 export const OVERRIDE_ENTITY_TYPES = [
-  'coaches', 'draft_picks', 'matches', 'match_coaches', 'players',
+  'coaches', 'draft_picks', 'matches', 'match_coaches', 'players', 'season_list_members',
 ] as const;
 
 /**

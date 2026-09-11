@@ -426,6 +426,107 @@ describe('AFLDB-ISSUE-160 source contract', () => {
     expect(pyFitzroy.slice(callSite, insertBranch)).not.toContain('UPDATE players');
   });
 
+  test('AFLDB-ISSUE-161: exactly one INSERT INTO season_list_members in src/', () => {
+    // I-7. A playing list is administrative intent, and one writer is what makes
+    // "importers may not overwrite manual truth" checkable at all. A grep is the
+    // only check that stays true as the tree grows.
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        const code = fs.readFileSync(full, 'utf-8').replace(/\r\n/g, '\n')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        if (/INSERT\s+INTO\s+season_list_members/i.test(code)) {
+          found.push(path.relative(root, full).split(path.sep).join('/'));
+        }
+      }
+    };
+    walk(path.join(root, 'src'));
+    expect(found).toEqual(['src/db/queries/admin-season-lists.ts']);
+  });
+
+  test('AFLDB-ISSUE-161: appearances are never written as membership (D-2)', () => {
+    const source = readSource('src/db/queries/admin-season-lists.ts');
+    const code = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    // The appearances projection is a SELECT and only a SELECT: no statement in
+    // this module may read player_club_season_stats and write a membership in
+    // the same breath. The frozen origin enumeration carries no appearance-
+    // derived value, so there is no origin such a row could even be given.
+    expect(code).not.toMatch(/INSERT\s+INTO\s+season_list_members[\s\S]{0,400}player_club_season_stats/i);
+    expect(code).not.toContain('seeded_appearances');
+    expect(code).toContain("export const FIRST_LIST_SEASON = 2027;");
+    const origins = /SEASON_LIST_ORIGINS = \[([^\]]*)\]/.exec(code)![1];
+    expect([...origins.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]))
+      .toEqual(['added', 'copied_list', 'transferred', 'imported']);
+  });
+
+  test('AFLDB-ISSUE-161: the replay fails closed, honours tombstones, and never ON CONFLICTs', () => {
+    expect(pyCommon).toContain('replay_admin_overrides(season_list_members): refusing to commit');
+    expect(pyCommon).toContain('player_identity does not resolve to exactly one player');
+    expect(pyCommon).toContain('club_slug does not resolve to exactly one club');
+    expect(pyCommon).toContain('no club identity of that organisation is eligible in that season');
+    expect(pyCommon).toContain('membership override carries no valid origin');
+
+    const branch = pyCommon.slice(pyCommon.indexOf('elif table == "season_list_members":'));
+    // The pre-check reads EVERY override for the entity type, active and inactive:
+    // an unresolvable TOMBSTONE is as serious as an unresolvable membership,
+    // because failing to apply it resurrects a deliberately removed player.
+    expect(branch).toContain("WHERE o.entity_type = 'season_list_members'");
+    expect(branch).not.toMatch(/entity_type = 'season_list_members' AND o\.is_active/);
+    // Tombstones delete, and they delete FIRST.
+    const deleteAt = branch.indexOf('DELETE FROM season_list_members');
+    const insertAt = branch.indexOf('INSERT INTO season_list_members');
+    expect(deleteAt).toBeGreaterThan(0);
+    expect(insertAt).toBeGreaterThan(deleteAt);
+    // Guarded by NOT EXISTS, never ON CONFLICT: the UNIQUE is on (season,
+    // player), so the same player at a different club is a contradiction between
+    // two durable records and must surface, not be swallowed.
+    expect(branch).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM season_list_members m/);
+    expect(branch.slice(0, branch.length)).not.toMatch(
+      /INSERT INTO season_list_members[\s\S]{0,1200}ON CONFLICT/);
+  });
+
+  test('AFLDB-ISSUE-161: a membership is never derived, so no rebuild may touch it', () => {
+    // The whole point of a separate canonical table (§3): "listed" is not
+    // "played", and every table that means "played" is TRUNCATEd and rebuilt
+    // from player_match_stats by this job — which the nightly settle runs. If
+    // season_list_members ever appeared here, an administered list would be
+    // silently erased every night. This is the assertion that stops it, and it
+    // is exact rather than a spot check.
+    const rebuild = readSource('tools/migration/rebuild_derived.py');
+    expect(rebuild).toContain('TRUNCATE player_club_season_stats;');
+    expect(rebuild).not.toContain('season_list_members');
+
+    const inventory = readSource('tools/db/promotion-inventory.ts');
+    const derived = /DERIVED_FOOTBALL_TABLES: readonly string\[\] = \[([\s\S]*?)\]/.exec(inventory)![1];
+    expect([...derived.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]))
+      .toEqual(['player_clubs', 'player_club_season_stats', 'player_season_stats',
+        'player_career_stats', 'club_seasons']);
+
+    // Nor is it a settle target: the settle writes matches, player_match_stats
+    // and scores and then runs the rebuild above. Neither reaches this table.
+    const settle = readSource('src/lib/acquisition/settle-afltables.ts');
+    expect(settle).not.toContain('season_list_members');
+  });
+
+  test('AFLDB-ISSUE-161: the frozen origin enumeration in the replay equals the migration', () => {
+    // common.py cannot read the database schema and still fail closed, so it
+    // carries a copy. This is the assertion that stops the two drifting.
+    const migration = readSource('src/db/migrations/096_season_list_members.sql');
+    const check = /origin\s+text\s+NOT NULL CHECK \(origin IN \(([\s\S]*?)\)\)/.exec(migration)![1];
+    const expected = [...check.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
+    const block = pyCommon.slice(pyCommon.indexOf('SEASON_LIST_ORIGINS = ('));
+    const declared = [...block.slice(0, block.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort();
+    expect(declared).toEqual(expected);
+    expect(declared).not.toContain('seeded_appearances');
+  });
+
   test('§8.3: a manual player is named by token in the ledger, never seeded twice', () => {
     expect(pyExport).toContain('"source": "manual_admin_edit", "external_id": manual_id');
     expect(pyDraftGuru).toContain('def resolve_manual_players(');

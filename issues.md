@@ -608,7 +608,7 @@ created, reopened, resolved, or materially reclassified.
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
 | **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), locally audited**; next: operator review + commit of the ISSUE-160 audit fixes, then DEV acceptance when the operator updates DEV |
-| **ID:** AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`; **operator decisions D-1…D-8 DECIDED 2026-09-11** (D-2 with modification: 2027 is the first authoritative list season and 2026 appearances are never promoted into membership; D-3 subject to a Stage 1 evidence gate; fixtures boundary: ISSUE-161 never depends on a fixture, likely ISSUE-162 owns them). **Stage 1 authorised.** Stacked on ISSUE-160 (not merged first; both deploy to DEV together as the Admin Centre batch). Chosen model: new canonical registry table `season_list_members` (`UNIQUE (season, player_id)`) with whole-row `data_overrides` keyed `<club_slug>|<season>|<player identity>`, per-mutation import-role transactions, `data_edits` on the player, fail-closed replay branch, inactive override = removal tombstone; no `retired` flag (not-current = no membership in the current list season); no `seasons`/`clubs`/`club_seasons` writes (list season ≤ `max(seasons.year)+1`, eligible clubs = `is_current_afl_club` identities beyond the register). One migration required (next free 096, not allocated). No public-consumer change required. Next: Stage 1 in a fresh Opus 5 high session, starting with the preflight and the D-3 evidence probes. | **Severity:** Medium | **Area:** Admin / Data management / Player–club–season model / Promotion lineage; runbook `AFLDB-ISSUE-161.md`; branch `opus/issue-161-season-lists` |
+| **ID:** AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`; **operator decisions D-1…D-8 DECIDED 2026-09-11** (D-2 with modification: 2027 is the first authoritative list season and 2026 appearances are never promoted into membership; D-3 subject to a Stage 1 evidence gate; fixtures boundary: ISSUE-161 never depends on a fixture, likely ISSUE-162 owns them). **Stage 1 authorised.** Stacked on ISSUE-160 (not merged first; both deploy to DEV together as the Admin Centre batch). Chosen model: new canonical registry table `season_list_members` (`UNIQUE (season, player_id)`) with whole-row `data_overrides` keyed `<club_slug>|<season>|<player identity>`, per-mutation import-role transactions, `data_edits` on the player, fail-closed replay branch, inactive override = removal tombstone; no `retired` flag (not-current = no membership in the current list season); no `seasons`/`clubs`/`club_seasons` writes (list season ≤ `max(seasons.year)+1`, eligible clubs = `is_current_afl_club` identities beyond the register). **Stage 1 executed 2026-09-11 (Opus 5 high): D-3 gate PASSED (modern-era probe = 0 rows; 249 historical multi-club player-seasons, latest 1992), migration 096 allocated and applied to `afldb_test`, `season_list_members` + `afldb_season_list_clubs()` + `data_overrides` widening shipped, `admin-season-lists.ts` (add / multi-add / remove+tombstone / transfer / copy-forward / appearances review / diagnostics), `player-identity.ts` extracted behaviour-preservingly, fail-closed replay branch + fitzRoy call site + promotion doc/checklist. 25 pure + 40 integration tests green; ISSUE-160 regressions 45 + 120 green; tsc and lint clean. NOT committed, NOT deployed; DEV and PROD untouched.** Next: Stage 2 admin surface. | **Severity:** Medium | **Area:** Admin / Data management / Player–club–season model / Promotion lineage; runbook `AFLDB-ISSUE-161.md`; branch `opus/issue-161-season-lists` |
 | **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), not deployed, not merged; locally audited 2026-09-11 — one atomicity defect and eight new ESLint errors found and fixed, uncommitted for operator review.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit of the audit fixes, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; two runbook §18 list affordances (the `state` filter and the Player-links deep link) reported undelivered; S-1 before deploy |
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
@@ -23276,7 +23276,7 @@ promotion record and the ISSUE-160 evidence before `merge:ready`.
 
 ## AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-- **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Stage 1 authorised.**
+- **Status:** Open / **Stage 1 code-complete 2026-09-11 (Opus 5 high) — implemented and validated on `afldb_test`, NOT committed, NOT deployed; Stage 2 (admin surface) outstanding.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Stage 1 authorised.**
 - **Severity:** Medium
 - **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 - **Branch:** `opus/issue-161-season-lists`, worktree `D:\dev\afldb-issue-161`, cut from `opus/issue-160-draft-admin` @ `1295d3d` (stacked on ISSUE-160 by operator direction; ISSUE-160 is not merged first).
@@ -23346,13 +23346,75 @@ batch. Then: merge/integrate the stack → update/rebuild DEV → combined ISSUE
 acceptance → role-based Playwright → fix defects → close both when green. Deferred DEV acceptance
 during implementation is not a failure.
 
-### Validation
+### Stage 1 execution — 2026-09-11 (Opus 5 high), code-complete, uncommitted
 
-None yet (planning only). Test strategy: runbook §24.
+**Preflight.** `npm run preflight -- --mode implementation --issue 161` → **READY, 0 blockers, 3
+warnings**: `.env` absent in this worktree (created locally, untracked, DSNs rewritten to the
+`55432` tunnel), `psql`/`pg_restore` unavailable on the workstation (not required for this mode).
+Branch `opus/issue-161-season-lists` at `436d0c9`, tree clean, contains local `main`.
+
+**Migration number re-check.** `git log --all -- 'src/db/migrations/096*'` returned nothing and no
+`096*` file existed; highest was `095_coach_admin_overrides.sql`. **096 allocated.**
+
+**D-3 evidence gate — PASSED, invariant upheld.** Both runbook §21 probes run READ-ONLY against the
+rebuilt `afldb_test` (59,002 `player_club_season_stats` rows, seasons 1897–2026, `max(seasons.year)
+= 2026`):
+
+- **Probe (a)** — multi-club player-seasons by decade: 1890s 2, 1900s 1, 1910s 30, 1920s 21,
+  1930s 53, 1940s 30, 1950s 25, 1960s 10, 1970s 34, 1980s 39, 1990s 4. **Total 249**, and the
+  **latest is 1992** — the residue of the pre-1993 clearance era, entirely outside the
+  authoritative list domain, whose first season is 2027.
+- **Probe (b)** — `season >= 2000`: **ZERO rows.**
+- No repository or rules evidence of a legitimate second same-season AFL list place was found.
+
+`UNIQUE (season, player_id)` was therefore implemented as designed, with the measurements recorded
+in the migration beside the constraint.
+
+### Validation (Stage 1, on `afldb_test` only)
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `tests/admin-season-list-actions.test.ts` (new, pure) | **25 passed** |
+| `tests/integration/admin-season-lists.test.ts` (new, real PostgreSQL + real replay) | **40 passed**, and re-runnable: a second consecutive run passed and left zero rows behind |
+| `tests/data-overrides-source-contract.test.ts` (extended) | 24 passed |
+| `tests/db-promotion-check.test.ts` (extended) | passed — `season_list_members` classified registry, no `PROMOTION_CONTRACT` entry, `assertContractCoherent()` does not throw (W-8 cleared) |
+| `tests/current-season-import.test.ts` (extended, manual authority) | passed — `overrideScopeProvenFrom()` returns the same answer against the pre-096 and post-096 CHECK, so the widening is order-independent (W-10 cleared) |
+| ISSUE-160 regression: `tests/integration/admin-draft.test.ts` | **45 passed** (W-6 cleared — the shared identity extraction changed no result) |
+| ISSUE-160 regression: `admin-draft-actions`, `player-link-mutations`, `reference-data` | 120 passed |
+| `tests/integration/fk-indexes.test.ts`, `tests/auth.test.ts` | 132 passed |
+| Broad unit run (all 115 `tests/*.test.ts`) | 4,227 passed, 14 skipped, **1 failed: `finals-semantics-contract.test.ts`** — the known Windows-CRLF-only failure on an untouched file; passes on Linux |
+| `npx eslint` on every changed/new file | clean (2 findings remain in untouched code, both present at `HEAD`) |
+| `git diff --check` | clean |
+
+Database writes were confined to `afldb_test` (migration 096 applied there; every test fixture
+marker-tagged and removed in `afterAll`). **DEV and PROD were not touched, nothing was committed,
+pushed, merged or deployed.**
+
+### Stage 1 deviations from the runbook (3, all recorded deliberately)
+
+1. **Replay step order.** §19 lists the tombstone `DELETE` fourth; it is executed **first**, before
+   the active inserts. A stale row for the same `(season, player)` at the club a player was moved
+   away from would otherwise collide with `UNIQUE (season, player_id)` and abort a reload that was
+   about to become correct. Every behaviour §19 specifies is still performed, and tombstone-first
+   matches §7, which ranks the tombstone above every other authority.
+2. **"Membership persists through a real `rebuild_derived.py` run" (§24)** is proved as an exact
+   source contract instead of by running the job: `rebuild_derived.py` contains no reference to
+   `season_list_members`, `DERIVED_FOOTBALL_TABLES` is asserted equal to its five members, and
+   `settle-afltables.ts` names the table nowhere. That is a stronger and deterministic statement of
+   the same claim, and it avoids a full derived rebuild of the only rebuilt test database.
+3. **The §24 "test-scoped bound override"** is an env var read only when `NODE_ENV === 'test'`
+   (asserted inert under `NODE_ENV=production` by a unit test), rather than a throwaway `seasons`
+   row. It raises the CEILING only and can never lower `FIRST_LIST_SEASON`, so no test can write an
+   authoritative row below 2027 — and D-6's "ISSUE-161 writes no `seasons` row" holds even in the
+   fixtures.
 
 ### Next action
 
-Decisions are recorded. A fresh Opus 5 high session: `Execute AFLDB-ISSUE-161 Stage 1 according to
-AFLDB-ISSUE-161.md` from this worktree, starting with `npm run preflight -- --mode implementation
---issue 161`, the ISSUE-161/096 re-check and the operator-run D-3 evidence probes (runbook §21;
-contrary evidence stops before the migration is written).
+Stage 2 (admin surface, runbook §29): capabilities `data.seasonLists.read/.edit`, nav entry,
+`/admin/season-lists`, `/[season]`, `/[season]/[club]`, `actions.ts`, `validation.ts`, the panels
+(copy preview/confirm, Add, Draftees, Appearances review, Remove, Transfer), the ISSUE-160 handoff
+link, `docs/admin-and-beta.md`, and the `tests/auth.test.ts` capability↔guard↔nav rows. The Stage 1
+backend is ready for operator review and commit first. DEV deploy order when the Admin Centre batch
+ships: **migration 096 → `npm run db:privileges` → code** (`db:privileges` could not be run from the
+workstation — no `psql` — and the table's app read is fail-closed until it does).

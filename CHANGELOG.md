@@ -15,6 +15,44 @@ commit.
 
 ## [Unreleased]
 
+### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
+
+- Until now AFLDB held no concept of a **playing list**. Every player-club relationship it stored
+  was inferred from matches actually played -- `player_clubs`, `player_club_season_stats`,
+  `player_season_stats`, `player_career_stats` and `club_seasons` are all truncated and rebuilt
+  from `player_match_stats` -- so a player who was *listed* but had not *played* had no club
+  anywhere in the model, and "who is currently on this club's list" was not a question any query
+  could answer. Migration 096 adds `season_list_members`: one row asserts *this player was a
+  member of this club's list for this season*. It is administrative intent, never participation;
+  `player_club_season_stats` continues to mean "played for", and nothing derived changes meaning.
+- A listed player may have played no games and hold no statistics at all -- the point of the new
+  table, and impossible in every table that existed before it.
+- **2027 is the first authoritative list season.** Earlier seasons are represented by matches
+  played, not by lists, and match appearances are never promoted into membership: there is no
+  bulk seed and no appearance-derived provenance. The 2026 appearances a club page shows while
+  building its first list are a clearly-labelled review panel, and each player added from it is an
+  explicit decision recorded as an ordinary addition that merely notes where the administrator was
+  looking.
+- **"Retired" is not stored anywhere, and nothing new about a player is.** Removing a player from
+  a list means only that they are not on that club's list for that season: no player flag moves,
+  no earlier season is touched, and no career statistic, draft row or link changes. A player who
+  returns is simply listed again. While a season's clubs are not all populated, "no membership"
+  means *unknown*, not *retired*, and the season overview shows which clubs are still empty.
+- A player holds **at most one** club's list place per season, enforced by the database. Measured
+  on the rebuilt test database before the constraint was written: across 1897-2026 only 249
+  player-seasons ever involved two clubs and the latest is 1992, the residue of the pre-1993
+  clearance era; from 2000 onward there are none.
+- Season lists need no fixture, no match and no season row to exist. A list for next season can be
+  built before anything about that season has been scheduled, and the clubs offered are the ones
+  currently competing -- so the tracked season register, the club table and the ladder tables are
+  never written to in order to make administration possible.
+- Administered lists survive a database rebuild and a production promotion: each membership carries
+  a durable record keyed by club, season and the player's permanent identity, replayed
+  fail-closed after players are restored. A removal is durable too -- it is recorded as an
+  intentional removal that no later import and no replay may undo.
+- Backend only in this stage: the administration screens, their permissions and the draft
+  handoff arrive with the Admin Centre batch.
+
 ### Draft administration gains one mutation contract, and admin-created people become promotable (AFLDB-ISSUE-160 Stage 1, ISSUE-156 P3b) - 11 September 2026
 
 - `createPlayerInTransaction()` -- the one player-creation primitive in `src/` -- now mints a

@@ -184,6 +184,7 @@ const PINNED_FOOTBALL_TABLES = [
   'player_career_stats', 'player_height_evidence',
   'player_club_season_stats', 'player_clubs', 'player_match_stats',
   'player_name_aliases', 'player_relationships', 'player_season_stats', 'players', 'promotion_candidates',
+  'season_list_members',
   'seasons', 'sources', 'stat_availability', 'stat_definitions', 'venue_aliases', 'venues',
 ];
 
@@ -1260,13 +1261,20 @@ describe('lineage-safe reinstatement', () => {
     // already registered in afldb_meta.import_writable_tables (087:114-115), so
     // they are rebuilt data; declaring them here as well would classify them
     // {kind:'both'}, which is a refusal.
-    for (const name of ['coaches', 'match_coaches']) {
+    // AFLDB-ISSUE-161 §19 / W-8 is the same shape: season_list_members is
+    // registered by migration 096's grant_import_write, so it is rebuilt data
+    // and must have NO PROMOTION_CONTRACT entry. An unclassified table refuses
+    // every promotion phase (R-3) and a doubly-classified one is {kind:'both'},
+    // which also refuses — so this assertion and its presence in
+    // PINNED_FOOTBALL_TABLES above are the two halves of the classification.
+    for (const name of ['coaches', 'match_coaches', 'season_list_members']) {
       expect(contractByName(name), name).toBeUndefined();
     }
-    // The acceptance checklist names both new entity types in the replay step.
+    // The acceptance checklist names every new entity type in the replay step.
     const checklist = ACCEPTANCE_CHECKLIST.join('\n');
     expect(checklist).toContain('coaches');
     expect(checklist).toContain('match_coaches');
+    expect(checklist).toContain('season_list_members');
   });
 
   it('remaps Gridley preservation by source key when source and candidate ids differ', () => {

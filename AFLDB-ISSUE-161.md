@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-**Status:** Planning complete — no implementation, no migration, no commit, no deployment. **Operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)**: D-2 approved with modification (2027 is the first authoritative season; 2026 appearances are never promoted into authoritative membership), D-3 approved subject to Stage 1 evidence (stop on contrary evidence), all others approved as recommended. Additional operator boundary: ISSUE-161 does not own fixture creation/scheduling (likely ISSUE-162) and must not depend on a fixture existing (§9.4, §27). **Stage 1 may begin.**
+**Status:** **Stage 1 COMPLETE 2026-09-11 (Opus 5 high) — implemented and validated on `afldb_test`; not committed, not deployed; Stage 2 outstanding (§32).** The D-3 evidence gate **passed** and migration **096** is allocated. Planning complete; **Operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)**: D-2 approved with modification (2027 is the first authoritative season; 2026 appearances are never promoted into authoritative membership), D-3 approved subject to Stage 1 evidence (stop on contrary evidence), all others approved as recommended. Additional operator boundary: ISSUE-161 does not own fixture creation/scheduling (likely ISSUE-162) and must not depend on a fixture existing (§9.4, §27). **Stage 1 may begin.**
 **Severity:** Medium
 **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 **Created:** 2026-09-11
@@ -820,6 +820,79 @@ no revalidate route (§10), stage split (§29).
 17. **Blockers / stop conditions:** none fired during planning. Stage 1 hard stops: D-3 contrary evidence (§21), W-2 replay exactness, W-8 promotion classification, W-14 any dependency on a fixture.
 18. **Ready to begin:** **yes — Stage 1 is authorised.** A fresh Opus 5 high session with the opening prompt `Execute AFLDB-ISSUE-161 Stage 1 according to AFLDB-ISSUE-161.md` from this worktree, on the ISSUE-160 branch state; first actions are the preflight, the ISSUE-161/096 re-check and the D-3 evidence probes (operator-run, read-only).
 
+---
+
+## 32. Stage 1 execution record — 2026-09-11 (Opus 5, high)
+
+Implemented on `opus/issue-161-season-lists` from `436d0c9`. **Not committed, not pushed, not
+merged, not deployed. DEV and PROD were not touched; every database write went to `afldb_test`.**
+
+### 32.1 Gates
+
+| Gate | Outcome |
+|---|---|
+| Preflight (`--mode implementation --issue 161`) | **READY** — 0 blockers, 3 warnings: `.env` absent in the worktree (created locally, untracked, DSNs pointed at the `55432` tunnel), `psql`/`pg_restore` unavailable (not required for this mode) |
+| Migration number | `git log --all -- 'src/db/migrations/096*'` empty and no `096*` file — **096 allocated** |
+| **D-3 evidence gate (§21)** | **PASSED**, read-only on rebuilt `afldb_test` (59,002 `player_club_season_stats` rows, 1897–2026). Probe (a) by decade: 1890s 2, 1900s 1, 1910s 30, 1920s 21, 1930s 53, 1940s 30, 1950s 25, 1960s 10, 1970s 34, 1980s 39, 1990s 4 — **total 249, latest 1992**. Probe (b) `season >= 2000`: **0 rows**. No rule evidence of a legitimate second same-season list place. `UNIQUE (season, player_id)` implemented as designed, with the measurement recorded beside the constraint |
+| W-8 promotion classification | cleared — registry-classified, no `PROMOTION_CONTRACT` entry, `assertContractCoherent()` does not throw |
+| W-10 settle authority | cleared — `overrideScopeProvenFrom()` returns the same answer for the pre-096 and post-096 CHECK |
+| W-6 ISSUE-160 redesign | cleared — `tests/integration/admin-draft.test.ts` 45/45 after the identity extraction |
+| W-14 fixture dependency | cleared — 2027 holds 0 `matches` and 0 `club_seasons` rows and every mutation works |
+| W-3 register writes | cleared — no `seasons`, `clubs` or `club_seasons` row is written by code **or by a test fixture** |
+
+### 32.2 Delivered
+
+`src/db/migrations/096_season_list_members.sql` — the table exactly as §5 (surrogate `id`, no FK to
+`seasons`, `UNIQUE (season, player_id)`, five indexes, four origins, table/column comments);
+`afldb_season_list_clubs(smallint)` implementing §9.1 as the one rule (measured on `afldb_test`: 18
+clubs for 2027 and 2026 by forward extension, 14 for 1990 and 8 for 1900 through the era arm);
+`data_overrides.entity_type` widened retaining every literal; both role registries.
+
+`src/db/queries/player-identity.ts` — `MANUAL_SOURCE_KEY`, `manualEntityKey`,
+`readManualPlayerToken`, `resolvePlayerIdentity`, moved verbatim from `admin-draft.ts` and
+`players.ts`, which both re-export them, so no caller or test changed.
+
+`src/db/queries/admin-season-lists.ts` — `FIRST_LIST_SEASON = 2027`, the key shape and its parser,
+the bound rule, `addSeasonListMember`, `addSeasonListMembers`, `removeSeasonListMember`,
+`transferSeasonListMember`, `copySeasonListsForward` (preview and write), the §23 appearances
+review projection, the §15.1 diagnostics, the club/season reads and the §8 derivations. Every
+mutation is one import-role transaction; every precondition refuses before the first write; every
+post-write refusal throws `RollbackRefusal`.
+
+`tools/migration/common.py` — the fail-closed `season_list_members` replay branch (`SEASON_LIST_ORIGINS`
+frozen copy, pre-check over active **and** inactive overrides, tombstone `DELETE` first, `NOT EXISTS`
+insert, payload `UPDATE`); `import_fitzroy_core.py` call site immediately after `players`;
+`docs/production-promotion.md` §8 loop and the promotion-inventory acceptance checklist;
+`manual-authority.ts` inventory.
+
+Tests: `tests/admin-season-list-actions.test.ts` (new, 25) and
+`tests/integration/admin-season-lists.test.ts` (new, 40, including the real Python replay), plus
+extensions to `data-overrides-source-contract`, `db-promotion-check` and `current-season-import`.
+`tests/reference-data.test.ts` needed no edit: its post-045 contract is derived from the migrations
+and the table registers `grant_import_write`.
+
+### 32.3 Deviations from this runbook
+
+1. The replay executes the tombstone `DELETE` **first** rather than fourth (§19): a stale row for
+   the same `(season, player)` would otherwise collide with the UNIQUE and abort a reload that was
+   about to become correct. Tombstone-first is what §7's precedence already says.
+2. "Membership persists through a real `rebuild_derived.py` run" (§24) is proved as an exact source
+   contract — `rebuild_derived.py` names the table nowhere, `DERIVED_FOOTBALL_TABLES` is pinned to
+   its five members, `settle-afltables.ts` names it nowhere — rather than by running a full derived
+   rebuild of the only rebuilt test database.
+3. The §24 "test-scoped bound override" is an env var honoured only when `NODE_ENV === 'test'`
+   (proved inert under `NODE_ENV=production`), not a throwaway `seasons` row. It raises the ceiling
+   only and can never lower `FIRST_LIST_SEASON`.
+
+### 32.4 Outstanding
+
+Stage 2 in full (§29): capabilities, nav, the three routes, actions/validation/panels, the
+ISSUE-160 handoff link, `docs/admin-and-beta.md`, `tests/auth.test.ts`. Then commit, the Admin
+Centre DEV batch (**migration 096 → `npm run db:privileges` → code**; the app read is fail-closed
+until the privileges run, which the workstation cannot do — no `psql`), combined ISSUE-160 +
+ISSUE-161 DEV acceptance and role-based Playwright. PROD follows the ISSUE-155/151 contract
+separately.
+
 <!-- afldb-merge-readiness
-{"status":"in-progress","hardBlockers":["planning only — no implementation yet; Stage 1 authorised 2026-09-11"],"expectedFiles":["AFLDB-ISSUE-161.md","issues.md","IssuesIndex.md","AFLDB-ISSUE-156.md"],"validation":[]}
+{"status":"in-progress","hardBlockers":["Stage 2 (admin surface) not implemented; ISSUE-161 ships with ISSUE-160 as one Admin Centre batch and neither has DEV acceptance yet"],"expectedFiles":["AFLDB-ISSUE-161.md","issues.md","IssuesIndex.md","AFLDB-ISSUE-156.md","CHANGELOG.md","src/db/migrations/096_season_list_members.sql","src/db/queries/admin-season-lists.ts","src/db/queries/player-identity.ts","src/db/queries/admin-draft.ts","src/db/queries/players.ts","src/lib/acquisition/manual-authority.ts","tools/migration/common.py","tools/migration/import_fitzroy_core.py","tools/db/promotion-inventory.ts","docs/production-promotion.md","tests/admin-season-list-actions.test.ts","tests/integration/admin-season-lists.test.ts","tests/data-overrides-source-contract.test.ts","tests/db-promotion-check.test.ts","tests/current-season-import.test.ts"],"validation":["npx tsc --noEmit: clean","tests/admin-season-list-actions.test.ts: 25 passed","tests/integration/admin-season-lists.test.ts: 40 passed (twice, idempotent teardown)","tests/integration/admin-draft.test.ts (ISSUE-160 regression): 45 passed","data-overrides-source-contract + db-promotion-check + current-season-import: 382 passed","fk-indexes + auth: 132 passed","all tests/*.test.ts: 4227 passed, 14 skipped, 1 pre-existing Windows-CRLF-only failure (finals-semantics-contract, untouched file)","eslint on every changed file: clean","git diff --check: clean","D-3 probes: (a) 249 multi-club player-seasons, latest 1992; (b) season >= 2000 = 0 rows"]}
 -->

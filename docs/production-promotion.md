@@ -643,7 +643,9 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    record that names its subject by IDENTITY cannot resolve until that identity exists.
    `players` before `draft_picks`, because a manual selection names its player by an AFL
    Tables path or a `manual_admin_edit` token; `coaches` before `match_coaches`, because
-   an assignment resolves its coach by path. `matches` is independent and may go anywhere:
+   an assignment resolves its coach by path; `players` before `season_list_members`, because
+   a playing-list membership names its player by that same identity. `matches` is independent
+   and may go anywhere:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -651,14 +653,19 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    from common import load_env, connect_pg, replay_admin_overrides
    load_env()
    with connect_pg() as pg:
-       for table in ('players', 'matches', 'draft_picks', 'coaches', 'match_coaches'):
+       for table in ('players', 'matches', 'draft_picks', 'season_list_members',
+                     'coaches', 'match_coaches'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
    ```
 
    `coaches` and `match_coaches` are `AFLDB-ISSUE-159` (migration 095); `players` and
-   `draft_picks` gained the same shape in `AFLDB-ISSUE-160`. For `matches`, and for a
+   `draft_picks` gained the same shape in `AFLDB-ISSUE-160`; `season_list_members` is
+   `AFLDB-ISSUE-161` (migration 096) and is the only branch that also acts on INACTIVE
+   overrides — an inactive membership override is a **tombstone**, the decision that a
+   player is deliberately not on a list, so the replay deletes any row it finds for that
+   key before it re-creates the active ones. For `matches`, and for a
    source-owned player or selection, an override patches fields of a row the rebuild
    already produced. For a manual one it carries an **entire row**: an administrator can
    create a footballer and their draft selection before any source has published either,
@@ -667,7 +674,10 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
 
    Between the swap and this step a manual coach, a manual player and their manual
    selections do not exist in the promoted database at all — every `/coaches/<slug>-<id>`
-   and `/players/<slug>-<id>` URL for one 404s, and the ids change across the window. Run
+   and `/players/<slug>-<id>` URL for one 404s, and the ids change across the window.
+   Every administered playing list is likewise absent for that window; no public surface
+   reads lists yet (`AFLDB-ISSUE-161` §10), so it is visible only in `/admin/season-lists`,
+   which shows a season with no members rather than an error. Run
    this step promptly, and run it **before** the `data_edits.row_id` remap: its
    `'coaches'` rows resolve through `coaches.afltables_coach_path`, its `'draft_picks'`
    rows through the selection's `<source key>|<player_url>|<draft_year>|<draft_kind>`, and

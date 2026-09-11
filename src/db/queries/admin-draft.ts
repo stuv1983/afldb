@@ -9,8 +9,13 @@ import postgres from 'postgres';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { sql } from '@/db/client';
 import {
-  createPlayerInTransaction,
+  MANUAL_SOURCE_KEY,
+  manualEntityKey,
   readManualPlayerToken,
+  resolvePlayerIdentity,
+} from '@/db/queries/player-identity';
+import {
+  createPlayerInTransaction,
   type CreatePlayerInput,
 } from '@/db/queries/players';
 import { resolveLockedLink, UNRESOLVED_LINK_STATUSES } from '@/db/queries/player-links';
@@ -67,7 +72,13 @@ import { EDITABLE_ENTITIES, validateFieldValue, type FieldValue } from '@/lib/ed
 
 type Tx = postgres.TransactionSql;
 
-export const MANUAL_SOURCE_KEY = 'manual_admin_edit';
+/**
+ * Identity lives in `@/db/queries/player-identity` (AFLDB-ISSUE-161 §29): season
+ * lists became the second domain that has to name a player durably, and one
+ * identity rule with two implementations is two rules. Re-exported here so every
+ * existing importer of this module is unchanged.
+ */
+export { MANUAL_SOURCE_KEY, manualEntityKey, resolvePlayerIdentity };
 
 // --- the frozen event contract (§3.1, J-8, J-9) -------------------------
 
@@ -168,11 +179,6 @@ export function trackedProfilePaths(): Set<string> {
 export const AFLTABLES_PROFILE_PATH_RE = /^players\/[A-Z]\/[A-Za-z0-9_'.-]+\.html$/;
 
 // --- entity_key shapes (§3.1) -------------------------------------------
-
-/** The `data_overrides.entity_key` of a MANUAL selection or player. */
-export function manualEntityKey(token: string): string {
-  return `${MANUAL_SOURCE_KEY}:${token}`;
-}
 
 /** The `player_url` a manual selection carries. Outside the DraftGuru regex by construction. */
 export function manualPlayerUrl(token: string): string {
@@ -365,42 +371,6 @@ async function resolveClubForYear(
     };
   }
   return { ok: true, club: { id: club.id, name: club.name, slug: club.slug } };
-}
-
-/**
- * The player's DURABLE identity string for an override payload, resolved
- * server-side inside the transaction (§4 rule 2 -- nothing identity-shaped is
- * trusted from the browser). AFL Tables path first, then the manual token.
- */
-async function resolvePlayerIdentity(
-  tx: Tx, playerId: number,
-): Promise<
-  | { ok: true; identity: string; minted: false }
-  | { ok: false; error: string; reason: DraftRefusalReason }
-  | { ok: true; identity: null; minted: false }
-> {
-  const afl = await tx<{ externalId: string }[]>`
-    SELECT DISTINCT e.external_id AS "externalId"
-      FROM external_identities e
-      JOIN sources s ON s.id = e.source_id
-     WHERE e.player_id = ${playerId}
-       AND s.key = 'afltables'
-       AND e.match_method = 'afltables_profile_url'
-       AND e.status IN ('unique', 'resolved')
-  `;
-  if (afl.length > 1) {
-    return {
-      ok: false,
-      reason: 'ambiguous_identity',
-      error: 'That player holds more than one AFL Tables profile identity. Refusing to choose one; '
-        + 'reconcile the identity before recording a selection against them.',
-    };
-  }
-  if (afl.length === 1) return { ok: true, identity: `afltables:${afl[0].externalId}`, minted: false };
-
-  const token = await readManualPlayerToken(tx, playerId);
-  if (token) return { ok: true, identity: manualEntityKey(token), minted: false };
-  return { ok: true, identity: null, minted: false };
 }
 
 // --- duplicate / conflict contract (§7) ---------------------------------

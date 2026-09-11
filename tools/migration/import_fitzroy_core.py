@@ -3524,6 +3524,12 @@ def main() -> int:
             import_players(pg, rep, players, args, refs)
             from common import replay_admin_overrides
             replay_admin_overrides(pg, "players")
+            # AFLDB-ISSUE-161 §19. Immediately after players, and BINDING in that
+            # order: a season-list membership names its player by identity, so the
+            # identities have to exist first. It needs nothing else -- no matches,
+            # no fixture and no club_seasons row -- because a playing list is
+            # administrative intent about a season that may not have been played.
+            replay_admin_overrides(pg, "season_list_members")
         elif group == "aliases":
             # AFLDB-ISSUE-110. Runs after `players` so freshly registered
             # identities resolve; separately selectable (--groups aliases) so

@@ -419,25 +419,12 @@ export async function createPlayerInTransaction(
 }
 
 /**
- * The `manual_admin_edit` token a player carries, or null when it holds none
- * (or, refusing to choose, more than one). Read inside the caller's
- * transaction: nothing identity-shaped is ever trusted from the browser (§4).
+ * The `manual_admin_edit` token a player carries. Moved unchanged to the shared
+ * identity module (AFLDB-ISSUE-161 §29) when season lists became the second
+ * domain that names a player durably; re-exported here so every existing
+ * importer of this module is unchanged.
  */
-export async function readManualPlayerToken(
-  tx: postgres.TransactionSql,
-  playerId: number,
-): Promise<string | null> {
-  const rows = await tx<{ externalId: string }[]>`
-    SELECT e.external_id AS "externalId"
-      FROM external_identities e
-      JOIN sources s ON s.id = e.source_id
-     WHERE e.player_id = ${playerId}
-       AND s.key = 'manual_admin_edit'
-       AND e.status IN ('unique', 'resolved')
-     ORDER BY e.external_id
-  `;
-  return rows.length === 1 ? rows[0].externalId : null;
-}
+export { readManualPlayerToken } from '@/db/queries/player-identity';
 
 /**
  * Create a new player in the database (see changeLog.md).

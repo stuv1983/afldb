@@ -3644,6 +3644,7 @@ import {
 
 const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql');
 const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
+const seasonListMigration = readSource('src/db/migrations/096_season_list_members.sql');
 
 /** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
 function entityTypeCheck(...entities: readonly string[]): string {
@@ -3656,6 +3657,10 @@ const CHECK_BEFORE_095 = entityTypeCheck('players', 'matches', 'draft_picks');
 /** The CHECK as migration 095 leaves it — the post-095 database. */
 const CHECK_AFTER_095 = entityTypeCheck(
   'players', 'matches', 'draft_picks', 'coaches', 'match_coaches',
+);
+/** The CHECK as migration 096 leaves it — the post-096 database (AFLDB-ISSUE-161). */
+const CHECK_AFTER_096 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
 );
 
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
@@ -3680,6 +3685,10 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect(coachAdminMigration).toMatch(
       /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches'\s*\)\)/,
     );
+    // 096 widens it forward again, retaining every literal 095 left (ISSUE-161 §5).
+    expect(seasonListMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members'\s*\)\)/,
+    );
     // The documented inventory names the same entities the database now admits.
     // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
     // `checkAdmittedEntities()` returns ASCII order ('match_coaches' sorts before
@@ -3687,9 +3696,15 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     // may — an order-sensitive comparison is an exact-set proof wearing a
     // different hat, and it would re-create the deploy window §3.1 removed.
     expect([...OVERRIDE_ENTITY_TYPES])
-      .toEqual(['coaches', 'draft_picks', 'matches', 'match_coaches', 'players']);
+      .toEqual(['coaches', 'draft_picks', 'matches', 'match_coaches', 'players',
+        'season_list_members']);
     expect([...OVERRIDE_ENTITY_TYPES].sort())
-      .toEqual(checkAdmittedEntities([CHECK_AFTER_095]));
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_096]));
+    // And the order-independence D-1 requires, stated as a fact rather than a
+    // hope: the settle's answer is identical against the pre-096 constraint, so
+    // the migration and the code may deploy in either order.
+    expect(overrideScopeProvenFrom([CHECK_AFTER_095])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_096]));
     // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
     // exact-set proof has no safe deploy order in either direction, so the proof
     // itself must not consult this list at all.
