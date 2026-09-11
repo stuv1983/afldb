@@ -60,6 +60,34 @@ commit.
   `coaches` replay carries an entire row rather than a field patch, so until it runs, a manually
   created coach does not exist in the promoted database at all.
 
+### Coach administration ships an admin surface, and AFLDB-ISSUE-159 closes (Stage 2, ISSUE-156 P3) - 11 September 2026
+
+- `/admin/coaches` (search by name, filter by provenance / link status / active override, a
+  bounded create panel) and `/admin/coaches/[id]` (read-only identity and provenance, editable
+  metadata, player linkage, club-and-season-bounded coaching assignments) give AFLDB its first
+  coach administration surface. Reading is `data.coaches.read` (Admin and up); every mutation
+  is `data.coaches.edit` (Super Admin only) — a coach edit becomes a public statistical fact
+  immediately, with no draft stage.
+- Creating a coach AFL Tables never published a page for refuses a duplicate outright when an
+  existing coach shares the name and the same-or-unrecorded date of birth, and asks for an
+  explicit confirmation (never a silent guess) when the name matches but the date of birth
+  differs. Player linkage resolves only through the tracked AFL Tables identity
+  (`external_identities`), never by name, and a link a tracked
+  `afltables-contract.json` correction already governs is refused rather than silently
+  overridden.
+- Every mutation — create, edit, link/unlink, assign/clear, retire an override — writes the
+  canonical row, the durable `data_overrides` record and the `data_edits` audit row as one
+  transaction: none of the three survives without the other two.
+- No coach Server Action calls `revalidatePath` in-action (a deliberately more conservative
+  choice than the existing Brownlow/player-links actions): a dedicated
+  `/admin/coaches/revalidate` route does, invoked by the browser only after an action has
+  already resolved.
+- Validated end to end on real DEV (`6299bf8`): a live three-role Playwright permission matrix
+  (Super Admin / Admin / Contributor), responsive and keyboard-focus acceptance at
+  320/768/1000/1280/1920, and the full create/edit/link/assign/override-retirement flow,
+  alongside `npx tsc --noEmit` and 161 affected automated tests, all green. `AFLDB-ISSUE-159`
+  is Resolved; not yet merged to `main`.
+
 ### Admin Centre capabilities are enforced, not decorative (AFLDB-ISSUE-158, ISSUE-156 P2) - 11 September 2026
 
 - Every admin page, route handler and Server Action under `/admin` now authorises through

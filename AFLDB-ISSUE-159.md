@@ -1,17 +1,29 @@
 # AFLDB-ISSUE-159 — Coach administration (AFLDB-ISSUE-156 P3)
 
-**Status:** **Stage 1 COMPLETE and VALIDATED — G0 through G8 all PASSED (2026-09-11).**
-The issue is NOT Resolved: Stage 2 (the `/admin/coaches` surface) is **UNBLOCKED but NOT
-STARTED**, and `AFLDB-ISSUE-159` closes only when Stage 2 ships. Stage 1 was written,
-committed `dbef4c2`, deployed to DEV, and validated: G1 (254 passed); G2 (§5.3 pre-check
-with `total` corrected 383 -> 386, then migration 095 on `afldb_test`); G3 A–E after
-catching and fixing a composite-key decode defect (§6.1); **G4 on real `afldb_dev` as legs
-A+B+C under operator decision D-5 (§17.1)**; G5 12/12; G6 97/97; G7 13/13; G8 typecheck
-clean. **G4-D remains OPEN** as a non-blocking dated obligation: when the 2026 Brownlow
-votes publish, the next real DEV settle must show `brownlow_round_votes` traversing the
-canonical apply path. Not merged to `main`. Deliverables and prohibitions are §16; gates and their recorded results are
-§17; the per-file record of what was written is the Stage 1 implementation table in the
-`issues.md` entry.
+**Status:** **RESOLVED 2026-09-11 — Stage 1 COMPLETE and VALIDATED (G0–G8, 2026-09-11) and
+Stage 2 COMPLETE and VALIDATED (gates 6–13, 2026-09-11).** Stage 1 was written, committed
+`dbef4c2`, deployed to DEV, and validated: G1 (254 passed); G2 (§5.3 pre-check with `total`
+corrected 383 -> 386, then migration 095 on `afldb_test`); G3 A–E after catching and fixing a
+composite-key decode defect (§6.1); **G4 on real `afldb_dev` as legs A+B+C under operator
+decision D-5 (§17.1)**; G5 12/12; G6 97/97; G7 13/13; G8 typecheck clean. Stage 2 was written
+against §9/§14, deployed to DEV on this branch at `6299bf8`, and validated on real DEV: gate 6
+(three-role Super Admin / Admin / Contributor permission matrix, live Playwright); gate 7
+(unit duplicate/link/assignment bounds); gate 8 (create/edit/link/assign atomicity for all
+four mutation families, including a forced failure at the `data_edits` INSERT specifically);
+gate 9 (a source-owned coach's `display_name` override survives the importer's own replay SQL
+run verbatim, absent-vs-null semantics intact); gate 10 (coach-only manual creation +
+existing-player linkage, end to end); gate 11 (`match_coaches.source_id = manual_admin_edit`,
+`listCoachesForAdmin`'s live `matchesCoached` recompute, the 087 club-membership trigger
+refusal); gate 12 (DEV Playwright responsive/focus acceptance, 320/768/1000/1280/1920, zero
+unexpected console/network errors); gate 13 (`npx tsc --noEmit` clean, 161/161 affected
+suites, `tests/integration/admin-coaches.test.ts` 13/13, `git diff --check` clean). **G4-D
+remains OPEN** as a non-blocking dated obligation, unrelated to Stage 2: when the 2026
+Brownlow votes publish, the next real DEV settle must show `brownlow_round_votes` traversing
+the canonical apply path. **Not yet merged to `main`** — merge readiness
+(`npm run merge:ready -- --issue 159`) is a separate operator step. Deliverables and
+prohibitions are §16; Stage 1 gates and their recorded results are §17; Stage 2 gates and
+their recorded results are §18; the per-file record of what was written is the Stage 1 and
+Stage 2 implementation tables in the `issues.md` entry.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition / Promotion lineage
 **Created:** 2026-09-11
@@ -1040,27 +1052,37 @@ conclusion was drawn from the defective run.
 
 ---
 
+## 18. Stage 2 validation gates (exact, in order)
+
+Stage 2 is complete only when every gate below has passed. All eight passed 2026-09-11, on
+real DEV deployment `6299bf8` (branch `opus/issue-159-coach-admin`).
+
+| # | Gate | Command / evidence | Pass condition |
+|---|---|---|---|
+| **G6** | Permission matrix | `tests/auth.test.ts` (the real `requireCapability()` called against every capability incl. both `data.coaches.*`, per role, asserting resolve vs. `NEXT_REDIRECT`) + `tests/admin-coach-actions.test.ts` structural source-contract (every coach action calls it first) + live DEV Playwright across Super Admin / Admin / Contributor | Contributor: no nav entry; `/admin/coaches` and `/admin/coaches/[id]` redirect to `/admin/upload`; a direct mutation POST redirects the same way. Admin: nav entry, list/detail readable, no mutation controls rendered anywhere, a direct mutation POST still redirects (`requireCapability`, not hidden UI). Super Admin: full read/write across all seven §8.2 surfaces. **PASSED** |
+| **G7** | Unit duplicate/link/assignment bounds | `npx vitest run tests/admin-coach-actions.test.ts` (entity_key shapes, `parseAssignments` bounds — DB-free by design) + `tests/integration/admin-coaches.test.ts` (duplicate hard-refusal, soft-confirm, already-linked refusal — DB-level by design) | Both green | **PASSED** |
+| **G8** | Atomic transaction rollback, all four mutation families | `npx vitest run tests/integration/admin-coaches.test.ts` | `createCoach`, `saveCoachMetadata`, `linkCoachToPlayer`, `setCoachAssignment` each assert their `data_edits` row on success, and each rolls the canonical mutation (and override, where applicable) back under a forced failure at the `data_edits` INSERT specifically — a trigger scoped to the test file (created in `beforeAll`, dropped in `afterAll`, fires only on a sentinel `note` value no real caller sends) rather than the `data_overrides` FK the original single rollback test happened to trip first | **PASSED** |
+| **G9** | Override survives reload, absent-vs-null intact | `tests/integration/admin-coaches.test.ts` (extracts `tools/migration/common.py`'s own replay SQL at runtime and runs it verbatim against `afldb_test`) + `tests/data-overrides-source-contract.test.ts` (static shape proof for every field) | A source-owned coach's admin-edited `display_name` and `notes` survive a simulated reimport that overwrites them, once the importer's own replay statement runs | **PASSED** |
+| **G10** | Manual creation + existing-player linkage, end to end | `tests/integration/admin-coaches.test.ts` | A coach-only manual creation (no player row fabricated) and a separate existing-player-to-coach link (through `external_identities`, never a name) each proven against the real database | **PASSED** |
+| **G11** | Assignment correctness + derived recompute + trigger refusal | `tests/integration/admin-coaches.test.ts` | `match_coaches.source_id = manual_admin_edit`; `listCoachesForAdmin`'s live `matchesCoached` (`count(*) ... GROUP BY coach_id` over `match_coaches` — never stored, migration 087:27-31) goes 0 → 1 after the write; the 087 `match_coaches_club_in_match` trigger refuses a club that did not play in the match | **PASSED** |
+| **G12** | Responsive / focus acceptance | Live DEV Playwright | 320/768/1000/1280/1920 across `/admin/coaches` and `/admin/coaches/[id]`, no horizontal overflow at any width; a duplicate hard-refusal keeps focus on the "Create coach" button (never `document.body`) at both desktop and 320px; zero unexpected console errors, zero unexpected 4xx/5xx | **PASSED** |
+| **G13** | Typecheck + full affected suites | `npx tsc --noEmit`; affected suites | Clean exit 0; **161/161** affected suites green; `tests/integration/admin-coaches.test.ts` **13/13**; `git diff --check` clean | **PASSED** |
+
+No full-repository test run or `npm run build` was required; escalation was not triggered.
+
+---
+
 ## Next action
 
-**Approved. Tracking allocated 2026-09-11** — `AFLDB-ISSUE-159` now exists in `issues.md`
-(detail entry + Open Issues row), `IssuesIndex.md`, and `AFLDB-ISSUE-156.md` (§10 C-1 decided,
-§11 P3 = 159, P3 handoff contract).
+**RESOLVED 2026-09-11.** Stage 1 (§17) and Stage 2 (§18) are both complete and validated.
+`AFLDB-ISSUE-159` closes on this record. Remaining operator steps, in the standard issue
+lifecycle order: review and commit the reviewed local change on
+`opus/issue-159-coach-admin` (including the already-modified
+`tests/integration/admin-coaches.test.ts`); `npm run merge:ready -- --issue 159`; merge to
+`main`; PROD deploy on the normal schedule (DEV is already current at `6299bf8`).
+ISSUE-151 promotion/restore lineage stays untouched throughout.
 
-*Superseded — Stage 1 has been written and G0–G3 have passed.*
-
-**Current next action (2026-09-11).** **Stage 1 is COMPLETE and validated: G0–G8 all passed.**
-The Stage 1 closeout tracking updates are written and await the operator's commit and push on
-`opus/issue-159-coach-admin`. **Do not merge to `main` yet** — merge readiness is a separate
-operator step (`npm run merge:ready -- --issue 159`), and ISSUE-151 promotion/restore lineage
-stays untouched.
-
-Then **Stage 2 in a fresh session** (§9, §15: Sonnet 5 / medium effort, escalating to Opus 5
-for the assignment transaction and the permission matrix), against this document as the
-contract. Stage 2 is UNBLOCKED but NOT STARTED. Binding on it: D-2, D-3 and D-4 are Stage 2
-obligations; the reported P9-class coach reconciliation stop (§13) stays out of scope; and
-the interaction contract in §9 is inherited, including no `revalidatePath` inside a Server
-Action (S-6).
-
-**G4-D remains OPEN** and is carried by this issue until the 2026 Brownlow count publishes:
-the next real DEV settle after it must positively show `brownlow_round_votes` traversing the
-canonical apply path. It blocks nothing.
+**G4-D remains OPEN** and is carried by this issue's history until the 2026 Brownlow count
+publishes: the next real DEV settle after it must positively show `brownlow_round_votes`
+traversing the canonical apply path. It is explicitly non-blocking and does not keep
+`AFLDB-ISSUE-159` open.
