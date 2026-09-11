@@ -2453,6 +2453,130 @@ def import_venues(pg, rep, matches: dict[tuple, MatchFact], refs: dict) -> dict[
     return venue_ids
 
 
+# ---------------------------------------------------------------------------
+# AFLDB-ISSUE-160 D-2 -- the manual-player insert guard
+# ---------------------------------------------------------------------------
+#
+# THE PROBLEM. AFLDB-ISSUE-160 lets an administrator create a footballer through
+# their draft selection, before they have played a senior game. That player
+# holds a `manual_admin_edit` identity and no AFL Tables identity. When they
+# debut, the intended sequence is: the administrator attaches the AFL Tables
+# profile path (/admin/draft, §6.5), and from then on THIS importer resolves the
+# profile to that player and UPDATEs it.
+#
+# If nobody attaches it first, this importer reaches its new-player INSERT
+# branch with an unregistered profile path and creates a SECOND canonical
+# player for the same person, splitting their career across two rows. The
+# existing architecture cannot prevent that on its own.
+#
+# THE GUARD. Before that INSERT, compare the incoming player against the manual
+# players still awaiting an AFL Tables identity, and REFUSE to insert when the
+# comparison cannot prove they are different people. The DOB rule is symmetric,
+# because an unknown date proves nothing in either direction:
+#
+#     manual DOB unknown            -> REFUSE
+#     source DOB absent             -> REFUSE
+#     both known, any source == manual -> REFUSE
+#     both known, all source <> manual -> allow (a distinct namesake)
+#
+# WHAT IT NEVER DOES. It never writes `external_identities`, never attaches a
+# source identity to any player, never sets `player_id` anywhere, and never
+# decides which player a profile belongs to. A name and a date of birth may
+# REFUSE an unsafe insert here; they may NEVER link a player. That invariant is
+# what keeps identity human-decided everywhere in this tree.
+#
+# ON REFUSAL the RuntimeError propagates through `import_batch`, which rolls
+# back the ENTIRE fitzRoy players batch -- every UPDATE and INSERT of that run,
+# not only the refused player -- records the batch as failed with the error
+# text, and re-raises so the operator sees it. A legitimate new player who
+# merely shares a name with an undated manual player is therefore HELD, never
+# lost: the operator attaches the identity in /admin/draft, or records a
+# distinguishing date of birth on the manual player, then reruns the players
+# group.
+
+MANUAL_CANDIDATES_SQL = """
+    SELECT p.id, p.display_name, p.search_name, p.dob
+      FROM players p
+      JOIN external_identities m ON m.player_id = p.id
+                                AND m.status IN ('unique', 'resolved')
+      JOIN sources ms ON ms.id = m.source_id AND ms.key = %s
+     WHERE NOT EXISTS (
+             SELECT 1
+               FROM external_identities a
+               JOIN sources asrc ON asrc.id = a.source_id AND asrc.key = %s
+              WHERE a.player_id = p.id AND a.status IN ('unique', 'resolved'))
+     ORDER BY p.id
+"""
+
+
+def manual_insert_verdict(manual_dob, fact_dobs) -> str:
+    """'refuse' or 'allow' for ONE manual candidate. Pure; see the block above.
+
+    ``manual_dob`` is the candidate's ``players.dob`` (a date or None);
+    ``fact_dobs`` is the set of dates the source asserts for the incoming
+    player (``PlayerFact.dobs`` keys). Either side unknown refuses, because an
+    unknown date distinguishes nobody.
+    """
+    if manual_dob is None:
+        return "refuse"
+    known = {d for d in (fact_dobs or ()) if d is not None}
+    if not known:
+        return "refuse"
+    manual_key = manual_dob.isoformat() if hasattr(manual_dob, "isoformat") else str(manual_dob)
+    for dob in known:
+        if (dob.isoformat() if hasattr(dob, "isoformat") else str(dob)) == manual_key:
+            return "refuse"
+    return "allow"
+
+
+def load_manual_identity_candidates(cur) -> dict:
+    """search_name -> [(player_id, display_name, dob)] for every manual player
+    that still holds no AFL Tables identity. Empty on every database where no
+    administrator has created a player, which is the normal case.
+    """
+    cur.execute(MANUAL_CANDIDATES_SQL, (SOURCE_KEY_MANUAL, SOURCE_KEY_AFLTABLES))
+    out: dict[str, list] = {}
+    for player_id, display_name, search_name, dob in cur.fetchall():
+        out.setdefault(search_name, []).append((player_id, display_name, dob))
+    return out
+
+
+def normalise_names_in_sql(cur, names) -> dict:
+    """display_name -> afldb_normalise_name(display_name), computed by the SAME
+    SQL function the candidates' ``search_name`` was computed by. Normalising
+    one side in Python is how two spellings of the same rule drift apart.
+    """
+    unique = sorted({n for n in names if n})
+    if not unique:
+        return {}
+    cur.execute(
+        "SELECT n, afldb_normalise_name(n) FROM unnest(%s::text[]) AS t(n)", (unique,))
+    return dict(cur.fetchall())
+
+
+def refuse_unsafe_manual_insert(profile_path, fact_display_name, fact_dobs, candidates) -> None:
+    """Raise unless inserting this new player is provably safe. Never returns a
+    value: the only two outcomes are 'the INSERT proceeds unchanged' and
+    'fail closed'.
+    """
+    blocking = [(pid, name, dob) for pid, name, dob in candidates
+                if manual_insert_verdict(dob, fact_dobs) == "refuse"]
+    if not blocking:
+        return
+    detail = "; ".join(
+        f"player #{pid} {name!r} (dob {dob.isoformat() if dob is not None else 'unrecorded'})"
+        for pid, name, dob in blocking)
+    source_dobs = ", ".join(sorted(
+        d.isoformat() if hasattr(d, "isoformat") else str(d) for d in (fact_dobs or ()))) or "none"
+    raise RuntimeError(
+        f"refusing to insert a new canonical player for AFL Tables profile {profile_path!r} "
+        f"({fact_display_name!r}, source date(s) of birth: {source_dobs}): it matches "
+        f"administrator-created player(s) still awaiting an AFL Tables identity -- {detail}. "
+        "Inserting would split one footballer across two rows. Attach the AFL Tables profile "
+        "to the intended player in /admin/draft, or record a date of birth that distinguishes "
+        "them, then rerun the players group. Nothing has been written (AFLDB-ISSUE-160 D-2).")
+
+
 def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) -> None:
     """Players + DOB evidence + AFL Tables external identities.
 
@@ -2482,6 +2606,17 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
                       AND player_id IS NOT NULL""",
                 (afltables_id, MATCH_METHOD))
             existing_by_url = dict(cur.fetchall())
+
+            # AFLDB-ISSUE-160 D-2. Loaded ONCE, before the loop: the set is empty on
+            # every database where no administrator has created a player, so the guard
+            # costs one cheap query and nothing else in the normal case. The fact-side
+            # names are normalised by the same SQL function in one batched call, so the
+            # per-player check below is a dict lookup and a pure comparison -- never a
+            # query inside the loop.
+            manual_candidates = load_manual_identity_candidates(cur)
+            fact_name_keys = (
+                normalise_names_in_sql(cur, [f.display_name for f in players.values()])
+                if manual_candidates else {})
 
             player_ids: dict[str, int] = {}   # url path -> players.id
             touched: list[int] = []
@@ -2519,6 +2654,15 @@ def import_players(pg, rep, players: dict[str, PlayerFact], args, refs: dict) ->
                     player_ids[url] = existing_id
                     batch.records_updated += 1
                 else:
+                    # AFLDB-ISSUE-160 D-2: the ONLY place this guard runs. The UPDATE
+                    # branch above -- a profile this database already knows -- is
+                    # untouched, and so is the nightly settle.
+                    if manual_candidates:
+                        candidates = manual_candidates.get(
+                            fact_name_keys.get(fact.display_name, ""), [])
+                        if candidates:
+                            refuse_unsafe_manual_insert(
+                                url, fact.display_name, set(fact.dobs), candidates)
                     cur.execute(
                         """INSERT INTO players
                              (display_name, sort_name, search_name, slug,

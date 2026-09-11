@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import 'server-only';
 
 import { cache } from 'react';
@@ -252,18 +254,6 @@ async function fetchPlayer(id: number): Promise<PlayerProfile | null> {
   return row ?? null;
 }
 
-export type DraftPickInput = {
-  recruitedFrom?: string | null;
-  /** A draft row is a historical fact, so its season is never inferred. */
-  draftYear: number;
-  draftType?: string | null;
-  pickNumber?: number | null;
-  clubId?: number | null;
-  draftAge?: number | null;
-  pickNote?: string | null;
-  detail?: string | null;
-};
-
 export type CreatePlayerInput = {
   displayName: string;
   givenName?: string | null;
@@ -275,26 +265,58 @@ export type CreatePlayerInput = {
   notes?: string | null;
   debutSeason?: number | null;
   finalSeason?: number | null;
-  draftInfo?: DraftPickInput | null;
 };
 
 export type CreatedPlayer = { id: number; slug: string; displayName: string };
 
 /**
- * The transaction-scoped half of player creation.
+ * The transaction-scoped half of player creation, and the ONE player-creation
+ * primitive in `src/` (AFLDB-ISSUE-160 §5). Compound import mutations --
+ * "create and link" (`player-links.ts`) and "create player + draft selection"
+ * (`admin-draft.ts`) -- call this only after locking their own prerequisite
+ * row, so those workflows share the creation rules without opening a second
+ * connection or committing an orphan player halfway through.
  *
- * Compound import mutations (notably "create and link") call this only
- * after locking their own prerequisite row. Keeping the inserts here means
- * those workflows share the standalone creation rules without opening a
- * second connection or committing an orphan player halfway through.
+ * WHY IT MINTS AN IDENTITY. Before ISSUE-160 an admin-created player carried
+ * no durable identity at all: nothing in `external_identities` named it, so
+ * `replay_admin_overrides(players)` could not patch it, no replay re-created
+ * it after a destructive reload, and its `player_creation` audit rows were
+ * `no_identity_in_replaced` on a promotion -- which STOPS a PROD promotion
+ * (DEF-4a). Every player created here therefore gets, in this same
+ * transaction:
+ *
+ *   1. an `external_identities (manual_admin_edit, <token>)` row -- the
+ *      durable identity, a `randomUUID()` minted once and never edited, never
+ *      name-derived;
+ *   2. a `data_overrides ('players', 'manual_admin_edit:<token>', 'identity')`
+ *      row carrying the whole player -- the durable RECORD, which
+ *      `replay_admin_overrides(players)` re-creates the row from on a rebuilt
+ *      candidate (§8.1).
+ *
+ * `search_name`, `slug` and `sort_name` are derived IN SQL, by the same
+ * expressions `import_fitzroy_core.import_players()` and the §8.1 replay use,
+ * so a replayed twin of this row is byte-identical to it. Deriving them in
+ * JavaScript is what would make a promoted database differ from the one the
+ * admin typed into.
+ *
+ * `adminUserId` is required because the override row requires it: no caller
+ * can create a player whose durable record is unattributable.
+ *
+ * There is deliberately NO draft branch here any more (D-5): the only
+ * `INSERT INTO draft_picks` in `src/` is `admin-draft.ts`, so draft selections
+ * have exactly one mutation contract.
  */
 export async function createPlayerInTransaction(
   tx: postgres.TransactionSql,
   input: CreatePlayerInput,
+  actor: { adminUserId: number },
 ): Promise<CreatedPlayer> {
   const displayName = input.displayName.trim();
   if (!displayName || displayName.length > 100) {
     throw new Error('Display name is required (up to 100 characters).');
+  }
+  if (!Number.isInteger(actor.adminUserId) || actor.adminUserId <= 0) {
+    throw new Error('A valid administrator id is required to create a player.');
   }
   let givenName = input.givenName?.trim() || null;
   let surname = input.surname?.trim() || null;
@@ -309,43 +331,14 @@ export async function createPlayerInTransaction(
     }
   }
 
-  const sortName = surname ? (givenName ? `${surname}, ${givenName}` : surname) : displayName;
-  const slug = displayName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'player';
-
   const dob = input.dob ? input.dob.trim() : null;
   const dobConfidence = dob ? (input.dobConfidence || 'sourced') : 'unknown';
   const birthYear = dob && /^\d{4}/.test(dob) ? Number(dob.slice(0, 4)) : null;
+  const heightCm = input.heightCm ?? null;
+  const weightKg = input.weightKg ?? null;
+  const notes = input.notes?.trim() || null;
 
-  if (input.draftInfo && (
-    !Number.isInteger(input.draftInfo.draftYear)
-    || input.draftInfo.draftYear < 1981
-    || input.draftInfo.draftYear > 2100
-  )) {
-    throw new Error(
-      'An explicit draft year from 1981 to 2100 is required when draft information is supplied.',
-    );
-  }
-
-  let draftClubNameRaw: string | null = null;
-  if (input.draftInfo?.clubId != null) {
-    if (!Number.isInteger(input.draftInfo.clubId) || input.draftInfo.clubId <= 0) {
-      throw new Error('Draft club ID must be a positive integer.');
-    }
-    const [club] = await tx<{ id: number; name: string; activeId: number | null }[]>`
-      SELECT c.id, c.name,
-             afldb_identity_for_season(c.organization_id, ${input.draftInfo.draftYear}) AS "activeId"
-        FROM clubs c
-       WHERE c.id = ${input.draftInfo.clubId}
-    `;
-    if (!club) throw new Error(`Draft club #${input.draftInfo.clubId} does not exist.`);
-    if (club.activeId !== club.id) {
-      throw new Error(`${club.name} is not the historical club identity active in ${input.draftInfo.draftYear}.`);
-    }
-    draftClubNameRaw = club.name;
-  }
+  const token = randomUUID();
 
   const [row] = await tx<CreatedPlayer[]>`
     INSERT INTO players (
@@ -354,11 +347,17 @@ export async function createPlayerInTransaction(
       height_cm, weight_kg, notes,
       debut_season, final_season
     ) VALUES (
-      ${displayName}, ${givenName}, ${surname}, ${sortName},
-      afldb_normalise_name(${displayName}), ${slug},
+      ${displayName}, ${givenName}, ${surname},
+      CASE
+        WHEN ${surname}::text IS NULL THEN ${displayName}::text
+        WHEN ${givenName}::text IS NULL THEN ${surname}::text
+        ELSE ${surname}::text || ', ' || ${givenName}::text
+      END,
+      afldb_normalise_name(${displayName}),
+      regexp_replace(afldb_normalise_name(${displayName}), '\\s+', '-', 'g'),
       ${dob}::date, ${dobConfidence}::value_confidence,
       ${birthYear}, ${dobConfidence}::value_confidence,
-      ${input.heightCm ?? null}, ${input.weightKg ?? null}, ${input.notes?.trim() || null},
+      ${heightCm}, ${weightKg}, ${notes},
       ${input.debutSeason ?? null}, ${input.finalSeason ?? null}
     )
     RETURNING id, slug, display_name AS "displayName"
@@ -381,37 +380,63 @@ export async function createPlayerInTransaction(
     ) ON CONFLICT (player_id) DO NOTHING
   `;
 
-  // Optional draft & recruitment record. The year is deliberately required:
-  // neither a birth date nor the wall clock is evidence of a draft season.
-  if (input.draftInfo) {
-    const d = input.draftInfo;
-    const draftType = d.draftType?.trim() || 'National Draft';
+  // The durable identity. 'resolved' is the human-decision status (as opposed
+  // to an importer's 'unique'), matching every other admin-authored link.
+  await tx`
+    INSERT INTO external_identities
+          (source_id, external_id, external_name, external_url, player_id,
+           status, candidate_count, match_method, notes)
+    VALUES ((SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+            ${token}, ${displayName}, NULL, ${row.id},
+            'resolved', 0, 'manual_admin_edit',
+            'Player created in the AFLDB admin surface (AFLDB-ISSUE-160 §5).')
+  `;
 
-    await tx`
-      INSERT INTO draft_picks (
-        draft_year, draft_type, pick_number, player_name_raw, player_id,
-        link_status_value, club_id, club_name_raw, original_club_raw,
-        height_cm, weight_kg, draft_age, pick_note, detail
-      ) VALUES (
-        ${d.draftYear},
-        ${draftType},
-        ${d.pickNumber ?? null},
-        ${displayName},
-        ${row.id},
-        'resolved',
-        ${d.clubId ?? null},
-        ${draftClubNameRaw},
-        ${d.recruitedFrom?.trim() || null},
-        ${input.heightCm ?? null},
-        ${input.weightKg ?? null},
-        ${d.draftAge ?? null},
-        ${d.pickNote?.trim() || null},
-        ${d.detail?.trim() || null}
-      )
-    `;
+  // The durable record. Absent-vs-explicit-null is preserved: a key is
+  // written only for a field the caller supplied, so the §8.1 replay's
+  // jsonb_exists arms mean what they say. display_name is always present --
+  // it is NOT NULL, and the replay re-creates the row from it.
+  const identityPayload: Record<string, unknown> = { display_name: displayName };
+  identityPayload.given_name = givenName;
+  identityPayload.surname = surname;
+  if (input.dob !== undefined) {
+    identityPayload.dob = dob;
+    identityPayload.dob_confidence = dobConfidence;
+    identityPayload.birth_year = birthYear;
   }
+  if (input.heightCm !== undefined) identityPayload.height_cm = heightCm;
+  if (input.weightKg !== undefined) identityPayload.weight_kg = weightKg;
+  if (input.notes !== undefined) identityPayload.notes = notes;
+
+  await tx`
+    INSERT INTO data_overrides
+          (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
+    VALUES ('players', ${`manual_admin_edit:${token}`}, 'identity',
+            ${tx.json(identityPayload as postgres.JSONValue)}, ${actor.adminUserId}, true, now())
+  `;
 
   return row;
+}
+
+/**
+ * The `manual_admin_edit` token a player carries, or null when it holds none
+ * (or, refusing to choose, more than one). Read inside the caller's
+ * transaction: nothing identity-shaped is ever trusted from the browser (§4).
+ */
+export async function readManualPlayerToken(
+  tx: postgres.TransactionSql,
+  playerId: number,
+): Promise<string | null> {
+  const rows = await tx<{ externalId: string }[]>`
+    SELECT e.external_id AS "externalId"
+      FROM external_identities e
+      JOIN sources s ON s.id = e.source_id
+     WHERE e.player_id = ${playerId}
+       AND s.key = 'manual_admin_edit'
+       AND e.status IN ('unique', 'resolved')
+     ORDER BY e.external_id
+  `;
+  return rows.length === 1 ? rows[0].externalId : null;
 }
 
 /**
@@ -437,13 +462,13 @@ export async function createPlayer(
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
     const created = await importSql.begin(async (tx) => {
-      const player = await createPlayerInTransaction(tx, input);
+      const player = await createPlayerInTransaction(tx, input, { adminUserId: audit.adminUserId });
       await recordDataEdit(tx, {
         tableName: 'players',
         rowId: player.id,
         fieldGroup: 'player_creation',
         oldValues: {},
-        newValues: { displayName: player.displayName, hasDraftInfo: Boolean(input.draftInfo) },
+        newValues: { displayName: player.displayName },
         adminUserId: audit.adminUserId,
         note: audit.note,
       });

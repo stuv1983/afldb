@@ -15,6 +15,69 @@ commit.
 
 ## [Unreleased]
 
+### Draft administration gains one mutation contract, and admin-created people become promotable (AFLDB-ISSUE-160 Stage 1, ISSUE-156 P3b) - 11 September 2026
+
+- `createPlayerInTransaction()` -- the one player-creation primitive in `src/` -- now mints a
+  durable identity for every player it creates: an `external_identities (manual_admin_edit,
+  <token>)` row and a whole-row `data_overrides ('players', 'manual_admin_edit:<token>',
+  'identity')` record, in the same transaction. This is behavioural and it closes a real gap:
+  before it, an admin-created player was named by nothing outside its own id, so
+  `replay_admin_overrides` could not patch it, no replay re-created it after a destructive
+  reload, and its `player_creation` audit rows resolved to nothing on a promotion -- which
+  STOPS a PROD promotion. It also derives `search_name`, `slug` and `sort_name` in SQL, by the
+  same expressions the fitzRoy importer and the replay use, so a replayed player is
+  byte-identical to the one the administrator typed. (Deriving the slug in JavaScript was also
+  producing a wrong one: the `'\s+'` in the old template literal was the letter `s`, so every
+  run of `s` in a name became a hyphen.)
+- New `src/db/queries/admin-draft.ts` is the only `INSERT INTO draft_picks` in `src/`, and the
+  only place draft selections are created, corrected, relinked, adopted or retired. A manual
+  selection is an ordinary `draft_picks` row under the `manual_admin_edit` source with
+  `player_url = 'manual:<token>'` -- inside migration 069's partial reload key, and unable to
+  collide with the DraftGuru URL contract. Its durable record names its player by IDENTITY and
+  its club by SLUG, never by an id a promotion renumbers. Every mutation is one import-role
+  transaction: canonical write, `data_overrides`, `recordDataEdit()`, all or nothing.
+- Draft selections can now be created for a player who does not exist yet, atomically. The
+  duplicate contract refuses rather than guesses: an existing player with the same normalised
+  name and no distinguishing date of birth is a hard refusal, a namesake with a different
+  recorded date needs an explicit confirmation, and an unlinked DraftGuru selection for the
+  same event is surfaced so the administrator links it instead. No fuzzy score decides identity
+  anywhere. A pick number already held in the same draft and kind is refused outright --
+  measured: zero such collisions exist across all 6,810 source selections.
+- `replay_admin_overrides()` gains manual branches for `players` and `draft_picks`, each
+  fail-closed over the whole active set before it writes: an administrator-created footballer
+  and their selections are re-created on a rebuilt database rather than vanishing at the swap.
+  When the player has since debuted and their AFL Tables profile was attached, the replay
+  BINDS the token onto the existing source-created row instead of inserting a twin. The
+  ordering `players` -> `draft_picks` is binding, and `docs/production-promotion.md` §8 now
+  says so and includes `draft_picks` in the replay loop.
+- `tools/migration/import_fitzroy_core.py` refuses, fail-closed, to insert a new canonical
+  player whose normalised name matches an administrator-created player still awaiting an AFL
+  Tables identity, unless both dates of birth are known and different. The rule is symmetric:
+  an unknown date on either side refuses, because an unknown date distinguishes nobody. The
+  guard runs only in the new-player INSERT branch, never writes `external_identities`, never
+  sets a `player_id`, and has exactly two outcomes -- safe to insert, or fail the whole players
+  batch with the manual player named. A name and a date may refuse an unsafe insert here; they
+  may never link a player.
+- Promotion lineage: `data_edits` rows with `table_name = 'draft_picks'` now have a stable
+  identity (`<source key>|<player_url>|<draft_year>|<draft_kind>`) and are remapped or refused.
+  They were previously reinstated with their integer `row_id` unchanged and never counted,
+  listed or remapped -- silent misattribution on any lineage-changing promotion. The `players`
+  rule admits the manual token alongside the AFL Tables path, one identity per player, path
+  first. A selection carrying no `source_id` has no key and reports unresolved rather than
+  being carried across by an integer that now names someone else.
+- `/admin/data-editor` is no longer a second draft writer: `saveDataEdit` and `saveEdit` refuse
+  `draft_picks`, `getEditableRow` returns nothing for it, and `CreatePlayerForm` has lost its
+  draft block. `EDITABLE_ENTITIES.draft_picks` stays as the field spec the new surface
+  validates with, and gains a `selection_facts` group (pick number, club) the generic editor
+  never had. This also removes the writer that produced `null|null|<year>|null` override keys
+  for admin-created selections -- one key shared by every admin pick of a year, which the
+  UNIQUE made the second edit silently overwrite and which no replay could ever match.
+- A pre-ISSUE-160 selection with no provenance can be adopted, one row at a time, by an
+  explicit Super Admin action that mints its identity and durable record -- and the linked
+  player's identity too, when that player has none. A second identity is never minted when a
+  valid one already exists. There is no bulk backfill, because a durable record needs an
+  administrator to attribute it to and a migration cannot supply one.
+
 ### Coach data becomes administrable, and the settle proof stops depending on deploy order (AFLDB-ISSUE-159 Stage 1, ISSUE-156 P3) - 11 September 2026
 
 - The nightly settle's override-scope proof no longer pins the `data_overrides.entity_type`

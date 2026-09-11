@@ -890,6 +890,28 @@ class Reporter:
     def warn(self, message: str) -> None:
         print(f"    WARNING: {message}", flush=True)
 
+# The frozen DraftGuru event-kind enumeration (migration 069). The ONE authority
+# is data/reference/draftguru-event-kinds.json; this copy exists because the
+# replay must fail closed WITHOUT reading a repository file at import time, and
+# tests/data-overrides-source-contract.test.ts asserts the two are equal so they
+# cannot drift. draft_kind is an enumeration and is NEVER derived from
+# draft_type -- the 1981/1982/1987 pages carry no Draft column at all, and those
+# 113 rows are ('National Draft', 'national') while every other national row is
+# ('National', 'national').
+MANUAL_DRAFT_KINDS = (
+    "free_agency",
+    "midseason",
+    "mini_draft",
+    "national",
+    "post_draft",
+    "pre_draft",
+    "preseason",
+    "rookie",
+    "trade",
+    "training_squad_selection",
+)
+
+
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
 
@@ -899,6 +921,180 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """
     with conn.cursor() as cur:
         if table == "players":
+            # AFLDB-ISSUE-160 §8.1. Two key shapes share entity_type 'players':
+            #
+            #   'afltables:players/S/Some_Player0.html'  a source-owned player whose
+            #                                            fields a human corrected
+            #   'manual_admin_edit:<token>'              an admin-CREATED player, whose
+            #                                            canonical row this replay is
+            #                                            what re-creates after a
+            #                                            destructive reload or a
+            #                                            promotion
+            #
+            # The manual branch is the only place in the players replay that INSERTs a
+            # canonical row, and it must be: players is rebuilt on promotion, so without
+            # it an admin-created footballer does not survive the swap, and their
+            # data_edits rows resolve to nothing and STOP the promotion (DEF-4a).
+            #
+            # Identity is never name-derived. The token is a randomUUID minted once by
+            # createPlayerInTransaction() and never edited.
+            #
+            # Fail closed FIRST, over the whole active manual set, before anything is
+            # written. An override whose payload cannot re-create a row is a human
+            # decision this reload cannot honour, and a reload that silently drops one
+            # is worse than a reload that stops.
+            cur.execute("""
+                SELECT o.entity_key,
+                       CASE
+                           WHEN o.override_values->>'display_name' IS NULL
+                               THEN 'manual player override carries no display_name to re-create the row with'
+                           WHEN length(substring(o.entity_key from position(':' in o.entity_key) + 1)) = 0
+                               THEN 'entity_key carries no token'
+                           WHEN o.override_values->>'dob' IS NOT NULL
+                                 AND COALESCE(o.override_values->>'dob_confidence', 'unknown') = 'unknown'
+                               THEN 'manual player override carries a dob with no dob_confidence '
+                                    '(players_dob_confidence_ck, migration 018)'
+                           WHEN jsonb_exists(o.override_values, 'afltables_profile_path')
+                                 AND o.override_values->>'afltables_profile_path' IS NOT NULL
+                                 AND (SELECT count(DISTINCT e.player_id)
+                                        FROM external_identities e
+                                        JOIN sources s ON s.id = e.source_id
+                                       WHERE s.key = 'afltables'
+                                         AND e.match_method = 'afltables_profile_url'
+                                         AND e.status IN ('unique', 'resolved')
+                                         AND e.player_id IS NOT NULL
+                                         AND e.external_id = o.override_values->>'afltables_profile_path') > 1
+                               THEN 'afltables_profile_path resolves to more than one player'
+                       END AS problem
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'players' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+            """)
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(players): refusing to commit, "
+                    + str(len(unresolvable)) + " active manual override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # Every manual override whose token names no identity in THIS database --
+            # i.e. the player is missing, which is exactly the state a rebuilt candidate
+            # is in. Guarded by NOT EXISTS rather than ON CONFLICT: players has no
+            # natural unique key for a conflict target to name.
+            cur.execute("""
+                SELECT substring(o.entity_key from position(':' in o.entity_key) + 1) AS token,
+                       o.override_values,
+                       (SELECT min(e.player_id)
+                          FROM external_identities e
+                          JOIN sources s ON s.id = e.source_id
+                         WHERE s.key = 'afltables'
+                           AND e.match_method = 'afltables_profile_url'
+                           AND e.status IN ('unique', 'resolved')
+                           AND e.player_id IS NOT NULL
+                           AND e.external_id = o.override_values->>'afltables_profile_path')
+                           AS bound_player_id
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'players' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                   AND NOT EXISTS (
+                         SELECT 1 FROM external_identities e
+                           JOIN sources s ON s.id = e.source_id
+                          WHERE s.key = 'manual_admin_edit'
+                            AND e.external_id = substring(o.entity_key from position(':' in o.entity_key) + 1)
+                            AND e.player_id IS NOT NULL)
+                 ORDER BY o.entity_key
+            """)
+            pending_manual_players = cur.fetchall()
+
+            for token, payload, bound_player_id in pending_manual_players:
+                if bound_player_id is not None:
+                    # The player ALREADY exists in this database under their AFL Tables
+                    # profile, because they debuted and the rebuild created them from the
+                    # source. Bind the token onto that row instead of creating a twin.
+                    # This is what makes a promotion AFTER the debut produce one player,
+                    # not two -- and it must happen before the data_edits remap, which is
+                    # why the ordering players -> draft_picks is binding.
+                    player_id = bound_player_id
+                else:
+                    # search_name, slug and sort_name are derived by the SAME expressions
+                    # import_fitzroy_core.import_players() and createPlayerInTransaction()
+                    # use, so a replayed twin is byte-identical to the row the admin typed.
+                    cur.execute("""
+                        INSERT INTO players
+                              (display_name, given_name, surname, sort_name, search_name, slug,
+                               dob, dob_confidence, birth_year, birth_year_confidence,
+                               height_cm, weight_kg, notes)
+                        SELECT %(display_name)s, %(given_name)s, %(surname)s,
+                               CASE
+                                   WHEN %(surname)s::text IS NULL THEN %(display_name)s::text
+                                   WHEN %(given_name)s::text IS NULL THEN %(surname)s::text
+                                   ELSE %(surname)s::text || ', ' || %(given_name)s::text
+                               END,
+                               afldb_normalise_name(%(display_name)s),
+                               regexp_replace(afldb_normalise_name(%(display_name)s), '\\s+', '-', 'g'),
+                               %(dob)s::date,
+                               COALESCE(%(dob_confidence)s::value_confidence, 'unknown'),
+                               %(birth_year)s::smallint,
+                               COALESCE(%(dob_confidence)s::value_confidence, 'unknown'),
+                               %(height_cm)s::smallint, %(weight_kg)s::smallint, %(notes)s
+                        RETURNING id
+                    """, {
+                        "display_name": payload.get("display_name"),
+                        "given_name": payload.get("given_name"),
+                        "surname": payload.get("surname"),
+                        "dob": payload.get("dob"),
+                        "dob_confidence": payload.get("dob_confidence"),
+                        "birth_year": payload.get("birth_year"),
+                        "height_cm": payload.get("height_cm"),
+                        "weight_kg": payload.get("weight_kg"),
+                        "notes": payload.get("notes"),
+                    })
+                    player_id = cur.fetchone()[0]
+                    # The derived rebuild regenerates the real figures; this is the same
+                    # zero row createPlayerInTransaction() seeds.
+                    cur.execute("""
+                        INSERT INTO player_career_stats
+                              (player_id, games, goals, finals, premierships, wins, draws, losses,
+                               brownlow_votes, brownlow_medals, clubs_played, seasons_played,
+                               behinds_recorded_games, kicks_recorded_games, handballs_recorded_games,
+                               disposals_recorded_games, marks_recorded_games, tackles_recorded_games,
+                               hitouts_recorded_games)
+                        VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+                        ON CONFLICT (player_id) DO NOTHING
+                    """, (player_id,))
+
+                cur.execute("""
+                    INSERT INTO external_identities
+                          (source_id, external_id, external_name, player_id,
+                           status, candidate_count, match_method, notes)
+                    VALUES ((SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                            %s, %s, %s, 'resolved', 0, 'manual_admin_edit',
+                            'Re-created from the durable admin record (AFLDB-ISSUE-160 §8.1).')
+                    ON CONFLICT (source_id, external_id) DO NOTHING
+                """, (token, payload.get("display_name"), player_id))
+
+                # An attached AFL Tables path is a human decision too, and a rebuilt
+                # candidate that lacks it would leave the player unreachable by the
+                # source on the next import. Registered only when no other player
+                # already holds it -- the pre-check proved at most one does.
+                afl_path = payload.get("afltables_profile_path")
+                if afl_path and bound_player_id is None:
+                    cur.execute("""
+                        INSERT INTO external_identities
+                              (source_id, external_id, external_name, external_url, player_id,
+                               status, candidate_count, match_method, notes)
+                        SELECT (SELECT id FROM sources WHERE key = 'afltables'),
+                               %(path)s, %(name)s,
+                               'https://afltables.com/afl/stats/' || %(path)s, %(player_id)s,
+                               'resolved', 0, 'afltables_profile_url',
+                               'Re-created from the durable admin record (AFLDB-ISSUE-160 §8.1).'
+                         WHERE NOT EXISTS (
+                                 SELECT 1 FROM external_identities e
+                                   JOIN sources s ON s.id = e.source_id
+                                  WHERE s.key = 'afltables' AND e.external_id = %(path)s)
+                    """, {"path": afl_path, "name": payload.get("display_name"),
+                          "player_id": player_id})
+
             # display_name is NOT NULL (explicit NULL forbidden), so COALESCE is safe.
             # given_name, surname, dob, height_cm, weight_kg, notes are nullable (explicit NULL permitted),
             # so they must use jsonb_exists to distinguish absent vs explicit JSON null.
@@ -1017,6 +1213,148 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
             """)
 
         elif table == "draft_picks":
+            # AFLDB-ISSUE-160 §8.2. Two key shapes share entity_type 'draft_picks':
+            #
+            #   '<source_id>|<player_url>|<year>|<kind>'  a source-owned DraftGuru
+            #                                             selection a human corrected
+            #                                             (migration 069's reload key,
+            #                                             unchanged -- R-7)
+            #   'manual_admin_edit:<token>'               an admin-CREATED selection,
+            #                                             whose canonical row this
+            #                                             replay is what re-creates
+            #
+            # draft_picks is rebuilt on promotion, so without the manual branch an
+            # admin-recorded selection simply does not exist in the promoted database
+            # (DEF-4b). The manual row carries player_url = 'manual:<token>', which the
+            # DraftGuru URL contract regex cannot match, so it lives inside 069's
+            # partial unique index without ever colliding with a source row.
+            #
+            # ORDERING IS BINDING: replay_admin_overrides(players) runs FIRST, because a
+            # manual selection's payload names its player by IDENTITY -- a token or an
+            # AFL Tables path -- and that identity has to exist before this can resolve it.
+            #
+            # Fail closed FIRST, over the whole active manual set.
+            cur.execute("""
+                SELECT o.entity_key,
+                       CASE
+                           WHEN length(substring(o.entity_key from position(':' in o.entity_key) + 1)) = 0
+                               THEN 'entity_key carries no token'
+                           WHEN o.override_values->>'player_identity' IS NULL
+                               THEN 'manual selection override names no player identity'
+                           WHEN o.override_values->>'club_slug' IS NULL
+                               THEN 'manual selection override names no club'
+                           WHEN (SELECT count(*) FROM clubs c
+                                  WHERE c.slug = o.override_values->>'club_slug') <> 1
+                               THEN 'club_slug does not resolve to exactly one club'
+                           WHEN o.override_values->>'draft_year' IS NULL
+                                 OR o.override_values->>'draft_kind' IS NULL
+                                 OR o.override_values->>'draft_type' IS NULL
+                               THEN 'manual selection override is missing draft_year, draft_kind or draft_type'
+                           WHEN NOT (o.override_values->>'draft_kind' = ANY(%(kinds)s))
+                               THEN 'draft_kind is not one of the frozen draft event kinds'
+                           WHEN (SELECT count(DISTINCT e.player_id)
+                                   FROM external_identities e
+                                   JOIN sources s ON s.id = e.source_id
+                                  WHERE e.status IN ('unique', 'resolved')
+                                    AND e.player_id IS NOT NULL
+                                    AND s.key = split_part(o.override_values->>'player_identity', ':', 1)
+                                    AND e.external_id = substring(o.override_values->>'player_identity'
+                                                                  from position(':' in o.override_values->>'player_identity') + 1)
+                                 ) <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM data_overrides o
+                 WHERE o.entity_type = 'draft_picks' AND o.is_active = true
+                   AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+            """, {"kinds": list(MANUAL_DRAFT_KINDS)})
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(draft_picks): refusing to commit, "
+                    + str(len(unresolvable)) + " active manual override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            # The manual set, decoded once: the identity resolution and the two writes
+            # below must never be able to disagree about what a key means.
+            manual_decoded = """
+                manual AS (
+                    SELECT substring(o.entity_key from position(':' in o.entity_key) + 1) AS token,
+                           o.override_values AS v,
+                           (SELECT DISTINCT e.player_id
+                              FROM external_identities e
+                              JOIN sources s ON s.id = e.source_id
+                             WHERE e.status IN ('unique', 'resolved')
+                               AND e.player_id IS NOT NULL
+                               AND s.key = split_part(o.override_values->>'player_identity', ':', 1)
+                               AND e.external_id = substring(o.override_values->>'player_identity'
+                                                             from position(':' in o.override_values->>'player_identity') + 1)
+                           ) AS player_id,
+                           (SELECT c.id FROM clubs c WHERE c.slug = o.override_values->>'club_slug') AS club_id,
+                           (SELECT c.name FROM clubs c WHERE c.slug = o.override_values->>'club_slug') AS club_name
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'draft_picks' AND o.is_active = true
+                       AND split_part(o.entity_key, ':', 1) = 'manual_admin_edit'
+                )
+            """
+
+            # 1. Re-create every admin-created selection the reload removed or that a
+            #    rebuilt database never had.
+            cur.execute("WITH " + manual_decoded + """
+                INSERT INTO draft_picks
+                      (draft_year, draft_type, draft_kind, pick_number, pick_note,
+                       player_id, player_name_raw, link_status_value, candidate_count, match_method,
+                       club_id, club_name_raw, original_club_raw,
+                       draft_age, height_cm, weight_kg, detail,
+                       source_id, source_record_id, player_url)
+                SELECT (m.v->>'draft_year')::smallint, m.v->>'draft_type', m.v->>'draft_kind',
+                       (m.v->>'pick_number')::smallint, m.v->>'pick_note',
+                       m.player_id, COALESCE(m.v->>'player_name_raw', p.display_name),
+                       'resolved', 0, 'manual_admin_edit',
+                       m.club_id, m.club_name, m.v->>'original_club_raw',
+                       (m.v->>'draft_age')::smallint, (m.v->>'height_cm')::smallint,
+                       (m.v->>'weight_kg')::smallint, m.v->>'detail',
+                       (SELECT id FROM sources WHERE key = 'manual_admin_edit'),
+                       m.token, 'manual:' || m.token
+                  FROM manual m
+                  JOIN players p ON p.id = m.player_id
+                 WHERE NOT EXISTS (
+                         SELECT 1 FROM draft_picks d
+                           JOIN sources s ON s.id = d.source_id
+                          WHERE s.key = 'manual_admin_edit'
+                            AND d.player_url = 'manual:' || m.token)
+            """)
+
+            # 2. Apply the payload to every manual row, so a corrected year, kind, pick,
+            #    club or player link replays too. The override IS the row for a manual
+            #    selection -- unlike a source-owned correction, which is a delta -- so
+            #    this is an unconditional whole-row UPDATE, not a jsonb_exists patch.
+            cur.execute("WITH " + manual_decoded + """
+                UPDATE draft_picks d
+                   SET draft_year = (m.v->>'draft_year')::smallint,
+                       draft_type = m.v->>'draft_type',
+                       draft_kind = m.v->>'draft_kind',
+                       pick_number = (m.v->>'pick_number')::smallint,
+                       pick_note = m.v->>'pick_note',
+                       player_id = m.player_id,
+                       player_name_raw = COALESCE(m.v->>'player_name_raw', d.player_name_raw),
+                       link_status_value = 'resolved',
+                       club_id = m.club_id,
+                       club_name_raw = m.club_name,
+                       original_club_raw = m.v->>'original_club_raw',
+                       draft_age = (m.v->>'draft_age')::smallint,
+                       height_cm = (m.v->>'height_cm')::smallint,
+                       weight_kg = (m.v->>'weight_kg')::smallint,
+                       detail = m.v->>'detail'
+                  FROM manual m
+                 WHERE d.player_url = 'manual:' || m.token
+                   AND d.source_id = (SELECT id FROM sources WHERE key = 'manual_admin_edit')
+            """)
+
+            # 3. The source-owned patch, unchanged in shape and extended with the
+            #    selection_facts group (pick_number, club) ISSUE-160 added to the editor
+            #    spec. Every field is nullable, so absent-vs-explicit-null is preserved
+            #    by jsonb_exists -- the migration-086 discipline. player_name_raw is
+            #    NOT NULL, so it COALESCEs.
             cur.execute("""
                 UPDATE draft_picks d
                    SET player_name_raw = COALESCE(o.override_values->>'player_name_raw', d.player_name_raw),
@@ -1025,7 +1363,18 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                        height_cm = CASE WHEN jsonb_exists(o.override_values, 'height_cm') THEN (o.override_values->>'height_cm')::integer ELSE d.height_cm END,
                        weight_kg = CASE WHEN jsonb_exists(o.override_values, 'weight_kg') THEN (o.override_values->>'weight_kg')::integer ELSE d.weight_kg END,
                        pick_note = CASE WHEN jsonb_exists(o.override_values, 'pick_note') THEN o.override_values->>'pick_note' ELSE d.pick_note END,
-                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END
+                       detail = CASE WHEN jsonb_exists(o.override_values, 'detail') THEN o.override_values->>'detail' ELSE d.detail END,
+                       pick_number = CASE WHEN jsonb_exists(o.override_values, 'pick_number') THEN (o.override_values->>'pick_number')::smallint ELSE d.pick_number END,
+                       club_id = CASE
+                           WHEN jsonb_exists(o.override_values, 'club_slug')
+                                AND o.override_values->>'club_slug' IS NOT NULL
+                               THEN COALESCE((SELECT c.id FROM clubs c WHERE c.slug = o.override_values->>'club_slug'), d.club_id)
+                           ELSE d.club_id END,
+                       club_name_raw = CASE
+                           WHEN jsonb_exists(o.override_values, 'club_slug')
+                                AND o.override_values->>'club_slug' IS NOT NULL
+                               THEN COALESCE((SELECT c.name FROM clubs c WHERE c.slug = o.override_values->>'club_slug'), d.club_name_raw)
+                           ELSE d.club_name_raw END
                   FROM data_overrides o
                  WHERE o.entity_type = 'draft_picks'
                    AND o.entity_key = d.source_id::text || '|' || d.player_url || '|' || d.draft_year::text || '|' || d.draft_kind

@@ -524,7 +524,9 @@ export async function createPlayerAndResolveLink(input: {
       if (decision.type === 'confirmed_unlinked') return 'stale_unlinked';
       if (decision.type === 'linked') return 'already_resolved';
 
-      const player = await createPlayerInTransaction(tx, input.player);
+      const player = await createPlayerInTransaction(tx, input.player, {
+        adminUserId: input.adminUserId,
+      });
       await applyLockedLink(
         tx,
         input.targetTable,

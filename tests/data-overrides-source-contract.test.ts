@@ -217,7 +217,12 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   });
 
   test('DraftGuru replay hook contract', () => {
-    expect(pyCommon).toMatch(/elif table == "draft_picks":\s+cur\.execute\("""\s+UPDATE draft_picks d\s+SET.*?entity_key = d\.source_id::text \|\| '\|' \|\| d\.player_url \|\| '\|' \|\| d\.draft_year::text \|\| '\|' \|\| d\.draft_kind/s);
+    // AFLDB-ISSUE-160 §8.2 put a fail-closed pre-check and the manual-row branch ahead
+    // of this patch, so the UPDATE is no longer the first statement of the branch. What
+    // must not change is the KEY it joins on: migration 069's reload key, unchanged
+    // (R-7), because rewriting it would orphan every override already written.
+    expect(pyCommon).toMatch(/elif table == "draft_picks":/);
+    expect(pyCommon).toMatch(/UPDATE draft_picks d\s+SET.*?entity_key = d\.source_id::text \|\| '\|' \|\| d\.player_url \|\| '\|' \|\| d\.draft_year::text \|\| '\|' \|\| d\.draft_kind/s);
     expect(pyDraftGuru).toMatch(/from common import \([^)]*replay_admin_overrides/s);
     expect(pyDraftGuru).toMatch(/reconcile_draftguru_identities\([\s\S]*?\)\s+replay_admin_overrides\(pg, "draft_picks"\)\s+report_reload\(rep, "draft_persons"/);
   });
@@ -303,5 +308,130 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
       /GRANT\s+(?:SELECT|UPDATE)\s+ON\s+SEQUENCE\s+data_overrides_id_seq/i,
     );
     expect(reconcilerGrant).not.toMatch(/grant_import_write\(['"]data_overrides['"]\)/i);
+  });
+});
+
+describe('AFLDB-ISSUE-160 source contract', () => {
+  const root = process.cwd();
+  // Line endings are normalised on read. The worktree is an autocrlf=true checkout, so
+  // every tracked file is CRLF here and LF on the Linux host; an assertion that pins a
+  // literal newline would otherwise pass on one and fail on the other.
+  const readSource = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf-8')
+    .replace(/\r\n/g, '\n');
+  const pyCommon = readSource('tools/migration/common.py');
+  const pyFitzroy = readSource('tools/migration/import_fitzroy_core.py');
+  const pyDraftGuru = readSource('tools/rebuild/draftguru/import_draftguru.py');
+  const pyExport = readSource('tools/rebuild/draftguru/export_link_decisions.py');
+
+  test('exactly one INSERT INTO draft_picks in src/ — and it is admin-draft.ts (D-5)', () => {
+    // W-10. Two admin write paths with different semantics is the thing ISSUE-160
+    // exists to end; a grep is the only check that stays true as the tree grows.
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        // Strip comments first: a doc comment that NAMES the rule is not a second
+        // writer, and a test that cannot tell the difference would forbid explaining it.
+        const code = fs.readFileSync(full, 'utf-8').replace(/\r\n/g, '\n')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        if (/INSERT\s+INTO\s+draft_picks/i.test(code)) {
+          found.push(path.relative(root, full).split(path.sep).join('/'));
+        }
+      }
+    };
+    walk(path.join(root, 'src'));
+    expect(found).toEqual(['src/db/queries/admin-draft.ts']);
+  });
+
+  test('the manual selection identity namespace cannot collide with the source one', () => {
+    const adminDraft = readSource('src/db/queries/admin-draft.ts');
+    // 'manual:<uuid>' is not a URL, so the DraftGuru canonical_player_url regex — the
+    // contract the importer keys on — can never match it.
+    expect(adminDraft).toContain("return `manual:${token}`;");
+    const contract = JSON.parse(fs.readFileSync(
+      path.join(root, 'tools/rebuild/draftguru/draftguru-contract.json'), 'utf-8'));
+    const urlRe = new RegExp(contract.canonical_player_url.regex);
+    expect(urlRe.test('manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455')).toBe(false);
+    // And the token is minted, never derived from anything a human typed.
+    expect(adminDraft).toContain("import { randomUUID } from 'node:crypto';");
+    expect(adminDraft).not.toMatch(/manual:\$\{[^}]*[Nn]ame/);
+  });
+
+  test('the frozen draft-kind enumeration in the replay equals the tracked contract', () => {
+    // common.py cannot read a repository file at import time and still fail closed, so
+    // it carries a copy. This is the assertion that stops the two drifting.
+    const kinds = JSON.parse(fs.readFileSync(
+      path.join(root, 'data/reference/draftguru-event-kinds.json'), 'utf-8'));
+    const expected = [...new Set([
+      ...kinds.events.map((e: { draft_kind: string }) => e.draft_kind),
+      kinds.absent_column.draft_kind,
+    ])].sort();
+    const block = pyCommon.slice(pyCommon.indexOf('MANUAL_DRAFT_KINDS = ('));
+    const declared = [...block.slice(0, block.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort();
+    expect(declared).toEqual(expected);
+  });
+
+  test('the players replay re-creates a manual player and fails closed first (§8.1)', () => {
+    expect(pyCommon).toContain('replay_admin_overrides(players): refusing to commit');
+    // Guarded by NOT EXISTS on the identity, not ON CONFLICT: players has no natural
+    // unique key a conflict target could name.
+    expect(pyCommon).toMatch(/NOT EXISTS \(\s+SELECT 1 FROM external_identities e/);
+    expect(pyCommon).toContain("s.key = 'manual_admin_edit'");
+    // The bind branch: a manual player who has since debuted resolves onto the
+    // candidate's path-player instead of being created twice.
+    expect(pyCommon).toContain('bound_player_id');
+    expect(pyCommon).toContain('INSERT INTO player_career_stats');
+  });
+
+  test('the draft_picks replay re-creates a manual selection and fails closed first (§8.2)', () => {
+    expect(pyCommon).toContain('replay_admin_overrides(draft_picks): refusing to commit');
+    expect(pyCommon).toContain('player_identity does not resolve to exactly one player');
+    expect(pyCommon).toContain('club_slug does not resolve to exactly one club');
+    expect(pyCommon).toContain('draft_kind is not one of the frozen draft event kinds');
+    // The manual row is re-created only when it is absent, and then whole-row UPDATEd
+    // from its payload, so a corrected year or club replays too.
+    expect(pyCommon).toMatch(/INSERT INTO draft_picks[\s\S]{0,2000}?d\.player_url = 'manual:' \|\| m\.token/);
+    // The source-owned patch keeps its 069 key and gains selection_facts.
+    expect(pyCommon).toMatch(
+      /entity_key = d\.source_id::text \|\| '\|' \|\| d\.player_url \|\| '\|' \|\| d\.draft_year::text \|\| '\|' \|\| d\.draft_kind/);
+    expect(pyCommon).toMatch(/pick_number = CASE WHEN jsonb_exists\(o\.override_values, 'pick_number'\)/);
+    expect(pyCommon).toMatch(/club_id = CASE\s+WHEN jsonb_exists\(o\.override_values, 'club_slug'\)/);
+  });
+
+  test('D-2: the fitzRoy guard refuses, and can never link', () => {
+    // The whole point of the guard: a name and a date of birth may REFUSE an unsafe
+    // insert; they may never attach an identity or set a player_id.
+    const guard = pyFitzroy.slice(
+      pyFitzroy.indexOf('MANUAL_CANDIDATES_SQL'), pyFitzroy.indexOf('def import_players('));
+    expect(guard).toContain('def manual_insert_verdict(');
+    expect(guard).toContain('def refuse_unsafe_manual_insert(');
+    // It reads player_id (that is how it finds candidates) and writes nothing at all:
+    // no INSERT, no UPDATE, no DELETE anywhere in the guard.
+    expect(guard).not.toMatch(/\bINSERT\s+INTO\b/i);
+    expect(guard).not.toMatch(/\bUPDATE\s+\w/i);
+    expect(guard).not.toMatch(/\bDELETE\s+FROM\b/i);
+    // Both sides normalised by the SAME SQL function -- a Python-side normalisation is
+    // how two spellings of one rule drift apart.
+    expect(guard).toContain('afldb_normalise_name(n)');
+    expect(pyFitzroy).toContain('refuse_unsafe_manual_insert(');
+    // It runs ONLY in the new-player INSERT branch.
+    const insertBranch = pyFitzroy.indexOf("INSERT INTO players\n                             (display_name, sort_name, search_name, slug,");
+    const callSite = pyFitzroy.indexOf('refuse_unsafe_manual_insert(\n');
+    expect(callSite).toBeGreaterThan(0);
+    expect(callSite).toBeLessThan(insertBranch);
+    expect(pyFitzroy.slice(callSite, insertBranch)).not.toContain('UPDATE players');
+  });
+
+  test('§8.3: a manual player is named by token in the ledger, never seeded twice', () => {
+    expect(pyExport).toContain('"source": "manual_admin_edit", "external_id": manual_id');
+    expect(pyDraftGuru).toContain('def resolve_manual_players(');
+    const branch = pyDraftGuru.slice(pyDraftGuru.indexOf('elif target["source"] == MANUAL_SOURCE_KEY:'));
+    const nextBranch = branch.indexOf('        else:');
+    expect(branch.slice(0, nextBranch)).not.toContain('seed_player');
+    expect(pyDraftGuru).toContain('two ledger decisions claim one manual identity');
   });
 });

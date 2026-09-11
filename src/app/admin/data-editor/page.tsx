@@ -114,7 +114,7 @@ export default async function DataEditorPage(
           <h2>Players & recruitment</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             <PlayerFinder />
-            <CreatePlayerForm clubs={clubs} />
+            <CreatePlayerForm />
           </div>
         </div>
 

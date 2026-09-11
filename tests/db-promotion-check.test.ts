@@ -1063,8 +1063,20 @@ describe('lineage-safe reinstatement', () => {
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
       .toEqual([
-        'coaches:afltables_coach_path', 'matches:match_key', 'players:afltables_profile_url',
+        'coaches:afltables_coach_path', 'draft_picks:draft_pick_key',
+        'matches:match_key', 'players:afltables_profile_url',
       ]);
+    // AFLDB-ISSUE-160 D-3. 'draft_picks' had been admitted by
+    // data_edits_table_name_check since migration 057 with NO lineage target, so a
+    // draft audit row was reinstated with its integer row_id unchanged and was never
+    // counted, listed or remapped -- on a lineage-changing promotion that integer names
+    // a different selection. The target makes the gate remap it or stop.
+    const draftTarget = edits.find((x) => x.target.kind === 'draft_picks')!;
+    expect(draftTarget.target).toMatchObject({
+      kind: 'draft_picks', entity: 'draft_picks', identity: 'draft_pick_key',
+    });
+    expect(draftTarget.ref.column).toBe('row_id');
+    expect(draftTarget.ref.kindColumn).toBe('table_name');
     // AFLDB-ISSUE-159 §5.6. Migration 095 admits 'coaches' into
     // data_edits.table_name, which obliges a lineage target for it: coaches is
     // rebuilt on promotion, so the swap renumbers every coach id a human edit
@@ -1113,6 +1125,7 @@ describe('lineage-safe reinstatement', () => {
   it('identifies rows by a stable external key only — never by a name', () => {
     for (const rule of [
       'afltables_profile_url', 'match_key', 'source_key', 'afltables_coach_path',
+      'draft_pick_key',
     ] as const) {
       const sql = `${LINEAGE_IDENTITY_SQL[rule].byId}\n${LINEAGE_IDENTITY_SQL[rule].byIdentity}`;
       expect(sql).not.toMatch(/display_name|search_name|given_name|surname|full_name/i);
@@ -1140,6 +1153,95 @@ describe('lineage-safe reinstatement', () => {
     // no namespace is special-cased, because 'manual:<token>' IS the identity.
     expect(`${coach.byId}\n${coach.byIdentity}`).not.toMatch(/manual|LIKE/i);
     expect(coach.description).toContain('manual:<token>');
+
+    // AFLDB-ISSUE-160. The players rule admits a SECOND identity namespace -- the
+    // manual token an admin-created player is minted with -- without ever admitting a
+    // name. DISTINCT ON with the AFL Tables path ordered first keeps one player to one
+    // identity, so a player known by token on the replaced side and by path in the
+    // candidate still resolves.
+    const players = LINEAGE_IDENTITY_SQL.afltables_profile_url;
+    expect(players.byId).toContain("s.key = 'manual_admin_edit'");
+    expect(players.byId).toContain("match_method = 'manual_admin_edit'");
+    expect(players.byId).toContain('DISTINCT ON (ei.player_id)');
+    expect(players.byIdentity).toContain('DISTINCT ON (ei.player_id)');
+    expect(players.byId).toContain("ORDER BY ei.player_id, (s.key <> 'afltables')");
+    expect(players.byIdentity).toContain("ORDER BY ei.player_id, (s.key <> 'afltables')");
+
+    // AFLDB-ISSUE-160 D-3. The draft key is the SOURCE KEY, never the per-database
+    // sources.id -- the id is renumbered by a rebuild and would silently rename every
+    // selection. A selection with no source_id has no key at all and is absent from
+    // both directions, so it reports unresolved instead of being carried by an integer.
+    const draft = LINEAGE_IDENTITY_SQL.draft_pick_key;
+    expect(draft.entity).toBe('draft_picks');
+    expect(draft.byId).toContain("s.key || '|' || dp.player_url");
+    expect(draft.byIdentity).toContain("s.key || '|' || dp.player_url");
+    expect(`${draft.byId}\n${draft.byIdentity}`).not.toMatch(/player_name_raw|club_name_raw/);
+    expect(`${draft.byId}\n${draft.byIdentity}`).toContain('JOIN public.sources s ON s.id = dp.source_id');
+    expect(draft.description).toContain('manual:<token>');
+  });
+
+  it('AFLDB-ISSUE-160 D-3: draft selections remap by identity, and a NULL-source row refuses', () => {
+    // Source-owned and manual selections both resolve; the pre-ISSUE-160 admin row,
+    // which carries no key on either side, is 'no_identity_in_replaced' -- reported,
+    // never dropped and never carried by its old integer.
+    const remap = resolveLineageRemap({
+      entity: 'draft_picks',
+      rule: 'draft_pick_key',
+      referencedIds: [10, 11, 12],
+      replacedIdentities: [
+        { id: 10, identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national' },
+        { id: 11, identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie' },
+      ],
+      candidateIdentities: [
+        { id: 900, identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national' },
+        { id: 901, identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie' },
+      ],
+    });
+    expect(remap.mapped).toEqual([
+      {
+        oldId: 10, newId: 900,
+        identity: 'draftguru|https://www.draftguru.com.au/players/a-player/1|2019|national',
+      },
+      {
+        oldId: 11, newId: 901,
+        identity: 'manual_admin_edit|manual:0f1c2d3e-4a5b-6c7d-8e9f-001122334455|2024|rookie',
+      },
+    ]);
+    expect(remap.unresolved).toEqual([{ oldId: 12, reason: 'no_identity_in_replaced' }]);
+    expect(remap.merges).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-160: a manual player resolves by token, and by path once it is attached', () => {
+    // The token-only player (never debuted) and the path+token player (debuted, the
+    // identity attached by 6.5 and bound onto the candidate by the §8.1 replay) both
+    // map to exactly one candidate row, and neither is ambiguous despite holding two
+    // identity rows -- that is what DISTINCT ON with the path ordered first buys.
+    const remap = resolveLineageRemap({
+      entity: 'players',
+      rule: 'afltables_profile_url',
+      referencedIds: [4, 5],
+      replacedIdentities: [
+        { id: 4, identity: 'aa11bb22-cc33-dd44-ee55-ff6677889900' },
+        { id: 5, identity: 'players/S/Some_Player0.html' },
+      ],
+      candidateIdentities: [
+        { id: 7004, identity: 'aa11bb22-cc33-dd44-ee55-ff6677889900' },
+        { id: 7005, identity: 'players/S/Some_Player0.html' },
+      ],
+    });
+    expect(remap.unresolved).toEqual([]);
+    expect(remap.mapped.map((m) => `${m.oldId}->${m.newId}`)).toEqual(['4->7004', '5->7005']);
+  });
+
+  it('AFLDB-ISSUE-160 W-16: the draft target leaves the DEV historical-only declaration coherent', () => {
+    // data_edits is historical-only on DEV and names row_id. The new target is a third
+    // KIND on that same column, not a new column, so the disposition still names every
+    // lineage-bound column -- and assertContractCoherent() is the thing that says so.
+    const edits = contractByName('data_edits')!;
+    expect(edits.historicalOnly!.columns).toEqual(['row_id']);
+    expect([...new Set(lineageTargetsOf(edits).map((x) => x.ref.column))]).toEqual(['row_id']);
+    expect(() => assertContractCoherent()).not.toThrow();
+    expect(promotionContractProblems()).toEqual([]);
   });
 
   it('AFLDB-ISSUE-159 S-4: the coach target leaves the DEV historical-only declaration coherent', () => {

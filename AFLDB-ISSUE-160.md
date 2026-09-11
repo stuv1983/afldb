@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** Planning complete 2026-09-11 — **Approved for Stage 1. Operator decisions D-1…D-9 decided 2026-09-11 (§12); no decision remains open before Stage 1. Nothing implemented.**
+**Status:** **Stage 1 IMPLEMENTED 2026-09-11 (backend and data contract) — uncommitted, not deployed, not merged. Stage 2 NOT started.** Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gate 4 (deferred to Stage 2 with the routes that enforce the capabilities), gates 15–16, and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record* and *Validation*.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Created:** 2026-09-11
@@ -9,9 +9,17 @@
 **Migration:** **none required** (§10). Next free number on this branch is **096** (highest is `095_coach_admin_overrides.sql`); it is *not* allocated here.
 **Planning model:** Fable 5.1, high. **Implementation:** Opus 5 high for Stage 1 (§17).
 
-This document is a planning deliverable. No application code, migration, privilege, test or
-deployment change was made while producing it. Every fact below is a 2026-09-11 snapshot of
-this branch and must be re-verified at the implementation preflight (§0).
+This document was a planning deliverable and is now the executed Stage 1 contract. Everything
+below is the plan as approved; where implementation deviated from it, the deviation is recorded
+in `issues.md` rather than edited into the plan, so the two can be compared. The three
+deviations are: capabilities (D-6) deferred to Stage 2, because `tests/auth.test.ts` fails on a
+capability declared but enforced nowhere and Stage 1 ships no route; §15's `/admin/data-editor`
+page changes split, with only the backend refusals and the dead `CreatePlayerForm` block done
+in Stage 1; and J-16's tracked-rule source, which §7 names as
+`data/reference/afltables-contract.json` — that file does not exist, and the tracked player
+profile-continuity rules live in `tools/rebuild/fitzroy/fitzroy-contract.json`
+(`profile_url_continuity.rules[]`), which is what the rule is implemented against. One probe
+correction: §16 gate 2 probe (g) names `data_edits.edited_at`; the column is `created_at`.
 
 ---
 
@@ -739,7 +747,17 @@ run only then. Stage 1 and Stage 2 are committed on `afldb_test` + typecheck evi
 
 ## Next action
 
-D-1…D-9 are decided (§12, 2026-09-11). A fresh **Opus 5 / high** session executes Stage 1
-against §17/§16 from this worktree, beginning with §0.2 and the gate-2 probes. Operator
-decision S-1 (§11.1, ISSUE-151 sequencing) is required before **deployment** of the promotion
-tooling change, not before Stage 1.
+**Stage 1 is implemented and awaiting operator review and commit** (2026-09-11). The
+implementation record — preflight result, the gate-2 probe table, the D-8 branch selection and
+why, the two real defects found during implementation, the deviations above, and the gate-by-gate
+result — is in `issues.md` under AFLDB-ISSUE-160. Nothing is committed, pushed, merged or
+deployed, and neither DEV nor PROD was touched.
+
+After the commit, a fresh session executes **Stage 2** (§17, §18): `/admin/draft`,
+`/admin/draft/new`, `/admin/draft/[id]` and the create-player wizard; `data.draft.read` and
+`data.draft.edit` plus the nav entry (gate 4 lands here, with the routes that enforce them);
+the D-9 shared revalidate/submit extraction; the remaining `/admin/data-editor` page removal;
+and gate 16 when the operator updates DEV.
+
+Operator decision **S-1** (§11.1, ISSUE-151 sequencing) is required before **deployment** of
+the promotion-tooling change, not before the Stage 1 commit.

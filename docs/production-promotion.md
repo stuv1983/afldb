@@ -66,8 +66,8 @@ promoted by accident.
 | `beta_login_tokens` | beta | yes | reset | Short-lived single-use magic links. |
 | `site_settings` | admin | yes | reinstate | Deliberate super-admin choices; the app silently falls back to defaults without them. |
 | `site_media` | admin | yes | reinstate | Uploaded images. Not in the original issue list — found in the schema. |
-| `data_edits` | data editor | yes | reinstate (**dev: historical-only**) | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`/`coaches`, not a FK → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
-| `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). Replay covers `players`, `matches`, `draft_picks`, `coaches`, `match_coaches`; the `coaches` replay re-creates whole admin-created rows, not just field patches (§8). |
+| `data_edits` | data editor | yes | reinstate (**dev: historical-only**) | Append-only audit of human canonical edits. `table_name` + `row_id` is a row id in `players`/`matches`/`coaches`/`draft_picks`, not a FK → **lineage-bound** (§7.4c). Withheld as a recorded gap on a DEV promotion (§7.4d). |
+| `data_overrides` | data editor | yes | reinstate **+ replay** | Human overrides reloads replay; the rebuild never saw them (§8). Replay covers `players`, `matches`, `draft_picks`, `coaches`, `match_coaches`; the `coaches`, `players` and `draft_picks` replays re-create whole admin-created rows, not just field patches (§8). |
 | `data_submissions` | uploads | yes | reinstate | `import_batch_id` may dangle → probed (§7.4). |
 | `data_submission_rows` | uploads | yes | reinstate | After `data_submissions`. |
 | `player_link_suggestions` | player links | yes | reinstate | Reader suggestions; `target_id` is deliberately not a FK. |
@@ -588,7 +588,7 @@ byte-identical to before this issue):
 | Table | Columns | Decision |
 |---|---|---|
 | `player_link_resolutions` | `player_id`, `target_id` | `AFLDB-ISSUE-139` D1. `target_id`'s seven honours tables carry no external key, so not one row can be evidenced; remapping `player_id` alone is explicitly not an answer (§7.4c). |
-| `data_edits` | `row_id` | `AFLDB-ISSUE-139` D2. Every lineage-bound row is in the bootstrap id space: its `players` ids carry no external identity at all, and two of its matches were created and then deleted on `afldb_dev` itself. |
+| `data_edits` | `row_id` | `AFLDB-ISSUE-139` D2. Every lineage-bound row is in the bootstrap id space: its `players` ids carry no external identity at all, and two of its matches were created and then deleted on `afldb_dev` itself. `AFLDB-ISSUE-160` D-3 adds a `draft_picks` target on the same column; the disposition is unchanged, because it withholds the column, not one kind. |
 
 One consequence to state in the DEV promotion record: `player_link_match_candidates` is
 regenerated from rebuilt players **plus reinstated resolutions** (§8), so with none reinstated
@@ -639,9 +639,11 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    promoted canonical rows. Replay them with the importer's own function, as the import role.
 
    Replay **every** entity type the `data_overrides.entity_type` CHECK admits, in this
-   order — `coaches` before `match_coaches`, because an assignment resolves its coach by
-   path and an admin-created coach does not exist in the candidate until the `coaches`
-   replay re-creates it:
+   order. The order is **binding**, not cosmetic, and for one reason in two places: a
+   record that names its subject by IDENTITY cannot resolve until that identity exists.
+   `players` before `draft_picks`, because a manual selection names its player by an AFL
+   Tables path or a `manual_admin_edit` token; `coaches` before `match_coaches`, because
+   an assignment resolves its coach by path. `matches` is independent and may go anywhere:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -649,21 +651,35 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    from common import load_env, connect_pg, replay_admin_overrides
    load_env()
    with connect_pg() as pg:
-       for table in ('players', 'matches', 'coaches', 'match_coaches'):
+       for table in ('players', 'matches', 'draft_picks', 'coaches', 'match_coaches'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
    ```
 
-   `coaches` and `match_coaches` are `AFLDB-ISSUE-159` (migration 095), and they are not
-   like the others. For `players` and `matches` an override patches fields of a row the
-   rebuild already produced. For `coaches` it can carry an **entire row**: an
-   admin-created coach has no AFL Tables page, so the rebuilt source database has never
-   heard of them, and this replay is the only thing that puts them back. Between the swap
-   and this step a manual coach does not exist in the promoted database at all — every
-   `/coaches/<slug>-<id>` URL for one 404s, and the ids change across the window. Run this
-   step promptly, and run it **before** the `data_edits.row_id` remap, whose `'coaches'`
-   rows resolve through `coaches.afltables_coach_path`.
+   `coaches` and `match_coaches` are `AFLDB-ISSUE-159` (migration 095); `players` and
+   `draft_picks` gained the same shape in `AFLDB-ISSUE-160`. For `matches`, and for a
+   source-owned player or selection, an override patches fields of a row the rebuild
+   already produced. For a manual one it carries an **entire row**: an administrator can
+   create a footballer and their draft selection before any source has published either,
+   so the rebuilt source database has never heard of them, and this replay is the only
+   thing that puts them back.
+
+   Between the swap and this step a manual coach, a manual player and their manual
+   selections do not exist in the promoted database at all — every `/coaches/<slug>-<id>`
+   and `/players/<slug>-<id>` URL for one 404s, and the ids change across the window. Run
+   this step promptly, and run it **before** the `data_edits.row_id` remap: its
+   `'coaches'` rows resolve through `coaches.afltables_coach_path`, its `'draft_picks'`
+   rows through the selection's `<source key>|<player_url>|<draft_year>|<draft_kind>`, and
+   its `'players'` rows through an AFL Tables profile path *or* a `manual_admin_edit`
+   token — none of which a candidate carries until this replay has run.
+
+   One case is worth knowing about because it looks like a bug and is not. When a manual
+   player has since debuted and an administrator attached their AFL Tables profile
+   (`/admin/draft`, `AFLDB-ISSUE-160` §6.5), the candidate ALREADY holds that footballer,
+   created by the source under that path. The `players` replay then **binds** the manual
+   token onto that existing row rather than inserting a second one — which is why a
+   promotion after the debut produces one player, not twins.
 
    The function refuses rather than skipping: an override whose match key, club slug,
    coach path or player profile path does not resolve raises and rolls the replay back,

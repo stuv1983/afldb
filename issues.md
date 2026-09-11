@@ -607,8 +607,8 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
-| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b ALLOCATED 2026-09-11 as `AFLDB-ISSUE-160`, its D-1..D-9 decided 2026-09-11**; next: ISSUE-160 Stage 1 in a fresh Opus session |
-| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Planning complete 2026-09-11 / Approved for Stage 1; operator decisions D-1..D-9 DECIDED 2026-09-11 (D-2 symmetric-DOB guard, D-3 conditional on PROD probes + pre-deploy sequencing decision S-1, D-7 adoption mints an identity-less legacy player's identity, D-8 both J-3 branches pre-authorised) — NOT implemented. One authoritative draft mutation contract (`/admin/draft`), manual selections and manually created players carried under the existing `manual_admin_edit` source with a minted token in existing columns, re-created by `replay_admin_overrides` on promotion; search-before-create with hard duplicate refusal; later AFL Tables identity attached by admin action and backed by a fail-closed importer refusal (D-2). No migration, no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: Stage 1 (Opus 5 high); S-1 before deploy |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 IMPLEMENTED 2026-09-11, uncommitted**; next: operator review + commit of ISSUE-160 Stage 1, then its Stage 2 |
+| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 IMPLEMENTED 2026-09-11 (backend and data contract), uncommitted, not deployed, not merged; Stage 2 (the `/admin/draft` surface, capabilities, nav, D-9 extraction, Playwright) NOT started.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract now exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by new fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. No migration (096 still free), no privilege change, no capability declared yet. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit, then Stage 2; gate-2 PROD probes and gate 9's real-importer half still open; S-1 before deploy |
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
      gate on 2026-09-11; Stage 2 validated live on real DEV at `6299bf8` including the
@@ -22732,8 +22732,11 @@ above; no ID is allocated for it here.
 
 ## AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** Planning complete 2026-09-11 — **Approved for Stage 1; operator decisions D-1..D-9
-DECIDED 2026-09-11 (`AFLDB-ISSUE-160.md` §12), none open. NOT implemented.**
+**Status:** Open — **Stage 1 IMPLEMENTED 2026-09-11 (backend and data contract), uncommitted,
+not deployed, not merged. Stage 2 (the `/admin/draft` surface, capabilities, nav, D-9
+extraction, Playwright) NOT started.** Operator decisions D-1..D-9 decided 2026-09-11
+(`AFLDB-ISSUE-160.md` §12) and implemented as decided; none open. Operator decision S-1
+(§11.1) remains open and gates DEPLOYMENT of the promotion-tooling change, not the commit.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Found:** 2026-09-11
@@ -22877,19 +22880,141 @@ separate operator-reviewed step outside ISSUE-160.
 - `tests/integration/draftguru-import.test.ts` spawns the real importer as the import role and
   already proves the admin-owned-row ownership boundary (`:576`) and override replay (`:779`).
 
+### Stage 1 implementation record — 2026-09-11
+
+**Preflight.** `npm run preflight -- --mode implementation --issue 160` = **READY**, 0 blockers,
+3 non-blocking warnings (no local `.env` in the worktree, `psql` unavailable, `pg_restore`
+unavailable — none required for this mode). ISSUE-160 re-confirmed as the only allocation and
+migration 096 re-confirmed free (`git log --all -- 'src/db/migrations/096*'` empty).
+
+**Gate 2 — historical probes, read-only, recorded verbatim.** Run against `afldb_test`
+(rebuilt) and `afldb_dev` through the operator's existing SSH tunnel; **the PROD probes were
+NOT run — PROD was deliberately untouched this session — and (d), (e), (g), (h) on PROD remain
+OPEN as the §11.1 pre-deploy evidence.** One correction to the runbook's probe text: probe (g)
+names `data_edits.edited_at`, which does not exist; the column is `created_at`.
+
+| Probe | `afldb_test` | `afldb_dev` |
+|---|---|---|
+| (a) `(draft_year, draft_kind, pick_number)` collisions, source rows | **0 rows** | **0 rows** |
+| (b) NULL `pick_number` by kind, source rows | `free_agency` 138/138, `post_draft` 188/188, `pre_draft` 370/370, `trade` 990/990 **all NULL**; `national` 0/3089, `rookie` 0/1209, `preseason` 0/541, `midseason` 0/280, `mini_draft` 0/4, `training_squad_selection` 0/1 | — |
+| (c) same player + year + kind duplicates | **0** | **0** |
+| (d) selections with `source_id IS NULL` | **0** | **0** |
+| (e) DEF-1 residue (`entity_key LIKE 'null|%'`) | **0** (and 0 `draft_picks` overrides of any shape) | **0** |
+| (f) players with no `external_identities` | 65 | 0 |
+| (g) `data_edits` rows with `table_name='draft_picks'` | **0** | **0** |
+| (h) `draft_pick_key` for those rows | n/a (0 rows) | n/a (0 rows) |
+
+**D-8 / J-3 branch selected: HARD REFUSAL.** Probe (a) returned zero valid historical
+collisions at the `(draft_year, draft_kind, pick_number)` grain across all 6,810 source
+selections, on both databases, so the pre-authorised refusal branch is the one implemented and
+the confirmation branch is deliberately absent. The refusal names the colliding selection
+(year, kind, pick, club, player) so it is actionable.
+
+Consequences of the other probe results, recorded rather than inferred: **D-7 adoption has no
+backlog on `afldb_test` or `afldb_dev`** (probe (d) = 0 on both), so the adopt action ships
+proven by fixtures rather than by real rows, and the PROD count is unknown until probe (d) runs
+there. **The DEF-1 residue is empty on both** (probe (e) = 0), so the "frozen historical
+residue" disposition has nothing to freeze on either; PROD is unknown. **There are no
+`draft_picks` audit rows on either database** (probe (g) = 0), so D-3's new lineage target
+changes nothing about a promotion from either today — its value is preventing the silent
+misattribution the moment the new surface writes its first such row.
+
+**What was implemented.** §3, §5, §6.1–6.8, §7 (J-1…J-16), §8.1–8.4, §9, §11 and the backend
+half of §15 — see `CHANGELOG.md` for the behavioural summary. Files changed: `players.ts`,
+`player-links.ts`, new `admin-draft.ts`, `data-edits.ts`, `spec.ts`,
+`data-editor/{actions.ts,CreatePlayerForm.tsx,page.tsx}`, `tools/migration/common.py`,
+`tools/migration/import_fitzroy_core.py`, `tools/rebuild/draftguru/import_draftguru.py`,
+`tools/rebuild/draftguru/export_link_decisions.py`, `tools/db/promotion-inventory.ts`,
+`docs/production-promotion.md`, `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`,
+`AFLDB-ISSUE-156.md`, `AFLDB-ISSUE-160.md`; tests new
+(`tests/admin-draft-actions.test.ts`, `tests/integration/admin-draft.test.ts`,
+`tools/migration/test_manual_insert_guard.py`) and extended
+(`player-link-mutations`, `edit-spec`, `data-overrides-source-contract`, `db-promotion-check`,
+`integration/draftguru-import`). **No migration (096 still free), no privilege change.**
+
+**Two real defects found and fixed during implementation, neither in the plan.**
+
+1. `createPlayerInTransaction`'s new SQL slug derivation was written as `'\s+'` inside a
+   TypeScript template literal, where `\s` is simply the letter `s` — so PostgreSQL received
+   `regexp_replace(..., 's+', '-', 'g')` and every run of `s` in a name became a hyphen
+   (`afldb-issue-160-test-new-draftee` came back as `afldb i-ue 160 te-t new draftee`). The
+   integration gate caught it by comparing against the same expression evaluated in SQL. Fixed
+   by escaping for both layers.
+2. The `draft_picks` manual replay's whole-row UPDATE joined `sources` in its `FROM` list and
+   referenced the UPDATE target from it (`JOIN sources s ON s.id = d.source_id`), which
+   PostgreSQL rejects outright — the replay could not run at all. Fixed by resolving the source
+   id in a scalar subquery in the `WHERE`.
+
+A third was added to the `players` replay pre-check rather than discovered in production:
+migration 018 requires `dob IS NULL OR dob_confidence <> 'unknown'`, so a durable record
+carrying a date of birth and no confidence would have aborted the replay mid-INSERT with a
+constraint error. It now refuses in the fail-closed pre-check, naming the record.
+
+**Two deviations from the runbook text, both deliberate and both narrower than the plan.**
+
+- **Capabilities (D-6) are NOT declared in Stage 1.** `tests/auth.test.ts` fails on any
+  capability declared in `capabilities.ts` but enforced at no page, route or action, and Stage 1
+  ships no route. Declaring `data.draft.read` / `data.draft.edit` now would break a green suite
+  to no benefit. Gate 4 is therefore Stage 2, where the routes that enforce them are built.
+- **§15's UI half is split.** The backend half shipped (`saveEdit` and `saveDataEdit` refuse
+  `draft_picks`; `getEditableRow` returns nothing for it; the natural-key branch is gone; the
+  spec keeps `draft_picks` and gains `selection_facts`). `CreatePlayerForm`'s draft block was
+  also removed, because the action now rejects those fields and leaving them would ship a form
+  that always errors. The `/admin/data-editor` page's draft SEARCH section and its
+  `entity=draft_picks` notice are Stage 2: the notice links to `/admin/draft/[id]`, which does
+  not exist yet. Until then a draft id renders the page's existing "no row with that id" empty
+  state — honest, and with no dangling link.
+
+**A product constraint worth recording.** J-8 admits a draft year up to `max(season) + 1`, but
+J-6 requires a club identity active in that year and `clubs.last_season` is populated (2026 on
+`afldb_test`), so a selection for a draft one season ahead of the club table is refused by J-6.
+Neither rule is wrong; the two bounds simply do not coincide, and an administrator recording
+next year's draft early will need the club table advanced first.
+
 ### Validation
 
-Documentary only: `AFLDB-ISSUE-160.md` exists with sections 0–19; `AFLDB-ISSUE-156.md` §1, §2,
-§3, §6, §7, §9, §10 (R-10), §11 (P3b row and handoff contract) and Next action amended; this
-ledger's Open Issues count and table, this entry and the ISSUE-156 entry updated;
-`IssuesIndex.md` synchronised. No file under `src/`, `tools/`, `tests/`, `deploy/`, no
-migration, no privilege change, no `CHANGELOG.md` change (planning only).
+**Executed 2026-09-11 on this branch, against `afldb_test` only (`afldb_dev` was never
+mutated).**
+
+| Gate | Result |
+|---|---|
+| 1 Preflight | **PASS** — READY, 0 blockers |
+| 2 Historical probes | **PARTIAL** — `afldb_test` + `afldb_dev` done and recorded above; PROD (d)/(e)/(g)/(h) **OPEN** |
+| 3 Player-creation contract | **PASS** — `tests/player-link-mutations.test.ts`, 36 tests |
+| 4 Capability matrix | **DEFERRED to Stage 2** (no route enforces a draft capability yet) |
+| 5 Duplicate/conflict unit contracts | **PASS** — new `tests/admin-draft-actions.test.ts`, 25 tests |
+| 6 Existing-player creation + 6.8 adoption | **PASS** — `tests/integration/admin-draft.test.ts` |
+| 7 New player through the draft | **PASS** — one player, one identity, two records, two audits, zero orphans |
+| 8 Atomicity | **PASS** — both forced-failure triggers, every family in §9.3 |
+| 9 Source-owned correction replay | **WRITTEN, SKIPPED HERE** — `tests/integration/draftguru-import.test.ts` needs `.venv`, the accepted DraftGuru Stage A snapshot and `AFLDB_TEST_IMPORT_DATABASE_URL`; none is present in this worktree, so the whole suite skips |
+| 10 D-2 guard | **PASS** — `tools/migration/test_manual_insert_guard.py` (all four DOB shapes, both directions, string/date, the raising wrapper, and a static proof the guard writes nothing) plus a live case running the REAL candidate query and verdict against `afldb_test`, and the settle-shaped identity lookup after 6.5 |
+| 11 Manual reload / reconciliation | **PASS** — the REAL `replay_admin_overrides` re-creates the deleted player and selection with the same tokens and no twin, replays a corrected year and club, BINDS the token onto a debuted player instead of inserting one, refuses an unresolvable record, and is idempotent; 6.7 supersede leaves one selection and one player |
+| 12 Promotion lineage | **PASS** — `tests/db-promotion-check.test.ts` (100 tests) plus live checks that `draft_pick_key` names a source row and a manual row, skips a NULL-source row, round-trips, and that the widened `players` rule returns exactly one identity, path-first |
+| 13 Data-editor transition | **PASS** — `tests/edit-spec.test.ts` and `tests/data-overrides-source-contract.test.ts`, including the source grep proving exactly one `INSERT INTO draft_picks` in `src/` |
+| 14 Typecheck + affected suites | **PASS** — `npx tsc --noEmit` clean; 605 tests across the nine affected unit suites, 38 in the new integration suite, 51 across the affected integration suites |
+| 15–16 DEV deploy + Playwright | **DEFERRED** — the operator is holding DEV for the Admin Centre batch |
+
+`npx eslint` on every changed file reports no new finding; the four remaining errors and four
+warnings are pre-existing at `HEAD` (`data-edits.ts` `Record<string, any>`,
+`player-link-mutations.test.ts`'s fake transaction, `players.ts` `_total`,
+`data-editor/page.tsx`'s unused `formatDate`/`formatRoundShort` imports).
+
+One unrelated pre-existing failure was observed and is NOT a regression:
+`tests/integration/data-editor.test.ts` → "refuses to build a ladder for a season it has no
+matches for" requires a season in `seasons` with no non-final `matches`, and the current
+`afldb_test` has 207 non-final 2026 matches, so no such season exists. Nothing in ISSUE-160
+touches `seasons`, `matches`, `club_seasons` or `recomputeClubSeasons`.
 
 ### Next action
 
-D-1..D-9 are decided. A fresh **Opus 5 / high-effort** session executes Stage 1 against
-`AFLDB-ISSUE-160.md` §16 (gates) and §17 (phasing), beginning with §0.2 and the gate-2
-historical probes (including the PROD read-only probes (d), (e), (g), (h)). Operator decision
-S-1 (ISSUE-151 sequencing, runbook §11.1) is required before the promotion-tooling change is
-deployed, not before Stage 1. DEV browser acceptance (gates 15–16) is deferred until the
-operator updates DEV for the Admin Centre batch.
+Operator reviews and commits Stage 1, then a fresh session runs **Stage 2** (`/admin/draft`,
+`/admin/draft/new`, `/admin/draft/[id]`, the create-player wizard, `data.draft.read` /
+`data.draft.edit` and the nav entry, the D-9 shared revalidate/submit extraction, the
+`/admin/data-editor` page's remaining draft removal, and gate 16 Playwright once DEV is
+updated). Still open from Stage 1: the gate-2 **PROD** read-only probes (d), (e), (g), (h) —
+not run because PROD was deliberately untouched — and the real-importer half of gate 9, which
+runs on a host carrying `.venv`, the accepted DraftGuru Stage A snapshot and
+`AFLDB_TEST_IMPORT_DATABASE_URL`. Operator decision **S-1** (§11.1, sequencing this
+`promotion-inventory.ts` change against the paused ISSUE-151 PROD promotion `20260907-234124`)
+is required before the promotion-tooling change DEPLOYS, and must be recorded in the ISSUE-151
+promotion record and the ISSUE-160 evidence before `merge:ready`.

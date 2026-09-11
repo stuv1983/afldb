@@ -27,6 +27,14 @@ import {
  * row is written inside the same import-role transaction (migration
  * 066, AFLDB-ISSUE-027): if the audit insert fails, the edit rolls
  * back with it, so an edit can never exist without its audit row.
+ *
+ * AFLDB-ISSUE-160 D-5: `draft_picks` is no longer editable here. It kept a
+ * spec entry, a natural key and an apply branch, but the key it produced for
+ * an admin-created row was garbage and was never replayed, and a second draft
+ * writer with different semantics is exactly what one authoritative mutation
+ * contract cannot have. `src/db/queries/admin-draft.ts` owns draft selections
+ * now; `EDITABLE_ENTITIES.draft_picks` stays as the field spec it validates
+ * with.
  */
 
 export type EditableRow = {
@@ -64,25 +72,11 @@ export async function getEditableRow(
     };
   }
 
-  if (entity.key === 'draft_picks') {
-    const [row] = await sql<Record<string, unknown>[]>`
-      SELECT dp.player_name_raw, dp.original_club_raw,
-             dp.height_cm, dp.weight_kg, dp.draft_age,
-             dp.pick_note, dp.detail,
-             dp.draft_year, dp.draft_type, dp.pick_number,
-             c.name AS club_name
-        FROM draft_picks dp
-        LEFT JOIN clubs c ON c.id = dp.club_id
-       WHERE dp.id = ${rowId}
-    `;
-    if (!row) return null;
-    return {
-      entity: entity.key,
-      rowId,
-      title: `${row.player_name_raw} · ${row.draft_year} ${row.draft_type} Draft (Pick ${row.pick_number ?? '—'}) · ${row.club_name ?? '—'}`,
-      values: stringify(entity, row),
-    };
-  }
+  // AFLDB-ISSUE-160 D-5: draft selections are read and edited in /admin/draft,
+  // which is the one draft mutation contract. EDITABLE_ENTITIES.draft_picks
+  // stays as the field SPEC that surface validates with; this generic editor
+  // is no longer a second, weaker writer for it.
+  if (entity.key === 'draft_picks') return null;
 
   const [row] = await sql<Record<string, unknown>[]>`
     SELECT m.attendance, m.home_goals, m.home_behinds, m.away_goals, m.away_behinds,
@@ -146,15 +140,14 @@ async function getEntityNaturalKey(tx: Tx, entityKey: string, rowId: number): Pr
     if (!row) return null; // Not source-owned or lacks stable identity
     return `afltables:${row.external_id}`;
   }
-  if (entityKey === 'draft_picks') {
-    // Draft picks natural key matching the supported DraftGuru importer reload key:
-    const [row] = await tx<{ source_id: number; player_url: string; draft_year: number; draft_kind: string }[]>`
-      SELECT source_id, player_url, draft_year, draft_kind
-        FROM draft_picks WHERE id = ${rowId}
-    `;
-    if (!row) throw new Error('Draft pick not found');
-    return `${row.source_id}|${row.player_url}|${row.draft_year}|${row.draft_kind}`;
-  }
+  // 'draft_picks' is deliberately absent (AFLDB-ISSUE-160 D-5 / DEF-1). For an
+  // admin-created row every component of that key was SQL NULL, so the
+  // expression produced the literal string 'null|null|<year>|null' -- one key
+  // shared by every admin pick of that year and field group, which the UNIQUE
+  // (entity_type, entity_key, field_group) then made the SECOND edit silently
+  // overwrite, and which replay_admin_overrides could never match. Draft
+  // identity now lives in src/db/queries/admin-draft.ts, where a manual row is
+  // keyed by its own minted token.
   throw new Error(`Unknown entity key for natural key: ${entityKey}`);
 }
 
@@ -170,6 +163,9 @@ export async function saveEdit(input: {
   const entity = EDITABLE_ENTITIES[input.entityKey];
   const group = entity?.groups[input.groupKey];
   if (!entity || !group) return { ok: false, error: 'Unknown entity or field group.' };
+  if (input.entityKey === 'draft_picks') {
+    return { ok: false, error: 'Draft selections are edited in /admin/draft.' };
+  }
   if (!Number.isInteger(input.rowId) || input.rowId <= 0) {
     return { ok: false, error: 'Bad row id.' };
   }
@@ -206,8 +202,6 @@ export async function saveEdit(input: {
 
       if (input.entityKey === 'players') {
         await applyPlayerEdit(tx, input.rowId, input.groupKey, values);
-      } else if (input.entityKey === 'draft_picks') {
-        await applyDraftPickEdit(tx, input.rowId, input.groupKey, values);
       } else {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
@@ -452,42 +446,5 @@ async function applyMatchEdit(
       return;
     default:
       throw new Error(`unhandled matches group ${groupKey}`);
-  }
-}
-
-async function applyDraftPickEdit(
-  tx: Tx,
-  rowId: number,
-  groupKey: string,
-  v: Record<string, FieldValue>,
-): Promise<void> {
-  switch (groupKey) {
-    case 'player_info':
-      await tx`
-        UPDATE draft_picks
-           SET player_name_raw = ${v.player_name_raw},
-               original_club_raw = ${v.original_club_raw},
-               draft_age = ${v.draft_age}
-         WHERE id = ${rowId}
-      `;
-      return;
-    case 'measurements':
-      await tx`
-        UPDATE draft_picks
-           SET height_cm = ${v.height_cm},
-               weight_kg = ${v.weight_kg}
-         WHERE id = ${rowId}
-      `;
-      return;
-    case 'notes':
-      await tx`
-        UPDATE draft_picks
-           SET pick_note = ${v.pick_note},
-               detail = ${v.detail}
-         WHERE id = ${rowId}
-      `;
-      return;
-    default:
-      throw new Error(`unhandled draft_picks group ${groupKey}`);
   }
 }

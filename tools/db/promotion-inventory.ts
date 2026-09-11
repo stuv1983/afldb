@@ -86,7 +86,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  * prevent.
  */
 export type LineageIdentityRule =
-  'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path' | 'none';
+  'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path'
+  | 'draft_pick_key' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -334,11 +335,26 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         // (migration 095) obliges a lineage target for it, because coaches is
         // rebuilt on promotion and its ids are renumbered by the swap.
         { kind: 'coaches', entity: 'coaches', identity: 'afltables_coach_path' },
+        // AFLDB-ISSUE-160 D-3. 'draft_picks' has been admitted by
+        // data_edits_table_name_check since migration 057, but it had no lineage
+        // target -- so a draft audit row was reinstated with its row_id integer
+        // unchanged and was never counted, listed or remapped, because the gate
+        // enumerates only the declared targets. On a lineage-changing promotion
+        // that integer then names a DIFFERENT selection: silent misattribution,
+        // exactly what AFLDB-ISSUE-142 (B) exists to prevent. With the target the
+        // row is remapped through the selection's stable key, or the gate reports
+        // FAIL and the promotion stops before the swap. On a shared lineage the
+        // gate passes unchanged, as today.
+        { kind: 'draft_picks', entity: 'draft_picks', identity: 'draft_pick_key' },
       ],
       remediation: 'Every entity here has a stable identity, so every row is remappable in '
         + 'principle: resolve row_id through the AFL Tables profile url (players), '
-        + 'matches.match_key, or coaches.afltables_coach_path, and apply the generated '
-        + 'per-row UPDATEs after the reinstate. A coach edit resolves the same way whether '
+        + 'matches.match_key, coaches.afltables_coach_path, or the draft selection key '
+        + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), and apply the "
+        + 'generated per-row UPDATEs after the reinstate. A draft audit row whose selection '
+        + 'carries no source_id at all (a pre-AFLDB-ISSUE-160 admin row) has NO stable key and '
+        + 'is reported unresolved: adopt that selection in /admin/draft first, which mints its '
+        + 'identity, or decide it explicitly. A coach edit resolves the same way whether '
         + 'the coach is source-owned or admin-created: the path is the identity either way, '
         + "'coaches/<Given>_<Surname><n>.html' or 'manual:<token>', and an admin-created "
         + 'coach is re-created in the candidate by the data_overrides replay step (§8) '
@@ -1425,28 +1441,45 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
 >> = {
   afltables_profile_url: {
     entity: 'players',
-    description: "external_identities: source 'afltables', match_method "
-      + "'afltables_profile_url', status unique/resolved — the AFL Tables profile path",
+    description: "external_identities: source 'afltables' + match_method "
+      + "'afltables_profile_url' (the AFL Tables profile path), or, for a player an "
+      + "administrator created, source 'manual_admin_edit' + match_method "
+      + "'manual_admin_edit' (the token minted once at creation). Status unique/resolved. "
+      + 'ONE identity per player: the AFL Tables path is ordered first, so a player known '
+      + 'by token on the replaced side and by path in the candidate still resolves — '
+      + 'the players override replay binds the token onto the path-player BEFORE the '
+      + 'remap runs (AFLDB-ISSUE-160 §8.1, the same ordering rule as coaches)',
+    // AFLDB-ISSUE-160. Before this, an administrator-created player carried no identity
+    // at all, so its data_edits rows were 'no_identity_in_replaced' and STOPPED a PROD
+    // promotion (DEF-4a). DISTINCT ON (player_id) with the path ordered first is what
+    // keeps one player to one identity while admitting the second namespace.
     byId: `
-      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+      SELECT DISTINCT ON (ei.player_id) ei.player_id::bigint AS id, ei.external_id AS identity
         FROM external_identities ei
         JOIN sources s ON s.id = ei.source_id
-       WHERE s.key = 'afltables'
-         AND ei.match_method = 'afltables_profile_url'
+       WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+              OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
          AND ei.status IN ('unique', 'resolved')
          AND ei.player_id IS NOT NULL
          AND ei.player_id = ANY ($1::bigint[])
-       ORDER BY 1, 2`,
+       ORDER BY ei.player_id, (s.key <> 'afltables'), ei.external_id`,
     byIdentity: `
-      SELECT ei.player_id::bigint AS id, ei.external_id AS identity
+      SELECT DISTINCT ON (ei.player_id) ei.player_id::bigint AS id, ei.external_id AS identity
         FROM external_identities ei
         JOIN sources s ON s.id = ei.source_id
-       WHERE s.key = 'afltables'
-         AND ei.match_method = 'afltables_profile_url'
+       WHERE ((s.key = 'afltables' AND ei.match_method = 'afltables_profile_url')
+              OR (s.key = 'manual_admin_edit' AND ei.match_method = 'manual_admin_edit'))
          AND ei.status IN ('unique', 'resolved')
          AND ei.player_id IS NOT NULL
-         AND ei.external_id = ANY ($1::text[])
-       ORDER BY 1, 2`,
+         AND ei.player_id IN (
+               SELECT inner_ei.player_id
+                 FROM external_identities inner_ei
+                 JOIN sources inner_s ON inner_s.id = inner_ei.source_id
+                WHERE ((inner_s.key = 'afltables' AND inner_ei.match_method = 'afltables_profile_url')
+                       OR (inner_s.key = 'manual_admin_edit' AND inner_ei.match_method = 'manual_admin_edit'))
+                  AND inner_ei.status IN ('unique', 'resolved')
+                  AND inner_ei.external_id = ANY ($1::text[]))
+       ORDER BY ei.player_id, (s.key <> 'afltables'), ei.external_id`,
   },
   afltables_coach_path: {
     entity: 'coaches',
@@ -1463,6 +1496,38 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
       SELECT id::bigint AS id, afltables_coach_path AS identity
         FROM public.coaches
        WHERE afltables_coach_path = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  draft_pick_key: {
+    entity: 'draft_picks',
+    description: "the selection's stable acquisition key, "
+      + "'<sources.key>|<player_url>|<draft_year>|<draft_kind>' — migration 069's reload "
+      + 'key, written with the source KEY rather than the per-database sources.id so it '
+      + "denotes the same selection on both databases. A manual selection's player_url is "
+      + "'manual:<token>', minted once and never edited. A selection with source_id NULL "
+      + '(a pre-AFLDB-ISSUE-160 admin row) has NO key and is deliberately absent here, so '
+      + 'it reports as unresolved rather than being carried by an integer that now names '
+      + 'someone else (AFLDB-ISSUE-160 D-3)',
+    byId: `
+      SELECT dp.id::bigint AS id,
+             s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+               AS identity
+        FROM public.draft_picks dp
+        JOIN public.sources s ON s.id = dp.source_id
+       WHERE dp.player_url IS NOT NULL
+         AND dp.draft_kind IS NOT NULL
+         AND dp.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT dp.id::bigint AS id,
+             s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+               AS identity
+        FROM public.draft_picks dp
+        JOIN public.sources s ON s.id = dp.source_id
+       WHERE dp.player_url IS NOT NULL
+         AND dp.draft_kind IS NOT NULL
+         AND s.key || '|' || dp.player_url || '|' || dp.draft_year::text || '|' || dp.draft_kind
+             = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {

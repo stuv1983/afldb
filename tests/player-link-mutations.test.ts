@@ -38,7 +38,7 @@ import {
   resolveLink,
   resolveLinkFromSuggestion,
 } from '@/db/queries/player-links';
-import { createPlayer, type DraftPickInput } from '@/db/queries/players';
+import { createPlayer } from '@/db/queries/players';
 
 type SeenQuery = { text: string; values: unknown[] };
 type QueryResponder = (text: string, values: unknown[]) => unknown[];
@@ -446,37 +446,35 @@ describe('22Under22 award-winner resolution', () => {
   });
 });
 
-describe('player creation facts', () => {
-  it('rejects partial draft fields at the server-action boundary', async () => {
+describe('player creation facts (AFLDB-ISSUE-160 §5, gate 3)', () => {
+  it('refuses draft fields at the server-action boundary instead of dropping them', async () => {
+    // D-5: draft selections have exactly one mutation contract, and it is not the
+    // generic data editor. Rejecting rather than ignoring is the point -- a stale
+    // client must not be able to silently discard a selection the administrator
+    // believed they had recorded.
     const formData = new FormData();
     formData.set('displayName', 'New Draftee');
     formData.set('recruitedFrom', 'Murray U18');
 
     const result = await createPlayerAction({}, formData);
 
-    expect(result).toEqual({
-      error: 'A valid draft year (1981–2100) is required with draft details.',
-    });
+    expect(result).toEqual({ error: 'Draft selections are edited in /admin/draft.' });
     expect(mocks.postgres).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it('rejects partial draft information instead of inventing a draft year', async () => {
-    const { tx, seen } = fakeTransaction(() => []);
-    installImportClient(tx);
-
-    const partialDraft = { recruitedFrom: 'Murray U18' } as DraftPickInput;
-    await expect(createPlayer({
-      displayName: 'New Draftee',
-      dob: '2007-03-01',
-      draftInfo: partialDraft,
-    }, { adminUserId: 5 })).rejects.toThrow('An explicit draft year');
-
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO draft_picks'))).toBe(false);
+  it('refuses every draft field, not only the year', async () => {
+    for (const field of ['draftYear', 'draftType', 'pickNumber', 'draftClubId', 'draftAge', 'pickNote']) {
+      const formData = new FormData();
+      formData.set('displayName', 'New Draftee');
+      formData.set(field, '2005');
+      expect(await createPlayerAction({}, formData), field)
+        .toEqual({ error: 'Draft selections are edited in /admin/draft.' });
+    }
+    expect(mocks.postgres).not.toHaveBeenCalled();
   });
 
-  it('stores the supplied draft year and keeps unrecorded career totals NULL', async () => {
+  it('mints a durable identity and record, and inserts no draft row', async () => {
     const { tx, seen } = fakeTransaction((text) => {
       if (text.startsWith('INSERT INTO players')) {
         return [{ id: 88, slug: 'new-draftee', displayName: 'New Draftee' }];
@@ -488,11 +486,33 @@ describe('player creation facts', () => {
     await createPlayer({
       displayName: 'New Draftee',
       dob: '1980-03-01',
-      draftInfo: { draftYear: 2005, recruitedFrom: 'Murray U18' },
     }, { adminUserId: 5, note: 'Historic draftee backfill' });
 
-    const draftInsert = seen.find((query) => query.text.startsWith('INSERT INTO draft_picks'));
-    expect(draftInsert?.values[0]).toBe(2005);
+    // DEF-4b: the ONLY INSERT INTO draft_picks in src/ is admin-draft.ts.
+    expect(seen.some((query) => query.text.startsWith('INSERT INTO draft_picks'))).toBe(false);
+
+    // DEF-4a: the player gets a durable identity (external_identities) AND a durable
+    // record (data_overrides) in the same transaction, or it is not promotable.
+    const identityInsert = seen.find((q) => q.text.startsWith('INSERT INTO external_identities'));
+    expect(identityInsert, 'no manual identity minted').toBeDefined();
+    expect(identityInsert!.text).toContain("SELECT id FROM sources WHERE key = 'manual_admin_edit'");
+    expect(identityInsert!.text).toContain("'resolved', 0, 'manual_admin_edit'");
+    const token = identityInsert!.values[0] as string;
+    expect(token, 'the token is a randomUUID, never name-derived')
+      .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(identityInsert!.values[1]).toBe('New Draftee');
+    expect(identityInsert!.values[2]).toBe(88);
+
+    const overrideInsert = seen.find((q) => q.text.startsWith('INSERT INTO data_overrides'));
+    expect(overrideInsert, 'no durable record written').toBeDefined();
+    expect(overrideInsert!.values[0]).toBe(`manual_admin_edit:${token}`);
+    expect(overrideInsert!.values[1]).toEqual({
+      json: {
+        display_name: 'New Draftee', given_name: 'New', surname: 'Draftee',
+        dob: '1980-03-01', dob_confidence: 'sourced', birth_year: 1980,
+      },
+    });
+    expect(overrideInsert!.values[2]).toBe(5);
 
     // The required data_edits audit is part of the same transaction
     // (AFLDB-ISSUE-027) and snapshots the created identity.
@@ -500,7 +520,7 @@ describe('player creation facts', () => {
     expect(auditInsert?.values).toEqual([
       'players', 88, 'player_creation',
       { json: {} },
-      { json: { displayName: 'New Draftee', hasDraftInfo: true } },
+      { json: { displayName: 'New Draftee' } },
       5, 'Historic draftee backfill',
     ]);
     expect(mocks.authSql).not.toHaveBeenCalled();
@@ -511,22 +531,52 @@ describe('player creation facts', () => {
     );
   });
 
-  it('rejects a draft club identity that was not active in the supplied year', async () => {
-    const { tx, seen } = fakeTransaction((text) => {
-      if (text.startsWith('SELECT c.id, c.name')) {
-        return [{ id: 24, name: 'Western Bulldogs', activeId: 5 }];
-      }
-      return [];
-    });
+  it('derives search_name, slug and sort_name in SQL, by the importer expressions', () => {
+    // §3.2: a replayed twin has to be byte-identical to the row the admin typed, and
+    // the only way to guarantee that is for both sides to run the same SQL. A
+    // JavaScript slug would diverge the moment a name carries an accent or an
+    // apostrophe.
+    const source = readFileSync(join(process.cwd(), 'src/db/queries/players.ts'), 'utf8');
+    const insert = source.slice(source.indexOf('INSERT INTO players ('));
+    expect(insert).toContain('afldb_normalise_name(${displayName})');
+    expect(insert, 'the backslash must survive BOTH the template literal and SQL')
+      .toContain("regexp_replace(afldb_normalise_name(${displayName}), '\\\\s+', '-', 'g')");
+    // A bare \s in a TS template literal is the letter s, so PostgreSQL would
+    // replace every run of "s" in a name with a hyphen.
+    expect(insert).not.toContain("'" + String.fromCharCode(92) + "s+'");
+    expect(insert).toContain("ELSE ${surname}::text || ', ' || ${givenName}::text");
+    // The same two expressions, spelled identically, in the replay that re-creates it.
+    const replay = readFileSync(join(process.cwd(), 'tools/migration/common.py'), 'utf8');
+    expect(replay).toContain('afldb_normalise_name(%(display_name)s)');
+    expect(replay).toContain(
+      "regexp_replace(afldb_normalise_name(%(display_name)s), '\\\\s+', '-', 'g')");
+  });
+
+  it('omits an absent optional field from the durable record, and keeps an explicit null', async () => {
+    // absent-vs-explicit-null is what makes the replay's jsonb_exists arms mean what
+    // they say: an absent key leaves the column alone, an explicit null clears it.
+    const { tx, seen } = fakeTransaction((text) => (
+      text.startsWith('INSERT INTO players')
+        ? [{ id: 91, slug: 'minimal', displayName: 'Minimal' }]
+        : []));
     installImportClient(tx);
 
-    await expect(createPlayer({
-      displayName: 'Historical Draftee',
-      draftInfo: { draftYear: 1981, clubId: 24 },
-    }, { adminUserId: 5 })).rejects.toThrow('not the historical club identity active in 1981');
+    await createPlayer({ displayName: 'Minimal', notes: null }, { adminUserId: 5 });
 
-    expect(seen.some((query) => query.text.includes('afldb_identity_for_season'))).toBe(true);
-    expect(seen.some((query) => query.text.startsWith('INSERT INTO players'))).toBe(false);
+    const overrideInsert = seen.find((q) => q.text.startsWith('INSERT INTO data_overrides'));
+    const payload = (overrideInsert!.values[1] as { json: Record<string, unknown> }).json;
+    expect(Object.keys(payload).sort()).toEqual(['display_name', 'given_name', 'notes', 'surname']);
+    expect(payload.notes).toBeNull();
+    expect('dob' in payload).toBe(false);
+    expect('height_cm' in payload).toBe(false);
+  });
+
+  it('refuses to create a player it cannot attribute the durable record to', async () => {
+    const { tx, seen } = fakeTransaction(() => []);
+    installImportClient(tx);
+    await expect(createPlayer({ displayName: 'Unattributed' }, { adminUserId: 0 }))
+      .rejects.toThrow('valid administrator id');
+    expect(seen.some((q) => q.text.startsWith('INSERT INTO players'))).toBe(false);
   });
 
   it('does not fall back to the read-only application connection', async () => {
