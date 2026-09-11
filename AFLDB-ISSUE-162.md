@@ -1,0 +1,1036 @@
+# AFLDB-ISSUE-162 — Fixture / season schedule administration (ISSUE-156 P3d)
+
+- **Status:** Planning complete 2026-09-11 — **no code, no migration, no commit, no deployment.**
+  **Operator decisions D-1…D-7 DECIDED 2026-09-11 (§35); D-6 approved with a condition and one
+  additional implementation constraint. Stage 1 is authorised.**
+- **Severity:** Medium
+- **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
+- **Planning model:** Fable 5.1, high
+- **Worktree / branch:** `D:\dev\afldb-issue-162`, `opus/issue-162-fixture-admin`, cut from
+  `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161, which is stacked on ISSUE-160).
+  Neither parent is merged first; all three deploy to DEV together as the Admin Centre batch (§34).
+- **Parent:** `AFLDB-ISSUE-156` (Admin Centre completion umbrella). Allocated as a supplemental
+  child **P3d** after P3c, so P4–P12 keep their labels. **P10 (fixture-identity correction of
+  played matches, `match-rekey.ts`) is NOT absorbed** — see §31.
+
+Every file/line citation below was verified natively on this branch on 2026-09-11. No database was
+read or written during planning; every "measured" figure is quoted from the cited record.
+
+---
+
+## 1. Executive summary
+
+AFLDB cannot represent an unplayed match. `matches` requires `home_score`, `away_score`, `result`
+and `margin` `NOT NULL` (`003_matches.sql:45-52`) and reconciles them with five CHECKs
+(`003:60-70`, `022:25-55`), so the only "fixture" the database knows is a game that has already
+been scored. The current-season acquisition already records this: "pre-match match identity is
+structurally unavailable: `matches` requires NOT NULL scores/result/margin, so an unplayed fixture
+cannot exist there" (`IssuesIndex.md:2299-2300`, ISSUE-100 L3A). Every consumer of `matches` —
+the club ladder (`rebuild_derived.py:340-356`, `player-derived.ts:413-458`), season metadata
+(`player-derived.ts:515-560`), round ladders (`rounds.ts:44-105`), venue records (`venues.ts`,
+13 reads), NL team plans, the Grid Solver — reads "row exists" as "match played". A scheduled row
+placed in `matches` with placeholder scores would count as a 0–0 draw; with NULL scores it cannot
+be inserted at all.
+
+The repository's own precedent for this exact distinction is AFLW: `staging_aflw.fixtures` (the
+published schedule, `fixture_status IN ('played','scheduled','cancelled')`, scores CHECK-forced NULL
+unless played, `025_staging_aflw.sql:80-125`) is a separate table from `staging_aflw.matches` (one
+row per played fixture, `025:127-131`). The chosen design follows that shape at canonical level:
+
+- **A new canonical registry table `fixtures`** holds scheduled-match facts only: season, round,
+  home/away club identity, optional date, optional local start time, optional venue, a lifecycle
+  `status` (`scheduled` | `cancelled` | `void`) and a minted, never-edited `fixture_key` token
+  under the existing `manual_admin_edit` source. It carries **no** score, result, attendance or
+  statistic column, so no fixture can ever be read as a played match.
+- **`matches` stays played-only and untouched.** No column, constraint or consumer changes. The
+  ladder, season metadata, venue/club records, NL and Grid Solver are safe by construction.
+- **"Played" is derived, never stored:** a fixture is played when exactly one `matches` row exists
+  for the same season, round code and club pair (§18). The AFL Tables settle keeps inserting
+  `matches` rows by `match_key` exactly as today and never reads `fixtures`; no twin is possible
+  because the two tables never hold the same fact.
+- **Durability** is the ISSUE-159/160/161 shape: a whole-row `data_overrides` record keyed
+  `manual_admin_edit:<token>`, one import-role transaction per mutation with an in-transaction
+  `data_edits` row, and a fail-closed `replay_admin_overrides('fixtures')` branch so every
+  fixture survives a rebuild, a DEV→PROD promotion and disaster recovery.
+- **Removal never deletes.** A data-entry mistake is `void`; a real-world cancellation is
+  `cancelled`; both keep the row, the identity and the audit trail resolvable (§16).
+- **Season boundary:** ISSUE-162 writes no `seasons`, `clubs` or `club_seasons` row (ISSUE-161
+  D-6, `096_season_list_members.sql:33-57`). A fixture season is administrable for
+  `max(seasons.year) <= S <= max(seasons.year) + 1`; eligible clubs come from the ONE existing rule
+  `afldb_season_list_clubs(season)` (`096:166-185`).
+- **One migration** (next free number **097** at planning time; re-check at Stage 1), additive,
+  no backfill. Two stages: Stage 1 = model + mutations + replay + promotion classification +
+  derived-safety tests; Stage 2 = `/admin/fixtures` routes, capabilities, single and round-batch
+  entry, diagnostics, responsive acceptance deferred to the Admin Centre DEV batch.
+
+---
+
+## 2. Current fixture architecture (Planning Question 1)
+
+### 2.1 What `matches` is
+
+| Fact | Column(s) | Nullable | Evidence |
+|---|---|---|---|
+| Identity | `id` (identity, rebuilt on promotion); `match_key text NOT NULL UNIQUE` = `season\|round_code\|match_date\|home name\|away name` | no | `003:20-23`; rendering `import_fitzroy_core.py:54,1880`; `match-rekey.ts:4-13` |
+| Season | `season smallint NOT NULL REFERENCES seasons(year)` | no | `003:25` |
+| Round | `round_code text NOT NULL`, `round_number smallint`, `round_type round_type NOT NULL`, `is_final boolean NOT NULL` CHECK-derived, `is_finals_series` GENERATED | round_number NULL for finals only (`matches_round_number_ck`) | `003:26-29,66-69`; `084`; `085:52-54` |
+| Date / time | `match_date date NOT NULL`, `match_time text` (AFL Tables `Local.start.time`, verbatim), `scheduled_at timestamptz` | date NOT NULL; time nullable; `scheduled_at` has **no reader or writer anywhere in `src/` or `tools/`** (only `003:33`) | `003:31-33`; `import_fitzroy_core.py:1604` |
+| Venue | `venue_id` nullable enrichment, `venue_raw text NOT NULL` | venue_id yes | `003:35-38,74-75` |
+| Clubs | `home_club_id`, `away_club_id NOT NULL`, CHECK differ | no | `003:40-41,60` |
+| Scores | `home_score`, `away_score` **NOT NULL**; goals/behinds nullable; components CHECK | **no** | `003:43-48`; `022:36-55` |
+| Result | `result match_result NOT NULL`, `winner_club_id`, `margin NOT NULL`; result must follow scores | **no** | `003:50-52,61-65`; `022:25-30` |
+| Attendance | nullable; NULL = not recorded, never 0; zero must cite a source | yes | `003:54-55,72-73`; `020` |
+| Provenance | `source_id`, `source_record_id`, `import_batch_id`, `imported_at` (migration 064) | yes | `064:10-15` |
+
+**Conclusion:** there is no state of a `matches` row that means "not yet played". Every row is a
+result. There is no separate fixture table in `public`; the only fixture table in the database
+is AFLW's staging one (§2.4).
+
+### 2.2 Who writes `matches`, and how a row is identified
+
+| Writer | Identity used | Behaviour on an existing row | Evidence |
+|---|---|---|---|
+| `tools/migration/import_fitzroy_core.py import_matches()` (historical rebuild, 1897–2025) | `match_key` | `INSERT … ON CONFLICT (match_key) DO UPDATE` every scored field; period scores deleted and re-copied. **No `DELETE FROM matches` and no `TRUNCATE matches` anywhere in `tools/`** (the only two are the ISSUE-155 acceptance fixture scripts) | `:2978-3086`; grep |
+| `tools/db/rebuild-test.ts` (`npm run db:test:rebuild`) | starts from an **empty** database | every table recreated; overrides replayed only where the importer calls `replay_admin_overrides` | `AFLDB-ISSUE-161.md` §19 |
+| AFL Tables nightly settle (`settle-afltables.ts` → `canonical-apply.ts writeMatch()`) | the bundle projection's `match_key` verbatim; canonical lookup by `refs.matchIdsByKey` (every `matches` row of the season, `:1694`); a miss runs the ISSUE-131 rekey search | insert when `new_target`; update by id on a hit; refuses `rekey_ambiguous` / `rekey_would_merge` | `settle-afltables.ts:2946-3031`; `canonical-apply.ts:651-688` |
+| ISSUE-131 rekey (`match-rekey.ts`) | season + BOTH club ids exact, at most one of `round_code`/`match_date` differs, candidate must be owned by the promoting source (`m.source_id = identity.sourceId`) and provably retired | moves `match_key` in place, carries `data_overrides` (`carryMatchOverrides`) | `:18-37,115-150,156-231` |
+| Squiggle/Kali current-season refresh (`current-season-import.ts`) | `resolveLocalMatch()`: season, date, local round codes, unordered club pair, exactly one hit | **writes `staging.external_current_matches` only; "cannot create a partial `matches` row"** | `:475-484,596-613`; `063` |
+| `createMatch()` (`match-admin.ts`, `/admin/data-editor`) | a **third** `match_key` rendering (`season\|round\|date\|homeId\|awayId`, `:224`) that the applier calls "one of three incompatible renderings" | inserts a fully scored row; also `INSERT INTO seasons … ON CONFLICT DO NOTHING` (`:192-196`); recomputes club_seasons/season metadata | `:101-320`; `canonical-apply.ts:663-665` |
+| `src/lib/ingest/datasets.ts` (legacy CSV intake) | `match_key` upsert | scored rows only | `:559-572` |
+| `replay_admin_overrides('matches')` | `data_overrides.entity_key = match_key` | patches attendance/time/event/notes/score fields on an existing row; never inserts | `common.py:1161-1228` |
+
+### 2.3 Byes, finals, rounds today
+
+- **Byes are absence.** No bye row exists; `rounds.ts:36-42` documents that the round ladder joins
+  on `round_number <=` precisely so "a bye correctly carries a club's standing forward instead of
+  silently missing a round".
+- **Rounds are a text code plus a typed enum.** Home-and-away `round_code` is the decimal string of
+  `round_number` (`normalise_results_round`, `import_fitzroy_core.py:1213-1221`); finals codes are
+  `EF QF SF PF GF WF` (`FINALS_CODES`, `:166-173`), each mapped to `round_type`. AFLDB numbers the
+  Opening Round as **round 1** from 2024 (`tools/records/import-first-kick-goal.ts:597`,
+  `data/reference/source-families.json:57`, `tests/current-season-import.test.ts:130`); Squiggle and
+  Kali number it 0. ISSUE-140 measured what happens when two conventions meet: 17 duplicate 2026
+  `matches` rows on the pre-rebuild DEV lineage (`issues.md:18024-18049`).
+- **Finals** are rows with `round_number NULL` and a finals `round_type`; participants are known
+  because the row is a result. The Wildcard Final is `round_type = 'wildcard_final'`,
+  `is_final = true`, `is_finals_series = false` (`084`, `085`).
+
+### 2.4 The repository-native fixture precedent (AFLW)
+
+`staging_aflw.fixtures` (`025:80-125`): "the complete published fixture list, including matches
+that were never played … scores here are NULL and `fixture_status` carries the meaning";
+`fixture_status IN ('played','scheduled','cancelled')`; `is_played = (fixture_status = 'played')`
+CHECK; `saflw_fixtures_score_ck` forces scores NULL unless played, "or it becomes a 0-0 draw";
+`match_date` nullable. `staging_aflw.matches` is "one row per played fixture" with
+`match_key REFERENCES staging_aflw.fixtures(match_key)`. The AFLW model already separates
+schedule from result; it is staging-only and outside the normalised model, so it is a design
+precedent, not a reusable table.
+
+### 2.5 Season register and club eligibility
+
+- `seasons` is reference data loaded by `TRUNCATE`-and-copy from `data/reference/seasons.json`
+  (`last_season: 2026`, `in_progress_seasons: [2026]`); the ISSUE-101 rollover advances it only
+  after the completed season's acquisition is accepted, and never from the browser
+  (`AFLDB-ISSUE-161.md` §9.2 table; `season-rollover.ts:685-721,1245-1308`).
+- `clubs.last_season` for a current identity equals the register's last season, so
+  `afldb_identity_for_season(org, 2027)` returns NULL for every identity while the register ends at
+  2026 (`096:147-151`). ISSUE-161 solved this once with `afldb_season_list_clubs(p_season)`:
+  `is_current_afl_club` identities for `S >= max(seasons.year)`, era identities with a
+  `club_seasons` row before it (`096:166-185`).
+- `club_seasons` is derived from `matches WHERE NOT is_final` with NOT NULL ladder columns
+  (`006:55-78`; `rebuild_derived.py:340-356`); it cannot hold a season with no results.
+
+---
+
+## 3. Scheduled-vs-played semantic model (Planning Question 2)
+
+Three fact classes, three homes:
+
+| Class | Holds | Home | Written by |
+|---|---|---|---|
+| **Scheduled-match facts** | season, round, home, away, date (or TBC), local time (or TBC), venue (or TBC), lifecycle status, provenance | **`fixtures`** (new) | Super Admin (ISSUE-162); a future fixture importer under its own source (not this issue) |
+| **Played-match facts** | scores, result, margin, attendance, period scores, participation and statistics | `matches`, `match_period_scores`, `player_match_stats`, `brownlow_round_votes` | AFL Tables settle, historical rebuild, data editor |
+| **Derived statistics** | ladders, club/venue/player/coach records, season metadata | `club_seasons`, `player_*_stats`, `seasons` measured columns, live queries | `rebuild_derived.py`, `player-derived.ts`, read-time SQL |
+
+Rules that follow:
+
+1. A fixture never carries a score, result, attendance, period, lineup or statistic. The table has
+   no such column, so "0–0 means not played" is unrepresentable rather than merely forbidden.
+2. A played match never carries scheduling intent. `matches` is unchanged.
+3. "Played" is a **derived** relation between the two (§18), never a stored flag on either.
+4. Nothing derived reads `fixtures` (§21); nothing in `fixtures` is derived from anything.
+
+**Can the current `matches` table represent a future fixture correctly?** No, and not by any
+minimal change: making `home_score`/`away_score`/`result`/`margin` nullable would require re-proving
+every one of the 105 `FROM matches` occurrences across 41 `src/` files, `rebuild_derived.py`, the
+NL compilers and the Grid Solver (all of which take a row as a result), would leave `match_key`
+— a content address over the very fields a fixture changes — as the identity, and would put
+unplayed rows inside the settle's `matchIdsByKey` lookup and the ISSUE-131 rekey candidate set.
+That is the stop condition "scheduled rows in `matches` contaminate ladder/stat derivation" fired
+by design, and it is why Option A/C are rejected (§5).
+
+---
+
+## 4. Chosen canonical data model (Planning Question 3)
+
+**Option B′ — a canonical registry table `fixtures`, played state derived by resolution against
+`matches`.** One logical match has at most one fixture identity (permanent, minted) and at most
+one played identity (`match_key`, source-owned); the two are joined deterministically, never
+merged and never duplicated.
+
+```sql
+CREATE TABLE fixtures (
+  id               bigint      PRIMARY KEY GENERATED ALWAYS AS IDENTITY,   -- rebuilt on promotion; never identity
+  fixture_key      text        NOT NULL UNIQUE,   -- randomUUID() minted once at creation; never edited (§6)
+  season           smallint    NOT NULL CHECK (season BETWEEN 1897 AND 2100),  -- no FK to seasons (§8)
+  round_code       text        NOT NULL,          -- '1'..'N' or EF/QF/SF/PF/GF/WF, the matches vocabulary (§9)
+  round_number     smallint,
+  round_type       round_type  NOT NULL,          -- the existing enum, wildcard_final included
+  is_final         boolean     GENERATED ALWAYS AS (round_type <> 'home_and_away') STORED,
+  match_date       date,                          -- NULL = date TBC (§10)
+  match_time       text,                          -- NULL = time TBC; local venue time text, matches.match_time vocabulary
+  venue_id         integer     REFERENCES venues(id),   -- NULL = TBC or unmapped
+  venue_raw        text,                          -- named-but-unmapped venue text; NULL with venue_id NULL = TBC (§11)
+  home_club_id     integer     NOT NULL REFERENCES clubs(id),
+  away_club_id     integer     NOT NULL REFERENCES clubs(id),
+  status           text        NOT NULL DEFAULT 'scheduled'
+                               CHECK (status IN ('scheduled', 'cancelled', 'void')),  -- §16
+  status_reason    text,                          -- required by the writer for cancelled/void
+  notes            text,
+  source_id        smallint    NOT NULL REFERENCES sources(id),   -- manual_admin_edit for every ISSUE-162 row
+  source_record_id text        NOT NULL,          -- = fixture_key for manual rows
+  import_batch_id  bigint      REFERENCES import_batches(id),     -- reserved for a future importer, NULL here
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT fixtures_clubs_differ_ck   CHECK (home_club_id <> away_club_id),
+  CONSTRAINT fixtures_round_number_ck   CHECK (
+    (round_type = 'home_and_away' AND round_number IS NOT NULL AND round_code = round_number::text)
+    OR (round_type <> 'home_and_away' AND round_number IS NULL)),
+  CONSTRAINT fixtures_status_reason_ck  CHECK (status = 'scheduled' OR status_reason IS NOT NULL),
+  CONSTRAINT fixtures_venue_ck          CHECK (venue_id IS NULL OR venue_raw IS NOT NULL),
+  CONSTRAINT fixtures_source_record_uq  UNIQUE (source_id, source_record_id)
+);
+CREATE INDEX ix_fixtures_season_round ON fixtures (season, round_code);
+CREATE INDEX ix_fixtures_home         ON fixtures (home_club_id, season);
+CREATE INDEX ix_fixtures_away         ON fixtures (away_club_id, season);
+CREATE INDEX ix_fixtures_venue        ON fixtures (venue_id) WHERE venue_id IS NOT NULL;
+CREATE INDEX ix_fixtures_source       ON fixtures (source_id);
+CREATE INDEX ix_fixtures_batch        ON fixtures (import_batch_id) WHERE import_batch_id IS NOT NULL;
+```
+
+(The exact DDL is written at Stage 1; the shape above is the contract. `venue_raw` is populated
+from `venues.canonical_name` when `venue_id` is set, as `createMatch()` does at `:214-218`, so a
+fixture always renders a venue string the same way `matches` does.)
+
+**Assessment against the Q3 criteria**
+
+| Criterion | Option B′ |
+|---|---|
+| Semantic correctness | exact: schedule and result are different facts in different tables; no fake values anywhere |
+| Compatibility with existing imports | total: no importer, settle or rekey path reads or writes `fixtures`; `matches` unchanged |
+| Promotion / replay | the ISSUE-161 registry shape (`grant_import_write` registry, whole-row override, fail-closed replay); one new lineage rule for audit rows (§20) |
+| Manual edits | ordinary row edits under the token identity; `match_key` never involved |
+| Public query impact | none until a public consumer opts in (§22) |
+| Ladder / stat derivation | untouched by construction (§21) |
+| Performance | ≤ ~230 rows per season; indexed by (season, round) |
+| Migration complexity | one additive migration, no backfill |
+| Duplicate fixture/result risk | different tables; the played link is a deterministic resolution with an `ambiguous` outcome that never merges (§18) |
+| Scheduled → completed cleanly? | the fixture identity persists and reports `played` once the result exists; the result is the source's row. Two rows, one logical match, joined by rule — not one row that changes state |
+
+---
+
+## 5. Rejected alternatives
+
+| Option | Why rejected |
+|---|---|
+| **A. `matches` canonical for both, scores nullable** | fires the derived-contamination stop condition (§3); `match_key` is a mutable content address (`match-rekey.ts:4-13`) unfit for a fixture whose date/round/venue change; unplayed rows would enter the settle's season lookup and the rekey candidate set; ~41 consumer files plus Python and NL to re-prove; ISSUE-140 shows what duplicate keys under two round conventions already cost |
+| **C. `matches` plus explicit fixture status/provenance** | same schema change as A plus a status column every consumer would have to filter on; one missed filter = a 0–0 draw in a ladder; `matches_result_scores_ck` and friends would have to be conditionalised on status |
+| **B (strict). New table that "settles into" `matches` by moving the row** | there is nothing to move: the settle creates the played row from the source with its own identity; a copy step would put fixture code inside `canonical-apply.ts` and create a second writer of `matches` outside the Decision-E ownership model |
+| **Stored `fixtures.match_id` FK** | lineage-bound (`matches.id` is rebuilt on promotion); would need the `rowIdColumn` staged-remap mechanism ISSUE-155 invented (`promotion-inventory.ts:670-721`) for a link that is fully derivable. Deferred unless read-time resolution proves insufficient (D-6) |
+| **Placeholder "TBC" clubs for finals** | clubs are tracked reference data (`clubs.json`); a fake identity would enter every club query; §17 creates a finals fixture only once participants are known |
+| **Reuse `createMatch()`** | it is a played-match creator with a third incompatible `match_key` rendering and a `seasons` INSERT the reference loader reverts (`match-admin.ts:192-196,224`); its use for scheduling is exactly the fake-score path this issue forbids |
+| **Reuse `staging_aflw.fixtures`** | AFLW staging, team codes not club ids, outside the normalised model and the promotion registry |
+| **`data_overrides`-only design (no table)** | a fixture is a first-class canonical fact with FKs, uniqueness and diagnostics; `data_overrides` is a durable *record*, not a queryable table (the ISSUE-161 §3 argument, unchanged) |
+
+---
+
+## 6. Match identity strategy (Planning Question 4)
+
+| Component | Stable? | Role |
+|---|---|---|
+| `fixtures.fixture_key` (UUID token) | **yes** — minted once by `randomUUID()`, never edited, survives rebuild/promotion via the override key | **the durable fixture identity**; admin route segment; `data_overrides.entity_key = 'manual_admin_edit:<token>'`; `source_record_id` |
+| `fixtures.id` | no (rebuilt on promotion) | storage only; `data_edits.row_id`, remapped by the new `fixture_key` lineage rule (§20) |
+| season + round_code + club pair | stable in practice, **mutable by edit** | the **played-resolution key** (§18) and the duplicate-refusal key (§13) — never the identity |
+| `match_date`, `match_time`, `venue_id` | mutable | schedule facts, freely rescheduled |
+| home/away designation | mutable (swap action) | schedule fact; resolution tolerates a swap with a warning |
+| `matches.match_key` | content address over mutable fields | the **played** identity, source-owned; ISSUE-162 never renders, stores or compares it |
+| `matches.source_record_id` (AFL Tables game id) | source-owned | never used here |
+
+This mirrors the ISSUE-160 manual-selection contract (`AFLDB-ISSUE-160.md` §3.1: `player_url =
+'manual:<token>'`, "token = `randomUUID()` minted once at creation, never edited, never
+name-derived") and the ISSUE-159 manual-coach namespace. No display string is ever an identity.
+
+**Binding constraint (operator, 2026-09-11):** a played-match association never replaces
+`fixture_key` with `match_key`. `fixture_key` is the fixture's identity before, during and after
+settlement, across every reschedule, venue change, round change and club correction. `fixtures`
+carries no `match_key` and no `match_id` column; the played row's id is a read-time result (§18),
+never stored, and no writer in this issue may render, copy or compare a `match_key`.
+
+---
+
+## 7. Source / provenance strategy (Planning Question 5, 25)
+
+| Row | `source_id` | `source_record_id` | Durable record | Distinguishable how |
+|---|---|---|---|---|
+| Manual fixture (this issue) | `manual_admin_edit` (`057:36-42`) | the token | `data_overrides ('fixtures', 'manual_admin_edit:<token>', 'fixture', whole-row payload)` | `source_id` only; never a name pattern |
+| Future imported fixture (not this issue) | its own source (e.g. `squiggle_api`, `063:10-14`) | the provider id | none needed (reload re-creates) | `source_id` |
+| Played match | AFL Tables (`matches.source_id`) | AFL Tables game id | source | separate table |
+
+Precedence rules (binding on any later importer):
+
+1. A source-owned fixture writer writes only rows carrying its own `source_id`; it never inserts,
+   updates or deletes a `manual_admin_edit` row (the ISSUE-161 §7 rule, `096:139-140`).
+2. A manual fixture is never overwritten by source data; reconciliation between a manual fixture
+   and a source fixture is a **diagnostic** (§31), never an automatic mutation.
+3. The played link (§18) is the only interaction with AFL Tables data, and it is read-only.
+4. `data_overrides` is sufficient for durability because every ISSUE-162 row is manual and whole-row;
+   no "source-backed row plus patch override" case exists yet. When a fixture importer arrives it
+   adds the patch form for its own rows, exactly as `matches` overrides do today.
+
+No new provenance state is invented: `manual_admin_edit` / imported (reserved) / the three
+lifecycle statuses are all that exist.
+
+---
+
+## 8. Season-boundary ownership (Planning Questions 6, 34)
+
+**Answer: Option B — the existing reference/rollover process owns `seasons`; fixture administration
+works against the register and never writes it.** This is the same answer ISSUE-161 D-6 recorded
+and the migration-096 header restates (`096:33-57`), so there is one season-boundary model across
+ISSUE-101, ISSUE-161 and ISSUE-162:
+
+| Structure | Owner | ISSUE-162 |
+|---|---|---|
+| `seasons` row for S+1 | `seasons.json` via `load_reference_data.py`; advanced by the ISSUE-101 rollover | **never written**; no FK from `fixtures.season` (CHECK range only, as `096:75`) |
+| `clubs.last_season`, `club_organizations` | same loader | never written |
+| `club_seasons` for S+1 | derived from `matches` | never written; not required |
+| `createMatch()`'s `INSERT INTO seasons` (`match-admin.ts:192-196`) | legacy data-editor path | **not reused**; it is the ISSUE-033 lineage the reference loader reverts |
+
+Administrable fixture season: `max(seasons.year) <= S <= max(seasons.year) + 1` (D-3). The lower
+bound admits the in-progress season so finals fixtures can be entered as they become known; the
+upper bound matches ISSUE-161's list bound. `S < max(seasons.year)` is history and is refused for
+every write (source-owned results already exist). When the rollover advances the register the window
+slides and nothing has to be migrated.
+
+**Operational note (not a dependency):** AFL Tables 2027 results can land in `matches` only once
+the register carries 2027 (`matches.season REFERENCES seasons(year)`). That is the existing
+ISSUE-101 lifecycle and is unaffected by fixtures; a 2027 fixture exists and is administrable
+before, during and after that rollover. "Opening a season" for fixtures is the first fixture
+written for it — no initialise action, no workflow state (the ISSUE-161 finding, §9.2 there).
+
+---
+
+## 9. Round model (Planning Question 7)
+
+Reuse the `matches` vocabulary exactly, so the played resolution (§18) compares like with like:
+
+- `round_type` = the existing enum (`home_and_away`, `wildcard_final`, `elimination_final`,
+  `qualifying_final`, `semi_final`, `preliminary_final`, `grand_final`).
+- Home-and-away: `round_number` 1..30 required; `round_code = round_number::text` (CHECK).
+  **Opening Round is round 1** (AFLDB convention since 2024, §2.3); the UI labels round 1 with
+  "AFLDB numbers the Opening Round as round 1" for seasons ≥ 2024 and never offers a round 0.
+- Finals: `round_number NULL`; `round_code` is the `FINALS_CODES` key for the type (`EF QF SF PF
+  GF WF`), derived server-side from `round_type` exactly as `createMatch()` does (`match-admin.ts:150-156`).
+- Named rounds (Gather Round, Rivalry Round, split rounds) are not modelled in `matches` and are not
+  modelled here; `notes` carries them. A split round is simply a round whose fixtures span more
+  dates; nothing assumes one weekend.
+- No hard-coded 24 rounds, 18 clubs or 9 games per round: the round set for a season is whatever
+  fixtures exist; diagnostics (§27) report shape, never refuse it.
+- Round text is not source-owned for fixtures: the admin selects a `round_type` and, for
+  home-and-away, a `round_number`; the writer renders `round_code`. A human never types a code.
+
+---
+
+## 10. Date / time / TBC model (Planning Question 9)
+
+| Fact | Representation | Rationale |
+|---|---|---|
+| Exact scheduled date | `match_date date` | same type as `matches.match_date` |
+| Date known, time TBC | `match_date` set, `match_time NULL` | `matches.match_time` is already nullable text meaning "not published" (`076:59`); NULL is the existing "unknown" |
+| Date TBC | `match_date NULL` (`match_time` must then be NULL too — writer rule) | new table, so nullable is free; **no fake midnight, no sentinel date** |
+| Time known | `match_time text`, validated by the writer as `HH:MM` 24-hour local venue time | `matches.match_time` is free text from `Local.start.time` (`import_fitzroy_core.py:1604`); the writer constrains what an admin may type, the column keeps the vocabulary |
+| Reschedule | UPDATE date/time under the token identity, audited (§15) | identity is not the date |
+| `scheduled_at timestamptz` | **not added** | the `matches` column has had no reader or writer since migration 003; adding a second time representation invents a convention nothing consumes |
+
+**Timezone is explicit and textual:** the stored time is local venue time, exactly as AFL Tables
+publishes and `matches` stores it. No timestamptz, no UTC conversion, no DST arithmetic. Display
+uses the same formatting the match page uses for `matchTime` (plain text); date formatting goes
+through `formatDate` (`format.ts:125-134`, `timeZone: 'UTC'` on a `date` value, so no shift).
+Sorting: `round_number NULLS LAST`, then `match_date NULLS LAST`, then `match_time NULLS LAST`,
+then `id` — TBC fixtures sort to the end of their round, never to the start.
+
+---
+
+## 11. Venue model (Planning Question 10)
+
+- Known venue: `venue_id` from `venues` (existing rows only, chosen from a list), `venue_raw =
+  canonical_name` copied at write time (the `createMatch()` convention, `match-admin.ts:212-218`).
+- TBC venue: `venue_id NULL`, `venue_raw NULL`.
+- Named venue not in `venues`: `venue_id NULL`, `venue_raw = <typed name>` — the same shape
+  `matches` uses for an unmapped source string (`003:74-75`). Diagnostic: "unmapped venue" (warning).
+- Venue changed later: UPDATE, audited (§15).
+- **No inline venue creation.** No `INSERT INTO venues` or `venue_aliases` exists anywhere in
+  `src/`; venues are created by `import_venues()` (`import_fitzroy_core.py:3522`) from source
+  strings and by the settle's alias resolution. A venue-administration surface is a separate
+  ISSUE-156 child; ISSUE-162 hands off to it by leaving `venue_id NULL` with the name in
+  `venue_raw`, which the admin corrects once the venue exists.
+
+---
+
+## 12. Club eligibility model (Planning Questions 11, 32, 33)
+
+- **Source of truth:** `afldb_season_list_clubs(season)` (`096:166-185`) — the ONE rule
+  ISSUE-161 introduced. For `S >= max(seasons.year)` it returns `is_current_afl_club` identities;
+  a new club, rename or departure enters through `clubs.json` and is picked up with no code
+  change. ISSUE-162 adds no second rule and modifies neither this function nor
+  `afldb_identity_for_season()`.
+- Writer invariant: `home_club_id` and `away_club_id` must both be in
+  `afldb_season_list_clubs(season)`; an id typed or posted outside that set is refused
+  (`club_ineligible`). Clubs are chosen from that list in the UI; ids, never names, are submitted.
+- **Not circular:** the eligible set never reads `fixtures` or `matches` for a future season.
+- **ISSUE-161 interaction:** none beyond the shared function. A fixture needs no membership; a
+  membership needs no fixture (`AFLDB-ISSUE-161.md` §9.4, W-14). Fixture creation writes no
+  `season_list_members` row and player lists are never consulted.
+- **ISSUE-160 interaction:** none. `fixtures` references `clubs`, `venues`, `sources`,
+  `import_batches` only; no `draft_picks` or `players` column, no read of either.
+- Future expansion club: appears in the eligible set when `clubs.json` declares it current; until
+  then a fixture naming it is refused rather than a placeholder being invented.
+
+---
+
+## 13. Create-match workflow (Planning Question 12)
+
+`createFixture(input)` in a new `src/db/queries/admin-fixtures.ts` — the ONE fixture mutation
+contract (the `admin-season-lists.ts` shape, `:11-96`):
+
+Input: `season`, `roundType`, `roundNumber?`, `homeClubId`, `awayClubId`, `matchDate?`,
+`matchTime?`, `venueId?` | `venueRaw?`, `notes?`, `adminUserId`.
+
+Preconditions, all checked **before the first write**, under
+`pg_advisory_xact_lock(<fixtures namespace>, season)` so two concurrent creates for one season
+serialise (the ISSUE-155 Phase B lock pattern):
+
+| Rule | Refusal reason |
+|---|---|
+| `max(seasons.year) <= season <= max + 1` | `season_out_of_window` |
+| `roundType` valid; H&A ⇒ `roundNumber` in 1..30; finals ⇒ no number | `invalid_round` |
+| `homeClubId <> awayClubId` | `same_club` |
+| both clubs in `afldb_season_list_clubs(season)` | `club_ineligible` |
+| `matchTime` requires `matchDate`; `matchTime` matches `^\d{2}:\d{2}$` | `invalid_schedule` |
+| `venueId` exists, or `venueRaw` non-empty, or both absent | `invalid_venue` |
+| no `status = 'scheduled'` fixture in `(season, round_code)` with the same unordered club pair | `duplicate_fixture` |
+| neither club has a `scheduled` fixture in `(season, round_code)` | `club_already_scheduled` |
+| no `matches` row for `(season, round_code, unordered pair)` | `already_played` (the game exists as a result; nothing to schedule) |
+| token `randomUUID()` not already present (defensive) | `identity_collision` |
+
+Writes, one import-role transaction: `INSERT INTO fixtures` (status `scheduled`,
+`source_id = manual_admin_edit`, `source_record_id = token`) → `INSERT INTO data_overrides`
+(`is_active = true`, whole-row payload §20) → `recordDataEdit(tx, { tableName: 'fixtures',
+rowId, fieldGroup: 'fixture_creation', oldValues: {}, newValues: <payload> })`. Any refusal after
+a write throws `RollbackRefusal` (never returned). No fuzzy matching anywhere: club ids, round
+enum, exact codes.
+
+---
+
+## 14. Bulk-entry workflow (Planning Question 13)
+
+**Recommendation: a round-at-a-time batch form with optional structured-paste pre-fill, previewed
+and written all-or-nothing (Option E + B, D-4).** CSV/JSON upload and "import from external source"
+are not built.
+
+- The unit of entry is a round: one `roundType`/`roundNumber` header, N rows of
+  (home, away, date, time, venue), N ≤ 20 (AFL rounds have ≤ 9 games; 20 leaves room without
+  admitting a whole-season paste). A whole season is 24 such submissions, each under a minute.
+- Paste: a textarea accepting one fixture per line (`Home, Away, YYYY-MM-DD, HH:MM, Venue`) is
+  parsed **client-side** into the same structured rows the form submits; clubs and venues are
+  resolved to ids by exact match against the eligible-club and venue lists, unresolved cells left
+  blank and highlighted. The server never receives free text as a fixture; it receives ids.
+- **Preview is mandatory and server-side:** `createFixtures({ rows, dryRun: true })` runs the full
+  §13 validation over every row inside a transaction that is rolled back, and returns per-row
+  outcomes plus a `previewFingerprint` (SHA-256 over the canonicalised rows). Confirm posts the
+  rows again with the fingerprint; the writer recomputes it and refuses `stale_preview` on
+  mismatch — the `CopyForwardPanel` lesson (`AFLDB-ISSUE-161.md` §33.5: never let Confirm act on
+  rows the operator did not preview).
+- **All-or-nothing**, one transaction, one `batch_id` (UUID) written into every override payload
+  and audit row. Justification: a round is the natural unit; partial success creates the "did row
+  7 land?" ambiguity that ISSUE-160's atomicity defect was about; re-entering nine rows costs less
+  than reasoning about a half-written round. Row-level refusals are returned in full (row index,
+  reason, offending value) with nothing written.
+- Cross-row rules inside a batch: no club twice in the batch; no pair twice; every row also
+  passes the single-row rules against the database state.
+
+---
+
+## 15. Edit / reschedule workflow (Planning Question 14)
+
+All edits are UPDATEs of the same row/identity, each its own transaction with a CAS on
+`expectedUpdatedAt` (`stale` refusal, the ISSUE-161 remove pattern), the season advisory lock, the
+override payload rewritten whole-row, and a `data_edits` row with old/new values.
+
+| Field | While `scheduled` and unplayed | Once played (§18 resolves to a match) | Once `cancelled` | Once `void` |
+|---|---|---|---|---|
+| date / time (`fixture_schedule`) | yes | **refused** `played_locked` — the result row is authoritative | yes (a cancelled game may be rescheduled, which also reinstates it, §16) | refused |
+| venue (`fixture_venue`) | yes | refused `played_locked` | yes | refused |
+| round (`fixture_round`) | yes, re-runs duplicate/played checks for the new round | refused | yes | refused |
+| home/away swap (`fixture_clubs`) | yes, re-runs checks | refused | yes | refused |
+| replace a club (`fixture_clubs`) | yes, re-runs checks | refused | yes | refused |
+| season | **never** — void and re-create | — | — | — |
+| notes (`fixture_notes`) | yes | yes (the only edit a played fixture accepts) | yes | yes |
+
+"Once played" is evaluated at write time inside the transaction from §18's resolution, so a
+schedule edit can never race a settle into orphaning anything: the fixture holds no statistics to
+orphan, and the played row is never touched by any ISSUE-162 write. Correcting a **played** match's
+round/date/clubs is ISSUE-156 P10 (`match-rekey.ts`), not this issue (§31).
+
+---
+
+## 16. Delete / cancel / void workflow (Planning Question 15)
+
+**No hard DELETE. Two terminal statuses, both replay-safe (D-2):**
+
+| Situation | Operation | Row | Override | Reversible? | Excluded from uniqueness? |
+|---|---|---|---|---|---|
+| Data-entry mistake (wrong clubs, wrong season, duplicate) | `voidFixture({ reason })` | `status = 'void'`, `status_reason` | active, payload `status: 'void'` | no (create a new fixture) | yes |
+| Real-world cancellation / abandonment before play | `cancelFixture({ reason })` | `status = 'cancelled'`, `status_reason` | active, payload `status: 'cancelled'` | yes: `reinstateFixture()` → `scheduled` after re-running §13 checks | yes |
+| Rescheduled / replaced | **edit** the same fixture (§15) — identity is the token, so a "replacement row" is unnecessary; if a cancelled fixture is later replayed on a new date, reinstate and reschedule it | — | — | — | — |
+| Played fixture | void/cancel **refused** `played_locked` | — | — | — | — |
+
+Why not the ISSUE-161 DELETE-plus-tombstone: fixture audit rows point at `fixtures.id` (§23), and
+a deleted row's `data_edits` would become unresolvable at the next promotion lineage remap
+(`docs/production-promotion.md` §7.4c) — the exact stop the ISSUE-160 `draft_pick_key` rule was
+written to avoid. Keeping the row keeps every audit row resolvable forever, matches the ISSUE-155
+"deactivate, never delete" and C1 "claim-and-demote, never delete" precedents, and preserves the
+distinction the operator asked for: `void` is "this never should have existed", `cancelled` is
+"this was real and did not happen". Void rows are hidden from every list by default and visible
+under a "show voided" filter with their reason.
+
+---
+
+## 17. Finals workflow (Planning Question 16)
+
+- A finals fixture is an ordinary fixture with a finals `round_type`, `round_number NULL`,
+  `round_code` rendered from the type; venue/date/time TBC via NULLs.
+- **It is created when the two participants are known** (after the qualifying week), not before.
+  No placeholder club, no "TBC v TBC" row: `home_club_id`/`away_club_id` are NOT NULL and
+  reference tracked club identities only (§5). Until then the finals series simply has fewer
+  fixtures, which the season diagnostics show as "finals: N of an expected up-to-9 known" (info).
+- Two clubs can meet twice in a series (QF and GF): `round_code` separates them in every rule.
+- The Wildcard Final is `wildcard_final`; `is_final` true; nothing here reads `is_finals_series`.
+- Once AFL Tables publishes the result, the fixture resolves to played (§18) like any other.
+
+---
+
+## 18. Result-settlement model (Planning Question 17)
+
+"Settlement" is a **read-time, deterministic resolution**, defined once (a SQL fragment exported
+from `admin-fixtures.ts`, used by every read and by the write-time `played_locked` check):
+
+```text
+for fixture f (status <> 'void'):
+  exact   := matches m WHERE m.season = f.season AND m.round_code = f.round_code
+                         AND m.home_club_id = f.home_club_id AND m.away_club_id = f.away_club_id
+  swapped := same, with home/away exchanged
+  |exact| = 1                          -> played            (match id = that row)
+  |exact| = 0 AND |swapped| = 1        -> played_home_away_differs   (warning; match id = that row)
+  |exact| + |swapped| = 0              -> unplayed
+  otherwise                            -> ambiguous          (hard diagnostic; never resolved automatically)
+```
+
+- Identity used: season, round code and club **ids** — the stable components of §6; date and
+  venue are deliberately absent so a source-published reschedule still resolves.
+- No name matching, no date tolerance, no scoring. `ambiguous` is surfaced, never merged
+  (the `match-rekey.ts` rule 4 discipline).
+- **D-6 condition (binding):** the resolution is deterministic and **fails closed**. The only
+  inputs are exact `season`, exact `round_code` and exact club **ids**; the `swapped` arm is the
+  same three exact facts with the two ids exchanged, not an approximation. Any outcome other than
+  exactly one `exact` row, or zero `exact` and exactly one `swapped` row, leaves the fixture
+  **unlinked** (`unplayed` or `ambiguous`); nothing is guessed from names, dates or venues, and
+  nothing is ever written by the resolution. `fixture_key` remains the identity of a played
+  fixture; the resolved `matches.id` is a read-time value only (§6 constraint).
+- Conflict behaviour when the source's row disagrees with the fixture on date/venue/home-away: the
+  fixture still resolves (played), and the diagnostics list the disagreement as `warning`
+  (`schedule_differs_from_result`). The result row is authoritative for what happened; the
+  fixture is left as the record of what was scheduled and may be edited only in `notes`.
+- A source round convention mismatch (the ISSUE-140 class: source says round N, AFLDB round N+1)
+  cannot arise inside AFLDB's own `matches` because the settle already normalises to AFLDB's
+  numbering; a fixture entered under the wrong number shows as `unplayed` with a
+  `played_match_without_fixture` counterpart in the same round's diagnostics, which is the cue to
+  correct the fixture's round (§15).
+- **No twin:** ISSUE-162 never inserts into `matches`; the settle never inserts into `fixtures`.
+
+---
+
+## 19. Current-season ingestion interaction (Planning Question 18)
+
+| Path | Reads/writes `matches`? | Reads/writes `fixtures`? | Change required |
+|---|---|---|---|
+| Squiggle/Kali refresh (`current-season-import.ts`) | resolves only; "cannot create a partial `matches` row" (`:483`) | no | **none** |
+| AFL Tables settle (`settle-afltables.ts` / `canonical-apply.ts`) | inserts/updates by `match_key`; rekey by ISSUE-131 rules | no | **none** |
+| `repair-match-rekeys.ts` | matches | no | none |
+| `/admin/current-season` trigger (ISSUE-127) | runs the settle | no | none |
+| `manual-authority.ts` proof | reads `data_overrides.entity_type` CHECK live; order-independent since ISSUE-159 D-1 (`:33-44`) | `OVERRIDE_ENTITY_TYPES` gains `'fixtures'` (`:80-82`); not a settle target, so `UNREPRESENTABLE_OVERRIDE_ENTITIES` unchanged and condition 2 holds in either deploy order | one constant + its test |
+
+No second ingestion path is created. Manual fixtures coexist with source data because they are a
+different fact in a different table; they are "settled" by §18's resolution the moment the settle
+lands the result.
+
+---
+
+## 20. fitzRoy / rebuild / replay / promotion model (Planning Questions 19, 26)
+
+- **Does the rebuild destroy manual fixtures?** `npm run db:test:rebuild` starts from an empty
+  database, and a promotion swaps in a rebuilt candidate whose registry tables are empty
+  (`docs/production-promotion.md` §1: everything in `import_writable_tables` "arrives with the
+  rebuild"). So yes — exactly as for `season_list_members`, `coaches`, manual `players` and
+  manual `draft_picks`, which is why the registry-plus-replay shape exists.
+- **Durable record:** `data_overrides` row per fixture: `entity_type = 'fixtures'`,
+  `entity_key = 'manual_admin_edit:<token>'`, `field_group = 'fixture'`, `is_active = true`
+  always (status lives in the payload; no tombstones, §16), payload:
+  `{ fixture_key, season, round_type, round_number, round_code, match_date, match_time,
+  home_club_slug, away_club_slug, venue_slug?, venue_raw?, status, status_reason?, notes?,
+  batch_id? }` — club **slugs** (tracked reference data) and venue **slug**, never ids.
+- **`replay_admin_overrides(conn, 'fixtures')`** (new branch in `tools/migration/common.py`):
+  1. fail-closed pre-check over every `fixtures` override: token present; season in range;
+     `round_type` a valid enum label and `round_number`/`round_code` consistent; both club slugs
+     resolve to an identity in `afldb_season_list_clubs(season)`; `status` in the CHECK set; any
+     failure → `RuntimeError` naming the keys, nothing written;
+  2. venue: `venue_slug` resolving to a venue → `venue_id` + canonical name; not resolving →
+     `venue_id NULL`, `venue_raw` from the payload, **counted and printed** (venue is enrichment,
+     `003:74-75`, not identity; a promotion is not stopped by a venue rename);
+  3. `INSERT … WHERE NOT EXISTS (fixture_key)` (never `ON CONFLICT`), then `UPDATE` every
+     scheduling/status field from the payload for rows that exist, so a replay is idempotent and
+     re-creates `void` and `cancelled` rows too (their audit rows must stay resolvable).
+- **Call sites:** `import_fitzroy_core.py` after `replay_admin_overrides(pg, "matches")`
+  (`:3538-3540`) — binding order: after `players` is irrelevant, after `matches` is not required
+  either (the played link is read-time), but placing it in the `matches` group keeps "every
+  match-shaped thing" together; the §8 promotion loop in `docs/production-promotion.md:650-661`
+  becomes `('players', 'matches', 'draft_picks', 'season_list_members', 'coaches',
+  'match_coaches', 'fixtures')` with the ordering note "`fixtures` is independent and may go
+  anywhere".
+- **Promotion inventory (`tools/db/promotion-inventory.ts`):**
+  - `fixtures` is registered via `afldb_meta.grant_import_write('fixtures')` → an import-writable
+    **registry** table; **no `PROMOTION_CONTRACT` entry** (that would classify it `both` and refuse
+    every phase, `096:238-244`); not a `DERIVED_FOOTBALL_TABLE`.
+  - New `LineageIdentityRule` **`fixture_key`** (`:88-90`) with `byId`/`byIdentity` SQL over
+    `fixtures (id, fixture_key)`, and a new `data_edits` target
+    `{ kind: 'fixtures', entity: 'fixtures', identity: 'fixture_key' }` beside the `draft_pick_key`
+    entry (`:333-348`), so `data_edits.table_name = 'fixtures'` rows remap across a lineage change
+    exactly as draft audit rows do. Because rows are never deleted (§16) and the replay re-creates
+    every override before the remap runs, every fixture audit row resolves.
+  - `tests/db-promotion-check.test.ts` extended; `assertContractCoherent()` and the classification
+    test must pass with the new registry row (unclassified → every phase refuses — **stop**, R-3).
+- **Promotion window:** between the swap and the replay no fixture exists in the promoted
+  database; no public surface reads fixtures (§22), so it is admin-visible only, and the promotion
+  record states it (the 159/160/161 wording).
+- **Disaster recovery:** `data_overrides` is in every backup; restore + the §8 loop re-creates every
+  fixture; `privileges.sql` must be reconciled after a restore (fail-closed read registry).
+- **Fail-closed conditions:** unresolvable club slug, invalid round vocabulary, invalid status,
+  missing token, unclassified table, missing lineage rule → the replay/checker stops and names the
+  key; none of these is skipped.
+
+---
+
+## 21. Derived-statistics safety (Planning Question 20)
+
+**By construction:** ISSUE-162 writes `fixtures`, `data_overrides` and `data_edits` only. It never
+inserts, updates or deletes a `matches`, `match_period_scores`, `player_match_stats`,
+`club_seasons` or `seasons` row and never calls `recomputeClubSeasons`, `recomputeSeasonMetadata`
+or `rebuild_derived.py`. Every consumer audited reads `matches` (or tables derived from it) and
+none reads `fixtures`:
+
+| Consumer | Reads | Affected? |
+|---|---|---|
+| Final ladder `club_seasons` | `matches WHERE NOT is_final` (`rebuild_derived.py:340-356`, `player-derived.ts:427-458`) | no |
+| Round ladder | `matches` (`rounds.ts:44-105`) | no |
+| Season metadata / status / match_count | `matches` (`player-derived.ts:515-560`) | no |
+| Club records, comparison, streaks | `matches` (`clubs.ts`, `club-comparison.ts`, `nl/team-streak.ts`) | no |
+| Venue records / counts | `matches` (`venues.ts:49,147-449`) | no |
+| Match search, match pages, sitemap | `matches` (`match-search.ts`, `matches.ts:23-95`, `sitemap.ts`) | no |
+| Player stats / W-D-L / coach records | `player_match_stats`, `match_coaches` → `matches` | no |
+| NL search plans | `matches` (`search/nl/plan.ts`, `nl/*.ts`) | no |
+| Grid Solver | `matches` (`grid-solver.ts:194-201`) | no |
+| Brownlow coverage | `matches` (`016`) | no |
+| Current-season completeness / settle report | `matches`, staging | no |
+
+**Contract test (Stage 1):** a static source contract asserting the string `fixtures` (as a table
+reference) appears in none of `src/db/queries/**` except `admin-fixtures*.ts`, none of
+`src/search/**`, none of `src/lib/acquisition/**`, and none of `tools/migration/rebuild_derived.py`
+— the `tests/reference-data.test.ts` "tables after 045" style. Plus the integration proofs in §29.
+
+---
+
+## 22. Public-site impact (Planning Question 21)
+
+- **A. Required correctness changes: none.** No public page, NL plan, Grid Solver axis or API
+  reads `fixtures`; no public behaviour changes.
+- **B. Useful UI exposure (deferred, separate ISSUE-156 child or public issue):** season page
+  "Upcoming fixtures" for an in-progress season (`/seasons/[year]` is ISR 1h and prerendered —
+  `season-page-isr-stale-after-settle` memory — so exposure needs its own revalidation design);
+  club page "Next match"; venue page "Upcoming"; a pre-match `/fixtures/[season]/[key]` page.
+- **C. Follow-ups:** fixture importer under a source id (Squiggle publishes fixtures); reconciliation
+  view (§31); venue administration (§11).
+- Consequence: `revalidatePaths: []` always in Stage 2 actions, no revalidate route (the ISSUE-161 §10
+  decision), until B exists.
+
+---
+
+## 23. Capabilities / permissions (Planning Question 22)
+
+Pattern inspected: `data.<domain>.read` / `data.<domain>.edit` (`capabilities.ts:42-47,88-106`),
+`ADMIN_AND_UP` for read, `SUPER_ADMIN_ONLY` for edit; nav in the Data group (`nav-model.ts:84-91`).
+
+| Capability | Roles | Grants |
+|---|---|---|
+| `data.fixtures.read` | Admin, Super Admin | every `/admin/fixtures*` page, diagnostics, audit links |
+| `data.fixtures.edit` | Super Admin | create, batch create, edit/reschedule, venue/round/club changes, cancel, reinstate, void |
+| Contributor | — | nothing; `requireCapability` redirects before any fixture markup or action reference reaches the client (ISSUE-155 §27.27 K precedent) |
+
+Result entry is **not** a fixture capability: scores live in `matches` and are owned by the settle
+and the data editor; a fixture never accepts a score. `tests/auth.test.ts`'s source contract must
+cover both capabilities at every page/route/action boundary.
+
+---
+
+## 24. Audit contract (Planning Question 23)
+
+`data_edits.table_name` CHECK is widened to admit `'fixtures'` (migration, §26) — the ISSUE-160
+`draft_picks` shape, not the ISSUE-161 audit-on-the-parent shape, because a fixture has no
+allowlisted parent row and (§16) is never deleted, so `row_id = fixtures.id` always resolves
+through the `fixture_key` lineage rule.
+
+| Operation | `field_group` | `old_values` → `new_values` | Extra |
+|---|---|---|---|
+| create | `fixture_creation` | `{}` → whole row | — |
+| batch create | `fixture_creation` per row | as above | `batch_id`, `batch_size` in `new_values`; one `data_edits` row per fixture |
+| reschedule | `fixture_schedule` | `{match_date, match_time}` before → after | — |
+| venue change | `fixture_venue` | `{venue_id, venue_raw}` | — |
+| round change | `fixture_round` | `{round_type, round_number, round_code}` | — |
+| home/away swap or club replacement | `fixture_clubs` | `{home_club_id, away_club_id}` | — |
+| cancel | `fixture_cancelled` | `{status, status_reason}` | reason required |
+| reinstate | `fixture_reinstated` | `{status, status_reason}` | — |
+| void | `fixture_void` | `{status, status_reason}` | reason required |
+| notes | `fixture_notes` | `{notes}` | — |
+
+Every row carries actor (`admin_user_id`), the fixture (`row_id`), and — inside `new_values` —
+`fixture_key`, `season`, `round_code`, `home_club_slug`, `away_club_slug`, so the entry is readable
+without joining. `note` carries the operator's free-text reason. Refusals worth recording
+(`duplicate_fixture`, `club_already_scheduled`, `already_played`, `played_locked`, `stale`,
+`stale_preview`, `forbidden`) are audited to `auth_audit_log` via `audit()` after the transaction,
+as the ISSUE-161 actions do (`season-lists/actions.ts:29-40`); ordinary validation misses are not.
+Source settle/reconcile is not an ISSUE-162 mutation and writes no fixture audit.
+
+The ISSUE-157 audit viewer (`/admin/audit/entity/fixtures/<id>`) must accept the new
+`table_name`; the entity-link helper in `src/db/queries/data-edits.ts` gains a `fixtures` case
+(read-only, Stage 2).
+
+---
+
+## 25. Transaction contract (Planning Question 24)
+
+Binding on every writer in `admin-fixtures.ts` (the `admin-season-lists.ts:70-77` contract):
+
+1. One `AFLDB_IMPORT_DATABASE_URL` transaction per operation (single fixture, single edit, whole
+   batch); `pg_advisory_xact_lock(<namespace>, season)` first.
+2. Every precondition (§13, §15, §16) is evaluated **before the first write**, inside the lock.
+3. Canonical write → `data_overrides` write → `recordDataEdit()` in that order in the same
+   transaction; an audit or override failure rolls the canonical write back (ISSUE-027).
+4. Any refusal discovered after a write is **thrown** as `RollbackRefusal`, never returned
+   (`postgres.js` commits when the callback resolves — the ISSUE-160 defect).
+5. No post-commit audit of the mutation itself; only the `auth_audit_log` refusal/success note.
+6. Batch = **all-or-nothing** (D-4): one transaction, every row validated against the database and
+   against the other rows, one `batch_id`; any failure returns every row's outcome and writes nothing.
+7. `expectedUpdatedAt` CAS on every edit; the loser of a race is refused `stale`.
+8. Forced-failure proofs (Stage 1 gate): a trigger on `data_edits`/`data_overrides` that raises for
+   a marked note must roll back the fixture row (the ISSUE-159/160/161 gate-8 strategy).
+
+---
+
+## 26. Migration plan (Planning Question 27)
+
+**Required: yes, one, additive, forward-only, no backfill.** Next free number at planning:
+**097** (highest on this branch: `096_season_list_members.sql`). **Not allocated here**; Stage 1
+re-checks `src/db/migrations/` on its own branch first.
+
+Contents:
+
+1. `CREATE TABLE fixtures` + indexes (§4). No FK to `seasons` (§8). `is_final` generated.
+2. `data_overrides.entity_type` CHECK: add `'fixtures'` (retain every existing literal verbatim;
+   the three unrepresentable settle targets stay absent, `096:189-231`).
+3. `data_edits.table_name` CHECK: add `'fixtures'` (retain every literal from `095:105-118`).
+4. `SELECT afldb_meta.grant_app_read('fixtures'); SELECT afldb_meta.grant_import_write('fixtures');`
+   — app reads for the admin pages, import-role writes for the mutations, registry classification
+   for promotion; **no `privileges.sql` edit** (the registries drive it); nothing for `afldb_auth`.
+5. `COMMENT ON TABLE/COLUMN` stating: schedule facts only; never a score; status semantics; played
+   is derived; never hand-edited outside `admin-fixtures.ts`.
+
+Deploy order is binding: **migration → `npm run db:privileges` → code** (app read is fail-closed
+since 039; ISSUE-027/161 precedent). The two CHECK widenings are safe in either order relative to
+the code: code writing `'fixtures'` before the migration is refused by the CHECK and rolled back;
+`manual-authority.ts`'s proof is order-independent (ISSUE-159 D-1). No destructive statement, no
+data rewrite, no down-migration.
+
+---
+
+## 27. Fixture-completeness diagnostics (Planning Question 28)
+
+Read-only, per season, shown on `/admin/fixtures/[season]` (Stage 2), computed in
+`admin-fixtures-ui.ts`:
+
+| Class | Check |
+|---|---|
+| **Hard invalid** (should be impossible; shown if ever present) | two `scheduled` fixtures for one club in one round; same pair twice in one round; `ambiguous` played resolution (§18); H&A fixture with `round_number` NULL |
+| **Warning** | `played_home_away_differs`; `schedule_differs_from_result` (date/venue/time disagree with the played row); `played_match_without_fixture` (a `matches` row in the season/round with no fixture — the ISSUE-140 cue); unmapped venue (`venue_raw` set, `venue_id` NULL); a club with 0 scheduled fixtures in a season that has any (likely incomplete entry); a club whose H&A fixture count differs from the modal count by more than 1 |
+| **Informational** | total fixtures; per-round counts; per-round byes (clubs with no fixture in that round, listed by name — bye vs incomplete is not decidable, so it is shown, not judged); TBC counts (date / time / venue); finals known (per `round_type`); cancelled and void counts; played / unplayed counts |
+
+Nothing here refuses: AFL formats vary (Opening Round, 23-round seasons, unequal counts,
+wildcards), so shape is reported, never enforced.
+
+---
+
+## 28. Admin UI route / design plan (Planning Questions 29, 30)
+
+Conventions inspected: `/admin/season-lists`, `/[season]`, `/[season]/[club]`; `force-dynamic`;
+`generateMetadata` calling `requireCapability`; `robots: noindex`; panels as client components
+with `useActionState` through the shared `action-submit.ts` helper; `revalidatePaths: []`.
+
+| Route | Capability | Content |
+|---|---|---|
+| `/admin/fixtures` | `data.fixtures.read` | administrable seasons (`max`, `max+1`) with fixture / round / TBC / played counts and a diagnostics badge; link into each |
+| `/admin/fixtures/[season]` | read (edit reveals panels) | rounds as stacked sections (never one wide grid): each round a compact list of fixtures (date · time · home v away · venue · status/played chip · provenance chip); filters: round, club, status, TBC-only, played/unplayed, show voided; diagnostics panel (§27); "Add fixture" and "Enter a round" entry points |
+| `/admin/fixtures/[season]/new` | `data.fixtures.edit` | two tabs on one page: **Single fixture** (round-at-a-time form with one row) and **Round batch** (§14: header + N rows + paste box → Preview → Confirm) |
+| `/admin/fixtures/[season]/[fixtureKey]` | read (edit reveals panels) | detail: schedule, venue, round, clubs, status, provenance, played resolution with a link to `/matches/[id]` when played; panels: reschedule, venue, round, swap/replace clubs, cancel/reinstate, void, notes; link to `/admin/audit/entity/fixtures/<id>` |
+
+Nav: Data group, "Fixtures" after "Season lists". Dashboard badge optional (count of TBC in the
+in-progress season).
+
+UX choice (Q30): **round-at-a-time form** (single row = the same form with N=1), not a wizard
+(too slow for 200 rows), not a modal (loses context), not a spreadsheet grid (unusable at 320px,
+keyboard-hostile). Keyboard: tab order home → away → date → time → venue → next row; Enter in the
+last cell adds a row; clubs and venues are `<select>`s populated from the eligible list so no
+free text reaches the server; duplicates are caught client-side before preview and again
+server-side. Confirmation: preview table with per-row outcome, then a single Confirm bound to the
+preview fingerprint. Responsive targets 320 / 768 / 1000 / 1280 / 1920: each fixture row stacks
+to two lines under 768px; the batch form becomes one card per row under 768px; no horizontal
+scroll; focus restored after a refused action (ISSUE-155 H-1 `focus-restore.ts` reuse).
+
+---
+
+## 29. Test strategy (Planning Question 35)
+
+Existing homes reused; two new suites named in the 159/160/161 convention.
+
+| Suite | Kind | Covers |
+|---|---|---|
+| `tests/admin-fixture-actions.test.ts` (new) | pure | key/payload shape; round rendering (H&A, finals, WF, Opening Round = 1); date/time/TBC validation (`HH:MM`, time without date refused); season window arithmetic; batch cross-row rules; preview fingerprint; action parsers/allowlists; refusal-audit selection |
+| `tests/integration/admin-fixtures.test.ts` (new, `afldb_test`, marker `AFLDB-ISSUE-162-TEST`, seasons `max+1`/`max+2` under the same `NODE_ENV=test` ceiling ISSUE-161 uses, no `seasons`/`clubs`/`club_seasons` row created) | DB | create; unplayed fixture has no score anywhere; duplicate refusal; `club_already_scheduled`; `same_club`; ineligible club; season out of window; TBC venue/date/time; reschedule; venue change; round change; swap; cancel → reinstate; void; finals fixture; **zero `player_match_stats` / `match_period_scores` / `matches` rows written** (count before = after); ladder safety: `club_seasons` for the test season absent before and after, `recomputeClubSeasons` never invoked (spy) and `seasons.match_count` unchanged; identity: token durable across edits; played resolution — seed one marker `matches` row through the test's owner connection (never through ISSUE-162 code) and prove `played`, `played_home_away_differs`, `ambiguous`, `played_locked`; transactions — forced-failure triggers on `data_edits` and `data_overrides` roll the row back, post-write refusal throws, batch atomicity (one bad row writes nothing); **real replay**: run `replay_admin_overrides('fixtures')` from `tools/migration/common.py` via the repository `.venv` (the ISSUE-161 harness, `admin-season-lists.test.ts:26-70`) after deleting the test rows and prove byte-equal re-creation including `void`/`cancelled`, venue degrade path, and the fail-closed refusals |
+| `tests/auth.test.ts` | contract | both capabilities declared, role table, nav entry, every page/route/action boundary |
+| `tests/data-overrides-source-contract.test.ts` | contract | `'fixtures'` admitted; settle targets still absent |
+| `tests/reference-data.test.ts` | contract | `fixtures` in the post-045 registry list |
+| `tests/db-promotion-check.test.ts` | contract | registry classification, `fixture_key` rule, `data_edits` target, `assertContractCoherent()` |
+| manual-authority test | contract | `OVERRIDE_ENTITY_TYPES` includes `'fixtures'`; conditions 2 and 4 hold |
+| derived-safety source contract (new `it` in `reference-data` or a sibling) | static | no `fixtures` reference in derived/NL/grid/acquisition code (§21) |
+| `tests/admin-match-mutations.test.ts` | regression | `createMatch`/`deleteMatch` unchanged |
+| Playwright (DEV batch, §34) | UI | three-role matrix; season/round views; refusal rendering; keyboard flow; focus after refusal; 320/768/1000/1280/1920; batch preview → confirm → stale-preview refusal |
+
+---
+
+## 30. Performance (Planning Question 36)
+
+Volumes: ≤ ~230 fixtures per season, two seasons administrable. Season page = one query over
+`fixtures` joined to `clubs`/`venues` plus one played-resolution join against `matches` filtered by
+season (`ix_matches_season_round` and the club indexes already exist). Diagnostics = a handful of
+grouped queries per page load. Indexes: exactly those in §4 (every FK column carries a leading
+index — `tests/integration/fk-indexes.test.ts`). No caching, no materialised view, no new index on
+`matches`.
+
+---
+
+## 31. Explicit out-of-scope
+
+- Correcting a **played** match's identity, round, date or clubs — ISSUE-156 **P10**
+  (`match-rekey.ts`, ISSUE-142 lineage interaction); never through a fixture edit.
+- Score/result/attendance/lineup entry of any kind.
+- Any write to `matches`, `seasons`, `clubs`, `club_seasons`, `venues`, `venue_aliases`.
+- A fixture importer (Squiggle/Kali/AFL Tables) and a reconciliation dashboard (AFLDB-only /
+  source-only / same / changed-date / changed-venue / unresolved) — deferred; the §18 resolution
+  and the §27 warnings are the minimum linking needed for settlement and are all Stage 2 ships.
+- Public exposure (§22 B/C).
+- Venue administration.
+- AFLW fixtures.
+- Named-round labels.
+- A `seasons` initialise action or any change to the ISSUE-101 rollover.
+- Backfilling historical fixtures (no source publishes AFLDB-normalised schedules; nothing to backfill).
+
+---
+
+## 32. Risks / stop conditions
+
+| ID | Condition | Status at planning | Stage 1 action if it fires |
+|---|---|---|---|
+| S-1 | Scheduled rows in `matches` contaminate ladder/stat derivation | **fires for options A/C** (§3) — resolved by choosing B′; no fixture row is ever written to `matches` | if any Stage 1 code path writes `matches`: stop |
+| S-2 | Match identity cannot survive date/venue changes | `match_key` cannot; `fixture_key` can (§6) — resolved | — |
+| S-3 | Current-season import would inevitably duplicate manual fixtures | different tables; no importer reads/writes `fixtures` (§19) — resolved | — |
+| S-4 | Season register ownership conflicts between ISSUE-101/161/162 | one model, Option B (§8) — resolved | — |
+| S-5 | Current schema cannot represent TBC facts without fake values | `matches` cannot; `fixtures` NULLs can (§10) — resolved by the migration | — |
+| S-6 | Rebuild would destroy manual fixtures without a safe replay identity | registry + whole-row override + token (§20) — resolved | replay not byte-exact in the real-replay test → stop |
+| S-7 | Finals placeholders require fake clubs | none created (§17) — resolved | — |
+| S-8 | Cancellation/deletion could erase played historical data | fixtures hold none; played fixtures are locked (§15, §16) — resolved | — |
+| S-9 | Migration requires unsafe backfill | none (§26) — resolved | — |
+| S-10 | Stage 1 requires DEV/PROD mutation | no; `afldb_test` only | — |
+| R-1 | Unclassified table refuses every promotion phase | `grant_import_write` registry, checker test | classification test fails → stop before merge (ISSUE-156 R-3) |
+| R-2 | `data_edits` rows for fixtures unresolvable at lineage remap | never-delete + `fixture_key` rule (§16, §20) | `db-promotion-check` unresolved → stop |
+| R-3 | Subtractive `afldb_auth` spec / fail-closed app read | registries drive privileges; deploy order stated (§26) | — |
+| R-4 | Two Super Admins race one season | season advisory lock + CAS | concurrency test |
+| R-5 | `revalidatePath` inside a Server Action hangs the client | no revalidation at all in this issue | — |
+| R-6 | int8-as-string on `fixtures.id`/`data_edits.id` | cast `::int`/`::text` in SQL (ISSUE-156 §4 trap) | contract test |
+| R-7 | Windows CRLF false failures | known; Linux is the gate | — |
+
+None of S-1…S-10 blocks the plan as designed; S-1 and S-5 are the reasons for the design.
+
+---
+
+## 33. Staged implementation plan
+
+**Stage 1 — model, mutations, replay, promotion, derived-safety (Opus 5 high or Fable 5.1 high,
+fresh session, this worktree)**
+
+1. Preflight: `npm run preflight -- --mode implementation --issue 162`; re-check next free
+   migration; confirm D-1, D-2, D-6 decided.
+2. Migration (§26). Apply to `afldb_test` only.
+3. `src/db/queries/admin-fixtures.ts`: `createFixture`, `createFixtures` (dry-run + write),
+   `rescheduleFixture`, `changeFixtureVenue`, `changeFixtureRound`, `changeFixtureClubs`,
+   `cancelFixture`, `reinstateFixture`, `voidFixture`, `updateFixtureNotes`, the played-resolution
+   fragment, `administrableFixtureSeasons()`, `readSeasonFixtures()`, diagnostics readers, override
+   reader through the narrow import-role SELECT helper.
+4. `tools/migration/common.py` `replay_admin_overrides('fixtures')` + `import_fitzroy_core.py`
+   call site + `docs/production-promotion.md` §8 loop and §1 table row.
+5. `tools/db/promotion-inventory.ts`: `fixture_key` rule + `data_edits` target;
+   `manual-authority.ts` constant; `data-edits.ts` entity link case.
+6. Tests (§29) green: new pure + integration suites, contract suites, forced-failure proofs, real
+   replay, derived-safety proofs; `tsc`, eslint, `git diff --check`.
+7. Ledger update; stop for operator review/commit.
+
+**Stage 2 — admin surface (Fable 5.1 high, fresh session)**
+
+1. Capabilities + nav (§23); routes and panels (§28); Server Actions with the shared submit helper;
+   `revalidatePaths: []`.
+2. Batch entry UI with paste pre-fill, preview, fingerprint-gated confirm.
+3. Diagnostics panel (§27); audit viewer entity link.
+4. `tests/auth.test.ts` contract; action parsers; local `next build`/typecheck; static responsive
+   review. Live Playwright deferred to §34.
+5. Ledger update; stop.
+
+**No Stage 3.** A fixture importer, reconciliation view, public exposure and venue admin are
+separate issues.
+
+---
+
+## 34. Admin Centre batch rollout / deployment plan (Planning Question 37)
+
+Recorded explicitly, per the operator's standing rule:
+
+- ISSUE-162 is developed locally on top of ISSUE-161 (on ISSUE-160). Nothing deploys to DEV during
+  implementation; PROD is not touched.
+- No Admin/Super Admin change deploys to DEV until ISSUE-162 is code-complete **and** the operator
+  confirms there is no further Admin Centre addition to include in the batch.
+- Then, in order: integrate the stacked branches (160 → 161 → 162); apply migrations in order
+  (096, then ISSUE-162's number); `npm run db:privileges`; rebuild/update DEV; combined
+  ISSUE-160 + 161 + 162 acceptance; three-role Playwright; responsive acceptance at
+  320/768/1000/1280/1920; fix defects; close the three issues when green.
+- PROD follows the ISSUE-151 promotion contract (registry table, replay before the `data_edits`
+  remap) and is a separate, later operator decision.
+
+---
+
+## 35. Operator decisions — DECIDED 2026-09-11 (binding for Stage 1 and Stage 2)
+
+| ID | Decision | Outcome | Binding wording |
+|---|---|---|---|
+| **D-1** | Canonical fixture model (§4) | **APPROVED — B′** | Use a separate canonical `fixtures` registry. Do not reuse `matches` for unplayed schedule rows. |
+| **D-2** | Removal semantics (§16) | **APPROVED** | Fixtures are never hard-deleted. Use `scheduled` / `cancelled` / `void` lifecycle states and preserve audit/replay identity. |
+| **D-3** | Administrable season window (§8) | **APPROVED** | Use the safe forward-season window `max(seasons.year) <= S <= max + 1`. Do not mutate the season reference register merely to administer the next fixture. |
+| **D-4** | Bulk-entry UX and transaction mode (§14) | **APPROVED** | Round-batch entry is the primary bulk workflow, with preview + validation + atomic (all-or-nothing) commit. |
+| **D-5** | TBC representation (§10, §11) | **APPROVED** | NULL means genuinely TBC/unknown for date, local time and venue. No fake values. |
+| **D-6** | Played linkage (§18) | **APPROVED WITH CONDITION** | Played linkage is derived/read-time, but must be **deterministic and fail closed**. No approximate or name/date-only guessing. Ambiguity leaves the fixture unlinked. The durable `fixture_key` remains the fixture identity after a match is played. |
+| **D-7** | Public exposure (§22) | **APPROVED** | No public fixture exposure in ISSUE-162. |
+| **Constraint** | Identity across settlement (§6) | **operator constraint, 2026-09-11** | A played-match association must not replace `fixture_key` with `match_key`. `fixture_key` remains stable across reschedules, venue changes and settlement. |
+
+Options considered and rejected for each decision are retained in the corresponding sections
+(§5 for D-1; §16 for D-2; §8 for D-3; §14 for D-4; §10 for D-5; §5 and §18 for D-6; §22 for D-7).
+
+Technical questions resolved from evidence and **not** put to the operator: table vs override-only
+(§5), identity token (§6), one eligibility rule (§12), round vocabulary (§9), venue handoff (§11),
+finals-when-known (§17), audit target and `data_edits` widening (§24), capabilities (§23),
+routes (§28), stage split (§33), no settle/current-season change (§19), promotion classification
+(§20).
+
+---
+
+## 36. Final report
+
+1. **Proposed issue title:** AFLDB-ISSUE-162 — Fixture / season schedule administration: create and
+   maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d).
+2. **Recommended canonical model:** new canonical registry table `fixtures` (schedule facts only,
+   no score columns); `matches` unchanged and played-only; played state derived by resolution.
+3. **Migration required:** **yes**, one additive migration (next free **097** at planning, not
+   allocated): table + indexes; `data_overrides.entity_type` += `'fixtures'`;
+   `data_edits.table_name` += `'fixtures'`; `grant_app_read` + `grant_import_write`. No backfill.
+4. **Scheduled vs played:** different tables. A fixture cannot carry a score; a match cannot be
+   unplayed. "Played" = exactly one `matches` row for the same season, round code and club pair.
+5. **Durable match identity:** `fixtures.fixture_key`, a UUID minted once under
+   `manual_admin_edit`, never edited; `data_overrides` key `manual_admin_edit:<token>`;
+   `match_key` is never used for fixtures.
+6. **2027 availability:** no initialise step and no `seasons`/`clubs`/`club_seasons` write; a
+   season is administrable for `max(seasons.year) <= S <= max+1`, clubs from
+   `afldb_season_list_clubs(S)`; the register advances only through the ISSUE-101 rollover.
+7. **Round model:** the `matches` vocabulary — `round_type` enum, `round_number` for
+   home-and-away (Opening Round = 1), `round_code` rendered server-side, finals codes
+   `EF QF SF PF GF WF`; no hard-coded shape.
+8. **Date/time/TBC:** nullable `match_date` and `match_time` (local venue time text, `HH:MM`);
+   NULL = TBC; no sentinel, no timestamptz.
+9. **Venue:** existing `venues` only, TBC = NULL, unmapped name kept in `venue_raw`; no inline
+   creation.
+10. **Create/edit/delete/cancel:** one mutation contract in `admin-fixtures.ts`; server-side
+    invariants (§13); edits under the token identity with CAS; `cancelled` (reversible) and
+    `void` (mistake) statuses, never DELETE; played fixtures locked except notes.
+11. **Bulk entry:** round-at-a-time batch form with structured-paste pre-fill, server-side preview
+    with a fingerprint-gated confirm, all-or-nothing.
+12. **Finals:** created when participants are known; no placeholder clubs; venue/date/time TBC.
+13. **Source settlement:** read-time deterministic resolution against `matches`; no settle,
+    current-season or rekey code changes; disagreements are warnings; ambiguity is never merged.
+14. **Replay/rebuild:** whole-row `data_overrides`, fail-closed `replay_admin_overrides('fixtures')`
+    (venue degrades with a report), registry classification, `fixture_key` lineage rule for audit
+    rows, promotion §8 loop extended.
+15. **Derived safety:** by construction (no `matches` write) plus integration and static-contract
+    proofs.
+16. **Permissions:** `data.fixtures.read` (Admin+), `data.fixtures.edit` (Super Admin);
+    Contributor nothing; no result entry.
+17. **Routes:** `/admin/fixtures`, `/admin/fixtures/[season]`, `/admin/fixtures/[season]/new`,
+    `/admin/fixtures/[season]/[fixtureKey]`; Data-group nav "Fixtures"; no revalidate route.
+18. **Stages:** Stage 1 model/mutations/replay/promotion/tests; Stage 2 admin surface; no Stage 3.
+19. **Tests:** `tests/admin-fixture-actions.test.ts`, `tests/integration/admin-fixtures.test.ts`
+    (including the real Python replay and derived-safety proofs), plus `auth`,
+    `data-overrides-source-contract`, `reference-data`, `db-promotion-check`, manual-authority;
+    Playwright deferred to the DEV batch.
+20. **Operator decisions:** D-1…D-7 **DECIDED 2026-09-11** (§35): all approved as recommended,
+    D-6 with the condition that the read-time resolution is deterministic and fail-closed (ambiguity
+    = unlinked; no name/date guessing), plus the constraint that `fixture_key` is never replaced by
+    `match_key` across settlement.
+21. **Blockers / stop conditions:** none fired against the approved design; S-1 and S-5 fire
+    for the rejected `matches`-based options and are the reason for D-1. Stage 1 hard stops:
+    replay not byte-exact, promotion classification refusal, any code path writing `matches`, any
+    column or writer that stores or compares a `match_key` on a fixture.
+22. **Ready to begin:** **yes — Stage 1 is authorised.** Opening prompt for the Stage 1 session:
+    `Execute AFLDB-ISSUE-162 Stage 1 according to AFLDB-ISSUE-162.md` from
+    `D:\dev\afldb-issue-162` on `opus/issue-162-fixture-admin`; first actions are the preflight and
+    the migration-number re-check. No DEV, no PROD, no merge, no deploy.

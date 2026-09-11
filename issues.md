@@ -7,7 +7,19 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 17 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-160`.
+**Open issues:** 19 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-160`, `-161`, `-162`.
+
+<!-- 2026-09-11 (ISSUE-156 P3d ALLOCATED AS `AFLDB-ISSUE-162` — PLANNING ONLY, NO CODE):
+     `AFLDB-ISSUE-162` (Fixture / season schedule administration, ISSUE-156 P3d) allocated by
+     operator direction in worktree `D:\dev\afldb-issue-162`, branch `opus/issue-162-fixture-admin`
+     cut from `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161 on ISSUE-160; neither
+     parent merged first; the three deploy to DEV together as the Admin Centre batch). Highest
+     migration on the branch `096_season_list_members.sql`; **097 is the next free number, NOT
+     allocated — one additive migration is planned**. Runbook `AFLDB-ISSUE-162.md`; operator
+     decisions D-1…D-7 pending, D-1/D-2/D-6 block Stage 1. Count line corrected at the same time:
+     `-161` had a row in this table but was missing from the count (17 → 19 with `-161` and
+     `-162`). No `src/`, `tools/`, `tests/`, `deploy/`, migration, privilege or `CHANGELOG.md`
+     change in this allocation; no database read or written. -->
 
 <!-- 2026-09-11 (ISSUE-156 P3b ALLOCATED AS `AFLDB-ISSUE-160` — PLANNING ONLY, NO CODE):
      `AFLDB-ISSUE-160` (Draft administration and new-player intake through the draft, ISSUE-156
@@ -609,6 +621,7 @@ created, reopened, resolved, or materially reclassified.
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
 | **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), locally audited**; next: operator review + commit of the ISSUE-160 audit fixes, then DEV acceptance when the operator updates DEV |
 | **ID:** AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`; **operator decisions D-1…D-8 DECIDED 2026-09-11** (D-2 with modification: 2027 is the first authoritative list season and 2026 appearances are never promoted into membership; D-3 subject to a Stage 1 evidence gate; fixtures boundary: ISSUE-161 never depends on a fixture, likely ISSUE-162 owns them). **Stage 1 authorised.** Stacked on ISSUE-160 (not merged first; both deploy to DEV together as the Admin Centre batch). Chosen model: new canonical registry table `season_list_members` (`UNIQUE (season, player_id)`) with whole-row `data_overrides` keyed `<club_slug>|<season>|<player identity>`, per-mutation import-role transactions, `data_edits` on the player, fail-closed replay branch, inactive override = removal tombstone; no `retired` flag (not-current = no membership in the current list season); no `seasons`/`clubs`/`club_seasons` writes (list season ≤ `max(seasons.year)+1`, eligible clubs = `is_current_afl_club` identities beyond the register). **Stage 1 executed 2026-09-11 (Opus 5 high): D-3 gate PASSED (modern-era probe = 0 rows; 249 historical multi-club player-seasons, latest 1992), migration 096 allocated and applied to `afldb_test`, `season_list_members` + `afldb_season_list_clubs()` + `data_overrides` widening shipped, `admin-season-lists.ts` (add / multi-add / remove+tombstone / transfer / copy-forward / appearances review / diagnostics), `player-identity.ts` extracted behaviour-preservingly, fail-closed replay branch + fitzRoy call site + promotion doc/checklist. 25 pure + 40 integration tests green; ISSUE-160 regressions 45 + 120 green; tsc and lint clean.** **Stage 2 executed 2026-09-11 (Sonnet 5 high):** `/admin/season-lists` + `/[season]` + `/[season]/[club]`, capabilities `data.seasonLists.read`/`.edit`, Data-group nav entry, the five panels, and the ISSUE-160 handoff link (navigation only; no draft mutation writes `season_list_members`); `revalidatePaths: []` always and no revalidate route. **Local completion audit 2026-09-11 (Opus 5 high, operator-authorised commands): preflight READY (0 blockers), tsc clean, 204 unit + 85 integration + 420 contract + 2 FK-index tests pass, eslint clean over every ISSUE-161-authored file, `git diff --check` clean; the §33.4 repair pass is now re-validated. One concrete defect found and fixed narrowly (`CopyForwardPanel` could confirm a copy the operator never previewed) with 3 regression tests added.** NOT committed, NOT deployed; DEV and PROD untouched. Next: operator review/commit, then the combined Admin Centre DEV batch. | **Severity:** Medium | **Area:** Admin / Data management / Player–club–season model / Promotion lineage; runbook `AFLDB-ISSUE-161.md`; branch `opus/issue-161-season-lists` |
+| **ID:** AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-162.md`. Finding: `matches` requires NOT NULL scores/result/margin (003) and every ladder/season/venue/NL/Grid consumer reads "row exists" as "played", so an unplayed fixture cannot live there without contaminating derived data; the repository's own precedent is AFLW's separate `staging_aflw.fixtures` (025). Chosen model: a new canonical registry table `fixtures` (schedule facts only — no score column can exist), `matches` untouched, "played" derived by a deterministic season + round code + club-pair resolution, identity = a minted `fixture_key` token under `manual_admin_edit`, whole-row `data_overrides` + fail-closed `replay_admin_overrides('fixtures')`, `data_edits` widened to `'fixtures'` with a `fixture_key` lineage rule, never-delete lifecycle (`scheduled` / `cancelled` / `void`), no `seasons`/`clubs`/`club_seasons` write (window `max(seasons.year)..max+1`, clubs from `afldb_season_list_clubs()`), no settle/current-season change. One additive migration (next free 097, not allocated). **Operator decisions D-1…D-7 DECIDED 2026-09-11 (D-6 with a fail-closed/unlinked-on-ambiguity condition; `fixture_key` never replaced by `match_key`); Stage 1 authorised.** Stacked on ISSUE-161 (`opus/issue-162-fixture-admin` from `34858ce`); deploys to DEV only with the Admin Centre batch. | **Severity:** Medium | **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage; runbook `AFLDB-ISSUE-162.md`; next: operator commits the planning files, then Stage 1 in a fresh high-effort session |
 | **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), not deployed, not merged; locally audited 2026-09-11 — one atomicity defect and eight new ESLint errors found and fixed, uncommitted for operator review.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit of the audit fixes, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; two runbook §18 list affordances (the `state` filter and the Player-links deep link) reported undelivered; S-1 before deploy |
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
@@ -23703,3 +23716,98 @@ combined Admin Centre batch ships: **migration 096 → `npm run db:privileges` �
 (`db:privileges` could not be run from the workstation — no `psql` — and the table's app read is
 fail-closed until it does), then the combined ISSUE-160 + ISSUE-161 DEV acceptance and role-based
 Playwright (runbook §24's deferred UI row). Neither ISSUE-160 nor ISSUE-161 is resolved.
+
+## AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d)
+
+- **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment; no database read or written.** Runbook `AFLDB-ISSUE-162.md` (36 sections). **Operator decisions D-1…D-7 DECIDED 2026-09-11** (runbook §35): all approved as recommended — separate `fixtures` registry (D-1), never hard-deleted with `scheduled`/`cancelled`/`void` (D-2), forward window without touching the season register (D-3), round-batch entry with preview + atomic commit (D-4), NULL = genuinely TBC (D-5), no public exposure (D-7); **D-6 approved with condition**: played linkage is derived/read-time but deterministic and fail-closed, no name/date guessing, ambiguity leaves the fixture unlinked, `fixture_key` stays the identity after play; plus the constraint that a played association never replaces `fixture_key` with `match_key`. **Stage 1 authorised.**
+- **Severity:** Medium
+- **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
+- **Branch:** `opus/issue-162-fixture-admin`, worktree `D:\dev\afldb-issue-162`, cut from `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161 on ISSUE-160 by operator direction; neither parent merged first; all three deploy to DEV together as the Admin Centre batch).
+- **Planning model:** Fable 5.1, high.
+- **Parent:** `AFLDB-ISSUE-156`, allocated as supplemental child **P3d**; P10 (played-match identity correction, `match-rekey.ts`) is not absorbed.
+
+### Problem
+
+AFLDB must be able to create and maintain a future season's fixture (e.g. 2027) without depending
+operationally on AFL Tables or another external site. Today it cannot represent an unplayed match at
+all: `matches.home_score`, `away_score`, `result` and `margin` are `NOT NULL` (`003_matches.sql:45-52`)
+and reconciled by CHECKs (`003:60-70`, `022:25-55`), so every row is a result; ISSUE-100 L3A already
+recorded "an unplayed fixture cannot exist there" (`IssuesIndex.md:2299-2300`). Every consumer —
+`club_seasons` (`rebuild_derived.py:340-356`, `player-derived.ts:413-458`), season metadata
+(`player-derived.ts:515-560`), round ladders (`rounds.ts:44-105`), venue records, NL plans, the Grid
+Solver — reads "row exists" as "played". The only manual creator, `createMatch()`
+(`match-admin.ts:101-320`), writes a fully scored row under a third incompatible `match_key`
+rendering and inserts a `seasons` row the reference loader reverts.
+
+### Planning findings (2026-09-11, verified natively; full evidence in `AFLDB-ISSUE-162.md` §2)
+
+- `match_key` (`season|round_code|date|home|away`) is a content address over exactly the fields a
+  fixture changes (`match-rekey.ts:4-13`) and is unusable as a fixture identity; the ISSUE-131 rekey
+  and the settle's `matchIdsByKey` lookup both key on it.
+- The AFL Tables settle inserts `matches` rows by `match_key` (`canonical-apply.ts:651-688`); the
+  Squiggle/Kali refresh "cannot create a partial `matches` row" (`current-season-import.ts:475-484`);
+  neither reads any fixture table. The historical importer upserts by `match_key` and never
+  deletes/truncates `matches`; the test rebuild starts empty, so a registry table must be replayed.
+- The repository already separates schedule from result for AFLW: `staging_aflw.fixtures`
+  (`fixture_status IN ('played','scheduled','cancelled')`, scores CHECK-forced NULL unless played,
+  `025:80-125`) versus `staging_aflw.matches` (one row per played fixture).
+- Season boundary: `seasons`/`clubs`/`club_seasons` are reference-loaded or derived and must not be
+  written (ISSUE-161 D-6, `096:33-57`); `afldb_season_list_clubs(season)` (`096:166-185`) is the one
+  future-season eligibility rule and is reused unchanged.
+- Rounds: `round_code` = decimal `round_number` for home-and-away, `FINALS_CODES` `EF QF SF PF GF WF`
+  for finals (`import_fitzroy_core.py:166-173,1213-1221`); AFLDB numbers the Opening Round as round 1
+  (ISSUE-140 measured the cost of mixing conventions). Byes are absence (`rounds.ts:36-42`).
+- Time: `matches.match_time` is local venue time text from `Local.start.time`; `scheduled_at` has had
+  no reader or writer since migration 003.
+
+### Chosen model (recommended; D-1)
+
+A new canonical registry table **`fixtures`**: season (CHECK range, no FK), round type/number/code
+(the `matches` vocabulary), home/away club ids (eligible identities only), nullable date / local time
+/ venue (NULL = TBC; unmapped venue name kept in `venue_raw`), `status IN ('scheduled','cancelled',
+'void')` with a required reason for the terminal states, `fixture_key` = a UUID minted once under
+`manual_admin_edit`, provenance columns. **No score, result, attendance or statistic column exists**,
+so a fixture cannot be read as a played match; `matches` is untouched. "Played" is derived at read
+time: exactly one `matches` row for the same season, round code and club pair (a swapped home/away
+resolves with a warning; two candidates are `ambiguous` and never merged). Durability is the
+ISSUE-159/160/161 shape — whole-row `data_overrides ('fixtures', 'manual_admin_edit:<token>',
+'fixture')`, one import-role transaction per mutation with an in-transaction `data_edits` row,
+fail-closed `replay_admin_overrides('fixtures')` (venue degrades with a report), registry
+classification via `grant_import_write`, a new `fixture_key` lineage rule and `data_edits` target in
+`promotion-inventory.ts`. Rows are never deleted (`void` = data-entry mistake, `cancelled` =
+real-world, reversible) so every audit row stays resolvable across a lineage change. Played fixtures
+accept only a notes edit; correcting a played match stays ISSUE-156 P10. Bulk entry = a
+round-at-a-time batch form with structured-paste pre-fill, server-side preview and a
+fingerprint-gated all-or-nothing confirm. No settle, current-season or rekey code changes. No public
+exposure in this issue. Capabilities `data.fixtures.read` (Admin+) / `data.fixtures.edit` (Super
+Admin); routes `/admin/fixtures`, `/[season]`, `/[season]/new`, `/[season]/[fixtureKey]`.
+
+### Migration
+
+One additive migration required (next free **097** at planning, not allocated; re-check at Stage 1):
+`fixtures` + indexes; `data_overrides.entity_type` += `'fixtures'`; `data_edits.table_name` +=
+`'fixtures'`; `grant_app_read` + `grant_import_write`. No backfill. Deploy order migration →
+`db:privileges` → code.
+
+### Stop conditions evaluated
+
+S-1 (scheduled rows in `matches` contaminate derivation) and S-5 (schema cannot represent TBC without
+fake values) **fire for the rejected `matches`-based options** and are the reason for the design;
+none fires against the recommended model. S-2/S-3/S-4/S-6/S-7/S-8/S-9/S-10 resolved by evidence
+(runbook §32). Stage 1 hard stops: replay not byte-exact, promotion classification refusal, any code
+path writing `matches`.
+
+### Validation
+
+None yet (planning only). Planned: new `tests/admin-fixture-actions.test.ts` and
+`tests/integration/admin-fixtures.test.ts` (including the real Python replay, forced-failure
+rollbacks, batch atomicity and derived-safety proofs), plus `auth`, `data-overrides-source-contract`,
+`reference-data`, `db-promotion-check`, manual-authority extensions; Playwright deferred to the
+combined Admin Centre DEV batch.
+
+### Next action
+
+D-1…D-7 are decided (2026-09-11). Operator reviews/commits the planning files, then Stage 1 in a
+fresh high-effort session from this worktree: `Execute AFLDB-ISSUE-162 Stage 1 according to
+AFLDB-ISSUE-162.md`, starting with the preflight and the migration-number re-check (097 free at
+planning). No DEV update, no deploy, no PROD, no merge of ISSUE-160/161 first.
