@@ -34,6 +34,7 @@ vi.mock('postgres', () => ({ default: mocks.postgres }));
 vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 
 import { isAllowedLeadershipRevalidatePath } from '@/app/admin/season-lists/revalidate-paths';
+import { optionalText, parsePositiveInt, requiredText } from '@/app/admin/season-lists/validation';
 import {
   isLeadershipRole,
   isLeadershipStatus,
@@ -43,6 +44,8 @@ import {
   normaliseLeadershipDates,
   parseLeadershipEntityKey,
 } from '@/db/queries/admin-club-leadership';
+import { isDataEditTableName } from '@/db/queries/audit-log';
+import { DATA_EDIT_TABLE_LABELS, isAuditRowId } from '@/lib/audit-view';
 
 describe('the durable key shape (§5, D-8)', () => {
   it('is a minted token under the manual namespace, and round-trips', () => {
@@ -127,6 +130,45 @@ describe('leadership date validation (§7, L-5, D-3)', () => {
   it('never invents a sentinel date', () => {
     expect(normaliseLeadershipDates({ startedOn: null, endedOn: null }))
       .toEqual({ startedOn: null, endedOn: null });
+  });
+});
+
+describe('the form parsers the leadership actions depend on (§17)', () => {
+  // `leadership-actions.ts` reads `season`, `playerId` and `newPlayerId`
+  // through `parsePositiveInt` and refuses when any of them is null, so a
+  // blank or junk field must never arrive at the mutation as a number — a
+  // zero season or a player id of 0 would be a lookup miss reported as a
+  // confusing refusal rather than as the bad request it is.
+  it('never turns a blank, zero or non-integer field into a number', () => {
+    expect(parsePositiveInt('7')).toBe(7);
+    for (const bad of ['', ' ', '0', '-1', '1.5', 'NaN', 'captain']) {
+      expect(parsePositiveInt(bad), bad).toBeNull();
+    }
+    expect(parsePositiveInt(null)).toBeNull();
+  });
+
+  it('reads an omitted optional field as absent, not as an empty value', () => {
+    // A blank start date is an UNKNOWN date (D-3), and `normaliseLeadershipDates`
+    // only treats it that way because the parser hands it through as null.
+    for (const blank of ['', '   ']) expect(optionalText(blank, 10), blank).toBeNull();
+    expect(optionalText(null, 10)).toBeNull();
+    expect(optionalText(' 2027-03-18 ', 10)).toBe('2027-03-18');
+    expect(requiredText('   ', 60)).toBeNull();
+    expect(requiredText(' a-token ', 60)).toBe('a-token');
+  });
+});
+
+describe('the audit subject (§15)', () => {
+  it('is the appointment itself, and the viewer accepts the link the panel renders', () => {
+    // `LeadershipPanel` links every row to
+    // /admin/audit/entity/club_leadership/<club_leadership.id>, and that route
+    // 404s unless BOTH halves hold: the table is on the `data_edits`
+    // allowlist, and the id is digits. Migration 098 admits the name; this
+    // pins the application half, so narrowing the allowlist can never leave
+    // the leadership surface linking into a 404.
+    expect(isDataEditTableName('club_leadership')).toBe(true);
+    expect(DATA_EDIT_TABLE_LABELS.club_leadership).toBe('Club leadership');
+    expect(isAuditRowId('1234')).toBe(true);
   });
 });
 

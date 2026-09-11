@@ -827,14 +827,31 @@ is now `('players', 'matches', 'draft_picks', 'season_list_members', 'club_leade
 does **not** depend on `season_list_members`, so there is no ordering cycle. Deploy order for the
 batch is now **096 → 097 → 098 → `npm run db:privileges` → code**.
 
-**Stage 2 built 2026-09-12 (Sonnet 5 high), uncommitted, not yet validated.** The Leadership
-section and Appoint panel on the season-list club page, the Captain column on the season overview,
-the capability-gated `/admin/season-lists/revalidate` route, the public `ClubLeadership` block, and
-`tests/admin-club-leadership-actions.test.ts` are all now in the working tree — see
-`AFLDB-ISSUE-163.md` §33 for the full record. No new capability, no stop condition fired.
+**Stage 2 built 2026-09-12 (Sonnet 5 high).** The Leadership section and Appoint panel on the
+season-list club page, the Captain column on the season overview, the capability-gated
+`/admin/season-lists/revalidate` route, the public `ClubLeadership` block, and
+`tests/admin-club-leadership-actions.test.ts` — see `AFLDB-ISSUE-163.md` §33 for the full record. No
+new capability, no stop condition fired.
 
-Next: the operator runs the Stage 1 validation of `AFLDB-ISSUE-163.md` §32.11 (apply 098 to
-`afldb_test` only, `db:privileges`, tsc, the contract suites, the integration suites, ESLint) —
-Stage 1 remains a precondition for Stage 2's own validation (§33) — reviews and commits both stages
-separately, then the operator's local completion audit mirroring P3c/P3d before the combined
-160+161+162+163 DEV batch. P4–P12 remain unallocated placeholders.
+**Both stages validated and committed 2026-09-12 (`8ed32b3`, `c28ea60`, `ea9f3dd`).** Stage 1:
+migration 098 applied to `afldb_test` only + `db:privileges:test`, tsc, 390 passed/4 skipped contract
+suites, 37/37 `tests/integration/admin-club-leadership.test.ts` including the real Python replay,
+367/367 stacked regressions, 254/4-skipped current-season, ESLint, `git diff --check`. Stage 2: tsc,
+150/150 `admin-club-leadership-actions` + `auth`, ESLint, clean tree, preflight READY.
+
+**Final local audit 2026-09-12 (Opus 5 high), fixes uncommitted.** The whole P3e implementation was
+read against §30 D-1…D-18 with no command executed, and every verdict holds — backend integrity,
+lifecycle/CAS, co-captaincy, replacement, the season-list invariant, replay/durability, the public
+source boundary, player honours, auth, revalidation security and both UIs — with **no deviation from
+D-1…D-18 and no stop condition**. Three Stage 2 defects were fixed (none in schema, queries, replay,
+promotion or capability shape, so §2's capability table and the promotion contract above are
+untouched): the Appoint form no longer collapses into a receipt on success; the co-captaincy confirm
+step is bound to the exact `(role, player)` it was refused for; and the unreachable Replace
+co-captaincy branch was removed. Three narrow tests were added to the existing pure suite. Findings
+recorded rather than fixed are in `AFLDB-ISSUE-163.md` §34.4.
+
+Next: the operator re-runs the Stage 2-only gates (`tsc`, `admin-club-leadership-actions`, `auth`,
+ESLint over `AppointLeaderPanel.tsx`/`LeadershipActions.tsx`/the test file, `git diff --check`),
+commits the audit fixes, and then runs the combined 160+161+162+163 DEV batch (096 → 097 → 098 →
+`npm run db:privileges` → code) whose rendered Playwright acceptance is the remaining proof for all
+four children. P4–P12 remain unallocated placeholders.

@@ -19,7 +19,17 @@ type Candidate = { playerId: number; displayName: string; activeLeadershipRole: 
  * A second active captain is never submitted silently: the first submit
  * carries no `confirmCoCaptaincy`, and only a `co_captaincy_unconfirmed`
  * refusal — naming the sitting captain(s) — unlocks an explicit "Appoint as
- * co-captain" confirmation. Vice-captains need no confirmation at all (L-4).
+ * co-captain" confirmation. That confirmation belongs to the EXACT submission
+ * it refused: changing the role or the player withdraws it, so a confirmation
+ * given about one appointment can never be carried over to a different one the
+ * operator has not been warned about. Vice-captains need no confirmation at
+ * all (L-4).
+ *
+ * A recorded appointment leaves the form standing (the `AddPlayerPanel`
+ * precedent) rather than replacing it with a receipt: a club-season normally
+ * needs a captain AND one or more vice-captains, and making the second
+ * appointment cost a page reload would be the panel working against its own
+ * task.
  */
 export function AppointLeaderPanel({
   season, clubSlug, candidates,
@@ -33,9 +43,12 @@ export function AppointLeaderPanel({
   const [playerId, setPlayerId] = useState('');
   const [startedOn, setStartedOn] = useState('');
   const [note, setNote] = useState('');
+  /** What the last submit actually asked for, so a refusal cannot outlive it. */
+  const [submitted, setSubmitted] = useState<{ role: LeadershipRole; playerId: string } | null>(null);
 
   const submit = (event: React.MouseEvent<HTMLButtonElement>, confirmCoCaptaincy: boolean) => {
     if (!playerId) return;
+    setSubmitted({ role, playerId });
     const formData = new FormData();
     formData.set('season', String(season));
     formData.set('clubSlug', clubSlug);
@@ -47,16 +60,11 @@ export function AppointLeaderPanel({
     appoint.submit(formData, event.currentTarget);
   };
 
-  if (appoint.state.ok) {
-    return (
-      <section className="section">
-        <h2>Appoint</h2>
-        <p className="notice" role="status">{appoint.state.message}</p>
-      </section>
-    );
-  }
-
-  const isCoCaptaincyRefusal = appoint.state.reason === 'co_captaincy_unconfirmed';
+  // L-3. The confirm step is offered only while the current selection is still
+  // the one the backend refused — change the role or the player and it is gone,
+  // because the refusal named sitting captains in relation to THAT appointment.
+  const isCoCaptaincyRefusal = appoint.state.reason === 'co_captaincy_unconfirmed'
+    && submitted !== null && submitted.role === role && submitted.playerId === playerId;
 
   return (
     <section className="section">
@@ -112,6 +120,9 @@ export function AppointLeaderPanel({
         </label>
 
         {appoint.state.error && <p className="notice" role="alert">{appoint.state.error}</p>}
+        {appoint.state.ok && appoint.state.message && (
+          <p className="notice" role="status">{appoint.state.message}</p>
+        )}
 
         {isCoCaptaincyRefusal ? (
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

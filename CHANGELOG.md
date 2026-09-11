@@ -92,6 +92,11 @@ commit.
 - The club page's existing Captains history table was fixed to key each row on its own database id
   rather than on `season` + player name, which could collide when the same player held two
   appointments in one season (ended, then re-appointed) -- a rendering fix, not a data change.
+- A co-captaincy confirmation belongs to the exact appointment it was asked about: changing the role
+  or the player after a refusal withdraws the confirm step and asks again, so a warning given about
+  one player can never be spent on another. Recording an appointment also leaves the Appoint form
+  standing rather than replacing it with a receipt -- a club normally names a captain and two or
+  three vice-captains in one sitting, and each of those should not cost a page reload.
 - Responsive: the Leadership section uses stacked controls rather than a wide table, and remains
   usable at 375px; rendered browser acceptance across roles and widths is deferred to the combined
   Admin Centre DEV batch, per the operator's release-batching decision.

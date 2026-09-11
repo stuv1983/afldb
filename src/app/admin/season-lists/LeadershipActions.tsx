@@ -29,10 +29,18 @@ type CandidateMember = { playerId: number; displayName: string; activeLeadership
  * heavily worded destructive block, exactly as the ISSUE-162 fixture
  * lifecycle precedent (`LifecyclePanel.tsx`) established.
  *
- * A `co_captaincy_unconfirmed` refusal from Replace or Reinstate is rendered
- * as a deliberate second step (the message plus an explicit "Confirm
- * co-captaincy" button that resubmits with `confirmCoCaptaincy=1`) rather
- * than auto-retried — L-3 requires a human decision, never a silent retry.
+ * A `co_captaincy_unconfirmed` refusal from Reinstate is rendered as a
+ * deliberate second step (the message plus an explicit "Confirm co-captaincy"
+ * button that resubmits with `confirmCoCaptaincy=1`) rather than auto-retried
+ * — L-3 requires a human decision, never a silent retry.
+ *
+ * REPLACE HAS NO SUCH STEP, and must not grow one. `replaceLeader()` ends the
+ * outgoing row and inserts the incoming one for the same role, club and season
+ * inside one transaction, so the active headcount for that role never rises and
+ * a replacement can never produce a co-captaincy (`ReplaceLeaderInput` carries
+ * no `confirmCoCaptaincy` field and the mutation never calls
+ * `sittingCaptains()`). A confirm control here could therefore only ever offer
+ * an operator a consequence the backend cannot deliver.
  */
 export function LeadershipActions({
   appointmentKey, role, status, expectedUpdatedAt, startedOn, endedOn, note,
@@ -79,7 +87,7 @@ export function LeadershipActions({
   if (correct.state.ok) return <p className="notice" role="status">{correct.state.message}</p>;
   if (voidAction.state.ok) return <p className="notice" role="status">{voidAction.state.message}</p>;
 
-  const submitReplace = (event: React.MouseEvent<HTMLButtonElement>, confirmCoCaptaincy: boolean) => {
+  const submitReplace = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!newPlayerId) return;
     const formData = new FormData();
     formData.set('appointmentKey', appointmentKey);
@@ -87,7 +95,6 @@ export function LeadershipActions({
     formData.set('newPlayerId', newPlayerId);
     if (effectiveOn) formData.set('effectiveOn', effectiveOn);
     if (replaceNote) formData.set('note', replaceNote);
-    if (confirmCoCaptaincy) formData.set('confirmCoCaptaincy', '1');
     replace.submit(formData, event.currentTarget);
   };
 
@@ -180,31 +187,17 @@ export function LeadershipActions({
           />
         </label>
         {replace.state.error && <p className="notice" role="alert">{replace.state.error}</p>}
-        {replace.state.reason === 'co_captaincy_unconfirmed' ? (
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button
-              type="button" className="btn btn-primary"
-              onClick={(event) => submitReplace(event, true)} disabled={anyPending || !newPlayerId}
-            >
-              Confirm co-captaincy and replace anyway
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setMode('none')} disabled={anyPending}>
-              Back
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button
-              type="button" className="btn btn-primary"
-              onClick={(event) => submitReplace(event, false)} disabled={anyPending || !newPlayerId}
-            >
-              {replace.isPending ? 'Replacing…' : 'Confirm replacement'}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setMode('none')} disabled={anyPending}>
-              Cancel
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <button
+            type="button" className="btn btn-primary"
+            onClick={submitReplace} disabled={anyPending || !newPlayerId}
+          >
+            {replace.isPending ? 'Replacing…' : 'Confirm replacement'}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setMode('none')} disabled={anyPending}>
+            Cancel
+          </button>
+        </div>
       </div>
     );
   }
