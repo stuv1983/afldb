@@ -5,7 +5,7 @@
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Created:** 2026-09-11
 **Parent lineage:** `AFLDB-ISSUE-155` (Phases D–I transferred here by reference; see §0)
-**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2). P3–P12 are named placeholders and receive an ID only when each phase starts.
+**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2), `AFLDB-ISSUE-159` (P3), `AFLDB-ISSUE-160` (P3b — Draft administration, a supplemental child inserted after P3 on 2026-09-11; P4–P12 keep their labels). P4–P12 are named placeholders and receive an ID only when each phase starts.
 
 This document is a planning deliverable. No application code, migration, privilege, test or
 deployment change was made while producing it. Every later phase must re-verify the repository
@@ -54,6 +54,7 @@ Additions this umbrella introduces, and nothing else:
 |---|---|---|---|
 | Operations | `/admin/audit` | P1 | Read-only audit viewer over `auth_audit_log` + `data_edits` |
 | Data | `/admin/coaches`, `/admin/coaches/[id]` | P3 | Replaces the coach slice of `/admin/data-editor` |
+| Data | `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]` | P3b | Draft administration and new-player draft intake (added 2026-09-11, `AFLDB-ISSUE-160`). Replaces the draft slice of `/admin/data-editor` and the draft block of `CreatePlayerForm` — the one draft mutation contract |
 | Data | `/admin/records/*` (first-kick, after-siren, family) | P4 | Special records |
 | Data | `/admin/honours/*` | P5 | Awards/honours correction lifecycle |
 | Site | existing `/admin/content`, `/admin/settings` widened | P6 | No new top-level route by default |
@@ -86,6 +87,7 @@ capability that appears only in navigation is a defect (P2 makes this a CI-faili
 | `people.admins.lifecycle` | – | – | ✓ | **`requireSuperAdmin` retained** + documented capability assertion beside it (ISSUE-155 §26.3: a `can_manage_admins` delegate must stay denied) | P2 |
 | `ops.audit.read` (new) | – | ✓ (own-scope TBD at P1 preflight) | ✓ | `requireCapability` | P1 |
 | `data.coaches.edit` (new) | – | draft-level TBD | ✓ | `requireCapability` | P3 |
+| `data.draft.read` / `data.draft.edit` (new, 2026-09-11) | – / – | ✓ / – | ✓ / ✓ | `requireCapability`; new-player creation and AFL Tables identity attach sit under `.edit`, no third capability (`AFLDB-ISSUE-160.md` D-6) | P3b |
 | `data.records.edit` / `.suppress` (new) | – | – | ✓ | `requireCapability` | P4 |
 | `data.honours.correct` (new) | – | – | ✓ | `requireCapability` | P5 |
 | `site.content.publish` (new or existing widened) | – | – | ✓ | `requireCapability` | P6 |
@@ -108,6 +110,7 @@ everywhere else it records a durable override or refuses.
 | Brownlow round votes / season totals | `brownlow_round_votes` (canonical), `brownlow_season_votes` derived at publication | Draft/finalise/publish only via `src/db/queries/admin-brownlow.ts` | entry state + authority tables (094) | done |
 | Admin users | `auth_users` | Phase B lifecycle transaction only | atomic `auth_audit_log` | done |
 | Coaches / match coaching tenure | `coaches`, `match_coaches` (source-provenanced, 087) | Manual rows under a manual source; edits to source-owned rows via override | `data_overrides` widened to coaches; `data_edits` allowlist widened | P3 |
+| Draft selections and manual players (added 2026-09-11) | `draft_picks` (source-owned by DraftGuru, key 069); `players` + `external_identities` | Source-owned selection fields via override; manual selection = ordinary row under `manual_admin_edit` with `player_url = 'manual:<token>'`; manual player = ordinary `players` row with a minted `manual_admin_edit` identity in `external_identities`; both re-created on promotion by the `players`/`draft_picks` replay branches | `data_overrides` (`players`, `draft_picks` — already admitted, no widening) + `data_edits` | P3b |
 | First-kick goal / after-siren / family records | `player_achievements` (053), `after_siren_kicks` (089), family list (088) | Patch/suppress via override, never direct rewrite of source rows | `data_overrides` widened; explicit suppress operation | P4 |
 | Awards / honours | award tables (source-owned) | Correction lifecycle with review; never a second authority for Brownlow | `data_overrides` widened; `data_edits` | P5 |
 | Site content / settings | `site_settings`, content revisions | Existing `/admin/content`, `/admin/settings` patterns reused | existing revision metadata | P6 |
@@ -181,6 +184,7 @@ preflight**; ISSUE-151/152/153/154/155 work may consume numbers first.
 | P1 | none | — | — |
 | P2 | none | — | — |
 | P3 | yes | coach manual-source provenance decision (see §10 stop condition C-1); `data_overrides.entity_type` and `data_edits.table_name` widened for coaches | both |
+| P3b | **none** | `players` and `draft_picks` are already admitted by both CHECKs; identity is carried in existing columns (`AFLDB-ISSUE-160.md` §10). Next free number was 096 on 2026-09-11, not allocated | — |
 | P4 | yes | explicit patch/suppress operation on `data_overrides` (or smallest equivalent); entity widening for `player_achievements`, `after_siren_kicks`, family list | both |
 | P5 | yes | honours entity widening; review-state if no current token suffices | both |
 | P6 | none unless revision/history metadata is insufficient | monotonic revision only | — |
@@ -214,6 +218,7 @@ player-links fix moved it out of the action path).
 | P1 | none (admin-only reads) | none |
 | P2 | none | none |
 | P3 | player pages, club season pages, coach pages | tag/path revalidation after commit, outside the action's pending path |
+| P3b | `/players/[slug]` (ISR 1h) and `/sitemap.xml`; `/draft`, `/draft/[year]`, `/players` are `force-dynamic` and need nothing | same shape as P3 (`revalidatePaths` returned by the action, POSTed to a bounded allowlisted route afterwards) |
 | P4 | player pages, records pages, match pages | same |
 | P5 | player pages, honours pages, season pages | same |
 | P6 | root layout / content pages | reuse existing `/admin/content` root-layout revalidation |
@@ -257,6 +262,11 @@ P2 (158) ──┤     │
 ```
 
 - P1 and P2 are functionally independent; either order works. P1 first is recommended (§11).
+- P3b (`AFLDB-ISSUE-160`) sits between P3 and P8 in the graph: it reuses P3's action,
+  revalidation and transaction patterns, adds **no** table, and honours the ISSUE-151 contract by
+  adding a lineage identity rule (`draft_pick_key`) and a `data_edits` target for `draft_picks`
+  plus widening the `players` rule to manual identities — see `AFLDB-ISSUE-160.md` §11. P8's
+  data-editor decomposition inherits the draft slice already removed.
 - P3, P4, P5, P7, P9, P10 each add a table or a NOT NULL football reference and therefore
   **must add a `tools/db/promotion-inventory.ts` classification entry in the same change**
   (see ISSUE-151 dependency below). P1, P2, P6, P8, P11, P12 are not affected.
@@ -290,6 +300,7 @@ reference.
 | R-8 | int8-as-string / jsonb double-decode on audit columns | P1 | Contract test on the query layer before UI |
 | **C-1** | **~~Coach-only identity creation as specified in ISSUE-155 §9 is not implementable against the current schema~~ — DECIDED 2026-09-11, `AFLDB-ISSUE-159`.** `coaches.afltables_coach_path` is `NOT NULL UNIQUE` (087:38) and `coaches.source_id` is `NOT NULL` (087:58). | **P3** | **CLEARED.** A manual coach is an ordinary `coaches` row whose `afltables_coach_path` **and** `name_key` are both a synthetic `'manual:' || <token>` under the **existing** `manual_admin_edit` source (057:36-42); the durable record is a `data_overrides` row replayed on reload and promotion. Nothing relaxed, nothing dropped, no new `sources` row, no merge tooling. The nullable-path alternative was rejected: `data_edits.row_id` is lineage-bound and name-derived identity is forbidden, so a NULL path stops the promotion. Rationale and citations: `AFLDB-ISSUE-159.md` §1–§2 |
 | R-9 | Refresh job runs an operation outside the allowlist or overlaps a running settle | P7 | Any unbounded importer argument reachable from the browser → stop |
+| **R-10** | A manually created player is duplicated when AFL Tables first publishes them: the nightly settle never creates players, but the operator-run `import_fitzroy_core.py` inserts any profile with no registered identity | **P3b** | `AFLDB-ISSUE-160.md` W-3 / D-2: the admin attaches the profile path first (the settle and the importer then both resolve the existing player), backed by a fail-closed name+dob refusal in `import_players()` (operator-run importer only). If D-2 is declined, new-player creation is **not shipped** |
 
 **P9 — Player / entity lifecycle including merge — is not ordinary CRUD.** No merge tooling
 exists anywhere in the repository (`tools/migration/`, `src/lib/acquisition/`). Required: a
@@ -313,7 +324,8 @@ contract remaps.
 |---|---|---|---|---|---|
 | P1 | **AFLDB-ISSUE-157** | Admin foundation and audit viewer | new | low | §P1 below |
 | P2 | **AFLDB-ISSUE-158** | Capability enforcement | extends §23 Phase A | medium | §P2 below |
-| P3 | **AFLDB-ISSUE-159** | Coach administration | Phase D (§23, §9) | medium | §P3 below — C-1 decided; two gated stages, hard gate = a real DEV settle still applying |
+| P3 | **AFLDB-ISSUE-159** | Coach administration | Phase D (§23, §9) | medium | §P3 below — C-1 decided; two gated stages, hard gate = a real DEV settle still applying. **RESOLVED 2026-09-11, merged `af6379e`** |
+| P3b | **AFLDB-ISSUE-160** | Draft administration and new-player draft intake | restored original Admin Centre scope (no ISSUE-155 phase) — inserted 2026-09-11 | medium-high (player identity) | §P3b below — no migration; W-3 cleared by D-2 (decided 2026-09-11, symmetric DOB rule); D-1…D-9 all decided; two stages, no DEV settle gate |
 | P4 | placeholder | Special records — first-kick / after-siren / family | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe |
 | P5 | placeholder | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority |
 | P6 | placeholder | Site content and versioning | Phase F (§23, §11) | medium | reuse root-layout revalidation |
@@ -458,6 +470,54 @@ record, and no merge tooling exists in the repository. P3 ships duplicate **prev
 no merge, no `superseded_by` column, no delete path for `coaches`. It receives its own ID when
 P9 starts and is **not** folded into 159.
 
+### P3b handoff contract — AFLDB-ISSUE-160: Draft administration and new-player draft intake
+
+**Allocated 2026-09-11. Status: Planning complete / Approved for Stage 1 — operator decisions
+D-1…D-9 decided 2026-09-11 (D-2 symmetric-DOB importer guard; D-3 conditional on read-only PROD
+probes and a pre-deploy sequencing decision S-1 against the paused ISSUE-151 promotion; D-7
+adoption also mints an identity-less legacy player's identity; D-8 both J-3 branches
+pre-authorised; D-9 Stage 2 only) — not implemented.** The authoritative contract is `AFLDB-ISSUE-160.md`; this
+is the umbrella's summary. Draft administration was part of the original Admin Centre intent
+but had no phase of its own; it is restored here as a supplemental child after P3 so P4–P12
+keep their labels.
+
+**Objective.** One authoritative, audited, replayable, promotable contract for draft
+selections, including onboarding a genuinely new person into AFLDB through their draft
+selection — search-before-create, duplicate refusal, atomic player + selection creation — and
+attaching a later AFL Tables identity to that same player rather than minting a second one.
+
+**Planning findings that bind implementation.**
+- Admin-created players and picks today have **no promotion identity** (both vanish on
+  promotion; a manual player's `data_edits` rows stop a PROD promotion), and editing an
+  admin-created pick writes a `data_overrides` key of `null|null|<year>|null`. ISSUE-160
+  **prevents new occurrences** of all three by the ISSUE-159 pattern: a minted
+  `manual_admin_edit` token carried in existing columns (`external_identities` for players,
+  `draft_picks.player_url = 'manual:<token>'` for picks), a whole-row `data_overrides` record,
+  and re-create branches in `replay_admin_overrides`. Existing rows are repaired **per row**
+  only, through the D-7 adopt action (a legacy pick and, when needed, its identity-less
+  player, in one transaction); no bulk backfill. Existing `null|…` override keys are inert and
+  stay as frozen residue, enumerated by the gate-2 probe (runbook §13).
+- **No migration, no privilege change**: `players` and `draft_picks` are already admitted by
+  both CHECKs.
+- The nightly settle never creates a player and resolves debutants only through registered
+  AFL Tables identities, so *attach-first* is immediate and sufficient; the residual duplicate
+  risk is the operator-run fitzRoy import, closed by a fail-closed name+dob **refusal** (never a
+  link) in `import_players()` — decision D-2 (approved, symmetric DOB rule: either DOB unknown
+  or both equal → refuse, both known and different → distinct namesake; a refusal rolls back
+  the whole players batch), stop condition W-3 cleared (§10 R-10).
+- `/admin/data-editor` loses its draft slice and `CreatePlayerForm` its draft block;
+  `createPlayerInTransaction` stops inserting `draft_picks`; `saveEdit` refuses `draft_picks`.
+  `EDITABLE_ENTITIES.draft_picks` survives as the validation spec only.
+- Merging two existing players and relinking/unlinking a source-owned selection stay **P9**.
+
+**Two stages, one issue.** Stage 1 (Opus 5, high): identity/provenance contracts,
+`createPlayerInTransaction` minting, `src/db/queries/admin-draft.ts`, replay branches, importer
+guard and ledger target, promotion inventory, docs, unit + `afldb_test` integration. Stage 2
+(Sonnet 5 high for UI wiring, Opus for the create-player wizard action and permission matrix):
+`/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, capabilities `data.draft.read`
+(Admin-and-up) / `data.draft.edit` (Super Admin), shared revalidate/submit extraction (D-9).
+DEV browser acceptance is deferred until the operator updates DEV for the Admin Centre batch.
+
 ---
 
 ## 12. Explicit non-goals
@@ -497,13 +557,20 @@ role guards are exactly the dashboard, submission review, change-password and th
 `requireAdminManager()` before it became the guard, and `tests/auth.test.ts` holds the source
 contract. Evidence and the validation commands are in `issues.md` under ISSUE-158.
 
-**P3 is allocated.** `AFLDB-ISSUE-159` (Coach administration), 2026-09-11, branch
-`opus/issue-159-coach-admin`, status Planning / Approved for Stage 1 — nothing implemented.
-Stop condition C-1 is **decided** (§10) and migration **095** is allocated to it. Operator
-decisions D-1…D-4 are approved and recorded in `AFLDB-ISSUE-159.md` §12; coach reconciliation is
-reported out of scope and stays P9-class.
+**P3 is complete.** `AFLDB-ISSUE-159` (Coach administration) resolved 2026-09-11 and merged
+to `main` at `af6379e` (migration 095, `/admin/coaches`, Stage 1 + Stage 2 gates all passed on
+DEV). Coach reconciliation stays P9-class.
 
-Next: start **ISSUE-159 Stage 1** in a fresh Opus 5 / high-effort session against
-`AFLDB-ISSUE-159.md` §16 (deliverables) and §17 (gates). Stage 2 does not begin until gate G4 —
-a real DEV settle still applying `match_period_scores`, `player_match_stats` and
-`brownlow_round_votes` — passes. P4–P12 remain unallocated placeholders.
+**P3b is allocated and decided.** `AFLDB-ISSUE-160` (Draft administration and new-player draft
+intake), 2026-09-11, branch `opus/issue-160-draft-admin`, status Planning complete / Approved
+for Stage 1; operator decisions D-1…D-9 decided 2026-09-11 (`AFLDB-ISSUE-160.md` §12) —
+nothing implemented. No migration, no privilege change. Stop condition W-3 (duplicate player at
+AFL Tables debut) is cleared by the approved D-2. The one remaining operator-visible decision,
+S-1 (whether the paused ISSUE-151 PROD promotion completes under the current lineage contract
+or resumes under the new `draft_pick_key` gate), is a **pre-deploy** decision (runbook §11.1),
+not a Stage 1 gate.
+
+Next: a fresh **Opus 5 / high-effort** session executes **ISSUE-160 Stage 1** against
+`AFLDB-ISSUE-160.md` §16/§17. DEV is deliberately not updated
+until the Admin Centre batch is complete; gates 15–16 wait for that. P4–P12 remain unallocated
+placeholders.
