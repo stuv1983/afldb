@@ -3530,6 +3530,14 @@ def main() -> int:
             # no fixture and no club_seasons row -- because a playing list is
             # administrative intent about a season that may not have been played.
             replay_admin_overrides(pg, "season_list_members")
+            # AFLDB-ISSUE-163 §19. BINDING after players, for the same reason:
+            # an appointment names its player by identity. It does NOT depend on
+            # season_list_members -- holding a season-list place is a
+            # precondition of MAKING an appointment, never a property of a
+            # recorded one, and this replay deliberately does not re-check it --
+            # so there is no ordering cycle between the two. It is placed here
+            # only to keep the season-shaped administration together.
+            replay_admin_overrides(pg, "club_leadership")
         elif group == "aliases":
             # AFLDB-ISSUE-110. Runs after `players` so freshly registered
             # identities resolve; separately selectable (--groups aliases) so

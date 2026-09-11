@@ -70,7 +70,11 @@ import type {
  * is not a settle target and changes no answer here) and migration 097
  * (`AFLDB-ISSUE-162` §19: `fixtures`, a SCHEDULED match, which is likewise not a
  * settle target — the settle writes `matches` and never reads or writes
- * `fixtures` — so it too changes no answer here). Listed in the order
+ * `fixtures` — so it too changes no answer here) and migration 098
+ * (`AFLDB-ISSUE-163` §19: `club_leadership`, a captain or vice-captain
+ * appointment, which is likewise not a settle target — nothing in the nightly
+ * settle reads or writes it — so it too changes no answer here). Listed in the
+ * order
  * §3.1 / §16.1 write it, which is NOT the ASCII order `checkAdmittedEntities()`
  * returns: nothing compares the two as sequences, and nothing may.
  *
@@ -82,7 +86,7 @@ import type {
  */
 export const OVERRIDE_ENTITY_TYPES = [
   'coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
-  'season_list_members',
+  'season_list_members', 'club_leadership',
 ] as const;
 
 /**

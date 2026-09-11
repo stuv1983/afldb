@@ -3,6 +3,7 @@ import 'server-only';
 import { cache } from 'react';
 
 import { sql } from '@/db/client';
+import { FIRST_LEADERSHIP_SEASON } from '@/db/queries/club-leadership';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
 import { parseStatLine } from '@/lib/jsonb';
 import type { FilterValues } from '@/search/table-filters';
@@ -466,13 +467,38 @@ export async function getPlayerHonours(playerId: number) {
          AND w.link_status_value IN ('unique','resolved')
        ORDER BY w.season
     `,
+    // Captaincies, from BOTH sources, with exactly one authority per season
+    // (AFLDB-ISSUE-163 §20.3, operator clarification 4, 2026-09-12). Without
+    // the canonical half this list would simply STOP at 2026 — a player who
+    // captains their club in 2027 would hold no captaincy honour at all — and
+    // the fix must not be to write into `captaincies`, whose rows are a curated
+    // Wikipedia import keyed on a raw player NAME.
+    //
+    // The canonical branch renders `role` as the same 'Captain' literal the
+    // legacy table stores, so the two halves are one list with one vocabulary
+    // and the player page needs no change to render 2027+. VICE-CAPTAINCIES
+    // ARE EXCLUDED: a vice-captain who was never captain must never appear as
+    // one. DISTINCT by (season, club): a player re-appointed captain later in
+    // the same season is two appointments but one captaincy season.
     sql<{ season: number; clubName: string; clubSlug: string; role: string }[]>`
-      SELECT cp.season, c.name AS "clubName", c.slug AS "clubSlug", cp.role
-        FROM captaincies cp
-        JOIN clubs c ON c.id = cp.club_id
-       WHERE cp.player_id = ${playerId}
-         AND cp.link_status_value IN ('unique','resolved')
-       ORDER BY cp.season
+      WITH captaincy_rows AS (
+        SELECT cp.season::int AS season, c.name AS "clubName", c.slug AS "clubSlug", cp.role
+          FROM captaincies cp
+          JOIN clubs c ON c.id = cp.club_id
+         WHERE cp.player_id = ${playerId}
+           AND cp.link_status_value IN ('unique','resolved')
+           AND cp.season < ${FIRST_LEADERSHIP_SEASON}::smallint
+        UNION
+        SELECT DISTINCT l.season::int AS season, lc.name AS "clubName", lc.slug AS "clubSlug",
+               'Captain'::text AS role
+          FROM club_leadership l
+          JOIN clubs lc ON lc.id = l.club_id
+         WHERE l.player_id = ${playerId}
+           AND l.role = 'captain'
+           AND l.status <> 'void'
+           AND l.season >= ${FIRST_LEADERSHIP_SEASON}::smallint
+      )
+      SELECT * FROM captaincy_rows ORDER BY season
     `,
     sql<{
       inductedYear: number | null; isLegend: boolean; legendYear: number | null;
@@ -612,6 +638,31 @@ export async function getSeasonBestAndFairest(year: number) {
   `;
 }
 
+/**
+ * The club's captaincy history, from BOTH sources, with exactly one authority
+ * per season (AFLDB-ISSUE-163 §20.3, operator clarification 2, 2026-09-12):
+ *
+ *     season <  FIRST_LEADERSHIP_SEASON   captaincies      (Wikipedia honours)
+ *     season >= FIRST_LEADERSHIP_SEASON   club_leadership  (canonical registry)
+ *
+ * The boundary is a WHERE clause on each branch, not a de-duplication after the
+ * fact: nothing here compares names to decide which of two rows to keep, so a
+ * genuine co-captain is never mistaken for a duplicate and a legacy row is
+ * never silently outranked. Without the union the page would show a 2027
+ * captain in its leadership block and a Captains table ending in 2026 — a
+ * visible self-contradiction.
+ *
+ * Canonical rows are one row per APPOINTMENT, so co-captains are two rows and a
+ * mid-season replacement is two rows (the outgoing one carrying "to <date>" in
+ * the free-text period slot when the date is known). VOID rows never appear —
+ * they were never valid leadership — while ENDED rows do, because they happened.
+ * Vice-captains never appear here: this is the captaincy history.
+ *
+ * A canonical row's `id` is NEGATED so it can never collide with a
+ * `captaincies.id` in a React key or an `UnmatchedPlayer` target. It is never
+ * an `UnmatchedPlayer` target in practice either: every canonical row has
+ * `player_id NOT NULL` and reports `linkStatus = 'unique'`.
+ */
 export async function getClubCaptains(clubId: number) {
   return sql<{
     id: number;
@@ -619,18 +670,37 @@ export async function getClubCaptains(clubId: number) {
     playerName: string; linkStatus: string; role: string; period: string | null;
     identityName: string;
   }[]>`
-    SELECT cp.id, cp.season, cp.player_id AS "playerId", p.slug AS "playerSlug",
-           COALESCE(p.display_name, cp.player_name_raw) AS "playerName",
-           cp.link_status_value::text AS "linkStatus",
-           cp.role, cp.period, c.name AS "identityName"
-      FROM captaincies cp
-      JOIN clubs c ON c.id = cp.club_id
-      LEFT JOIN players p ON p.id = cp.player_id
-     WHERE cp.club_id IN (
-             SELECT id FROM clubs
-              WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
-           )
-     ORDER BY cp.season DESC, cp.role
+    WITH lineage AS (
+      SELECT id FROM clubs
+       WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
+    ),
+    captain_rows AS (
+      SELECT cp.id, cp.season::int AS season, cp.player_id AS "playerId", p.slug AS "playerSlug",
+             COALESCE(p.display_name, cp.player_name_raw) AS "playerName",
+             cp.link_status_value::text AS "linkStatus",
+             cp.role, cp.period, c.name AS "identityName"
+        FROM captaincies cp
+        JOIN clubs c ON c.id = cp.club_id
+        LEFT JOIN players p ON p.id = cp.player_id
+       WHERE cp.club_id IN (SELECT id FROM lineage)
+         AND cp.season < ${FIRST_LEADERSHIP_SEASON}::smallint
+      UNION ALL
+      SELECT (-l.id)::int AS id, l.season::int AS season, l.player_id AS "playerId",
+             lp.slug AS "playerSlug", lp.display_name AS "playerName",
+             'unique'::text AS "linkStatus",
+             'Captain'::text AS role,
+             CASE WHEN l.status = 'ended' AND l.ended_on IS NOT NULL
+                  THEN 'to ' || l.ended_on::text END AS period,
+             lc.name AS "identityName"
+        FROM club_leadership l
+        JOIN clubs lc ON lc.id = l.club_id
+        JOIN players lp ON lp.id = l.player_id
+       WHERE l.club_id IN (SELECT id FROM lineage)
+         AND l.role = 'captain'
+         AND l.status <> 'void'
+         AND l.season >= ${FIRST_LEADERSHIP_SEASON}::smallint
+    )
+    SELECT * FROM captain_rows ORDER BY season DESC, role, "playerName"
   `;
 }
 

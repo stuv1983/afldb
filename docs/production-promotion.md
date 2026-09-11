@@ -644,10 +644,13 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    `players` before `draft_picks`, because a manual selection names its player by an AFL
    Tables path or a `manual_admin_edit` token; `coaches` before `match_coaches`, because
    an assignment resolves its coach by path; `players` before `season_list_members`, because
-   a playing-list membership names its player by that same identity. `matches` is independent
-   and may go anywhere, and so is `fixtures`: a fixture names its clubs and its venue by
+   a playing-list membership names its player by that same identity; `players` before
+   `club_leadership`, because a leadership appointment names its player by it too. `matches` is
+   independent and may go anywhere, and so is `fixtures`: a fixture names its clubs and its venue by
    **slug** — tracked reference data loaded long before any replay — and names no player, no
-   match and no selection, so it depends on no other branch:
+   match and no selection, so it depends on no other branch. `club_leadership` depends on
+   `players` and on nothing else — in particular **not** on `season_list_members`, so the two
+   have no ordering cycle:
 
    ```bash
    cd ~/projects/afldb && ./.venv/bin/python - <<'PY'
@@ -656,7 +659,7 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    load_env()
    with connect_pg() as pg:
        for table in ('players', 'matches', 'draft_picks', 'season_list_members',
-                     'coaches', 'match_coaches', 'fixtures'):
+                     'club_leadership', 'coaches', 'match_coaches', 'fixtures'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
@@ -674,7 +677,16 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    `data_edits` rows stay resolvable, and dropping the void rows here would break that. An
    unresolvable **club** slug stops the replay; an unresolvable **venue** slug degrades to
    the stored venue name and is reported, because venue is enrichment and a promotion must
-   not be stopped by a venue rename. For `matches`, and for a
+   not be stopped by a venue rename. `club_leadership` is `AFLDB-ISSUE-163` (migration 098)
+   and has the same whole-row, always-active shape: an **ended** or **void** appointment must
+   be re-created rather than suppressed, for the same reason — an appointment is never deleted
+   so its `data_edits` rows stay resolvable, and dropping the void rows here would break that.
+   It deliberately does **not** re-check season-list membership: holding the list place is a
+   precondition of *making* an appointment, not a property of a recorded one, so a list
+   corrected after the fact must never erase valid leadership history. An unresolvable club
+   slug, an identity that resolves to zero or to more than one player, an invalid role or
+   status, an impossible interval or an active row carrying an end date all stop the replay.
+   For `matches`, and for a
    source-owned player or selection, an override patches fields of a row the rebuild
    already produced. For a manual one it carries an **entire row**: an administrator can
    create a footballer and their draft selection before any source has published either,
@@ -686,7 +698,11 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    and `/players/<slug>-<id>` URL for one 404s, and the ids change across the window.
    Every administered playing list is likewise absent for that window; no public surface
    reads lists yet (`AFLDB-ISSUE-161` §10), so it is visible only in `/admin/season-lists`,
-   which shows a season with no members rather than an error. Run
+   which shows a season with no members rather than an error. Club leadership IS publicly
+   visible (`AFLDB-ISSUE-163` §19): for that window a club page shows no current leadership
+   block and its Captains history stops at the last pre-2027 season. After the replay,
+   revalidate `/clubs/<slug>` for every current identity, or accept the page's own ISR window
+   and state the choice in the promotion record. Run
    this step promptly, and run it **before** the `data_edits.row_id` remap: its
    `'coaches'` rows resolve through `coaches.afltables_coach_path`, its `'draft_picks'`
    rows through the selection's `<source key>|<player_url>|<draft_year>|<draft_kind>`, and

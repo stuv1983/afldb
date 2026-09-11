@@ -721,6 +721,252 @@ describe('AFLDB-ISSUE-160 source contract', () => {
       .map((m) => m[1]).sort()).toEqual(expectedTypes);
   });
 
+  test('AFLDB-ISSUE-163: exactly one INSERT INTO club_leadership in src/', () => {
+    // ONE writer is what makes "nothing else may appoint a captain" checkable
+    // at all, and a grep is the only check that stays true as the tree grows.
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        const code = fs.readFileSync(full, 'utf-8').replace(/\r\n/g, '\n')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+        if (/INSERT\s+INTO\s+club_leadership/i.test(code)) {
+          found.push(path.relative(root, full).split(path.sep).join('/'));
+        }
+      }
+    };
+    walk(path.join(root, 'src'));
+    expect(found).toEqual(['src/db/queries/admin-club-leadership.ts']);
+  });
+
+  test('AFLDB-ISSUE-163: leadership never mutates a list, a player or a match', () => {
+    // §12, the operator constraint of 2026-09-12. Appointing a leader is a
+    // statement about an office. It must not quietly write a season-list
+    // membership around its own precondition, mutate a player identity, or
+    // touch a match or a statistic.
+    const code = executableTypeScript(readSource('src/db/queries/admin-club-leadership.ts'));
+    for (const table of [
+      'season_list_members', 'players', 'external_identities', 'captaincies',
+      'matches', 'player_match_stats', 'club_seasons', 'seasons', 'clubs',
+    ]) {
+      expect(code, table).not.toMatch(new RegExp(
+        `INSERT\\s+INTO\\s+${table}\\b|UPDATE\\s+${table}\\b|DELETE\\s+FROM\\s+${table}\\b`, 'i',
+      ));
+    }
+    // There is NO hard-delete path anywhere: 'ended' and 'void' keep the row so
+    // its data_edits rows stay resolvable at a promotion lineage remap.
+    expect(code).not.toMatch(/DELETE\s+FROM\s+club_leadership/i);
+    // The durable identity is the one thing no statement may move. Asserted as
+    // "appointment_key is never an assignment target", not as a distance from
+    // the word SET: `WHERE appointment_key = ...` is legitimate and common, and
+    // a distance rule would either catch it or miss a real SET list.
+    expect(code).not.toMatch(/SET\s+appointment_key\s*=/i);
+    expect(code).not.toMatch(/\n\s*appointment_key\s*=[^=]/);
+    // The membership precondition is LOCKED, not merely read (§9, L-8): the
+    // lock is what stops a concurrent AFLDB-ISSUE-161 removal committing
+    // between the check and the appointment.
+    expect(code).toContain('FOR KEY SHARE');
+  });
+
+  test('AFLDB-ISSUE-163: one season boundary, and no public read reaches admin code', () => {
+    // §20.3 and operator clarification 2 of 2026-09-12. The boundary is ONE
+    // constant, derived from the season-list floor so leadership can never
+    // precede the lists, and it is declared exactly once.
+    const publicReads = readSource('src/db/queries/club-leadership.ts');
+    expect(publicReads).toContain('export const FIRST_LEADERSHIP_SEASON = FIRST_LIST_SEASON;');
+    expect(readSource('src/db/queries/admin-season-lists.ts'))
+      .toContain('export const FIRST_LIST_SEASON = 2027;');
+    // The writer re-exports it; it does not declare a second one.
+    const writer = readSource('src/db/queries/admin-club-leadership.ts');
+    expect(writer).not.toMatch(/const FIRST_LEADERSHIP_SEASON\s*=/);
+    expect(writer).toContain('export { FIRST_LEADERSHIP_SEASON };');
+
+    // The public module reads the public client only, and imports no admin
+    // mutation, override or audit code (§20.4).
+    const publicCode = executableTypeScript(publicReads);
+    expect(publicCode).not.toContain('data_overrides');
+    expect(publicCode).not.toContain('admin-club-leadership');
+    expect(publicCode).not.toContain('AFLDB_IMPORT_DATABASE_URL');
+
+    // The two public captain-history projections, ISOLATED.
+    //
+    // Scoping matters here and a whole-file search would be wrong: `awards.ts`
+    // legitimately carries `award_winners.is_vice_captain` (awards.ts:111), a
+    // REPRESENTATIVE-TEAM flag for All-Australian and 22 Under 22 selections —
+    // not club leadership at all (AFLDB-ISSUE-163 §2.1). Searching the file for
+    // the token `vice_captain` says nothing about either projection and fails on
+    // unrelated award functionality that must not change.
+    const awardsCode = executableTypeScript(readSource('src/db/queries/awards.ts'));
+
+    // §20.4: the public reads reach the public leadership module and never the
+    // admin writer.
+    expect(awardsCode).toContain("from '@/db/queries/club-leadership'");
+    expect(awardsCode).not.toContain('admin-club-leadership');
+
+    // Exactly two canonical reads exist, so a third projection cannot be added
+    // without a boundary and land outside this contract.
+    expect((awardsCode.match(/FROM club_leadership\b/g) ?? []).length).toBe(2);
+
+    const block = (from: string, to: string) => {
+      const start = awardsCode.indexOf(from);
+      const end = awardsCode.indexOf(to);
+      expect(start, from).toBeGreaterThan(-1);
+      expect(end, to).toBeGreaterThan(start);
+      return awardsCode.slice(start, end);
+    };
+    const projections: Record<string, string> = {
+      'getPlayerHonours captaincies':
+        block('WITH captaincy_rows AS (', 'SELECT * FROM captaincy_rows'),
+      getClubCaptains:
+        block('WITH lineage AS (', 'SELECT * FROM captain_rows'),
+    };
+
+    for (const [name, projection] of Object.entries(projections)) {
+      // One authority per season, enforced on BOTH arms of the union — the
+      // boundary is in the query, never a de-duplication by name afterwards.
+      expect(projection, name).toContain('cp.season < ${FIRST_LEADERSHIP_SEASON}::smallint');
+      expect(projection, name).toContain('l.season >= ${FIRST_LEADERSHIP_SEASON}::smallint');
+
+      // The canonical arm's own filter, from its FROM clause onwards. Asserted
+      // POSITIVELY: the only `l.role` predicate deciding which rows enter is the
+      // equality to 'captain', and the only `l.status` predicate excludes rows
+      // entered in error. A vice-captaincy therefore cannot reach a captain
+      // history however the rest of the file grows, and the proof does not
+      // depend on a token being absent from unrelated code.
+      const arm = projection.slice(projection.indexOf('FROM club_leadership'));
+      const predicates = (pattern: RegExp) =>
+        (arm.match(pattern) ?? []).map((line) => line.trim());
+      expect(predicates(/l\.role\b[^\n]*/g), name).toEqual(["l.role = 'captain'"]);
+      expect(predicates(/l\.status\b[^\n]*/g), name).toEqual(["l.status <> 'void'"]);
+      expect(arm, name).not.toMatch(/vice_captain/);
+    }
+  });
+
+  test('AFLDB-ISSUE-163: captaincies stays frozen below the canonical boundary', () => {
+    // §3, §23, R-14. The legacy Wikipedia manifest must never start answering a
+    // season club_leadership owns, or one season would have two authorities and
+    // the union would contradict itself. This is the pin.
+    const captaincies = readSource('tools/migration/captaincies.py');
+    const maxSeason = Number(/^MAX_SEASON = (\d{4})$/m.exec(captaincies)![1]);
+    const firstLeadership = Number(
+      /export const FIRST_LIST_SEASON = (\d{4});/
+        .exec(readSource('src/db/queries/admin-season-lists.ts'))![1],
+    );
+    expect(maxSeason).toBeLessThan(firstLeadership);
+    // And the legacy role vocabulary is untouched by this issue: widening it is
+    // a deliberate change to an honours import, not a side effect of leadership
+    // administration.
+    expect(captaincies).toContain('ROLES = {"Captain"}');
+    expect(captaincies).toContain('EXPECTED_TOTAL = 1774');
+    // Migration 098 does not touch the legacy table at all.
+    const migration = readSource('src/db/migrations/098_club_leadership.sql');
+    const sqlOnly = migration.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+    expect(sqlOnly).not.toMatch(/ALTER\s+TABLE\s+captaincies|INSERT\s+INTO\s+captaincies/i);
+    expect(sqlOnly).not.toMatch(/ALTER\s+TABLE\s+season_list_members/i);
+  });
+
+  test('AFLDB-ISSUE-163: the leadership replay fails closed, never deletes, never re-checks lists', () => {
+    expect(pyCommon).toContain('replay_admin_overrides(club_leadership): refusing to commit');
+    expect(pyCommon).toContain('player_identity does not resolve to exactly one player');
+    expect(pyCommon).toContain('club_slug does not resolve to exactly one club');
+    expect(pyCommon).toContain('payload appointment_key does not match the entity_key token');
+    expect(pyCommon).toContain('payload carries no valid role');
+    expect(pyCommon).toContain('payload carries no valid status');
+    expect(pyCommon).toContain('an active appointment cannot carry an end date');
+    expect(pyCommon).toContain('the appointment ends before it starts');
+
+    const branch = replayBranch(pyCommon, 'club_leadership');
+    expect(branch.length).toBeGreaterThan(0);
+    const branchCode = executablePython(branch);
+
+    // The refusal is computed over EVERY override and raised BEFORE any write,
+    // so a reload either honours every human decision or does none of it.
+    expect(branch.indexOf('raise RuntimeError')).toBeLessThan(branch.indexOf('INSERT INTO'));
+    expect(branch).toContain('unresolvable = [(key, problem)');
+
+    // NEVER deletes. An appointment persists through 'ended' and 'void'
+    // precisely so its data_edits rows stay resolvable at the lineage remap.
+    expect(branchCode).not.toMatch(/DELETE\s+FROM\s+club_leadership/i);
+    // Ended and void rows are RE-CREATED, not suppressed. Every leadership
+    // override is active, so the branch reads none of them by is_active, and
+    // neither write filters by status — the ONLY guard on the insert is the
+    // NOT EXISTS on the key.
+    expect(branchCode).not.toMatch(/o\.is_active/);
+    expect(branchCode).not.toMatch(/WHERE[^\n]*v->>'status'\s*=/);
+    // Guarded by NOT EXISTS, never ON CONFLICT: two active payloads naming one
+    // player-season are a contradiction between durable records and must
+    // surface through the partial unique index as the error they are.
+    expect(branch).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM club_leadership x/);
+    expect(branch).not.toMatch(/INSERT INTO club_leadership[\s\S]{0,1500}ON CONFLICT/);
+    // The identity is the one thing a replay may not move — asserted as
+    // "appointment_key is never an assignment target". `WHERE
+    // x.appointment_key = a.token` is how the UPDATE finds its row and must
+    // stay, so a distance-from-SET rule would refuse the correct code.
+    expect(branchCode).not.toMatch(/SET\s+appointment_key\s*=/);
+    expect(branchCode).not.toMatch(/\n\s*appointment_key\s*=/);
+    expect(branchCode).toMatch(/UPDATE club_leadership x\s*\n\s*SET season =/);
+
+    // §9, D-5. Membership is a precondition of MAKING an appointment, never a
+    // property of a recorded one: a replay that re-checked it would erase valid
+    // leadership history wherever a list was corrected afterwards, and would
+    // make AFLDB-ISSUE-161's removal destructive. The branch never reads it.
+    expect(branchCode).not.toContain('season_list_members');
+    // And no fuzzy fallback anywhere: an identity is resolved or refused.
+    expect(branchCode).not.toMatch(/ILIKE|similarity\(|soundex|levenshtein|display_name/i);
+  });
+
+  test('AFLDB-ISSUE-163: leadership is never derived, and the importer calls its replay', () => {
+    // Nothing recomputes an appointment, so no rebuild and no settle may touch
+    // the table — if either did, an administered captain would be erased
+    // nightly.
+    expect(readSource('tools/migration/rebuild_derived.py')).not.toContain('club_leadership');
+    expect(readSource('src/lib/acquisition/settle-afltables.ts')).not.toContain('club_leadership');
+    const inventory = readSource('tools/db/promotion-inventory.ts');
+    const derived = /DERIVED_FOOTBALL_TABLES: readonly string\[\] = \[([\s\S]*?)\]/.exec(inventory)![1];
+    expect([...derived.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]))
+      .not.toContain('club_leadership');
+
+    // ORDERING IS BINDING after players, because an appointment names its
+    // player by identity.
+    expect(pyFitzroy).toMatch(
+      /replay_admin_overrides\(pg, "players"\)[\s\S]{0,1600}replay_admin_overrides\(pg, "club_leadership"\)/,
+    );
+    // And the promotion runbook's replay loop names it, or a promoted database
+    // would hold no administered leadership at all.
+    expect(readSource('docs/production-promotion.md'))
+      .toMatch(/for table in \([^)]*'club_leadership'/);
+  });
+
+  test('AFLDB-ISSUE-163: the frozen leadership enumerations in the replay equal the migration', () => {
+    // common.py cannot read the database schema and still fail closed, so it
+    // carries copies. These are the assertions that stop them drifting.
+    const migration = readSource('src/db/migrations/098_club_leadership.sql');
+
+    const roleCheck = /CHECK \(role IN \(([^)]*)\)\)/.exec(migration)![1];
+    const expectedRoles = [...roleCheck.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
+    const roleBlock = pyCommon.slice(pyCommon.indexOf('LEADERSHIP_ROLES = ('));
+    expect([...roleBlock.slice(0, roleBlock.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort()).toEqual(expectedRoles);
+    expect(expectedRoles).not.toContain('co_captain');
+
+    const statusCheck = /CHECK \(status IN \(([^)]*)\)\)/.exec(migration)![1];
+    const expectedStatuses = [...statusCheck.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort();
+    const statusBlock = pyCommon.slice(pyCommon.indexOf('LEADERSHIP_STATUSES = ('));
+    expect([...statusBlock.slice(0, statusBlock.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort()).toEqual(expectedStatuses);
+
+    // The TypeScript writer carries the same two vocabularies.
+    const writer = readSource('src/db/queries/admin-club-leadership.ts');
+    const tsRoles = /LEADERSHIP_ROLES = \[([^\]]*)\]/.exec(writer)![1];
+    expect([...tsRoles.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()).toEqual(expectedRoles);
+    const tsStatuses = /LEADERSHIP_STATUSES = \[([^\]]*)\]/.exec(writer)![1];
+    expect([...tsStatuses.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort())
+      .toEqual(expectedStatuses);
+  });
+
   test('§8.3: a manual player is named by token in the ledger, never seeded twice', () => {
     expect(pyExport).toContain('"source": "manual_admin_edit", "external_id": manual_id');
     expect(pyDraftGuru).toContain('def resolve_manual_players(');

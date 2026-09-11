@@ -15,6 +15,42 @@ commit.
 
 ## [Unreleased]
 
+### Club captains and vice-captains become real records (AFLDB-ISSUE-163 Stage 1, ISSUE-156 P3e) - 12 September 2026
+
+- AFLDB has always shown club captains, but only as an imported honours list: 1,774 rows
+  transcribed from Wikipedia covering 1897-2026, captains only, matched by the spelling of a
+  person's name, with a free-text period such as "2022 (co-captain), 2023- (sole captain)". There
+  was no way to record who the captain *is*, to change one mid-season, to record a vice-captain, or
+  to say that a recorded captaincy had ended. Migration 098 adds `club_leadership`: one row asserts
+  *this player was appointed to this role, at this club, for this season*.
+- **Co-captains are simply two captains.** The role vocabulary is `captain` and `vice_captain`, and
+  nothing else. Two people holding the office at once is two captain appointments -- which is how
+  the existing data already describes it -- so a co-captaincy needs no special row type, and a
+  co-captain who becomes the sole captain needs no rewriting. A club may name as many vice-captains
+  as it actually has.
+- **"Current" means the record says so, not that a date has passed.** An appointment is `active`,
+  `ended` or `void`, and the public page reads the status. Start and end dates are evidence and are
+  optional: a captain announced in December with no date attached is stored with no date, never with
+  an invented 1 January.
+- **Nothing is ever deleted, and a mistake is not the same as a change.** An appointment that really
+  finished is `ended` and stays as history; a row entered in error is `void` and also stays, marked
+  as never having been valid, with the reason recorded. A mid-season change of captain keeps both
+  people: the outgoing appointment ends, the incoming one begins, and both remain true.
+- **A leader is chosen from the club's own list.** A player can only be appointed while they hold
+  that club's playing-list place for that season. If they are later removed from the list or
+  transferred, the appointment stands -- it is the record of who held the office, and it is not
+  silently rewritten by a later correction to the list.
+- **Public pages never answer one season from two sources.** Seasons before 2027 come from the
+  historical honours record exactly as they do today; 2027 onwards comes from the new one. The club
+  page's captains table and a player's captaincy honours both use that same boundary, so nothing is
+  duplicated at the join and a 2027 captaincy is a captaincy honour like any other. The honours
+  import itself is untouched, and a vice-captaincy never appears as a captaincy.
+- Every appointment is durably recorded and is re-created by the same replay that restores
+  administered coaches, players, draft selections and playing lists, so a rebuild or a production
+  promotion cannot lose one -- including the ended and void ones.
+- Backend only so far: the administration screens and the club page's leadership block are the next
+  stage, and nothing is user-visible yet.
+
 ### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
 
 - Until now AFLDB could not represent a match that had not been played. `matches` requires

@@ -225,6 +225,7 @@ player-links fix moved it out of the action path).
 | P3 | player pages, club season pages, coach pages | tag/path revalidation after commit, outside the action's pending path |
 | P3b | `/players/[slug]` (ISR 1h) and `/sitemap.xml`; `/draft`, `/draft/[year]`, `/players` are `force-dynamic` and need nothing | same shape as P3 (`revalidatePaths` returned by the action, POSTed to a bounded allowlisted route afterwards) |
 | P3d | **none** — `fixtures` has no public reader at all (`AFLDB-ISSUE-162.md` §22, D-7) | **none**; no Server Action in P3d revalidates a public path |
+| P3e | `/clubs/[slug]` (ISR 24h): a current-leadership block and the Captains history union; `/players/[slug]` (ISR 1h): captaincy honours from 2027 (`AFLDB-ISSUE-163.md` §20, §32.7) | path-based `/clubs/<slug>` for **every identity of the affected organisation**, computed server-side in the mutation and POSTed to a capability-gated allowlisted `/admin/season-lists/revalidate` after the action resolves — never `revalidatePath` inside the action, never a broad sweep. `/players/[slug]` rides its own ISR window; a leadership change does not revalidate it |
 | P4 | player pages, records pages, match pages | same |
 | P5 | player pages, honours pages, season pages | same |
 | P6 | root layout / content pages | reuse existing `/admin/content` root-layout revalidation |
@@ -277,7 +278,14 @@ P2 (158) ──┤     │
   via `afldb_season_list_clubs()`, reused unchanged. It adds the `fixtures` table, has no public
   consumer in either direction, and adds a `fixture_key` lineage identity rule so a `data_edits`
   row about a fixture survives a promotion remap — see `AFLDB-ISSUE-162.md` §20.
-- P3, P3d, P4, P5, P7, P9, P10 each add a table or a NOT NULL football reference and therefore
+- P3e (`AFLDB-ISSUE-163`) sits after P3d and depends on P3c for two things: `afldb_season_list_clubs()`
+  (same one eligibility rule) and `season_list_members` as the write-time precondition of an
+  appointment — a precondition only, never a foreign key, so ISSUE-161's removal contract is
+  untouched and the leadership replay deliberately does not re-check it. It depends on P3b for
+  `resolvePlayerIdentity` and on P3d only for precedent. It adds the `club_leadership` table and an
+  `appointment_key` lineage identity rule, and it is the first phase of this batch with a PUBLIC
+  consumer — see `AFLDB-ISSUE-163.md` §19, §20, §32.
+- P3, P3d, P3e, P4, P5, P7, P9, P10 each add a table or a NOT NULL football reference and therefore
   **must add a `tools/db/promotion-inventory.ts` classification entry in the same change**
   (see ISSUE-151 dependency below). P1, P2, P6, P8, P11, P12 are not affected.
 - P12 runs last and is the only phase that re-runs the full permission audit across all
@@ -764,4 +772,65 @@ Playwright (three roles × 320/768/1000/1280/1920) once the operator updates DEV
 Centre batch — deliberately deferred, not a defect. P3d is validated and completed before the batch
 is considered closed; the combined DEV deployment rule covers P3b, P3c and P3d together, and no
 part of it reaches DEV or PROD until the operator confirms the batch. P4–P12 remain unallocated
+placeholders.
+
+### P3e handoff contract — AFLDB-ISSUE-163: Club leadership administration
+
+Allocated 2026-09-12 as the supplemental child **P3e**, after P3d. The authoritative contract is
+`AFLDB-ISSUE-163.md`; this is the umbrella's summary. Stacked on P3d (branch
+`opus/issue-163-club-leadership`, worktree `D:\dev\afldb-issue-163`, cut from `f80a1df`), and
+**the combined-batch rule remains binding: no Admin/Super Admin change from P3b, P3c, P3d or P3e
+reaches DEV or PROD until the operator confirms the batch.**
+
+**P3e is the first item in this batch with PUBLIC OUTPUT.** P3b, P3c and P3d are admin-only —
+`fixtures` has no public reader at all, and season lists have none yet — so the batch's acceptance
+was until now entirely behind `/admin`. P3e changes two public surfaces: the club page (a current
+leadership block, and its existing Captains history table becoming a two-source union) and the
+player page (captaincy honours). The combined DEV acceptance therefore gains the public club page
+before and after an appointment, the history union across the season boundary, the player honours
+boundary, and the revalidation proof — with the `dev-beta-gate-breaks-isr-measurement` precaution
+(a minted beta cookie and a control club) for any ISR measurement.
+
+**Finding that shaped it:** a captaincy model already existed. `captaincies` (migration 005) holds
+1,774 Wikipedia rows for 1897–2026, `Captain`-only, keyed on a raw player NAME, with `season` a FK
+to the reference register, free-text periods and no lifecycle, already rendered on club and player
+pages. It is a historical honours import, not operational truth, and extending it would have broken
+five separate contracts at once. P3e therefore adds a separate canonical registry and the two
+coexist by a **hard season boundary** — legacy answers ≤ 2026, canonical answers ≥ 2027, never
+both — built into the queries rather than applied afterwards as a de-duplication by name.
+
+**Stage 1 BUILT 2026-09-12 (Opus 5 high) — uncommitted, NOT yet validated by a run, migration 098
+applied nowhere.** Operator signed off D-1…D-18 with four clarifications (capability reuse; the
+hard source boundary; explicit lifecycle/date consistency; and no 2027+ hole in player honours).
+Delivered: migration **098** (`club_leadership`, its CHECKs including "an active appointment
+carries no end date", the partial `UNIQUE (season, player_id) WHERE status='active'` that keeps
+co-captaincy representable, and both CHECK widenings retaining every literal);
+`src/db/queries/admin-club-leadership.ts` as the single leadership mutation contract (appoint,
+replace, end, reinstate, correct, void — CAS on `updated_at`, `FOR KEY SHARE` on the season-list
+membership, `RollbackRefusal` for every post-write refusal, `revalidatePaths` returned and never
+performed); `src/db/queries/club-leadership.ts` plus the season-boundary union in **both**
+`getClubCaptains` and `getPlayerHonours`; the additive `activeLeadershipRole` column in
+`readClubSeasonList`; the fail-closed `replay_admin_overrides('club_leadership')` branch, its
+fitzRoy call site after `players`, and the `appointment_key` lineage rule, `data_edits` target,
+acceptance checklist and §8 runbook text; a new integration suite and three contract-suite
+extensions. **No stop condition fired**, and **no P3c or P3d file changed in a way that alters
+their contracts** — ISSUE-161 gained one additive read-only column and nothing else, and its
+removal and transfer remain permitted (leadership warns, never blocks, because an appointment is
+historical validity rather than current eligibility).
+
+**Capabilities:** none added. P3e reuses `data.seasonLists.read` / `.edit`, so §2's capability
+table, the nav order and the ISSUE-158 scanner surface are all unchanged.
+
+**Promotion/replay:** P3e adds one entity to the replay loop and one lineage identity. The §8 order
+is now `('players', 'matches', 'draft_picks', 'season_list_members', 'club_leadership', 'coaches',
+'match_coaches', 'fixtures')`; `club_leadership` is binding after `players` only, and deliberately
+does **not** depend on `season_list_members`, so there is no ordering cycle. Deploy order for the
+batch is now **096 → 097 → 098 → `npm run db:privileges` → code**.
+
+Next: the operator runs the Stage 1 validation of `AFLDB-ISSUE-163.md` §32.11 (apply 098 to
+`afldb_test` only, `db:privileges`, tsc, the contract suites, the integration suites, ESLint),
+reviews and commits, then Stage 2 (Leadership section and Appoint panel on the season-list club
+page, the Captain column on the season overview, the capability-gated
+`/admin/season-lists/revalidate` route, the public `ClubLeadership` block, and
+`tests/admin-club-leadership-actions.test.ts`) in a fresh session. P4–P12 remain unallocated
 placeholders.

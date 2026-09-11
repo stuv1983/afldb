@@ -197,7 +197,13 @@ function testCeilingSeason(): number | null {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-async function readListSeasonBounds(db: postgres.Sql | Tx): Promise<ListSeasonBounds> {
+/**
+ * Exported for AFLDB-ISSUE-163 (§10): club leadership is administrable for
+ * exactly the seasons whose lists are, so it reads THIS function rather than
+ * carrying a copy. One rule, one test-only ceiling, and no state in which a
+ * club's list may be administered for a season its leadership may not.
+ */
+export async function readListSeasonBounds(db: postgres.Sql | Tx): Promise<ListSeasonBounds> {
   // One cast, here: `postgres.Sql` and `TransactionSql` carry the same tagged
   // template call signature but TypeScript will not call it through the union.
   const [row] = await (db as postgres.Sql)<{ maxYear: number | null }[]>`
@@ -1125,6 +1131,18 @@ export type SeasonListMemberRow = {
   draftPickId: number | null;
   /** True when the player holds a `manual_admin_edit` identity and no AFL Tables one. */
   awaitingIdentity: boolean;
+  /**
+   * AFLDB-ISSUE-163 §9. The ACTIVE leadership role this member holds at this
+   * club for this season, or null. Read-only and additive: it changes no
+   * membership invariant, and it is what lets the member table badge a captain
+   * and the Remove/Transfer confirm warn that an appointment exists.
+   *
+   * It WARNS, it never blocks — AFLDB-ISSUE-161's removal and transfer
+   * contracts are untouched, and an appointment survives the membership going
+   * away because an appointment is historical validity, not current
+   * eligibility.
+   */
+  activeLeadershipRole: 'captain' | 'vice_captain' | null;
 };
 
 /**
@@ -1152,7 +1170,11 @@ export async function readClubSeasonList(
                          WHERE e.player_id = p.id AND s.key = 'afltables'
                            AND e.match_method = 'afltables_profile_url'
                            AND e.status IN ('unique', 'resolved')))
-             AS "awaitingIdentity"
+             AS "awaitingIdentity",
+           (SELECT l.role FROM club_leadership l
+             WHERE l.season = m.season AND l.club_id = m.club_id AND l.player_id = m.player_id
+               AND l.status = 'active'
+             ORDER BY l.role LIMIT 1) AS "activeLeadershipRole"
       FROM season_list_members m
       JOIN clubs c ON c.id = m.club_id
       JOIN players p ON p.id = m.player_id

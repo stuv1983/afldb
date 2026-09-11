@@ -48,7 +48,15 @@ export type DataEditTableName =
   // the whole point is that the match may not exist. row_id = fixtures.id
   // therefore always resolves, through the fixture_key lineage rule in
   // tools/db/promotion-inventory.ts.
-  | 'fixtures';
+  | 'fixtures'
+  // Club leadership administration (migration 098, AFLDB-ISSUE-163 §15). The
+  // fixtures shape again, and for the same two reasons: an appointment is NEVER
+  // deleted (ended and void keep the row), and it has no allowlisted parent row
+  // to be a property OF -- it is deliberately not a property of the player,
+  // because the row is about a club, a season and an office, and one person may
+  // hold several. row_id = club_leadership.id therefore always resolves,
+  // through the appointment_key lineage rule in tools/db/promotion-inventory.ts.
+  | 'club_leadership';
 
 /**
  * The same allowlist as a runtime value, for the read side
@@ -67,6 +75,7 @@ export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
   'brownlow_season_authority',
   'coaches',
   'fixtures',
+  'club_leadership',
 ];
 
 export function isDataEditTableName(value: string): value is DataEditTableName {

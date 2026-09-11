@@ -3646,6 +3646,7 @@ const overridesMigration = readSource('src/db/migrations/073_data_overrides.sql'
 const coachAdminMigration = readSource('src/db/migrations/095_coach_admin_overrides.sql');
 const seasonListMigration = readSource('src/db/migrations/096_season_list_members.sql');
 const fixtureMigration = readSource('src/db/migrations/097_fixtures.sql');
+const leadershipMigration = readSource('src/db/migrations/098_club_leadership.sql');
 
 /** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
 function entityTypeCheck(...entities: readonly string[]): string {
@@ -3667,6 +3668,11 @@ const CHECK_AFTER_096 = entityTypeCheck(
 const CHECK_AFTER_097 = entityTypeCheck(
   'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
   'fixtures',
+);
+/** The CHECK as migration 098 leaves it — the post-098 database (AFLDB-ISSUE-163). */
+const CHECK_AFTER_098 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership',
 );
 
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
@@ -3702,15 +3708,24 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect(fixtureMigration).toMatch(
       /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures'\s*\)\)/,
     );
-    // And the three unrepresentable settle targets are still absent from it.
+    // 098 widens it forward again, retaining every literal 097 left
+    // (AFLDB-ISSUE-163 §22). `club_leadership` is a captain or vice-captain
+    // appointment, not a settle target — nothing in the nightly settle reads or
+    // writes it — so admitting it changes no answer below.
+    expect(leadershipMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership'\s*\)\)/,
+    );
+    // And the three unrepresentable settle targets are still absent from both.
     for (const settleTarget of [
       'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
     ]) {
-      const widening = fixtureMigration.slice(
-        fixtureMigration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
-      );
-      expect(widening.slice(0, widening.indexOf('));')), settleTarget)
-        .not.toContain(settleTarget);
+      for (const migration of [fixtureMigration, leadershipMigration]) {
+        const widening = migration.slice(
+          migration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
+        );
+        expect(widening.slice(0, widening.indexOf('));')), settleTarget)
+          .not.toContain(settleTarget);
+      }
     }
     // The documented inventory names the same entities the database now admits.
     // As a SET: the inventory is written in the order §3.1/§16.1 states it, and
@@ -3720,9 +3735,9 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     // different hat, and it would re-create the deploy window §3.1 removed.
     expect([...OVERRIDE_ENTITY_TYPES])
       .toEqual(['coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
-        'season_list_members']);
+        'season_list_members', 'club_leadership']);
     expect([...OVERRIDE_ENTITY_TYPES].sort())
-      .toEqual(checkAdmittedEntities([CHECK_AFTER_097]));
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_098]));
     // And the order-independence D-1 requires, stated as a fact rather than a
     // hope: the settle's answer is identical against the pre-096 and pre-097
     // constraints, so each migration and its code may deploy in either order.
@@ -3730,11 +3745,13 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
       overrideScopeProvenFrom([CHECK_AFTER_096]));
     expect(overrideScopeProvenFrom([CHECK_AFTER_096])).toBe(
       overrideScopeProvenFrom([CHECK_AFTER_097]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_097])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_098]));
     // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
     // exact-set proof has no safe deploy order in either direction, so the proof
     // itself must not consult this list at all.
-    const module = readSource('src/lib/acquisition/manual-authority.ts');
-    const proof = module.slice(module.indexOf('export function overrideScopeProvenFrom'));
+    const moduleCode = readSource('src/lib/acquisition/manual-authority.ts');
+    const proof = moduleCode.slice(moduleCode.indexOf('export function overrideScopeProvenFrom'));
     expect(proof.length).toBeGreaterThan(0);
     expect(proof.slice(0, proof.indexOf('\n}'))).not.toContain('OVERRIDE_ENTITY_TYPES');
   });
