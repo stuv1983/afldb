@@ -33,18 +33,23 @@ import {
   AFLTABLES_PROFILE_PATH_RE,
   DRAFT_EVENT_PAIRS,
   DRAFT_KINDS,
+  DRAFT_LIST_STATES,
   MANUAL_SOURCE_KEY,
   MIN_DRAFT_YEAR,
   NO_DRAFT_YEARS,
   NULL_PICK_KINDS,
   checkNewPlayerDuplicates,
   checkSelectionConflicts,
+  isDraftListState,
   manualEntityKey,
   manualPlayerUrl,
+  needsPlayerLinkReview,
+  playerLinksHref,
   provenanceOf,
   sourcePickEntityKey,
   trackedProfilePaths,
 } from '@/db/queries/admin-draft';
+import { UNRESOLVED_LINK_STATUSES } from '@/db/queries/player-links';
 
 type Responder = (text: string) => unknown[];
 
@@ -437,5 +442,55 @@ describe('Stage 2: isAllowedRevalidatePath (/admin/draft/revalidate)', () => {
   it('refuses a case mismatch rather than normalising it', () => {
     expect(isAllowedRevalidatePath('/Players/chris-fagan-123')).toBe(false);
     expect(isAllowedRevalidatePath('/Sitemap.xml')).toBe(false);
+  });
+});
+
+
+describe('Stage 2: the §18 list review states', () => {
+  it('admits exactly the three states the runbook names, and nothing else', () => {
+    expect([...DRAFT_LIST_STATES]).toEqual(['override', 'duplicate', 'awaiting-identity']);
+    for (const state of DRAFT_LIST_STATES) expect(isDraftListState(state)).toBe(true);
+  });
+
+  it('refuses anything else, so a hand-typed query string cannot widen the filter', () => {
+    for (const bad of ['', 'Override', 'awaiting_identity', 'legacy', 'all', 'true', '1']) {
+      expect(isDraftListState(bad)).toBe(false);
+    }
+  });
+});
+
+describe('Stage 2: needsPlayerLinkReview / playerLinksHref (the §18 deep link)', () => {
+  it('offers the queue for a SOURCE-OWNED selection in an unresolved link status', () => {
+    for (const linkStatusValue of UNRESOLVED_LINK_STATUSES) {
+      expect(needsPlayerLinkReview({ provenance: 'draftguru', linkStatusValue })).toBe(true);
+    }
+  });
+
+  it('never offers it for a selection /admin/draft itself owns', () => {
+    // Manual rows always carry a player and are relinked by 6.4; legacy rows
+    // are repaired by 6.8. Neither belongs in the person-grained queue.
+    for (const linkStatusValue of [...UNRESOLVED_LINK_STATUSES, 'resolved', 'unique']) {
+      expect(needsPlayerLinkReview({ provenance: 'manual', linkStatusValue })).toBe(false);
+      expect(needsPlayerLinkReview({ provenance: 'legacy', linkStatusValue })).toBe(false);
+    }
+  });
+
+  it('never offers it for a source row that is already linked', () => {
+    expect(needsPlayerLinkReview({ provenance: 'draftguru', linkStatusValue: 'resolved' })).toBe(false);
+    expect(needsPlayerLinkReview({ provenance: 'draftguru', linkStatusValue: 'unique' })).toBe(false);
+  });
+
+  it('builds only the two parameters /admin/player-links actually supports', () => {
+    expect(playerLinksHref({ playerNameRaw: 'Chris Fagan' }))
+      .toBe('/admin/player-links?table=draft_picks&q=Chris%20Fagan');
+  });
+
+  it('encodes a name that would otherwise alter the query string', () => {
+    const href = playerLinksHref({ playerNameRaw: "O'Brien & Sons #1" });
+    expect(href.startsWith('/admin/player-links?table=draft_picks&q=')).toBe(true);
+    // One `q`, no injected parameter, and the name survives a round trip.
+    const url = new URL(href, 'https://example.invalid');
+    expect([...url.searchParams.keys()]).toEqual(['table', 'q']);
+    expect(url.searchParams.get('q')).toBe("O'Brien & Sons #1");
   });
 });

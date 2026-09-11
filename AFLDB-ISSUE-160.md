@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** **Stage 1 and Stage 2 IMPLEMENTED 2026-09-11 — uncommitted, not deployed, not merged.** Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Stage 2 delivers `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, `/admin/draft/revalidate`; capabilities `data.draft.read`/`data.draft.edit` (gate 4, now done); the Data-group nav entry; the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving); and the `/admin/data-editor` draft-slice UI removal (D-5 UI half). Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gates 15–16 (deferred by the operator's Admin Centre release-batching decision, not by any defect), and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record*, *Stage 2 implementation record* and *Validation*.
+**Status:** **Stage 1 and Stage 2 CODE-COMPLETE and locally validated — committed 2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`) on `opus/issue-160-draft-admin`; not deployed, not merged.** A local completion audit followed on 2026-09-11 (Opus 5 high) and found one real atomicity defect, eight new ESLint errors and two undelivered §18 list items; the defects are fixed and, on the operator's direction, **both §18 gaps are now implemented** — all uncommitted for operator review. See `issues.md` → AFLDB-ISSUE-160 → *Local completion audit* and *§18 list-contract closure*. Every remaining gate is a deliberately deferred external one. Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Stage 2 delivers `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, `/admin/draft/revalidate`; capabilities `data.draft.read`/`data.draft.edit` (gate 4, now done); the Data-group nav entry; the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving); and the `/admin/data-editor` draft-slice UI removal (D-5 UI half). Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gates 15–16 (deferred by the operator's Admin Centre release-batching decision, not by any defect), and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record*, *Stage 2 implementation record* and *Validation*.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Created:** 2026-09-11
@@ -747,12 +747,24 @@ run only then. Stage 1 and Stage 2 are committed on `afldb_test` + typecheck evi
 
 ## Next action
 
-**Stage 1 and Stage 2 are implemented and awaiting operator review and commit** (2026-09-11).
+**Stage 1 and Stage 2 are implemented and committed** (`91935b9`, `a947e52`, 2026-09-11) **and
+audited locally** (2026-09-11). The audit's two narrow fixes and this tracking update are
+uncommitted and await operator review; nothing is pushed, merged or deployed.
+
+Two runbook §18 list-contract items were found NOT delivered by the audit and, on the
+operator's direction (2026-09-11), **both are now implemented**: the list `state` filter
+(`override` = an active durable correction, `duplicate` = J-14 exactly, `awaiting-identity` =
+a `manual_admin_edit` identity with no `afltables` one), each derived in SQL from rows the
+database already holds; and the deep link from an unresolved source-owned selection to
+`/admin/player-links?table=draft_picks&q=<player_name_raw>`, using only parameters that page
+already supports. No migration, no persisted workflow state and no new mutation path. Full
+record: `issues.md` → *§18 list-contract closure*.
+
 The implementation record for both stages — preflight results, the gate-2 probe table, the D-8
 branch selection and why, the real defects found (and, for Stage 2, the one self-caught test-file
-overwrite corrected before commit), the deviations above, and the gate-by-gate result — is in
-`issues.md` under AFLDB-ISSUE-160. Nothing is committed, pushed, merged or deployed, and neither
-DEV nor PROD was touched.
+overwrite corrected before commit), the deviations above, the gate-by-gate result and the local
+completion audit — is in `issues.md` under AFLDB-ISSUE-160. Nothing is pushed, merged or
+deployed, and neither DEV nor PROD was touched.
 
 Stage 2 delivered `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]` and the create-player
 wizard; `data.draft.read` and `data.draft.edit` plus the nav entry (gate 4); the D-9 shared

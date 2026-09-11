@@ -34,7 +34,7 @@ export function SupersedePanel({
     <section className="section">
       <h2>Duplicate selection detected</h2>
       <p className="muted" style={{ fontSize: '0.85rem' }}>
-        DraftGuru now lists a source-owned selection #{sourcePickId} ("{sourcePlayerNameRaw}") for
+        DraftGuru now lists a source-owned selection #{sourcePickId} (&ldquo;{sourcePlayerNameRaw}&rdquo;) for
         the same player, year and kind as this manual selection. Superseding links the source
         selection to the player and retires this manual one — leaving exactly one selection for
         this event, never two and never none.

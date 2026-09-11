@@ -39,6 +39,9 @@ import {
   listManualPlayersAwaitingIdentity,
   manualEntityKey,
   type ManualPickFields,
+  needsPlayerLinkReview,
+  playerLinksHref,
+  readActiveDraftOverrideKeys,
   readDraftOverrides,
   retireManualPick,
   retireSourcePickOverride,
@@ -1060,6 +1063,43 @@ describe('gate 8: every mutation is all-or-nothing', () => {
     expect(record?.overrideValues).not.toHaveProperty('afltables_profile_path');
   });
 
+  it('6.5 rolls the identity back when the refusal is found AFTER the insert', async () => {
+    // The late-refusal path: a manual player whose durable record is missing, so
+    // the override UPDATE matches nothing and 6.5 refuses -- but only after its
+    // `external_identities` INSERT has already run. `postgres.js` commits when
+    // the `begin()` callback RESOLVES, so a returned refusal here would attach
+    // the AFL Tables identity with no `data_edits` row and tell the operator it
+    // failed. The refusal must roll back (§9.1).
+    const created = await createPlayerAndDraftPick({
+      ...manualFields({ pickNumber: 206 }),
+      player: { displayName: `${MARKER} Recordless`, dob: '1997-05-05' },
+      adminUserId: actorId,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    createdPlayerIds.add(created.playerId);
+    createdPickIds.add(created.pickId);
+
+    await admin`
+      DELETE FROM data_overrides
+       WHERE entity_type = 'players' AND entity_key = ${manualEntityKey(created.playerToken)}
+         AND field_group = 'identity'`;
+
+    const path = `players/R/${MARKER}-Recordless0.html`;
+    const result = await attachAflTablesIdentity({
+      playerId: created.playerId, profilePath: path, adminUserId: actorId,
+    });
+    expect(result).toMatchObject({ ok: false, reason: 'conflict' });
+
+    const [after] = await sql<{ identities: number; audits: number }[]>`
+      SELECT (SELECT count(*) FROM external_identities WHERE external_id = ${path})::int AS identities,
+             (SELECT count(*) FROM data_edits
+               WHERE table_name = 'players' AND row_id = ${created.playerId}
+                 AND field_group = 'source_identity')::int AS audits`;
+    expect(after.identities, 'the identity must not be attached by a refused action').toBe(0);
+    expect(after.audits, 'no audit row means no write may have survived').toBe(0);
+  });
+
   it('6.8 rolls back the pick UPDATE, both records and both audits', async () => {
     const [player] = await admin<{ id: number }[]>`
       INSERT INTO players (display_name, search_name, sort_name, slug)
@@ -1436,5 +1476,210 @@ describe('gate 12: the lineage rules resolve these rows on a real database', () 
       { id: number; identity: string }[];
     expect(both).toHaveLength(1);
     expect(both[0].identity).toBe(path);
+  });
+});
+
+
+// -------------------------------------------------------------------------
+// §18 - the list review states and the Player-links deep link
+// -------------------------------------------------------------------------
+
+describe('the /admin/draft list review states (§18)', () => {
+  let overridePickId = 0;
+  let awaitingPickId = 0;
+  let awaitingPlayerId = 0;
+  let duplicatePickId = 0;
+  let duplicatePlayerId = 0;
+  let duplicateSourcePickId = 0;
+  let unlinkedSourcePickId = 0;
+
+  beforeAll(async () => {
+    // `override` WITHOUT `awaiting-identity`: a manual selection for a player
+    // who already holds an AFL Tables identity. Every manual selection carries
+    // an active `selection` record, and this player is not awaiting one, so the
+    // three states stay independently observable.
+    //
+    // Its own player, not the suite's shared `sourcedPlayerId`: earlier tests
+    // leave that one holding selections in several kinds (the 6.4 relink test
+    // moves one onto them), and J-1 rightly refuses a second selection for one
+    // player in one (year, kind). A dedicated player keeps this block's
+    // fixtures independent of what ran before it.
+    const [overridePlayer] = await admin<{ id: number }[]>`
+      INSERT INTO players (display_name, search_name, sort_name, slug)
+      VALUES (${MARKER + ' State Sourced'},
+              afldb_normalise_name(${MARKER + ' State Sourced'}),
+              ${MARKER + ' State Sourced'}, ${MARKER.toLowerCase() + '-state-sourced'})
+      RETURNING id`;
+    createdPlayerIds.add(overridePlayer.id);
+    await admin`
+      INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+      VALUES ((SELECT id FROM sources WHERE key = 'afltables'),
+              ${'players/T/' + MARKER + '-State0.html'}, ${overridePlayer.id},
+              'unique', 'afltables_profile_url')`;
+
+    const withOverride = await createManualPick({
+      ...manualFields({ pickNumber: 301, draftKind: 'trade', draftType: 'Trade' }),
+      playerId: overridePlayer.id, adminUserId: actorId,
+    });
+    expect(withOverride.ok, JSON.stringify(withOverride)).toBe(true);
+    if (!withOverride.ok) return;
+    overridePickId = withOverride.pickId;
+    createdPickIds.add(overridePickId);
+
+    // `awaiting-identity`: a manually created player, which by construction
+    // holds a manual_admin_edit identity and no AFL Tables one.
+    const awaiting = await createPlayerAndDraftPick({
+      ...manualFields({ pickNumber: 302, draftKind: 'preseason', draftType: 'Pre-Season' }),
+      player: { displayName: MARKER + ' State Awaiting', dob: '2002-06-06' },
+      adminUserId: actorId,
+    });
+    expect(awaiting.ok, JSON.stringify(awaiting)).toBe(true);
+    if (!awaiting.ok) return;
+    awaitingPickId = awaiting.pickId;
+    awaitingPlayerId = awaiting.playerId;
+    createdPickIds.add(awaitingPickId);
+    createdPlayerIds.add(awaitingPlayerId);
+
+    // `duplicate` (J-14): the manual row goes in first, then DraftGuru publishes
+    // the same selection and it is linked to the same player -- exactly the
+    // sequence the state exists to surface, and the one 6.6/6.7 resolve.
+    const dup = await createPlayerAndDraftPick({
+      ...manualFields({ pickNumber: 303, draftKind: 'post_draft', draftType: 'Post-Draft' }),
+      player: { displayName: MARKER + ' State Duplicate', dob: '2003-07-07' },
+      adminUserId: actorId,
+    });
+    expect(dup.ok, JSON.stringify(dup)).toBe(true);
+    if (!dup.ok) return;
+    duplicatePickId = dup.pickId;
+    duplicatePlayerId = dup.playerId;
+    createdPickIds.add(duplicatePickId);
+    createdPlayerIds.add(duplicatePlayerId);
+
+    const [source] = await admin<{ id: number }[]>`
+      INSERT INTO draft_picks
+        (draft_year, draft_type, draft_kind, pick_number, player_name_raw, player_id,
+         link_status_value, club_id, source_id, source_record_id, player_url)
+      VALUES (${fixtureYear}, 'Post-Draft', 'post_draft', 304,
+              ${MARKER + ' State Duplicate'}, ${duplicatePlayerId}, 'resolved', ${clubId},
+              ${draftguruSourceId}, ${MARKER + '#3'}, ${SOURCE_URL.replace('/1', '/3')})
+      RETURNING id`;
+    duplicateSourcePickId = source.id;
+    createdPickIds.add(duplicateSourcePickId);
+
+    // An UNLINKED source-owned selection -- the only shape whose next action
+    // belongs to /admin/player-links. The suite's other unlinked source row is
+    // linked by the 6.7 supersede test before this block runs, so this one is
+    // created here rather than depended upon.
+    const [unlinked] = await admin<{ id: number }[]>`
+      INSERT INTO draft_picks
+        (draft_year, draft_type, draft_kind, pick_number, player_name_raw,
+         link_status_value, club_id, source_id, source_record_id, player_url)
+      VALUES (${fixtureYear}, 'Training Squad Selection', 'training_squad_selection', 305,
+              ${MARKER + ' State Unlinked'}, 'unmatched', ${clubId},
+              ${draftguruSourceId}, ${MARKER + '#4'}, ${SOURCE_URL.replace('/1', '/4')})
+      RETURNING id`;
+    unlinkedSourcePickId = unlinked.id;
+    createdPickIds.add(unlinkedSourcePickId);
+  });
+
+  it('state=override returns EXACTLY the rows whose entity key carries an active record', async () => {
+    // The pin between the two derivations of one key shape: the SQL predicate
+    // inside `listDraftPicksForAdmin` and `entityKeyFor()`, which produces the
+    // `entityKey` the page renders its badge from. If they ever disagree, this
+    // fails.
+    const activeKeys = await readActiveDraftOverrideKeys();
+    const all = await listDraftPicksForAdmin({ year: fixtureYear, page: 1, pageSize: 200 });
+    const expected = all.rows.filter((r) => r.entityKey !== null && activeKeys.has(r.entityKey));
+
+    const filtered = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'override', overrideKeys: [...activeKeys], page: 1, pageSize: 200,
+    });
+    expect(filtered.rows.map((r) => r.id).sort((a, b) => a - b))
+      .toEqual(expected.map((r) => r.id).sort((a, b) => a - b));
+    expect(filtered.total).toBe(expected.length);
+    expect(filtered.rows.map((r) => r.id)).toContain(overridePickId);
+  });
+
+  it('state=override with no active keys returns nothing rather than everything', async () => {
+    const filtered = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'override', overrideKeys: [], page: 1, pageSize: 200,
+    });
+    expect(filtered.rows).toEqual([]);
+    expect(filtered.total).toBe(0);
+  });
+
+  it('state=duplicate returns the manual row whose player also holds a source selection', async () => {
+    const { rows, total } = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'duplicate', page: 1, pageSize: 200,
+    });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(duplicatePickId);
+    // The source-owned half is not itself the duplicate: the manual row is the
+    // one to retire or supersede.
+    expect(ids).not.toContain(duplicateSourcePickId);
+    // A manual selection with no source-owned sibling is not a duplicate.
+    expect(ids).not.toContain(overridePickId);
+    expect(ids).not.toContain(awaitingPickId);
+    expect(rows.every((r) => r.provenance === 'manual')).toBe(true);
+    expect(total).toBe(rows.length);
+  });
+
+  it('state=awaiting-identity follows the identity rows, not the names', async () => {
+    const { rows } = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'awaiting-identity', page: 1, pageSize: 200,
+    });
+    const ids = rows.map((r) => r.id);
+    expect(ids).toContain(awaitingPickId);
+    // The sourced player shares no identity gap: they hold an AFL Tables path.
+    expect(ids).not.toContain(overridePickId);
+
+    // Every row it returns names a player the D-2 guard would also treat as
+    // awaiting identity -- one predicate, two readers.
+    const awaiting = new Set((await listManualPlayersAwaitingIdentity()).map((p) => p.playerId));
+    expect(rows.every((r) => r.playerId !== null && awaiting.has(r.playerId))).toBe(true);
+  });
+
+  it('attaching the identity removes the row from awaiting-identity', async () => {
+    const before = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'awaiting-identity', page: 1, pageSize: 200,
+    });
+    expect(before.rows.map((r) => r.id)).toContain(awaitingPickId);
+
+    const attached = await attachAflTablesIdentity({
+      playerId: awaitingPlayerId,
+      profilePath: 'players/S/' + MARKER + '-State-Awaiting0.html',
+      adminUserId: actorId,
+    });
+    expect(attached.ok, JSON.stringify(attached)).toBe(true);
+
+    const after = await listDraftPicksForAdmin({
+      year: fixtureYear, state: 'awaiting-identity', page: 1, pageSize: 200,
+    });
+    expect(after.rows.map((r) => r.id)).not.toContain(awaitingPickId);
+  });
+
+  it('the deep link is offered for an unresolved SOURCE row and for nothing else', async () => {
+    const { rows } = await listDraftPicksForAdmin({ year: fixtureYear, page: 1, pageSize: 200 });
+    const unresolvedSource = rows.filter(
+      (r) => r.provenance === 'draftguru' && r.playerId === null,
+    );
+    expect(unresolvedSource.map((r) => r.id)).toContain(unlinkedSourcePickId);
+    for (const row of unresolvedSource) expect(needsPlayerLinkReview(row)).toBe(true);
+
+    // The href names only the two parameters /admin/player-links supports, and
+    // carries the row's own `player_name_raw`, which is what that page's `q`
+    // matches its queue rows on.
+    const unlinkedRow = rows.find((r) => r.id === unlinkedSourcePickId)!;
+    expect(playerLinksHref(unlinkedRow)).toBe(
+      '/admin/player-links?table=draft_picks&q=' + encodeURIComponent(unlinkedRow.playerNameRaw),
+    );
+
+    // Everything /admin/draft owns itself is excluded: manual rows (relinked by
+    // 6.4), legacy rows (repaired by 6.8) and already-linked source rows.
+    for (const row of rows) {
+      if (row.provenance !== 'draftguru' || row.playerId !== null) {
+        expect(needsPlayerLinkReview(row)).toBe(false);
+      }
+    }
   });
 });

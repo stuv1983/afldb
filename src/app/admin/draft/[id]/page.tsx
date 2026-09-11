@@ -15,6 +15,8 @@ import {
   getDraftPickAdminDetail,
   listManualPlayersAwaitingIdentity,
   MANUAL_SOURCE_KEY,
+  needsPlayerLinkReview,
+  playerLinksHref,
   readDraftOverrides,
 } from '@/db/queries/admin-draft';
 import { hasCapability } from '@/lib/auth/capabilities';
@@ -60,6 +62,9 @@ export default async function DraftPickAdminDetailPage(
   if (!detail) notFound();
 
   const canEdit = hasCapability(admin, 'data.draft.edit');
+  // Navigation only; /admin/player-links enforces its own capability and owns
+  // the person-grained decision (J-17 refuses relinking a source row here).
+  const canReviewLinks = hasCapability(admin, 'data.playerLinks');
   const [clubs, revision] = await Promise.all([listClubs(), currentRevision(detail.id, detail.playerId)]);
 
   const overrides = detail.entityKey ? await readDraftOverrides(detail.entityKey) : [];
@@ -125,7 +130,14 @@ export default async function DraftPickAdminDetailPage(
                 <td>
                   {detail.playerId !== null
                     ? <>{detail.playerDisplayName} (#{detail.playerId})</>
-                    : <span className="muted">Unresolved — link in Player links</span>}
+                    : needsPlayerLinkReview(detail) && canReviewLinks
+                      ? (
+                        <>
+                          <span className="muted">Unresolved — </span>
+                          <Link href={playerLinksHref(detail)}>resolve in Player links</Link>
+                        </>
+                      )
+                      : <span className="muted">Unresolved — link in Player links</span>}
                 </td>
                 <th scope="row">Link status</th>
                 <td>{detail.linkStatusValue}</td>

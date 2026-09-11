@@ -5,8 +5,12 @@ import { AdminPager } from '@/components/admin/AdminPager';
 import { listClubs } from '@/db/queries/clubs';
 import {
   DRAFT_KINDS,
+  DRAFT_LIST_STATES,
   type DraftProvenance,
+  isDraftListState,
   listDraftPicksForAdmin,
+  needsPlayerLinkReview,
+  playerLinksHref,
   readActiveDraftOverrideKeys,
 } from '@/db/queries/admin-draft';
 import { hasCapability } from '@/lib/auth/capabilities';
@@ -23,6 +27,12 @@ const PROVENANCE_LABELS: Record<DraftProvenance, string> = {
   draftguru: 'DraftGuru',
   manual: 'Manual',
   legacy: 'Legacy (unrepaired)',
+};
+
+const STATE_LABELS: Record<string, string> = {
+  override: 'Has an active override',
+  duplicate: 'Duplicate of a source selection',
+  'awaiting-identity': 'Awaiting AFL Tables identity',
 };
 
 const LINK_STATUS_LABELS: Record<string, string> = {
@@ -55,23 +65,34 @@ export default async function DraftAdminPage(
     : undefined;
   const rawLinkState = firstValue(params.linkState) ?? '';
   const linkState = rawLinkState === 'linked' || rawLinkState === 'unresolved' ? rawLinkState : undefined;
+  const rawState = firstValue(params.state) ?? '';
+  const state = isDraftListState(rawState) ? rawState : undefined;
 
   const rawPage = Number(firstValue(params.page) ?? '1');
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  const [{ rows, total }, clubs, overrideKeys] = await Promise.all([
-    listDraftPicksForAdmin({ year, kind, clubSlug, q: q || undefined, provenance, linkState, page, pageSize: PAGE_SIZE }),
-    listClubs(),
-    readActiveDraftOverrideKeys(),
-  ]);
+  // The active override keys are read first, not alongside: `state=override`
+  // filters ON them, and `data_overrides` is import-role-only so the list query
+  // cannot join it. They are the same set the Override badge renders from --
+  // one read, one source of truth.
+  const [clubs, overrideKeys] = await Promise.all([listClubs(), readActiveDraftOverrideKeys()]);
+  const { rows, total } = await listDraftPicksForAdmin({
+    year, kind, clubSlug, q: q || undefined, provenance, linkState, state,
+    overrideKeys: state === 'override' ? [...overrideKeys] : undefined,
+    page, pageSize: PAGE_SIZE,
+  });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const canEdit = hasCapability(admin, 'data.draft.edit');
+  // Navigation only. /admin/player-links enforces its own capability on arrival
+  // and owns every mutation there; this just avoids offering a Super-Admin-only
+  // destination to a viewer the existing capability model would turn away.
+  const canReviewLinks = hasCapability(admin, 'data.playerLinks');
 
   const hrefWith = (overrides: Record<string, string | undefined>) => {
     const merged: Record<string, string | undefined> = {
       q: q || undefined, year: year ? String(year) : undefined, kind, club: clubSlug,
-      provenance, linkState, ...overrides,
+      provenance, linkState, state, ...overrides,
     };
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(merged)) if (value) search.set(key, value);
@@ -132,6 +153,15 @@ export default async function DraftAdminPage(
             <option value="unresolved">Unresolved</option>
           </select>
         </label>
+        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          State
+          <select name="state" defaultValue={state ?? ''}>
+            <option value="">Any</option>
+            {DRAFT_LIST_STATES.map((value) => (
+              <option key={value} value={value}>{STATE_LABELS[value]}</option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className="btn">Filter</button>
         <Link href="/admin/draft">Clear</Link>
       </form>
@@ -141,7 +171,13 @@ export default async function DraftAdminPage(
         totalPages={totalPages}
         pageHref={pageHref}
         label="Draft selection pages"
-        summary={<>{' · '}{formatNumber(total)} selection{total === 1 ? '' : 's'}{q ? ` matching "${q}"` : ''}</>}
+        summary={(
+          <>
+            {' · '}{formatNumber(total)} selection{total === 1 ? '' : 's'}
+            {q ? ` matching "${q}"` : ''}
+            {state ? ` · ${STATE_LABELS[state].toLowerCase()}` : ''}
+          </>
+        )}
       />
 
       <section className="section">
@@ -178,7 +214,17 @@ export default async function DraftAdminPage(
                   </td>
                   <td>{row.clubName ?? '—'}</td>
                   <td><span className="badge">{PROVENANCE_LABELS[row.provenance]}</span></td>
-                  <td>{LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}</td>
+                  <td>
+                    {LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}
+                    {needsPlayerLinkReview(row) && canReviewLinks && (
+                      <>
+                        <br />
+                        <Link href={playerLinksHref(row)} style={{ fontSize: '0.8rem' }}>
+                          Resolve in Player links
+                        </Link>
+                      </>
+                    )}
+                  </td>
                   <td>{row.entityKey && overrideKeys.has(row.entityKey) && <span className="badge">Overridden</span>}</td>
                 </tr>
               ))}

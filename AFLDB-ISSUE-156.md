@@ -568,10 +568,17 @@ contract. Evidence and the validation commands are in `issues.md` under ISSUE-15
 to `main` at `af6379e` (migration 095, `/admin/coaches`, Stage 1 + Stage 2 gates all passed on
 DEV). Coach reconciliation stays P9-class.
 
-**P3b Stage 1 and Stage 2 are implemented and awaiting operator review.** `AFLDB-ISSUE-160`
+**P3b Stage 1 and Stage 2 are code-complete, committed and locally validated.** `AFLDB-ISSUE-160`
 (Draft administration and new-player draft intake), branch `opus/issue-160-draft-admin`, both
-stages completed 2026-09-11 — uncommitted, not deployed, not merged, neither DEV nor PROD
-touched. No migration (096 still free), no privilege change. Draft selections have exactly one
+stages completed and committed 2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`) — not
+deployed, not merged, neither DEV nor PROD touched. A local completion audit the same day
+found and fixed one real atomicity defect (a refusal returned after a write committed the
+partial mutation) and eight new Stage 2 ESLint errors, and reported two runbook §18 list items
+as undelivered; on the operator's direction both were then implemented (the list review-state
+filter and the Player-links deep link, read-only, no migration, no new mutation path). Those
+changes are uncommitted and await operator review. Nothing but the deliberately deferred
+external gates -- PROD probes (d)/(e)/(g)/(h), S-1, gate 9's real-importer half, gate 15 DEV
+deploy/build and gate 16 Playwright -- remains. No migration (096 still free), no privilege change. Draft selections have exactly one
 mutation contract (`src/db/queries/admin-draft.ts`, the only `INSERT INTO draft_picks` in
 `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a
 whole-row durable record; both players and selections are re-created on a rebuilt database by

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState, useTransition } from 'react';
 
 import { createManualPickAction, createPlayerAndDraftPickAction, searchPlayersForDraftAction } from '@/app/admin/draft/actions';
@@ -87,7 +88,7 @@ export function NewPickWizard({
     return (
       <section className="section">
         <p className="notice" role="status">{existing.state.message}</p>
-        <p><a href="/admin/draft">Back to draft administration</a></p>
+        <p><Link href="/admin/draft">Back to draft administration</Link></p>
       </section>
     );
   }
@@ -95,7 +96,7 @@ export function NewPickWizard({
     return (
       <section className="section">
         <p className="notice" role="status">{createNew.state.message}</p>
-        <p><a href="/admin/draft">Back to draft administration</a></p>
+        <p><Link href="/admin/draft">Back to draft administration</Link></p>
       </section>
     );
   }
@@ -196,7 +197,7 @@ export function NewPickWizard({
           </ul>
         )}
         {query.trim().length >= 2 && !searching && results.length === 0 && (
-          <p className="muted">No existing player matches "{query}".</p>
+          <p className="muted">No existing player matches &ldquo;{query}&rdquo;.</p>
         )}
 
         {existing.state.needsConfirmation && selectedCandidate && (

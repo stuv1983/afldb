@@ -104,6 +104,20 @@ commit.
 - `/admin/data-editor` no longer shows a draft search form or results table: the "Draft picks"
   section is a single link to `/admin/draft`, and opening a stale `?entity=draft_picks&id=`
   bookmark now shows a link to the selection's new home instead of a false "not found".
+- The list also filters by review state, so the selections that need a human are reachable
+  without reading every page: `override` (the selection carries an active durable
+  correction), `duplicate` (a manual selection whose player now also holds a source-owned
+  selection for the same draft event -- the state retirement and supersession exist to
+  resolve), and `awaiting-identity` (the selection's player holds an admin-created identity
+  and no AFL Tables profile yet, so a future source import would otherwise split them in
+  two). Every one is derived from rows the database already holds -- an override row, a
+  second selection, an identity row -- never from a name comparison, and nothing new is
+  stored to support them.
+- An unresolved DraftGuru selection now links straight to its decision in Player links.
+  Linking a source-owned selection to a player is person-grained and stays where it already
+  lives; draft administration points at it rather than offering a second way to do it. The
+  link is offered only for rows Player links actually owns -- never for a manual selection,
+  a legacy row, or an already-linked one -- and only to a viewer who may open that page.
 - The ISSUE-159 coach admin surface's revalidate-route and submit-helper machinery is
   generalised into `src/lib/admin/revalidate-route.ts` and
   `src/components/admin/action-submit.ts` and shared with draft administration; coaches'

@@ -13,7 +13,7 @@ import {
   readManualPlayerToken,
   type CreatePlayerInput,
 } from '@/db/queries/players';
-import { resolveLockedLink } from '@/db/queries/player-links';
+import { resolveLockedLink, UNRESOLVED_LINK_STATUSES } from '@/db/queries/player-links';
 import { EDITABLE_ENTITIES, validateFieldValue, type FieldValue } from '@/lib/edit/spec';
 
 /**
@@ -243,6 +243,35 @@ export type DraftMutationResult<T> =
 
 function refuse(reason: DraftRefusalReason, error: string): { ok: false; error: string; reason: DraftRefusalReason } {
   return { ok: false, error, reason };
+}
+
+/**
+ * A refusal discovered AFTER this transaction has already written something.
+ *
+ * `postgres.js` commits when the `begin()` callback RESOLVES and rolls back only
+ * when it REJECTS, so a plain `return refuse(...)` past the first write would
+ * commit the half-done mutation while telling the operator it failed -- an
+ * unaudited canonical write, which §9.1 forbids ("canonical write(s) +
+ * override(s) + recordDataEdit, all or nothing"). Throwing this instead rolls
+ * the transaction back; the mutation's own `catch` turns it back into exactly
+ * the refusal the caller would otherwise have received, so the contract the
+ * action layer sees is unchanged.
+ *
+ * `createPlayerAndDraftPick` throws for the same reason at its own
+ * cannot-happen branch; this names the pattern so the late refusals share it.
+ */
+class RollbackRefusal extends Error {
+  constructor(readonly reason: DraftRefusalReason, readonly detail: string) {
+    super(detail);
+    this.name = 'RollbackRefusal';
+  }
+}
+
+/** The refusal a `RollbackRefusal` carried, or null for a genuine failure. */
+function rolledBackRefusal(
+  error: unknown,
+): { ok: false; error: string; reason: DraftRefusalReason } | null {
+  return error instanceof RollbackRefusal ? refuse(error.reason, error.detail) : null;
 }
 
 function confirmNeeded(
@@ -1359,7 +1388,10 @@ export async function adoptLegacyPick(
           RETURNING id
         `;
         if (updated.length === 0) {
-          return refuse('stale', 'That selection was adopted by someone else while this form was open.');
+          // Past the point where this transaction may have minted the player's
+          // identity, so the refusal has to ROLL BACK rather than return.
+          throw new RollbackRefusal('stale',
+            'That selection was adopted by someone else while this form was open.');
         }
 
         const payload = manualSelectionPayload({
@@ -1396,7 +1428,8 @@ export async function adoptLegacyPick(
         };
       });
     } catch (error) {
-      return refuse('failed', `The selection could not be adopted: ${message(error)}`);
+      return rolledBackRefusal(error)
+        ?? refuse('failed', `The selection could not be adopted: ${message(error)}`);
     }
   });
 }
@@ -1491,7 +1524,10 @@ export async function attachAflTablesIdentity(input: {
           RETURNING id
         `;
         if (updated.length === 0) {
-          return refuse('conflict',
+          // The `external_identities` INSERT above has already run, so returning
+          // here would attach the identity WITHOUT its audit row while reporting
+          // failure. Roll the whole attach back instead.
+          throw new RollbackRefusal('conflict',
             'That player holds a manual identity but no durable record to attach the path to.');
         }
 
@@ -1507,7 +1543,8 @@ export async function attachAflTablesIdentity(input: {
         return { ok: true as const };
       });
     } catch (error) {
-      return refuse('failed', `The identity could not be attached: ${message(error)}`);
+      return rolledBackRefusal(error)
+        ?? refuse('failed', `The identity could not be attached: ${message(error)}`);
     }
   });
 }
@@ -1666,6 +1703,56 @@ export function provenanceOf(sourceKey: string | null): DraftProvenance {
   return sourceKey === MANUAL_SOURCE_KEY ? 'manual' : 'draftguru';
 }
 
+/**
+ * The three review states §18 names for the `/admin/draft` list. Each is
+ * derived from state this database already holds -- an active override row, a
+ * real source-owned duplicate of a manual selection, or an identity that has
+ * not been attached yet. None of them is a name comparison, and none of them
+ * is stored: there is no workflow column anywhere and nothing here writes.
+ */
+export const DRAFT_LIST_STATES = ['override', 'duplicate', 'awaiting-identity'] as const;
+export type DraftListState = (typeof DRAFT_LIST_STATES)[number];
+
+export function isDraftListState(value: string): value is DraftListState {
+  return (DRAFT_LIST_STATES as readonly string[]).includes(value);
+}
+
+/**
+ * Whether this row's next action belongs to `/admin/player-links` rather than
+ * to `/admin/draft`.
+ *
+ * Only a SOURCE-OWNED selection qualifies. A manual selection always carries
+ * `player_id` and is relinked by 6.4 here; a legacy row is repaired by 6.8
+ * here; and J-17 refuses relinking a source row from this surface at all,
+ * because source linkage is person-grained through `draft_persons`. The link
+ * statuses are the ones the player-links queue actually holds
+ * (`UNRESOLVED_LINK_STATUSES`), not a `player_id IS NULL` guess -- although
+ * `draft_picks_link_ck` (migration 019) makes the two equivalent.
+ */
+export function needsPlayerLinkReview(
+  row: { provenance: DraftProvenance; linkStatusValue: string },
+): boolean {
+  return row.provenance === 'draftguru'
+    && (UNRESOLVED_LINK_STATUSES as readonly string[]).includes(row.linkStatusValue);
+}
+
+/**
+ * The deep link into the existing review queue for one unresolved source
+ * selection.
+ *
+ * `table` and `q` are the only two parameters `/admin/player-links` supports
+ * for this purpose and both are used as that page already defines them:
+ * `table` is checked by `isLinkTargetTable()`, and `q` is matched
+ * case-insensitively against the queue row's `playerName`, which for a draft
+ * pick IS `draft_picks.player_name_raw` (`listUnresolvedLinks`). Nothing is
+ * invented. The queue collapses a person's selections to one `draft_persons`
+ * decision, so this lands on the decision rather than on this one row -- which
+ * is the person-grained contract, not a near miss.
+ */
+export function playerLinksHref(row: { playerNameRaw: string }): string {
+  return `/admin/player-links?table=draft_picks&q=${encodeURIComponent(row.playerNameRaw)}`;
+}
+
 export type DraftAdminListFilters = {
   year?: number;
   kind?: string;
@@ -1673,6 +1760,15 @@ export type DraftAdminListFilters = {
   q?: string;
   provenance?: DraftProvenance;
   linkState?: 'linked' | 'unresolved';
+  state?: DraftListState;
+  /**
+   * The active `data_overrides` entity keys, from
+   * {@link readActiveDraftOverrideKeys}. Required only by `state=override`:
+   * `data_overrides` carries no `grant_app_read`, so the public client this
+   * list reads on cannot join it, and the key set is passed in instead of
+   * being read twice from two different roles.
+   */
+  overrideKeys?: readonly string[];
   page: number;
   pageSize: number;
 };
@@ -1722,6 +1818,55 @@ export async function listDraftPicksForAdmin(
          AND (${filters.linkState ?? null}::text IS NULL
               OR (${filters.linkState ?? null} = 'linked' AND dp.player_id IS NOT NULL)
               OR (${filters.linkState ?? null} = 'unresolved' AND dp.player_id IS NULL))
+         -- §18 review states. Each is a fact this database already holds; the
+         -- filter runs in SQL rather than over the page's rows so the count and
+         -- the pager describe the same set the table does.
+         AND (${filters.state ?? null}::text IS NULL
+              -- override: an ACTIVE data_overrides row for this selection's own
+              -- entity key. The key set is supplied by the caller because only
+              -- the import role may read data_overrides; the expression below
+              -- must agree with entityKeyFor(), and the gate-18 integration
+              -- case asserts exactly that by comparing the two sets.
+              OR (${filters.state ?? null} = 'override'
+                  AND (CASE
+                         WHEN s.key = ${MANUAL_SOURCE_KEY} AND dp.player_url LIKE 'manual:%'
+                           THEN ${MANUAL_SOURCE_KEY} || ':' || substring(dp.player_url from 8)
+                         WHEN dp.source_id IS NOT NULL AND dp.player_url IS NOT NULL
+                              AND dp.draft_kind IS NOT NULL
+                           THEN dp.source_id::text || '|' || dp.player_url || '|'
+                                || dp.draft_year::text || '|' || dp.draft_kind
+                       END) = ANY(${(filters.overrideKeys ?? []) as string[]}::text[]))
+              -- duplicate: J-14 exactly -- a MANUAL selection whose player also
+              -- holds a SOURCE-OWNED selection for the same year and kind, which
+              -- is what 6.6/6.7 exist to resolve. The same predicate the detail
+              -- page uses to decide whether to offer SupersedePanel.
+              OR (${filters.state ?? null} = 'duplicate'
+                  AND s.key = ${MANUAL_SOURCE_KEY}
+                  AND dp.player_id IS NOT NULL
+                  AND EXISTS (
+                        SELECT 1 FROM draft_picks other
+                         WHERE other.player_id = dp.player_id
+                           AND other.draft_year = dp.draft_year
+                           AND other.draft_kind = dp.draft_kind
+                           AND other.id <> dp.id
+                           AND other.source_id IS NOT NULL
+                           AND other.source_id <> (SELECT id FROM sources
+                                                    WHERE key = ${MANUAL_SOURCE_KEY})))
+              -- awaiting-identity: the row's player holds a manual_admin_edit
+              -- identity and no AFL Tables identity yet -- the same predicate
+              -- listManualPlayersAwaitingIdentity() uses and the same set the
+              -- D-2 importer guard measures itself against. Identity state, never
+              -- a name comparison.
+              OR (${filters.state ?? null} = 'awaiting-identity'
+                  AND dp.player_id IS NOT NULL
+                  AND EXISTS (
+                        SELECT 1 FROM external_identities m
+                          JOIN sources ms ON ms.id = m.source_id AND ms.key = ${MANUAL_SOURCE_KEY}
+                         WHERE m.player_id = dp.player_id AND m.status IN ('unique', 'resolved'))
+                  AND NOT EXISTS (
+                        SELECT 1 FROM external_identities a
+                          JOIN sources asrc ON asrc.id = a.source_id AND asrc.key = 'afltables'
+                         WHERE a.player_id = dp.player_id AND a.status IN ('unique', 'resolved'))))
     )
     SELECT id, draft_year AS "draftYear", draft_kind AS "draftKind", draft_type AS "draftType",
            pick_number AS "pickNumber", player_name_raw AS "playerNameRaw",

@@ -47,7 +47,7 @@ export function RetirePanel({ pickId, expectedRevision }: { pickId: number; expe
       <p className="muted" style={{ fontSize: '0.85rem' }}>
         This permanently deletes the selection row. It should be used only for a manual selection
         that should never have existed — a duplicate entry, or a mistake. To replace a manual
-        selection with a source-owned one that has since been published, use "Supersede" instead,
+        selection with a source-owned one that has since been published, use &ldquo;Supersede&rdquo; instead,
         which retires this row and links the source selection in one step.
       </p>
       {!confirming ? (

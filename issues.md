@@ -607,8 +607,8 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
-| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED 2026-09-11, uncommitted**; next: operator review + commit of ISSUE-160, then DEV acceptance when the operator updates DEV |
-| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED 2026-09-11, uncommitted, not deployed, not merged.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; S-1 before deploy |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), locally audited**; next: operator review + commit of the ISSUE-160 audit fixes, then DEV acceptance when the operator updates DEV |
+| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), not deployed, not merged; locally audited 2026-09-11 — one atomicity defect and eight new ESLint errors found and fixed, uncommitted for operator review.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit of the audit fixes, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; two runbook §18 list affordances (the `state` filter and the Player-links deep link) reported undelivered; S-1 before deploy |
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
      gate on 2026-09-11; Stage 2 validated live on real DEV at `6299bf8` including the
@@ -22732,8 +22732,13 @@ above; no ID is allocated for it here.
 
 ## AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** Open — **Stage 1 and Stage 2 IMPLEMENTED 2026-09-11, uncommitted, not deployed,
-not merged.** Stage 2 delivers the `/admin/draft` surface (list/new/detail/revalidate),
+**Status:** Open — **Stage 1 and Stage 2 CODE-COMPLETE and locally validated. Committed
+2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`, branch `opus/issue-160-draft-admin`); not
+deployed, not merged.** A local completion audit (2026-09-11, Opus 5 high) re-ran every local
+gate and found one real atomicity defect, eight new ESLint errors and two undelivered runbook
+§18 list items. The defects are fixed and, on the operator's direction, **both §18 gaps are now
+implemented** — all of it uncommitted for operator review; see *Local completion audit* and
+*§18 list-contract closure* below. Only the deliberately deferred external gates remain. Stage 2 delivers the `/admin/draft` surface (list/new/detail/revalidate),
 `data.draft.read`/`data.draft.edit` capabilities enforced at every boundary, the Data-group nav
 entry, the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving),
 and the `/admin/data-editor` draft-slice UI removal — see *Stage 2 implementation record* below.
@@ -23074,9 +23079,189 @@ already exercises every new action/route boundary structurally.
 `player-link-mutations`, `db-promotion-check`. `db:privileges` unnecessary (no privilege change);
 no migration (096 still free).
 
+### Local completion audit — 2026-09-11
+
+Run from the committed Stage 2 checkpoint (`a947e52`) on a clean tree, Opus 5 high. Scope: the
+implemented surface against the runbook, especially the Stage 1 / Stage 2 boundary. No DEV, no
+PROD, no deploy, no merge.
+
+**One real defect, fixed.** *A refusal returned after a write COMMITTED the partial mutation.*
+`postgres.js` commits when the `begin()` callback **resolves** and rolls back only when it
+**rejects**, so a `return refuse(...)` placed past the transaction's first write commits the
+half-done mutation while telling the operator it failed — which §9.1 forbids. Two sites had it:
+
+- `attachAflTablesIdentity()` — the `external_identities` INSERT runs, then the `identity`
+  override UPDATE matches 0 rows and the function returned `conflict`. Net effect: the AFL
+  Tables identity **was attached, with no `data_edits` row at all**, and the admin was told it
+  failed; a retry then refused with J-16 "already holds the AFL Tables identity". Reachable
+  whenever a player holds a `manual_admin_edit` identity with no `('players',
+  'manual_admin_edit:<token>', 'identity')` override row.
+- `adoptLegacyPick()` — the `stale` refusal when the `WHERE source_id IS NULL` compare-and-swap
+  matches 0 rows, reached after the transaction may already have minted the linked player's
+  token, `external_identities` row, `identity` override and `identity_adopted` audit. In
+  practice unreachable because `lockPick()` takes `FOR UPDATE` first and a second adopt refuses
+  at the early `source_id IS NOT NULL` check, but it is the same bug.
+
+Neither was a plan defect: Stage 1's own `createPlayerAndDraftPick` already **throws** at its
+analogous cannot-happen branch precisely so the transaction rolls back. The fix names that
+pattern — a private `RollbackRefusal` carrying `(reason, detail)`, thrown at both late sites and
+converted back to the identical refusal by each mutation's existing `catch`. The success paths,
+the refusal reasons and the action-layer contract are unchanged.
+
+Regression coverage: `tests/integration/admin-draft.test.ts` gains "6.5 rolls the identity back
+when the refusal is found AFTER the insert", which builds the reachable state (delete the
+player's `identity` override), calls the real `attachAflTablesIdentity`, and asserts the refusal
+leaves **zero** `external_identities` rows for the path and **zero** `source_identity` audit
+rows. Proven to catch it: with the fix reverted the test fails on `identities` 1 ≠ 0.
+
+**Eight new ESLint errors, fixed.** Stage 2 introduced them and the Stage 1 note that "`npx
+eslint` on every changed file reports no new finding" was not re-run for Stage 2:
+`react/no-unescaped-entities` in `RetirePanel.tsx` (2), `SupersedePanel.tsx` (2) and
+`NewPickWizard.tsx` (2), plus `@next/next/no-html-link-for-pages` in `NewPickWizard.tsx` (2) —
+two `<a href="/admin/draft">` post-success links that would have forced a full page reload
+instead of a client navigation. Next 16 no longer lints during `next build`, so gate 15 was not
+at risk; `npm run lint` was. After the fix the only findings on changed files are 6 errors and 4
+warnings, **all verified pre-existing at `af6379e`** (`data-edits.ts` `Record<string, any>` ×2,
+`player-link-mutations.test.ts` `any` ×4, `players.ts` `_total` ×2, `data-editor/page.tsx`
+unused `formatDate`/`formatRoundShort` ×2). The Stage 1 record said "four remaining errors"; the
+measured figure is six, same disposition.
+
+**Two runbook §18 items were found not delivered and were not previously recorded as
+deviations. The operator directed both to be implemented immediately (2026-09-11), and they
+are now CLOSED -- see *§18 list-contract closure* below:**
+
+- the list `state` filter (`override` | `duplicate` | `awaiting-identity`). The list carried an
+  *Overridden* badge column sourced from `readActiveDraftOverrideKeys()`, but
+  `DraftAdminListFilters` had no `state` member and the form offered no such control;
+- "unresolved source rows deep-link to `/admin/player-links`". `/admin/draft/[id]` renders
+  "Unresolved — link in Player links" as plain muted text and the list links only to the detail
+  page; there is no `/admin/player-links` href anywhere under `src/app/admin/draft/`.
+
+**Everything else audited clean.** All nine Stage 1 mutation primitives are exposed by exactly
+one action each and no Stage 2 action bypasses `admin-draft.ts`; `requireCapability` is the
+first awaited statement of every draft page, the revalidate route and all ten actions;
+`admin-draft.ts` holds the only `INSERT INTO`/`DELETE FROM draft_picks` in `src/`
+(`player-links.ts:375` is `applyLockedLink`'s sanctioned link UPDATE); the new-player path
+re-reads the player and resolves identity server-side, so D-2's "name/DOB may refuse but never
+decide identity" invariant holds in the wizard, in `checkNewPlayerDuplicates` and in the
+importer guard, which is called only in the new-player INSERT branch; J-3 ships as the hard
+refusal with no dormant confirmation branch; NULL pick numbers never render or store as zero;
+adoption's identity preference order and its `stale` compare-and-swap are as §6.8 specifies;
+`/admin/data-editor` refuses `draft_picks` in `saveDataEdit`, `getEditableRow` and `saveEdit`,
+its draft section is gone and `entity=draft_picks&id=N` now points at `/admin/draft/N`; no code
+path can produce a `null|null|<year>|null` override key; the `draft_picks` replay's manual
+branches read only `is_active` overrides, so a retired selection is never resurrected; the
+widened `afltables_profile_url` rule and `draft_pick_key` are as D-3 specifies and
+`docs/production-promotion.md` §8 now replays `draft_picks` in the binding order; the D-9
+extraction is behaviour-preserving for coaches, both allowlists stay domain-local, and no
+Server Action calls `revalidatePath`.
+
+**S-1 is untouched and cannot be applied by accident.** The `promotion-inventory.ts` change is
+unconditional by design, so the only thing standing between it and the paused ISSUE-151 PROD
+promotion `20260907-234124` is that this branch is unmerged and undeployed — which is exactly
+what §11.1 option (a) describes. There is no in-code guard and the runbook asks for none.
+
+**Gates re-run from the committed checkpoint** (afldb_test only; `afldb_dev` never touched):
+`npx tsc --noEmit` clean; `git diff --check` clean; 9 unit suites / 619 tests pass
+(`admin-draft-actions`, `auth`, `edit-spec`, `data-overrides-source-contract`,
+`player-link-mutations`, `db-promotion-check`, `admin-coach-actions`, `coach-reconciliation`,
+`current-season-import`); `tests/integration/admin-draft.test.ts` 39/39 (38 before the new
+regression test); `tests/integration/admin-coaches.test.ts` 13/13;
+`tools/migration/test_manual_insert_guard.py` ok. `tests/integration/draftguru-import.test.ts`
+**skips whole (21 tests)** — the precise blockers are the missing Stage A snapshot
+(`data/sources/draftguru/annual-html-20260826/raw/years`) and the unset
+`AFLDB_TEST_IMPORT_DATABASE_URL`; `psycopg` **is** importable from the system Python here, so
+the earlier ".venv" wording overstated that half. `tests/integration/data-editor.test.ts` still
+has its one unrelated pre-existing failure ("refuses to build a ladder for a season it has no
+matches for"): it needs a season with no non-final matches and `afldb_test` has none — neither
+ISSUE-160 commit touches that file, `seasons`, `matches` or `recomputeClubSeasons`. No fixture
+residue is left on `afldb_test`.
+
+### §18 list-contract closure — 2026-09-11
+
+Both gaps the audit reported are implemented. No migration, no new persisted state, no new
+mutation path: the whole change is read-side plus one navigation link.
+
+**1. The `state` filter (`override` | `duplicate` | `awaiting-identity`).** Added to
+`listDraftPicksForAdmin()` as a SQL predicate rather than a filter over the rendered page, so
+the count, the pager and the table describe the same set. Each state is derived from rows this
+database already holds, and none of them is a name comparison:
+
+| State | Exact meaning | Derived from |
+|---|---|---|
+| `override` | the selection's own `data_overrides` entity key carries an **active** row | the key set `readActiveDraftOverrideKeys()` already reads for the *Overridden* badge, passed into the query — `data_overrides` has no `grant_app_read`, so the public client this list reads on cannot join it, and it is not read twice under two roles |
+| `duplicate` | **J-14 exactly**: a MANUAL selection whose player *also* holds a source-owned selection for the same `(draft_year, draft_kind)` — the state 6.6 retirement and 6.7 supersession exist to resolve | canonical `draft_picks` only, the same predicate `/admin/draft/[id]` uses to decide whether to offer `SupersedePanel` |
+| `awaiting-identity` | the row's player holds a `manual_admin_edit` identity and **no** `afltables` identity | `external_identities`, the same predicate as `listManualPlayersAwaitingIdentity()` and the same candidate set the D-2 importer guard measures itself against |
+
+`isDraftListState()` gates the query-string value, so a hand-typed `?state=` cannot widen the
+filter, and an unknown value falls back to no filter rather than an error. A row may legitimately
+satisfy more than one state (a newly created player's selection is both `override` and
+`awaiting-identity`); the filter selects, it does not classify, so nothing has to choose between
+them.
+
+The `override` predicate is the only place the `entity_key` shape is written twice — once in SQL
+for the filter, once in `entityKeyFor()` for the rendered badge. The gate-18 integration case
+pins them together by asserting that `state=override` returns **exactly** the rows whose
+returned `entityKey` is in the active key set, so a divergence fails the suite rather than
+quietly filtering the wrong rows.
+
+**2. The Player-links deep link.** An unresolved source-owned selection now links to
+`/admin/player-links?table=draft_picks&q=<player_name_raw>`, from both the list's Link-status
+cell and the detail page's Player row. Both parameters are ones that page already supports and
+are used as it defines them: `table` is validated by `isLinkTargetTable()` and `q` is matched
+case-insensitively against the queue row's `playerName`, which for a draft pick **is**
+`draft_picks.player_name_raw` (`listUnresolvedLinks`). Nothing was invented, and no parameter
+was added to the destination.
+
+`needsPlayerLinkReview()` is the single rule: source-owned provenance **and** a link status in
+`UNRESOLVED_LINK_STATUSES`, which is now exported from `player-links.ts` so the draft surface
+reads the destination's own list instead of restating it. Manual rows (relinked by 6.4), legacy
+rows (repaired by 6.8) and already-linked source rows are excluded — J-17 refuses relinking a
+source row from this surface at all, so offering the link there would be offering a door that
+does not open. The affordance is rendered only to a viewer holding `data.playerLinks`; it is
+navigation only, and `/admin/player-links` enforces its own capability and owns every mutation
+on arrival.
+
+**No new mutation path.** The diff adds no Server Action, no route, no `INSERT`/`UPDATE`/`DELETE`
+and no call into any `admin-draft.ts` mutation. `admin-draft.ts` still holds the only
+`INSERT INTO`/`DELETE FROM draft_picks` in `src/`, and the ten existing actions are unchanged.
+
+**Coverage.** Seven unit cases in `tests/admin-draft-actions.test.ts` pin the state enumeration
+(a hand-typed `?state=` cannot widen it) and every branch of `needsPlayerLinkReview()` /
+`playerLinksHref()`, including that a name which would otherwise alter the query string survives
+a round trip with no injected parameter. Six integration cases in
+`tests/integration/admin-draft.test.ts` prove the three states against real rows: `override`
+returns **exactly** the rows whose `entityKey` is in the active key set (the pin described
+above) and returns **nothing** when the key set is empty — the failure mode that matters, a
+predicate silently ignored, would return everything; `duplicate` finds the manual half of a
+J-14 pair and not the source half, and not a manual selection without one; `awaiting-identity`
+matches `listManualPlayersAwaitingIdentity()` row for row and drops a selection the moment 6.5
+attaches the identity; and the deep link is offered for an unlinked source row and for no other
+shape. One fixture lesson worth recording: the first draft of the block reused the suite's
+shared `sourcedPlayerId`, and J-1 correctly refused the second selection because an earlier test
+had already moved one onto that player — the block now mints its own player, so its fixtures do
+not depend on what ran before it.
+
+**Gates re-run after the closure** (`afldb_test` only; `afldb_dev` and PROD untouched):
+`npx tsc --noEmit` clean; `git diff --check` clean; **9 unit suites / 626 tests pass, 0
+skipped**; `tests/integration/admin-draft.test.ts` **45/45** (39 before, +6);
+`tests/integration/admin-coaches.test.ts` **13/13**;
+`tools/migration/test_manual_insert_guard.py` ok. ESLint over every ISSUE-160 changed file
+reports **6 errors and 4 warnings, all of them the set already verified pre-existing at
+`af6379e`** — zero new findings from this change. `tests/integration/draftguru-import.test.ts`
+still skips whole (21 tests, no Stage A snapshot and no `AFLDB_TEST_IMPORT_DATABASE_URL`) and
+`tests/integration/data-editor.test.ts` still has its one unrelated pre-existing ladder failure
+(1 failed / 9 passed / 2 skipped). No fixture residue is left on `afldb_test`.
+
 ### Next action
 
-Operator reviews and commits Stage 1 and Stage 2 together (one uncommitted working tree).
+Operator reviews and commits one uncommitted working tree carrying both the audit fixes and the
+§18 closure: `src/db/queries/admin-draft.ts`, `src/db/queries/player-links.ts`,
+`src/app/admin/draft/{page.tsx,[id]/page.tsx,NewPickWizard.tsx,RetirePanel.tsx,SupersedePanel.tsx}`,
+`tests/admin-draft-actions.test.ts`, `tests/integration/admin-draft.test.ts`, and the tracking
+(`CHANGELOG.md`, `issues.md`, `IssuesIndex.md`, `AFLDB-ISSUE-160.md`, `AFLDB-ISSUE-156.md`).
+Stage 1 and Stage 2 are already committed at `91935b9` and `a947e52`. ISSUE-160 is
+**code-complete and locally validated**; every non-deferred requirement is met.
 ISSUE-160 stays **open** pending deferred DEV acceptance: gate 15 (DEV deploy/build) and gate 16
 (three-role Playwright at 320/768/1000/1280/1920 on `/admin/draft`, `/admin/draft/new`,
 `/admin/draft/[id]`) run only when the operator updates DEV for the Admin Centre batch. Still open
