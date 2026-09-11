@@ -87,6 +87,7 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     { href: '/admin/player-links', label: 'Player links', capability: 'data.playerLinks' },
     { href: '/admin/coaches', label: 'Coaches', capability: 'data.coaches.read' },
     { href: '/admin/draft', label: 'Draft administration', capability: 'data.draft.read' },
+    { href: '/admin/season-lists', label: 'Season lists', capability: 'data.seasonLists.read' },
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 

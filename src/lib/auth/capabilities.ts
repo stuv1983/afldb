@@ -43,6 +43,8 @@ export type Capability =
   | 'data.coaches.edit'
   | 'data.draft.read'
   | 'data.draft.edit'
+  | 'data.seasonLists.read'
+  | 'data.seasonLists.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -94,6 +96,14 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // mutation data.draft.edit already gates.
   'data.draft.read': ADMIN_AND_UP,
   'data.draft.edit': SUPER_ADMIN_ONLY,
+  // Season list administration (AFLDB-ISSUE-161 §16). Reading a club's list
+  // widens no boundary an Admin does not already have -- lists are (future)
+  // public facts and operations.audit.read already gives an Admin the full
+  // edit trail. A list change becomes a public fact the moment a consumer
+  // ships, there is no draft stage, and copy-forward is a bulk write --
+  // matching data.coaches.edit / data.draft.edit. No Admin mutation.
+  'data.seasonLists.read': ADMIN_AND_UP,
+  'data.seasonLists.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

@@ -17,10 +17,19 @@ import { type AdminActionState, useAdminActionSubmit } from '@/components/admin/
 export type DraftCandidate = { kind: 'player' | 'pick'; id: number; label: string; reason: string };
 export type DraftConfirmReason = 'null_pick_number' | 'distinct_namesakes' | 'unlinked_source_selection';
 
+/**
+ * The AFLDB-ISSUE-161 §14 handoff: present only when the target season
+ * (`draftYear + 1`) is within the season-list administrable range (§9.1).
+ * A link only, never a mutation — the season-list Add panel still requires
+ * an explicit Super Admin confirmation (D-5).
+ */
+export type SeasonListHandoff = { season: number; clubSlug: string; playerId: number } | null;
+
 export type DraftActionState = AdminActionState & {
   needsConfirmation?: boolean;
   confirm?: DraftConfirmReason;
   candidates?: DraftCandidate[];
+  seasonListHandoff?: SeasonListHandoff;
 };
 
 export function useDraftActionSubmit(

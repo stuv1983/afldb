@@ -53,6 +53,35 @@ commit.
 - Backend only in this stage: the administration screens, their permissions and the draft
   handoff arrive with the Admin Centre batch.
 
+### Season list administration ships an admin surface (AFLDB-ISSUE-161 Stage 2, ISSUE-156 P3c) - 11 September 2026
+
+- `/admin/season-lists`, `/admin/season-lists/[season]` and `/admin/season-lists/[season]/[club]`
+  give Admin (read) and Super Admin (edit) a supported way to see and manage every club's playing
+  list: the season selector shows every administrable season from 2027 with its completeness; the
+  season overview shows each eligible club's member count against the previous season -- list-to-
+  list from 2028, explicitly labelled non-authoritative appearances for 2027, never called "the
+  2026 list"; the club page is the operational surface -- members whether or not they have played,
+  filters, and (Super Admin) Add, Remove and Transfer.
+- Removing a player says exactly what happens -- "Remove from the season list" -- never "retire":
+  no career, draft or global-retirement state moves, and a mistaken removal is reversed by adding
+  the player again. Transfer is the atomic backend primitive end to end, never a client-side
+  remove followed by an add, so a failure never leaves a player unlisted.
+- Copy-forward carries a season's lists onto the next season's identities, previewed before
+  anything is written and refused by name if a target club already holds rows or has no identity
+  in the target season. It is not offered for 2027: the season page explains why and points at the
+  club page's 2026 appearances review panel instead, where every addition is an explicit,
+  individually audited decision -- never a bulk seed from participation data.
+- The draft administration screens now offer a season-list handoff: after recording a selection,
+  or from an existing selection's detail page, a link offers to add that player to next season's
+  list at the club they were selected by. It is a link only -- nothing about a draft selection
+  ever writes a list membership, and the link hides itself when the following season is not yet
+  administrable.
+- New capabilities `data.seasonLists.read` (Admin and Super Admin) and `data.seasonLists.edit`
+  (Super Admin only) are declared and enforced at every page and Server Action boundary this issue
+  adds; no Admin mutation exists. A Season lists link appears in the Admin Centre sidebar's Data
+  group, after Draft administration, for anyone who holds `data.seasonLists.read`. No public page
+  changes and no revalidation route was added: every action here returns no paths to revalidate.
+
 ### Draft administration gains one mutation contract, and admin-created people become promotable (AFLDB-ISSUE-160 Stage 1, ISSUE-156 P3b) - 11 September 2026
 
 - `createPlayerInTransaction()` -- the one player-creation primitive in `src/` -- now mints a

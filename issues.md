@@ -23276,7 +23276,7 @@ promotion record and the ISSUE-160 evidence before `merge:ready`.
 
 ## AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-- **Status:** Open / **Stage 1 code-complete 2026-09-11 (Opus 5 high) — implemented and validated on `afldb_test`, NOT committed, NOT deployed; Stage 2 (admin surface) outstanding.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Stage 1 authorised.**
+- **Status:** Open / **Stage 1 AND Stage 2 code-complete 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high) — implemented on `afldb_test` / statically for Stage 2, NOT committed, NOT deployed.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Stage 2 delivers `/admin/season-lists`, `/admin/season-lists/[season]`, `/admin/season-lists/[season]/[club]`; capabilities `data.seasonLists.read`/`.edit`; the Data-group nav entry; the ISSUE-160 handoff link (`/admin/draft/[id]` and the new-selection success panel); no revalidate route (`revalidatePaths: []` always, per §10); DEV Playwright deferred to the combined Admin Centre batch. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Both stages await operator review/commit and the combined ISSUE-160+ISSUE-161 DEV acceptance; neither issue is resolved.**
 - **Severity:** Medium
 - **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 - **Branch:** `opus/issue-161-season-lists`, worktree `D:\dev\afldb-issue-161`, cut from `opus/issue-160-draft-admin` @ `1295d3d` (stacked on ISSUE-160 by operator direction; ISSUE-160 is not merged first).
@@ -23409,12 +23409,168 @@ pushed, merged or deployed.**
    authoritative row below 2027 — and D-6's "ISSUE-161 writes no `seasons` row" holds even in the
    fixtures.
 
+### Stage 2 execution — 2026-09-11 (Sonnet 5 high), code-complete, uncommitted
+
+Implemented on top of the uncommitted Stage 1 tree, from this same worktree. **Not committed, not
+pushed, not merged, not deployed.** No shell/Git/database/deployment command was executed by
+Claude during Stage 2 (CLAUDE.md §9); the Stage 1 checkpoint (`97af605`) and a clean tree were
+confirmed from the session's own git-status context rather than by running `npm run preflight`.
+
+**Capabilities (§16).** `data.seasonLists.read` (`ADMIN_AND_UP`), `data.seasonLists.edit`
+(`SUPER_ADMIN_ONLY`) added to `src/lib/auth/capabilities.ts`'s `Capability` union and
+`CAPABILITY_ROLES`. Nav: Data group, after "Draft administration", label "Season lists", gated on
+`.read` (`src/app/admin/nav-model.ts`). `tests/auth.test.ts`'s `EQUIVALENT_ROLE_GUARD` map extended
+with both capabilities (`requireAdmin` / `requireSuperAdmin`) — the file's existing generic
+boundary-scanner (guard-first, capability↔nav↔declaration cross-checks) covers the new routes and
+actions automatically; no new test cases were hand-written for the mechanical parts of that
+contract.
+
+**Routes delivered exactly as the runbook (§20):** `/admin/season-lists` (season selector: every
+administrable season from 2027, member/completeness counts), `/admin/season-lists/[season]`
+(eligible-club cards, previous-season comparison — list-to-list from 2028, explicitly-labelled
+non-authoritative 2026 appearances for 2027 — and, for a copyable season, the Copy-forward panel),
+`/admin/season-lists/[season]/[club]` (member table with filters, Add/Remove/Transfer, the
+draftee-suggestion panel, the appearances-review panel for 2027, and the §15.1 "played but not
+listed" diagnostic). No `/admin/season-lists/[season]/[club]/[player]` detail route and no
+`/admin/season-lists/revalidate` route, matching §10/§20.
+
+**One Stage 2 backend addition (read-only, additive):** `readDraftSuggestions(season, clubSlug)` in
+`src/db/queries/admin-season-lists.ts` — Stage 1 delivered every mutation and the appearances
+projection but no read for "this club's draft selections not yet listed" (§14); this is a plain
+`SELECT` against `draft_picks`/`season_list_members`, changes no Stage 1 invariant, mutates nothing,
+and needed no migration.
+
+**Add / Remove / Transfer / Copy-forward:** thin Server Actions in
+`src/app/admin/season-lists/actions.ts`, each `requireCapability('data.seasonLists.edit')` as the
+literal first statement, calling exactly one Stage 1 primitive, returning `revalidatePaths: []`
+always. Remove and Transfer are per-row client controls (`MemberActions.tsx`) with an explicit
+two-step confirmation ("Remove from the season list", never "retire"); Transfer offers only
+eligible destination clubs and calls the atomic `transferSeasonListMember` primitive (never
+client-side remove-then-add). Copy-forward (`CopyForwardPanel.tsx`) is dry-run-then-confirm,
+club-selectable, and is not rendered at all for 2027 (D-2: nothing to copy) — the season page shows
+an explanatory note pointing at the appearances review panel instead.
+
+**Appearances review / draftee suggestions:** both read-only projections, rendered with a per-row
+explicit "Add" (own `candidate_source`, e.g. `draft:<pick id>` or `appearances:2026`) plus, for
+appearances only, an optional multi-select "Add selected" using the Stage 1 batch primitive — still
+one explicit reviewed submission, never an automatic seed. Nothing is written by either panel's
+read.
+
+**ISSUE-160 handoff (§14, option C):** a link only, added to `src/app/admin/draft/submit-helper.ts`
+(`SeasonListHandoff` type on `DraftActionState`), computed in `src/app/admin/draft/actions.ts`
+(`seasonListHandoffFor`, called from `createManualPickAction` and `createPlayerAndDraftPickAction`
+after their own write succeeds) and rendered in `NewPickWizard.tsx`'s two success panels and in
+`/admin/draft/[id]/page.tsx`'s header line. The link deep-links to
+`/admin/season-lists/<draftYear+1>/<clubSlug>?add=<playerId>`, hides itself when the target season
+is outside the administrable range, and never writes `season_list_members` — the destination Add
+panel still requires an explicit Super Admin confirmation.
+
+**No retired flag; fixture independence.** Neither introduced anywhere: "listed" / "not listed" is
+read directly from `season_list_members` per season, and every route/read above depends only on
+`clubs`, `players`, `draft_picks`, `season_list_members` and `seasons.year` — none of them needs a
+`matches` row, a fixture or a `club_seasons` row for a future season (verified by inspection against
+the Stage 1 query bodies, which the runbook's §9.4 already established are fixture-independent).
+
+**Deviations from the runbook (recorded, not stopped on):**
+
+1. The club-page filter set implements `all | draftees | unresolved | no-games` as filters on the
+   MEMBER table (rows that ARE listed); `departed` is not implemented as a fourth filter value
+   because a departed player is, by definition, absent from that table and cannot be filtered into
+   it — the runbook's own `"departed(S-1 panel)"` annotation reads as a note that departure is a
+   separate panel, not a table filter. No separate "departed since previous season" panel was built
+   in this pass (diminishing return against the season overview's own previous-vs-current member
+   counts); this is a scope trim, not a defect, and is a candidate follow-up if the operator wants
+   it.
+2. The draftee suggestion panel offers only a per-row "Add" (exact `candidate_source =
+   'draft:<pick id>'` per player), not a multi-select batch add: `addSeasonListMembers` accepts one
+   shared `candidateSource` for the whole batch, which would blur the per-pick evidence a per-row
+   call preserves. The appearances review panel, where `candidate_source` is genuinely uniform
+   across a batch (`appearances:<season-1>`), keeps both the per-row and the multi-select path.
+
+**Validation not yet run by Claude (CLAUDE.md §9 — Claude does not execute shell commands by
+default; none was authorised for Stage 2).** The exact commands for the operator to run:
+
+```
+npx tsc --noEmit
+npx vitest run tests/auth.test.ts tests/admin-season-list-actions.test.ts tests/admin-draft-actions.test.ts
+npx vitest run tests/integration/admin-season-lists.test.ts tests/integration/admin-draft.test.ts
+npx eslint src/app/admin/season-lists src/app/admin/draft src/lib/auth/capabilities.ts src/app/admin/nav-model.ts src/db/queries/admin-season-lists.ts
+git diff --check
+```
+
+### Stage 2 validation repair pass — 2026-09-11 (Sonnet 5, high)
+
+The operator ran the block above. Results: `npx tsc --noEmit` PASS; `tests/integration/
+admin-season-lists.test.ts` 40/40 PASS; `tests/integration/admin-draft.test.ts` 45/45 PASS;
+`git diff --check` PASS; auth/unit batch **198 passed, 3 failed**; eslint **1 new error**.
+
+Fixed, scope held to exactly these findings plus one genuine contract gap surfaced by
+re-inspecting the runbook (§33.4's own inspection instruction, not a reported failure):
+
+1. **`tests/auth.test.ts`** — two nav expectations still asserted the Data group's href list from
+   before `/admin/season-lists` existed (`omits a group entirely for a viewer with no capability`
+   and `keeps the Data group in section order`). Both updated to append `/admin/season-lists`
+   after `/admin/draft`; no capability test weakened, `/admin/season-lists` not removed anywhere.
+2. **`generateMetadata` guard defect (real).** Neither
+   `src/app/admin/season-lists/[season]/page.tsx` nor `.../[season]/[club]/page.tsx` guarded its
+   `generateMetadata` — an oversight from the first Stage 2 pass: no other admin page in the
+   repository uses `generateMetadata` at all (every other dynamic-route admin page, including this
+   repo's own `/admin/draft/[id]`, uses a static `export const metadata`), so there was no existing
+   pattern to copy from when these two files were written. Fixed by adding
+   `await requireCapability('data.seasonLists.read')` as the literal first statement in both
+   functions, before `await params` — the same contract the pages' own default exports already
+   meet. `tests/auth.test.ts`'s generic boundary scanner was not special-cased.
+3. **`AddPlayerPanel.tsx` lint error (real).** One internal admin link (`/admin/draft/new`) used a
+   plain `<a>`; replaced with `next/link`'s `Link`. The file's two links to public
+   `/players/<slug>-<id>` pages were untouched — they already match the exact pattern
+   `/admin/draft/[id]` and `/admin/draft` use for "view public page" links, which is why they were
+   not flagged.
+4. **`+added/-departed vs S-1` and "departed since S-1" (mandatory, not optional — confirmed by
+   re-reading §11 and §20, which state `"changes vs S-1 (+added / -departed, computed by
+   organisation)"` as explicit season-overview content, and §13/§15.1's own references to a
+   "departed since S-1" panel).** The first Stage 2 pass's deviation note calling this optional was
+   wrong. Fixed with two additive, read-only Stage 2 queries in `admin-season-lists.ts`
+   (`readSeasonListChanges(season)`, `readDepartedSincePreviousList(season, clubSlug)`; no
+   migration, no invariant touched, per-club with the S-1 side organisation-scoped so a rename
+   never double-counts): the season overview's club cards now show `+X / −Y` instead of a raw
+   count; the club page gained a "Departed since S-1" panel for `season > FIRST_LIST_SEASON` (2027
+   itself already shows the identical set via the existing appearances review panel, so a second
+   copy was not built there).
+
+`revalidatePaths: []` freshness was also traced and confirmed correct with no code change needed:
+`useAdminActionSubmit` (`src/components/admin/action-submit.ts`) calls `router.refresh()`
+unconditionally on every successful action result, independent of `revalidatePaths` — that call
+alone is what refreshes the CURRENT admin page's server-rendered data (every season-list page is
+`export const dynamic = 'force-dynamic'`, so `router.refresh()` always re-executes the page's own
+server reads against the database). `revalidatePath`/`postRevalidate` is a separate mechanism that
+exists only for PUBLIC, cached (ISR) pages outside `/admin` needing explicit cache invalidation —
+`revalidatePaths: []` is correct because no such public consumer exists yet (§10). This is the same
+mechanism every other admin mutation surface in the repo (coaches, draft) already relies on
+identically, not a new or untested path.
+
+No backend semantics were touched by this pass: migration 096, `season_list_members` invariants,
+add/remove/transfer/copy-forward, the replay branch, `FIRST_LIST_SEASON` and the ISSUE-160
+no-auto-membership rule are all unchanged; the two new queries are plain `SELECT`s.
+
+**Files changed by the repair pass:** `tests/auth.test.ts`, `src/app/admin/season-lists/
+[season]/page.tsx`, `src/app/admin/season-lists/[season]/[club]/page.tsx`,
+`src/app/admin/season-lists/AddPlayerPanel.tsx`, `src/db/queries/admin-season-lists.ts`.
+
+**Re-run for the operator to confirm before commit:**
+
+```
+npx tsc --noEmit
+npx vitest run tests/auth.test.ts tests/admin-season-list-actions.test.ts tests/admin-draft-actions.test.ts
+npx vitest run tests/integration/admin-season-lists.test.ts tests/integration/admin-draft.test.ts
+npx eslint src/app/admin/season-lists src/app/admin/draft src/lib/auth/capabilities.ts src/app/admin/nav-model.ts src/db/queries/admin-season-lists.ts
+git diff --check
+git status --short
+```
+
 ### Next action
 
-Stage 2 (admin surface, runbook §29): capabilities `data.seasonLists.read/.edit`, nav entry,
-`/admin/season-lists`, `/[season]`, `/[season]/[club]`, `actions.ts`, `validation.ts`, the panels
-(copy preview/confirm, Add, Draftees, Appearances review, Remove, Transfer), the ISSUE-160 handoff
-link, `docs/admin-and-beta.md`, and the `tests/auth.test.ts` capability↔guard↔nav rows. The Stage 1
-backend is ready for operator review and commit first. DEV deploy order when the Admin Centre batch
-ships: **migration 096 → `npm run db:privileges` → code** (`db:privileges` could not be run from the
-workstation — no `psql` — and the table's app read is fail-closed until it does).
+Both stages are code-complete and awaiting operator review and commit. DEV deploy order when the
+combined Admin Centre batch ships: **migration 096 → `npm run db:privileges` → code**
+(`db:privileges` could not be run from the workstation — no `psql` — and the table's app read is
+fail-closed until it does), then the combined ISSUE-160 + ISSUE-161 DEV acceptance and role-based
+Playwright (runbook §24's deferred UI row). Neither ISSUE-160 nor ISSUE-161 is resolved.

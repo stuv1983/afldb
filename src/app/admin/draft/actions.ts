@@ -14,11 +14,12 @@ import {
   supersedeManualPickBySourceRow as supersedeManualPickBySourceRowQuery,
   type DraftRefusalReason,
 } from '@/db/queries/admin-draft';
+import { administrableListSeasons, isAdministrableListSeason } from '@/db/queries/admin-season-lists';
 import { searchPlayers } from '@/db/queries/search';
 import { audit, requireCapability } from '@/lib/auth/session';
 import { playerPath } from '@/lib/format';
 
-import type { DraftActionState } from './submit-helper';
+import type { DraftActionState, SeasonListHandoff } from './submit-helper';
 import {
   optionalText, parseEventPair, parseNullablePickNumber, parsePositiveInt, requiredText,
 } from './validation';
@@ -60,6 +61,23 @@ async function playerRevalidatePaths(playerIds: number[], options: { includeSite
   }
   if (options.includeSitemap) paths.push('/sitemap.xml');
   return paths;
+}
+
+/**
+ * AFLDB-ISSUE-161 §14 (option C, D-5): a link only, offered when the season
+ * following this draft year is within the season-list administrable range
+ * (§9.1) — "the handoff hides itself when the target season exceeds the
+ * list bound, with the reason" is satisfied by simply returning null rather
+ * than rendering a link nowhere useful. Never mutates season-list state.
+ */
+async function seasonListHandoffFor(
+  clubSlug: string | null, draftYear: number, playerId: number,
+): Promise<SeasonListHandoff> {
+  if (!clubSlug) return null;
+  const targetSeason = draftYear + 1;
+  const bounds = await administrableListSeasons();
+  if (!isAdministrableListSeason(targetSeason, bounds)) return null;
+  return { season: targetSeason, clubSlug, playerId };
 }
 
 function readFieldValues(formData: FormData, prefix: string): Record<string, string> {
@@ -207,6 +225,7 @@ export async function createManualPickAction(
     ok: true,
     message: `Selection #${result.pickId} recorded.`,
     revalidatePaths: await playerRevalidatePaths([result.playerId]),
+    seasonListHandoff: await seasonListHandoffFor(clubSlug, draftYear, result.playerId),
   };
 }
 
@@ -275,6 +294,7 @@ export async function createPlayerAndDraftPickAction(
       + 'External identity: none yet (manual). An AFL Tables identity attaches after debut; '
       + 'a DraftGuru identity links through Player links when the source publishes this person.',
     revalidatePaths: await playerRevalidatePaths([result.playerId], { includeSitemap: true }),
+    seasonListHandoff: await seasonListHandoffFor(clubSlug, draftYear, result.playerId),
   };
 }
 

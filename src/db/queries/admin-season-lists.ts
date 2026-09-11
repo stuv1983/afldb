@@ -1196,6 +1196,103 @@ export async function readSeasonListOverview(season: number): Promise<SeasonList
   `;
 }
 
+export type SeasonListChangeSummary = {
+  clubSlug: string;
+  clubName: string;
+  added: number;
+  departed: number;
+};
+
+/**
+ * STAGE 2 ADDITION (§11, §15.1, §20). "changes vs S-1 (+added / -departed,
+ * computed by organisation)" is explicit runbook text for the season
+ * overview's club cards, not an optional nicety -- Stage 1 delivered no read
+ * for it. Read-only, additive; changes no Stage 1 invariant.
+ *
+ * Computed PER CLUB: a player counts as "added" to a club when they are on
+ * that club's S list but were not, anywhere in the SAME organisation, on
+ * S-1's roster (or, for `FIRST_LIST_SEASON`, did not appear there in S-1);
+ * "departed" is the mirror -- on the organisation's S-1 roster (list or
+ * appearances) but not on THIS club's S list, whether they moved to another
+ * club or left the game entirely. The S-1 side is organisation-scoped so a
+ * rename between S-1 and S never miscounts a continuing player as both.
+ */
+export async function readSeasonListChanges(season: number): Promise<SeasonListChangeSummary[]> {
+  if (season === FIRST_LIST_SEASON) {
+    return sql<SeasonListChangeSummary[]>`
+      SELECT e.slug AS "clubSlug", e.name AS "clubName",
+             (SELECT count(*)::int FROM season_list_members m
+               WHERE m.season = ${season}::smallint AND m.club_id = e.id
+                 AND NOT EXISTS (
+                   SELECT 1 FROM player_club_season_stats pcs JOIN clubs pc ON pc.id = pcs.club_id
+                    WHERE pcs.season = ${season - 1}::smallint AND pc.organization_id = e.organization_id
+                      AND pcs.player_id = m.player_id
+                 )) AS added,
+             (SELECT count(*)::int FROM player_club_season_stats pcs
+                JOIN clubs pc ON pc.id = pcs.club_id
+               WHERE pcs.season = ${season - 1}::smallint AND pc.organization_id = e.organization_id
+                 AND NOT EXISTS (
+                   SELECT 1 FROM season_list_members m
+                    WHERE m.season = ${season}::smallint AND m.club_id = e.id AND m.player_id = pcs.player_id
+                 )) AS departed
+        FROM afldb_season_list_clubs(${season}::smallint) e
+       ORDER BY e.name
+    `;
+  }
+  return sql<SeasonListChangeSummary[]>`
+    SELECT e.slug AS "clubSlug", e.name AS "clubName",
+           (SELECT count(*)::int FROM season_list_members m
+             WHERE m.season = ${season}::smallint AND m.club_id = e.id
+               AND NOT EXISTS (
+                 SELECT 1 FROM season_list_members m2 JOIN clubs c2 ON c2.id = m2.club_id
+                  WHERE m2.season = ${season - 1}::smallint AND c2.organization_id = e.organization_id
+                    AND m2.player_id = m.player_id
+               )) AS added,
+           (SELECT count(*)::int FROM season_list_members m2
+              JOIN clubs c2 ON c2.id = m2.club_id
+             WHERE m2.season = ${season - 1}::smallint AND c2.organization_id = e.organization_id
+               AND NOT EXISTS (
+                 SELECT 1 FROM season_list_members m
+                  WHERE m.season = ${season}::smallint AND m.club_id = e.id AND m.player_id = m2.player_id
+               )) AS departed
+      FROM afldb_season_list_clubs(${season}::smallint) e
+     ORDER BY e.name
+  `;
+}
+
+export type SeasonListChangeCandidate = {
+  playerId: number;
+  playerSlug: string;
+  displayName: string;
+};
+
+/**
+ * STAGE 2 ADDITION (§15.1's "departed since S-1" diagnostic row; §13's
+ * "the season page's 'departed since S-1' panel" reference). Only meaningful
+ * for a season with an earlier AUTHORITATIVE list to compare against
+ * (season > FIRST_LIST_SEASON) -- for FIRST_LIST_SEASON (2027) this exact
+ * set is already what `readAppearanceReviewCandidates()` shows, clearly
+ * labelled non-authoritative, so this function is not called for it (the
+ * caller decides; no season guard here mirrors the caller-decides shape of
+ * the appearances projection).
+ */
+export async function readDepartedSincePreviousList(
+  season: number, clubSlug: string,
+): Promise<SeasonListChangeCandidate[]> {
+  return sql<SeasonListChangeCandidate[]>`
+    SELECT DISTINCT p.id AS "playerId", p.slug AS "playerSlug", p.display_name AS "displayName"
+      FROM season_list_members m2
+      JOIN players p ON p.id = m2.player_id
+      JOIN clubs c2 ON c2.id = m2.club_id
+      JOIN clubs target ON target.slug = ${clubSlug}
+     WHERE m2.season = ${season - 1}::smallint
+       AND c2.organization_id = target.organization_id
+       AND NOT EXISTS (SELECT 1 FROM season_list_members m
+                        WHERE m.season = ${season}::smallint AND m.club_id = target.id AND m.player_id = p.id)
+     ORDER BY p.display_name
+  `;
+}
+
 export type AppearanceReviewCandidate = {
   playerId: number;
   playerSlug: string;
@@ -1265,6 +1362,49 @@ export async function readPlayedNotListed(
        AND NOT EXISTS (SELECT 1 FROM season_list_members m
                         WHERE m.season = pcs.season AND m.player_id = pcs.player_id)
      ORDER BY pcs.games DESC, p.display_name
+  `;
+}
+
+export type DraftSuggestionCandidate = {
+  playerId: number;
+  playerSlug: string;
+  displayName: string;
+  draftPickId: number;
+  draftYear: number;
+  draftKind: string | null;
+  pickNumber: number | null;
+};
+
+/**
+ * STAGE 2 ADDITION (§14, §20 club-page "Draftees" panel). Stage 1 delivered
+ * no read for this — `readClubSeasonList()`'s `draftPickId` column answers a
+ * different question ("does this ALREADY-LISTED player's own club draft
+ * pick exist") — so this is new, read-only, and additive: it changes no
+ * Stage 1 invariant and writes nothing.
+ *
+ * `draft_picks` rows for THIS club with `draft_year IN (S-1, S)`,
+ * `player_id IS NOT NULL`, not yet on the S list — exactly §14's rule. Like
+ * the appearances review panel, this is a suggestion, never a source of
+ * membership: adding from it is the same explicit `addSeasonListMember`
+ * decision as anywhere else, carrying `candidate_source = 'draft:<pick id>'`
+ * as evidence of where the admin was looking.
+ */
+export async function readDraftSuggestions(
+  season: number, clubSlug: string,
+): Promise<DraftSuggestionCandidate[]> {
+  return sql<DraftSuggestionCandidate[]>`
+    SELECT p.id AS "playerId", p.slug AS "playerSlug", p.display_name AS "displayName",
+           d.id AS "draftPickId", d.draft_year::int AS "draftYear", d.draft_kind AS "draftKind",
+           d.pick_number AS "pickNumber"
+      FROM draft_picks d
+      JOIN players p ON p.id = d.player_id
+      JOIN clubs c ON c.id = d.club_id
+     WHERE c.slug = ${clubSlug}
+       AND d.player_id IS NOT NULL
+       AND d.draft_year IN (${season - 1}, ${season})
+       AND NOT EXISTS (SELECT 1 FROM season_list_members m
+                        WHERE m.season = ${season}::smallint AND m.player_id = d.player_id)
+     ORDER BY d.draft_year DESC, d.pick_number NULLS LAST, p.display_name
   `;
 }
 

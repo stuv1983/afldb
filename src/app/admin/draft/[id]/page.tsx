@@ -9,6 +9,7 @@ import { RetirePanel } from '@/app/admin/draft/RetirePanel';
 import { SourceFieldsPanel } from '@/app/admin/draft/SourceFieldsPanel';
 import { SupersedePanel } from '@/app/admin/draft/SupersedePanel';
 import { sql } from '@/db/client';
+import { administrableListSeasons, isAdministrableListSeason } from '@/db/queries/admin-season-lists';
 import { listClubs } from '@/db/queries/clubs';
 import {
   DRAFT_EVENT_PAIRS,
@@ -92,6 +93,15 @@ export default async function DraftPickAdminDetailPage(
       `)[0] ?? null
     : null;
 
+  // AFLDB-ISSUE-161 §14 handoff (option C, D-5): a link only, offered when
+  // the season following this draft year is within the season-list
+  // administrable range. Never mutates season-list state.
+  const listBounds = await administrableListSeasons();
+  const seasonListHandoff = detail.playerId !== null && detail.clubSlug
+    && isAdministrableListSeason(detail.draftYear + 1, listBounds)
+    ? { season: detail.draftYear + 1, clubSlug: detail.clubSlug }
+    : null;
+
   const auditHref = detail.provenance === 'draftguru'
     ? `/admin/audit/entity/draft_picks/${detail.id}`
     : detail.playerId !== null
@@ -111,6 +121,14 @@ export default async function DraftPickAdminDetailPage(
             <> · <a href={playerPath(detail.playerSlug, detail.playerId)}>View public page</a></>
           )}
           {auditHref && <> · <Link href={auditHref}>Audit trail</Link></>}
+          {seasonListHandoff && detail.playerId !== null && (
+            <>
+              {' · '}
+              <Link href={`/admin/season-lists/${seasonListHandoff.season}/${seasonListHandoff.clubSlug}?add=${detail.playerId}`}>
+                Add to {seasonListHandoff.season} season list
+              </Link>
+            </>
+          )}
         </p>
       </div>
 

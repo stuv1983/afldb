@@ -88,6 +88,13 @@ export function NewPickWizard({
     return (
       <section className="section">
         <p className="notice" role="status">{existing.state.message}</p>
+        {existing.state.seasonListHandoff && (
+          <p>
+            <Link href={`/admin/season-lists/${existing.state.seasonListHandoff.season}/${existing.state.seasonListHandoff.clubSlug}?add=${existing.state.seasonListHandoff.playerId}`}>
+              Add to the {existing.state.seasonListHandoff.season} season list…
+            </Link>
+          </p>
+        )}
         <p><Link href="/admin/draft">Back to draft administration</Link></p>
       </section>
     );
@@ -96,6 +103,13 @@ export function NewPickWizard({
     return (
       <section className="section">
         <p className="notice" role="status">{createNew.state.message}</p>
+        {createNew.state.seasonListHandoff && (
+          <p>
+            <Link href={`/admin/season-lists/${createNew.state.seasonListHandoff.season}/${createNew.state.seasonListHandoff.clubSlug}?add=${createNew.state.seasonListHandoff.playerId}`}>
+              Add to the {createNew.state.seasonListHandoff.season} season list…
+            </Link>
+          </p>
+        )}
         <p><Link href="/admin/draft">Back to draft administration</Link></p>
       </section>
     );
