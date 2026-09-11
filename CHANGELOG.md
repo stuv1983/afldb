@@ -75,6 +75,11 @@ commit.
   link appears in the Admin Centre sidebar's Data group, after Season lists, for anyone who holds
   `data.fixtures.read`. No public page changes and no revalidation route was added: every action
   here returns no paths to revalidate.
+- A voided fixture is presented as the terminal record it is: like a played one it shows its
+  identity, schedule and notes and no schedule, venue, round or club control, so no screen offers
+  an edit the server will refuse. Returning a date to TBC returns its start time to TBC with it,
+  on the single form, in the batch and on reschedule -- AFLDB stores an unknown time as unknown,
+  never as a time attached to no day.
 
 ### AFLDB learns what a club's playing list is (AFLDB-ISSUE-161 Stage 1, ISSUE-156 P3c) - 11 September 2026
 

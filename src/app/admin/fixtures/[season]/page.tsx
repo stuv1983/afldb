@@ -125,8 +125,10 @@ export default async function FixtureSeasonPage(
         <section className="section">
           <h2>Diagnostics</h2>
           <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'grid', gap: '0.3rem' }}>
-            {diagnostics.map((d) => (
-              <li key={d.code} style={{ fontSize: '0.85rem' }}>
+            {/* `round_byes` is emitted once per round (§27), so the code alone
+                is not unique across the list -- key on the position too. */}
+            {diagnostics.map((d, index) => (
+              <li key={`${d.code}-${index}`} style={{ fontSize: '0.85rem' }}>
                 <span className={`badge${d.severity === 'invalid' ? ' badge-danger' : d.severity === 'warning' ? ' badge-warn' : ''}`}>
                   {d.severity}
                 </span>{' '}

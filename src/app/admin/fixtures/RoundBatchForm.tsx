@@ -33,13 +33,22 @@ type WireRow = {
   notes: string | null;
 };
 
+/**
+ * The row exactly as the server will see it, and as the preview fingerprint
+ * covers it. A time is dropped when the row has no date: a time with no date
+ * is refused server-side (§10) and the time cell is disabled while the date is
+ * blank, so a row whose date was cleared after a time was typed would
+ * otherwise carry an invisible value that refuses the WHOLE round. Because
+ * preview and confirm both serialise through here, the two always agree.
+ */
 function toWireRow(row: Row): WireRow {
   const venueId = row.venueSelect && row.venueSelect !== OTHER_VENUE ? Number(row.venueSelect) : null;
+  const matchDate = row.matchDate || null;
   return {
     homeClubId: row.homeClubId ? Number(row.homeClubId) : null,
     awayClubId: row.awayClubId ? Number(row.awayClubId) : null,
-    matchDate: row.matchDate || null,
-    matchTime: row.matchTime || null,
+    matchDate,
+    matchTime: matchDate === null ? null : (row.matchTime || null),
     venueId,
     venueRaw: venueId === null && row.venueSelect === OTHER_VENUE ? (row.venueRaw || null) : null,
     notes: row.notes || null,
@@ -110,7 +119,14 @@ export function RoundBatchForm({
   });
 
   const updateRow = (index: number, patch: Partial<Row>) => {
-    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    setRows((current) => current.map((row, i) => {
+      if (i !== index) return row;
+      const next = { ...row, ...patch };
+      // Returning a date to TBC returns its time to TBC too -- the same rule
+      // `toWireRow` enforces on the wire, applied to what the operator can see.
+      if (patch.matchDate === '') next.matchTime = '';
+      return next;
+    }));
   };
   const addRow = () => setRows((current) => (current.length >= MAX_BATCH_ROWS ? current : [...current, { ...EMPTY_ROW }]));
   const removeRow = (index: number) => setRows((current) => current.filter((_, i) => i !== index));
@@ -164,7 +180,7 @@ export function RoundBatchForm({
   return (
     <section className="section">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', maxWidth: '32rem' }}>
-        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+        <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
           Round type
           <select value={roundType} onChange={(event) => setRoundType(event.target.value as FixtureRoundType)} disabled={batch.isPending}>
             <option value="home_and_away">Home and away</option>
@@ -177,7 +193,7 @@ export function RoundBatchForm({
           </select>
         </label>
         {roundType === 'home_and_away' && (
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Round number
             <input type="number" min={1} max={MAX_HOME_AND_AWAY_ROUND} value={roundNumber} onChange={(event) => setRoundNumber(event.target.value)} disabled={batch.isPending} />
           </label>
@@ -223,30 +239,30 @@ export function RoundBatchForm({
                 <tr key={index}>
                   <td>{index + 1}</td>
                   <td>
-                    <select value={row.homeClubId} onChange={(event) => updateRow(index, { homeClubId: event.target.value })} disabled={batch.isPending}>
+                    <select aria-label={`Home club, fixture ${index + 1}`} value={row.homeClubId} onChange={(event) => updateRow(index, { homeClubId: event.target.value })} disabled={batch.isPending}>
                       <option value="">— select —</option>
                       {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
                   <td>
-                    <select value={row.awayClubId} onChange={(event) => updateRow(index, { awayClubId: event.target.value })} disabled={batch.isPending}>
+                    <select aria-label={`Away club, fixture ${index + 1}`} value={row.awayClubId} onChange={(event) => updateRow(index, { awayClubId: event.target.value })} disabled={batch.isPending}>
                       <option value="">— select —</option>
                       {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
-                  <td><input type="date" value={row.matchDate} onChange={(event) => updateRow(index, { matchDate: event.target.value })} disabled={batch.isPending} /></td>
-                  <td><input type="text" placeholder="TBC" value={row.matchTime} onChange={(event) => updateRow(index, { matchTime: event.target.value })} disabled={batch.isPending || !row.matchDate} style={{ width: '4.5rem' }} /></td>
+                  <td><input type="date" aria-label={`Date, fixture ${index + 1} (blank = TBC)`} value={row.matchDate} onChange={(event) => updateRow(index, { matchDate: event.target.value })} disabled={batch.isPending} /></td>
+                  <td><input type="text" placeholder="TBC" aria-label={row.matchDate ? `Local start time, fixture ${index + 1} (blank = TBC)` : `Local start time, fixture ${index + 1} — choose a date first`} value={row.matchTime} onChange={(event) => updateRow(index, { matchTime: event.target.value })} disabled={batch.isPending || !row.matchDate} style={{ width: '4.5rem' }} /></td>
                   <td>
-                    <select value={row.venueSelect} onChange={(event) => updateRow(index, { venueSelect: event.target.value })} disabled={batch.isPending}>
+                    <select aria-label={`Venue, fixture ${index + 1}`} value={row.venueSelect} onChange={(event) => updateRow(index, { venueSelect: event.target.value })} disabled={batch.isPending}>
                       <option value="">TBC</option>
                       {venues.map((v) => <option key={v.id} value={v.id}>{v.canonicalName}</option>)}
                       <option value={OTHER_VENUE}>Named, unmapped…</option>
                     </select>
                     {row.venueSelect === OTHER_VENUE && (
-                      <input type="text" placeholder="Venue name" value={row.venueRaw} onChange={(event) => updateRow(index, { venueRaw: event.target.value })} disabled={batch.isPending} style={{ marginTop: '0.2rem', width: '100%' }} />
+                      <input type="text" placeholder="Venue name" aria-label={`Unmapped venue name, fixture ${index + 1}`} value={row.venueRaw} onChange={(event) => updateRow(index, { venueRaw: event.target.value })} disabled={batch.isPending} style={{ marginTop: '0.2rem', width: '100%' }} />
                     )}
                   </td>
-                  <td><input type="text" value={row.notes} onChange={(event) => updateRow(index, { notes: event.target.value })} disabled={batch.isPending} style={{ width: '8rem' }} /></td>
+                  <td><input type="text" aria-label={`Notes, fixture ${index + 1}`} value={row.notes} onChange={(event) => updateRow(index, { notes: event.target.value })} disabled={batch.isPending} style={{ width: '8rem' }} /></td>
                   {outcomes.length > 0 && (
                     <td style={{ fontSize: '0.8rem' }}>
                       {outcome === undefined ? '—' : outcome.ok
@@ -255,7 +271,7 @@ export function RoundBatchForm({
                     </td>
                   )}
                   <td>
-                    <button type="button" className="btn btn-secondary" onClick={() => removeRow(index)} disabled={batch.isPending || rows.length <= 1}>
+                    <button type="button" className="btn btn-secondary" onClick={() => removeRow(index)} disabled={batch.isPending || rows.length <= 1} aria-label={`Remove fixture ${index + 1}`}>
                       Remove
                     </button>
                   </td>

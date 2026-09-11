@@ -49,7 +49,7 @@ export function RoundPanel({
           </select>
         </label>
         {type === 'home_and_away' && (
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Round number
             <input type="number" min={1} max={MAX_HOME_AND_AWAY_ROUND} value={number} onChange={(event) => setNumber(event.target.value)} disabled={change.isPending} />
           </label>

@@ -1,12 +1,13 @@
 # AFLDB-ISSUE-162 — Fixture / season schedule administration (ISSUE-156 P3d)
 
-- **Status:** **Stage 1 EXECUTED 2026-09-11 (Opus 5 high, 1M context) — uncommitted, unvalidated by
-  a run, not deployed; DEV and PROD untouched.** Migration **097 re-checked free and allocated**.
-  See **§37 Stage 1 implementation record** for exactly what was built, the two deviations, and the
-  validation the operator must run before committing. Stage 2 (the `/admin/fixtures` surface) is
-  not built. Planning complete 2026-09-11.
+- **Status:** **OPEN. Stage 1 committed `cb98c67`, Stage 2 committed `6a9fbc4`; both validated
+  locally. Final local audit 2026-09-12 (Opus 5 high, 1M) — 8 Stage 2 defects fixed, UNCOMMITTED and
+  NOT RE-RUN (§39).** Not merged, not deployed; DEV and PROD untouched throughout. Migration **097
+  allocated**; its all-refs collision check (§37.10) has still never run and remains binding.
+  Combined ISSUE-160 + 161 + 162 DEV/browser acceptance is deferred to the Admin Centre batch (§34).
+  Records: **§37** Stage 1, **§38** Stage 2, **§39** the final audit.
   **Operator decisions D-1…D-7 DECIDED 2026-09-11 (§35); D-6 approved with a condition and one
-  additional implementation constraint. Stage 1 is authorised.**
+  additional implementation constraint.**
 - **Severity:** Medium
 - **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
 - **Planning model:** Fable 5.1, high
@@ -1475,3 +1476,186 @@ Stage 1 mutation's input type. Neither should require touching Stage 1.
 
 ISSUE-162 remains **not resolved**: Stage 2 is code-complete but unvalidated by a run, uncommitted,
 not merged, not deployed to DEV, PROD untouched.
+
+**Superseded by §39:** Stage 2 was subsequently validated and committed (`6a9fbc4`), and the
+whole-issue audit below re-gated it. §38.5's list was run green by the operator; the re-gate
+commands are §39.7.
+
+---
+
+## 39. Final local audit (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+
+A whole-issue audit of Stage 1 + Stage 2 together at `6a9fbc4`, against §§3–28, D-1…D-7 and the §6
+identity constraint. Read natively; no shell, Git, database or deployment command was executed
+(CLAUDE.md §9/§12), and no DEV or PROD state was touched.
+
+### 39.1 Verdict
+
+**No stop condition fired.** None of the twelve architectural stops is in play: the schema needs no
+migration 098, `fixture_key` needs no redesign, no persisted match linkage is required, the played
+resolution needs no fuzzy matching, the batch fingerprint contract is sound as designed, the
+capability contract agrees with the ISSUE-156 umbrella, nothing requires public exposure, the replay
+contract is unchanged, no path writes `matches`, and no `seasons` row is needed.
+
+Eight ordinary defects were found and fixed. Two are behavioural (a void fixture was offered four
+edit controls the backend can only refuse; a cleared date left an invisible start time that refused
+the submission). The rest are a duplicate React key, an undefined CSS class, a `<select>` that could
+display a club the fixture does not name, a coerced id in the batch parser, missing accessible names
+on the batch row controls, and a 320px overflow guard.
+
+### 39.2 Confirmations, by audit area
+
+| Area | Result |
+|---|---|
+| **A. Authorization** | Clean. `data.fixtures.read` = ADMIN_AND_UP, `data.fixtures.edit` = SUPER_ADMIN_ONLY (`capabilities.ts:117-118`). `tests/auth.test.ts`'s ISSUE-158 contract is generic over `src/app/admin/**`: it walks every `page.tsx`, `route.ts` and `'use server'` module, requires `requireCapability()` to be the FIRST awaited call of every exported async function, and asserts every declared capability is enforced at a real boundary and every enforced one is declared. All four fixture pages (and both `generateMetadata`s) and all ten actions satisfy it by construction; no role helper is used anywhere in the fixture tree, so the capability/legacy-guard mismatch class cannot arise. Nav visibility is furniture over the same capability the route enforces, asserted by the same suite |
+| **B. Server Action contract** | Clean. Ten actions, each: capability first, shape-only parsing, ONE `admin-fixtures.ts` call, structured `reason` preserved (`shouldAuditRefusal()` switches on the enum, never on the sentence), `revalidatePaths: []` on every success, none on a refusal, no public path anywhere. No action writes SQL; none catches a DB error into a success — `audit()` is the only `try/catch` and it wraps the audit call alone, after the mutation has already returned `ok` |
+| **C. Batch preview staleness** | Sound, and now proved rather than assumed. Two independent gates: the client retires Confirm whenever its snapshot (round type, round number, every wire row in order) differs from the previewed one, and the server recomputes `fixtureBatchFingerprint()` over `{season, roundType, roundNumber, rows[]}` and refuses `stale_preview` on any mismatch — including a confirm carrying no fingerprint at all. The server gate is the real one: the client snapshot omits `season` (a route prop), so the fingerprint is the only thing standing between a re-targeted season and a write. §39.4 item 9 extends the unit test to pin season, round type, both club ids, date, venue id, an unmapped venue name, notes and row count. Preview writes nothing (§37.11 and `wrote(seen)` is empty); confirm is one transaction, all-or-nothing; every row's outcome is returned, not only the first failure |
+| **D. Single create** | Clean. Clubs come only from `eligibleFixtureClubs()`; the `"other"` venue sentinel is swallowed by `parsePositiveInt()` and can never be read as an id; no placeholder club exists anywhere; finals carry no round number and home-and-away carries one (`renderRound()` + `fixtures_round_number_ck`); a time with no date is refused in the writer AND by `fixtures_time_needs_date_ck`; unmapped venues are supported with no `INSERT INTO venues`; `already_played` is refused before the first write; there is no score field to enter |
+| **E. Detail / CAS** | Clean after the void fix. `readFixture()` is by `fixture_key` and the page 404s on `fixture.season !== season`, so a right key under a wrong season is not reachable. Every panel carries `expectedUpdatedAt`; `editFixture()` locks the row `FOR UPDATE`, takes the season advisory lock, then CASes on `updated_at` and refuses `stale` — before the lifecycle gate, the precheck and any write. `fixture_key` is never in a `SET` list |
+| **F. Played resolution** | Clean. `resolvePlayed()` is the single decision for reads and for the write-time lock; `ambiguous` links nothing, is an `invalid` diagnostic, and deliberately does NOT lock edits; `played_home_away_differs` links but renders an explicit warning on both the list and the detail page; no date or venue is compared to decide the state; `PLAYED_RESULT_FACTS` yields a row only when exactly one candidate exists, so a schedule disagreement can never be reported against a row the resolution did not link. No `match_id`/`match_key` column, and none is compared. A played fixture renders notes only; the backend refuses `played_locked` independently of what is rendered |
+| **G. Lifecycle** | Clean after the void fix. scheduled→cancelled (reason + confirm), cancelled→scheduled (reinstate re-runs the §13 collision checks and the season window), scheduled→void and cancelled→void (reason + separate destructive block, reclassification wording when already cancelled), void terminal in every direction. No hard DELETE exists. Void is never a sibling button of cancel |
+| **H. Venue semantics** | Clean, and Stage 2 improves rather than hides the §37.8 limit. Mapped / unmapped-by-name / TBC are three distinct renderings on both the season list and the detail page, plus an `unmapped_venue` warning in the diagnostics. Editing an unrelated field does NOT destroy `venue_raw`: `editFixture()` carries every unchanged field forward from the locked row into the rewritten payload. The documented limit is unchanged and remains non-blocking — a replay that could not resolve a slug leaves `venue_id NULL` with the name intact, and a later edit rewrites the payload from that row without a `venue_slug`; the human-readable fact always survives and re-selecting the venue restores the binding |
+| **I. Diagnostics** | Clean after the key fix. Read-only, no auto-fix, no one-click retrospective creation; byes and missing clubs are `info`/`warning` and refuse nothing; ambiguity, swapped home/away, schedule disagreement, unmapped venue and played-without-fixture all surface |
+| **J. Audit links** | Correct as built. `/admin/audit/entity/fixtures/${fixture.id}` — numeric `fixtures.id`, which is what `data_edits.row_id` holds and what the generic page casts `::bigint`; `isDataEditTableName('fixtures')` and `DATA_EDIT_TABLE_LABELS.fixtures` both exist from Stage 1. Identical in shape to the `coaches/[id]` precedent, and `operations.audit.read` is ADMIN_AND_UP, the same audience as `data.fixtures.read`, so the link never dead-ends for a viewer who can see it. The inline href is the established convention, not an omission (§38.2 item 1) |
+| **K. Route / parameter safety** | Clean. `Number(param)` + `Number.isInteger` + `notFound()` on all three season routes; the season page and the new page additionally 404 outside the administrable window; the fixture key is used only as a bound parameter. No raw interpolation of user input anywhere — `sql.unsafe` is used twice, with a constant SQL string and bound `$1`/`$2`. No redirect takes a parameter |
+| **L. Responsive (source only)** | Every table is inside `.table-wrap`, which scrolls sideways on its own so the page body never does. Two-column inline grids now carry `minWidth: 0`. **Not** implemented: §28's "the batch form becomes one card per row under 768px" — the batch is a scrolling table at every width. Recorded as a known deviation for the DEV responsive pass, not silently fixed |
+| **M. Accessibility (source only)** | Labels are real `<label>`s wrapping their control; every actionable control is a `<button>` or a `<Link>`, never a clickable div; errors are `role="alert"`, successes `role="status"`; both destructive flows are two-step with a mandatory reason. Batch row controls now have accessible names, and the disabled time inputs say why. Severity badges carry their state in the text, so colour is reinforcement, not the signal |
+| **N. Tracking** | Corrected (§39.5). No document claimed DEV acceptance, Playwright, rendered responsive acceptance, PROD promotion or resolution; the inaccuracies were all stale understatements |
+| **O. Replay / promotion** | Nothing new is required. Stage 2 added no persisted state of any kind — every fixture fact it writes goes through the Stage 1 mutation contract, so the whole-row override and the `fixture_key` lineage rule still cover every mutation. No `PROMOTION_CONTRACT` entry, no new registry table, no new `data_edits` target |
+| **P. Cross-issue regression** | The only shared files touched by this audit are `src/styles/globals.css` (one ADDITIVE rule, `.badge-danger`, used by no other issue) and `tests/admin-fixture-actions.test.ts` (assertions added to one existing `it`). ISSUE-160 draft, ISSUE-161 season lists, the capability model, nav order, the audit viewer, current-season import, promotion inventory and the data-override source contracts are untouched |
+
+### 39.3 Defects found and fixed
+
+Ordered by severity. All eight are Stage 2; **no Stage 1 file was changed by this audit** —
+`097_fixtures.sql`, `src/db/queries/admin-fixtures.ts`, `tools/migration/common.py`,
+`import_fitzroy_core.py` and `promotion-inventory.ts` are byte-unchanged.
+
+1. **MEDIUM — a voided fixture was offered four edits the backend can only refuse.**
+   `[season]/[fixtureKey]/page.tsx` gated Reschedule, Venue, Round and Clubs on `canEdit && !played`,
+   so a `void` row rendered all four. `isFixtureEditAllowed()` refuses every field group but
+   `fixture_notes` for a void row (§16, §37.8 item 8), and `LifecyclePanel` already handled `void`
+   by returning its terminal message — the detail page was the one place the rule was missing.
+   Four controls that can only ever fail is a UI that disagrees with its own contract, and it invites
+   an operator to conclude the record is maintainable when it is deliberately not. Fixed with a
+   `schedulable` gate (`!played && status !== 'void'`); an editor already gets the explanation from
+   `LifecyclePanel`'s terminal branch, and a read-only Admin — who never sees that panel — now gets
+   the same sentence. **Hiding is not the boundary:** the backend gate is unchanged and still
+   refuses a forged request against any hidden panel, exactly as ISSUE-155 §27.27 K proved.
+2. **MEDIUM — clearing a date left an invisible start time that refused the submission.**
+   `ReschedulePanel` disables the time input while the date is blank but kept the time in state and
+   still submitted it, so returning a date to TBC produced `invalid_schedule` ("a start time needs a
+   date") about a value the operator could no longer see or edit. `RoundBatchForm` had the same
+   shape through `toWireRow()`, where it was worse: one such row refuses the WHOLE round. Fixed in
+   both, in both places — the state clears when the date is cleared, and `toWireRow()` drops the
+   time when the row has no date, so preview and confirm always serialise identically and the
+   fingerprint cannot be affected.
+3. **LOW-MEDIUM — a `<select>` could display a club the fixture does not name.** `ClubsPanel`'s
+   options are the season's eligible clubs, which is not guaranteed to contain the fixture's current
+   pair (`clubs.json` can change between entry and edit). A `<select>` whose `value` matches no
+   option renders as its FIRST option, so the panel would have shown one club and saved that club on
+   the next submit — a silent, wrong write. The current pair is now always present, labelled
+   "(no longer eligible)". The server's `club_ineligible` precheck is unchanged, so this reveals the
+   state rather than widening what may be written.
+4. **LOW — duplicate React keys on the diagnostics list.** `key={d.code}` on `[season]/page.tsx`,
+   while §27 emits `round_byes` once per round. Keyed on the position as well.
+5. **LOW — `badge-danger` was an undefined class.** Used in three fixture files for the `invalid`
+   severity, the ambiguous played state and a refused batch row; defined nowhere in `globals.css`,
+   so all three rendered identically to a benign badge. Added beside `.badge-warn`, using the
+   existing `--loss` token (defined in the light, `prefers-color-scheme` and `[data-theme]` blocks).
+   Additive; no existing rule changed.
+6. **LOW — the batch parser coerced a venue id where it held a club id strictly.**
+   `Number(row.venueId)` against §38.2 item 3's own stated contract, so `true` would have arrived as
+   venue 1, and a malformed id was quietly nulled into "TBC" — a guess about a submission that is
+   itself the thing being validated. Now the club rule: a number or absent, otherwise the parse
+   refuses. (Unreachable from the real client, and the backend's venue lookup refused every unreal
+   id anyway; this closes the gap between the parser and its documented contract.)
+7. **LOW — batch row controls had no accessible names.** Column headers do not name a control inside
+   a cell. `aria-label`s added, including the reason a disabled time input is disabled.
+8. **LOW — 320px overflow risk.** `1fr 1fr` / `1fr auto 1fr` inline grids whose children are
+   `<select>`s: a grid `1fr` track's min size is `auto`, and a `<select>`'s min-content width is
+   its widest option, so long club names can push a two-column row past a narrow viewport.
+   `minWidth: 0` added to those grid children — the remedy `globals.css` already documents for the
+   same class of overflow. Source-level only; the rendered check remains the DEV responsive pass.
+
+9. **Test hardening (C).** `fixtureBatchFingerprint`'s regression previously pinned the round number,
+   a time change, row order and blank/absent equivalence. It now also pins season, round type, both
+   club ids, the date, the venue id, an unmapped venue name, notes and the row count — the full set
+   the audit brief requires be proved rather than inferred from the canonicalisation.
+
+### 39.4 Files changed by this audit
+
+| File | Change |
+|---|---|
+| `src/app/admin/fixtures/[season]/[fixtureKey]/page.tsx` | `schedulable` gate; void explanation block; passes the club names to `ClubsPanel` |
+| `src/app/admin/fixtures/ClubsPanel.tsx` | current pair always selectable and labelled when no longer eligible; `minWidth: 0`; `aria-label` on the swap button |
+| `src/app/admin/fixtures/ReschedulePanel.tsx` | clearing the date clears the time; the label says why the time is disabled; `minWidth: 0` |
+| `src/app/admin/fixtures/RoundBatchForm.tsx` | `toWireRow()` drops a time with no date; `updateRow()` clears the time with the date; `aria-label` on every row control; `minWidth: 0` on the header grid |
+| `src/app/admin/fixtures/RoundPanel.tsx`, `SingleFixtureForm.tsx` | `minWidth: 0` on the two-column grid children |
+| `src/app/admin/fixtures/[season]/page.tsx` | unique diagnostics keys |
+| `src/app/admin/fixtures/actions.ts` | `parseBatchRows()` holds `venueId` to the club-id rule |
+| `src/styles/globals.css` | **additive** `.badge-danger` |
+| `tests/admin-fixture-actions.test.ts` | fingerprint regression extended |
+| `CHANGELOG.md`, `issues.md`, `IssuesIndex.md`, `AFLDB-ISSUE-162.md`, `AFLDB-ISSUE-156.md` | tracking |
+
+### 39.5 Tracking corrections made
+
+Every document was checked for an overclaim first; there was none. The corrections are all in the
+other direction — records that had gone stale by understating what had happened:
+
+- `IssuesIndex.md` and `issues.md` still carried "Stage 2 NOT built" and "tests written but NOT run"
+  UPDATE blocks at the top, and a **State** line describing Stage 1 as uncommitted while a later
+  bullet in the same entry said it was committed at `cb98c67`.
+- Stage 2 is now committed (`6a9fbc4`) and its §38.5 validation ran green — recorded, with the
+  figures the operator supplied.
+- `src/db/queries/data-edits.ts` was still listed as an outstanding Stage 2 item; §38.2 item 1
+  established it is not an extension point and no change was needed. Corrected to say so.
+
+No document asserts DEV acceptance, Playwright, rendered responsive acceptance, PROD promotion or
+resolution. ISSUE-162 remains **OPEN**.
+
+### 39.6 Known limitations carried forward (none blocking)
+
+1. The §37.8 item 7 venue-slug replay limit, unchanged and non-blocking: a fixture re-created by a
+   replay that could not resolve its slug keeps the venue NAME and loses the slug binding if a later
+   edit rewrites the payload. Re-selecting the venue restores it; Stage 2 surfaces the state in
+   three places rather than hiding it.
+2. The §37.5 tail risk, unchanged: once the register advances past a fixture's season,
+   `afldb_season_list_clubs()` takes its historical arm and a fixture naming a club with no
+   `club_seasons` row for that season would fail the replay closed. Specified behaviour, recorded
+   so it is not discovered during a promotion.
+3. §28's per-row card layout for the batch form under 768px is not implemented; it is a scrolling
+   table at every width (§39.2 L).
+4. `listVenues()` orders by match count and aggregates over `matches` on every load of the two pages
+   that render a venue `<select>`. Correct and small at AFLDB's venue volume; noted, not changed —
+   it is a shared query outside this issue.
+5. Rendered acceptance of every point in §39.2 L and M is deferred to the DEV batch by design.
+
+### 39.7 Re-gate — NOT YET RUN
+
+Nothing below has executed. In order, from `D:\dev\afldb-issue-162`:
+
+1. `npm run preflight -- --mode implementation --issue 162`
+2. `npx tsc --noEmit`
+3. `npx vitest run tests/auth.test.ts`
+4. `npx vitest run tests/admin-fixture-actions.test.ts tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts tests/current-season-import.test.ts`
+5. `npx vitest run tests/integration/admin-fixtures.test.ts` (expect 36/36; no Stage 1 file changed)
+6. `npx vitest run tests/admin-season-list-actions.test.ts tests/integration/admin-season-lists.test.ts tests/reference-data.test.ts tests/admin-match-mutations.test.ts` (ISSUE-160/161 regressions — `globals.css` is the only shared file touched)
+7. `npx eslint` over the eight changed TS/TSX files of §39.4
+8. `git diff --check` and `git status --short`
+
+The §37.10 all-refs migration-097 collision check
+(`git log --all --oneline -- src/db/migrations/097_*.sql`) has still never run and remains binding.
+
+Failure expectations: step 2 would most likely be the `ClubsPanel` prop addition; step 3 should be
+unaffected (no capability, nav or boundary changed); step 5 should be unaffected entirely.
+
+### 39.8 State after this audit
+
+- Stage 1 backend **complete** and validated locally (committed `cb98c67`).
+- Stage 2 Admin UI **complete** and validated locally (committed `6a9fbc4`).
+- Final local code/contract audit **complete**; its fixes are **uncommitted** and **not re-run**.
+- ISSUE-162 remains **OPEN**.
+- Combined ISSUE-160 + 161 + 162 DEV/browser acceptance **deferred** to the Admin Centre batch (§34),
+  which begins only on the operator's confirmation that no further Admin/Super Admin addition joins it.
+- PROD promotion **deferred**. No public fixture exposure. No DEV or PROD mutation was performed or
+  requested at any point in Stage 1, Stage 2 or this audit.

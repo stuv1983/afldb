@@ -54,6 +54,13 @@ export default async function FixtureDetailPage(
 
   const canEdit = hasCapability(admin, 'data.fixtures.edit');
   const played = isPlayedState(fixture.playedState);
+  // A void row is terminal and accepts `fixture_notes` and nothing else
+  // (§16, §37.8 item 8), exactly as a played one does. `isFixtureEditAllowed()`
+  // refuses every other field group for it, so rendering the schedule, venue,
+  // round and club panels there would offer four controls that can only ever
+  // fail. Hiding them is a convenience, never the boundary: the backend gate
+  // is unchanged and still refuses a forged request against any of them.
+  const schedulable = !played && fixture.status !== 'void';
 
   // Fetched unconditionally: both reads are cheap, and keeping one code path
   // avoids a ternary that would otherwise need to unify two differently-typed
@@ -145,17 +152,25 @@ export default async function FixtureDetailPage(
         </div>
       </section>
 
-      {canEdit && !played && (
+      {canEdit && schedulable && (
         <ReschedulePanel fixtureKey={fixture.fixtureKey} matchDate={fixture.matchDate} matchTime={fixture.matchTime} expectedUpdatedAt={fixture.updatedAt} />
       )}
-      {canEdit && !played && (
+      {canEdit && schedulable && (
         <VenuePanel fixtureKey={fixture.fixtureKey} venueId={fixture.venueId} venueRaw={fixture.venueRaw} venues={venues.map((v) => ({ id: v.id, canonicalName: v.canonicalName }))} expectedUpdatedAt={fixture.updatedAt} />
       )}
-      {canEdit && !played && (
+      {canEdit && schedulable && (
         <RoundPanel fixtureKey={fixture.fixtureKey} roundType={fixture.roundType} roundNumber={fixture.roundNumber} expectedUpdatedAt={fixture.updatedAt} />
       )}
-      {canEdit && !played && (
-        <ClubsPanel fixtureKey={fixture.fixtureKey} homeClubId={fixture.homeClubId} awayClubId={fixture.awayClubId} clubs={clubs.map((c) => ({ id: c.id, name: c.name }))} expectedUpdatedAt={fixture.updatedAt} />
+      {canEdit && schedulable && (
+        <ClubsPanel
+          fixtureKey={fixture.fixtureKey}
+          homeClubId={fixture.homeClubId}
+          homeClubName={fixture.homeClubName}
+          awayClubId={fixture.awayClubId}
+          awayClubName={fixture.awayClubName}
+          clubs={clubs.map((c) => ({ id: c.id, name: c.name }))}
+          expectedUpdatedAt={fixture.updatedAt}
+        />
       )}
 
       {canEdit && (
@@ -170,6 +185,17 @@ export default async function FixtureDetailPage(
 
       {canEdit && !played && (
         <LifecyclePanel fixtureKey={fixture.fixtureKey} status={fixture.status} expectedUpdatedAt={fixture.updatedAt} />
+      )}
+      {/* An editor is told this by LifecyclePanel's own terminal branch; this
+          is the same fact for a read-only Admin, who never sees that panel. */}
+      {!canEdit && !played && fixture.status === 'void' && (
+        <section className="section">
+          <p className="muted">
+            This fixture was voided as a data-entry error. It is kept so its audit trail and
+            durable record stay resolvable, but it is not maintained — only its notes may still be
+            changed.
+          </p>
+        </section>
       )}
       {played && (
         <section className="section">

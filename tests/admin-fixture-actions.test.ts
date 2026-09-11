@@ -694,6 +694,36 @@ describe('the round batch (§14, D-4)', () => {
     expect(fixtureBatchFingerprint({
       ...batch, rows: [{ ...batch.rows[0], matchTime: '19:20' }],
     })).not.toBe(a);
+
+    // EVERY material part of the submission is in it, not only the round
+    // number and the time. The season in particular: the client's Confirm is
+    // additionally gated on a snapshot that omits it (it is a route prop, not
+    // an editable field), so the fingerprint is the ONLY thing standing
+    // between a re-targeted season and a silent write.
+    expect(fixtureBatchFingerprint({ ...batch, season: 2028 })).not.toBe(a);
+    expect(fixtureBatchFingerprint({ ...batch, roundType: 'grand_final', roundNumber: null })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], homeClubId: 9 }],
+    })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], awayClubId: 9 }],
+    })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], matchDate: '2027-05-02' }],
+    })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], venueId: 56 }],
+    })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], venueId: null, venueRaw: 'A ground not in the register' }],
+    })).not.toBe(a);
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [{ ...batch.rows[0], notes: 'Gather Round' }],
+    })).not.toBe(a);
+    // Adding or removing a row is a different submission too.
+    expect(fixtureBatchFingerprint({
+      ...batch, rows: [...batch.rows, { homeClubId: 9, awayClubId: 10 }],
+    })).not.toBe(a);
     // Order is part of the submission: two rows swapped are a different preview.
     const two = { ...batch, rows: [batch.rows[0], { homeClubId: 8, awayClubId: 10 }] };
     const swapped = { ...batch, rows: [{ homeClubId: 8, awayClubId: 10 }, batch.rows[0]] };

@@ -133,14 +133,23 @@ function parseBatchRows(raw: FormDataEntryValue | null): FixtureBatchRowInput[] 
     const homeClubId = row.homeClubId;
     const awayClubId = row.awayClubId;
     if (!Number.isInteger(homeClubId) || !Number.isInteger(awayClubId) || homeClubId <= 0 || awayClubId <= 0) return null;
-    const venueId = row.venueId === null || row.venueId === undefined || row.venueId === ''
-      ? null : Number(row.venueId);
+    // A venue id is held to the same rule as a club id (§38.2 item 3): it is
+    // already a JS number or it is absent. Coercing `Number(row.venueId)` would
+    // let `true` arrive as venue 1, and quietly nulling a malformed value would
+    // turn a bad id into "TBC" -- a guess, where the submission is the thing
+    // being validated. Absent/null/'' is the only non-number this accepts,
+    // because that is how the form says TBC.
+    let venueId: number | null = null;
+    if (row.venueId !== null && row.venueId !== undefined && row.venueId !== '') {
+      if (typeof row.venueId !== 'number' || !Number.isInteger(row.venueId) || row.venueId <= 0) return null;
+      venueId = row.venueId;
+    }
     rows.push({
       homeClubId,
       awayClubId,
       matchDate: typeof row.matchDate === 'string' && row.matchDate ? row.matchDate : null,
       matchTime: typeof row.matchTime === 'string' && row.matchTime ? row.matchTime : null,
-      venueId: venueId !== null && Number.isInteger(venueId) ? venueId : null,
+      venueId,
       venueRaw: venueId === null && typeof row.venueRaw === 'string' && row.venueRaw ? row.venueRaw : null,
       notes: typeof row.notes === 'string' && row.notes ? row.notes : null,
     });

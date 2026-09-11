@@ -54,7 +54,7 @@ export function SingleFixtureForm({
     <section className="section">
       <form ref={formRef} onSubmit={(event) => event.preventDefault()} style={{ display: 'grid', gap: '0.6rem', maxWidth: '32rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Round type
             <select
               name="roundType"
@@ -72,7 +72,7 @@ export function SingleFixtureForm({
             </select>
           </label>
           {roundType === 'home_and_away' && (
-            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
               Round number{season >= 2024 ? ' (Opening Round = 1)' : ''}
               <input
                 type="number" name="roundNumber" min={1} max={MAX_HOME_AND_AWAY_ROUND}
@@ -84,14 +84,14 @@ export function SingleFixtureForm({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Home club
             <select name="homeClubId" value={homeClubId} onChange={(event) => setHomeClubId(event.target.value)} disabled={create.isPending}>
               <option value="">— select —</option>
               {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Away club
             <select name="awayClubId" value={awayClubId} onChange={(event) => setAwayClubId(event.target.value)} disabled={create.isPending}>
               <option value="">— select —</option>
@@ -102,11 +102,11 @@ export function SingleFixtureForm({
         {sameClub && <p className="notice" role="alert">A fixture needs two different clubs.</p>}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Date (leave blank for TBC)
             <input type="date" name="matchDate" value={matchDate} onChange={(event) => setMatchDate(event.target.value)} disabled={create.isPending} />
           </label>
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Local start time (HH:MM, leave blank for TBC)
             <input type="text" name="matchTime" placeholder="19:40" pattern="[0-9]{2}:[0-9]{2}" disabled={create.isPending || !matchDate} />
           </label>
@@ -121,7 +121,7 @@ export function SingleFixtureForm({
           </select>
         </label>
         {venueSelect === OTHER_VENUE && (
-          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem' }}>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.85rem', minWidth: 0 }}>
             Venue name (unmapped — no venue is created here)
             <input type="text" name="venueRaw" maxLength={200} disabled={create.isPending} />
           </label>

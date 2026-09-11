@@ -731,7 +731,8 @@ accepted DraftGuru Stage A snapshot and `AFLDB_TEST_IMPORT_DATABASE_URL`. Operat
 resumes under the new `draft_pick_key` gate) stays a **pre-deploy** decision (runbook §11.1),
 not a commit gate.
 
-**P3d Stage 1 is committed (`cb98c67`); Stage 2 is built, uncommitted and NOT YET VALIDATED.**
+**P3d Stage 1 is committed (`cb98c67`) and Stage 2 is validated and committed (`6a9fbc4`); a final
+local audit (2026-09-12) fixed 8 Stage 2 defects and those fixes are UNCOMMITTED and NOT RE-RUN.**
 `AFLDB-ISSUE-162` (Fixture / season schedule administration), branch
 `opus/issue-162-fixture-admin` stacked on P3c. Stage 1: migration **097** (the `fixtures` registry
 — schedule facts only, no `match_id` and no `match_key`), `src/db/queries/admin-fixtures.ts` as
@@ -746,10 +747,19 @@ test-ordering defect in the integration suite (§37.11) and Stage 1 was then com
 `.edit` declared and enforced, the Data-group nav entry, single-fixture and round-batch
 (fingerprint-gated preview/confirm) entry, one panel per §15 field group, and cancel/reinstate/void
 as three visibly distinct controls with the destructive-confirmation void control §37.8 item 8
-required. Full record `AFLDB-ISSUE-162.md` §38. Not yet validated by a run.
+required. Full record `AFLDB-ISSUE-162.md` §38. Stage 2 validation ran green (tsc; `auth` 138/138;
+the fixture + contract bundle 452 passed / 4 skipped; `integration/admin-fixtures` 36/36; ESLint;
+preflight READY) and Stage 2 was committed. A final whole-issue audit followed
+(`AFLDB-ISSUE-162.md` §39): **no stop condition fired and no Stage 1 file was changed**; 8 Stage 2
+defects were fixed, the two behavioural ones being a `void` fixture rendering four edit panels the
+backend can only refuse, and a cleared date leaving an invisible start time that refused the
+submission (and, in the round batch, the whole round). The capability contract, the batch
+preview/confirm fingerprint, the CAS on every edit, the fail-closed played resolution, the
+venue mapped/unmapped/TBC distinction and the audit-link identifier were each checked and confirmed
+clean. Nothing in P3d requires new promotion or replay handling: Stage 2 added no persisted state.
 
-Next: the operator runs the Stage 2 validation (`AFLDB-ISSUE-162.md` §38.5), reviews and commits
-Stage 2, then DEV deploy + gate 16
+Next: the operator re-gates the audit fixes (`AFLDB-ISSUE-162.md` §39.7), reviews and commits
+them, then DEV deploy + gate 16
 Playwright (three roles × 320/768/1000/1280/1920) once the operator updates DEV for the Admin
 Centre batch — deliberately deferred, not a defect. P3d is validated and completed before the batch
 is considered closed; the combined DEV deployment rule covers P3b, P3c and P3d together, and no

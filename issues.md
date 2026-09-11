@@ -9,7 +9,24 @@ created, reopened, resolved, or materially reclassified.
 
 **Open issues:** 19 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-160`, `-161`, `-162`.
 
-<!-- 2026-09-11 (`AFLDB-ISSUE-162` STAGE 1 EXECUTED — UNCOMMITTED, UNVALIDATED, NOT DEPLOYED):
+<!-- 2026-09-12 (`AFLDB-ISSUE-162` FINAL LOCAL AUDIT — STILL OPEN; AUDIT FIXES UNCOMMITTED AND NOT
+     RE-RUN; NOT MERGED, NOT DEPLOYED, DEV AND PROD UNTOUCHED): whole-issue audit of Stage 1 +
+     Stage 2 at `6a9fbc4`. Stage 2 was validated green by the operator (tsc; auth 138/138; fixture
+     + contract 452 passed / 4 skipped; integration 36/36; ESLint; preflight READY) and committed
+     `6a9fbc4`. NO stop condition fired and NO Stage 1 file was changed. 8 Stage 2 defects fixed —
+     a void fixture was offered four edit panels the backend can only refuse; a cleared date left
+     an invisible start time that refused the submission (and the whole round, in the batch);
+     `ClubsPanel` could display a club the fixture does not name; duplicate diagnostics keys;
+     `badge-danger` was undefined CSS; a coerced venue id in the batch parser; missing accessible
+     names on batch row controls; a 320px grid overflow guard. Fingerprint regression extended to
+     season, round type, clubs, date, venue, notes and row count. Known deviation recorded, not
+     fixed: §28's per-row batch card layout under 768px is not implemented. Full record
+     `AFLDB-ISSUE-162.md` §39; re-gate `AFLDB-ISSUE-162.md` §39.7. Entry at the foot of this
+     file. -->
+
+<!-- 2026-09-11 (`AFLDB-ISSUE-162` STAGE 1 EXECUTED — superseded by the audit block above; Stage 2
+     is now built, validated and committed. Retained as the Stage 1 record.
+     UNCOMMITTED, UNVALIDATED, NOT DEPLOYED):
      Fixture / season schedule administration Stage 1 built against the approved runbook in
      worktree `D:\dev\afldb-issue-162`. **Migration 097 re-checked free and ALLOCATED** as
      `097_fixtures.sql` — the first `src/db/migrations/`, `src/`, `tools/` and `tests/` change this
@@ -24078,14 +24095,85 @@ that module is the unrelated `/admin/data-editor` reader/writer, and the audit e
 already fully generic; the fixture detail page links to `/admin/audit/entity/fixtures/<id>` inline,
 exactly as the coach and draft detail pages already do.
 
+### Stage 2 validated and committed (2026-09-11)
+
+The operator ran `AFLDB-ISSUE-162.md` §38.5 green: `npx tsc --noEmit` clean; `tests/auth.test.ts`
+138/138; the fixture unit + contract bundle 452 passed / 4 skipped;
+`tests/integration/admin-fixtures.test.ts` 36/36 (so the §37.11 test-ordering repair holds and no
+Stage 1 behaviour moved); ESLint clean across every changed and new TS/TSX file; `git diff --check`
+clean but for the expected LF→CRLF warning; `preflight` READY. Stage 2 is committed at `6a9fbc4`
+("Implement AFLDB-ISSUE-162 Stage 2 fixture admin UI"). Not merged, not deployed, DEV and PROD
+untouched.
+
+### Final local audit (2026-09-12, Opus 5 high 1M, UNCOMMITTED)
+
+A whole-issue audit of Stage 1 and Stage 2 together at `6a9fbc4`, against §§3–28, D-1…D-7 and the
+§6 identity constraint. Read natively; no shell, Git, database or deployment command was executed
+(CLAUDE.md §9/§12). Full record: `AFLDB-ISSUE-162.md` §39.
+
+**No stop condition fired.** No migration 098 is needed, `fixture_key` needs no redesign, Stage 2
+needs no persisted match linkage, the played resolution needs no fuzzy/date/venue matching, the
+batch fingerprint contract is safe as designed, the capability contract agrees with the ISSUE-156
+umbrella, nothing requires public exposure, the replay contract is unchanged, no code path writes
+`matches`, and no `seasons` row is required. **No Stage 1 file was changed** — `097_fixtures.sql`,
+`src/db/queries/admin-fixtures.ts`, `tools/migration/common.py`, `import_fitzroy_core.py` and
+`tools/db/promotion-inventory.ts` are byte-unchanged.
+
+**Eight Stage 2 defects, fixed.** Two behavioural: (1) a **void** fixture was offered the
+Reschedule, Venue, Round and Clubs panels, all four of which `isFixtureEditAllowed()` can only
+refuse `invalid_transition` — `LifecyclePanel` already handled `void`, the detail page was the one
+place the rule was missing; hiding them is convenience only, and the backend gate is unchanged and
+still refuses a forged request against a hidden panel. (2) Clearing a date disabled the start-time
+input but left its value in state and still submitted it, so returning a date to TBC refused
+`invalid_schedule` about a value the operator could no longer see — and in the round batch one such
+row refused the WHOLE round; the time now clears with the date in the UI and is dropped on the wire
+by `toWireRow()`, so preview and confirm still serialise identically. Six smaller: `ClubsPanel`
+rendered its first option when a fixture's club was no longer in the season's eligible list (a
+`<select>` whose value matches no option), so it could display one club and save that one — the
+current pair is now always present and labelled; duplicate React keys on the per-round `round_byes`
+diagnostics; `badge-danger` used in three fixture files and defined nowhere in `globals.css`; the
+batch parser coerced `venueId` where it held club ids strictly; batch row controls had no
+accessible names; `minWidth: 0` added to the two-column inline grids against a 320px overflow.
+`fixtureBatchFingerprint`'s regression now pins season, round type, both club ids, date, venue id,
+an unmapped venue name, notes and the row count.
+
+**Confirmed clean.** Authorisation: `tests/auth.test.ts`'s generic ISSUE-158 walker requires
+`requireCapability()` to be the first awaited call of every admin page, route and Server Action, so
+all four fixture pages, both `generateMetadata`s and all ten actions are covered by construction; no
+role helper is used anywhere in the fixture tree, so no capability/legacy-guard mismatch is
+possible; nav visibility is furniture over the same capability the route enforces. Batch staleness:
+two independent gates, and the server fingerprint is the real one because the client snapshot omits
+the season. CAS: every edit locks `FOR UPDATE`, takes the season advisory lock and refuses `stale`
+before the lifecycle gate, the precheck and any write. Played resolution: one decision function for
+reads and for the write-time lock, ambiguity links nothing and deliberately does not lock, no
+`match_id`/`match_key` exists or is compared, and `PLAYED_RESULT_FACTS` yields a row only when
+exactly one candidate exists. Venue: mapped, unmapped-by-name and TBC are three distinct
+renderings, and an edit to an unrelated field carries `venue_raw` forward untouched — the §37.8
+item 7 slug-degradation limit is unchanged, non-blocking, and surfaced rather than hidden. Audit
+link: `/admin/audit/entity/fixtures/<fixtures.id>`, the numeric id `data_edits.row_id` holds, with
+`operations.audit.read` the same ADMIN_AND_UP audience as `data.fixtures.read` — the `coaches/[id]`
+shape exactly. Promotion/replay: Stage 2 added no persisted state, so the whole-row override and
+the `fixture_key` lineage rule still cover every fixture mutation.
+
+**Known deviation recorded, not fixed:** §28's "the batch form becomes one card per row under
+768px" is not implemented — the batch is a scrolling table at every width. Flagged for the DEV
+responsive pass rather than redesigned without a browser. Responsive and accessibility review here
+was source-level only; no rendered acceptance is claimed.
+
 ### Next action
 
-**Operator runs the Stage 2 validation** (`AFLDB-ISSUE-162.md` §38.5): `npm run preflight --
-mode implementation --issue 162`; `npx tsc --noEmit`; `npx vitest run tests/auth.test.ts`; the
-Stage 1 regression set (`admin-fixture-actions`, the three contract suites,
-`tests/integration/admin-fixtures.test.ts` expecting 36/36 per the prior pass) to confirm Stage 2
-did not disturb it; ESLint over every Stage 2 file; `git diff --check` and `git status --short`.
-Steps 1 and 2 of the Stage 1 §Validation record — preflight and the all-refs migration-097
-collision check — have **still never run** and remain binding alongside the Stage 2 gates. Then the
-operator reviews the diff and commits. No DEV update, no deploy, no PROD, no merge of ISSUE-160/161
-first. ISSUE-162 is **not resolved**: Stage 2 is code-complete but unvalidated by a run.
+**Operator re-gates the audit fixes, then reviews and commits them** (`AFLDB-ISSUE-162.md` §39.7):
+`npm run preflight -- --mode implementation --issue 162`; `npx tsc --noEmit`;
+`npx vitest run tests/auth.test.ts`; `npx vitest run tests/admin-fixture-actions.test.ts
+tests/data-overrides-source-contract.test.ts tests/db-promotion-check.test.ts
+tests/current-season-import.test.ts`; `npx vitest run tests/integration/admin-fixtures.test.ts`
+(expect 36/36 — no Stage 1 file changed); the ISSUE-160/161 regression set
+(`admin-season-list-actions`, `integration/admin-season-lists`, `reference-data`,
+`admin-match-mutations`), because `src/styles/globals.css` is the only shared file the audit
+touched and its change is one additive rule; ESLint over the eight changed TS/TSX files;
+`git diff --check` and `git status --short`. The all-refs migration-097 collision check
+(`git log --all --oneline -- src/db/migrations/097_*.sql`) has **still never run** and remains
+binding. After that ISSUE-162 is locally complete and waits on the operator's confirmation that no
+further Admin/Super Admin addition joins the batch, then combined ISSUE-160 + 161 + 162 DEV
+deployment and acceptance. No DEV update, no deploy, no PROD, no merge of ISSUE-160/161 first.
+ISSUE-162 is **not resolved**.
