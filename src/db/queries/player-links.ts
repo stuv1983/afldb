@@ -652,6 +652,25 @@ export async function setSuggestionStatus(
 export type SuggestedLinkMethod = 'suggested' | 'bulk_suggested';
 
 /**
+ * What the queue page had on screen for this row, read out of the cache
+ * SERVER-side by the calling action. Never a browser value.
+ */
+export type DisplayedSuggestion = {
+  algorithmVersion: string;
+  score: number;
+};
+
+/**
+ * Approval outcome. `notice` is reporting, not permission: it appears
+ * only on an approval that already passed every check, to say that the
+ * suggestion shown to the reviewer was computed under an older
+ * algorithm version than the one the link was actually approved on.
+ */
+export type SuggestionResolveResult =
+  | { ok: true; notice?: string }
+  | { ok: false; error: string };
+
+/**
  * Approve a suggested match.
  *
  * The cache is advice, not authority, so none of it is trusted here.
@@ -669,6 +688,11 @@ export type SuggestedLinkMethod = 'suggested' | 'bulk_suggested';
  * A score posted by the browser is therefore incapable of influencing
  * anything: it is not read, and a stale page fails step 4 rather than
  * quietly linking a player the evidence no longer supports.
+ *
+ * `displayed` changes none of that. It is the cached version and score
+ * the action read from the database before calling here, and it is used
+ * only to REPORT that the screen was stale once the fresh score has
+ * already carried the decision on its own.
  */
 export async function resolveLinkFromSuggestion(input: {
   targetTable: LinkTargetTable;
@@ -677,7 +701,8 @@ export async function resolveLinkFromSuggestion(input: {
   adminUserId: number;
   method: SuggestedLinkMethod;
   note?: string | null;
-}): Promise<ResolveResult> {
+  displayed?: DisplayedSuggestion | null;
+}): Promise<SuggestionResolveResult> {
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
 
@@ -728,10 +753,19 @@ export async function resolveLinkFromSuggestion(input: {
         matchScore: best.score,
         algorithmVersion: assessment.algorithmVersion,
       });
-      return { ok: true as const };
-    }) as { ok: true } | { ok: false; error: string };
 
-    if (outcome.ok) return { ok: true };
+      // Reporting only, and only after the fresh score has already
+      // approved the link on its own evidence.
+      const displayed = input.displayed;
+      const notice = displayed && displayed.algorithmVersion !== assessment.algorithmVersion
+        ? `The suggestion on screen was stale: shown as ${displayed.algorithmVersion} `
+          + `score ${displayed.score}; approved on ${assessment.algorithmVersion} `
+          + `score ${best.score}.`
+        : undefined;
+      return notice ? { ok: true as const, notice } : { ok: true as const };
+    }) as { ok: true; notice?: string } | { ok: false; error: string };
+
+    if (outcome.ok) return outcome.notice ? { ok: true, notice: outcome.notice } : { ok: true };
     const messages: Record<string, string> = {
       stale: 'No unresolved row with that id — it may already be linked.',
       evidence: 'The source row could not be re-read for scoring.',

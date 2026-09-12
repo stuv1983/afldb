@@ -1,14 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
+import { ALGORITHM_VERSION, MATCH_POLICY } from '@/lib/player-matching/confidence';
 import {
   conflictLabel,
   describeAlternative,
-  describeBulkCriteria,
+  describeBulkChecklist,
+  describeCeiling,
+  describeLimitReason,
   describeSourceRecord,
   evidenceLabel,
   hasStrongNameEvidence,
   independentFamilyCount,
 } from '@/lib/player-matching/describe';
+import {
+  explainLimits,
+  profileFromSourceDetail,
+  profileFromSourceEvidence,
+  reachableCeiling,
+  type LimitAssessmentInput,
+  type LimitReasonCode,
+  type SourceProfile,
+} from '@/lib/player-matching/explain-limits';
 import type { EvidenceItem } from '@/lib/player-matching/types';
 
 /**
@@ -158,31 +170,381 @@ describe('alternatives are described without matcher jargon', () => {
   });
 });
 
-describe('bulk readiness is explained, not asserted', () => {
-  it('lists the four things that make a row safe unattended', () => {
-    const criteria = describeBulkCriteria(
-      [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)],
-      [],
-      null,
+// ---------------------------------------------------------------------
+// Explainability (AFLDB-ISSUE-164 §11, acceptance §13 item 1)
+// ---------------------------------------------------------------------
+
+/** A profile with nothing on it; each test turns on only what it needs. */
+const profile = (sourceType: string, over: Partial<SourceProfile> = {}): SourceProfile => ({
+  sourceType,
+  hasClubId: false,
+  clubText: 'absent',
+  hasActiveSeason: false,
+  hasAssertedRange: false,
+  hasDraftYear: false,
+  hasReportedGames: false,
+  hasReportedGoals: false,
+  ...over,
+});
+
+const assessed = (over: Partial<LimitAssessmentInput> = {}): LimitAssessmentInput => ({
+  band: 'very_high',
+  score: 97,
+  gap: null,
+  nearTies: 0,
+  ambiguous: false,
+  hardConflict: false,
+  bulkEligible: false,
+  evidence: [],
+  conflicts: [],
+  ...over,
+});
+
+const codes = (assessment: LimitAssessmentInput, p: SourceProfile): LimitReasonCode[] =>
+  explainLimits(assessment, p).reasons.map((r) => r.code);
+
+describe('reachable ceiling reproduces the §3 arithmetic', () => {
+  it('puts a complete draft profile at 97, exactly as §3.1 computes it', () => {
+    // name_exact 44 + club_anywhere 15 + draft timing 13 + games 15 +
+    // goals 10. club_in_season is unreachable because a draft row
+    // carries no active season at all.
+    const ceiling = reachableCeiling(profile('draft_person', {
+      hasClubId: true, hasDraftYear: true, hasReportedGames: true, hasReportedGoals: true,
+    }));
+    expect(ceiling.score).toBe(97);
+    expect(ceiling.parts.map((p) => p.signal)).toContain('club_anywhere');
+    expect(ceiling.parts.map((p) => p.signal)).not.toContain('club_in_season');
+    expect(ceiling.reachesVeryHigh).toBe(true);
+  });
+
+  it('puts an honour-team row with no resolvable club at 44, as §3.2 does', () => {
+    const ceiling = reachableCeiling(profile('honour_team_members'));
+    expect(ceiling.score).toBe(44);
+    expect(ceiling.reachesVeryHigh).toBe(false);
+  });
+
+  it('puts an award row with a season but no club_id at 61', () => {
+    expect(reachableCeiling(profile('award_winners', { hasActiveSeason: true })).score)
+      .toBe(61);
+    // With a real club_id the same row reaches 97.
+    expect(reachableCeiling(
+      profile('award_winners', { hasActiveSeason: true, hasClubId: true }),
+    ).score).toBe(97);
+  });
+
+  it('counts club text and club_id as ONE family, never both', () => {
+    // S1-S4 are one club family (§6). A profile carrying both must not
+    // be paid twice for the same club.
+    const both = reachableCeiling(profile('hall_of_fame', {
+      hasClubId: true, clubText: 'resolved', hasAssertedRange: true,
+    }));
+    expect(both.parts.filter((p) => p.family === 'club')).toHaveLength(1);
+  });
+
+  it('never invents evidence a source does not carry', () => {
+    // Hall of Fame with a parsed span and a resolvable club:
+    // 44 + 15 (club in span) + 17 (career span) = 76. Still short of the
+    // Very High floor, which is the honest answer.
+    const ceiling = reachableCeiling(profile('hall_of_fame', {
+      clubText: 'resolved', hasAssertedRange: true,
+    }));
+    expect(ceiling.score).toBe(76);
+    expect(ceiling.reachesVeryHigh).toBe(false);
+  });
+
+  it('reads its weights from MATCH_POLICY rather than repeating them', () => {
+    const ceiling = reachableCeiling(profile('captaincies', {
+      hasClubId: true, hasActiveSeason: true,
+    }));
+    expect(ceiling.score).toBe(
+      MATCH_POLICY.scoring.name.exact
+      + MATCH_POLICY.scoring.club.clubSeason
+      + MATCH_POLICY.scoring.era.seasonInCareer,
     );
-    // Counted without the name: club is the one thing corroborating it.
-    expect(criteria).toEqual([
-      'Strong identity match',
-      'Independent football evidence (1 kind)',
-      'No hard conflicts',
-      'No credible alternative',
-    ]);
+  });
+});
+
+describe('source profiles are derived, not guessed', () => {
+  it('distinguishes an award row with a club_id from one with only club text', () => {
+    const linked = profileFromSourceDetail({
+      kind: 'award_winner', award: 'Brownlow Medal', season: 1994,
+      club: 'Richmond', position: null, hasClubId: true,
+    }, 'award_winners');
+    expect(linked.hasClubId).toBe(true);
+
+    // The club NAME is present either way, so the name alone must never
+    // be read as proof of a club_id.
+    const textOnly = profileFromSourceDetail({
+      kind: 'award_winner', award: 'Brownlow Medal', season: 1994,
+      club: 'Richmond', position: null, hasClubId: false,
+    }, 'award_winners');
+    expect(textOnly.hasClubId).toBe(false);
+    expect(reachableCeiling(textOnly).score).toBe(61);
+  });
+
+  it('reads a Hall of Fame career span through the same parser the scorer uses', () => {
+    const parsed = profileFromSourceDetail({
+      kind: 'hall_of_fame', category: 'Player', inductedYear: 2015,
+      playingCareer: '1987-1998', club: 'Essendon', isLegend: false,
+    }, 'hall_of_fame', { clubTextResolved: true });
+    expect(parsed.hasAssertedRange).toBe(true);
+    expect(parsed.clubText).toBe('resolved');
+
+    const unparsed = profileFromSourceDetail({
+      kind: 'hall_of_fame', category: 'Player', inductedYear: 2015,
+      playingCareer: 'unknown', club: 'Glenelg', isLegend: false,
+    }, 'hall_of_fame');
+    expect(unparsed.hasAssertedRange).toBe(false);
+    expect(unparsed.clubText).toBe('present_unresolved');
+  });
+
+  it('agrees with the live evidence row it is a stand-in for', () => {
+    const fromEvidence = profileFromSourceEvidence({
+      target: {
+        targetTable: 'draft_picks', targetId: 1,
+        resolutionEntityType: 'draft_person', resolutionEntityId: 9,
+      },
+      rawName: 'Aaron Cadman', normalisedName: 'aaron cadman',
+      temporal: [{ kind: 'draft_year', year: 2022 }],
+      clubId: 12, clubOrganizationId: 12, clubMatch: 'club_id',
+      clubNameRaw: 'GWS', resolvedClubs: [],
+      reportedGames: 40, reportedGoals: 22,
+      context: '', uniquenessScope: { kind: 'none' }, linkStatus: 'unmatched',
+    }, 'draft_person');
+
+    const fromDetail = profileFromSourceDetail({
+      kind: 'draft', draftYear: 2022, club: 'GWS', draftType: 'National',
+      pick: 1, reportedGames: 40, reportedGoals: 22, picks: 1,
+    }, 'draft_person');
+
+    expect(fromEvidence).toEqual(fromDetail);
+    expect(reachableCeiling(fromEvidence).score).toBe(97);
+  });
+});
+
+describe('limit reasons explain every P0 shape', () => {
+  it('names a non-exact name as the reason, above the arithmetic it causes', () => {
+    // §3.1 composition 1: every non-name family agrees and the only
+    // shortfall is the name string.
+    const assessment = assessed({
+      band: 'high', score: 79, gap: null,
+      evidence: [
+        item('name_trigram_high', 'name', 26),
+        item('club_in_season', 'club', 36),
+        item('era_season_in_career', 'era', 17),
+      ],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.primary?.code).toBe('name_not_exact');
+    expect(explained.reasons.map((r) => r.code)).toContain('below_bulk_score_floor');
+    expect(describeLimitReason(explained.primary!))
+      .toBe('Not bulk-ready: the name is not an exact match');
+  });
+
+  it('reports a policy exclusion as policy, independently of the score', () => {
+    // A captaincy that agrees on everything. Nothing about the evidence
+    // is wrong; the class is simply not approved unattended.
+    const assessment = assessed({
+      score: 97,
+      evidence: [
+        item('name_exact', 'name', 44),
+        item('club_in_season', 'club', 36),
+        item('era_season_in_career', 'era', 17),
+      ],
+    });
+    const p = profile('captaincies', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.reasons.map((r) => r.code)).toEqual(['source_class_not_bulk']);
+    expect(describeLimitReason(explained.reasons[0]))
+      .toBe('Not bulk-ready: captaincies is suggestion-only (policy)');
+    // The evidence criteria all still read as met: the row is excluded
+    // by class, not by anything it failed to prove.
+    const evidenceChecks = explained.checks.filter((c) => c.key !== 'source_class');
+    expect(evidenceChecks.every((c) => c.met)).toBe(true);
+  });
+
+  it('says when nothing independent corroborates the name', () => {
+    const assessment = assessed({
+      band: 'low', score: 44, evidence: [item('name_exact', 'name', 44)],
+    });
+    const explained = explainLimits(assessment, profile('award_winners'));
+    expect(explained.primary?.code).toBe('no_independent_corroboration');
+    const reason = explained.reasons.find((r) => r.code === 'no_independent_corroboration');
+    expect(reason).toMatchObject({ families: 1, required: 2 });
+  });
+
+  it('quotes the bulk score floor when that is the only shortfall', () => {
+    const assessment = assessed({
+      score: 80, gap: 30,
+      evidence: [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.reasons.map((r) => r.code)).toEqual(['below_bulk_score_floor']);
+    expect(describeLimitReason(explained.reasons[0]))
+      .toBe('Not bulk-ready: score 80 is below the bulk floor of 90');
+  });
+
+  it('puts a near tie ahead of the gap floor it also breaches', () => {
+    const assessment = assessed({
+      score: 97, gap: 3, nearTies: 1, ambiguous: true,
+      evidence: [
+        item('name_exact', 'name', 44),
+        item('club_in_season', 'club', 36),
+        item('era_season_in_career', 'era', 17),
+      ],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.primary?.code).toBe('near_tie');
+    expect(explained.reasons.map((r) => r.code))
+      .toEqual(['near_tie', 'below_bulk_gap_floor']);
+    expect(describeLimitReason(explained.primary!))
+      .toBe('Needs review: the next candidate is only 3 behind');
+  });
+
+  it('puts a hard conflict above everything else', () => {
+    const assessment = assessed({
+      band: 'low', score: 97, hardConflict: true,
+      conflicts: [{ reason: 'club_not_in_history', detail: 'never played there' }],
+      evidence: [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.primary?.code).toBe('hard_conflict');
+  });
+
+  it('says outright when a record type can never reach Very High', () => {
+    const assessment = assessed({
+      band: 'low', score: 44, evidence: [item('name_exact', 'name', 44)],
+    });
+    const explained = explainLimits(assessment, profile('honour_team_members'));
+    const ceiling = explained.reasons.find(
+      (r) => r.code === 'profile_ceiling_below_very_high',
+    );
+    expect(ceiling).toMatchObject({ ceiling: 44, required: 85 });
+    expect(describeLimitReason(ceiling!))
+      .toBe('A honour_team_members record can reach at most 44, '
+        + 'below the Very High floor of 85');
+    // Policy exclusion and ceiling are separate statements.
+    expect(explained.reasons.map((r) => r.code)).toContain('source_class_not_bulk');
+  });
+
+  it('raises no reason at all for a fully eligible row', () => {
+    const assessment = assessed({
+      score: 97, gap: 97, bulkEligible: true,
+      evidence: [
+        item('name_exact', 'name', 44),
+        item('club_in_season', 'club', 36),
+        item('era_season_in_career', 'era', 17),
+      ],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p);
+    expect(explained.reasons).toEqual([]);
+    expect(explained.primary).toBeNull();
+    expect(explained.bulkReady).toBe(true);
+    expect(explained.checks.every((c) => c.met)).toBe(true);
+  });
+
+  it('withholds a disagreeing name group and says why', () => {
+    const assessment = assessed({
+      score: 97, gap: 97, bulkEligible: true,
+      evidence: [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)],
+    });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    const explained = explainLimits(assessment, p, { groupDisagrees: true });
+    expect(explained.bulkReady).toBe(false);
+    expect(explained.primary?.code).toBe('group_disagrees');
+  });
+
+  it('treats unresolved club text as neither evidence nor a reason', () => {
+    // Club text naming a SANFL club is not a failure of this row; it is
+    // simply not evidence. It must add no reason of its own and must not
+    // change the ceiling relative to a row with no club text at all.
+    const assessment = assessed({
+      band: 'low', score: 44, evidence: [item('name_exact', 'name', 44)],
+    });
+    const unresolved = profile('honour_team_members', { clubText: 'present_unresolved' });
+    const absent = profile('honour_team_members', { clubText: 'absent' });
+
+    expect(reachableCeiling(unresolved).score).toBe(reachableCeiling(absent).score);
+    expect(codes(assessment, unresolved)).toEqual(codes(assessment, absent));
+    expect(codes(assessment, unresolved)).not.toContain('club_text_unresolved');
+  });
+});
+
+describe('explainability never rescores', () => {
+  it('leaves the assessment it was handed untouched', () => {
+    const assessment = assessed({
+      band: 'high', score: 79,
+      evidence: [item('name_trigram_high', 'name', 26), item('club_anywhere', 'club', 15)],
+    });
+    const before = JSON.stringify(assessment);
+    explainLimits(assessment, profile('draft_person', {
+      hasClubId: true, hasDraftYear: true, hasReportedGames: true, hasReportedGoals: true,
+    }));
+    expect(JSON.stringify(assessment)).toBe(before);
+  });
+
+  it('repeats the eligibility answer rather than forming its own', () => {
+    // bulkEligible is assessMatch's decision. explainLimits reports it;
+    // it may never contradict it, and the only thing it may add is the
+    // page-level group rule.
+    const eligible = assessed({ score: 97, gap: 97, bulkEligible: true,
+      evidence: [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)] });
+    const p = profile('award_winners', { hasClubId: true, hasActiveSeason: true });
+    expect(explainLimits(eligible, p).bulkReady).toBe(true);
+    expect(explainLimits({ ...eligible, bulkEligible: false }, p).bulkReady).toBe(false);
+  });
+
+  it('is explanatory only: the shipped version and policy are unchanged', () => {
+    expect(ALGORITHM_VERSION).toBe('v3');
+    expect(MATCH_POLICY.scoring.club.clubTextInSpan).toBe(15);
+    expect(MATCH_POLICY.scoring.club.clubTextAnywhere).toBe(15);
+    expect(MATCH_POLICY.bulk.sourceTypes.draft_person).toBe(false);
+  });
+});
+
+describe('bulk readiness is explained, not asserted', () => {
+  it('lists every criterion with its own verdict, on a row that passes', () => {
+    const explained = explainLimits(
+      assessed({
+        score: 97, gap: 97, bulkEligible: true,
+        evidence: [item('name_exact', 'name', 44), item('club_in_season', 'club', 36)],
+      }),
+      profile('award_winners', { hasClubId: true, hasActiveSeason: true }),
+    );
+    const checklist = describeBulkChecklist(explained.checks);
+    expect(checklist.map((c) => c.met)).toEqual([true, true, true, true, true, true]);
+    expect(checklist[0].label).toBe('Strong identity match');
+    expect(checklist[5].label).toBe('award_winners may be approved unattended');
   });
 
   it('says which criterion is missing rather than hiding it', () => {
-    const criteria = describeBulkCriteria(
-      [item('name_trigram_high', 'name', 26)],
-      [{ reason: 'club_not_in_history', detail: 'never played there' }],
-      3,
+    const explained = explainLimits(
+      assessed({
+        band: 'low', score: 26, gap: 3, hardConflict: true,
+        conflicts: [{ reason: 'club_not_in_history', detail: 'never played there' }],
+        evidence: [item('name_trigram_high', 'name', 26)],
+      }),
+      profile('hall_of_fame'),
     );
-    expect(criteria[0]).toBe('Name evidence is not exact');
-    expect(criteria[1]).toBe('Nothing corroborates the name');
-    expect(criteria[2]).toBe('Contradicted by the source');
-    expect(criteria[3]).toBe('No close alternative (gap 3)');
+    const checklist = describeBulkChecklist(explained.checks);
+    expect(checklist.every((c) => !c.met)).toBe(true);
+    expect(checklist[0].label).toBe('Name evidence is not exact');
+    expect(checklist[1].label).toBe('Only 1 evidence family — 2 required');
+    expect(checklist[2].label).toBe('Score 26 is below the bulk floor of 90');
+    expect(checklist[3].label).toBe('Next candidate is only 3 behind — 25 required');
+    expect(checklist[4].label).toBe('Contradicted by the source');
+    expect(checklist[5].label).toBe('hall_of_fame is suggestion-only (policy)');
+  });
+
+  it('states the ceiling as a ceiling, never as a score', () => {
+    expect(describeCeiling(44, false))
+      .toBe('Highest score this record type can reach: 44 — never Very High');
+    expect(describeCeiling(97, true))
+      .toBe('Highest score this record type can reach: 97');
   });
 });

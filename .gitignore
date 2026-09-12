@@ -168,3 +168,11 @@ Thumbs.db
 !.vscode/extensions.json
 /afldb-nl-mass-corpus.csv
 /afldb-nl-mass-corpus.csv.summary.json
+
+# ISSUE-164 generated player-matching measurement reports.
+# Keep the frozen v1 baseline inputs tracked; all other reports are reproducible scratch output.
+/backtest-*.json
+/queue-*.json
+/compare-*.json
+!/backtest-v1-baseline.json
+!/queue-v1-baseline.json

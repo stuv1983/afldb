@@ -24,15 +24,21 @@ import {
 } from '@/db/queries/player-match-candidates';
 import { sql } from '@/db/client';
 import { requireCapability } from '@/lib/auth/session';
-import { BAND_ORDER, isConfidenceBand } from '@/lib/player-matching/confidence';
+import { ALGORITHM_VERSION, BAND_ORDER, isConfidenceBand } from '@/lib/player-matching/confidence';
 import {
   conflictLabel,
   describeAlternative,
-  describeBulkCriteria,
+  describeBulkChecklist,
+  describeCeiling,
+  describeLimitReason,
   describeSourceRecord,
   evidenceDescription,
   evidenceLabel,
 } from '@/lib/player-matching/describe';
+import {
+  explainLimits,
+  profileFromSourceDetail,
+} from '@/lib/player-matching/explain-limits';
 import type { ConfidenceBand } from '@/lib/player-matching/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { firstValue } from '@/lib/params';
@@ -209,6 +215,19 @@ export default async function PlayerLinksPage(
     bandCounts.set(key, (bandCounts.get(key) ?? 0) + 1);
   }
   const bulkCount = searched.filter((r) => suggestionFor(r)?.bulkEligible === true).length;
+  // A cached suggestion computed under a different algorithm version
+  // than the running code is never presented silently: the count drives
+  // the banner and each such row carries its own badge. The comparison
+  // is made here, on the server, against the version the code itself
+  // declares -- nothing about it comes from the browser.
+  const staleVersions = new Set(
+    [...bestByEntity.values()]
+      .map((s2) => s2.algorithmVersion)
+      .filter((version) => version !== ALGORITHM_VERSION),
+  );
+  const staleCount = [...bestByEntity.values()]
+    .filter((s2) => s2.algorithmVersion !== ALGORITHM_VERSION).length;
+
   const lastComputed = [...bestByEntity.values()]
     .reduce<Date | null>((latest, s2) => {
       const at = s2.computedAt instanceof Date ? s2.computedAt : new Date(s2.computedAt);
@@ -408,6 +427,15 @@ export default async function PlayerLinksPage(
 
       <section className="section">
         <RefreshSuggestionsControls computedAt={lastComputed} />
+        {staleCount > 0 && (
+          <p className="badge badge-warn" style={{ display: 'block', margin: '0.5rem 0 0' }}>
+            ⚠ {formatNumber(staleCount)} cached suggestion(s) were scored by an older matcher
+            ({[...staleVersions].sort().join(', ')}); the current algorithm is {ALGORITHM_VERSION}.
+            Their scores, bands and bulk flags are out of date. Approving one still rescores it
+            under {ALGORITHM_VERSION} and refuses if the evidence no longer supports it — press
+            Refresh to bring the queue itself up to date.
+          </p>
+        )}
         <p className="section-note">
           A suggestion is evidence for a decision, never the decision itself. Approving one
           rescores it against the live data first, and anything contradicted or too close to
@@ -519,16 +547,48 @@ export default async function PlayerLinksPage(
                       const match = bestByEntity.get(entityKey);
                       const ranked = candidatesByEntity.get(entityKey) ?? [];
                       const alternatives = ranked.filter((c) => c.rank > 1);
-                      const record = describeSourceRecord(
-                        sourceDetails.get(`${row.targetTable}:${row.targetId}`) ?? null,
-                      );
+                      const sourceDetail =
+                        sourceDetails.get(`${row.targetTable}:${row.targetId}`) ?? null;
+                      const record = describeSourceRecord(sourceDetail);
                       const summary = match ? summaries.get(match.playerId) : undefined;
                       // A group whose records disagree about the player is
                       // never offered for unattended approval, whatever the
                       // individual rows scored.
                       const bulkReady = (match?.bulkEligible ?? false) && !group.disagrees;
+                      const stale = match !== undefined
+                        && match.algorithmVersion !== ALGORITHM_VERSION;
                       const nextBest = alternatives[0]
                         ? { playerName: alternatives[0].playerName, score: alternatives[0].score }
+                        : null;
+
+                      // Why this row is where it is (AFLDB-ISSUE-164 §11).
+                      //
+                      // Explanation only: it reads the cached assessment and
+                      // MATCH_POLICY and returns typed reasons. It cannot
+                      // move a score, a band or a bulk flag, and bulkReady
+                      // above is still what decides selection.
+                      //
+                      // Club text counts as resolved only when a ranked
+                      // candidate actually scored a club-text signal --
+                      // proof that the text names an AFLDB club. Text that
+                      // resolved to nothing is reported as contributing
+                      // neither for nor against, never as absent.
+                      const clubTextResolved = ranked.some((c) =>
+                        c.evidence.some((e) =>
+                          e.signal === 'club_in_span' || e.signal === 'club_text_anywhere'));
+                      const limits = match
+                        ? explainLimits(
+                            match,
+                            profileFromSourceDetail(
+                              sourceDetail, row.resolutionEntityType, { clubTextResolved },
+                            ),
+                            { groupDisagrees: group.disagrees },
+                          )
+                        : null;
+                      // Not repeated on rows that propose nothing: there is
+                      // no suggestion there to explain.
+                      const limitLine = limits?.primary && match && match.band !== 'none'
+                        ? describeLimitReason(limits.primary)
                         : null;
 
                       return (
@@ -608,12 +668,28 @@ export default async function PlayerLinksPage(
                                     {BAND_LABELS[match.band as ConfidenceBand] ?? match.band}
                                   </span>
                                 </div>
+                                {stale && (
+                                  <span
+                                    className="badge badge-warn"
+                                    title={`Scored by matcher ${match.algorithmVersion}; `
+                                      + `the current algorithm is ${ALGORITHM_VERSION}. `
+                                      + 'Approval rescores under the current one.'}
+                                  >
+                                    Stale ({match.algorithmVersion})
+                                  </span>
+                                )}
                                 {bulkReady && <span className="badge">Bulk-ready</span>}
                                 {match.ambiguous && match.band !== 'none'
                                   && <span className="badge badge-warn">Needs review</span>}
                                 {match.band !== 'none' && (
                                   <div className="muted" style={{ fontSize: '0.8rem' }}>
                                     {describeAlternative(match.gap, nextBest)}
+                                  </div>
+                                )}
+                                {/* One concise reason, under the band badge. */}
+                                {limitLine && (
+                                  <div className="muted" style={{ fontSize: '0.8rem' }}>
+                                    {limitLine}
                                   </div>
                                 )}
                               </>
@@ -652,9 +728,25 @@ export default async function PlayerLinksPage(
                                   ambiguous: match.ambiguous,
                                   hardConflict: match.hardConflict,
                                   bulkEligible: bulkReady,
-                                  bulkCriteria: describeBulkCriteria(
-                                    match.evidence, match.conflicts, match.gap,
-                                  ),
+                                  // Rendered for every suggested row, not
+                                  // only the eligible ones: the drawer's job
+                                  // is to say which criteria a row misses.
+                                  bulkCriteria: describeBulkChecklist(limits?.checks ?? []),
+                                  limitReasons: (limits?.reasons ?? []).map(describeLimitReason),
+                                  ceiling: limits
+                                    ? describeCeiling(
+                                        limits.ceiling.score, limits.ceiling.reachesVeryHigh,
+                                      )
+                                    : null,
+                                  // Club text that names no AFLDB club is
+                                  // neither evidence for nor against, and
+                                  // the drawer says so rather than leaving
+                                  // the ceiling looking arbitrary.
+                                  clubTextUnresolved:
+                                    !clubTextResolved
+                                    && (sourceDetail?.kind === 'hall_of_fame'
+                                      || sourceDetail?.kind === 'honour_team')
+                                    && sourceDetail.club !== null,
                                   evidence: match.evidence.map((item) => ({
                                     ...item, label: evidenceDescription(item),
                                   })),
@@ -662,6 +754,8 @@ export default async function PlayerLinksPage(
                                     ...conflict, label: conflictLabel(conflict),
                                   })),
                                   algorithmVersion: match.algorithmVersion,
+                                  currentAlgorithmVersion: ALGORITHM_VERSION,
+                                  stale,
                                   alternatives: alternatives.map((c) => ({
                                     playerId: c.playerId,
                                     playerName: c.playerName,

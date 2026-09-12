@@ -733,6 +733,7 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-153` | Low | Public UI / record pages / database queries | **OPEN — NOT INVESTIGATED BEYOND THE STAGE-0 READ. No implementation.** Split out of `AFLDB-ISSUE-152` Stage-0 Finding F1 by operator decision 2026-09-08 so a public-UI defect does not sit inside an NL issue. Two public record pages do not read what their prose says. **(1)** `/records/father-son` → `getFatherSonRecords` (`src/db/queries/family-records.ts:130`) reads `player_relationships WHERE relationship = 'parent_child'` and **never touches `father_son_selections`** — so AFLDB's public "father-son" board is a parent–child board, while the Grid Solver's `father_son_selection` / `father_son_father` builders (`src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts:1279`) read the actual AFL father–son draft-rule table. Two different meanings of the same phrase in one product, over two different tables. **(2)** `/records/family` → `getFamilyRecords` (`src/db/queries/family-records.ts:39`) groups **every** `relationship_type` by `family_key` with **no `relationship` filter**, while `src/app/records/family/page.tsx:15,99` states "Combined career VFL/AFL games by a linked family of **siblings**" and "A family is a set of players AFLDB has linked as **siblings**" — a family whose only link is a cousin, in-law or spouse row is counted and described as siblings. Not reproduced against data; `AFLDB-ISSUE-152`'s evidence pack sizes it (§3.1 relationship types + link completeness, §3.2 labels, §4.1 father-son coverage). The decision is a **semantic** one — whether each page's prose is corrected to match its query, or its query narrowed to match its prose, or the boards split — and it is not obviously a code-only fix. **`AFLDB-ISSUE-152` depends on this** for family/father-son NL wording (subfamilies C1, FS1–FS3, FS6, decisions D6/D8) but is **not blocked** by it for Phases B, C or E. Key files: `src/db/queries/family-records.ts`, `src/app/records/family/page.tsx`, `src/app/records/father-son/page.tsx`, `src/db/queries/grid-solver.ts`. | **Operator:** decide the intended semantics of each board — correct the prose, narrow the query, or split father-son selections onto their own board — then allocate a branch/worktree and implement. Run `ISSUE-152-nl-evidence.sql` §3.1/§3.2/§4.1 against `afldb_test` first to size how many families and selections each reading actually changes. |
 | `AFLDB-ISSUE-152` | Medium | Natural-language search / semantic coverage / `src/search/nl/*` | **OPEN — PHASES B, C AND E COMMITTED AND VALIDATED; PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09; PHASE D (UNBLOCKED HALF C2/C3/C4/FS4) IMPLEMENTED, RENDERED AND GREEN 2026-09-09 — P5-r2 319/319 AND A FRESH P4-r1 1,495/1,495; PHASE F IMPLEMENTED, RENDERED AND GREEN 2026-09-09 (runbook §26 implementation, §27 rendered acceptance) — X1 + X2 SHIPPED, X3 DEFERRED (F-D1), P6 349/349 AND A FRESH P4-r1 1,495/1,495; PHASE F IS ACCEPTED AND READY TO MERGE AS A STABLE CHECKPOINT BEFORE `AFLDB-ISSUE-153`; WORKING TREE CLEAN — B, C, D, E, F AND G ARE ALL COMMITTED ON THE BRANCH THROUGH `5be7511`; ISSUE-152 AS A WHOLE IS NOT CLOSED.** Branch `opus/issue-152-nl-record-expansion` (worktree `D:\dev\afldb-issue-152`) from `main` @ `c2761e6`. `PARSER_VERSION` **39** (B 34->35 `e8f5f67`, C 35->36 `47a645f`, E 36->37 `75d207d`, D 37->38 `6ee63a4`, F 38->39 `f619de8`). Built: **B** `coach_record` grain + 386-coach directory, false coaching decline deleted (**F2 CLOSED**), migration **092**; **C** `after_siren` event grain over 126 curated events with three independent dimensions and a match-link boundary, migration **093** (**M7 CLOSED**); **E** first-kick-goal E7/E8 with **no grain, no builder, no SQL and no migration** (**D11 SATISFIED / F4 CLOSED** — `afldb_test` batch 230: 334 updated / 0 inserted / 0 deleted; M-E1 334 total / 330 linked / 44 multi-kick / max consecutive 6 / 23 only-career-goal / 4 no-further-kicks / 1911-2026), three deliberate fail-closed deviations (§18.5). **PHASE G IS GREEN.** **P3-r2** (`issue152-phaseg-p3r2`, preserved `nl-ui-out-152-phaseg/p3-new-family-r2/`): **271/271 observed, 212 answered / 16 unanswerable / 43 absent, 271 pass, 0 fail, 0 unscored, 0 rate-limit detections, 0 page_error, 0 http_error, 0 filler disagreements, 0 client-side errors**, 3/3 batches. **P4-r1** (`issue152-phaseg-p4r1`, preserved `nl-ui-out-152-phaseg/p4-regression-r1/`): **1,495/1,495 observed, 1,435 answered / 60 unanswerable, 1,495 pass, 0 fail, 0 unscored**, every transport counter at zero, 15/15 batches — **the 1,435 + 60 gate is unchanged and still green** after three parser versions, two new grains and a deleted decline. Both sweeps ran against a **local production build of this branch** on `127.0.0.1:3100` at 2,200 ms / one worker, because DEV serves `main` and would measure the wrong code (§19.1). **P3-r1 was VALID at 269/270**; its sole failure was a corpus-contract defect — the unsuffixed "gary ablett" is AMBIGUOUS by the resolver's own rule (ids 4700/4701) and must not carry a `plan` expectation. Fixed by suffixing the plan row to "gary ablett jr" and adding the bare form as decline `fkg_dec_007`; final pinned corpus **271 = 212 plan + 59 decline**, **strict size guard KEPT**. Smoke r1 INADMISSIBLE (no 55432 tunnel, `ECONNREFUSED 127.0.0.1:55432`); **smoke r2 clean at 40/40**. `tools/issue-152/` is now a reusable tunnel/server/verify/smoke/P3/P4/status/diagnose workflow; preserved output is **immutable and refuses overwrite** (`tests/phase-g-preserve-static.test.ps1`, 30 assertions); `phase-g-verify.ps1` exits **0** on all six static gates. **Closeout validation 2026-09-09:** `npx tsc --noEmit` clean; **644/644** across 6 focused suites (parser 253, plan 136, describe 49, audit 10, ui-corpus 37, semantic-mapping 159); `phase-g-verify.ps1` PASS; preserve-static PASS. The 271-row and 1,495-row sweeps were deliberately NOT re-run — the closeout changed prose only. Four `tests/integration/database.test.ts` dataset counts still fail as external `afldb_test` baseline drift — out of scope, untouched. **PHASE D (unblocked half) is IMPLEMENTED, §22:** six new grid builders (catalogue 158 -> 164) over `player_relationships` — `has_afl_father`, `has_afl_son`, `has_afl_parent_or_child`, `brother_of_player`, `father_of_player`, `son_of_player` — with `has_brother` and `father_son_father` REUSED unchanged, a new typed `relationshipSubject` plan field, **no migration**, and relationship-explicit answer wording. Direction is role-typed (measured father -> son, 127 of 127), "brother" stays label-backed, an unlinked side is a name and never an identity, and the blocked father-son SELECTION forms still decline on their own leftover tokens. Red before green: the Stage-0 probe recorded **31/31 NONE** and was then deleted (§22.2). Green: `tsc` clean, parser **300/300** (47 new), plan **144/144**, describe **61/61**, grid-solver-spec **16/16**, nine further DB-free NL suites **485/485**, NL integration **174/174**, and the new DB-backed `tests/integration/nl-answers-relationships.test.ts` **20/20** against hand-written SQL. **Operator decision D20 is ACCEPTED 2026-09-09** (§22.5): relationship queries whose true result count exceeds 100 use AFLDB's EXISTING capped-list disclosure contract — true total computed and reported, existing capped table rendered, explicit "Showing 100 of N", and answer wording stating the displayed rows are not the whole list. Silent truncation is prohibited and NO Phase-D-specific refusal was introduced for 658 / 181 / 107. Held by five assertions in `tests/nl-describe.test.ts` and by the eight over-cap rows in the new corpus. **Two `tests/integration/grid-solver.test.ts` won-final failures are pre-existing and NOT Phase D** (282 vs 283, 3,644 vs 3,658; 69 insertions / 0 deletions in that file) — recommend allocating `AFLDB-ISSUE-154`. **PHASE D RENDERED CORPUS AND ACCEPTANCE HARNESS ARE BUILT, §23:** two additive tracked corpora — `tests/nl-ui/corpora/afldb-ui-questions-relationships-v1-20260909.csv` (**26** plan) and `...-relationships-decline-v1-20260909.csv` (**22** decline), 48 rows over C2/C3/C4/FS4 only, with one named decline row per boundary (C1/D6, C5/C6, FS1, FS2, FS3, FS6, vague family/related-to, sisters, twins, cousins, grandparents, uncles, in-laws, mothers, pairings, ambiguous subject, and the five unsupported scopes) and the **Ben Cousins** surname-collision regression preserved as a rendered pair. **Every one of the 48 rows was verified against `afldb_test` before being pinned** by a throwaway DB-backed probe that parsed, executed and rendered each one — 48/48 as claimed (17 parser declines + 5 `validatePlan` refusals; pinned negatives render as an ANSWER, not an empty panel; `sons of Gary Ablett Snr` resolves the FATHER, id 4700). **HISTORICAL PHASE G EVIDENCE DOES NOT MOVE:** the accepted P3 corpus stays **271 = 212 + 59** and `phase-g-new-corpus.ps1` still runs exactly it; Phase D APPENDS as a separate `current` set, **319 = 238 plan + 81 decline**, 4 Playwright batches, whose first 271 rows are byte-for-byte the 271-row file so §19.3's position-based statements survive. New runner `tools/issue-152/phase-d-corpus.ps1` (P5, run tag `issue152-phased-p5`) keeps every P3 guard — 2,200 ms at ONE worker, `NL_UI_LIMIT` refused not inherited, throttling as `page_error` and a hard failure, immutable `-OutName` — and adds four refusals of its own: a corpus that is not 319/238/81, a corpus that does not slice into 4 batches, the P3/P4 run tags, and a missing tunnel (TCP probe; **no psql or database client anywhere in the script**). Pins are stated three times independently (`PHASE_G_SETS.current`, `phase-d-corpus.ps1`, `tests/nl-ui-corpus.test.ts`). **Validation 2026-09-09:** `tsc` clean; **627/627** across parser/plan/describe/audit/query-intent/grid-solver-spec/nl-ui-corpus; **232/232** across the four remaining DB-free NL corpus suites; relationships integration **20/20**; semantic-mapping **22/22**; `phase-g-verify.ps1 -Set current` PASS with `playwright --list` enumerating **4** batches; `phase-g-verify.ps1` default PASS and UNCHANGED at 271/212/59 and 3 batches; preserve-static PASS. **Nothing in `src/` changed in this slice** — parser stays **v38**, no migration. **PHASE D RENDERED ACCEPTANCE IS NOW COMPLETE AND GREEN, §24:** **P5-r2** (`issue152-phased-p5r2`, preserved `nl-ui-out-152-phaseg/p5-phase-d-current-r2/`): **319/319 observed, 238 answered / 21 unanswerable / 60 absent, 319 pass, 0 fail, 0 unscored, 0 rate-limit detections, 0 page_error, 0 http_error, 0 filler disagreements, 0 client-side errors**, 4/4 batches. **P4-r1 re-run FRESH** (`issue152-phased-p4r1`, preserved `nl-ui-out-152-phaseg/p4-regression-phase-d-r1/`): **1,495/1,495, 1,435 answered / 60 unanswerable, 0 fail, 0 unscored**, every transport counter at zero, 15/15 batches — the 1,435 + 60 gate is UNCHANGED. **The FIRST P5 attempt was INADMISSIBLE** (stale pre-Phase-D standalone build) and is counted nowhere; a **fresh discriminator** proved Phase D relationship rendering on the rebuilt server BEFORE P5-r2, which is what makes P5-r2 admissible. Historical Phase G P3/P4 preserved evidence is **untouched** and the accepted P3 corpus stays 271 = 212 + 59. **Closeout validation 2026-09-09** (no sweep re-run — no executable behaviour changed): `tsc` clean; **1,107/1,107** across 16 focused DB-free NL suites; `grid-solver-spec` **16/16**; relationships integration **20/20** and semantic-mapping **22/22**, both DB-backed against `afldb_test` read-only over the 55432 forward; `phase-g-verify.ps1 -Set current` PASS (319/238/81, 4 batches); `phase-g-verify.ps1` default PASS and UNCHANGED (271/212/59, 3 batches); preserve-static PASS, 30 assertions; `git diff --check` clean. The authoritative `afldb_test` Stage-0 evidence remains the basis for every semantic claim. **C2, C3, C4 and FS4 are COMPLETE and GREEN; C1, C5/C6, FS1, FS2, FS3, FS6 and D6/D8 remain incomplete or blocked and are held only by named decline rows.** D6/D8 and F1 sit with `AFLDB-ISSUE-153`. **PHASE F IS PLANNED, NOT STARTED (§25):** its §9 gate is satisfied — Phase D is GREEN for the ISSUE-152-owned/unblocked scope (C2/C3/C4/FS4) — and the ISSUE-153-deferred semantics (C1, FS1-FS3, FS6, D6/D8) do NOT block it and remain explicit declines. Planned against measured read-only `afldb_test` evidence: **X1 = 365** (played AND actually coached, `match_coaches`-backed, NOT the 368 identity-only seam), **X2 = 27** (played Richmond AND coached Richmond; 41 coached-only, 14 never played there), **X3 = 1** (Rhyce Shaw 10974 / coach 233). **Two new builders only** — `has_coached` and `coached_club(organization)`, catalogue 164 -> 166 — with `played_for_club` and `father_son_selection` REUSED; **no grain, no plan field, no migration**; `coached_by` cannot serve and is not overloaded; **X2 sets no `scope.clubFor`** so `careerPredicatesOwnClubFor` cannot suppress the playing-club filter and answer 41 for 27; coached-club scope folds through `clubs.organization_id` (Pagan 3/2, Wallace 3/2, Laidley 2/1). **D9 unchanged: "also" ships, "later" declines by name and is never silently stripped** despite chronology being derivable (238/127/0). One parser bump, **v38 -> v39**. Corpus appends a `next` set, **349 = 252 plan + 97 decline**, 4 batches; the accepted 271 and 319 sets do not move. **PHASE F IS NOW IMPLEMENTED AND LOCALLY VALIDATED (§26).** All four operator decisions are FINAL: **F-D1** defers X3 to `AFLDB-ISSUE-153`; **F-D2** declines every temporal reading by name; **F-D3** declines one-sided club composition; **F-D4** approved the `played_for_club` reuse (0 zero-game memberships, 27, 365). Shipped: **X1** (365) and **X2** (27, plus the asymmetric and organization-lineage forms). Catalogue **164 -> 166**; `PARSER_VERSION` **38 -> 39**; **no grain, no migration**; ONE plan field, `crossDomainClubs`, added because `describe.ts` cannot turn an organization id into a club name — a recorded deviation from §25.5, validated so the named clubs and the bound parameters can never drift apart. Three refusals live INSIDE the reading rather than in `validatePlan`, because this reading clears `clubAgainst` and consumes its own cues: temporal wording, any father-son wording (closing the F-D1 back door), and an opponent — the last found by measurement, when the first corpus verification run answered "played and also coached against Carlton" with 27 Carlton people. **Validation:** R0 red-before-green recorded (§26.1 — no Phase F wording answered under v38; the `coach_record` election §25.8 predicted IS real for one wording and was stopped by `validatePlan`, not by confidence); `npm run typecheck` PASS; **3,777** DB-free tests pass (2 pre-existing unrelated failures, §26.9); the NEW **`tests/integration/nl-answers-cross-domain.test.ts` 21/21** against independently hand-written SQL — X1 **365** and provably not the 368 identity seam, X2 Richmond **27**, `coached_club(18)` alone **41**, the Pagan/Wallace/Laidley lineage traps, both Aaron Black identities, D20 365/100 — and **215/215** across all 11 NL integration suites. Corpus: two new tracked CSVs (15 plan / 15 decline), `PHASE_G_SETS.next` = **349 = 253 plan + 96 decline**, 4 batches, **every row verified against `afldb_test` BEFORE pinning** (30/30); the frozen 271, 319 and 1,495 sets do not move. `tools/issue-152/phase-f-corpus.ps1` (P6, run tag `issue152-phasef-p6`) keeps every P3/P5 guard. **"Richmond players coached by Damien Hardwick" (§13.15(4)) was NOT implemented and still refuses at `validatePlan`** — named IN by §25.1 but specified nowhere else, no measured population, and its two readings are exactly the ambiguity F-D3 declines (§26.8). **PHASE F RENDERED ACCEPTANCE IS NOW COMPLETE AND GREEN, §27.** A fresh production `npm run build` of this branch PASSED and was served standalone on `127.0.0.1:3100`; the **mandatory stale-build discriminator** then returned **HTTP 200** and **"365 players match"** for `/search?q=players+who+also+coached`, which no pre-Phase-F build can produce — and **D20 rendered correctly in the same check**, "Showing 100 of 365" with the answer text explicitly stating the displayed rows were NOT the whole list. **P6** (`issue152-phasef-p6`, preserved `nl-ui-out-152-phaseg/p6-phase-f-next/`): **349/349 observed, 253 answered / 25 unanswerable / 71 absent, 349 pass, 0 fail, 0 unscored, 0 rate-limit detections, 0 page_error, 0 http_error, 0 filler disagreements, 0 client-side errors**, 4/4 batches. **P4-r1 re-run FRESH** (`issue152-phasef-p4r1`, preserved `nl-ui-out-152-phaseg/p4-regression/`): **1,495/1,495, 1,435 answered / 60 unanswerable, absent 0, 0 fail, 0 unscored**, every transport counter at zero, 15/15 batches — the 1,435 + 60 gate is UNCHANGED. Two corrections were made during acceptance and **neither is semantic**: `2ec9871` fixed two test type contracts (`matchType: 'final'` -> `'finals'`, and a hand-copied set union replaced by the imported `PhaseGSetName`), and `5be7511` added `next` to the shared `ValidateSet` in `tools/issue-152/phase-g-common.ps1` so `phase-f-corpus.ps1` could ask for its own set — **harness-only, no semantic change**. The frozen 271, 319 and 1,495 sets and every preserved historical run are untouched. **C1, FS1, FS2, FS3, FS6, D6, D8 and X3 remain DEFERRED to `AFLDB-ISSUE-153`, are each held by a named decline row in the rendered corpus, and are NOT Phase F failures.** Key files: `issues/open/AFLDB-ISSUE-152.md` (§14 B, §16 C, §18 E, **§19-§21 Phase G**, **§22 Phase D implementation**, **§23 Phase D corpus/harness + D20**, **§24 Phase D rendered acceptance**, **§26 Phase F implementation**, **§27 Phase F rendered acceptance**), `src/search/nl/{vocab,parser,plan,describe}.ts`, `src/search/grid-solver-spec.ts`, `src/db/queries/grid-solver.ts`, `tools/issue-152/*` (incl. `phase-d-corpus.ps1`, `phase-f-corpus.ps1`, `phase-g-common.ps1`, `build-phase-g-corpora.ts`), `tests/nl-ui/corpora/afldb-ui-questions-relationships*-v1-20260909.csv`, `tests/nl-ui/corpora/afldb-ui-questions-cross-domain*-v1-20260909.csv`, `tests/integration/nl-answers-cross-domain.test.ts`, `tests/nl-ui/nl-stress.spec.ts`. | **Operator:** **(1)** **Review and merge the Phase F checkpoint.** Phases B, C, D (unblocked half), E, F and G are all implemented, rendered and green and are **committed on `opus/issue-152-nl-record-expansion` through `5be7511`**; the working tree is clean apart from untracked ISSUE-152 evidence/probe `.sql`/`.txt` files in the worktree root, which are local evidence and must NOT be staged. **Phase F is ACCEPTED and ready to merge as a stable checkpoint before `AFLDB-ISSUE-153` begins.** **(2)** **Deploy ordering is unchanged and non-negotiable: migrations 092 AND 093 must both reach `afldb_dev` and production BEFORE the code**, or the telemetry grain CHECK drops rows silently while answers render correctly. **(3)** Decide whether `nl:stress` runs before deploy — it has still NOT been run for B, C, D, E or F. **(4)** **Do NOT resolve ISSUE-152.** Phase F acceptance closes **X1** and **X2** only; **C1, FS1, FS2, FS3, FS6, D6, D8 and X3 remain deferred to `AFLDB-ISSUE-153`**, are each held by a named decline row in the rendered corpus, and are **not** Phase F failures. **"Richmond players coached by Damien Hardwick" is still a decline** (§26.8), and the two DB-free failures of §26.9 and the two `tests/integration/grid-solver.test.ts` won-final failures of §24.8 are pre-existing and outside ISSUE-152 — recommend allocating `AFLDB-ISSUE-154` for the latter. **(5)** To re-run rendered acceptance later: `phase-g-tunnel.ps1` (window 1), `phase-g-server.ps1` (window 2), then `phase-g-verify.ps1`, `phase-g-smoke.ps1`, and the runner for the set under test — `phase-g-new-corpus.ps1` (271), `phase-d-corpus.ps1` (319), `phase-f-corpus.ps1` (349), `phase-g-regression.ps1` (1,495) — each with a FRESH `-RunTag` because preserved output will not be overwritten, each behind a fresh production build of the branch under test, and each behind the **mandatory stale-build discriminator**. |
 | `AFLDB-ISSUE-148` | Low | Public UI / club pages / database queries | **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; Premierships section added the same day (same issue, operator request), implemented + `tsc`-checked, its integration suite written but NOT yet operator-run. Awaiting operator commit / merge / DEV deployment / browser smoke.** Branch `fable/issue-148-coach-club-records` (worktree `D:\dev\afldb-issue-148-coach-club-records`). Public club pages showed players and season history but never the club's coaches or a premiership list. **(1) Coaching:** `getClubCoachRecords(clubId)` in `src/db/queries/coaches.ts` (lineage-scoped by `organization_id`, exactly like `getClubTotals` / `getClubLeaders`; W/D/L from `matches.winner_club_id`; draw-weighted win % `(W + D/2)/G` matching `/records/coaches`; one row per coach, separate tenures combined), `src/components/ClubCoachRecords.tsx` (Coach · **Span** · Games · W · D · L · Win % — "Span" because the value is `formatSpan(firstSeason, lastSeason)`, a first/last range; coach names link to player / `/coaches/[slug]-id`), pushed after Captains, omitted when empty. **(2) Premierships:** `getClubPremierships(clubId)` in `src/db/queries/clubs.ts` — one row per **won Grand Final** (`m.round_type = 'grand_final'`, the canonical predicate `getCoachCareer` / Grid Solver use — never every final, never a Wildcard Final; a drawn GF has a null winner so the replay is taken), opponent resolved home-or-away as the non-winner, score from the winner's perspective, venue via `COALESCE(v.canonical_name, m.venue_raw)` + `v.slug`, crowd = `m.attendance` (null, never zero-filled), lineage-scoped so Footscray/Western Bulldogs share 1954+2016; `src/components/ClubPremierships.tsx` (Year · Opponent · Score · Venue · Date · Crowd; opponent → `clubPath`, venue → `venuePath`; `formatDate` / `formatAttendance`), pushed **first**, omitted when empty. **No migration**, no schema/route/privilege change. Tests: `tests/integration/club-coach-records.test.ts`, `tests/club-coach-records.test.ts`, `tests/integration/club-premierships.test.ts` (new), `tests/club-premierships.test.ts` (new). `CHANGELOG.md` — one `Unreleased` entry (both sections). **Validation:** coaching — operator-run against `afldb_test` via SSH tunnel: `tests/club-coach-records.test.ts` 8/8 PASS, `tests/integration/club-coach-records.test.ts` 9/9 PASS, `npx tsc --noEmit` PASS, `npm run build` PASS. Premierships — `npx tsc --noEmit` self-checked; its integration suite NOT yet operator-run. No migration. | **Operator:** run `npx vitest run tests/club-premierships.test.ts` and, with `AFLDB_TEST_DATABASE_URL` = `afldb_test`, `npx vitest run tests/integration/club-premierships.test.ts`; `npx tsc --noEmit`. On green, commit on `fable/issue-148-coach-club-records`, merge, deploy to DEV, eyeball `/clubs/richmond` + one historical club (both sections) and Resolve. |
+| `AFLDB-ISSUE-164` | Medium | Admin / Matching (`/admin/player-links`) | **OPEN — IN EXECUTION: P0, P1, P2, P1a, P1b, P1c, P3A/P3B, P4 and P5 COMPLETE 2026-09-12; DB-backed validation owed before resolution. P5 (closeout): the §11 explainability UI is implemented as a pure explanation layer — `src/lib/player-matching/explain-limits.ts` returns typed limit reasons (`group_disagrees`, `hard_conflict`, `near_tie`, `source_class_not_bulk`, `name_not_exact`, `no_independent_corroboration`, `below_bulk_score_floor`, `below_bulk_gap_floor`, `profile_ceiling_below_very_high`), the six evaluated bulk criteria and a reachable profile ceiling that reproduces the §3 arithmetic (draft 97, honour team 44, award with a season and no `club_id` 61, Hall of Fame with span and resolved club 76); the row shows one concise primary reason under the band badge and the drawer renders ✓/✗ criteria for EVERY suggested match (previously only `bulkEligible` rows) plus the ceiling line. It never rescores: no weight, band, gap, bulk rule, source admission or `ALGORITHM_VERSION` changed, migration 099 untouched, `v3` and D-9 intact. **§13 item 1 MET; §13 item 2b deliberately UNMET, deferred under D-9** (Tier 1 bulk population n = 0). **S6 decided — NOT implemented in ISSUE-164**: qualifying population is zero, a leave-one-out arm would be empty, revisit only after ordinary admin use creates a real human-decision population, `--holdout-self` mandatory if ever revisited, and no new issue raised for a zero-population hypothetical. Migration 099 verified on `afldb_dev`: 99 files, 99 applied, 0 pending; ordering stays migration first → build/restart. Missing P2 stale-cache CHANGELOG entry added. DB-free validation clean: `tsc --noEmit`, 187/187 focused tests. P4 (bulk-class review + live proof, documentation only — no code, no migration, no commit): NO new bulk class admissible or admitted under `v3` (`award_winners` 3,130 bulk / 0 FP / bound ≈ 0.096% and `award_nominations` 687 / 0 FP / ≈ 0.437% re-verified; `player_achievements` policy-admitted on HISTORICAL ISSUE-075 evidence only and NOT re-verified under `v3` because its executable labelled population is 0; `captaincies`, `draft_person` (D-9), `draft_picks`, `hall_of_fame` (0 bulk at 15/15 and 239 < the frozen 253 minimum) and `honour_team_members` all non-bulk). Stale-cache integrity PROVED LIVE on `afldb_dev` with cache `v1` against code `v3` (banner, STALE (V1) badges, drawer warning), then Refresh through the admin UI: cache entirely `v3`, 10,394 rows / 4,615 rank-1 / 38 bulk, queue 5,390 unresolved. All 38 live bulk rows enumerated (1 `award_nominations` #50 + 37 `award_winners`, all `v3` score 97) with NO forbidden source class; newly bulk-eligible = 0, so §13 item 6's manual-inspection set is empty and the 38 were enumerated for source-class containment, not hand-verified individually; no pre-refresh identity snapshot exists, so no literal historical DB identity diff is claimed. Live `v3` single-row approval proved (Aaron Cadman `award_winners#1563` → `player_id` 3, `match_method` `suggested`, score 97, `v3`) and reversed by guarded owner-role cleanup; NO live `bulk_suggested` write was performed and none is required — the bulk path reuses the same `resolveLinkFromSuggestion` and is proved by `tests/player-link-mutations.test.ts`. FINDING: there is NO product-level unlink/reversal workflow, so the old "reversible approval proof" wording is withdrawn and SQL cleanup is operator maintenance, never product functionality. §13 items 3a, 6 and 7 MET; item 2b still NOT met.** P3A (non-draft evidence plumbing: S1 lineage, exact club-text resolution, S3/S4 signals, `ALGORITHM_VERSION` `v3`) IMPLEMENTED 2026-09-12 and **P3B MEASURED AND DECIDED 2026-09-12 — S3 `clubTextInSpan` 15 / S4 `clubTextAnywhere` 15 are now the shipped weights** (labelled Top-1 99.64% → 99.67%, Hall of Fame Top-1 98.74% → 99.58% on exactly two namesake corrections, ambiguity 25 → 19, Very High / VH FP / bulk / hard conflicts all unchanged, no correct Top-1 lost; S3 at 23, 24 and 29 rejected as confidence inflation with no further identity improvement; the unresolved queue and `draft_person` are unchanged); no draft rule changed (P1c includes its Tier 1 labelling run and a closeout correction pass). Migration 099 validated on `afldb_test` and `afldb_dev`. P1b: no labelled regression anywhere, queue Very High 38 → 2,680 with every band move upward, 0 bulk-eligible draft rows. P1c: the 5 labelled draft rows are the 5 tracked human decisions; ISSUE-075's 2,319 came from retired `legacy_player_id` auto-linking and is NOT reproducible; the larger set must be acquired from the DraftGuru person-page AFL Tables bridge, not recovered. Tier 1 measured: 114 labels (100 linked + 14 true negatives, 6 correctly unlabelled), 96 resolvable positives + 14 negatives scored, recall 100%, Top-1 98.96% (one error: Matt Rendell → Matt Rowell, expected at rank 2), Top-3/5 100%, Very High 54/54 = 100% with 0 false positives, 0 hard conflicts, 0 confident false positives on the negatives, and 0 bulk-eligible rows because D-9 suspends the class. Error is confined to the stats-drifted / club-absent weak-evidence tail. Tier 1 CANNOT satisfy §9.1: Tier 2 is required before draft bulk re-admission and, under the frozen P1c rule, before any draft-specific tuning (S2, weights). D-9 stays in force. Modern draft rows plateau at exactly 79 / High and historical HoF / honour-team rows at 44 / Low because of per-profile evidence ceilings (a draft row has no active season, so `club_in_season`/`era` are unreachable; HoF/honour rows pass a NULL club id), not because of measured precision. Runbook `AFLDB-ISSUE-164.md`: Option A (additive model kept; lineage-aware club match, `club_at_debut`, HoF `club_in_span`, club-text resolution for HoF/honour rows; aliases before name rules; typed limit reasons + stale-cache banner; `v2`), weights and bulk classes set only by the extended backtest. Branch `sonnet/issue-164-player-link-confidence`, base `0955db3`. | **Operator:** Q1–Q6 and the Tier 1 labelling/measurement run are DONE (2026-09-12); results and the corrected Q3 are recorded in `AFLDB-ISSUE-164.md` §12 items 4, 8, 11 and 12. Next: decide on ISSUE-093 whether to authorise the full-population Stage B1 acquisition that Tier 2 needs. **Draft-specific P3 work (S2, draft weights, bulk policy, D-9 re-admission) cannot start until that population exists**; non-draft P3 evidence work is not blocked by it. `draft_person:4163` "Sam Chapman" remains undetermined — he is absent from the accepted Stage B1 snapshot, so Tier 1 cannot settle him and the v2 `name_exact` win is not evidence. **Outstanding next actions:** run `npx vitest run tests/integration/player-matching.test.ts`, then re-run the backtest and the unresolved queue **with no calibration override** to prove default v3 reproduces the selected 15/15 result exactly. **P4 is COMPLETE — do NOT perform another live bulk approval.** **P5 is COMPLETE** — ledger/index/CHANGELOG closeout done, the §11 explainability UI implemented, and S6 decided (not implemented in ISSUE-164; zero qualifying population). S2, Tier 2 acquisition and any new bulk source remain not started. Superseded, kept for history: the P1a/P1b command set was (`--out backtest-p1b-normalised.json` / `queue-p1b-normalised.json`, then `npm run match:compare -- <v1 baseline> <p1b report> --out <comparison>` for each pair; the v1 baseline JSONs are immutable and the comparison tool refuses an `--out` that resolves to an input; any bulk-eligible draft row is a stop condition and exits 2). |
 <!-- RETIRED 2026-09-06 — `AFLDB-ISSUE-145` is **Resolved** and is NO LONGER an open issue. The
      existing `/venues` index is now exposed in site navigation; validated (`tsc --noEmit` clean,
      the focused nav Playwright test passes on desktop / skips on mobile, `npm run build` exit 0 with
@@ -24719,3 +24720,503 @@ the replay validates a date's shape rather than the calendar. Deliberate and clo
 per-row message until reload; `readLeadershipDiagnostics()` exported and tested but not called by
 a page; the shape-based revalidation allowlist. PROD promotion on the ISSUE-156 umbrella's
 checklist; §27 out-of-scope unchanged.
+
+## AFLDB-ISSUE-164 — Recalibrate player-link confidence and expand evidence-aware bulk matching
+
+- **Status:** **RESOLVED 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry. As it stood earlier on 2026-09-12 (retained): **IN EXECUTION: P0, P1 (comparison half), P2, P1a, P1b, P1c, P3A/P3B, P4 and P5 (closeout) COMPLETE 2026-09-12; final operator validation (DB-free and DB-backed) COMPLETE — see the Resolution section for the shipped-default backtest/queue re-run that discharges the P3B obligation and the integration-test run.** **P5 COMPLETE 2026-09-12** — see "P5 — closeout" below: the §11 explainability UI (typed limit reasons, reachable profile ceilings, ✓/✗ bulk criteria on every suggested row) is implemented as a pure explanation layer with no scoring change, so **§13 item 1 is now MET**; **§13 item 2b is recorded as deliberately unmet, deferred under D-9**; S6 is **decided — not implemented in ISSUE-164** because its qualifying population is zero and a leave-one-out arm would be empty, with no new issue raised for a zero-population hypothetical; migration 099 verified applied on `afldb_dev` (99 files, 99 applied, 0 pending). DB-free validation clean (`tsc --noEmit`, 187/187 focused tests); `npx vitest run tests/integration/player-matching.test.ts` (23/23) and the P3B no-override shipped-default backtest/queue re-run are now COMPLETE — see the Resolution section. **P4 (bulk-class review + live proof) COMPLETE 2026-09-12** — see "P4 — bulk-class review and live proof" below: no new bulk class admitted under `v3`, newly bulk-eligible = 0, stale-cache integrity proved live with cache `v1` against code `v3`, a live `v3` single-row approval proved and then reversed by guarded operator SQL, the bulk path proved by `tests/player-link-mutations.test.ts` with **no live `bulk_suggested` write performed or required**, `player_achievements` recorded as policy-admitted on historical ISSUE-075 evidence and **not** re-verified under `v3`, and **no product-level unlink/reversal workflow exists**. **P3A IMPLEMENTED and P3B MEASURED, DECIDED AND SHIPPED 2026-09-12** (see "P3A — non-draft evidence plumbing" and "P3B — S3/S4 weight grid measured and selected" below: S1 lineage-aware club identity, exact read-time club-text resolution for `hall_of_fame` / `honour_team_members`, and S3 `clubTextInSpan` / S4 `clubTextAnywhere` now shipped at **15/15** — the lowest grid pair that buys the whole measurable identity improvement, with S3 at 23, 24 and 29 rejected as confidence inflation; `ALGORITHM_VERSION` `v3`, no draft change, no migration; the DB-backed integration run and the no-override shipped-policy backtest/queue re-run are now COMPLETE, see the Resolution section).** P1c's Tier 1 labelling run executed 2026-09-12 and a closeout correction pass followed it (see "P1c Tier 1 measurement and closeout corrections" below). Migration 099 is validated on `afldb_test` and `afldb_dev`. **P1b (operator, re-verified from the comparison JSONs):** labelled population unchanged at 6,324 with recall, top-1, top-3/5, bulk (3,817 / 0 FP), ambiguity and hard conflicts all unmoved; Very High +1; exactly three rows changed, all of them labelled draft rows moving `name_trigram_high` → `name_exact` (Fred Rodriguez and Riley Onley 26 → 44, Ryan O'Keefe 79 → 97 and into Very High). Live queue unchanged at 5,390 rows but Very High 38 → 2,680 (`draft_person` 0 → 2,642), 3,490 rows changed band and **every one moved up**, 0 moved down, bulk stays at 38 with 0 draft rows among them, and exactly one top-1 changed (`draft_person:4163` "Sam Chapman", Paul Chapman #10273 (28) → Sam Chapman #11609 (44)). `draftBulk.triggered` is false in both comparisons, so the D-9 stop condition held. **P1c reconciliation (this session, from code evidence):** the five labelled draft rows are the five `linked` entries in the tracked `data/reference/draftguru-link-decisions.json`, which records that exactly six explicit human decisions existed in `player_link_resolutions` before the rebuild. The historical population came from `tools/migration/import_draft.py`, now a tombstone, which linked through `players.legacy_player_id` — a column the rebuilt fitzRoy path never populates — and ISSUE-093 deliberately declined to replay automatic links as durable identity. **Nothing was lost and nothing is recoverable by repair; ISSUE-075's 2,319 draft bulk rows are NOT reproducible and may not be cited as current evidence.** `player_achievements` contributes no rows because the table is unloaded on this database, not because of a filter (operator query Q5 confirms). The larger population must be **acquired**, not recovered: the DraftGuru person page carries its own AFL Tables href, matched URL-to-URL with no scored family reused, measured at 97% coverage of the played cohort and 0 collisions over the Stage B1 sample. Tier 1 (114 labels) is available from the existing 120-record snapshot now; Tier 2 (admission-grade, low thousands) needs a full-population Stage B1 acquisition under ISSUE-093 governance and is not authorised here. Tooling built and tested, no scorer change: `tools/matching/label-set.ts` (parse, validate, rank provenance, refuse scorer-derived truth by name, raise both contradiction classes, sample-size arithmetic), `npm run match:backtest -- --labels` (evaluate against a frozen label file, never writing a link; full stratification, every wrong top-1, the true-negative table, D-9 exit 2) and `npm run match:draft-labels` (build a label file offline from a person-page snapshot). Derived sample-size finding: 253 zero-failure rows bound the false-positive rate at **1.177%**, not 0.1%; bounding it below 0.1% at 95% confidence needs **2,995** zero-failure rows, and an observed 99.9% is not expressible below n = 1,000. **D-9 remains in force** — P1c has now produced both the method and a Tier 1 calibration measurement, but not admission-grade evidence (see "P1c Tier 1 measurement and closeout corrections" below). Runbook `AFLDB-ISSUE-164.md` (17 sections); D-1…D-9 all signed off (D-5 amended; D-2 and D-7 amended on the P0 evidence; D-8: the normalisation fix ships as `ALGORITHM_VERSION` `v2`, so P2 stale-cache work precedes P1a; D-9: `draft_person` unattended bulk approval suspended in the P1a change set until P1c re-gates it under the frozen §9.1 rule, manual approval retained). **P0 finding (operator, hex evidence):** every `draft_persons.display_name_raw` (5,057 / 5,057) uses U+00A0 as its separator and `afldb_normalise_name()` preserves it, so draft names score `name_trigram_high` (26) instead of `name_exact` (44) — the 79 plateau is a normalisation defect, not weight insufficiency. Frank Johnson / Jack Lynch are genuine exact-name namesake ties (gap 0). Executable v1 baseline frozen at `0955db3` (`backtest-v1-baseline.json`, `queue-v1-baseline.json`, immutable): 6,324 labelled rows, top-1 99.64%, VH precision 99.98%, bulk 3,817 / 0 FP; only **5** labelled `draft_person` rows, so nothing validates draft policy yet. Phase order now P0 → P1 → P2 (stale-cache/version integrity) → P1a (normalisation fix, `v2`, draft bulk suspended) → P1b (measure) → P1c (grow the labelled draft set) → P3. **P2 complete** (stale-cache/version integrity; 45/45 `tests/player-link-mutations.test.ts`, typecheck clean; cached suggestion metadata is presentation-only and approval still decides on the fresh locked re-score alone). **P1a implemented 2026-09-12** and awaiting operator database validation — see the P1a record below. Next: operator runs the P1a validation set, applies migration 099 to `afldb_test` then `afldb_dev`, measures the U+00A0 reach across the remaining source tables, and only then starts P1b. **P1 baseline-comparison instrumentation implemented 2026-09-12** (17/17 `tests/match-backtest-compare.test.ts`, typecheck and lint clean): new pure `tools/matching/compare-reports.ts` and `npm run match:compare -- <baseline.json> <candidate.json> [--out <delta.json>]`, a separate entry point because `backtest.ts` cannot load without `DATABASE_URL`; `backtest.ts` gains `--baseline` and `--compare-out`. It joins the two reports on the resolution key and derives every aggregate from the joined rows — never from band counts, which can hide offsetting moves — giving overall and per-source recall / top-1/3/5 / band counts / Very High and bulk counts, precision and false positives / ambiguity / hard conflicts, a row-level band-migration matrix with `absent` on both axes, and row lists for changed top-1 (with correctness on both sides), expected-player rank, band direction, ambiguity gained and lost, material gap movement, bulk eligibility gained and lost, and exact-versus-fuzzy name evidence. Output is ordered by resolution key so repeat runs are byte-identical, neither input file can be overwritten, and any bulk-eligible draft row in the candidate run prints a stop-condition block and exits 2 (D-9). One schema extension: the queue report now carries `algorithmVersion` / `gitCommit` / `startedAt` / `tableFilter` beside its unchanged `proposals` array, so the frozen `queue-v1-baseline.json` still parses and its metadata reads as unknown rather than guessed. Gate met: self-comparing `backtest-v1-baseline.json` reproduces every §2.10 figure with all deltas zero. Still unbuilt, and not required by P1b: per-(source × score bucket) precision, per-signal precision lift, per-row reachable ceilings, exact-name collision rate, `--holdout-self`.
+- **Severity:** Medium
+- **Area:** Admin / Matching (`/admin/player-links`)
+- **Found:** 2026-09-12
+- **Branch:** `sonnet/issue-164-player-link-confidence`, worktree `D:\dev\afldb-issue-164`, base `0955db3`
+- **Planning model:** Fable 5.1, medium
+- **Parent:** `AFLDB-ISSUE-075` (deterministic suggestion/confidence system)
+
+### Symptom
+
+Modern draft rows with a name match, the drafting club in the player's history, draft timing and
+matching draft-source games/goals plateau at exactly 79 / High (Aaron Cadman, Aaron Mullett, Aaron
+Sandilands, Aaron Vandenberg). Historical Hall of Fame / honour-team rows with an exact name and
+no better candidate sit at 44 / Low and, with a namesake, Needs review (Frank Johnson, Jack
+Lynch). Both limit the trustworthy Very High and bulk-ready populations.
+
+### Planning findings (2026-09-12, verified natively — full evidence in `AFLDB-ISSUE-164.md` §2–§4)
+
+- **79 is arithmetic, not precision.** A `draft_person` row carries no active season
+  (`player-match-candidates.ts:243-249`), so `club_in_season` (36) and `era` (17) are
+  unreachable and the drafting club earns only `club_anywhere` (15). Draft ceiling = 97 with an
+  exact name, **79 with a trigram-high name** (26 + 15 + 13 + 15 + 10 — every non-name family
+  agreeing). Exact-name 79s are 44 + 15 + 13 + 7 (games near, goals absent) or 44 + 15 + 15 + 5
+  (no draft timing). Adjacent: 89 = Very High but under the bulk floor 90. Draft
+  `reported_games/goals` are a scrape snapshot, so active players drift from exact to near.
+- **44 is exact name and nothing else.** `hall_of_fame` and `honour_team_members` pass a NULL
+  `clubId` (only `club_name_raw`), no season and (honour teams) no span
+  (`player-match-candidates.ts:200-222`); ceilings are 61 and 44 under a global Very High line of
+  85. Needs review = a second exact-name namesake at 44, gap 0.
+- **Ledger correction:** approval never compares the cached `algorithm_version`; it re-scores
+  from scratch (`player-links.ts:695-711`). A version bump changes approval immediately while
+  the page shows stale cached numbers until Refresh, with no warning.
+- Confirmed weaknesses W1–W10 (§4): per-profile ceilings under one band scale; draft club
+  undervalued; non-exact-name penalty unrecoverable and bulk-foreclosing; unscored club text on
+  HoF/honour rows; club match on raw `clubs.id` rather than lineage; games/goals drift; bands
+  never verified per (source × bucket); no "why capped" on the page; no stale-cache banner; no
+  leave-one-out in the backtest.
+
+### Recommended design (runbook §5–§11)
+
+Option A: keep the additive one-signal-per-family model; add evidence at the evidence layer —
+S1 lineage-aware club match/contradiction, S2 `club_at_debut` for drafts, S3 `club_in_span` and
+S4 `club_anywhere` for HoF/honour rows via exact club-text resolution over `clubs` /
+`club_aliases`; proven Unicode/source-text artefacts (U+00A0) canonicalised in the shared
+normalisation *before* any alias handling, aliases kept for genuine variants only (S5, D-2
+amended); S6 prior-human-resolution agreement measured leave-one-out and never a bulk
+criterion. Bands and bulk floors move only on a per-(source × bucket) precision table; no
+global trigram weight increase. `ALGORITHM_VERSION` → `v2` (version handling for the
+normalisation fix is D-8). Typed limit reasons (`explainLimits`) rendered on row and drawer;
+stale-cache banner. Bulk class admission per the §9.1 rule frozen before any v2 result:
+n ≥ 253 bulk-eligible confirmed rows (rule of three at parity with `player_achievements`; the
+earlier "n ≥ 200" is withdrawn), 0 bulk FP, ≥ 99.9% VH precision, top-1 and false conflicts
+not worse, 100% hand inspection of new live bulk rows; the same standard gates any broadening
+of `draft_person` bulk. `captaincies` stay excluded; `honour_team_members` not admitted;
+`hall_of_fame` non-bulk (240 < 253). S1–S4 need no migration; the P1a normalisation fix
+probably does (SQL function, migration 009), to be assessed and approved before creation.
+
+### P1a — Unicode name-normalisation correction (implemented 2026-09-12, Opus 5)
+
+Full record in `AFLDB-ISSUE-164.md` §12 "P1a implementation record".
+
+- **One implementation, and it is SQL.** Search established that `afldb_normalise_name()`
+  (008:13-23, corrected 009:18-30) is the only name normalisation the matcher uses.
+  TypeScript deliberately does not fork it (`types.ts:168`), the Python ETL calls it to
+  compute the stored columns (`tools/migration/common.py:1099,1195`), and every application
+  lookup routes through it. No duplicate copy to record as a finding.
+- **`src/db/migrations/099_normalise_unicode_whitespace.sql`.** `translate()` maps a named,
+  explicit list of Unicode space separators — U+00A0, U+1680, U+2000–U+200A (so U+2007 is
+  covered), U+2028, U+2029, U+202F, U+205F, U+3000 — to an ordinary space *before* the
+  unchanged lower/unaccent/strip/collapse pipeline. `translate()` rather than a character
+  class so every code point is visible in the diff and no regex locale behaviour is relied
+  on. Zero-width characters (U+200B, U+FEFF) are deliberately untouched: they are not
+  separators and changing them would change a name's token count.
+- **Migration required: yes**, because the function is SQL. Two consequences handled in the
+  same transaction, both precedents set by 009: the four expression indexes over the function
+  (`ix_clubs_name_trgm`, `ix_club_aliases_trgm`, `ix_venues_name_trgm`,
+  `ix_venue_aliases_trgm`) are REINDEXed, and the stored `players.search_name` /
+  `player_name_aliases.search_alias` are recomputed under `IS DISTINCT FROM` — a no-op on an
+  already-ASCII corpus, and simultaneously the measurement of whether any player or alias name
+  carries Unicode whitespace itself.
+- **No stored raw data rewritten.** `draft_persons.display_name_raw` and every other `*_raw`
+  column, plus `display_name`, `slug`, `sort_name` and `player_name_aliases.alias`, are
+  untouched. Only derived comparison output changes.
+- **`ALGORITHM_VERSION` `v1` → `v2`** (D-8). No weight, band, gap or bulk threshold moved; the
+  matching semantics did, so every cached suggestion is stale until the queue is refreshed —
+  which P2's detection, banner, badges and approval-time notice already surface.
+- **`draft_person` suspended from unattended bulk approval** (D-9), reasoning recorded beside
+  the ISSUE-075 calibration it suspends. Suggestions and manual approval unchanged.
+- **Tests extended, none created.** `tests/integration/player-matching.test.ts` proves the SQL
+  function itself (U+00A0 normalises byte-equal to the ASCII form; the other admitted
+  separators do the same; U+200B deliberately does not; 008/009 lowercase, apostrophe, full
+  stop, hyphen and unaccent behaviour intact; whitespace collapse and trim deterministic).
+  `tests/player-matching.test.ts` proves the DB-free consequence: the preserved-NBSP form
+  reproduces the exact P0 composition at 79 with `strongName` false, the canonicalised form
+  scores `name_exact` for 97 with `strongName` true, `ALGORITHM_VERSION` is `v2`, and
+  `draft_person` is `very_high` but no longer bulk-eligible.
+- **Owed by P1a, operator-run:** the migration has been applied nowhere, and the U+00A0 reach
+  across the other source tables (award, honour, HoF, captaincy, achievement raw-name columns)
+  is still unmeasured. P1b may not start until both are answered.
+
+### P1c Tier 1 measurement and closeout corrections (2026-09-12, Opus 5 + operator)
+
+Full record in `AFLDB-ISSUE-164.md` §12 "P1c reconciliation and design record" items 4, 8, 11
+and 12. Summary:
+
+- **Tier 1 label export:** 120 records read → **114 labels** (100 `linked`, 14 `unlinked`), 6
+  UNLABELLED and correctly not invented as negatives.
+- **Scored:** 110 persons resolved, 0 not found, **4 positive targets not present in AFLDB**
+  (Aidan Schubert, Archie Ludowyke, Oscar Ryan, Talor Byrne) reported and excluded from the
+  rates rather than silently dropped → **96 resolvable positives + 14 true negatives**.
+- **Positives:** candidate recall **100%**, Top-1 **98.96%** (95/96), Top-3/5 **100%**. Bands
+  Very High 54/54 = **100%**, High 32/32, Medium 3/3, Low 6/6, None 0/1. **0 Very High false
+  positives, 0 hard conflicts.** 2 ambiguous, 1 correct.
+- **The only wrong Top-1:** `draft_person:3214` / `draft_picks#1000` "Matt Rendell" chose Matt
+  Rowell #9235 (score 0, gap 0, band `none`); expected Matt Rendell #9310 at **rank 2**.
+- **True negatives:** Very High 0, High 0, Medium 0, Low 1, None 13; **0 confident false
+  positives, 0 bulk-eligible**.
+- **Stratification:** exact names 94/94 correct, stats exact 86/86, club evidence present
+  56/56, no rival 34/34; the error sits in the **stats-drifted (9/10) and club-absent (39/40)**
+  weak-evidence tail.
+- **Bulk n = 0 because D-9 remains in force**, so §9.1 (253 bulk-eligible rows, 0 FP) **cannot
+  be satisfied by Tier 1 under any reading. Tier 2 is required before draft bulk re-admission
+  and, under the frozen P1c rule, before any draft-specific tuning (S2, draft weights).** No
+  draft scoring change is authorised from this result.
+
+Three closeout corrections were made in the same pass; **no scorer, weight, band, threshold,
+bulk-policy, migration-099 or truth-hierarchy behaviour changed.**
+
+1. **Q3 / runbook reconciliation wording (corrected).** The runbook previously expected
+   operator query Q3 to return **6** rows from `player_link_resolutions` on the current
+   database. That is wrong for a **rebuilt** database. Four artefacts must be kept apart:
+   pre-rebuild `player_link_resolutions` held the six explicit human/admin decisions; the
+   ISSUE-093 exporter converted them once into the durable natural-key ledger
+   `data/reference/draftguru-link-decisions.json`; `player_link_resolutions` keys decisions on
+   the rebuild-unstable surrogate `draft_picks.id` and **is not replayed**, so the rebuilt
+   table is **empty and 0 rows is expected, not a failure**; the rebuilt `draft_persons`
+   carries the replayed result — **5 `resolved` + 1 confirmed-unlinked `unmatched`**, all
+   `match_method = 'draftguru_explicit_admin_decision'`. Q3 has been replaced with a check of
+   the durable replay state (plus an optional Q3b confirming the empty audit table is the
+   expected absence rather than a filter artefact). **The substantive P1c conclusion — nothing
+   human was lost — is unchanged**, and no database audit trail has been invented.
+   Corroborating operator evidence: `draft_persons` 5,057 rows with no legacy/automatic match
+   method present; `players.legacy_player_id` populated on 0 of 13,273; `player_achievements`
+   empty (a population fact, not a filter); `afltables_identities` = 13,275.
+2. **`draft_person:4163` "Sam Chapman" (corrected).** The claim that Q4's `player_url` "carries
+   the AFL Tables href that decides it" was **too strong**. Q4 returns the durable key only.
+   `sam_chapman/2` is **not** in `draft-labels-b1-120.json` and a direct search of the accepted
+   Stage B1 `person_profile.jsonl` returned no record, so **Tier 1 cannot resolve him**. Status
+   remains **undetermined**; determination requires an authorised source/acquisition containing
+   that person. The v2 `name_exact` win is **not** evidence of correctness.
+3. **Sample-size report wording (code fix).** The run printed `n/a (a failure was observed, so
+   the zero-failure rule does not apply)` when **no** bulk failure had occurred — the bulk
+   sample was simply empty because D-9 disables draft bulk. New
+   `describeZeroFailureBound(n, failures)` in `tools/matching/label-set.ts` separates `n = 0`
+   ("no bulk-eligible labelled rows in this population"), `n > 0` with failures (the failure
+   wording, naming the count) and `n > 0` with none (the computed bound); `backtest.ts` calls
+   it. Unit tested. 32/32 `tests/match-backtest-compare.test.ts`, `tsc --noEmit` clean.
+
+### P3A — non-draft evidence plumbing (2026-09-12, Opus 5) — IMPLEMENTED, UNMEASURED
+
+Full record in `AFLDB-ISSUE-164.md` §12 "P3A implementation record". Summary:
+
+- **S1 lineage-aware club identity.** `clubs.organization_id` is carried on both `CandidateClub`
+  and `SourceEvidence` and decides club identity for the positive club signal **and** the
+  `club_not_in_history` contradiction, falling back to raw `clubs.id` wherever AFLDB records no
+  lineage (so a lineage-free database behaves exactly as `v2` did). Mergers are deliberately not
+  lineage: migration 017 keeps Fitzroy and Brisbane Lions separate organizations, so a Fitzroy
+  row is never corroborated by a Brisbane Lions career. The change is one-way — it can only
+  remove a false `club_not_in_history` and add club agreement, never manufacture a new club
+  contradiction — but it can move a namesake's score, which is what the backtest must measure.
+- **Exact club-text resolution (D-4, read time, no migration).** New pure
+  `src/lib/player-matching/club-identity.ts`; the index is built once per query from
+  `clubs.name`, `clubs.short_name` and `club_aliases.alias`. Raw text is split on `|` and `,`
+  (the separators `hall_of_fame` and `honour_team_members` actually use) and each segment is
+  matched **exactly**. Never trigram, never prefix. Fails closed on a segment naming more than
+  one continuing club; unresolved text yields no positive evidence, no negative evidence and no
+  contradiction; multi-club fields stay multi-club; no `*_raw` column is written. One documented
+  addition to §8 item 1, flagged for operator veto: a segment `A (B)` resolves only when both
+  halves are canonical clubs of the **same** continuing club (`Western Bulldogs (Footscray)`,
+  12 Hall of Fame rows), which is why `Fremantle (1882)` and `Glenorchy (New Town)` resolve to
+  nothing.
+- **S3 `club_in_span` and S4 `club_text_anywhere`** implemented in the `club` family, S3 first,
+  one club signal only. Neither can contradict.
+- **Both S3/S4 weights ship as `null` and score nothing.** §7 step 3 freezes a candidate number
+  for S2 and for nothing else, so a five-row grid (P3-0 control, then S3 at 15 / 20 / 24 / 28
+  with S4 held at 15, the value §5 implies by the 44 → 59 honour-team ceiling) is put to the
+  operator before any of it is run. No weight was chosen ad hoc.
+- **`ALGORITHM_VERSION` `v2` → `v3`** (D-8), for the S1 change alone. The whole cache is stale
+  until an operator Refresh; P2's banner, per-row badge, drawer warning and approval-time stale
+  notice are untouched and apply as designed, and approval still locks, re-reads through
+  `fetchSourceEvidence` and re-scores under current code.
+- **No draft change.** S2 was not implemented, D-9 is unchanged, `draft_person` remains non-bulk,
+  and no band, gap, trigram weight, bulk floor or draft weight moved. `hall_of_fame` and
+  `honour_team_members` stay suggestion-only under D-5 whatever the grid shows.
+- **Representative cases.** Frank Johnson (`hof:176`, `South Melbourne | Port Melbourne`, span
+  1950-1964): the South Melbourne evidence is now resolved and carried, and scores nothing under
+  P3-0 — whether it discriminates is a P3B measurement, not a claim. Jack Lynch (`aah:1953`,
+  All-Australian, West Adelaide) is an `award_winners` row naming a SANFL club: **out of scope
+  for S3/S4 and unchanged**, and P3 must not be reported as improving him.
+- **Local validation:** `tsc --noEmit` clean; 146/146 across `tests/player-matching.test.ts`
+  (86, 34 new), `tests/player-matching-describe.test.ts` and `tests/player-link-mutations.test.ts`.
+  9 new database-backed cases in `tests/integration/player-matching.test.ts` are **unrun**, as is
+  every backtest. Nothing in P3A has been measured against the v1 baseline.
+
+### P3B — S3/S4 weight grid measured and selected (2026-09-12, operator + Opus 5) — SHIPPED AT 15/15
+
+Full record in `AFLDB-ISSUE-164.md` §12 "P3B decision record". Summary:
+
+- **Selected: S3 `clubTextInSpan` = 15, S4 `clubTextAnywhere` = 15**, now the shipped values in
+  `MATCH_POLICY.scoring.club`. S4 was held at 15 across the grid per §5's 44 → 59 honour-team
+  ceiling, so S3 was the only free variable, and each row was declared on the command line and
+  recorded in its own report rather than by editing the policy between runs.
+- **Labelled set, P3-0 control → P3-A (15/15):** Top-1 6,301/6,324 = 99.64% → 6,303/6,324 =
+  99.67%; Hall of Fame Top-1 236/239 = 98.74% → 238/239 = 99.58%; ambiguity 25 → 19. Top-3/5,
+  Very High (5,528), Very High false positives (1), bulk (3,817/3,817, 0 FP) and hard conflicts
+  (9) are **all unchanged**, and **no correct Top-1 became wrong** anywhere in the grid. Signal
+  frequencies at 15/15: `club_in_span` 226, `club_text_anywhere` 43.
+- **The whole labelled improvement is two rows**, both namesake separations landing in *medium*
+  rather than Very High: `hall_of_fame#36` Frank Hughes #4385 (44, low) → #4386 (59, medium),
+  and `hall_of_fame#276` Mark Williams #9149 (53, low) → #9150 (68, medium).
+- **S3 at 23, 24 and 29 are REJECTED as confidence inflation without identity improvement.** 23
+  moved 74 rows up a band and changed 136 material gaps; 24 moved 151 Hall of Fame rows from
+  High to Very High, all of them correct and none of them newly resolved; 29 improved no
+  expected rank at all. None corrected a single further identity, so under the frozen
+  lowest-useful-weight rule the lowest pair that buys the whole improvement ships.
+- **Unresolved queue is not made more confident anywhere.** Population 5,390, Very High 2,680,
+  bulk 38, hard conflicts 23 and aggregate ambiguity 379 are identical before and after;
+  `draft_person` is completely unchanged; 6 low-confidence band promotions and 1 changed Top-1
+  suggestion — `hall_of_fame#38` George Coulthard, George Card #4884 (0) → George Collard #4900
+  (15) on `club_text_anywhere` against a `career_span_no_overlap` conflict, band `none`, bulk
+  false, recorded as a **changed weak suggestion and not a confirmed improvement**.
+  `hall_of_fame#168` John Murphy keeps its Top-1 (#7655, 76) but its runner-up rose to 68, gap
+  8, so the row is now medium and **ambiguous** — the safety rule working, not a regression.
+  Norman Ware `Western Bulldogs (Footscray)` gains +15 of gap, confirming the approved
+  same-organization parenthetical rule resolves and pays as designed.
+- **Draft remains frozen and is verified frozen:** raw club-id semantics, no S1 lineage for
+  draft, S2 not implemented, **D-9 in force**, no draft bulk, no Tier 2 work. A DB-free unit
+  case re-scores a draft row at 15/15, 23/15, 24/15 and 29/15 and asserts the result is
+  unchanged.
+- **Calibration CLI retained with updated semantics:** shipped values come from `MATCH_POLICY`
+  and are 15/15; no override (every application path) reports `source: 'shipped'` and scores
+  15/15; an explicit `--club-text-in-span` / `--club-text-anywhere` pair still overrides, still
+  records itself as `calibration-override` and still cannot reach `MATCH_POLICY`; reset returns
+  to 15/15, never to "not scored"; and there is still no environment variable.
+- **Unchanged:** `ALGORITHM_VERSION` stays `v3`, bands, gaps, bulk floors, source bulk policy,
+  Hall of Fame and honour-team non-bulk (D-5), draft raw-id matching and stale-cache safety.
+- **Local validation:** `tsc --noEmit` clean; **177/177** across `tests/player-matching.test.ts`,
+  `tests/match-backtest-compare.test.ts` and `tests/player-link-mutations.test.ts`.
+  `tests/integration/player-matching.test.ts` and the shipped-policy backtest/queue re-run with
+  no calibration override — the proof that default v3 reproduces the selected 15/15 result
+  exactly — were **completed in the P5 closeout validation** (23/23 integration; shipped-default
+  labelled/queue results identical to this 15/15 measurement): see "P5 — closeout" below and the
+  Resolution section.
+
+### P4 — bulk-class review and live proof (2026-09-12, operator + Opus 5) — COMPLETE
+
+Documentation and evidence only: **no code, no migration, no commit, no scoring/band/bulk-policy
+or source-admission change, and `ALGORITHM_VERSION` untouched at `v3`.** Full record in
+`AFLDB-ISSUE-164.md` §12 P4.1–P4.10; acceptance criteria §13 items 3a, 6 and 7 are now met.
+
+**Shipped policy under review:** `v3`; S3 `clubTextInSpan` 15; S4 `clubTextAnywhere` 15; draft
+keeps raw-club-id semantics; D-9 active; `hall_of_fame` / `honour_team_members` / `captaincies` /
+`draft_person` / `draft_picks` non-bulk.
+
+**Bulk-class review under `v3` (§9.1 applied mechanically) — no new class is admissible, and
+none was admitted:**
+
+| Class | Labelled n | Bulk | FP | Rule-of-three bound | Outcome |
+|---|---|---|---|---|---|
+| `award_winners` | 3,468 | 3,130 | 0 | ≈ 0.096% | Admitted, re-verified under `v3` |
+| `award_nominations` | 750 | 687 | 0 | ≈ 0.437% | Admitted, re-verified under `v3` |
+| `player_achievements` | 0 | — | — | — | **Policy-admitted on historical ISSUE-075 evidence only (253 / 0 FP / ≈ 1.19%); NOT re-verified under `v3`** — the executable population contains none of its rows. §9.1 must not be described as re-verified for this class. |
+| `captaincies` | — | 0 | — | — | Non-bulk by policy; measured Very High FP remains Jobe Watson |
+| `draft_person` | 5 | 0 | — | — | Non-bulk under D-9 |
+| `draft_picks` | — | 0 | — | — | Non-bulk |
+| `hall_of_fame` | 239 | 0 | — | — | 0 bulk at 15/15, and 239 < the frozen 253 minimum regardless; suggestion-only |
+| `honour_team_members` | 88 | 0 | — | — | Non-bulk |
+
+**Live stale-cache proof (invariant 13, §13 item 3a).** `afldb_dev` pre-refresh: `algorithm_version`
+`v1` only, 10,394 cache rows, 4,615 rank-1 entities, 38 bulk rows, `computed_at` 2026-09-11
+14:21:22+10. A local `v3` worktree served against that still-`v1` cache showed the banner (4,615
+cached `v1` suggestions against current `v3`, with the stale-scores/bands/bulk-flags warning and
+the statement that approval re-scores under `v3` and refuses unsupported or changed evidence),
+per-row **STALE (V1)** badges, the Aaron Cadman drawer reporting `v1` (current `v3`) with the
+same warning, and the Recompute control. Proved live at a version distance of **v1 → v3**; the
+criterion is now stated generically in the runbook as *cached `algorithm_version` ≠ running
+`ALGORITHM_VERSION`*.
+
+**Live refresh (§13 item 7).** Recompute run through the admin UI. Banner and badges gone, drawer
+reports `v3`, queue 5,390 unresolved / 10,394 candidates / 38 bulk-ready. DB after refresh:
+`algorithm_version` `v3` only, 10,394 rows, 4,615 rank-1 entities, 38 bulk, `computed_at`
+2026-09-12 17:44:26+10.
+
+**Live bulk population (§13 item 6).** All 38 post-refresh bulk rows enumerated: **1
+`award_nominations` (#50) + 37 `award_winners`**, all `v3`, all score 97 — **no `draft_person`,
+`draft_picks`, `hall_of_fame`, `honour_team_members`, `captaincies` or `player_achievements`
+row**. This matches the deterministic shipped-`v3` queue population exactly. **Newly
+bulk-eligible = 0**, so item 6's manual-inspection population is empty; the 38 were enumerated to
+prove source-class containment and live/model reconciliation, **not** hand-verified individually.
+Evidential limit recorded deliberately: no SQL snapshot of the 38 live `v1` row identities was
+taken before the refresh, and Refresh rebuilds the cache wholesale, so **no literal historical
+DB-table identity diff is claimed** — only that deterministic row-level queue comparison reports
+`becameBulkEligible = []` / `ceasedBulkEligible = []` and the live post-refresh population and
+count match that result.
+
+**Live current-code approval proof.** Aaron Cadman `award_winners#1563`: pre-state `player_id`
+NULL, `link_status_value` `implausible`, no resolution history, current `v3` suggestion player
+`#3` at score 97, bulk eligible. Single-row UI approval succeeded; DB after: `player_id` 3,
+`link_status_value` `resolved`, `player_link_resolutions` row with `action` `linked`,
+`previous_status` `implausible`, `match_method` `suggested`, `match_score` 97,
+`algorithm_version` `v3`. This proves the real `v3` approval path and that the server-computed
+score and version are what persist. It does **not** prove a live `bulk_suggested` browser
+mutation.
+
+**Bulk-path contract proof (tests, not a live write).** `ResolvePanel` → `BulkApproveControls` →
+`bulkApproveSuggestions` (`src/app/admin/player-links/actions.ts:301`) posts only target
+identities/status and suggested player ids — no browser score, band, bulk flag or algorithm
+version — and calls the same `resolveLinkFromSuggestion` (`src/db/queries/player-links.ts:697`)
+per row. Its four differences are `method = 'bulk_suggested'`, a fresh `assessment.bulkEligible`
+requirement, a set-wise cache-version lookup for stale reporting, and per-row skip-and-continue.
+`tests/player-link-mutations.test.ts` proves stale rows re-score under current code, a changed
+best is refused, a no-longer-bulk row is refused, the server-computed score and version are
+written, browser score/band/bulk/version are never trusted, per-row stale reporting, that one
+failed row does not abandon the batch, and that the bulk action uses `bulk_suggested`. A further
+live bulk write would add only browser-wiring and live `match_method` evidence; §13 does not
+require it and **it was not performed**.
+
+**Reversal finding.** **There is no product-level unlink or reversal workflow** — the
+player-links UI exposes no unlink control and `player_link_resolutions` permits only `linked` /
+`confirmed_unlinked`. The earlier runbook wording requiring "one *reversible* real approval" was
+therefore inaccurate and is **withdrawn**. The dev cleanup was **operator maintenance, not
+product functionality**: a guarded owner-role transaction restored Aaron Cadman (`player_id` →
+NULL, `link_status_value` → `implausible`, exact ISSUE-164 test resolution row deleted), verified
+afterwards as `player_id` NULL, status `implausible`, `resolution_rows` = 0, and the `v3`
+suggestion still player `#3` at score 97.
+
+**P4 conclusion:** no new class admitted; no new bulk-eligible rows; no forbidden source class in
+the live bulk population; stale-cache integrity proved live; current-code approval proved live;
+the bulk server contract proved by tests; no product-level reversal exists. §13 item 2b remains
+**NOT met** (the labelled draft population is still 5), so D-9 stays in force. Only P5 (closeout)
+remains.
+
+### P5 — closeout: explainability implemented, S6 decided, final validation complete (2026-09-12, Opus 5) — COMPLETE
+
+P5 planning found exactly one genuine acceptance blocker: **§13 item 1 was UNMET because the §11
+explainability UI had never been implemented.** `describe.ts` had no `explainLimits`, the typed
+reason vocabulary did not exist in `src/`, and `ResolveControls.tsx` rendered the bulk criteria
+only when `match.bulkEligible` — so the page could show what a row scored but not why it was
+capped, and a reviewer could not tell an unlucky row from a structurally impossible one.
+
+**Implemented (explainability only — no scoring change).** Full record in `AFLDB-ISSUE-164.md`
+§12 P5.1. New pure module `src/lib/player-matching/explain-limits.ts`:
+`explainLimits(assessment, profile, { groupDisagrees })` returns typed limit reasons, the six
+evaluated bulk criteria and the reachable ceiling. It reads the assessment the server already
+computed and `MATCH_POLICY`; it never rescores and cannot move a score, a band or a bulk flag.
+Reason vocabulary, in priority order: `group_disagrees`, `hard_conflict`, `near_tie`,
+`source_class_not_bulk`, `name_not_exact`, `no_independent_corroboration`,
+`below_bulk_score_floor`, `below_bulk_gap_floor`, `profile_ceiling_below_very_high` — each
+carrying its own structured numbers so no UI string has to be parsed to recover them. Wording
+lives in `describe.ts` beside the evidence and conflict tables.
+
+**Reachable ceiling.** `reachableCeiling(profile)` sums the best signal each family the source
+can actually supply could earn — one signal per family, S1–S4 as one club family, capped at 100
+as the scorer caps — and reproduces the §3 arithmetic: complete draft profile **97**, honour-team
+row with no resolvable club text **44**, award row with a season and no `club_id` **61**, Hall of
+Fame with a parsed span and a resolved club **76**. Explanatory only: nothing in `assessMatch`
+or `scoreCandidate` consults it. `readSourceDetails` now emits `hasClubId` for `award_winners`
+and `player_achievements`, whose club NAME is `COALESCE(clubs.name, club_name_raw)`; without it
+a text-only row would have been credited a club ceiling it can never reach.
+
+**UI.** Row: one concise primary reason under the band badge, suppressed on rows that propose
+nothing and on bulk-ready rows. Drawer: the criteria block renders for **every** suggested match
+with ✓/✗ per criterion (strong name, independent corroborating families, bulk score floor, bulk
+gap floor, no hard conflict, source class permitted), plus "Highest score this record type can
+reach: N" flagged "— never Very High" below 85, the unresolved-club-text note, and the full
+reason list. Policy exclusion is stated as policy, never as a complaint about the evidence: a
+captaincy scoring 97 shows all six evidence criteria ticked and reads "captaincies is
+suggestion-only (policy)". The invariant-13 stale banner, badge and drawer warning are unchanged
+and the warning still sits above the Approve button.
+
+**S6 (`resolved_namesake_agreement`) — DECIDED: not implemented in ISSUE-164.** The qualifying
+population under the §5 S6 definition is **zero** (the rebuilt `player_link_resolutions` is empty
+by design and the five tracked human decisions form no same-normalised-name pair), so a
+leave-one-out treatment arm would be empty and would measure nothing. Deferred/rejected for this
+issue; revisit only after ordinary admin use creates a meaningful independently measured
+human-decision population. If ever revisited, `--holdout-self` is mandatory and S6 never counts
+toward `minCorroboratingFamilies`. **No new issue is created for a zero-population
+hypothetical.**
+
+**Migration 099 deployment state** (verified on `afldb_dev`, operator, 2026-09-12): 99 migration
+files, 99 applied, `099_normalise_unicode_whitespace.sql` applied, 0 pending. Ordering unchanged:
+**migration first → application build/restart**.
+
+**Acceptance movement.** §13 item 1 **MET**. §13 item 2b recorded as **deliberately unmet,
+deferred under D-9** — Tier 1 produced a bulk-eligible population of n = 0, so the §9.1 standard
+cannot be met from this tranche's evidence and nothing draft-related moved, which is the stop
+condition working rather than a failure.
+
+**Files changed:** `src/lib/player-matching/explain-limits.ts` (new),
+`src/lib/player-matching/describe.ts`, `src/db/queries/player-match-candidates.ts`,
+`src/app/admin/player-links/page.tsx`, `src/app/admin/player-links/ResolveControls.tsx`,
+`tests/player-matching-describe.test.ts`, `tests/player-link-mutations.test.ts`, `CHANGELOG.md`
+(the missing P2 stale-cache entry plus this one), `AFLDB-ISSUE-164.md`, `issues.md`,
+`IssuesIndex.md`. Unchanged and verified by test: `ALGORITHM_VERSION` `v3`, S3/S4 at 15/15,
+`draft_person` non-bulk, every weight, band, gap and bulk floor, migration 099.
+
+**DB-free validation:** `npx tsc --noEmit` clean; 187/187 across
+`tests/player-matching-describe.test.ts`, `tests/player-matching.test.ts` and
+`tests/player-link-mutations.test.ts`.
+
+**Final operator validation (2026-09-12) — discharges the items above.** DB-backed:
+`tests/integration/player-matching.test.ts` — a first attempt failed 23/23 only because the
+shell's `AFLDB_TEST_DATABASE_URL` pointed at `127.0.0.1:5432` while the active tunnel was on
+`55432` (classified as environment/setup failure, not a product or test regression); after
+pointing the test DSN at the active `55432` tunnel, **23/23 passed** in ~5.15s. Shipped-default
+(`v3`, no calibration override) labelled backtest and queue re-run, owed since P3B: labelled
+population 6,324, top-1 6,303/6,324 = 99.67%, recall 6,310/6,324 = 99.78%, Very High 5,528
+(correct 5,527, 99.98%), bulk 3,817/3,817 (100%), ambiguous 19, hard conflicts 9; queue
+population 5,390, Very High 2,680, High 426, Medium 331, Low 169, None 1,784, bulk 38,
+ambiguous 379, hard conflicts 23 — both identical to the P3B 15/15 measurement above, and an
+explicit `--club-text-in-span 15 --club-text-anywhere 15` override reproduces both reports
+row-for-row, confirming the shipped default is the same policy as the measured grid selection.
+`npm run db:status` against `afldb_dev`: 99 migration files, 99 applied, migration 099 applied,
+0 pending. **ISSUE-164 is resolved on this evidence — see Resolution (2026-09-12) below.**
+
+### Validation plan
+
+Runbook §12–§13: P0 read-only evidence capture (cache rows for the named examples, baseline
+`npm run match:backtest -- --out`), P1 backtest instrumentation, P2 unit/describe/mutation
+suites extended (not created), P3 backtest grid gated on top-1 ≥ 99.69%, VH precision ≥
+99.99%, bulk FP 0, false contradictions ≤ 8, band-migration matrix, P4 live refresh + 100%
+inspection of any **new** bulk rows + a live current-code approval proof (the P3 gate figures
+here are the original ISSUE-075 numbers and are superseded by runbook §13 item 2, which now
+measures the final shipped `v3` policy against `backtest-v1-baseline.json`). **P4's original
+"one reversible approval" clause is withdrawn: no product-level reversal exists** — see the P4
+section above.
+
+### Follow-up
+
+None yet. Planning-session note: one read-only shell command (`Get-Content` on `issues.md`)
+was run against CLAUDE.md §9 while locating this insert point; nothing changed.
+
+### Resolution (2026-09-12)
+
+**Status:** Resolved. All phases P0 → P1 → P2 → P1a → P1b → P1c → P3A/P3B → P4 → P5 are
+complete, and the final operator validation obligations left open at the end of P5 (the
+DB-backed integration test and the shipped-default, no-override backtest/queue re-run owed
+since P3B) are now green. Uncommitted on `sonnet/issue-164-player-link-confidence`; the
+operator commits the reviewed local change per the standard issue lifecycle.
+
+**Root cause:** not a single defect — this issue corrected a source-text normalisation defect
+(U+00A0 in every `draft_persons` name, causing the 79-point draft plateau; migration 099),
+added previously-unscored club-text evidence for `hall_of_fame` / `honour_team_members` (S1–S4,
+shipped at 15/15), closed a stale-cache/version-integrity gap (`ALGORITHM_VERSION` → `v3`), and
+added the explainability layer the acceptance criteria required (§13 item 1).
+
+**Fix:** migration 099 (Unicode whitespace normalisation); `ALGORITHM_VERSION` `v3`; S1
+lineage-aware club identity; S3 `clubTextInSpan` / S4 `clubTextAnywhere` at 15/15; stale-cache
+detection, banner, per-row badge and approval-time notice; `explain-limits.ts` (typed limit
+reasons, reachable ceiling) and the drawer/row UI that renders it for every row, not only
+bulk-eligible ones; `draft_person` suspended from unattended bulk approval (D-9) pending a
+Tier 2 draft calibration population, per the pre-declared §9.1 rule of three.
+
+**Validation:** DB-free — `tsc --noEmit` clean, 187/187 focused suites. DB-backed —
+`tests/integration/player-matching.test.ts` 23/23 (a first 23/23 failure was an
+`AFLDB_TEST_DATABASE_URL` port/tunnel mismatch, environment setup, not a regression).
+Shipped-default (`v3`, no override) labelled backtest and queue re-run reproduce the P3B
+15/15 measurement exactly (labelled top-1 99.67%, Very High 99.98%, bulk 3,817/3,817 0 FP;
+queue Very High 2,680, bulk 38), and an explicit 15/15 override is identical to the default —
+confirming the shipped policy is what was measured and selected. `npm run db:status` against
+`afldb_dev`: 99/99 migrations applied, migration 099 applied, 0 pending. §13 items 1, 2, 2a, 3,
+3a, 4, 5, 6 and 7 are MET.
+
+**§13 item 2b — deliberately unmet, not a blocker.** The runbook (§13 item 2b, §16, §9.1)
+defines draft-class re-admission as gated on a Tier 2 labelled population of ≥ 253
+bulk-eligible confirmed rows with 0 false positives; P1c's Tier 1 run produced 114 labels with
+a bulk-eligible population of n = 0, so the standard is not met and cannot be met from this
+tranche's evidence. The runbook states this outcome in its own binding direction as success,
+not failure: "nothing draft-related moved... This is not a failure of ISSUE-164; it is the stop
+condition working" (§13 item 2b). `draft_person` remains suspended from unattended bulk
+approval under D-9 pending a future Tier 2 acquisition; that acquisition is a separate,
+already-identified follow-up, not a condition of this issue's closure.
+
+**Artefact disposition:** `backtest-v1-baseline.json` and `queue-v1-baseline.json` (the
+immutable P0 evidence, §2.10) and `draft-labels-b1-120.json` (the P1c Tier 1 label snapshot,
+kept at its existing root path) are tracked; `.gitignore` ignores `/backtest-*.json`,
+`/queue-*.json` and `/compare-*.json` with explicit exceptions for the two baseline files.
+
+**Follow-up recorded separately (no ID allocated — tracked on this runbook, not reopened as a
+new issue):** Tier 2 draft-population acquisition (DraftGuru person-page href matching under
+ISSUE-093 governance) and the resulting §9.1 re-gate of `draft_person`; S6
+(`resolved_namesake_agreement`), deferred/rejected for a zero qualifying population, revisit
+only once ordinary admin use creates a meaningful human-decision population and always with
+`--holdout-self`; `hall_of_fame` bulk admission, blocked at 239 < 253 confirmed links,
+re-run only once the confirmed population grows; the remaining P1 backtest instrumentation
+(per-source×bucket precision, per-signal lift, per-row reachable ceiling, exact-name collision
+rate) not required by this issue's acceptance criteria.

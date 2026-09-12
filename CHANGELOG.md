@@ -15,6 +15,199 @@ commit.
 
 ## [Unreleased]
 
+### The player-link queue explains why a row is where it is (AFLDB-ISSUE-164 P5) - 12 September 2026
+
+- **Every suggested row now states, in one line under its band, the single most important reason
+  it is not bulk-ready.** A reviewer reading "Low · 44" against a name they recognise could not
+  previously tell an unlucky row from a structurally impossible one. The reasons are typed, not
+  prose: a hard conflict, a near tie, a source class policy excludes, a non-exact name, missing
+  independent corroboration, the bulk score or gap floor, or a record type whose reachable
+  ceiling is below Very High -- reported in that order, most decisive first.
+- **The drawer shows all six bulk criteria with ✓/✗ for every suggested row, not only the rows
+  that already pass.** Showing them only on eligible rows was exactly why a capped row and an
+  unlucky one looked identical. Alongside them it now prints the highest score the record type
+  can reach, so a Hall of Fame row that tops out at 76 says so rather than appearing to have
+  underperformed.
+- **Policy exclusion is stated as policy, never as a complaint about the evidence.** A captaincy
+  scoring 97 on every family reads "captaincies is suggestion-only (policy)" with all six
+  evidence criteria still ticked. Club text that names no AFLDB club is reported as counting
+  neither for nor against, rather than silently vanishing from the arithmetic.
+- Explainability only: it reads the assessment the server already computed and the shipped
+  policy, and returns reasons. No weight, band, gap, bulk rule, source admission or
+  `ALGORITHM_VERSION` changed; the matcher stays at `v3` and `draft_person` stays suspended from
+  unattended approval.
+
+### Club text now scores, at the lowest weight that earns it (AFLDB-ISSUE-164 P3B) - 12 September 2026
+
+- **`club_in_span` and `club_text_anywhere` ship at 15 points each.** P3A resolved Hall of Fame
+  and honour-team club text and deliberately scored nothing with it, leaving the weight to a
+  measured grid. The grid has been run: 15/15 against a null/null control corrects two Hall of
+  Fame top-1 suggestions (two different Frank Hugheses, two different Mark Williamses) and drops
+  six rows out of ambiguity, while the Very High count, the single Very High false positive, the
+  bulk population (3,817 of 3,817, no false positives) and the nine hard conflicts are all
+  unchanged. No correct top-1 became wrong.
+- **Higher weights were rejected for inflating confidence without improving identity.** S3 at
+  23, 24 and 29 fixed nothing further: 24 moved 151 Hall of Fame rows from High to Very High,
+  all of them correct and none of them newly *resolved*. Very High is a claim about certainty,
+  not a reward for carrying more kinds of evidence, so the lowest weight that buys the whole
+  measurable improvement is the one that ships.
+- **The unresolved queue gains no confidence anywhere.** Its population, Very High count, bulk
+  count, hard conflicts and aggregate ambiguity are identical before and after, `draft_person`
+  is untouched, and the one changed suggestion (George Coulthard) scores 15 against a career-span
+  conflict and stays unbanded -- a hint for a human, not a link. One Hall of Fame row (John
+  Murphy) became *ambiguous* because its runner-up rose too: two near-identical candidates
+  refusing to look settled is the safety rule working, not a regression.
+- **The calibration override survives the decision it was built for.** Runs still declare a
+  candidate pair on the command line and still record which pair they used, but omitting the
+  options -- every application code path -- now means the shipped 15/15 rather than "not
+  scored", and an override still cannot reach `MATCH_POLICY`. No environment variable, then or
+  now.
+- No band, gap, bulk floor, draft rule or `ALGORITHM_VERSION` changed: draft matching keeps raw
+  club-id semantics, Hall of Fame and honour-team rows remain suggestion-only, `draft_person`
+  remains suspended from unattended approval, and the version stays `v3`.
+
+### A club is the club it became (AFLDB-ISSUE-164 P3A) - 12 September 2026
+
+- **Club evidence now compares continuing clubs, not raw club identities.** `player_clubs`
+  records the identity a player actually played under -- Footscray, South Melbourne -- while a
+  source row may name another identity of the same club. The matcher compared
+  `clubs.id`, so it lost real agreement and, against a complete club history, could raise
+  "never played for Western Bulldogs" about a Footscray career. Both the club reward and the
+  `club_not_in_history` contradiction now run through `clubs.organization_id`, falling back to
+  the raw id wherever AFLDB records no lineage. A merger is still not a lineage: migration 017
+  keeps Fitzroy and Brisbane Lions separate on purpose, so a Fitzroy row is never corroborated
+  by a Brisbane Lions career.
+- **Hall of Fame and honour-team club text is resolved, exactly or not at all.** Those two
+  sources carry a human-written club list and no club id, which is why they reached no club
+  evidence at all. The list is split on the separators the sources really use, and each name is
+  matched exactly against `clubs.name`, `clubs.short_name` or `club_aliases.alias` -- never
+  fuzzily. Text that names two continuing clubs, or a club AFLDB does not hold, resolves to
+  nothing: most of a Hall of Fame club list is SANFL, WAFL and Tasmanian clubs, and "not an
+  AFLDB club" is not evidence against anybody. Unresolved text produces no signal, no negative
+  evidence and no contradiction; a multi-club career stays multi-club; no raw source text is
+  rewritten and no migration is needed.
+- **The two new signals are implemented and score nothing yet.** `club_in_span` (a named club
+  inside the career span the Hall of Fame row itself asserts) and `club_text_anywhere` carry
+  null weights, because the weight belongs to a measured grid rather than to whoever wrote the
+  code. `ALGORITHM_VERSION` moves to `v3` for the lineage change alone, so every cached
+  suggestion is visibly stale until the queue is refreshed.
+- **No draft behaviour changed.** Draft timing, draft games and goals, the bands, the gap rules
+  and the bulk floors are untouched, and `draft_person` remains suspended from unattended
+  approval.
+
+### A cached suggestion never passes as a current one (AFLDB-ISSUE-164 P2) - 12 September 2026
+
+- **The player-link queue tells an admin when the scores it is showing are out of date.** Cached
+  suggestions carry the algorithm version they were computed under. When any of them differs
+  from the version the running code declares, a banner appears at the top of the queue naming
+  both versions and the affected row count, and each affected row carries a "Stale (v1)" badge
+  beside its band.
+- **The drawer repeats the warning above the Approve button**, stating that the displayed score
+  and evidence were computed by the older matcher and that approving re-scores the record under
+  the current one.
+- **Approval never uses the number on the screen.** The approval action locks the row, re-reads
+  it, and re-scores it under the running algorithm. If the fresh evidence names a different
+  player, or no longer supports the match, the approval is refused with the existing
+  changed/conflict/weak/not-bulk message. When it does still support the match, the approval
+  completes and returns a notice that the suggestion shown was stale -- "shown as v1 score 79;
+  approved on v3 score 92" -- and the score and version recorded are the fresh ones.
+- **Bulk approval reports the same per row**, in its existing approved/skipped summary, so a
+  stale row inside a batch is named individually rather than absorbed into a total.
+- The comparison is made server-side against the version the code itself declares; nothing about
+  staleness comes from the browser, and there is no path that approves on a cached score.
+
+### The matcher can be measured against ground truth it does not store (AFLDB-ISSUE-164 P1c) - 12 September 2026
+
+- **`npm run match:backtest -- --labels <file>`** scores a source population against a **frozen
+  label file** instead of against stored links. AFLDB's confirmed-link backtest can only measure
+  what someone has already linked, and for the draft source that is five rows -- the five
+  explicit human decisions in `data/reference/draftguru-link-decisions.json` -- against 5,052
+  unmatched people. No draft precision, Very High precision or bulk-safety claim is supportable
+  from five rows, so the labels are supplied separately and **never written as links**: they
+  resolve to ids in read-only SQL and are carried beside the evidence, which has no field that
+  could hold an answer. Alongside the standard report the run adds the sections a calibration
+  population needs -- truth-source independence, exact-versus-fuzzy name evidence, a fourteen
+  bucket stratification, **every** wrong top-1 rather than a sample, and a true-negative table
+  naming every person the matcher rated Very High who correctly has no AFLDB player at all. A
+  label whose person or whose target does not resolve is reported, never dropped; quietly
+  shrinking a population flatters every rate computed from it.
+- **A label must say where it came from, and the matcher's own opinion is refused by name.** A
+  suggestion the scorer produced cannot be ground truth about the scorer however confident it
+  was, so `scorer_top1`, `match_suggestion`, `bulk_approval` and the cached candidate table are
+  rejected at parse time; an unrecognised provenance is reported as unassessed rather than
+  trusted. Labels are keyed on the durable DraftGuru `player_url`, never a surrogate id, and two
+  labels for one person -- or two people claiming one AFLDB player -- raise an error naming both
+  sides. That is a finding for a curator, not something a tool resolves by choosing.
+- **`npm run match:draft-labels`** builds such a file offline from a person-page snapshot,
+  taking the page's own outbound AFL Tables link as the identity. The match is URL to URL, so no
+  name, club, draft year, games, goals or era -- every family the scorer scores -- is reused to
+  establish the truth it is measured against. A missing link is **not** read as "no such player":
+  a negative is emitted only when the page shows no identity *and* the person is in a declared
+  zero-senior-game cohort, and everyone else is reported as unlabelled.
+- **An empty sample no longer reads as an observed failure.** The report's 95% zero-failure
+  bound line said "a failure was observed, so the zero-failure rule does not apply" whenever no
+  bound could be computed -- including when the bulk population was simply *empty*, which is
+  exactly what a suspended class produces. The Tier 1 draft run hit that case and would have
+  reported a clean, suspended population as though it had made a false positive. The line now
+  distinguishes three states: no bulk-eligible rows at all, a population with failures (naming
+  the count), and a clean population with its computed bound.
+- No scoring behaviour, weight, band, gap or bulk threshold changed, and `draft_person` remains
+  suspended from unattended approval: a bulk-eligible draft row in a label run is still a stop
+  condition that exits 2.
+
+### Matching reports can be compared against a frozen baseline (AFLDB-ISSUE-164 P1) - 12 September 2026
+
+- **`npm run match:compare -- <baseline.json> <candidate.json>`** compares two saved
+  player-link matching reports and prints, with a machine-readable `--out` twin, the run
+  metadata of both, the deltas in candidate-generation recall, top-1/3/5, band counts, Very
+  High and bulk counts, precision and false positives, ambiguity and hard conflicts, the same
+  set per logical source type, and a **row-level band-migration matrix** joined on the
+  resolution key. Aggregates are derived from the joined rows, never synthesised from counts:
+  identical band totals can hide any number of offsetting moves, so a matrix built from
+  aggregates would be a fiction. Row-level lists name every changed top-1 (with correctness on
+  both sides), every change in the expected player's rank, every band change with direction,
+  ambiguity gained and lost, material gap movement, bulk eligibility gained and lost, and every
+  move between exact-name and fuzzy-name evidence. Output ordering is by resolution key, so
+  repeated runs on the same inputs are byte-identical. Neither input file can be overwritten.
+- **Any bulk-eligible draft row in the candidate run is reported as a stop condition** and
+  exits 2 (distinct from 1, a tool failure), because ISSUE-164 D-9 suspends `draft_person`
+  unattended approval until the class is re-gated on a large enough confirmed population.
+- `npm run match:backtest` gains `--baseline <json>` (compare this run against a saved report in
+  the same pass, in labelled and `--queue` modes) and `--compare-out <json>`. **The queue report
+  now carries run metadata** — `algorithmVersion`, `gitCommit`, `startedAt`, `tableFilter` —
+  beside its unchanged `proposals` array; reports written before this change still parse, with
+  their metadata reported as unknown rather than guessed. No scoring behaviour changed.
+
+### Name normalisation canonicalises Unicode whitespace; the player-link matcher moves to `v2` (AFLDB-ISSUE-164 P1a) - 12 September 2026
+
+- **`afldb_normalise_name()` now treats Unicode whitespace as whitespace** (migration 099). The
+  function collapsed ASCII whitespace only, so a name whose word separator is U+00A0 NO-BREAK
+  SPACE survived normalisation intact and could never be byte-equal to the `players.search_name`
+  it was meant to match. ISSUE-164 P0 measured that this affects **5,057 of 5,057 `draft_persons`
+  rows -- 100% of the draft source**: a visually identical name reached the scorer only through
+  the trigram arm at similarity 1.00 and was paid `name_trigram_high` (26) instead of `name_exact`
+  (44), which also failed `strongName` and so structurally barred the row from unattended
+  approval at any score. The 79-point draft plateau recorded on the issue is that defect, not a
+  weighting problem. The migration canonicalises a named, explicit list of Unicode space
+  separators (U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F, U+3000) to an
+  ordinary space before the existing lower/unaccent/strip/collapse pipeline; zero-width characters
+  are deliberately left alone. No punctuation, accent or transliteration behaviour changed, and no
+  raw source column was rewritten -- only the derived `players.search_name` and
+  `player_name_aliases.search_alias` are recomputed, and the four expression indexes over the
+  function are rebuilt in the same transaction.
+- **`ALGORITHM_VERSION` is `v2`.** No weight, band, gap or bulk threshold moved, but the matching
+  semantics did, so every cached `v1` suggestion is stale until the queue is refreshed -- which
+  the stale-cache detection shipped just before this (ISSUE-164 P2) makes visible on the page and
+  reports at approval. Approval itself is unchanged: it still re-locks, re-reads and re-scores
+  under the running code, and the cached score is never acted on.
+- **`draft_person` is suspended from unattended bulk approval** (ISSUE-164 D-9). Its admission
+  rests on ISSUE-075's 2,319-row calibration, which the current backtest cannot reproduce -- the
+  executable baseline holds five labelled draft rows against 5,052 unmatched. Because the
+  normalisation fix lifts the whole affected draft population to `name_exact` at once, leaving the
+  class admitted would present a large new unattended-approval set backed by five labelled rows.
+  Draft suggestions and one-at-a-time human approval are unaffected; only the unattended path is
+  closed, and only ISSUE-164 P1c can re-open it.
+
 ### The Admin Centre batch is accepted on DEV, and AFLDB-ISSUE-160, 161, 162 and 163 close (ISSUE-156 P3b–P3e) - 12 September 2026
 
 - Draft administration (160), season-list administration (161), fixture administration (162) and

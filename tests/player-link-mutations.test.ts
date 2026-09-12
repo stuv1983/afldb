@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   fetchSourceEvidence: vi.fn(),
   assessOneSource: vi.fn(),
+  readCachedSuggestionVersions: vi.fn(),
 }));
 
 vi.mock('postgres', () => ({ default: mocks.postgres }));
@@ -26,11 +27,16 @@ vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock('@/db/queries/player-match-candidates', () => ({
   fetchSourceEvidence: mocks.fetchSourceEvidence,
   assessOneSource: mocks.assessOneSource,
+  readCachedSuggestionVersions: mocks.readCachedSuggestionVersions,
   refreshMatchCandidates: vi.fn(),
 }));
 
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
-import { confirmUnlinked as confirmUnlinkedAction } from '@/app/admin/player-links/actions';
+import {
+  approveSuggestion,
+  bulkApproveSuggestions,
+  confirmUnlinked as confirmUnlinkedAction,
+} from '@/app/admin/player-links/actions';
 import {
   confirmUnlinked,
   createPlayerAndResolveLink,
@@ -87,6 +93,8 @@ beforeEach(() => {
   mocks.revalidatePath.mockReset();
   mocks.fetchSourceEvidence.mockReset();
   mocks.assessOneSource.mockReset();
+  mocks.readCachedSuggestionVersions.mockReset();
+  mocks.readCachedSuggestionVersions.mockResolvedValue(new Map());
   process.env.AFLDB_IMPORT_DATABASE_URL = 'postgres://import@example/afldb_test';
   process.env.DATABASE_URL = 'postgres://app@example/afldb_test';
 });
@@ -799,6 +807,170 @@ describe('suggested match approval', () => {
     });
     expect(mocks.postgres).not.toHaveBeenCalled();
   });
+
+  /**
+   * Stale cached scoring (AFLDB-ISSUE-164 P2, invariant 13).
+   *
+   * A cached suggestion computed under a different ALGORITHM_VERSION
+   * than the running code must never be presented or acted on
+   * silently. None of this weakens the rule above it: the fresh score
+   * still decides, alone, and the stale figures are only ever reported.
+   */
+  describe('stale cached versions', () => {
+    function formOf(fields: Record<string, string>): FormData {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(fields)) form.set(key, value);
+      return form;
+    }
+
+    it('approves a v1-cached row on the fresh v2 result and reports the staleness', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 79 },
+      });
+
+      expect(result.ok).toBe(true);
+      expect((result as { notice?: string }).notice)
+        .toContain('shown as v1 score 79; approved on v2 score 92');
+      // The recorded score and version are the FRESH ones, never the
+      // ones that were on screen.
+      const auditInsert = seen.find((query) => (
+        query.text.startsWith('INSERT INTO player_link_resolutions')
+      ));
+      expect(auditInsert?.values.slice(-3)).toEqual(['suggested', 92, 'v2']);
+    });
+
+    it('says nothing when the cache and the running matcher agree', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment());
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 97 },
+      });
+
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('refuses a stale row whose fresh best is a different player', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, playerId: 4331, score: 92 },
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'suggested',
+        displayed: { algorithmVersion: 'v1', score: 79 },
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('no longer supports that player'),
+      });
+      expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+      expect(seen.some((q) => q.text.startsWith('INSERT INTO player_link_resolutions'))).toBe(false);
+    });
+
+    it('refuses a stale bulk row that is no longer bulk-eligible', async () => {
+      const { tx, seen } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2', bulkEligible: false, band: 'high',
+      }));
+
+      const result = await resolveLinkFromSuggestion({
+        targetTable: 'award_winners', targetId: 412, playerId: 1000,
+        adminUserId: 5, method: 'bulk_suggested',
+        displayed: { algorithmVersion: 'v1', score: 97 },
+      });
+
+      expect(result.ok).toBe(false);
+      expect(seen.some((q) => q.text.startsWith('UPDATE'))).toBe(false);
+    });
+
+    it('takes the displayed version from the database, not from the form', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+      mocks.readCachedSuggestionVersions.mockResolvedValue(new Map([
+        ['award_winners:412', {
+          targetTable: 'award_winners', targetId: 412, algorithmVersion: 'v1', score: 79,
+        }],
+      ]));
+
+      const state = await approveSuggestion({}, formOf({
+        targets: 'award_winners:412:unmatched',
+        playerId: '1000',
+        // A browser trying to claim the cache is current must have no
+        // effect whatsoever.
+        algorithmVersion: 'v2',
+        score: '97',
+      }));
+
+      expect(mocks.readCachedSuggestionVersions).toHaveBeenCalledWith(
+        expect.anything(),
+        [{ targetTable: 'award_winners', targetId: 412 }],
+      );
+      expect(state.message).toBe('Suggested match approved.');
+      expect(state.warning).toContain('shown as v1 score 79; approved on v2 score 92');
+    });
+
+    it('reports stale rows per row in the bulk summary', async () => {
+      const { tx } = lockedUnmatchedRow();
+      installImportClient(tx);
+      mocks.fetchSourceEvidence.mockResolvedValue([sourceRow]);
+      mocks.assessOneSource.mockResolvedValue(assessment({
+        algorithmVersion: 'v2',
+        best: { ...assessment().best, score: 92 },
+      }));
+      mocks.readCachedSuggestionVersions.mockResolvedValue(new Map([
+        ['award_winners:412', {
+          targetTable: 'award_winners', targetId: 412, algorithmVersion: 'v1', score: 79,
+        }],
+        ['award_winners:413', {
+          targetTable: 'award_winners', targetId: 413, algorithmVersion: 'v2', score: 92,
+        }],
+      ]));
+
+      const state = await bulkApproveSuggestions({}, formOf({
+        targets: 'award_winners:412:unmatched,award_winners:413:unmatched',
+        playerIds: '1000,1000',
+      }));
+
+      expect(mocks.readCachedSuggestionVersions).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.arrayContaining([
+          { targetTable: 'award_winners', targetId: 412, previousStatus: 'unmatched' },
+          { targetTable: 'award_winners', targetId: 413, previousStatus: 'unmatched' },
+        ]),
+      );
+      expect(state.message).toBe('Approved 2 suggested match(es).');
+      // Only the row that was actually stale is named.
+      expect(state.warning).toContain('award_winners:412');
+      expect(state.warning).not.toContain('award_winners:413');
+    });
+  });
 });
 
 /**
@@ -845,6 +1017,15 @@ describe('player-link action contracts', () => {
     expect(bulk).toContain('skipped.push');
     expect(bulk).toContain('continue;');
     expect(bulk).not.toMatch(/if \(!result\.ok\) return/);
+  });
+
+  it('reads the displayed algorithm version from the cache, never from the request', () => {
+    // Invariant 13: staleness must be established server-side. A
+    // browser-supplied version would let a stale page assert it was
+    // current.
+    expect(actions).toContain('readCachedSuggestionVersions(sql,');
+    expect(actions).not.toContain("formData.get('algorithmVersion')");
+    expect(actions).not.toContain("formData.get('score')");
   });
 
   it('gates every action behind the super-admin-only data.playerLinks capability', () => {
@@ -901,6 +1082,91 @@ describe('queue page contracts', () => {
     // The page must never form its own view of why a score is what it
     // is; it renders what the scorer recorded.
     expect(page).toContain('match.evidence.map');
+    expect(page).not.toContain('scoreCandidate');
+    expect(page).not.toContain('assessMatch');
+  });
+
+  it('derives staleness from the server-side cache version and shows it', () => {
+    // Invariant 13: the page compares each cached row's version with the
+    // version the running code declares, and says so on the page --
+    // once at the top and again on every affected row.
+    expect(page).toContain("from '@/lib/player-matching/confidence'");
+    expect(page).toContain('ALGORITHM_VERSION');
+    expect(page).toContain('s2.algorithmVersion !== ALGORITHM_VERSION');
+    expect(page).toContain('match.algorithmVersion !== ALGORITHM_VERSION');
+    expect(page).toContain('staleCount > 0');
+    expect(page).toContain('Stale ({match.algorithmVersion})');
+    // The drawer is told both versions so it can warn before approval.
+    expect(page).toContain('currentAlgorithmVersion: ALGORITHM_VERSION');
+    expect(page).toContain('stale,');
+  });
+
+  it('warns in the drawer that a stale score is not what approval will use', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    expect(controls).toContain('match.stale');
+    expect(controls).toContain('Stale suggestion');
+    expect(controls).toContain('currentAlgorithmVersion');
+    // The warning sits above the approval form, not after it.
+    expect(controls.indexOf('Stale suggestion'))
+      .toBeLessThan(controls.indexOf('action={approveAction}'));
+  });
+
+  it('explains a capped row rather than leaving the band unexplained', () => {
+    // AFLDB-ISSUE-164 §11 items 1-2 / acceptance §13 item 1. The typed
+    // reasons come from the pure helper and are worded server-side; the
+    // page neither invents them nor rescores to get them.
+    expect(page).toContain("from '@/lib/player-matching/explain-limits'");
+    expect(page).toContain('explainLimits(');
+    expect(page).toContain('profileFromSourceDetail(');
+    expect(page).toContain('describeLimitReason(');
+    expect(page).toContain('{limitLine}');
+    // The group rule reaches the explanation as an input, not as a
+    // second opinion formed inside it.
+    expect(page).toContain('groupDisagrees: group.disagrees');
+  });
+
+  it('sends the drawer the criteria for every suggested row, not only bulk ones', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    // §11 item 3: the block used to render only when match.bulkEligible,
+    // which is exactly why a capped row and an unlucky one looked the
+    // same. It now renders whenever there are criteria to show.
+    expect(controls).toContain('match.bulkCriteria.length > 0');
+    expect(controls).not.toContain('{match.bulkEligible && (');
+    expect(controls).toContain("criterion.met ? '✓' : '✗'");
+    // Source-class exclusion and the reachable ceiling are both visible.
+    expect(controls).toContain('match.ceiling');
+    expect(controls).toContain('match.limitReasons');
+    expect(controls).toContain('match.clubTextUnresolved');
+    expect(page).toContain('describeBulkChecklist(');
+    expect(page).toContain('describeCeiling(');
+  });
+
+  it('keeps the stale warning alongside the criteria block', () => {
+    const controls = readFileSync(
+      join(process.cwd(), 'src', 'app', 'admin', 'player-links', 'ResolveControls.tsx'),
+      'utf8',
+    );
+    // Invariant 13 must survive §11: both blocks coexist, and the stale
+    // warning still sits above the approval form.
+    expect(controls).toContain('Stale suggestion');
+    expect(controls.indexOf('Stale suggestion'))
+      .toBeLessThan(controls.indexOf('match.bulkCriteria.length > 0'));
+    expect(controls.indexOf('match.bulkCriteria.length > 0'))
+      .toBeLessThan(controls.indexOf('action={approveAction}'));
+  });
+
+  it('leaves scoring, bands and bulk eligibility to the server', () => {
+    // The explanation layer is additive. Nothing on the page may decide
+    // a band or a bulk flag, and bulkReady is still the cached
+    // assessment narrowed only by the group rule.
+    expect(page).toContain('const bulkReady = (match?.bulkEligible ?? false) && !group.disagrees');
+    expect(page).toContain('bulkEligible: bulkReady,');
     expect(page).not.toContain('scoreCandidate');
     expect(page).not.toContain('assessMatch');
   });

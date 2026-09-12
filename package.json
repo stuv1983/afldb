@@ -27,6 +27,8 @@
     "settle:afltables": "tsx tools/current-season/settle-afltables.ts",
     "records:first-kick-goal": "tsx --conditions=react-server tools/records/import-first-kick-goal.ts",
     "match:backtest": "tsx --conditions=react-server tools/matching/backtest.ts",
+    "match:compare": "tsx tools/matching/compare.ts",
+    "match:draft-labels": "tsx tools/matching/export-draft-labels.ts",
     "nl:stress": "tsx --conditions=react-server tools/nl/stress-test.ts",
     "nl:stress:compare": "tsx tools/nl/compare-runs.ts",
     "test": "vitest run",
