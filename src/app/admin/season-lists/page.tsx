@@ -74,10 +74,10 @@ export default async function SeasonListsIndexPage() {
                   <td>
                     {summary.season}
                     {summary.season === current && (
-                      <span className="badge" style={{ marginLeft: '0.4rem' }}>Latest listed season</span>
+                      <span className="badge season-badge" style={{ marginLeft: '0.4rem' }}>Latest listed season</span>
                     )}
                     {summary.season === bounds.first && (
-                      <span className="badge" style={{ marginLeft: '0.4rem' }}>First authoritative season</span>
+                      <span className="badge season-badge" style={{ marginLeft: '0.4rem' }}>First authoritative season</span>
                     )}
                   </td>
                   <td className="num">{summary.populated} / {summary.clubs}</td>

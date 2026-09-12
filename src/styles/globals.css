@@ -981,6 +981,18 @@ label {
    standing alone in a cell does not. */
 * + .badge { margin-left: 0.35rem; }
 
+/* Season Lists index, "Season" column badges (AFLDB Design 2.2 defect 1):
+   `.badge`'s own `white-space: normal` lets it wrap, but nothing constrains
+   its width, so the browser still sizes the table column to fit it
+   unwrapped -- at 375px "First authoritative season" then bleeds into
+   "Clubs with a list". Capping the badge itself removes that unwrapped
+   width from the column's size calculation, forcing the wrap the column
+   already allows. Scoped to mobile: at wider widths the column has room
+   and an unwrapped badge is the accepted layout. */
+@media (max-width: 640px) {
+  .season-badge { max-width: 8.5rem; }
+}
+
 /* Coverage notice ---------------------------------------------------- */
 .notice {
   border-left: 2px solid var(--accent);

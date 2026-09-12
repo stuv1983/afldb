@@ -170,7 +170,11 @@ export default async function SeasonListClubPage(
                 <th scope="col">Origin</th>
                 <th scope="col" className="num">Games in {season}</th>
                 <th scope="col">Note</th>
-                {canEdit && <th scope="col"><span className="visually-hidden">Actions</span></th>}
+                {canEdit && (
+                  <th scope="col" style={{ position: 'relative' }}>
+                    <span className="visually-hidden">Actions</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
