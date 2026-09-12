@@ -190,54 +190,106 @@ export default async function FixtureSeasonPage(
       {[...rounds.entries()].map(([roundCode, rows]) => (
         <section key={roundCode} className="section">
           <h2>{roundHeading(rows[0])}</h2>
-          <div className="table-wrap">
-            <table className="sticky-last-col">
-              <thead>
-                <tr>
-                  <th scope="col">Date · time</th>
-                  <th scope="col">Home</th>
-                  <th scope="col">Away</th>
-                  <th scope="col">Venue</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Played</th>
-                  <th scope="col"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const venue = venueText(row);
-                  return (
-                    <tr key={row.fixtureKey}>
-                      <td>{scheduleText(row)}</td>
-                      <td>{row.homeClubName}</td>
-                      <td>{row.awayClubName}</td>
-                      <td>{venue.text}</td>
-                      <td>
-                        {FIXTURE_STATUS_LABELS[row.status]}
-                        {row.status === 'void' && row.statusReason && (
-                          <span className="muted"> — {row.statusReason}</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={
-                          row.playedState === 'ambiguous' ? 'badge badge-danger'
-                            : row.playedState === 'played_home_away_differs' || row.scheduleDiffersFromResult ? 'badge badge-warn'
-                              : undefined
-                        }>
-                          {PLAYED_STATE_LABELS[row.playedState]}
-                        </span>
-                        {row.scheduleDiffersFromResult && <span className="muted"> — schedule differs from result</span>}
-                      </td>
-                      <td>
-                        <Link href={`/admin/fixtures/${season}/${row.fixtureKey}`} className="btn btn-secondary">
-                          {canEdit ? 'Manage' : 'View'}
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="responsive-table">
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Date · time</th>
+                    <th scope="col">Home</th>
+                    <th scope="col">Away</th>
+                    <th scope="col">Venue</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Played</th>
+                    <th scope="col"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const venue = venueText(row);
+                    return (
+                      <tr key={row.fixtureKey}>
+                        <td>{scheduleText(row)}</td>
+                        <td>{row.homeClubName}</td>
+                        <td>{row.awayClubName}</td>
+                        <td>{venue.text}</td>
+                        <td>
+                          {FIXTURE_STATUS_LABELS[row.status]}
+                          {row.status === 'void' && row.statusReason && (
+                            <span className="muted"> — {row.statusReason}</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={
+                            row.playedState === 'ambiguous' ? 'badge badge-danger'
+                              : row.playedState === 'played_home_away_differs' || row.scheduleDiffersFromResult ? 'badge badge-warn'
+                                : undefined
+                          }>
+                            {PLAYED_STATE_LABELS[row.playedState]}
+                          </span>
+                          {row.scheduleDiffersFromResult && <span className="muted"> — schedule differs from result</span>}
+                        </td>
+                        <td>
+                          <Link href={`/admin/fixtures/${season}/${row.fixtureKey}`} className="btn btn-secondary">
+                            {canEdit ? 'Manage' : 'View'}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="admin-cards">
+              {rows.map((row) => {
+                const venue = venueText(row);
+                return (
+                  <li className="admin-card" key={row.fixtureKey}>
+                    <div className="admin-card-title">
+                      {row.homeClubName} <span className="muted">vs</span> {row.awayClubName}
+                    </div>
+                    <dl className="admin-card-fields">
+                      <div>
+                        <dt>Date · time</dt>
+                        <dd>{scheduleText(row)}</dd>
+                      </div>
+                      <div>
+                        <dt>Venue</dt>
+                        <dd>{venue.text}</dd>
+                      </div>
+                      <div>
+                        <dt>Status</dt>
+                        <dd>
+                          {FIXTURE_STATUS_LABELS[row.status]}
+                          {row.status === 'void' && row.statusReason && (
+                            <span className="muted"> — {row.statusReason}</span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Played</dt>
+                        <dd>
+                          <span className={
+                            row.playedState === 'ambiguous' ? 'badge badge-danger'
+                              : row.playedState === 'played_home_away_differs' || row.scheduleDiffersFromResult ? 'badge badge-warn'
+                                : undefined
+                          }>
+                            {PLAYED_STATE_LABELS[row.playedState]}
+                          </span>
+                          {row.scheduleDiffersFromResult && <span className="muted"> — schedule differs from result</span>}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="admin-card-action">
+                      <Link href={`/admin/fixtures/${season}/${row.fixtureKey}`} className="btn btn-secondary">
+                        {canEdit ? 'Manage' : 'View'}
+                      </Link>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </section>
       ))}

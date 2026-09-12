@@ -63,14 +63,13 @@ export default async function BrownlowSeasonsPage() {
 
       <section className="section">
         <div className="table-wrap">
-          {/* Authority sits last, and pinned, because it is the column the
-              screenshot evidence showed clipped off-screen with an expanded
-              sidebar: it is the operator's read of whose data this is
-              (source vs. corrected), whereas "Last activity" is who/when
-              metadata an operator consults less often. Ordering by that
-              priority — not alphabetically or by data pipeline stage — is
-              what lets a pinned last column protect the one that matters. */}
-          <table className="sticky-last-col">
+          {/* Authority sits last because it is the operator's read of whose
+              data this is (source vs. corrected), whereas "Last activity" is
+              who/when metadata an operator consults less often. Ordering by
+              that priority — not alphabetically or by data pipeline stage —
+              is what keeps it the thing you see first once you scroll to
+              the end of the row. */}
+          <table>
             <thead>
               <tr>
                 <th scope="col">Season</th>

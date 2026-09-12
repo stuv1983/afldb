@@ -71,7 +71,7 @@ export default async function FixturesIndexPage() {
 
       <section className="section">
         <div className="table-wrap">
-          <table className="sticky-last-col">
+          <table>
             <thead>
               <tr>
                 <th scope="col">Season</th>

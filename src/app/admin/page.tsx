@@ -107,7 +107,7 @@ export default async function AdminDashboard() {
         ) : (
           <CollapsibleTable title="Submissions log">
           <div className="table-wrap">
-            <table className="sticky-last-col">
+            <table>
               <thead>
                 <tr>
                   <th scope="col">File</th>

@@ -57,6 +57,13 @@
      heading lands in the same place whichever anchor was followed. */
   --anchor-offset: 5rem;
 
+  /* Clearance below .site-header for anything else that stays on screen
+     while the page scrolls -- previously just `.admin-nav`'s own literal
+     `4.5rem`, now the one value both it and a table's sticky `thead` sit
+     below. Redeclared in the 640px band, where the header itself is
+     shorter. */
+  --header-h: 4.5rem;
+
   color-scheme: light;
 }
 
@@ -444,7 +451,7 @@ th, td {
 }
 thead th {
   position: sticky;
-  top: 0;
+  top: var(--header-h);
   background: var(--bg);
   font-family: var(--font-sans);
   font-size: 0.625rem;
@@ -471,23 +478,58 @@ td.audit-wrap { white-space: normal; min-width: 10rem; overflow-wrap: anywhere; 
 td.audit-payload { white-space: normal; min-width: 16rem; width: 45%; overflow-wrap: anywhere; }
 td.audit-wrap code, td.audit-payload code { font-size: 0.75rem; }
 
-/* A dense admin table's rightmost column usually carries the one thing an
-   operator cannot do without -- Manage, Override, Authority -- so it stays
-   in view while the rest of the row scrolls underneath it inside
-   `.table-wrap`, rather than being the first thing pushed off-screen. This
-   is an intentional fallback for a table still too wide for its viewport
-   (design principle: desktop should not need it at all now that the admin
-   shell no longer shares the page's narrow reading measure); it does not
-   replace fitting the table, only covers the case where it genuinely can't.
-   The matching hover rule keeps the pinned cell in sync with its row. */
-.table-wrap table.sticky-last-col th:last-child,
-.table-wrap table.sticky-last-col td:last-child {
-  position: sticky;
-  right: 0;
-  background: var(--bg);
-  box-shadow: -6px 0 6px -6px var(--edge-shadow);
+/* `.sticky-last-col` (Design pass 1) pinned a table's trailing action
+   column with `position: sticky; right: 0`. Sticky computes that position
+   from `.table-wrap`'s scrollport: at any scroll offset short of "scrolled
+   fully right", the pinned cell painted over whatever data cell already
+   occupied that slot in normal flow -- the "Unplayed" -> "Unplayec" defect.
+   Retired: a trailing action column now simply scrolls with its row like
+   any other cell, so nothing is ever painted over. */
+
+/* Admin card view --------------------------------------------------- *
+ * A dense admin table (Coaches, Draft, Fixtures) reads as a card list
+ * below 640px instead: identity was the thing that scrolled out of view
+ * horizontally, so it needed to stop being a horizontally-scrolling table
+ * at all rather than a better-pinned one. Genuine `<dl>` markup, not a
+ * table forced to look like a card -- a screen reader still gets real
+ * name/value pairs, not "table" semantics for something that no longer
+ * reads as one. `.table-wrap` is what actually scrolls sideways, so
+ * hiding/showing that (not the bare `<table>`) is what this toggles. */
+.admin-cards { display: none; list-style: none; margin: 0; padding: 0; }
+@media (max-width: 640px) {
+  .responsive-table > .table-wrap { display: none; }
+  .responsive-table > .admin-cards { display: grid; gap: 0.75rem; }
 }
-.table-wrap table.sticky-last-col tbody tr:hover td:last-child { background: var(--bg-hover); }
+.admin-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.admin-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.admin-card-title .muted { font-weight: 400; }
+.admin-card-fields { display: grid; gap: 0.4rem; margin: 0; font-size: 0.8125rem; }
+.admin-card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.admin-card-fields dt {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.admin-card-fields dd { margin: 0; text-align: right; }
+.admin-card-action { display: grid; }
+.admin-card-action .btn { display: block; width: 100%; text-align: center; }
 /* A second line under a cell's main value: user id, IP, field group, note. */
 .audit-meta { display: block; font-size: 0.78rem; color: var(--text-muted); }
 /* auth_audit_log.detail as `key value` pairs, keys in a column of their own. */
@@ -915,6 +957,14 @@ label {
   color: var(--accent);
   border: 1px solid var(--border);
   vertical-align: middle;
+  /* A badge sits inside a `td`, which sets `white-space: nowrap` -- fine
+     for a one-word label, but a multi-word one ("ENTERED — READY TO
+     PUBLISH") then forces that column's minimum width to the whole
+     unbroken phrase, squeezing every other column in a dense admin table
+     on a narrow screen and truncating the badge itself. Wrapping here
+     costs nothing where there is room (nothing constrains the box) and
+     fixes it where there isn't. */
+  white-space: normal;
 }
 .badge-warn { background: transparent; color: var(--draw); }
 /* The severity above warn: an `invalid` diagnostic, an ambiguous played
@@ -1228,7 +1278,7 @@ label {
 .admin-nav {
   position: sticky;
   /* Clear of the sticky site header. */
-  top: 4.5rem;
+  top: var(--header-h);
   border-right: 1px solid var(--border);
   padding-right: 1rem;
   font-family: var(--font-sans);
@@ -1427,7 +1477,7 @@ details.admin-section > summary h2 {
 }
 
 @media (max-width: 640px) {
-  :root { --gutter: 1rem; }
+  :root { --gutter: 1rem; --header-h: 4rem; }
 
   body { font-size: 14px; line-height: 1.5; }
 

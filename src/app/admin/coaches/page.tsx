@@ -115,42 +115,84 @@ export default async function CoachesAdminPage(
       />
 
       <section className="section">
-        <div className="table-wrap">
-          <table className="sticky-last-col">
-            <thead>
-              <tr>
-                <th scope="col">Coach</th>
-                <th scope="col">DOB</th>
-                <th scope="col">Provenance</th>
-                <th scope="col">Link status</th>
-                <th scope="col">Matches coached</th>
-                <th scope="col">Override</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <Link href={`/admin/coaches/${row.id}`}>{row.displayName}</Link>
-                    {' '}
-                    <a href={coachPath(coachSlug(row.displayName), row.id)} className="muted" style={{ fontSize: '0.8rem' }}>
-                      view public page
-                    </a>
-                  </td>
-                  <td className="nowrap">{row.dob ?? '—'}</td>
-                  <td>
-                    <span className="badge">{row.provenance === 'manual' ? 'Manual' : 'AFL Tables'}</span>
-                  </td>
-                  <td>{LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}</td>
-                  <td className="num">{formatNumber(row.matchesCoached)}</td>
-                  <td>{row.hasActiveOverride && <span className="badge">Overridden</span>}</td>
+        <div className="responsive-table">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Coach</th>
+                  <th scope="col">DOB</th>
+                  <th scope="col">Provenance</th>
+                  <th scope="col">Link status</th>
+                  <th scope="col">Matches coached</th>
+                  <th scope="col">Override</th>
                 </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr><td colSpan={6} className="muted">No coaches match this search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <Link href={`/admin/coaches/${row.id}`}>{row.displayName}</Link>
+                      {' '}
+                      <a href={coachPath(coachSlug(row.displayName), row.id)} className="muted" style={{ fontSize: '0.8rem' }}>
+                        view public page
+                      </a>
+                    </td>
+                    <td className="nowrap">{row.dob ?? '—'}</td>
+                    <td>
+                      <span className="badge">{row.provenance === 'manual' ? 'Manual' : 'AFL Tables'}</span>
+                    </td>
+                    <td>{LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}</td>
+                    <td className="num">{formatNumber(row.matchesCoached)}</td>
+                    <td>{row.hasActiveOverride && <span className="badge">Overridden</span>}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={6} className="muted">No coaches match this search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <ul className="admin-cards">
+            {rows.map((row) => (
+              <li className="admin-card" key={row.id}>
+                <div className="admin-card-title">
+                  <Link href={`/admin/coaches/${row.id}`}>{row.displayName}</Link>
+                </div>
+                <dl className="admin-card-fields">
+                  <div>
+                    <dt>Link status</dt>
+                    <dd>{LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}</dd>
+                  </div>
+                  <div>
+                    <dt>Provenance</dt>
+                    <dd><span className="badge">{row.provenance === 'manual' ? 'Manual' : 'AFL Tables'}</span></dd>
+                  </div>
+                  <div>
+                    <dt>DOB</dt>
+                    <dd>{row.dob ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Matches coached</dt>
+                    <dd>{formatNumber(row.matchesCoached)}</dd>
+                  </div>
+                  {row.hasActiveOverride && (
+                    <div>
+                      <dt>Override</dt>
+                      <dd><span className="badge">Overridden</span></dd>
+                    </div>
+                  )}
+                </dl>
+                <div className="admin-card-action">
+                  <Link href={`/admin/coaches/${row.id}`} className="btn btn-secondary">
+                    {canEdit ? 'Manage' : 'View'}
+                  </Link>
+                </div>
+              </li>
+            ))}
+            {rows.length === 0 && <li className="muted">No coaches match this search.</li>}
+          </ul>
         </div>
       </section>
 

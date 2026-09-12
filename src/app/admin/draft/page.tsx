@@ -181,58 +181,124 @@ export default async function DraftAdminPage(
       />
 
       <section className="section">
-        <div className="table-wrap">
-          <table className="sticky-last-col">
-            <thead>
-              <tr>
-                <th scope="col" className="num">Year</th>
-                <th scope="col">Event</th>
-                <th scope="col" className="num">Pick</th>
-                <th scope="col">Player</th>
-                <th scope="col">Club</th>
-                <th scope="col">Provenance</th>
-                <th scope="col">Link status</th>
-                <th scope="col">Override</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="num">{row.draftYear}</td>
-                  <td>{row.draftType} <span className="muted">({row.draftKind ?? '—'})</span></td>
-                  <td className="num">{row.pickNumber ?? '—'}</td>
-                  <td>
-                    <Link href={`/admin/draft/${row.id}`}>{row.playerNameRaw}</Link>
-                    {row.playerId !== null && row.playerSlug && (
-                      <>
-                        {' '}
-                        <a href={playerPath(row.playerSlug, row.playerId)} className="muted" style={{ fontSize: '0.8rem' }}>
-                          view public page
-                        </a>
-                      </>
-                    )}
-                  </td>
-                  <td>{row.clubName ?? '—'}</td>
-                  <td><span className="badge">{PROVENANCE_LABELS[row.provenance]}</span></td>
-                  <td>
-                    {LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}
-                    {needsPlayerLinkReview(row) && canReviewLinks && (
-                      <>
-                        <br />
-                        <Link href={playerLinksHref(row)} style={{ fontSize: '0.8rem' }}>
-                          Resolve in Player links
-                        </Link>
-                      </>
-                    )}
-                  </td>
-                  <td>{row.entityKey && overrideKeys.has(row.entityKey) && <span className="badge">Overridden</span>}</td>
+        <div className="responsive-table">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" className="num">Year</th>
+                  <th scope="col">Event</th>
+                  <th scope="col" className="num">Pick</th>
+                  <th scope="col">Player</th>
+                  <th scope="col">Club</th>
+                  <th scope="col">Provenance</th>
+                  <th scope="col">Link status</th>
+                  <th scope="col">Override</th>
                 </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr><td colSpan={8} className="muted">No draft selections match this search.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td className="num">{row.draftYear}</td>
+                    <td>{row.draftType} <span className="muted">({row.draftKind ?? '—'})</span></td>
+                    <td className="num">{row.pickNumber ?? '—'}</td>
+                    <td>
+                      <Link href={`/admin/draft/${row.id}`}>{row.playerNameRaw}</Link>
+                      {row.playerId !== null && row.playerSlug && (
+                        <>
+                          {' '}
+                          <a href={playerPath(row.playerSlug, row.playerId)} className="muted" style={{ fontSize: '0.8rem' }}>
+                            view public page
+                          </a>
+                        </>
+                      )}
+                    </td>
+                    <td>{row.clubName ?? '—'}</td>
+                    <td><span className="badge">{PROVENANCE_LABELS[row.provenance]}</span></td>
+                    <td>
+                      {LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}
+                      {needsPlayerLinkReview(row) && canReviewLinks && (
+                        <>
+                          <br />
+                          <Link href={playerLinksHref(row)} style={{ fontSize: '0.8rem' }}>
+                            Resolve in Player links
+                          </Link>
+                        </>
+                      )}
+                    </td>
+                    <td>{row.entityKey && overrideKeys.has(row.entityKey) && <span className="badge">Overridden</span>}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr><td colSpan={8} className="muted">No draft selections match this search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <ul className="admin-cards">
+            {rows.map((row) => (
+              <li className="admin-card" key={row.id}>
+                <div className="admin-card-title">
+                  <Link href={`/admin/draft/${row.id}`}>{row.playerNameRaw}</Link>
+                  {row.playerId !== null && row.playerSlug && (
+                    <>
+                      {' '}
+                      <a href={playerPath(row.playerSlug, row.playerId)} className="muted" style={{ fontSize: '0.8rem' }}>
+                        view public page
+                      </a>
+                    </>
+                  )}
+                </div>
+                <dl className="admin-card-fields">
+                  <div>
+                    <dt>Year</dt>
+                    <dd>{row.draftYear}</dd>
+                  </div>
+                  <div>
+                    <dt>Event</dt>
+                    <dd>{row.draftType} <span className="muted">({row.draftKind ?? '—'})</span></dd>
+                  </div>
+                  <div>
+                    <dt>Pick</dt>
+                    <dd>{row.pickNumber ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Club</dt>
+                    <dd>{row.clubName ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Provenance</dt>
+                    <dd><span className="badge">{PROVENANCE_LABELS[row.provenance]}</span></dd>
+                  </div>
+                  <div>
+                    <dt>Link status</dt>
+                    <dd>
+                      {LINK_STATUS_LABELS[row.linkStatusValue] ?? row.linkStatusValue}
+                      {needsPlayerLinkReview(row) && canReviewLinks && (
+                        <>
+                          {' '}
+                          <Link href={playerLinksHref(row)} style={{ fontSize: '0.8rem' }}>
+                            Resolve in Player links
+                          </Link>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                  {row.entityKey && overrideKeys.has(row.entityKey) && (
+                    <div>
+                      <dt>Override</dt>
+                      <dd><span className="badge">Overridden</span></dd>
+                    </div>
+                  )}
+                </dl>
+                <div className="admin-card-action">
+                  <Link href={`/admin/draft/${row.id}`} className="btn btn-secondary">View selection</Link>
+                </div>
+              </li>
+            ))}
+            {rows.length === 0 && <li className="muted">No draft selections match this search.</li>}
+          </ul>
         </div>
       </section>
 
