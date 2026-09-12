@@ -7,7 +7,38 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 9 tracked here — `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+**Open issues:** 8 tracked here — `-139`, `-140`, `-144`, `-147`, `-148`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-151 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY, NO
+     DATABASE MUTATION THIS SESSION): closeout on operator decision. Implementation (generic staged
+     reinstatement: restore a NOT NULL, lineage-remappable table into schema-free
+     `promotion_staging`, remap there, promote into the real FK-constrained table with
+     `INSERT … OVERRIDING SYSTEM VALUE`, drop `promotion_staging`, fail closed on any leftover
+     staging schema) was already merged into `main` (`sonnet/issue-151-promotion-lineage-fk`, tip
+     `2f58029`, an ancestor of `main`) and its fix was what let the paused real production promotion
+     (stamp `20260907-234124`) resume and COMPLETE on 2026-09-08 01:11:24.440219 AEST
+     (`auth_audit_log` id 196, `database.promoted`; candidate `afldb_prod_candidate_20260907-234124`
+     replaced `afldb_prod`). Post-cutover validation: candidate phase PASS; `external_grid_sources`
+     survived with `ingest_source_id` remapped 57→gridley→7; `promotion_staging` absent after
+     completion; no rollback/data-integrity failure recorded. Independent later validation: the
+     2026-09-12 governed-state before/after comparison found no unexplained production-only state
+     loss, and `AFLDB-ISSUE-137`'s independent lineage-independent closure probe passed 22/22 against
+     current `afldb_prod`. Fresh current-`main` DB-free re-validation this session:
+     `npx vitest run tests/db-promotion-check.test.ts` **100/100 PASS** (grown from the 94/94
+     baseline recorded at merge time; no ISSUE-151 regression). **Operator decision — rehearsal gate
+     superseded, not run:** `ISSUE-151-staged-reinstate-rehearsal.sh` was never run; it is not
+     referenced by `docs/production-promotion.md` as a mandatory production gate, and it exercises
+     the same fixed 2b–2e staged-reinstatement path that already succeeded in real production. The
+     operator accepts the completed real production promotion plus the later independent validation
+     as stronger evidence than the unrun synthetic throwaway-DB rehearsal, so that outstanding gate is
+     explicitly superseded — not forgotten, not claimed to have run — and is no longer a precondition
+     for resolving this issue. The script is retained in place as a reusable diagnostic/reproduction
+     artefact for future staged-reinstatement work. **Correction:** the entry's "Operator action taken
+     to resume" section previously read "the operator then ran the database rehearsal and deploy" —
+     corrected, since the rehearsal was never run; only the promotion's own resume/regenerate/
+     restored/candidate/cutover steps were executed on `afldb-prod`. No remaining ISSUE-151 gate. See
+     `issues.md` Resolution (2026-09-13). Removed from the Open Issues table and `IssuesIndex.md`;
+     9 -> 8. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-138 RESOLVED — TRACKING ONLY, NO MIGRATION, NO DEPLOY, NO PRIVILEGE
      CHANGE THIS SESSION): the privileges integration suite's "afldb_import is confined to the
@@ -933,7 +964,18 @@ created, reopened, resolved, or materially reclassified.
 | `AFLDB-ISSUE-147` | Medium | Public UI / navigation IA / responsive layout | **OPEN — IMPLEMENTATION COMPLETE, validated locally against DEV data via an operator SSH tunnel; MERGED into `main` as `d18a0bd` and deployed on DEV.** Branch `claude/issue-147-ui` (worktree `D:\dev\afldb-issue-147-ui`) is an ancestor of `main`. Full authenticated rendered audit of the public site (27 routes × 7 widths, 320–1440) found page-level responsive discipline sound (zero document-level horizontal overflow anywhere), with three concentrated defects: **P0** the phone nav was a smaller, independently hand-kept IA than the masthead — Clubs, Venues, Coaches, Brownlow, Awards, Draft and Match Search were unreachable from the phone chrome (same gap under `/aflw`; the home "Browse the record" grid was a third drifting list, already missing Coaches); **P1** a 641–~890 px masthead-nav overflow band; **P1** dense tables scroll inside `.table-wrap` with no cue that off-screen columns / sort headers exist. Fix (navigation + responsive CSS + tests only; **no migration**, schema, query, route, privilege or deployment change): new canonical `src/lib/site-nav-model.ts` (one `PRIMARY_NAV`, derived `QUICK_TABS` incl. Clubs, derived `BROWSE_SECTIONS` incl. Coaches); `TabBar` gains a "More" bottom sheet (`role="dialog"`, focus-trapped, Escape/backdrop/link/`popstate` close, `aria-current`) listing the **whole** active primary set; masthead nav wraps cleanly at 641–1080 px; `.table-wrap` gets a CSS-only theme-aware directional scroll shadow (`--edge-shadow`, self-hiding, no markup change); new committed `tests/e2e/responsive-nav.spec.ts` derives nav parity from the rendered masthead so a future one-sided addition fails; `tests/e2e/journeys.spec.ts` nav tests de-skipped on mobile via a `reachPrimary()` helper + a new "clubs is reachable" test. Validation: `tsc`/`eslint`/`npm run build` PASS; `responsive-nav.spec.ts` 32/32; journeys nav tests 10/10 on Desktop + Pixel 7; full viewport audit 200/200, zero overflow, zero 4xx/5xx; before/after screenshots in `artifacts/issue-147/` (gitignored). | **Operator:** commit, merge and DEV deploy are DONE. Outstanding: the gate-**off** `npm run test:e2e` run of the committed `tests/e2e/responsive-nav.spec.ts` on the Linux dev host, and the phone-nav + `/clubs` smoke on a real device; then Resolve. The audit scaffolding (`playwright.responsive.config.ts`, `tests/responsive/_baseline-audit.spec.ts`, `artifacts/issue-147/`, `tests/nl-ui/.auth/`) was never committed to `main`, so no Git cleanup is outstanding. |
 | `AFLDB-ISSUE-149` | Low | Public UI / club pages / database queries | **OPEN — IMPLEMENTATION COMPLETE and MERGED into `main` as `00eea34`; deployed on DEV. Focused validation is GREEN (operator, 2026-09-07): `npx tsc --noEmit` PASS, `tests/club-records-sections.test.ts` 14/14, the five club integration suites 32/32, `npm run build` PASS. Stays Open only on the DEV browser smoke.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`), bootstrapped from merged `main` after ISSUE-148. SIX new public AFL club-page sections, all lineage-scoped by `clubs.organization_id`, all from existing canonical tables, **no migration**, ISSUE-148's Premierships / Coaches preserved. **(1) Club records** — `getClubMatchRecords(clubId)` (`src/db/queries/clubs.ts`): a `club_matches` CTE orients every lineage match to the club's perspective; six deterministic single-row picks — biggest win/loss margin, the club's OWN highest/lowest score, highest/lowest COMBINED match score; ties `match_date DESC, match_id DESC`. `src/components/ClubMatchRecords.tsx`. **(2) Record crowds** — `getClubCrowdRecords(clubId)`: same CTE + `attendance IS NOT NULL`; highest home-and-away / finals (`is_finals_series IS TRUE`) / Grand Final (`round_type='grand_final'`) crowd + Top 5; `attendance DESC, match_date DESC, match_id DESC`; null attendance never shown as 0. `src/components/ClubCrowdRecords.tsx`. **(3) Players** — `getClubPlayers(clubId)`: full `player_clubs` set summed by `organization_id`, one row per player, this club's games/goals only, not truncated. `src/components/ClubPlayers.tsx` (`SortableTable` in a `defaultOpen={false}` `CollapsibleTable`). **(4) Premiership players** — `getClubPremiershipPlayers(clubId)`: `player_club_season_stats.is_premier` in lineage, `season DESC, games DESC`. `src/components/ClubPremiershipPlayers.tsx`. **(5) Awards & honours** — `getClubBrownlowMedallists(clubId)` (`brownlow_season_votes` `is_winner` + linked + `club_id` in lineage, per ISSUE-118 §W.4) and `getClubHonours(clubId)` (`award_winners`, `awards.category='award'`, `slug<>'brownlow-medal'`, `club_id` in lineage) in `src/db/queries/awards.ts`; `src/components/ClubHonours.tsx`. Page wiring in `src/app/clubs/[slug]/page.tsx` (6 queries into the existing `Promise.all`; 5 section blocks, each omitted when empty). **Most Games / Most Goals / Captains from the brief were already on the page** (Games leaders / Goalkicking leaders / Captains — preserved). **Unsupported attribution omitted + reported:** `honour_team_members` (only `club_name_raw`, no `club_id`/season), `player_achievements` (0 rows), null-`club_id` Brownlow winners. Tests: `tests/integration/club-{match-records,crowd-records,players,premiership-players,honours}.test.ts` (new — record/crowd values re-derived from raw scorelines; club-specificity + no other-club leakage; honour attribution; premiership-season cross-check vs `club_seasons.is_premier` AND `getClubPremierships`), `tests/club-records-sections.test.ts` (new — component render). One Unreleased `CHANGELOG.md` entry. **Validation:** GREEN (operator, 2026-09-07) — see the entry below. | **Operator:** the tests, the build, the commit, the merge and the DEV deploy are all DONE. Outstanding: eyeball `/clubs/richmond`, a historical club (`/clubs/footscray` or `/clubs/western-bulldogs`) and a young club (`/clubs/gold-coast`) on DEV for the omit-when-empty paths, then Resolve. |
 | `AFLDB-ISSUE-150` | Low | Public UI / venue pages / database queries | **OPEN — IMPLEMENTATION COMPLETE. On the implementation workstation (a tunnel to `afldb_test` was up): `npx tsc --noEmit` PASS; `npx eslint` 0 errors (one pre-existing-style `_total` warning); `tests/venue-records-sections.test.ts` 12/12 (no DB); `tests/integration/venue-records.test.ts` 15/15 against `afldb_test` (truth re-derived from raw `matches` / `player_match_stats`). NOT run: `ISSUE-150-venue-evidence.sql` eyeball spot-check (no `psql` here), `npm run build` against a real database, the DEV browser smoke.** MERGED into `main` as `d2a615b` and deployed on DEV; branch `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), from merged `main` @ `00eea34` after ISSUE-149, is an ancestor of `main`. `/venues/[slug]` rebuilt from a "most recent 50 matches" list into a historical record page — **no migration**, no schema / index / route-privilege / deploy change; one new server-rendered route `/venues/[slug]/matches`. Five venue-scoped (`matches.venue_id`) typed query functions in `src/db/queries/venues.ts`, run in parallel, each mirroring `ISSUE-150-venue-evidence.sql` (the semantic contract): `getVenueOverview` (total matches, recorded-attendance coverage, first + most recent linked match); `getVenueClubRecords` (W-D-L + win % `wins/games*100` — a draw is NOT half a win — for every historical club identity, grouped on the raw `clubs.id` from the match so Footscray ≠ Western Bulldogs; `games DESC, wins DESC, name, id`); `getVenueRecords` (highest / lowest **recorded** attendance — NULL never wins, a genuine recorded 0 is a valid minimum — highest single-team score, biggest winning margin; every ORDER BY ends on a unique column); `getVenuePlayerLeaders` (top 5 for games / goals / marks / kicks / handballs in one round trip — `games` counts `player_match_stats` rows; the stat boards `SUM` only `WHERE <stat> IS NOT NULL`, never COALESCE a NULL to 0, carry `recordedGames`, and the marks/kicks/handballs boards are headed "Recorded"; ranked `value DESC, player_id`); `getVenueMatches` (`match_date DESC, id DESC`, `count(*) OVER ()` + empty-page fallback — the 50-row ceiling removed). Components `src/components/Venue{Records,ClubRecords,PlayerLeaders,MatchHistory}.tsx` (server, omit when empty). `src/app/venues/[slug]/page.tsx` rewritten (keeps `revalidate=86400` + `generateStaticParams`; Overview → Venue records → Club records → Player leaders → 10-match preview → link to full log); new `src/app/venues/[slug]/matches/page.tsx` (`force-dynamic`, `?page=` 100/page, `<Pagination>`, `noindex` on filtered views) — the exact `/players/[slug]/matches` split. Not in `sitemap.ts`. Key files: `src/db/queries/venues.ts`, the four new components, both venue pages, `tests/venue-records-sections.test.ts` (new), `tests/integration/venue-records.test.ts` (new), `CHANGELOG.md`, `ISSUE-150-venue-evidence.sql`, `ISSUE-150-OPERATOR-VALIDATION.md`. | **Operator:** run `ISSUE-150-venue-evidence.sql` against `afldb_test` and eyeball the implementation output for MCG, a low-volume ground, first/latest match, W-D-L, win %, highest/lowest recorded attendance, highest score, biggest margin, each top-5 board (commands + captured smoke numbers in `ISSUE-150-OPERATOR-VALIDATION.md`); `npm run build` with a real `DATABASE_URL`. The commit, merge and DEV deploy are DONE. On green: eyeball `/venues/melbourne-cricket-ground`, a low-volume ground and `/venues/melbourne-cricket-ground/matches` paging on desktop + narrow mobile, then Resolve. |
+<!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-151` is **Resolved** and is NO LONGER an open issue. This
+     row is the stale pre-closeout quick-index copy, kept only as lineage; its "OPEN" status and
+     "Stays Open" text are SUPERSEDED by the operator decision recorded in the full
+     `## AFLDB-ISSUE-151` entry's *Resolution (2026-09-13)* below — the completed real production
+     promotion (`auth_audit_log` id 196) plus later independent validation (the 2026-09-12
+     governed-state comparison and the `AFLDB-ISSUE-137` 22/22 closure probe) are accepted as
+     stronger evidence than the never-run synthetic rehearsal, which is superseded, not forgotten.
+     Its "the operator ran the rehearsal-adjacent deploy" wording below is also corrected there —
+     the rehearsal was never run.
 | `AFLDB-ISSUE-151` | High | Production promotion tooling / `tools/db/promotion-*` / Grid Solver corpus | **OPEN — IMPLEMENTATION COMPLETE, MERGED, AND USED IN PRODUCTION.** Branch `sonnet/issue-151-promotion-lineage-fk` (tip `2f58029`) is an ancestor of `main`. **The previously paused production promotion (stamp `20260907-234124`) resumed using this issue's staged-reinstatement fix and COMPLETED under `AFLDB-ISSUE-125` at 2026-09-08 01:11:24.440219 AEST** (`auth_audit_log` id 196, `database.promoted`; candidate `afldb_prod_candidate_20260907-234124` replaced `afldb_prod`). This corrects the "paused" / "outstanding: resumed production promotion" text that follows below, which is now historical only — those steps were executed, not pending. `AFLDB-ISSUE-137`'s identity-split repair was superseded by this promotion and closed 2026-09-12 on lineage-independent evidence. **Stays Open:** the database rehearsal script was never run; resolving on the strength of the live production result is an operator decision, not made here. Worktree `D:\dev\afldb-issue-151`; branch cut from `main` @ `88ca994`. Found by the first real production promotion (stamp `20260907-234124`, paused with the candidate restored and the source/pre-cutover/restored gates green): the generated `promotion-reinstate.sh` plainly `pg_restore`d `external_grid_sources` (id 1, `ingest_source_id = 57`; old `sources` 57 = gridley) into a candidate whose gridley row is `sources` 7 and whose id 57 does not exist, so the NOT NULL immediate FK `external_grid_sources_ingest_source_id_fkey` refuses before the correctly evidenced AFLDB-ISSUE-142 remap (57 -> gridley -> 7) could run; the inventory remediation, the restored-phase output, the transcript and the checklist contradicted each other on WHEN that remap runs. **Fix (tracked tooling only, no migration):** the contract STAGES any reinstated table with a NOT NULL football reference that has a stable lineage identity (`isStagedReinstatement`, decided by shape, today exactly `external_grid_sources`): `promotion-stage.sql` creates `promotion_staging.<t>` (`LIKE` copy — no identity/key/FK); the transcript restores the table through `pg_restore -f - | sed` (COPY header redirected to the staging copy, `grep`-guarded) and `psql --single-transaction`; the `--lineage-remap-out` file (now written on a shared lineage too, as an explicit no-op) targets the staging relation and runs at fixed step 2c; `promotion-promote-staged.sql` refuses any unsettled reference before its `INSERT … OVERRIDING SYSTEM VALUE SELECT * … ORDER BY id` (ids preserved, FK enforced on insert) and drops the schema without CASCADE; `external_grids` and `external_grid_axes` restore after (2e). `promotionPlanProblems` now refuses a plain restore of a staged table, a misordered stage/remap/promote/dependants lifecycle and every constraint bypass (`session_replication_role`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, `SET CONSTRAINTS`, `DEFERRABLE`, `NOT VALID`, `--disable-triggers`). Nullable §7.4 path and NOT NULL §7.4b `import_batch_id` decision untouched. **Hardening (2026-09-08 review):** (1) zero staged rows is never a legitimate state the promotion can distinguish from a skipped restore, so the invariant is asserted early — `--phase pre-cutover` gate `Staged tables hold rows in the replaced database` (`judgeStagedSourceRows`) refuses an empty/absent staged table before any plan exists, and the promote file keeps its empty-copy refusal; (2) an interrupted staged reinstatement fails closed — every checker phase runs `No leftover promotion_staging schema` (`judgeStagingLeftover`, FAIL with inspect-first instructions), `stagedPlanProblems` refuses `CREATE SCHEMA IF NOT EXISTS`, `DROP SCHEMA/TABLE IF EXISTS` and any `DROP SCHEMA` outside `promotion-promote-staged.sql`, and docs §7.2 'Interrupted staged reinstatement' requires inspection + a recorded finding before any hand drop or retry (§10 says the schema is never cleanup). **Validation:** `tests/db-promotion-check.test.ts` 96/96 (13 new), `tests/workflow-preflight.test.ts` 24/24, `tsc --noEmit` clean, `eslint` clean; generated artefacts for the real stamp inspected. NOT run: the DB rehearsal (`ISSUE-151-staged-reinstate-rehearsal.sh`) — the workstation has PostgreSQL client tools but no server. Key files: `tools/db/promotion-inventory.ts`, `tools/db/promotion-check.ts`, `tests/db-promotion-check.test.ts`, `docs/production-promotion.md` (§1, §6, §7, §7.2, §7.4b, §7.4c), `ISSUE-151-staged-reinstate-rehearsal.sh`, `CHANGELOG.md`. | **Historical — already executed, do not repeat:** the operator ran the rehearsal-adjacent deploy, moved the paused `promotion-*.sql`/`.sh` and old remap aside on afldb-prod, regenerated `--plan` for stamp `20260907-234124`, re-ran `--phase restored … --lineage-remap-out`, and resumed the transcript; `--phase candidate` passed and the cutover completed 2026-09-08 01:11:24.440219 AEST (`auth_audit_log` id 196). **Next:** operator decision on this issue's own resolution given the live production result stands in for the never-run standalone rehearsal script. |
+-->
+
 <!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-153` is **Resolved** and is NO LONGER an open issue. All
      seven runbook stages are implemented, validated and committed (`453e383`..`3aeb90a`) and
      MERGED into `main` as `08a218e`; migration 100 reached `afldb_dev` (100/100 applied, 0
@@ -20784,7 +20826,8 @@ out of scope; raise a separate issue if wanted.
 
 ## AFLDB-ISSUE-151 — Fix production promotion lineage/FK sequencing for `external_grid_sources`
 
-- **Status:** **OPEN — IMPLEMENTATION COMPLETE, MERGED, AND ITS FIX WAS USED IN PRODUCTION.** Branch
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+  IMPLEMENTATION COMPLETE, MERGED, AND ITS FIX WAS USED IN PRODUCTION. Branch
   `sonnet/issue-151-promotion-lineage-fk` (tip `2f58029`) is an ancestor of `main`. **The previously
   paused production promotion (stamp `20260907-234124`) resumed using this issue's staged-reinstatement
   fix and COMPLETED under `AFLDB-ISSUE-125` at 2026-09-08 01:11:24.440219 AEST** (`auth_audit_log` id
@@ -20798,11 +20841,12 @@ out of scope; raise a separate issue if wanted.
   117→139 and `beta_access_codes` 2→4 are expected post-cutover growth; `canonical_applications`
   9400→0 is expected rebuild-replaced settle history (`AFLDB-ISSUE-126` is not reopened by this).
   `AFLDB-ISSUE-137`'s production identity-split repair was itself superseded by this promotion and
-  closed 2026-09-12 on lineage-independent evidence (see that entry). **Stays Open:** the database
-  rehearsal script (`ISSUE-151-staged-reinstate-rehearsal.sh`) was never run, and this issue's own
-  resolution — given the live production result is now stronger evidence than the unrun rehearsal — is
-  an operator decision, not made here. Worktree `D:\dev\afldb-issue-151`; branch cut from `main` @
-  `88ca994`. No migration.
+  closed 2026-09-12 on lineage-independent evidence (see that entry). **Rehearsal gate superseded,
+  not forgotten:** the database rehearsal script (`ISSUE-151-staged-reinstate-rehearsal.sh`) was
+  never run. The operator has decided the completed real production promotion plus later independent
+  validation is stronger evidence than the unrun synthetic throwaway-DB rehearsal, so that outstanding
+  gate is explicitly superseded, and this issue is Resolved on that basis (see *Resolution* below).
+  Worktree `D:\dev\afldb-issue-151`; branch cut from `main` @ `88ca994`. No migration.
 - **Severity / Area:** High / Production promotion tooling (`tools/db/promotion-inventory.ts`,
   `tools/db/promotion-check.ts`), Grid Solver corpus (migration 080).
 - **Reported:** 2026-09-08, from the first real production promotion under
@@ -20925,9 +20969,11 @@ mechanism).
 ### Operator action taken to resume the paused production promotion (HISTORICAL — already executed; do not repeat)
 
 **This section describes work that has already happened. It is retained as the record of what tooling
-was actually run, not as a pending task.** Review and merge to `main` completed (`2f58029` is an
-ancestor of `main`); the operator then ran the database rehearsal and deploy, and executed the steps
-below on `afldb-prod`, resuming and completing the promotion on **2026-09-08 01:11:24.440219 AEST**
+was actually run, not as a pending task. The synthetic database rehearsal
+(`ISSUE-151-staged-reinstate-rehearsal.sh`) was never run — the steps below are the real production
+promotion's own resume/regenerate/restored/candidate/cutover sequence, not a rehearsal.** Review and
+merge to `main` completed (`2f58029` is an ancestor of `main`); the operator then resumed the paused
+promotion and executed the steps below on `afldb-prod`, completing it on **2026-09-08 01:11:24.440219 AEST**
 (`auth_audit_log` id 196, `database.promoted`, attributed to `AFLDB-ISSUE-125`). Do not re-run these
 steps against the stamp `20260907-234124` artefacts — that promotion is done and `afldb_prod` is now
 the promoted database.
@@ -20949,6 +20995,61 @@ the promoted database.
    `auth_audit_log` id 196 at 2026-09-08 01:11:24.440219 AEST. **This issue's own resolution is a
    separate operator decision** (see Status) — completion of the promotion it enabled is not the same
    claim as this issue having been fully validated end to end (the rehearsal script was never run).
+
+### Resolution (2026-09-13)
+
+**Status:** Resolved. Tracking-only closeout on operator decision; no code, migration, deploy or
+database mutation this session.
+
+**Root cause:** the promotion generator knew both that
+`external_grid_sources.ingest_source_id` is NOT NULL and that it is lineage-remappable through
+`sources.key`, but never combined those two facts into a safe restore strategy — `reinstatePlan`
+emitted the same plain per-table `pg_restore` line for every reinstated table, so the stale
+`ingest_source_id = 57` met the immediate FK inside the restore transaction before the evidenced
+57 → gridley → 7 remap could run (see *Root cause* above).
+
+**Fix:** generic staged reinstatement, decided by shape and never by table name (see *Fix* above) —
+restore any reinstated table with a NOT NULL football reference and a stable lineage identity into
+schema-free `promotion_staging`, apply the evidenced remap there, promote into the real
+FK-constrained table with `INSERT … OVERRIDING SYSTEM VALUE … ORDER BY id`, drop
+`promotion_staging` without CASCADE, and fail closed (`judgeStagingLeftover`) if interrupted staging
+is ever found. Merged into `main` via `sonnet/issue-151-promotion-lineage-fk` (tip `2f58029`, an
+ancestor of `main`).
+
+**Production evidence:** this fix let the paused real production promotion (stamp
+`20260907-234124`) resume and complete on 2026-09-08 01:11:24.440219 AEST (`auth_audit_log` id 196,
+`database.promoted`; candidate `afldb_prod_candidate_20260907-234124` replaced `afldb_prod`).
+Post-cutover: candidate phase PASS with `external_grid_sources` at 1 row on `ingest_source_id` 7 and
+`promotion_staging` absent; no rollback or data-integrity failure recorded. Later independent
+validation: a 2026-09-12 governed-state before/after comparison of production-only tables found no
+unexplained loss, and `AFLDB-ISSUE-137`'s independent lineage-independent closure probe
+(`issues/closed/AFLDB-ISSUE-137-closure-check.sql`) passed 22/22 against current `afldb_prod`. The
+same staged-reinstatement mechanism has since been reused/extended by later issues, including
+`AFLDB-ISSUE-155`.
+
+**Current source validation (this session):** fresh, DB-free, against current `main`:
+`npx vitest run tests/db-promotion-check.test.ts` — **100/100 PASS** (grown from the 94/94 baseline
+recorded above at merge time; no ISSUE-151 regression).
+
+**Rehearsal disposition — superseded, not run:** `ISSUE-151-staged-reinstate-rehearsal.sh` was never
+run. It is not referenced by `docs/production-promotion.md` as a mandatory production gate, and it
+exercises the same fixed 2b–2e staged-reinstatement path that already succeeded in real production.
+**Operator decision:** the completed real production promotion, plus the later independent
+validation above, is accepted as stronger evidence than the unrun synthetic throwaway-DB rehearsal —
+that outstanding gate is explicitly **superseded**, not forgotten, and is no longer a precondition
+for resolving this issue. The script remains in place, unmodified, as a reusable
+diagnostic/reproduction artefact for future staged-reinstatement work; nothing here claims it ran.
+
+**Tracking correction:** the "Operator action taken to resume" section above previously read "the
+operator then ran the database rehearsal and deploy, and executed the steps below" — corrected,
+since the rehearsal script was never run. Only the production promotion's own
+resume/regenerate/restored/candidate/cutover sequence was executed on `afldb-prod`.
+
+**Validation:** `tests/db-promotion-check.test.ts` 100/100 (current `main`, DB-free); production
+promotion `20260907-234124` completed 2026-09-08 01:11:24.440219 AEST (`auth_audit_log` id 196) and
+independently validated per above; no ISSUE-151 regression found.
+
+**Follow-up:** none new. No remaining ISSUE-151 gate.
 
 ---
 
