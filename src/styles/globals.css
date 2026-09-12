@@ -58,10 +58,8 @@
   --anchor-offset: 5rem;
 
   /* Clearance below .site-header for anything else that stays on screen
-     while the page scrolls -- previously just `.admin-nav`'s own literal
-     `4.5rem`, now the one value both it and a table's sticky `thead` sit
-     below. Redeclared in the 640px band, where the header itself is
-     shorter. */
+     while the page scrolls -- `.admin-nav`'s own sticky offset. Redeclared
+     in the 640px band, where the header itself is shorter. */
   --header-h: 4.5rem;
 
   color-scheme: light;
@@ -449,9 +447,17 @@ th, td {
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
 }
+/* Not `position: sticky`: `.table-wrap`'s `overflow-x: auto` forces its
+   computed `overflow-y` to `auto` too (a scroll axis can't sit next to
+   `visible`), which makes `.table-wrap` -- not the page -- the sticky
+   containing block. `.table-wrap` never scrolls internally (its height is
+   intrinsic to its content), so the header never actually tracks page
+   scroll; it only ever renders `--header-h` below its true position,
+   overlapping the first body row by however much of that offset the
+   row's own height doesn't absorb. Confirmed by scrolling the page through
+   a 2500px table: the header's viewport position moved in exact lockstep
+   with scroll at every offset, i.e. it was never actually stuck. */
 thead th {
-  position: sticky;
-  top: var(--header-h);
   background: var(--bg);
   font-family: var(--font-sans);
   font-size: 0.625rem;
@@ -460,7 +466,6 @@ thead th {
   color: var(--text-faint);
   font-weight: 500;
   border-bottom: 1px solid var(--border-strong);
-  z-index: 1;
 }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--bg-hover); }
