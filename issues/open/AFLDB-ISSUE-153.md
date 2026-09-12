@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **OPEN — PARKED 2026-09-10 at the Stages 1-5+7 checkpoint. Operator moved to `AFLDB-ISSUE-155`; do not start Stage 6 in this session or any resumption without the explicit lock+go recorded in §11.13. STAGES 1-5 AND 7 IMPLEMENTED 2026-09-09, DB-VALIDATED against `afldb_test` (§11.11) AND RENDERED GREEN on the re-pinned 319 and 349 sets (§11.12). Stage 6 (C1/D6/C5/C6) NOT STARTED and NOT AUTHORISED — its §9 dependencies are met, but it needs an explicit operator lock of the D6 contract (§7.7) and an explicit go before any code. `PARSER_VERSION` 39 -> 40, bumped once for the whole Stages 2-5 checkpoint. Operator decisions Q1, Q1a(a), Q2 (127 selection events), Q3, Q4, Q5 and Q6 are LOCKED and implemented as given. Stage 0 (§1-§10) is the settled record and must NOT be re-run. Nothing committed, merged or deployed. READ §11 FIRST — it is the session handoff; §11.13 is the latest (parking) checkpoint.** |
+| Status | **OPEN — ALL SEVEN RUNBOOK STAGES COMPLETE. Stage 6 (C1/D6/C5/C6, the `family` grain) was implemented and validated 2026-09-13 against the operator's explicit D6 lock and go (§11.14), then COMMITTED as `3aeb90a` (see §11.15). Stages 1-5 and 7 are COMMITTED across `453e383`..`25beb99` (see §11.15). `npm run merge:ready -- --issue 153` last returned **READY (0 blockers, 3 warnings)**; a re-run during closeout (2026-09-13) found ONE new untracked-file blocker unrelated to this issue's work — see §11.15. `PARSER_VERSION` 39 -> 40 -> 41 (40 for the whole Stages 2-5 checkpoint, 41 for Stage 6). Operator decisions Q1, Q1a(a), Q2 (127 selection events), Q3, Q4, Q5, Q6 and the Stage 6 D6 lock are all LOCKED and implemented as given. Stage 0 (§1-§10) is the settled record and must NOT be re-run. Migration 100 is applied to `afldb_test` ONLY — it must reach `afldb_dev` and production before this code, per normal deploy sequencing. NOT YET MERGED to `main`, NOT deployed. READ §11 FIRST — it is the session handoff; §11.15 is the latest (closeout) checkpoint.** |
 | Branch | `opus/issue-153-nl-deferred-semantics` (worktree `D:\dev\afldb-issue-153`) |
 | Base | `1476de6` — the accepted ISSUE-152 Phase F checkpoint on fresh `main` |
 | Parser baseline | `PARSER_VERSION` **39** at Stage 0 (`src/search/nl/plan.ts`) — verified, and unchanged by Stage 0. **Now 40**: bumped exactly once by the Stages 2–5 semantic checkpoint (§11.1). Do not bump again for anything already in that checkpoint. |
@@ -1334,3 +1334,65 @@ change (Stages 1–5 + 7, still uncommitted per §11.13, and Stage 6 together
 or separately per operator judgement), then runs `npm run merge:ready`.
 Migration 100 still needs to reach `afldb_dev` and production before the
 code, per the DEPLOY ORDER note above.
+
+## 11.15 Closeout and merge-readiness checkpoint — 2026-09-13
+
+The operator committed the reviewed local change. Git history now reads:
+
+```
+3aeb90a AFLDB-ISSUE-153: implement Stage 6 family grain
+25beb99 AFLDB-ISSUE-153: validate and re-pin Stages 1-5 + 7
+ee7fc72 AFLDB-ISSUE-153: record Stages 1-5 + 7 and hand the session off
+09bcd17 AFLDB-ISSUE-153 Stage 7 + DB oracles: written, and NOT YET RUN
+78f0aec AFLDB-ISSUE-153 Stages 2-5: bind the father-son rule, both sides
+453e383 AFLDB-ISSUE-153 Stage 1: say what the father-son and family boards are
+```
+
+All seven runbook stages (§9) are therefore implemented, validated **and
+committed**. Branch `opus/issue-153-nl-deferred-semantics` is 6 commits
+ahead of `main`, 0 behind; the main worktree is clean.
+
+**Merge-readiness history.** The operator reported `npm run merge:ready --
+--issue 153` returning `READY (0 blocker(s), 3 warning(s))` immediately
+after the Stage 6 commit, with these three warnings: (1) migration 100
+exists on the branch but not `origin/main` — reserve its number before
+applying it outside `*_test`; (2) runbook readiness metadata unavailable
+(no `afldb-merge-readiness` JSON block in this file); (3) unexpected-file
+classification unavailable (39 committed changed files, no
+`expectedFiles`/`--expected-file` given).
+
+**Re-run during this closeout session found a NEW, unrelated blocker.** A
+0-byte untracked file named `` 2` `` (digit 2, backtick) exists in the
+worktree root, dated 2026-09-13 06:01, with no git history — almost
+certainly a stray shell-redirection artifact from an earlier command, not
+ISSUE-153 evidence or output. It trips the `merge:ready` "issue worktree is
+clean" gate, changing the result to `BLOCKED (1 blocker, 3 warnings)`. This
+is **not** a defect in Stage 6 or any ISSUE-153 file — `git diff --stat`
+against the file is empty and it is not tracked. **Operator action needed:**
+delete (or investigate and then delete) `` 2` `` from the worktree root,
+then re-run `npm run merge:ready -- --issue 153`; the three warnings above
+are expected to remain and are not blockers.
+
+**Read-only checks run this session (worktree root, no state change):**
+
+| Check | Result |
+|---|---|
+| `git status --short` | clean except the one stray untracked file above |
+| `git diff --stat` | empty (nothing staged/unstaged) |
+| `git diff --check` | clean, no whitespace conflicts |
+| `npm run merge:ready -- --issue 153` | `BLOCKED (1 blocker, 3 warnings)` — blocker is the stray file above, not this issue's work |
+
+**Tracking reconciliation done in this session:** this file's header Status
+line and this §11.15; `issues.md`'s ISSUE-153 Status/Validation/Next-action
+fields; the `IssuesIndex.md` ISSUE-153 row. `CHANGELOG.md` already carries
+both the Stages 1–5 (9 September 2026) and Stage 6 (13 September 2026)
+entries under `Unreleased` and needed no further change.
+
+**Issue status.** Left **OPEN**, not resolved. This repository's convention
+(cross-checked against ISSUE-149/ISSUE-150, and matching this issue's own
+§11.12.5/item-5 resolution gate above) is to resolve a user-facing record/UI
+issue only after merge, DEV deployment and a DEV verification pass — not at
+the local-commit/merge-ready stage. ISSUE-153 is not merged, not deployed to
+`afldb_dev`, and neither `/records/father-son`/`/records/family` nor the new
+family-grain NL answers have been checked on DEV. Resolution stays a
+post-merge, post-deploy action.

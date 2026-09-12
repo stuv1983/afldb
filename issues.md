@@ -21223,12 +21223,19 @@ Runbook **§25**. Superseded by §26 above; kept as the recorded contract.
 
 ## AFLDB-ISSUE-153 — `/records/father-son` and `/records/family` do not read what their prose says
 
-- **Status:** **OPEN — PARKED AT THE STAGES 1–5 + 7 CHECKPOINT.** Stages 1–5 and 7
-  are implemented on `opus/issue-153-nl-deferred-semantics`; DB-backed validation
-  against `afldb_test` and rendered acceptance of the re-pinned 319- and 349-row
-  sets are green. The checkpoint remains uncommitted pending focused re-validation
-  and operator review. **Stage 6 is NOT STARTED and NOT AUTHORISED**; it requires
-  the explicit D6 contract lock and go recorded in the runbook §11.12.5/§11.13.
+- **Status:** **OPEN — ALL SEVEN RUNBOOK STAGES IMPLEMENTED, VALIDATED AND
+  COMMITTED** on `opus/issue-153-nl-deferred-semantics` (`453e383`..`3aeb90a`,
+  6 commits ahead of `main`, 0 behind). Stage 6 (the `family` grain, C1/D6/C5/C6)
+  was implemented and validated 2026-09-13 against the operator's explicit D6
+  lock and go, then committed as `3aeb90a`; Stages 1–5 and 7 are committed
+  across the five preceding commits. `npm run merge:ready -- --issue 153`
+  returned `READY (0 blocker(s), 3 warning(s))` after the Stage 6 commit; a
+  closeout re-run found one new, unrelated blocker — a stray 0-byte untracked
+  file in the worktree root with no git history — not a defect in this issue's
+  work (runbook §11.15). Migration 100 is applied to `afldb_test` only and must
+  reach `afldb_dev` and production before this code, per normal deploy
+  sequencing. **NOT merged, NOT deployed** — stays Open until merged and
+  verified on DEV.
 - **Severity / Area:** Low / Public UI — record pages and their database queries
   (`src/app/records/family/page.tsx`, `src/app/records/father-son/page.tsx`,
   `src/db/queries/family-records.ts`).
@@ -21336,16 +21343,24 @@ The runbook §11.11 records DB-backed validation against confirmed `afldb_test`,
 including the relationship suite at **42/42**, and §11.12 records rendered acceptance
 of the re-pinned sets at **319/319** and **349/349**, with zero failures, unscored rows,
 page errors or HTTP errors. The 1,495-row regression was deliberately not re-run for
-this checkpoint. The focused DB-free and DB-backed corrective suites are the final
-commit-readiness re-validation; no Stage 6 validation or implementation is in scope.
+that checkpoint. Stage 6 was then implemented and validated 2026-09-13 (runbook
+§11.14): `npx tsc --noEmit` PASS, the focused DB-free Stage 6 gate **618/618 PASS**,
+and `tests/integration/nl-answers-relationships.test.ts` **49/49 PASS** against
+`afldb_test`, with migration 100 applied there (100/100 applied, 0 pending). The four
+`tests/integration/database.test.ts` snapshot-count failures are pre-existing, stale
+baseline drift unrelated to this issue and remain out of scope. All seven stages are
+now committed (runbook §11.15).
 
 ### Next action
 
-Complete the focused commit-readiness re-validation named in the runbook §11.10,
-review the full 16-file checkpoint, and commit Stages 1–5 + 7 only after operator
-approval. Do not start Stage 6 without the explicit D6 contract lock and go in
-§11.12.5/§11.13. Do not merge, rebase, deploy or touch DEV/production as part of this
-checkpoint review.
+Operator review and merge. The reviewed local change (all seven stages,
+`453e383`..`3aeb90a`) is committed; `npm run merge:ready -- --issue 153` returned
+`READY (0 blocker(s), 3 warning(s))` after that commit. Before merging: clear the
+unrelated stray-file blocker found during closeout (runbook §11.15) and re-confirm
+`merge:ready`. After merge: migration 100 must reach `afldb_dev` and then production
+**before** this code deploys, per the same deploy-order convention 092/093 used.
+Resolve this issue only after DEV deployment and a DEV check of `/records/father-son`,
+`/records/family` and a family-grain NL search (e.g. "biggest football family").
 
 ## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
 
