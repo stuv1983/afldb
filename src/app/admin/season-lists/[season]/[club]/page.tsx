@@ -163,7 +163,7 @@ export default async function SeasonListClubPage(
 
       <section className="section">
         <div className="table-wrap">
-          <table>
+          <table className="sticky-last-col">
             <thead>
               <tr>
                 <th scope="col">Player</th>
@@ -193,7 +193,7 @@ export default async function SeasonListClubPage(
                   <td className="num">
                     {member.gamesInSeason === null ? 'No matches recorded' : member.gamesInSeason}
                   </td>
-                  <td>{member.note ?? '—'}</td>
+                  <td className="wide">{member.note ?? '—'}</td>
                   {canEdit && (
                     <td>
                       <MemberActions

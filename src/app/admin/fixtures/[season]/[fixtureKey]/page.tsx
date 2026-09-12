@@ -145,7 +145,7 @@ export default async function FixtureDetailPage(
               </tr>
               <tr>
                 <th scope="row">Fixture key</th>
-                <td colSpan={3} style={{ wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.8rem' }}>{fixture.fixtureKey}</td>
+                <td colSpan={3} style={{ whiteSpace: 'normal', wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '0.8rem' }}>{fixture.fixtureKey}</td>
               </tr>
             </tbody>
           </table>

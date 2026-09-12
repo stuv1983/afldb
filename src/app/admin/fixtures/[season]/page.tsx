@@ -191,7 +191,7 @@ export default async function FixtureSeasonPage(
         <section key={roundCode} className="section">
           <h2>{roundHeading(rows[0])}</h2>
           <div className="table-wrap">
-            <table>
+            <table className="sticky-last-col">
               <thead>
                 <tr>
                   <th scope="col">Date · time</th>

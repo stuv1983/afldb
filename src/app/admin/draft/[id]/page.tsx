@@ -136,7 +136,7 @@ export default async function DraftPickAdminDetailPage(
                 <th scope="row">Provenance</th>
                 <td><span className="badge">{PROVENANCE_LABELS[detail.provenance]}</span></td>
                 <th scope="row">Entity key</th>
-                <td style={{ wordBreak: 'break-all' }}>{detail.entityKey ?? '—'}</td>
+                <td style={{ whiteSpace: 'normal', wordBreak: 'break-all' }}>{detail.entityKey ?? '—'}</td>
               </tr>
               <tr>
                 <th scope="row">Player</th>
@@ -157,7 +157,7 @@ export default async function DraftPickAdminDetailPage(
               </tr>
               <tr>
                 <th scope="row">Source player URL</th>
-                <td style={{ wordBreak: 'break-all' }}>{detail.playerUrl ?? '—'}</td>
+                <td style={{ whiteSpace: 'normal', wordBreak: 'break-all' }}>{detail.playerUrl ?? '—'}</td>
                 <th scope="row">Active overrides</th>
                 <td>{activeGroups.size > 0 ? [...activeGroups].join(', ') : 'none'}</td>
               </tr>

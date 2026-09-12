@@ -215,6 +215,17 @@ p { margin: 0 0 0.75em; }
 
 .site-nav {
   display: flex;
+  /* Wraps to a tidy second row, right-aligned, the moment the full set no
+     longer fits the masthead's width — not just under the ≤1080px bucket
+     below, which reduces type size for a small tablet but was previously
+     the ONLY place this container wrapped. Above it, `.site-nav` shares the
+     page's fixed 1180px reading measure regardless of how wide the real
+     viewport is, so the eleven-item list can be just as tight at 1440 or
+     1920px; wrapping unconditionally means a line break appears exactly
+     when there is no room, at any width, instead of only below 1080px. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 0.35rem;
   gap: clamp(0.7rem, 1.45vw, 1.25rem);
   margin-left: auto;
   align-items: center;
@@ -228,6 +239,13 @@ p { margin: 0 0 0.75em; }
   text-transform: uppercase;
   padding: 0.35rem 0;
   border-bottom: 1px solid transparent;
+  /* Without this, a flex item that can't fit on the line shrinks below its
+     text's own width before `flex-wrap` moves it to a new line, breaking
+     "Match Search" onto two stacked words instead of wrapping the whole
+     item — the "awkward wrap" and neighbouring-item crowding seen in the
+     screenshot evidence. `nowrap` keeps each item's minimum width equal to
+     its full label, so a line break only ever happens between items. */
+  white-space: nowrap;
 }
 .site-nav a:hover {
   color: var(--text);
@@ -452,6 +470,24 @@ td.wide { white-space: normal; min-width: 12rem; }
 td.audit-wrap { white-space: normal; min-width: 10rem; overflow-wrap: anywhere; }
 td.audit-payload { white-space: normal; min-width: 16rem; width: 45%; overflow-wrap: anywhere; }
 td.audit-wrap code, td.audit-payload code { font-size: 0.75rem; }
+
+/* A dense admin table's rightmost column usually carries the one thing an
+   operator cannot do without -- Manage, Override, Authority -- so it stays
+   in view while the rest of the row scrolls underneath it inside
+   `.table-wrap`, rather than being the first thing pushed off-screen. This
+   is an intentional fallback for a table still too wide for its viewport
+   (design principle: desktop should not need it at all now that the admin
+   shell no longer shares the page's narrow reading measure); it does not
+   replace fitting the table, only covers the case where it genuinely can't.
+   The matching hover rule keeps the pinned cell in sync with its row. */
+.table-wrap table.sticky-last-col th:last-child,
+.table-wrap table.sticky-last-col td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--bg);
+  box-shadow: -6px 0 6px -6px var(--edge-shadow);
+}
+.table-wrap table.sticky-last-col tbody tr:hover td:last-child { background: var(--bg-hover); }
 /* A second line under a cell's main value: user id, IP, field group, note. */
 .audit-meta { display: block; font-size: 0.78rem; color: var(--text-muted); }
 /* auth_audit_log.detail as `key value` pairs, keys in a column of their own. */
@@ -1168,6 +1204,19 @@ label {
    breadcrumb row it used to: ten destinations across four unrelated
    concerns do not read as a list of peers. The rail collapses, and the
    choice is remembered — see AdminNav. */
+
+/* `.container` (the reading measure every page shares) caps the admin
+   shell at the same 1180px a prose page uses, so on a wide desktop the
+   sidebar and every table inside it were squeezed into that width with
+   the rest of the viewport sitting empty — and collapsing the sidebar
+   only gave the reclaimed space back to more margin, not to the tables
+   that needed it. Admin is a data-management surface, not an article, so
+   its container drops the cap and uses the viewport (still gutter-padded)
+   instead. `:has()` targets it without a class on every page's own
+   `.container` usage, and without giving the login/invite screens (which
+   render outside `.admin-shell`) the same wide measure. */
+.container:has(> .admin-shell) { max-width: none; }
+
 .admin-shell {
   display: grid;
   grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
@@ -1367,16 +1416,12 @@ details.admin-section > summary h2 {
 
 @media (max-width: 1080px) and (min-width: 641px) {
   .masthead .span { display: none; }
-  /* The full set no longer fits masthead width on a small tablet, so let
-     it wrap to a tidy second row aligned to the right rather than
-     spilling over the wordmark. The bottom tab bar does not appear until
-     640px, so this band keeps the complete nav visible. */
-  .site-nav {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.4rem 0.75rem;
-    padding-block: 0.5rem;
-  }
+  /* `.site-nav` always wraps when it runs out of room (see base rule
+     above); at this width it reliably needs to, so it also tightens its
+     type and spacing rather than wrapping at full desktop size. The bottom
+     tab bar does not appear until 640px, so this band keeps the complete
+     nav visible, just denser. */
+  .site-nav { gap: 0.4rem 0.75rem; padding-block: 0.5rem; }
   .site-nav a { font-size: 0.6875rem; }
   .site-header .container { align-items: center; }
 }

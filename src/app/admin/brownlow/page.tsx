@@ -63,7 +63,14 @@ export default async function BrownlowSeasonsPage() {
 
       <section className="section">
         <div className="table-wrap">
-          <table>
+          {/* Authority sits last, and pinned, because it is the column the
+              screenshot evidence showed clipped off-screen with an expanded
+              sidebar: it is the operator's read of whose data this is
+              (source vs. corrected), whereas "Last activity" is who/when
+              metadata an operator consults less often. Ordering by that
+              priority — not alphabetically or by data pipeline stage — is
+              what lets a pinned last column protect the one that matters. */}
+          <table className="sticky-last-col">
             <thead>
               <tr>
                 <th scope="col">Season</th>
@@ -74,8 +81,8 @@ export default async function BrownlowSeasonsPage() {
                 <th scope="col" className="num">Source</th>
                 <th scope="col" className="num">Left</th>
                 <th scope="col" className="num">Unattached</th>
-                <th scope="col">Authority</th>
                 <th scope="col">Last activity</th>
+                <th scope="col">Authority</th>
               </tr>
             </thead>
             <tbody>
@@ -104,11 +111,11 @@ export default async function BrownlowSeasonsPage() {
                         ? <span className="badge badge-warn">{season.unresolved}</span>
                         : '—'}
                     </td>
-                    <td className="muted">{SEASON_AUTHORITY_LABEL[season.authority]}</td>
                     <td className="muted" style={{ fontSize: '0.8rem' }}>
                       {who.label}
                       {who.at && <><br />{stamp(who.at)}</>}
                     </td>
+                    <td className="muted">{SEASON_AUTHORITY_LABEL[season.authority]}</td>
                   </tr>
                 );
               })}

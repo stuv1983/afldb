@@ -81,7 +81,7 @@ export default async function BrownlowSeasonPage({
           <p className="muted">No home-and-away rounds recorded for {season}.</p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="sticky-last-col">
               <thead>
                 <tr>
                   <th scope="col">Round</th>

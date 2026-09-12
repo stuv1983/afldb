@@ -94,7 +94,7 @@ export default async function SeasonListOverviewPage(
 
       <section className="section">
         <div className="table-wrap">
-          <table>
+          <table className="sticky-last-col">
             <thead>
               <tr>
                 <th scope="col">Club</th>
