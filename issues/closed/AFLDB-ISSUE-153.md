@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **OPEN — ALL SEVEN RUNBOOK STAGES COMPLETE. Stage 6 (C1/D6/C5/C6, the `family` grain) was implemented and validated 2026-09-13 against the operator's explicit D6 lock and go (§11.14), then COMMITTED as `3aeb90a` (see §11.15). Stages 1-5 and 7 are COMMITTED across `453e383`..`25beb99` (see §11.15). `npm run merge:ready -- --issue 153` last returned **READY (0 blockers, 3 warnings)**; a re-run during closeout (2026-09-13) found ONE new untracked-file blocker unrelated to this issue's work — see §11.15. `PARSER_VERSION` 39 -> 40 -> 41 (40 for the whole Stages 2-5 checkpoint, 41 for Stage 6). Operator decisions Q1, Q1a(a), Q2 (127 selection events), Q3, Q4, Q5, Q6 and the Stage 6 D6 lock are all LOCKED and implemented as given. Stage 0 (§1-§10) is the settled record and must NOT be re-run. Migration 100 is applied to `afldb_test` ONLY — it must reach `afldb_dev` and production before this code, per normal deploy sequencing. NOT YET MERGED to `main`, NOT deployed. READ §11 FIRST — it is the session handoff; §11.15 is the latest (closeout) checkpoint.** |
+| Status | **RESOLVED — 2026-09-13. All seven runbook stages implemented, validated, committed and MERGED to `main` at `08a218e` (merge of `opus/issue-153-nl-deferred-semantics`, tip `3aeb90a`). Migration 100 is applied to `afldb_test` AND `afldb_dev` (100/100 applied, 0 pending on DEV). DEV deploy completed and health-checked ok; the DEV resolution gate (`/records/father-son`, `/records/family`, and an NL "biggest football family" search) is PASS — see §11.16. Production has neither the migration nor the code yet; that is a deliberate deployment-lifecycle follow-up, not an implementation defect — see §11.16. READ §11 FIRST for the full implementation history; §11.16 is the closing checkpoint.** |
 | Branch | `opus/issue-153-nl-deferred-semantics` (worktree `D:\dev\afldb-issue-153`) |
 | Base | `1476de6` — the accepted ISSUE-152 Phase F checkpoint on fresh `main` |
 | Parser baseline | `PARSER_VERSION` **39** at Stage 0 (`src/search/nl/plan.ts`) — verified, and unchanged by Stage 0. **Now 40**: bumped exactly once by the Stages 2–5 semantic checkpoint (§11.1). Do not bump again for anything already in that checkpoint. |
@@ -1388,11 +1388,54 @@ fields; the `IssuesIndex.md` ISSUE-153 row. `CHANGELOG.md` already carries
 both the Stages 1–5 (9 September 2026) and Stage 6 (13 September 2026)
 entries under `Unreleased` and needed no further change.
 
-**Issue status.** Left **OPEN**, not resolved. This repository's convention
-(cross-checked against ISSUE-149/ISSUE-150, and matching this issue's own
-§11.12.5/item-5 resolution gate above) is to resolve a user-facing record/UI
-issue only after merge, DEV deployment and a DEV verification pass — not at
-the local-commit/merge-ready stage. ISSUE-153 is not merged, not deployed to
-`afldb_dev`, and neither `/records/father-son`/`/records/family` nor the new
-family-grain NL answers have been checked on DEV. Resolution stays a
-post-merge, post-deploy action.
+**Issue status at that point.** Left **OPEN**, not resolved. This repository's
+convention (cross-checked against ISSUE-149/ISSUE-150, and matching this
+issue's own §11.12.5/item-5 resolution gate above) is to resolve a
+user-facing record/UI issue only after merge, DEV deployment and a DEV
+verification pass — not at the local-commit/merge-ready stage. At that point
+ISSUE-153 was not merged, not deployed to `afldb_dev`, and neither
+`/records/father-son`/`/records/family` nor the new family-grain NL answers
+had been checked on DEV. That gate has since been satisfied — see §11.16.
+
+## 11.16 Merge, DEV deployment and resolution — 2026-09-13
+
+The stray untracked file blocking `merge:ready` (§11.15) was cleared by the
+operator. The reviewed change merged to `main` as `08a218e` (merge of
+`opus/issue-153-nl-deferred-semantics`, tip `3aeb90a`).
+
+**DEV deployment (`streamanator`, `/home/arm/projects/afldb`, database
+`afldb_dev`):**
+
+- revision `08a218e main`; dependency install completed.
+- Migration 100 (`100_nl_search_log_family_grain.sql`) applied — DEV
+  migration state 100/100 applied, 0 pending, confirmed schema current.
+- Production `npm run build`: 1,533 static pages generated; standalone
+  bundle prepared.
+- `afldb.service` restarted successfully; health endpoint ready after 2 s:
+  `{"status":"ok","database":"ok"}`.
+
+**DEV resolution gate — all three legs PASS, satisfying §11.12.5/item-5 and
+the note above:**
+
+- **`/records/father-son`** — page renders normally: 127 recorded
+  selections, 96 both linked, 31 with at least one side unlinked; the
+  father-son table renders correctly.
+- **`/records/family`** — page renders normally: 351 linked families, 704
+  linked players, Ablett ranked #1 at 906 combined career games; the member
+  list renders correctly. Both figures match the Stage 0/Stage 6 oracle
+  counts (§4.6).
+- **NL search** `biggest football family` → **"Ablett — 906 combined career
+  games"**, correctly described as the highest sibling family by combined
+  career games, with linked members displayed. Confirms the `family` grain
+  (Stage 6) is live and answering on DEV.
+
+**Production.** Migration 100 and this code have **not** reached
+production. This is recorded as an outstanding deployment-lifecycle
+follow-up, per the same deploy-order convention 092/093/094 used elsewhere
+(migration before code) — it is **not** an ISSUE-153 implementation defect,
+and does not reopen this issue.
+
+**Resolution.** All seven runbook stages are implemented, validated,
+committed, merged, deployed to DEV and DEV-verified. **ISSUE-153 is
+RESOLVED.** Production rollout is tracked as follow-up, not as unresolved
+scope of this issue.
