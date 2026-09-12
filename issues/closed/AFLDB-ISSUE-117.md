@@ -1,10 +1,11 @@
 # AFLDB-ISSUE-117 — Retired access keys cannot be removed from the admin UI
 
-**Status: Open.** Implemented 2026-08-31, incl. the revoked-or-spent widening (§5).
-**Reconciled onto current `main` 2026-09-06 (§8): migration renumbered `079` → `091`, and the
-`src/lib/auth/session.ts` change dropped as superseded.** DB-free validation green on the new
-branch (13/13 unit, `tsc` exit 0, `eslint` exit 0). The three DB-backed suites, the merge, the
-deploy and the manual dev confirmation remain.
+**Status: RESOLVED — 2026-09-13.** Implemented 2026-08-31, incl. the revoked-or-spent widening (§5).
+Reconciled onto current `main` 2026-09-06 (§8: migration renumbered `079` → `091`, and the
+`src/lib/auth/session.ts` change dropped as superseded), then merged (`a0b2ea4`) and deployed to DEV.
+DEV Playwright browser gate PASSED across all four `/admin/access` states; focused DB/test
+validation PASSED; PROD migration-091 and DELETE-grant proof both confirmed. See §10 for the full
+closure record.
 **Severity:** Medium — **Area:** Admin / Access management / Security.
 **Created:** 2026-08-31 (operator brief). **Reconciled:** 2026-09-06.
 **Branch:** `claude/issue-117`, worktree `D:\dev\afldb-issue-117`, cut from `main` @ `8dd96c5`.
@@ -399,5 +400,34 @@ Three things could clear the orphan row. **None is taken here:**
    branch never captured** — dev only ever ran the pre-widening code.
 5. **Then resolve:** `issues.md` + `IssuesIndex.md`, and move this file to `issues/closed/`.
 
-**Not resolved.** No database of any kind was contacted on 2026-09-06, nothing was merged or
-deployed, and production is untouched.
+All five steps above are now DONE — see §10.
+
+---
+
+## 10. Resolution (2026-09-13)
+
+**All outstanding items from §9 are complete. ISSUE-117 is closed.**
+
+- **Merge.** `claude/issue-117` merged to `main` at `a0b2ea4`; current `main` contains
+  `091_access_code_delete.sql` and the `afldb_auth` DELETE grant on `beta_access_codes`.
+- **DEV Playwright browser gate — PASS.** All four `/admin/access` states confirmed: an active code
+  offers Revoke, not Delete; a revoked code offers Delete; a one-use spent code exposes Delete
+  directly with no revoke first; an unlimited code is never treated as spent. Delete confirmation
+  correctly identifies the key and its state. A revoked code deletes successfully and remains gone
+  after reload; a spent code likewise deletes successfully and remains gone. No console/runtime
+  errors observed.
+- **Focused DB/test validation — PASS.** Target confirmed as `afldb_test`. `npm run db:migrate:test`
+  PASSED and migration `091` confirmed applied. `tests/integration/access-codes.test.ts` 8/8 PASS.
+  The ISSUE-117-specific `afldb_auth` DELETE-grant assertion in `tests/integration/privileges.test.ts`
+  PASSED. That suite's unrelated red — `external_grids`/`external_grid_axes` (`AFLDB-ISSUE-138`) and
+  a separate Brownlow (`brownlow_season_authority`, `brownlow_vote_entry_state`) privilege-drift
+  finding — is confirmed present both before and after this branch, per §4.2, and is explicitly
+  **not** absorbed into this issue's closure.
+- **PROD proof (read-only).** `091_access_code_delete.sql` applied at PROD timestamp
+  `2026-09-06 10:08:25.329637+10`. `has_table_privilege('afldb_auth', 'beta_access_codes', 'DELETE')`
+  returns `t` on PROD.
+- **No remaining gate.** No open verification item remains against this issue.
+- **Tracking.** `issues.md` (Open Issues table + detailed entry) and `IssuesIndex.md` updated;
+  this runbook moved from `issues/open/` to `issues/closed/`.
+
+**AFLDB-ISSUE-117 final closure gate: PASS.**

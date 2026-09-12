@@ -7,7 +7,25 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 11 tracked here — `-117`, `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+**Open issues:** 10 tracked here — `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-117 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): closeout only — the admin-access delete capability was already implemented, merged
+     (`a0b2ea4`) and DEV-deployed (`AFLDB-ISSUE-155` DEV deployment, 2026-09-11). This session
+     recorded the operator's final DEV Playwright browser gate (PASS across all four
+     `/admin/access` states: active offers Revoke only, revoked offers Delete, a one-use spent code
+     exposes Delete directly with no revoke first, unlimited codes are never treated as spent; a
+     revoked and a spent code each delete successfully and remain gone after reload; no
+     console/runtime errors), the prior focused DB/test PASS (`afldb_test` migration 091 applied,
+     `tests/integration/access-codes.test.ts` 8/8, the ISSUE-117-specific `afldb_auth` DELETE-grant
+     assertion in `tests/integration/privileges.test.ts` PASS), and PROD read-only proof (migration
+     `091_access_code_delete.sql` applied at `2026-09-06 10:08:25.329637+10`;
+     `has_table_privilege('afldb_auth', 'beta_access_codes', 'DELETE')` = `t`). The unrelated
+     privilege-suite red (`external_grids`/`external_grid_axes` = `AFLDB-ISSUE-138`;
+     `brownlow_season_authority`/`brownlow_vote_entry_state` = a separate drift finding) is
+     confirmed present both before and after and is NOT absorbed into this closure. See `issues.md`
+     Resolution (2026-09-13); runbook moved to `issues/closed/AFLDB-ISSUE-117.md`. Removed from the
+     Open Issues table and `IssuesIndex.md`; 11 -> 10. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-150 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): the venue-page expansion (five new query functions in `src/db/queries/venues.ts`,
@@ -18637,13 +18655,13 @@ and run every phase with `--environment dev` — settling `external_grids.import
 
 ## AFLDB-ISSUE-117 — Retired access keys cannot be removed from the admin UI
 
-- **Status:** Open — implemented, reconciled onto current `main`, and **MERGED** (`a0b2ea4`;
-  branch tip `0378180` is an ancestor of `main`). DB-free validation green 2026-09-06; the
-  DB-backed suites are DONE (`tests/integration/access-codes.test.ts` 8/8 after `091` was applied;
-  the `tests/integration/privileges.test.ts` shortfall is `AFLDB-ISSUE-138`, not this issue).
-  Migration `091`, `db:privileges` and the code all reached `afldb_dev` in the `AFLDB-ISSUE-155`
-  DEV deployment of 2026-09-11 (94/94 applied, 0 pending). Only the four-state `/admin/access`
-  browser check on DEV remains
+- **Status:** **RESOLVED — 2026-09-13.** Implemented, reconciled onto current `main`, and
+  **MERGED** (`a0b2ea4`; branch tip `0378180` is an ancestor of `main`). DB-free validation green
+  2026-09-06; the DB-backed suites are DONE (`tests/integration/access-codes.test.ts` 8/8 after
+  `091` was applied; the `tests/integration/privileges.test.ts` shortfall is `AFLDB-ISSUE-138`, not
+  this issue). Migration `091`, `db:privileges` and the code all reached `afldb_dev` in the
+  `AFLDB-ISSUE-155` DEV deployment of 2026-09-11 (94/94 applied, 0 pending). The four-state
+  `/admin/access` DEV Playwright browser gate has now PASSED; see *Resolution (2026-09-13)* below
 - **Severity:** Medium
 - **Area:** Admin / Access management / Security
 - **Found:** 2026-08-31 (operator report)
@@ -18659,7 +18677,7 @@ and run every phase with `--environment dev` — settling `external_grids.import
 - **Related:** `AFLDB-ISSUE-027` (a required audit commits atomically with its mutation);
   `AFLDB-ISSUE-119` (which built `auditInTransaction`, the mechanism this issue now uses);
   `AFLDB-ISSUE-142` Finding C and `AFLDB-ISSUE-139` (the DEV migration-parity consequence)
-- **Runbook:** `issues/open/AFLDB-ISSUE-117.md`
+- **Runbook:** `issues/closed/AFLDB-ISSUE-117.md`
 
 > **ID note.** The operator brief was written as "AFLDB-ISSUE-116" and the original branch is
 > `claude/issue-116`. `AFLDB-ISSUE-116` was already allocated to the `player_match_stats` Data QA
@@ -18806,7 +18824,7 @@ tracked forward reconciliation migration carrying a guarded delete of that one r
 `afldb_test` and production, where it never existed). The third is not defined anywhere in the
 repository today and would be a new, operator-approved mechanism, not an improvisation.
 
-### Next action
+### Next action (historical — all steps now DONE, see Resolution below)
 
 1. **DONE 2026-09-06.** The operator ran `npm run db:migrate:test` (applied `091`) and
    `tests/integration/access-codes.test.ts` passed **8/8**. The `privileges.test.ts` shortfall is
@@ -18818,10 +18836,50 @@ repository today and would be a new, operator-approved mechanism, not an improvi
    future host — migration `091`, then `privileges.sql`, then the code. Reversed, every Delete
    fails closed on a permission error and the audit records nothing, because the transaction
    aborts before the INSERT.
-4. Manual dev check on `/admin/access`, all four states: spent deletes directly; revoked deletes;
-   active-unused offers Revoke only; partly-used offers Revoke only. This is the one piece of
-   evidence the original branch never captured for the spent-key widening.
-5. Only then resolve.
+4. **DONE.** Manual dev check on `/admin/access`, all four states: spent deletes directly; revoked
+   deletes; active-unused offers Revoke only; partly-used offers Revoke only. This is the one piece
+   of evidence the original branch never captured for the spent-key widening.
+5. **DONE — resolved below.**
+
+### Resolution (2026-09-13)
+
+**Root cause:** `beta_access_codes` had a revoke path but no delete path, no `afldb_auth` DELETE
+grant, and `page.tsx` selected every code with no state filter, so retired keys — spent keys
+worst of all, since they could be neither revoked nor deleted — accumulated permanently in the
+admin UI with no disposal route.
+
+**Fix:** migration `091_access_code_delete.sql` grants `afldb_auth` DELETE on `beta_access_codes`;
+`tools/maintenance/privileges.sql` mirrors the grant so the subtractive reconciler preserves it;
+`deleteRetiredAccessCode` carries the "revoked or spent, never merely expired or partly used"
+eligibility predicate in its `WHERE` clause (proven a strict subset of "not redeemable," §5 above);
+`deleteAccessCode` runs the delete and its `access.code_deleted` audit inside one transaction via
+`auditInTransaction`; `DeleteCodeButton` offers Delete only for a revoked-or-spent row, behind an
+in-row confirmation naming the key and its state.
+
+**Validation:**
+
+- **DEV Playwright browser gate — PASS.** Active code: Revoke available, Delete not available.
+  Revoked code: Delete available. Delete confirmation identifies the key and its state. A revoked
+  code deletes successfully and remains gone after reload. A one-use spent code exposes Delete
+  directly with no revoke first, deletes successfully, and remains gone after reload. Unlimited
+  codes are correctly never treated as spent. No console/runtime errors.
+- **Focused DB/test validation — PASS.** `afldb_test` confirmed as target; `npm run db:migrate:test`
+  PASS with migration `091` confirmed applied; `tests/integration/access-codes.test.ts` 8/8 PASS;
+  the ISSUE-117-specific `afldb_auth` DELETE-grant assertion in `tests/integration/privileges.test.ts`
+  PASS.
+- **PROD proof (read-only).** `091_access_code_delete.sql` applied on PROD at
+  `2026-09-06 10:08:25.329637+10`; `has_table_privilege('afldb_auth', 'beta_access_codes',
+  'DELETE')` returns `t` on PROD.
+
+**Unrelated privilege-suite red, confirmed both before and after this branch, NOT this issue's and
+NOT absorbed here:** `external_grids` / `external_grid_axes` registration drift is
+`AFLDB-ISSUE-138`; `brownlow_season_authority` / `brownlow_vote_entry_state` is a separate,
+independently tracked privilege-drift finding.
+
+**AFLDB-ISSUE-117 final closure gate: PASS.** Removed from `IssuesIndex.md` and the Open Issues
+table; runbook moved to `issues/closed/AFLDB-ISSUE-117.md`. No `CHANGELOG.md` entry is added beyond
+what already documents the shipped admin-access delete capability, since behaviour did not change
+in this closeout session — only tracking state did.
 ## AFLDB-ISSUE-142 — The promotion checker refuses every real database on `player_match_period_stats`, and the contract reinstates id-keyed ledgers across a lineage change
 
 - **Status:** **Resolved 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry. As found and implemented on 2026-09-06 (retained): found during `AFLDB-ISSUE-139` Phase 4C preflight (read-only; no database was written); **implemented 2026-09-06** — (A) decided in the contract, (B) a fail-closed lineage gate with an evidenced per-row remap, (C) an authoritative repository conclusion with no code change. The "five files changed in the `main` working tree, uncommitted" state recorded below is **SUPERSEDED**: the work was committed and merged as `12a3995`, and every validation item it lists has since been executed and recorded elsewhere in this ledger.
