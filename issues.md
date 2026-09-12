@@ -7,7 +7,25 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 10 tracked here — `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+**Open issues:** 9 tracked here — `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-138 RESOLVED — TRACKING ONLY, NO MIGRATION, NO DEPLOY, NO PRIVILEGE
+     CHANGE THIS SESSION): the privileges integration suite's "afldb_import is confined to the
+     statistical tables" probe was reporting `external_grids` / `external_grid_axes` as drift since
+     migration `080_external_grids.sql` — diagnosed as a stale test contract, not a privilege
+     defect: those two tables deliberately sit outside `afldb_meta.import_writable_tables` because
+     broad `grant_import_write()` semantics would hand out UPDATE/DELETE/TRUNCATE that violate the
+     immutable captured-corpus design. Fix (`tests/integration/privileges.test.ts`, implementation
+     commit `b193628`, merged into `main` as `90f7176`): excludes the two tables from the generic
+     registry-parity probe and adds a dedicated narrow-shape assertion (SELECT/INSERT true,
+     table-level UPDATE false, `UPDATE(is_current)` true on `external_grids` only, DELETE/TRUNCATE
+     false, sequence USAGE/SELECT true). Fresh `afldb_test` evidence:
+     `tests/integration/privileges.test.ts` 37/37 PASS (was 35/36),
+     `tests/external-grids-import.test.ts` 47/47 PASS, `tsc --noEmit` and `eslint` clean,
+     `npm run merge:ready -- --issue 138` READY (0 blockers). `brownlow_season_authority` /
+     `brownlow_vote_entry_state` are confirmed NOT a separate drift finding — no Brownlow issue
+     opened or reopened. See `issues.md` Resolution (2026-09-13). Removed from the Open Issues
+     table and `IssuesIndex.md`; 10 -> 9. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-117 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): closeout only — the admin-access delete capability was already implemented, merged
@@ -15819,11 +15837,11 @@ Operator decision between: **(a)** the canonical rebuild-and-promote path under 
 
 ## AFLDB-ISSUE-138 — privileges integration suite reports drift on the deliberate `external_grids` import grants
 
-- **Status:** Open — found 2026-09-05 during `AFLDB-ISSUE-118` §23.28 (the coaches stage's validation sweep). **Implemented and validated 2026-09-13 on `sonnet/issue-138-privilege-test-contract`, UNCOMMITTED** — see Validation below. Left open pending operator review/commit per the standard issue lifecycle.
+- **Status:** Resolved — 2026-09-13. Found 2026-09-05 during `AFLDB-ISSUE-118` §23.28 (the coaches stage's validation sweep); diagnosed as a stale privilege-test contract, not a privilege defect. Implemented and validated 2026-09-13 on `sonnet/issue-138-privilege-test-contract` (implementation commit `b193628`), merged into `main` as `90f7176`. See Resolution below.
 - **Severity:** Low — test-only. No privilege is wrong: the grants are exactly the ones migration `080` intends. The suite reports them as drift on every rebuilt database since `080`.
 - **Area:** Testing / Database privileges
 - **Found:** 2026-09-05
-- **Resolved:** N/A
+- **Resolved:** 2026-09-13
 - **Related:** `AFLDB-ISSUE-118` (migration `080_external_grids.sql`; runbook §23.28 deviation (b)), `AFLDB-ISSUE-027` / migration `045` (the fail-closed registry contract the suite enforces), `AFLDB-ISSUE-109` / migration `078` (the column-scoped `data_overrides` exception the suite already models).
 - **Migration:** none expected.
 
@@ -15845,7 +15863,14 @@ Test-only change in `tests/integration/privileges.test.ts`, exactly as scoped ab
 
 Brownlow tracking note: fresh live evidence on `afldb_test` confirms `brownlow_season_authority` / `brownlow_vote_entry_state` already match their intended migration-094 shape and already have dedicated passing coverage — they were never a second drift finding. The stale wording in the `AFLDB-ISSUE-117` closeout entry and `IssuesIndex.md` implying a separate Brownlow privilege-drift finding has been corrected.
 
-Not yet done: operator review, commit, `merge:ready`, and closure (`IssuesIndex.md` / Open Issues table / this entry's Status and Resolved fields) — left open per instruction pending operator action.
+### Resolution (2026-09-13)
+Test-contract-only fix, no migration, `privileges.sql`, application code or registry change, no deployment. Implementation commit `b193628` merged into `main` as `90f7176` (`Merge branch 'sonnet/issue-138-privilege-test-contract'`).
+
+Final validation on a fresh `afldb_test` (confirmed `current_database = afldb_test` before testing, via the `127.0.0.1:55432` tunnel): `tests/integration/privileges.test.ts` **37/37 PASS** (was 35/36 before the fix, with the 1 known drift on `external_grids`/`external_grid_axes`); `tests/external-grids-import.test.ts` **47/47 PASS**, unaffected, confirming no privilege/migration change was needed; `tsc --noEmit` PASS; `eslint` on the edited file PASS; `git diff --check` clean. `npm run merge:ready -- --issue 138` returned **READY** (0 blockers, 2 metadata warnings only).
+
+Brownlow tracking note (repeated from Implementation and validation above): fresh live evidence confirms `brownlow_season_authority` / `brownlow_vote_entry_state` already match their intended migration-094 privilege shape with dedicated passing coverage — they were never a second drift finding, and the stale wording in the `AFLDB-ISSUE-117` closeout and `IssuesIndex.md` implying a separate Brownlow privilege-drift finding has been corrected. No Brownlow issue is opened or reopened by this closure.
+
+No remaining gate. Closed by the operator per the standard issue lifecycle; removed from the Open Issues table and `IssuesIndex.md` (10 -> 9).
 
 ## AFLDB-ISSUE-139 — `afldb_dev` cannot be converged onto the canonical AFL Tables identity layer
 
