@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** **Stage 1 and Stage 2 CODE-COMPLETE and locally validated — committed 2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`) on `opus/issue-160-draft-admin`; not deployed, not merged.** A local completion audit followed on 2026-09-11 (Opus 5 high) and found one real atomicity defect, eight new ESLint errors and two undelivered §18 list items; the defects are fixed and, on the operator's direction, **both §18 gaps are now implemented** — all uncommitted for operator review. See `issues.md` → AFLDB-ISSUE-160 → *Local completion audit* and *§18 list-contract closure*. Every remaining gate is a deliberately deferred external one. Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided. **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a) (zero collisions on `afldb_test` and `afldb_dev`); the confirmation branch is deliberately not implemented. Stage 2 delivers `/admin/draft`, `/admin/draft/new`, `/admin/draft/[id]`, `/admin/draft/revalidate`; capabilities `data.draft.read`/`data.draft.edit` (gate 4, now done); the Data-group nav entry; the D-9 shared revalidate/submit extraction (coaches switched to it, behaviour-preserving); and the `/admin/data-editor` draft-slice UI removal (D-5 UI half). Still open: the gate-2 **PROD** probes (d)/(e)/(g)/(h), the real-importer half of gate 9, gates 15–16 (deferred by the operator's Admin Centre release-batching decision, not by any defect), and operator decision **S-1** (§11.1) before deployment. Full implementation record, probe results and gate table: `issues.md` → AFLDB-ISSUE-160 → *Stage 1 implementation record*, *Stage 2 implementation record* and *Validation*.
+**Status:** **RESOLVED 2026-09-12.** Both stages (`91935b9`, `a947e52`), the 2026-09-11 audit fixes and §18 list-contract closure, and the §20 `/admin/draft/[id]` revision-read fix (`e6c4e8c`) are in `main` at `3272434`, deployed to DEV and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): production build PASS, `/api/health` ok, capability-scoped list/detail access, Super Admin editing, source-owned and linked/unlinked selections rendered, notes-override Save, stale two-tab compare-and-swap refusal, active-override/audit behaviour, and responsive acceptance at 1440/1024/768/375 — the gate 15/16 record is **§21**. Carried forward to the PROD promotion stage (owned by the `AFLDB-ISSUE-156` umbrella, not closure conditions): the gate-2 PROD probes (d)/(e)/(g)/(h), operator decision **S-1** (§11.1) and gate 9's real-importer half. Not observed in the browser and not claimed: a manual-provenance `/admin/draft/[id]` row (none existed on DEV during acceptance) — §21.3. Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided; **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a). PROD untouched throughout; no PROD validation is claimed. The pre-closeout history below (§0–§20 and the former *Next action*) is retained as written.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Created:** 2026-09-11
@@ -745,7 +745,7 @@ data editor (P8); PROD deploy; DEV update/rebuild.
 The operator is deliberately holding DEV until the Admin Centre batch is complete. Gates 15–16
 run only then. Stage 1 and Stage 2 are committed on `afldb_test` + typecheck evidence alone.
 
-## 20. DEV acceptance defect: `/admin/draft/[id]` read the audit log as the wrong role (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+## 20. DEV acceptance defect: `/admin/draft/[id]` read the audit log as the wrong role (2026-09-12, Opus 5 high 1M) — UNCOMMITTED (superseded 2026-09-12 by §21: committed as `e6c4e8c`, deployed and DEV-accepted)
 
 ### 20.1 What DEV acceptance found
 
@@ -825,7 +825,69 @@ commands are listed under *Next action*. A local production build is **not** fin
 rendered-route crash — DEV must be redeployed and `/admin/draft/[id]` re-tested in the browser.
 **ISSUE-160 stays OPEN.**
 
-## Next action
+*Superseded 2026-09-12 (§21): the fix was committed as `e6c4e8c`, reached DEV in `main` `3272434`,
+and `/admin/draft/[id]` was re-tested in the browser — list/detail accessible according to
+capability, Super Admin editing working, a notes-override Save proving the compare-and-swap
+completes, and a stale two-tab Save refused.*
+
+## 21. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+(ISSUE-160 + 161 + 162 + 163). PROD was not touched and no PROD validation is claimed. This
+closeout changed tracking only: no feature, application logic, test, schema, migration, DEV data
+or deployment.
+
+### 21.1 What reached DEV
+
+- `main` at `3272434`, containing Stage 1 `91935b9`, Stage 2 `a947e52`, the 2026-09-11 audit fixes
+  and §18 list-contract closure, the §20 revision-read fix (`e6c4e8c`, "Fix draft detail revision
+  access") and the batch-wide responsive commits `e638d61`, `9727ad5`, `ae3c4e0`, `aeb41f3`.
+- DEV: production build PASS, 1533/1533 static pages generated, `afldb.service` healthy,
+  `/api/health` `status=ok`, `database=ok`. No migration (none required, §10) and no privilege
+  change for this issue.
+
+### 21.2 Deferred gates 15–16 — closed
+
+| # | Gate | Result |
+|---|---|---|
+| 15 | DEV deploy/build | **PASS** — build and health as above |
+| 16 | Rendered acceptance | **PASS, scope as recorded in §21.3** — list/detail accessible according to capability; Super Admin editing works; source-owned and linked/unlinked selections rendered correctly; the §20 crash fixed (exact root cause: the revision read on the wrong database role; one shared auth-role revision reader; compare-and-swap on the correct authority); notes-override Save PASS; stale two-tab form / compare-and-swap rejection PASS; active-override and audit behaviour PASS; responsive 1440 / 1024 / 768 / 375 PASS; global navigation PASS; accessibility/focus spot checks PASS; no blocking console/runtime errors |
+
+### 21.3 Scope of the rendered acceptance (recorded, not claimed)
+
+1. **Widths.** Acceptance ran at 1440 / 1024 / 768 / 375 under the operator's device-priority
+   decision of 2026-09-12 (laptop/desktop = primary admin workspace; iPad/tablet = first-class
+   admin workspace; phone = functional fallback), not the 320 / 768 / 1000 / 1280 / 1920 set gate
+   16 named. The operator directed that the batch is not held open for phone-only cosmetic
+   polishing.
+2. **Manual-provenance detail page.** No manual-provenance selection existed in the DEV dataset
+   during rendered acceptance, so the `/admin/draft/[id]` manual-row variant (whole-row edit,
+   relink, identity attach, supersede and retire panels) was not observed in the browser. Not a
+   closure blocker: gate 16 does not name that variant; the §20 crash failed above every
+   provenance branch, so its fix is proven by any row; and the manual-row contracts are covered
+   by `tests/admin-draft-actions.test.ts` and `tests/integration/admin-draft.test.ts` (gates 5–8
+   and 11).
+3. **Sub-cases not itemised in the operator's evidence.** The `/admin/draft/new` new-player flow
+   in the browser (the J-12 confirmation and J-10 refusal), focus restore on a refused duplicate,
+   44 px targets and non-hover badges are not separately evidenced in this record; they rest on
+   the automated gates 5 and 7 and on the operator's overall functional and design sign-off of
+   2026-09-12.
+
+### 21.4 Carried forward to the PROD promotion stage (not closure conditions)
+
+Recorded on the `AFLDB-ISSUE-156` umbrella's promotion checklist:
+
+- the gate-2 PROD read-only probes (d) `source_id IS NULL` count, (e) the DEF-1 `null|%` residue,
+  (g)/(h) `data_edits` draft rows and their stable keys — the §11.1 D-3 rollout evidence;
+- operator decision **S-1** (§11.1): whether the paused ISSUE-151 PROD promotion
+  `20260907-234124` completes under the current lineage contract or resumes under the new
+  `draft_pick_key` gate — decided before the promotion-tooling change governs a PROD promotion,
+  and recorded in the ISSUE-151 promotion record;
+- gate 9's real-importer half (`tests/integration/draftguru-import.test.ts`), which runs only on a
+  host with `.venv`, the accepted DraftGuru Stage A snapshot and
+  `AFLDB_TEST_IMPORT_DATABASE_URL`.
+
+## Next action (as it stood before the closeout — superseded by §21; ISSUE-160 is RESOLVED)
 
 **FIRST, validate the 2026-09-12 `/admin/draft/[id]` crash fix (§20):**
 

@@ -343,9 +343,10 @@ contract remaps.
 | P1 | **AFLDB-ISSUE-157** | Admin foundation and audit viewer | new | low | §P1 below |
 | P2 | **AFLDB-ISSUE-158** | Capability enforcement | extends §23 Phase A | medium | §P2 below |
 | P3 | **AFLDB-ISSUE-159** | Coach administration | Phase D (§23, §9) | medium | §P3 below — C-1 decided; two gated stages, hard gate = a real DEV settle still applying. **RESOLVED 2026-09-11, merged `af6379e`** |
-| P3b | **AFLDB-ISSUE-160** | Draft administration and new-player draft intake | restored original Admin Centre scope (no ISSUE-155 phase) — inserted 2026-09-11 | medium-high (player identity) | §P3b below — no migration; W-3 cleared by D-2 (decided 2026-09-11, symmetric DOB rule); D-1…D-9 all decided; two stages, no DEV settle gate |
-| P3c | **AFLDB-ISSUE-161** | Season list administration — authoritative club playing lists per season | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3b | medium (player–club–season model; one migration) | §P3c below — **Stage 1 AND Stage 2 complete 2026-09-11** (D-3 evidence gate passed, migration 096, replay/promotion classification proven; admin surface implemented, Stage 2 validation not yet run) |
-| P3d | **AFLDB-ISSUE-162** | Fixture / season schedule administration — a future season's schedule inside AFLDB | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3c | medium-high (new canonical table beside `matches`; one migration; promotion lineage) | §P3d below — **Stage 1 backend only, 2026-09-11, UNCOMMITTED and NOT YET FULLY VALIDATED** (migration 097 applied to `afldb_test` only; typecheck, unit, contract, regression and lint gates green on the second run; the integration suite is awaiting a rerun after a test-ordering repair; preflight and the all-refs 097 collision check outstanding). Stage 2 admin surface NOT built. No DEV and no PROD acceptance is claimed |
+| P3b | **AFLDB-ISSUE-160** | Draft administration and new-player draft intake | restored original Admin Centre scope (no ISSUE-155 phase) — inserted 2026-09-11 | medium-high (player identity) | §P3b below — no migration; W-3 cleared by D-2 (decided 2026-09-11, symmetric DOB rule); D-1…D-9 all decided; two stages, no DEV settle gate. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`); PROD probes (d)/(e)/(g)/(h) and S-1 carried to the promotion checklist |
+| P3c | **AFLDB-ISSUE-161** | Season list administration — authoritative club playing lists per season | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3b | medium (player–club–season model; one migration) | §P3c below — Stage 1 AND Stage 2 complete 2026-09-11 (D-3 evidence gate passed, migration 096, replay/promotion classification proven). **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 096 applied on DEV) |
+| P3d | **AFLDB-ISSUE-162** | Fixture / season schedule administration — a future season's schedule inside AFLDB | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3c | medium-high (new canonical table beside `matches`; one migration; promotion lineage) | §P3d below — Stage 1 (`cb98c67`) and Stage 2 (`6a9fbc4`) validated; the DEV-rollout client/server boundary fix and cleared-date fix committed. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 097 applied on DEV, production build PASS); the all-refs 097 collision check is a closeout operator command |
+| P3e | **AFLDB-ISSUE-163** | Club leadership administration and current-captain display | new (no ISSUE-155 phase) — inserted 2026-09-12, stacked on P3d; the batch's first item with public output | medium (club–season–player model; one migration; public club page) | §P3e below — D-1…D-18 signed off with four clarifications; both stages validated (`ea9f3dd`), audit found no deviation. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 098 applied on DEV); §34.4 items 1–3 carried as follow-ups |
 | P4 | placeholder | Special records — first-kick / after-siren / family | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe |
 | P5 | placeholder | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority |
 | P6 | placeholder | Site content and versioning | Phase F (§23, §11) | medium | reuse root-layout revalidation |
@@ -684,9 +685,29 @@ Inherits `AFLDB-ISSUE-155.md` §21 in full. Additionally:
 
 ## Next action
 
+**2026-09-12 (closeout) — P3b, P3c, P3d and P3e are RESOLVED.** `AFLDB-ISSUE-160`, `-161`, `-162`
+and `-163` closed on the combined Admin Centre DEV acceptance at `main` `3272434`: migrations 096
+→ 097 → 098 applied in order, `npm run db:privileges` reconciled, then the code; production build
+PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` /
+`database=ok`; every functional workflow of the four surfaces accepted as Admin and Super Admin;
+responsive/design acceptance at 1440, 1024, 768 and 375 with global navigation and
+accessibility/focus spot checks and no blocking console/runtime errors. Operator device priority
+recorded: laptop/desktop primary, iPad/tablet first-class, phone a functional fallback — no
+Admin Centre issue is held open for phone-only cosmetic polish. The two DEV-found defects below
+were committed (`e6c4e8c` and the fixture form fix) and re-accepted; the ISSUE-162 client/server
+boundary fix was proven by the DEV build. Evidence: each child's *Resolution (2026-09-12)* in
+`issues.md` and runbooks 160 §21 / 161 §34 / 162 §42 / 163 §35. **The batch is ready for the
+next release/promotion stage — a separate operator decision; PROD is untouched.** The carried
+promotion checklist (deploy order; replay order before the `data_edits` remap; ISSUE-160 PROD
+probes and decision S-1; ISSUE-160 gate 9's real-importer half; the all-refs 096/097/098
+collision check) and the non-blocking follow-ups (ISSUE-163 §34.4 items 1–3; ISSUE-162 §39.6
+items 1–4; ISSUE-161 D-8) are recorded under *P3b–P3e complete (2026-09-12)* in the `issues.md`
+ISSUE-156 entry. P4–P12 remain unallocated placeholders; the next phase receives an ID at its
+start. Everything below this paragraph is the pre-closeout record, retained as written.
+
 **2026-09-12 — the first combined DEV browser acceptance of the Admin Centre batch (160 + 161 +
 162 + 163) found one BLOCKING defect and one cosmetic one; both are fixed, uncommitted and
-unvalidated.** The blocker: every `/admin/draft/[id]` render failed, for every selection and for
+unvalidated** *(superseded by the closeout paragraph above)*. The blocker: every `/admin/draft/[id]` render failed, for every selection and for
 both Admin and Super Admin, because ISSUE-160's J-18 concurrency revision reads
 `max(data_edits.id)` on roles that may not read that audit table — `afldb_app` on the page and
 `afldb_import` inside the mutation transaction, where `data_edits` is granted to `afldb_auth`
@@ -785,7 +806,8 @@ preview/confirm fingerprint, the CAS on every edit, the fail-closed played resol
 venue mapped/unmapped/TBC distinction and the audit-link identifier were each checked and confirmed
 clean. Nothing in P3d requires new promotion or replay handling: Stage 2 added no persisted state.
 
-Next: the operator re-gates the audit fixes (`AFLDB-ISSUE-162.md` §39.7), reviews and commits
+Next *(as it stood 2026-09-12 before the closeout; superseded — P3b, P3c and P3d are RESOLVED)*:
+the operator re-gates the audit fixes (`AFLDB-ISSUE-162.md` §39.7), reviews and commits
 them, then DEV deploy + gate 16
 Playwright (three roles × 320/768/1000/1280/1920) once the operator updates DEV for the Admin
 Centre batch — deliberately deferred, not a defect. P3d is validated and completed before the batch
@@ -869,7 +891,9 @@ step is bound to the exact `(role, player)` it was refused for; and the unreacha
 co-captaincy branch was removed. Three narrow tests were added to the existing pure suite. Findings
 recorded rather than fixed are in `AFLDB-ISSUE-163.md` §34.4.
 
-Next: the operator re-runs the Stage 2-only gates (`tsc`, `admin-club-leadership-actions`, `auth`,
+Next *(as it stood 2026-09-12 before the closeout; superseded — P3e is RESOLVED, see the closeout
+paragraph at the top of this section)*: the operator re-runs the Stage 2-only gates (`tsc`,
+`admin-club-leadership-actions`, `auth`,
 ESLint over `AppointLeaderPanel.tsx`/`LeadershipActions.tsx`/the test file, `git diff --check`),
 commits the audit fixes, and then runs the combined 160+161+162+163 DEV batch (096 → 097 → 098 →
 `npm run db:privileges` → code) whose rendered Playwright acceptance is the remaining proof for all

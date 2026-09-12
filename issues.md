@@ -7,9 +7,39 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 20 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`, `-160`, `-161`, `-162`, `-163`.
+**Open issues:** 16 tracked here — `-117`, `-137`, `-138`, `-139`, `-140`, `-142`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-153`, `-155`, `-156`.
 
-<!-- 2026-09-12 (`AFLDB-ISSUE-162` RELEASE-BLOCKING DEV BUILD DEFECT — FIXED, UNCOMMITTED, NOT
+<!-- 2026-09-12 (ADMIN CENTRE BATCH CLOSEOUT — `AFLDB-ISSUE-160`, `-161`, `-162`, `-163` RESOLVED;
+     TRACKING ONLY, NO CODE, NO MIGRATION, NO DEV DATA, NO DEPLOY, PROD UNTOUCHED): the four
+     Admin Centre children (P3b draft administration, P3c season lists, P3d fixtures, P3e club
+     leadership) reached DEV together from `main` `3272434` — migrations 096 → 097 → 098 applied
+     in order, `db:privileges` reconciled, then the code — and passed acceptance on 2026-09-12:
+     production build PASS with 1533/1533 static pages, `afldb.service` healthy, `/api/health`
+     `status=ok` / `database=ok`; every functional workflow of the four surfaces as Admin and Super
+     Admin (draft list/detail per capability, Super Admin editing, notes-override Save, stale
+     two-tab CAS refusal, active override/audit; season-list add/remove/transfer with usable 2027
+     lists; fixture create/manage/lifecycle incl. the date → time → clear-date re-test; leadership
+     captain/co-captain/vice-captain/replace/end/reinstate/correct/void, overview column, public
+     club-page revalidation, player honours); responsive/design acceptance at 1440, 1024, 768 and
+     375 with global navigation and accessibility/focus spot checks, no blocking console/runtime
+     errors. Operator device priority recorded: laptop/desktop primary, iPad/tablet first-class,
+     phone functional fallback — the batch is not held open for phone-only cosmetic polish, and
+     the widths above replace the 320/768/1000/1280/1920 set the runbooks named. The earlier
+     "UNCOMMITTED / not validated / `npm run build` has not been run" state of the ISSUE-162
+     client/server boundary fix and the ISSUE-160 `/admin/draft/[id]` fix is superseded: both
+     are in `main` `3272434`, the DEV build (ISSUE-162 §40's acceptance criterion) passed and
+     the rendered acceptance followed. Recorded, not claimed: a manual-provenance draft row was
+     not rendered on DEV (none exists there; non-blocking, `AFLDB-ISSUE-160.md` §21.3). Carried
+     forward on the `AFLDB-ISSUE-156` umbrella, not closure conditions: the PROD promotion
+     checklist (ISSUE-160 PROD probes and decision S-1, the replay order, the all-refs
+     096/097/098 collision check) and the non-blocking follow-ups (ISSUE-163 §34.4 items 1–3,
+     ISSUE-162 §39.6). Resolution records: each entry's *Resolution (2026-09-12)* and runbooks
+     160 §21 / 161 §34 / 162 §42 / 163 §35. Removed from the Open Issues table and
+     `IssuesIndex.md`; 20 -> 16. -->
+
+<!-- [SUPERSEDED 2026-09-12 by the closeout block above — the fix was committed, built on DEV and
+     accepted; ISSUE-162 and ISSUE-163 are RESOLVED. Retained as chronology.]
+     2026-09-12 (`AFLDB-ISSUE-162` RELEASE-BLOCKING DEV BUILD DEFECT — FIXED, UNCOMMITTED, NOT
      RE-VALIDATED; DEV DATABASE ALREADY MIGRATED, NO SERVICE TOUCHED): the combined 160+161+162+163
      DEV rollout applied migrations 096, 097 and 098 and reconciled privileges successfully
      (98/98 applied, 0 pending), then `npm run build` FAILED before any restart:
@@ -80,7 +110,9 @@ created, reopened, resolved, or materially reclassified.
      **098** expected, not allocated. Stacked on ISSUE-162 at `f80a1df`; ships in the combined
      Admin Centre DEV batch. Entry at the foot of this file. -->
 
-<!-- 2026-09-12 (`AFLDB-ISSUE-162` FINAL LOCAL AUDIT — STILL OPEN; AUDIT FIXES UNCOMMITTED AND NOT
+<!-- [SUPERSEDED 2026-09-12 by the closeout block at the top — the audit fixes reached `main`
+     `3272434` and ISSUE-162 is RESOLVED. Retained as chronology.]
+     2026-09-12 (`AFLDB-ISSUE-162` FINAL LOCAL AUDIT — STILL OPEN; AUDIT FIXES UNCOMMITTED AND NOT
      RE-RUN; NOT MERGED, NOT DEPLOYED, DEV AND PROD UNTOUCHED): whole-issue audit of Stage 1 +
      Stage 2 at `6a9fbc4`. Stage 2 was validated green by the operator (tsc; auth 138/138; fixture
      + contract 452 passed / 4 skipped; integration 36/36; ESLint; preflight READY) and committed
@@ -725,11 +757,20 @@ created, reopened, resolved, or materially reclassified.
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
 | **ID:** AFLDB-ISSUE-155 — Admin / Super Admin overhaul | **Status:** Open / In progress — Phases A, B, C1 and C2 complete and validated; C1+C2 ready to deploy together, not deployed. Blocked from closing on ONE item: `brownlow_vote_entry_state` and `brownlow_season_authority` must be added to `PROMOTION_CONTRACT` (`tools/db/promotion-inventory.ts`) — the §27.28 / §27.22 ISSUE-151 promotion-lineage follow-up, and a pre-deploy stop condition for any promotion. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition; plan `AFLDB-ISSUE-155.md` §27; next: the promotion-contract follow-up (see the C2 closeout record below), then close. **2026-09-11: Phases D–I transferred to `AFLDB-ISSUE-156`; ISSUE-155 now owns only the PROD closeout of A/B/C1/C2.** |
-| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration) with stop condition C-1 DECIDED at its preflight; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; **P3 (159) RESOLVED 2026-09-11, merged `af6379e`; P3b (`AFLDB-ISSUE-160`) Stage 1 + Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), locally audited**; next: operator review + commit of the ISSUE-160 audit fixes, then DEV acceptance when the operator updates DEV |
-| **ID:** AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c) | **Status:** Open / **Planning complete 2026-09-11 — no code, no migration, no commit, no deployment.** Runbook `AFLDB-ISSUE-161.md`; **operator decisions D-1…D-8 DECIDED 2026-09-11** (D-2 with modification: 2027 is the first authoritative list season and 2026 appearances are never promoted into membership; D-3 subject to a Stage 1 evidence gate; fixtures boundary: ISSUE-161 never depends on a fixture, likely ISSUE-162 owns them). **Stage 1 authorised.** Stacked on ISSUE-160 (not merged first; both deploy to DEV together as the Admin Centre batch). Chosen model: new canonical registry table `season_list_members` (`UNIQUE (season, player_id)`) with whole-row `data_overrides` keyed `<club_slug>|<season>|<player identity>`, per-mutation import-role transactions, `data_edits` on the player, fail-closed replay branch, inactive override = removal tombstone; no `retired` flag (not-current = no membership in the current list season); no `seasons`/`clubs`/`club_seasons` writes (list season ≤ `max(seasons.year)+1`, eligible clubs = `is_current_afl_club` identities beyond the register). **Stage 1 executed 2026-09-11 (Opus 5 high): D-3 gate PASSED (modern-era probe = 0 rows; 249 historical multi-club player-seasons, latest 1992), migration 096 allocated and applied to `afldb_test`, `season_list_members` + `afldb_season_list_clubs()` + `data_overrides` widening shipped, `admin-season-lists.ts` (add / multi-add / remove+tombstone / transfer / copy-forward / appearances review / diagnostics), `player-identity.ts` extracted behaviour-preservingly, fail-closed replay branch + fitzRoy call site + promotion doc/checklist. 25 pure + 40 integration tests green; ISSUE-160 regressions 45 + 120 green; tsc and lint clean.** **Stage 2 executed 2026-09-11 (Sonnet 5 high):** `/admin/season-lists` + `/[season]` + `/[season]/[club]`, capabilities `data.seasonLists.read`/`.edit`, Data-group nav entry, the five panels, and the ISSUE-160 handoff link (navigation only; no draft mutation writes `season_list_members`); `revalidatePaths: []` always and no revalidate route. **Local completion audit 2026-09-11 (Opus 5 high, operator-authorised commands): preflight READY (0 blockers), tsc clean, 204 unit + 85 integration + 420 contract + 2 FK-index tests pass, eslint clean over every ISSUE-161-authored file, `git diff --check` clean; the §33.4 repair pass is now re-validated. One concrete defect found and fixed narrowly (`CopyForwardPanel` could confirm a copy the operator never previewed) with 3 regression tests added.** NOT committed, NOT deployed; DEV and PROD untouched. Next: operator review/commit, then the combined Admin Centre DEV batch. | **Severity:** Medium | **Area:** Admin / Data management / Player–club–season model / Promotion lineage; runbook `AFLDB-ISSUE-161.md`; branch `opus/issue-161-season-lists` |
-| **ID:** AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d) | **Status:** Open / **Stage 1 code-complete 2026-09-11 (Opus 5 high, 1M) — UNCOMMITTED, UNVALIDATED BY A RUN, not deployed; DEV and PROD untouched.** Migration **097** re-checked free and allocated (`fixtures` registry with no score/result/margin/attendance column and deliberately no `match_id` and no `match_key`; `data_overrides.entity_type` and `data_edits.table_name` widened; both role registries). `src/db/queries/admin-fixtures.ts` ships the ONE fixture mutation contract (create, fingerprint-gated round batch, reschedule, venue, round, clubs, notes, cancel, reinstate, void) plus the read-time fail-closed played resolution and the season/diagnostics readers; fail-closed `replay_admin_overrides('fixtures')`, fitzRoy call site, promotion §8 loop and the `fixture_key` lineage rule + `data_edits` target all shipped. Two new test suites and four contract-suite extensions are **written but not run** — validation is the operator's next step (ledger entry lists the exact commands). Stage 2 (the `/admin/fixtures` surface) NOT built. Deploy order binding: **migration 097 → `npm run db:privileges` → code.** Planning complete 2026-09-11; runbook `AFLDB-ISSUE-162.md`. Finding: `matches` requires NOT NULL scores/result/margin (003) and every ladder/season/venue/NL/Grid consumer reads "row exists" as "played", so an unplayed fixture cannot live there without contaminating derived data; the repository's own precedent is AFLW's separate `staging_aflw.fixtures` (025). Chosen model: a new canonical registry table `fixtures` (schedule facts only — no score column can exist), `matches` untouched, "played" derived by a deterministic season + round code + club-pair resolution, identity = a minted `fixture_key` token under `manual_admin_edit`, whole-row `data_overrides` + fail-closed `replay_admin_overrides('fixtures')`, `data_edits` widened to `'fixtures'` with a `fixture_key` lineage rule, never-delete lifecycle (`scheduled` / `cancelled` / `void`), no `seasons`/`clubs`/`club_seasons` write (window `max(seasons.year)..max+1`, clubs from `afldb_season_list_clubs()`), no settle/current-season change. One additive migration (next free 097, not allocated). **Operator decisions D-1…D-7 DECIDED 2026-09-11 (D-6 with a fail-closed/unlinked-on-ambiguity condition; `fixture_key` never replaced by `match_key`); Stage 1 authorised and now executed.** Stacked on ISSUE-161 (`opus/issue-162-fixture-admin` from `34858ce`); deploys to DEV only with the Admin Centre batch. | **Severity:** Medium | **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage; runbook `AFLDB-ISSUE-162.md`; next: operator runs the Stage 1 validation, reviews and commits, then Stage 2 in a fresh session. **2026-09-12 DEV acceptance also found one non-blocking UI defect on `/admin/fixtures/[season]/new`: clearing the date disabled the start-time control but left the old time visible, so the screen showed a start time the stored record would not carry (the server already stored TBC/TBC — no integrity defect). `SingleFixtureForm`'s time input is now controlled and cleared with the date, matching `RoundBatchForm.updateRow()`. UNCOMMITTED, UNVALIDATED.** |
-| **ID:** AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e) | **Status:** Open / **Stage 1 AND Stage 2 BUILT, VALIDATED and COMMITTED 2026-09-12 (`8ed32b3`, `c28ea60`, `ea9f3dd`); FINAL LOCAL AUDIT 2026-09-12 (Opus 5 high) — three Stage 2 defects fixed, UNCOMMITTED; not merged, not deployed; migration 098 applied to `afldb_test` ONLY; DEV and PROD untouched.** Planning complete 2026-09-12; runbook `AFLDB-ISSUE-163.md`; **operator SIGNED OFF D-1…D-18 on 2026-09-12 with four clarifications** (capability reuse; a HARD ≤2026-legacy / ≥2027-canonical public source boundary; explicit lifecycle/date consistency; and no 2027+ hole in player honours). Migration **098** allocated as `098_club_leadership.sql`; the canonical registry, the one writer `src/db/queries/admin-club-leadership.ts`, the public reads `src/db/queries/club-leadership.ts`, the season-boundary union in BOTH `getClubCaptains` and `getPlayerHonours`, the additive `activeLeadershipRole` column, the fail-closed `replay_admin_overrides('club_leadership')` branch + fitzRoy call site, the `appointment_key` lineage rule + `data_edits` target + promotion §8 text, the Stage 2 Leadership section / Appoint panel / gated revalidate route / public `ClubLeadership` block, and the two test layers are all shipped and green (Stage 1: 390+4-skipped contract, 37/37 integration incl. the real Python replay, 367/367 stacked regressions; Stage 2: 150/150 + ESLint + `tsc`). **Final audit (§34): backend integrity, lifecycle/CAS, co-captaincy, replacement, the season-list invariant, replay/durability, the public source boundary, player honours, auth, revalidation security and both UIs all hold; no deviation from D-1…D-18 and no stop condition.** Three Stage 2 fixes: the Appoint form no longer collapses into a receipt on success (the `AddPlayerPanel` precedent — a club names a captain and several vice-captains in one sitting); the co-captaincy confirm step is now bound to the exact `(role, player)` it was refused for, so a confirmation cannot be spent on a different appointment; the unreachable Replace co-captaincy branch was removed with the reason recorded. Deploy order binding: **096 → 097 → 098 → `npm run db:privileges` → code.** Finding: `captaincies` (005, 1,774 Wikipedia rows 1897–2026, `Captain` only, name-keyed, season FK to the register, free-text periods) already exists and is public on club/player pages, but is a historical honours import, not canonical operational truth. Chosen: new registry table `club_leadership` (one row per appointment; roles `captain`/`vice_captain`, co-captaincy = concurrent captain rows; lifecycle `active`/`ended`/`void`, never deleted; optional dates, NULL = unknown; minted `appointment_key`; always-active whole-row `data_overrides`; `data_edits` on the appointment + lineage rule; fail-closed replay after `players`); write-time season-list precondition (locked, never a FK; removal warns, never blocks); `data.seasonLists.*` reused; Leadership section on the season-list club page; public current-leadership block on `/clubs/[slug]` + Captains history union from 2027; per-organisation `/clubs/<slug>` path revalidation via a new gated route. Stacked on ISSUE-162 (`opus/issue-163-club-leadership` from `f80a1df`); deploys only with the Admin Centre batch. | **Severity:** Medium | **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage; runbook `AFLDB-ISSUE-163.md`; next: operator re-runs the Stage 2-only gates (`tsc`, `admin-club-leadership-actions`, `auth`, ESLint over the two changed panels and the test file, `git diff --check`), commits the audit fixes, then the combined 160+161+162+163 DEV deployment and the rendered Playwright acceptance |
-| **ID:** AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b) | **Status:** Open / **Stage 1 and Stage 2 IMPLEMENTED and COMMITTED 2026-09-11 (`91935b9`, `a947e52`), not deployed, not merged; locally audited 2026-09-11 — one atomicity defect and eight new ESLint errors found and fixed, uncommitted for operator review.** D-8 resolved to the J-3 HARD-REFUSAL branch: gate-2 probe (a) measured ZERO `(draft_year, draft_kind, pick_number)` collisions across all 6,810 source selections. One authoritative draft mutation contract exists in `src/db/queries/admin-draft.ts` (the only `INSERT INTO draft_picks` in `src/`); every admin-created player is minted with a `manual_admin_edit` identity and a whole-row durable record, and both players and selections are re-created by fail-closed `replay_admin_overrides` branches; D-2 symmetric name+DOB refusal ships in `import_fitzroy_core.py`; D-3 `draft_pick_key` lineage rule and `data_edits` target ship in `promotion-inventory.ts`. Stage 2 adds `/admin/draft{,/new,/[id],/revalidate}`, `data.draft.read`/`data.draft.edit` (enforced everywhere, `tests/auth.test.ts` green), the Data-group nav entry, the D-9 shared revalidate/submit extraction (coaches switched to it, unchanged behaviour), and the data-editor draft-slice UI removal. No migration (096 still free), no privilege change. | **Severity:** Medium | **Area:** Admin / Data management / Acquisition / Promotion lineage; runbook `AFLDB-ISSUE-160.md`; branch `opus/issue-160-draft-admin`; next: operator review + commit of the audit fixes, then DEV deploy + gate 16 Playwright when the operator updates DEV; gate-2 PROD probes and gate 9's real-importer half still open; two runbook §18 list affordances (the `state` filter and the Player-links deep link) reported undelivered; S-1 before deploy. **2026-09-12 DEV acceptance: `/admin/draft/[id]` crashed universally (`permission denied for table data_edits` — the J-18 revision was read as `afldb_app` on the page and as `afldb_import` in the CAS; only `afldb_auth` may read the audit log). Fixed on the auth pool with two regressions, UNCOMMITTED and UNVALIDATED; no migration/grant/capability/authority-model change. DEV redeploy + focused browser re-test of the detail route still required.** |
+| **ID:** AFLDB-ISSUE-156 — Admin Centre completion (umbrella) | **Status:** Open / Owns the former ISSUE-155 Phases D–I plus the two newly identified prerequisites (audit visibility, capability enforcement). Children: 157 (P1) **RESOLVED 2026-09-11**, merged at `3bbcab0`; 158 (P2) **RESOLVED 2026-09-11**, merged at `92a898f`; 159 (P3) **RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434`; P4–P12 remain named placeholders with no ID yet. | **Severity:** Medium | **Area:** Admin / Auth / Data management / Acquisition / Operations; runbook `AFLDB-ISSUE-156.md`; the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — the carried PROD promotion checklist and the non-blocking follow-ups are in the entry's *P3b–P3e complete (2026-09-12)* record; next: the operator's release/promotion decision (a separate step, PROD untouched so far), then the next phase receives an ID at its start |
+<!-- RETIRED 2026-09-12 — `AFLDB-ISSUE-160` (Draft administration, ISSUE-156 P3b), `AFLDB-ISSUE-161`
+     (Season list administration, P3c), `AFLDB-ISSUE-162` (Fixture / season schedule administration,
+     P3d) and `AFLDB-ISSUE-163` (Club leadership administration, P3e) are **Resolved** and are NO
+     LONGER open issues. All four reached DEV together as the Admin Centre batch from `main`
+     `3272434` (migrations 096 → 097 → 098 → `npm run db:privileges` → code; production build PASS,
+     1533/1533 static pages; `afldb.service` healthy; `/api/health` ok) and passed functional,
+     responsive (1440/1024/768/375), global-navigation and accessibility/focus acceptance on
+     2026-09-12. Full evidence: each entry's *Resolution (2026-09-12)* below and the runbooks
+     `AFLDB-ISSUE-160.md` §21, `AFLDB-ISSUE-161.md` §34, `AFLDB-ISSUE-162.md` §42 and
+     `AFLDB-ISSUE-163.md` §35. The non-blocking follow-ups and the PROD promotion checklist are
+     carried on the `AFLDB-ISSUE-156` umbrella (its *P3b–P3e complete* record); no new issue ID was
+     allocated. PROD untouched; no PROD validation claimed. Removed from this table and from
+     `IssuesIndex.md`; 20 -> 16. -->
 <!-- RETIRED 2026-09-11 — `AFLDB-ISSUE-159` (Coach administration, ISSUE-156 P3) is **Resolved**
      and is NO LONGER an open issue. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
      gate on 2026-09-11; Stage 2 validated live on real DEV at `6299bf8` including the
@@ -21968,7 +22009,7 @@ recorded in `AFLDB-ISSUE-156.md` §10 and repeated here so the D-phase owner can
 
 ## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
 
-**Status:** Open / Planning complete 2026-09-11 — no implementation started.
+**Status:** Open — P1, P2 and P3 resolved 2026-09-11; **P3b, P3c, P3d and P3e (`AFLDB-ISSUE-160`–`163`) resolved 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434`, so the batch is ready for the next release/promotion stage (a separate operator decision; PROD untouched). P4–P12 unallocated. See *P3b–P3e complete (2026-09-12)* below for the carried promotion checklist and follow-ups.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Found:** 2026-09-11
@@ -22094,9 +22135,51 @@ is cleared only by decision D-2 (a fail-closed name+dob refusal in `import_playe
 link). Merging two existing players and relinking a source-owned selection stay P9. Details:
 `AFLDB-ISSUE-160.md`, ledger entry below.
 
+### P3b–P3e complete (2026-09-12)
+
+`AFLDB-ISSUE-160` (Draft administration, P3b), `AFLDB-ISSUE-161` (Season list administration,
+P3c), `AFLDB-ISSUE-162` (Fixture / season schedule administration, P3d) and `AFLDB-ISSUE-163`
+(Club leadership administration, P3e) resolved 2026-09-12 on the combined Admin Centre DEV
+acceptance at `main` `3272434`: migrations 096 → 097 → 098 applied in order, `npm run
+db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages;
+`afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every
+surface as Admin and Super Admin; responsive/design acceptance at 1440, 1024, 768 and 375 with
+global navigation and accessibility/focus spot checks and no blocking console/runtime errors.
+Operator device priority recorded: laptop/desktop primary, iPad/tablet first-class, phone a
+functional fallback — no Admin Centre issue is held open for phone-only cosmetic polish. Evidence
+under each child's *Resolution (2026-09-12)* and runbook (160 §21, 161 §34, 162 §42, 163 §35).
+PROD untouched; no PROD validation claimed.
+
+**Promotion checklist carried from the batch (PROD stage, ISSUE-151 contract — a separate
+operator decision):**
+
+- migrations 096 → 097 → 098 → `npm run db:privileges` → code, in that order (app read of the
+  three new tables is fail-closed until privileges are reconciled);
+- the replay order: `players` → `draft_picks`, `season_list_members`, `fixtures` and
+  `club_leadership` (each fail-closed) before the `data_edits` remap (`docs/production-promotion.md`
+  §8);
+- ISSUE-160 gate-2 PROD read-only probes (d)/(e)/(g)/(h) and operator decision **S-1**
+  (`AFLDB-ISSUE-160.md` §11.1) before the `draft_pick_key` gate governs a PROD lineage-changing
+  promotion, recorded in the ISSUE-151 promotion record;
+- ISSUE-160 gate 9's real-importer half (`tests/integration/draftguru-import.test.ts`) on a host
+  with `.venv`, the accepted DraftGuru Stage A snapshot and `AFLDB_TEST_IMPORT_DATABASE_URL`;
+- the all-refs migration collision check, never run for 096/097/098:
+  `git log --all --oneline -- src/db/migrations/096_*.sql src/db/migrations/097_*.sql src/db/migrations/098_*.sql`.
+
+**Follow-ups (non-blocking; no ID until one is pursued):** ISSUE-163 §34.4 items 1–3 (the
+appoint-path audit `new_values` omits the derivable `entity_key`; the public Captains table has no
+period column; the replay validates a date's shape rather than the calendar); ISSUE-162 §39.6
+items 1–4 (venue-slug replay limit, the register-advance tail risk, the batch form as a scrolling
+table under 768px, `listVenues()` cost); ISSUE-161 D-8 external-source reconciliation.
+
 ### Next action
 
-P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). The umbrella's next
+P1–P3 and P3b–P3e are complete. The Admin Centre batch (160–163) is DEV-accepted and ready for
+the next release/promotion stage, which is a separate operator decision under the checklist above
+(PROD untouched so far). P4–P12 remain unallocated placeholders; the next phase receives an ID at
+its start.
+
+*Next action as it stood 2026-09-11 (superseded):* P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). The umbrella's next
 phase is P3b, `AFLDB-ISSUE-160`: D-1..D-9 are decided (2026-09-11), so a fresh Opus 5 /
 high-effort session executes its **Stage 1** against `AFLDB-ISSUE-160.md` §16/§17. DEV is
 deliberately not updated until the Admin Centre batch is complete. P4–P12 remain unallocated
@@ -22853,7 +22936,10 @@ above; no ID is allocated for it here.
 
 ## AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** Open — **Stage 1 and Stage 2 CODE-COMPLETE and locally validated. Committed
+**Status:** **RESOLVED 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry;
+the DEV-found `/admin/draft/[id]` defect is fixed (`e6c4e8c`), in `main` `3272434`, and
+re-accepted in the browser. As it stood 2026-09-11 (retained): Open — **Stage 1 and Stage 2
+CODE-COMPLETE and locally validated. Committed
 2026-09-11 (Stage 1 `91935b9`, Stage 2 `a947e52`, branch `opus/issue-160-draft-admin`); not
 deployed, not merged.** A local completion audit (2026-09-11, Opus 5 high) re-ran every local
 gate and found one real atomicity defect, eight new ESLint errors and two undelivered runbook
@@ -23412,7 +23498,7 @@ still skips whole (21 tests, no Stage A snapshot and no `AFLDB_TEST_IMPORT_DATAB
 `tests/integration/data-editor.test.ts` still has its one unrelated pre-existing ladder failure
 (1 failed / 9 passed / 2 skipped). No fixture residue is left on `afldb_test`.
 
-### Next action
+### Next action (as it stood before the closeout — superseded by *Resolution (2026-09-12)*)
 
 Operator reviews and commits one uncommitted working tree carrying both the audit fixes and the
 §18 closure: `src/db/queries/admin-draft.ts`, `src/db/queries/player-links.ts`,
@@ -23432,9 +23518,45 @@ runs on a host carrying `.venv`, the accepted DraftGuru Stage A snapshot and
 is required before the promotion-tooling change DEPLOYS, and must be recorded in the ISSUE-151
 promotion record and the ISSUE-160 evidence before `merge:ready`.
 
+### Resolution (2026-09-12)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+(ISSUE-160 + 161 + 162 + 163) at `main` `3272434`; PROD untouched and no PROD validation claimed.
+Tracking-only closeout: no feature, logic, test, schema, migration or DEV data changed here.
+
+**Root cause:** not a defect — this issue implemented a feature (draft administration and
+new-player intake through the draft) that did not previously exist. The one DEV-found defect
+(every `/admin/draft/[id]` render failing, both roles) had the exact root cause that the J-18
+concurrency revision was read from `data_edits` on roles that may not read it (`afldb_app` on
+the page, `afldb_import` in the compare-and-swap); fixed by one shared auth-role revision
+reader used by the page and every compare-and-swap call site (`e6c4e8c`; runbook §20). No
+migration, grant, capability or authority-model change.
+
+**Fix:** the two-stage build recorded above (`91935b9`, `a947e52`), the 2026-09-11 audit fixes
+and §18 list-contract closure, and the §20 fix.
+
+**Validation:** gates 1, 3 and 5–14 PASS on `afldb_test` (2026-09-11, "Validation" above; gate 4
+in Stage 2; gate 9's real-importer half skipped, see Follow-up); gate 15 PASS on 2026-09-12 (DEV
+production build, 1533/1533 static pages, `afldb.service` healthy, `/api/health` ok); gate 16
+PASS on 2026-09-12 with the scope recorded in `AFLDB-ISSUE-160.md` §21.3 — list/detail accessible
+according to capability, Super Admin editing, source-owned and linked/unlinked selections
+rendered, notes-override Save, stale two-tab compare-and-swap refusal, active-override and audit
+behaviour, responsive 1440/1024/768/375, global navigation, accessibility/focus spot checks, no
+blocking console/runtime errors. Recorded, not claimed: a manual-provenance detail page (no such
+row on DEV; the crash was provenance-independent; automated coverage in `admin-draft-actions` and
+`integration/admin-draft`) and the browser new-player wizard sub-cases (automated gates 5 and 7;
+operator sign-off). Widths ran under the operator's device-priority decision, not §16's
+320/768/1000/1280/1920 set.
+
+**Follow-up recorded separately (promotion stage, on the ISSUE-156 umbrella's checklist):**
+gate-2 PROD read-only probes (d)/(e)/(g)/(h); operator decision S-1 (§11.1) before the
+`draft_pick_key` gate governs a PROD promotion; gate 9's real-importer half on a host with
+`.venv` and the DraftGuru Stage A snapshot. Merging two existing players and relinking a
+source-owned selection stay P9.
+
 ## AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-- **Status:** Open / **Stage 1 AND Stage 2 code-complete 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high) — implemented on `afldb_test` / statically for Stage 2, NOT committed, NOT deployed.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Stage 2 delivers `/admin/season-lists`, `/admin/season-lists/[season]`, `/admin/season-lists/[season]/[club]`; capabilities `data.seasonLists.read`/`.edit`; the Data-group nav entry; the ISSUE-160 handoff link (`/admin/draft/[id]` and the new-selection success panel); no revalidate route (`revalidatePaths: []` always, per §10); DEV Playwright deferred to the combined Admin Centre batch. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Both stages await operator review/commit and the combined ISSUE-160+ISSUE-161 DEV acceptance; neither issue is resolved.**
+- **Status:** **RESOLVED 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry. As it stood 2026-09-11 (retained): Open / **Stage 1 AND Stage 2 code-complete 2026-09-11 (Stage 1 Opus 5 high, Stage 2 Sonnet 5 high) — implemented on `afldb_test` / statically for Stage 2, NOT committed, NOT deployed.** The **D-3 evidence gate PASSED** (probe (b) = 0 rows; 249 historical multi-club player-seasons, latest 1992), so `UNIQUE (season, player_id)` stands as designed; **migration 096 allocated and applied to `afldb_test` only**. Stage 2 delivers `/admin/season-lists`, `/admin/season-lists/[season]`, `/admin/season-lists/[season]/[club]`; capabilities `data.seasonLists.read`/`.edit`; the Data-group nav entry; the ISSUE-160 handoff link (`/admin/draft/[id]` and the new-selection success panel); no revalidate route (`revalidatePaths: []` always, per §10); DEV Playwright deferred to the combined Admin Centre batch. Runbook `AFLDB-ISSUE-161.md`. **Operator decisions D-1…D-8 DECIDED 2026-09-11** (runbook §30): D-1, D-4, D-5 (option C), D-6, D-7, D-8 approved as recommended; **D-2 approved with modification** — 2027 is the first authoritative Admin-managed list season, 2026 match appearances are never promoted into authoritative membership, and appearance-derived 2026 data may be used only as an explicitly non-authoritative bootstrap/test/review seed (the read-only appearances review panel; every add from it is an explicit per-player decision); **D-3 approved subject to Stage 1 evidence** that no legitimate same-season multi-club membership exists (runbook §21 probes; contrary evidence = STOP). **Additional boundary:** ISSUE-161 does not own fixture creation/scheduling (a likely ISSUE-162 will) and must not depend on a fixture existing (runbook §9.4). **Both stages await operator review/commit and the combined ISSUE-160+ISSUE-161 DEV acceptance; neither issue is resolved.**
 - **Severity:** Medium
 - **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 - **Branch:** `opus/issue-161-season-lists`, worktree `D:\dev\afldb-issue-161`, cut from `opus/issue-160-draft-admin` @ `1295d3d` (stacked on ISSUE-160 by operator direction; ISSUE-160 is not merged first).
@@ -23854,7 +23976,7 @@ plus this entry, `IssuesIndex.md` and `AFLDB-ISSUE-161.md` §33.5.
 responsive/focus acceptance, later PROD promotion/probes, and the release-time S-1 decision
 inherited from ISSUE-160. None is an implementation failure.
 
-### Next action
+### Next action (as it stood before the closeout — superseded by *Resolution (2026-09-12)*)
 
 Both stages are code-complete, locally validated and awaiting operator review and commit. DEV deploy order when the
 combined Admin Centre batch ships: **migration 096 → `npm run db:privileges` → code**
@@ -23862,12 +23984,40 @@ combined Admin Centre batch ships: **migration 096 → `npm run db:privileges` �
 fail-closed until it does), then the combined ISSUE-160 + ISSUE-161 DEV acceptance and role-based
 Playwright (runbook §24's deferred UI row). Neither ISSUE-160 nor ISSUE-161 is resolved.
 
+### Resolution (2026-09-12)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+at `main` `3272434`; migration 096 was applied on DEV in the binding order (096 →
+`npm run db:privileges` → code). PROD untouched; no PROD validation claimed. Tracking-only
+closeout.
+
+**Root cause:** not a defect — this issue implemented a feature (authoritative club playing lists
+per season) that did not previously exist.
+
+**Fix:** Stage 1 `97af605`, Stage 2 `1441a5b`, the local audit's `CopyForwardPanel` fix, and the
+batch responsive commits including `aeb41f3` ("Fix season list mobile overflow").
+
+**Validation:** Stage 1 and Stage 2 local gates GREEN (above; runbook §32–§33.5); DEV production
+build PASS, 1533/1533 static pages, service healthy, `/api/health` ok; rendered acceptance
+2026-09-12 — functional add/remove/transfer/copy-forward workflows PASS, the 2027 club lists
+usable, Admin/Super Admin permissions accepted, 1440/1024/768 PASS, and the 375 mobile final
+acceptance PASS (the "First authoritative season" and season badges wrap without overlapping
+adjacent cells; no page-level horizontal overflow; the visually-hidden Actions header remains
+accessible; Remove/Transfer reachable through contained table scrolling; document width 360
+against the 375 viewport on `/admin/season-lists`, `/admin/season-lists/2027` and
+`/admin/season-lists/2027/adelaide`). Runbook §34. Widths ran under the operator's
+device-priority decision, not §24's 320/768/1000/1280/1920 set.
+
+**Follow-up recorded separately:** PROD promotion under the ISSUE-151 contract on the ISSUE-156
+umbrella's checklist; D-8 external-source reconciliation remains a future ISSUE-156 child with no
+ID.
+
 ## AFLDB-ISSUE-162 — Fixture / season schedule administration: create and maintain a future AFL season's fixture inside AFLDB (ISSUE-156 P3d)
 
-- **Status:** Open / **2026-09-12: a RELEASE-BLOCKING DEV build defect was found and fixed — three Stage 2 Client Components value-imported from the `server-only` fixture module and `npm run build` refused the whole Admin Centre batch. The pure §9 vocabulary now lives in `src/lib/fixtures/spec.ts` and is re-exported by `admin-fixtures.ts`. UNCOMMITTED and NOT re-validated; `npm run build` is the acceptance criterion. The DEV database is already migrated (096/097/098, 98/98 applied, privileges reconciled) and no service was restarted.** See **DEV build defect** below. Earlier: **Stage 1 code-complete 2026-09-11 (Opus 5 high, 1M context) — UNCOMMITTED, UNVALIDATED BY A RUN, NOT DEPLOYED; DEV and PROD untouched, no database written.** See **Stage 1 implementation (2026-09-11)** below for what was built, what remains and the exact validation the operator must run. Stage 2 (the `/admin/fixtures` surface) is a separate session. Planning complete 2026-09-11; runbook `AFLDB-ISSUE-162.md` (36 sections). **Operator decisions D-1…D-7 DECIDED 2026-09-11** (runbook §35): all approved as recommended — separate `fixtures` registry (D-1), never hard-deleted with `scheduled`/`cancelled`/`void` (D-2), forward window without touching the season register (D-3), round-batch entry with preview + atomic commit (D-4), NULL = genuinely TBC (D-5), no public exposure (D-7); **D-6 approved with condition**: played linkage is derived/read-time but deterministic and fail-closed, no name/date guessing, ambiguity leaves the fixture unlinked, `fixture_key` stays the identity after play; plus the constraint that a played association never replaces `fixture_key` with `match_key`. **Stage 1 authorised.**
+- **Status:** **RESOLVED 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry. The client/server boundary fix and the cleared-date fix below are committed, in `main` `3272434`, and the DEV production build (the boundary fix's acceptance criterion) PASSED before the rendered acceptance; the "UNCOMMITTED / not re-validated / has not been run" wording that follows is superseded and retained as chronology. As it stood 2026-09-12 before the commits: Open / **2026-09-12: a RELEASE-BLOCKING DEV build defect was found and fixed — three Stage 2 Client Components value-imported from the `server-only` fixture module and `npm run build` refused the whole Admin Centre batch. The pure §9 vocabulary now lives in `src/lib/fixtures/spec.ts` and is re-exported by `admin-fixtures.ts`. UNCOMMITTED and NOT re-validated; `npm run build` is the acceptance criterion. The DEV database is already migrated (096/097/098, 98/98 applied, privileges reconciled) and no service was restarted.** See **DEV build defect** below. Earlier: **Stage 1 code-complete 2026-09-11 (Opus 5 high, 1M context) — UNCOMMITTED, UNVALIDATED BY A RUN, NOT DEPLOYED; DEV and PROD untouched, no database written.** See **Stage 1 implementation (2026-09-11)** below for what was built, what remains and the exact validation the operator must run. Stage 2 (the `/admin/fixtures` surface) is a separate session. Planning complete 2026-09-11; runbook `AFLDB-ISSUE-162.md` (36 sections). **Operator decisions D-1…D-7 DECIDED 2026-09-11** (runbook §35): all approved as recommended — separate `fixtures` registry (D-1), never hard-deleted with `scheduled`/`cancelled`/`void` (D-2), forward window without touching the season register (D-3), round-batch entry with preview + atomic commit (D-4), NULL = genuinely TBC (D-5), no public exposure (D-7); **D-6 approved with condition**: played linkage is derived/read-time but deterministic and fail-closed, no name/date guessing, ambiguity leaves the fixture unlinked, `fixture_key` stays the identity after play; plus the constraint that a played association never replaces `fixture_key` with `match_key`. **Stage 1 authorised.**
 - **Severity:** Medium
 - **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
-- **2026-09-12 DEV acceptance (non-blocking UI defect, fixed, UNCOMMITTED, UNVALIDATED):** on `/admin/fixtures/[season]/new`, entering a date and a time and then clearing the date disabled the start-time control but left the old value (e.g. `19:25`) visible. The server was already correct — the fixture stored TBC date and TBC time — so this was presentation only, with no integrity defect and no backend change. `SingleFixtureForm`'s time input was uncontrolled; it is now controlled and cleared whenever the date is cleared, which is exactly the rule `RoundBatchForm.updateRow()` already applied (`if (patch.matchDate === '') next.matchTime = ''`). One file changed, `src/app/admin/fixtures/SingleFixtureForm.tsx`. No component-level test exists for these forms (no DOM test harness in `tests/`), so this carries no automated regression; it is verified by the focused browser re-test. ISSUE-162 stays OPEN.
+- **2026-09-12 DEV acceptance (non-blocking UI defect, fixed; "UNCOMMITTED, UNVALIDATED" as written — since committed, deployed and re-accepted in the browser, see Resolution):** on `/admin/fixtures/[season]/new`, entering a date and a time and then clearing the date disabled the start-time control but left the old value (e.g. `19:25`) visible. The server was already correct — the fixture stored TBC date and TBC time — so this was presentation only, with no integrity defect and no backend change. `SingleFixtureForm`'s time input was uncontrolled; it is now controlled and cleared whenever the date is cleared, which is exactly the rule `RoundBatchForm.updateRow()` already applied (`if (patch.matchDate === '') next.matchTime = ''`). One file changed, `src/app/admin/fixtures/SingleFixtureForm.tsx`. No component-level test exists for these forms (no DOM test harness in `tests/`), so this carries no automated regression; it is verified by the focused browser re-test. ISSUE-162 stays OPEN.
 - **Branch:** `opus/issue-162-fixture-admin`, worktree `D:\dev\afldb-issue-162`, cut from `opus/issue-161-season-lists` @ `34858ce` (stacked on ISSUE-161 on ISSUE-160 by operator direction; neither parent merged first; all three deploy to DEV together as the Admin Centre batch).
 - **Planning model:** Fable 5.1, high.
 - **Parent:** `AFLDB-ISSUE-156`, allocated as supplemental child **P3d**; P10 (played-match identity correction, `match-rekey.ts`) is not absorbed.
@@ -24271,7 +24421,7 @@ the `fixture_key` lineage rule still cover every fixture mutation.
 responsive pass rather than redesigned without a browser. Responsive and accessibility review here
 was source-level only; no rendered acceptance is claimed.
 
-### DEV build defect: a Client Component imported the `server-only` fixture module (2026-09-12, Opus 5 high 1M, UNCOMMITTED)
+### DEV build defect: a Client Component imported the `server-only` fixture module (2026-09-12, Opus 5 high 1M, UNCOMMITTED — superseded: committed, DEV build PASSED, see Resolution)
 
 Found by the combined ISSUE-160 + 161 + 162 + 163 DEV rollout on `streamanator`, at the production
 build step. **The DEV database work had already succeeded** — migrations `096_season_list_members`,
@@ -24330,7 +24480,7 @@ Client Components into this batch together and the failure mode is identical in 
 No CHANGELOG entry: ISSUE-162 Stage 1 and Stage 2 are already described under `Unreleased`, and
 this changes where an unreleased constant lives, not what AFLDB does.
 
-### Next action
+### Next action (as it stood before the closeout — superseded by *Resolution (2026-09-12)*)
 
 **Operator validates the build fix first — it is the release blocker** (from the worktree):
 `npx tsc --noEmit`; `npx vitest run tests/admin-fixture-actions.test.ts`; `npx vitest run
@@ -24361,11 +24511,49 @@ further Admin/Super Admin addition joins the batch, then combined ISSUE-160 + 16
 deployment and acceptance. No DEV update, no deploy, no PROD, no merge of ISSUE-160/161 first.
 ISSUE-162 is **not resolved**.
 
+### Resolution (2026-09-12)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+at `main` `3272434`; migration 097 was applied on DEV in the binding order (097 →
+`npm run db:privileges` → code). PROD untouched; no PROD validation claimed. Tracking-only
+closeout. The "UNCOMMITTED / not validated / `npm run build` has not been run" wording earlier in
+this entry describes the working tree before the commits that reached `main`; it is retained as
+chronology and superseded here.
+
+**Root cause:** not a defect — this issue implemented a feature (a future season's fixture
+inside AFLDB) that did not previously exist. Two DEV-rollout defects: (1) three Stage 2 Client
+Components value-imported from the `server-only` fixture mutation module, which only the
+production bundler can see — fixed by the server-neutral `src/lib/fixtures/spec.ts`, re-exported
+unchanged by `admin-fixtures.ts`, with a `src/`-wide client/server boundary regression in
+`tests/admin-fixture-actions.test.ts` (runbook §40); (2) the single-fixture form kept a stale
+visible start time after the date was cleared — presentation only, storage already TBC/TBC
+(§41).
+
+**Fix:** Stage 1 `cb98c67`, Stage 2 `6a9fbc4`, the §39 audit fixes, the §40 and §41 fixes, and the
+batch responsive commits including `ae3c4e0` ("Fix admin table header positioning", the shared
+table-header displacement found on the fixture pages).
+
+**Validation:** Stage 1 and Stage 2 local gates GREEN (above; §37.11 and the Stage 2 record);
+DEV production build PASS, 1533/1533 static pages — §40's acceptance criterion; service healthy,
+`/api/health` ok; rendered acceptance 2026-09-12 — functional Fixture Admin, create/manage/
+lifecycle workflows, the date → time → clear-date re-test, responsive fixture cards, the 1024/768
+table layout, and the Round 1 and Round 2 header/data layout explicitly re-tested at 1024 and
+768; desktop 1440 and phone 375 PASS; global navigation, accessibility/focus spot checks, no
+blocking console/runtime errors. Runbook §42. Widths ran under the operator's device-priority
+decision, not §34's 320/768/1000/1280/1920 set.
+
+**Follow-up recorded separately:** the §37.10 all-refs migration-097 collision check
+(`git log --all --oneline -- src/db/migrations/097_*.sql`) is an operator command in the closeout
+set — this resolution stands unless it lists a second `097_*.sql` file; §39.6 limitations 1–4
+recorded, non-blocking, no ID; PROD promotion on the ISSUE-156 umbrella's checklist; §31
+out-of-scope unchanged (fixture importer, reconciliation view, public exposure, venue
+administration, P10 rekey).
+
 ---
 
 ## AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e)
 
-- **Status:** Open / **Stage 1 AND Stage 2 BUILT, VALIDATED and COMMITTED 2026-09-12 (`ea9f3dd`); FINAL LOCAL AUDIT DONE 2026-09-12 (three Stage 2 defects fixed, uncommitted) — not merged, not deployed; migration 098 applied to `afldb_test` ONLY; DEV and PROD untouched.** Planning complete 2026-09-12 (Fable 5.1 high), runbook `AFLDB-ISSUE-163.md` (34 sections). **Operator SIGNED OFF D-1…D-18 on 2026-09-12 with four clarifications** (§30 record below). Stage 2 (admin Leadership section/Appoint panel, Captain overview column, public `ClubLeadership` block, revalidate route, unit tests) is built (Sonnet 5 high) — see the Stage 2 record below.
+- **Status:** **RESOLVED 2026-09-12** — see *Resolution (2026-09-12)* at the foot of this entry. As it stood earlier on 2026-09-12 (retained): Open / **Stage 1 AND Stage 2 BUILT, VALIDATED and COMMITTED 2026-09-12 (`ea9f3dd`); FINAL LOCAL AUDIT DONE 2026-09-12 (three Stage 2 defects fixed, uncommitted) — not merged, not deployed; migration 098 applied to `afldb_test` ONLY; DEV and PROD untouched.** Planning complete 2026-09-12 (Fable 5.1 high), runbook `AFLDB-ISSUE-163.md` (34 sections). **Operator SIGNED OFF D-1…D-18 on 2026-09-12 with four clarifications** (§30 record below). Stage 2 (admin Leadership section/Appoint panel, Captain overview column, public `ClubLeadership` block, revalidate route, unit tests) is built (Sonnet 5 high) — see the Stage 2 record below.
 - **Severity:** Medium
 - **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage
 - **Branch:** `opus/issue-163-club-leadership`, worktree `D:\dev\afldb-issue-163`, cut from `opus/issue-162-fixture-admin` @ `f80a1df` (stacked on ISSUE-162 on 161 on 160; nothing merges first; all four deploy to DEV together as the Admin Centre batch).
@@ -24491,10 +24679,43 @@ exported but unused by any page.
   `npx vitest run tests/auth.test.ts`; ESLint over the two panels and the test file; `git diff --check`.
   Stage 1's expensive suites do **not** need re-running: no Stage 1 file was touched.
 
-### Next action
+### Next action (as it stood before the closeout — superseded by *Resolution (2026-09-12)*)
 
 Operator: run the Stage 2 re-validation block above, commit the audit fixes, then the combined
 160+161+162+163 DEV deployment (migrations 096 → 097 → 098 → `npm run db:privileges` → code) and the
 rendered Playwright/browser acceptance, which is the only thing that can prove the leadership surface,
 the confirm flows, focus restore and the public block at real widths. PROD promotion after that. No
 DEV, no PROD, no merge, no deploy has happened. ISSUE-163 is **not resolved**.
+
+### Resolution (2026-09-12)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+at `main` `3272434`; migration 098 was applied on DEV in the binding order (096 → 097 → 098 →
+`npm run db:privileges` → code). PROD untouched; no PROD validation claimed. Tracking-only
+closeout: none of the §34.4 findings was implemented here.
+
+**Root cause:** not a defect — this issue implemented a feature (canonical club leadership from
+2027, beside the legacy `captaincies` honours import) that did not previously exist.
+
+**Fix:** both stages (`8ed32b3`, `c28ea60`, `ea9f3dd`) and the §34.2 audit fixes, as recorded
+above.
+
+**Validation:** operator validation of both stages GREEN 2026-09-12 (above; runbook §32.11 /
+§33.1 / §34 preamble); DEV production build PASS, 1533/1533 static pages, service healthy,
+`/api/health` ok; rendered acceptance 2026-09-12 — captain, co-captain (server-enforced
+confirmation), vice-captain, replace, end, reinstate, correct, void, the season-overview Captain
+column, public club-page revalidation and the player-honours integration all PASS; the
+architecture as deployed (legacy `captaincies` before 2027, `club_leadership` canonical from
+2027, roles captain / vice_captain with co-captains as concurrent captain rows, the
+active/ended/void lifecycle, season-list membership as the write-time precondition, Admin read /
+Super Admin edit, the public source boundary) confirmed; responsive/design acceptance PASS at
+1440/1024/768/375 with global navigation and accessibility/focus spot checks. Runbook §35. Widths
+ran under the operator's device-priority decision, not §24's 320/768/1000/1280/1920 set.
+
+**Follow-up recorded separately (no ID allocated; on the ISSUE-156 umbrella's follow-up list):**
+the appoint-path audit `new_values` omits the derivable `entity_key`; the public Captains table
+has no period column (co-captains and a mid-season replacement read as two rows for one season);
+the replay validates a date's shape rather than the calendar. Deliberate and closed: the terminal
+per-row message until reload; `readLeadershipDiagnostics()` exported and tested but not called by
+a page; the shape-based revalidation allowlist. PROD promotion on the ISSUE-156 umbrella's
+checklist; §27 out-of-scope unchanged.

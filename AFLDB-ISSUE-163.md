@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e)
 
-**Status:** **Stage 1 AND Stage 2 BUILT 2026-09-12 — uncommitted, neither has been run/validated, not merged, not deployed; migration 098 applied nowhere; DEV and PROD untouched.** Planning complete 2026-09-12. Operator decisions D-1…D-18 (§30) were **SIGNED OFF on 2026-09-12 with four clarifications**; the Stage 1 record, the deviations those clarifications produced, and the exact operator validation commands are **§32**. Stage 2 (admin Leadership section, Appoint panel, revalidate route, public `ClubLeadership` block, unit tests) is built and recorded at **§33**; it has not been run, gated or committed. Stage 1's own validation (§32.11) is still outstanding and is a precondition for Stage 2's.
+**Status:** **RESOLVED 2026-09-12.** Both stages (validated and committed 2026-09-12 — `8ed32b3`, `c28ea60`, `ea9f3dd`; §32.11 and §33.1 gates green) and the §34 audit fixes are in `main` at `3272434`, deployed to DEV with migration 098 applied and privileges reconciled, and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): captain, co-captain and vice-captain appointment, replace, end, reinstate, correct, void, the season overview Captain column, public club-page revalidation and the player-honours integration all passed, with responsive/design acceptance at 1440/1024/768/375 — the record is **§35**. Operator decisions D-1…D-18 (§30) **SIGNED OFF 2026-09-12 with four clarifications** and implemented as decided (§32.1); the §34 audit found no deviation and no stop condition. The five §34.4 findings are disposed in §35.3 as non-blocking follow-ups, not converted into completed work. PROD untouched; no PROD validation is claimed. Planning (§1–§31), Stage 1 (§32), Stage 2 (§33) and the audit (§34) are retained below as written.
 **Severity:** Medium
 **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage
 **Created:** 2026-09-12
@@ -1145,8 +1145,68 @@ git diff --check
 **ISSUE-163 stays OPEN**: the combined 160+161+162+163 DEV deployment, the rendered Playwright/browser
 acceptance (§24's UI row) and PROD promotion are all still ahead (§28).
 
+*Superseded 2026-09-12 by §35.*
+
+---
+
+## 35. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. This closeout changed
+tracking only: none of the §34.4 findings was implemented here.
+
+### 35.1 What reached DEV
+
+- `main` at `3272434`: Stage 1 and Stage 2 (`8ed32b3`, `c28ea60`, `ea9f3dd`; §32.11 and §33.1
+  gates green), the §34.2 audit fixes and the batch-wide responsive commits `e638d61`, `9727ad5`,
+  `ae3c4e0`, `aeb41f3`.
+- DEV database: migration 098 applied in the binding order 096 → 097 → 098 →
+  `npm run db:privileges` → code. Production build PASS, 1533/1533 static pages; `afldb.service`
+  healthy; `/api/health` `status=ok`, `database=ok`.
+
+### 35.2 §24's deferred UI row — closed
+
+- Functional acceptance PASS for: captain; co-captain (the server-enforced confirmation);
+  vice-captain; replace; end; reinstate; correct; void; the season-overview Captain column; public
+  club-page revalidation through `/admin/season-lists/revalidate`; and the player-honours
+  integration (a 2027+ captaincy as an honour).
+- Architecture as deployed: legacy `captaincies` answers seasons before 2027 and `club_leadership`
+  is canonical from 2027; roles `captain` / `vice_captain`; co-captains as concurrent captain rows;
+  the `active` / `ended` / `void` lifecycle; season-list membership as the write-time
+  precondition; Admin read / Super Admin edit through `data.seasonLists.*`; the public source
+  boundary maintained.
+- Responsive/design acceptance PASS at 1440 / 1024 / 768 / 375 (the Leadership section's stacked
+  controls at 375), global navigation PASS, accessibility/focus spot checks PASS, no blocking
+  console/runtime errors. Widths ran under the operator's device-priority decision of 2026-09-12
+  (laptop/desktop primary, iPad/tablet first-class, phone functional fallback) rather than the
+  320 / 768 / 1000 / 1280 / 1920 set §24 named; the operator directed that the batch is not held
+  open for phone-only cosmetic polishing.
+
+### 35.3 §34.4 findings — disposition (none is a closure blocker; none was implemented)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `insertAppointment()`'s audit `new_values` omits the derivable `entity_key` (§15 says it carries it) | **Follow-up (backlog).** A one-line change in `admin-club-leadership.ts` the next time it is opened, re-gated with §32.11's integration run. Every row already carries the key and the edit path already audits it. |
+| 2 | The public Captains table renders no `period` column, so co-captains and a mid-season replacement read as two undifferentiated rows for one season | **Follow-up (public-table design; §27's "its own issue if pursued").** Pre-existing for the 1,774 legacy rows; not a regression, not a data problem. |
+| 3 | The replay validates date shape, not the calendar (`2027-02-30` fails at `::date` rather than as a listed refusal) | **Follow-up (diagnostic quality).** Unreachable through the writer, still fails closed; fix together with item 1. |
+| 4 | A successful per-row mutation leaves `LeadershipActions` showing a terminal message until reload | **Deliberate** (§34.4 item 4 — protects the Correct form's pre-filled dates); closed. |
+| 5 | `readLeadershipDiagnostics()` is exported and integration-tested but no page calls it | **Deliberate** (§9 diagnostic API; the pages surface the same fact through `listed` / `unlistedActive`); closed. |
+| 6 | The revalidation allowlist is shape-based (`/clubs/<slug>`-shaped paths, computed server-side) | **Designed contract** (§21, §24); recorded, closed. |
+
+Items 1–3 are listed on the `AFLDB-ISSUE-156` umbrella's follow-up list; no issue ID is allocated
+until one is pursued.
+
+### 35.4 Carried forward (not closure conditions)
+
+- PROD promotion under the ISSUE-151 contract (§19; `club_leadership` replayed after `players`;
+  the `appointment_key` lineage rule), recorded on the `AFLDB-ISSUE-156` umbrella's promotion
+  checklist.
+- §27 out-of-scope items unchanged: the Wikipedia → canonical conversion of `captaincies`,
+  player-page leadership history from canonical rows, a public captains encyclopedia, external
+  leadership imports, match-level captaincy, NL / Grid Solver exposure.
+
 ---
 
 <!-- afldb-merge-readiness
-{"status": "in-progress", "hardBlockers": ["Stage 1 validation has NOT been run: apply migration 098 to afldb_test only, then db:privileges, then the suites in AFLDB-ISSUE-163.md §32.11", "git log --all -- 'src/db/migrations/098*' still to be confirmed empty by the operator", "Stage 2 validation has NOT been run: tsc, tests/admin-club-leadership-actions.test.ts, tests/auth.test.ts, eslint, git diff --check (AFLDB-ISSUE-163.md §33)", "ISSUE-163 ships only with the combined ISSUE-160 + 161 + 162 + 163 Admin Centre DEV batch, deploy order 096 -> 097 -> 098 -> db:privileges -> code"], "expectedFiles": ["src/db/migrations/098_club_leadership.sql", "src/db/queries/admin-club-leadership.ts", "src/db/queries/club-leadership.ts", "src/db/queries/admin-season-lists.ts", "src/db/queries/awards.ts", "src/db/queries/audit-log.ts", "src/lib/audit-view.ts", "src/lib/acquisition/manual-authority.ts", "tools/migration/common.py", "tools/migration/import_fitzroy_core.py", "tools/db/promotion-inventory.ts", "docs/production-promotion.md", "tests/integration/admin-club-leadership.test.ts", "tests/data-overrides-source-contract.test.ts", "tests/db-promotion-check.test.ts", "tests/current-season-import.test.ts", "src/app/admin/season-lists/leadership-actions.ts", "src/app/admin/season-lists/leadership-labels.ts", "src/app/admin/season-lists/revalidate-paths.ts", "src/app/admin/season-lists/revalidate/route.ts", "src/app/admin/season-lists/LeadershipPanel.tsx", "src/app/admin/season-lists/LeadershipActions.tsx", "src/app/admin/season-lists/AppointLeaderPanel.tsx", "src/app/admin/season-lists/MemberActions.tsx", "src/app/admin/season-lists/submit-helper.ts", "src/app/admin/season-lists/[season]/[club]/page.tsx", "src/app/admin/season-lists/[season]/page.tsx", "src/components/ClubLeadership.tsx", "src/app/clubs/[slug]/page.tsx", "tests/admin-club-leadership-actions.test.ts", "AFLDB-ISSUE-163.md", "AFLDB-ISSUE-156.md", "issues.md", "IssuesIndex.md", "CHANGELOG.md"], "validation": ["Stage 1 built 2026-09-12 (Opus 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution. Migration 098 has been applied to no database.", "Stage 2 built 2026-09-12 (Sonnet 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution."]}
+{"status": "ready", "hardBlockers": [], "expectedFiles": ["src/db/migrations/098_club_leadership.sql", "src/db/queries/admin-club-leadership.ts", "src/db/queries/club-leadership.ts", "src/db/queries/admin-season-lists.ts", "src/db/queries/awards.ts", "src/db/queries/audit-log.ts", "src/lib/audit-view.ts", "src/lib/acquisition/manual-authority.ts", "tools/migration/common.py", "tools/migration/import_fitzroy_core.py", "tools/db/promotion-inventory.ts", "docs/production-promotion.md", "tests/integration/admin-club-leadership.test.ts", "tests/data-overrides-source-contract.test.ts", "tests/db-promotion-check.test.ts", "tests/current-season-import.test.ts", "src/app/admin/season-lists/leadership-actions.ts", "src/app/admin/season-lists/leadership-labels.ts", "src/app/admin/season-lists/revalidate-paths.ts", "src/app/admin/season-lists/revalidate/route.ts", "src/app/admin/season-lists/LeadershipPanel.tsx", "src/app/admin/season-lists/LeadershipActions.tsx", "src/app/admin/season-lists/AppointLeaderPanel.tsx", "src/app/admin/season-lists/MemberActions.tsx", "src/app/admin/season-lists/submit-helper.ts", "src/app/admin/season-lists/[season]/[club]/page.tsx", "src/app/admin/season-lists/[season]/page.tsx", "src/components/ClubLeadership.tsx", "src/app/clubs/[slug]/page.tsx", "tests/admin-club-leadership-actions.test.ts", "AFLDB-ISSUE-163.md", "AFLDB-ISSUE-156.md", "issues.md", "IssuesIndex.md", "CHANGELOG.md"], "validation": ["Stage 1 built 2026-09-12 (Opus 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution. Migration 098 has been applied to no database.", "Stage 2 built 2026-09-12 (Sonnet 5 high) with NO command run: no shell, Git, SQL, test, lint, typecheck, DEV or PROD execution.", "Operator validation 2026-09-12, both stages GREEN (§34 preamble): migration 098 applied to afldb_test + db:privileges:test; tsc; 390 passed / 4 skipped contract suites; 37/37 tests/integration/admin-club-leadership.test.ts incl. the real Python replay; 367/367 stacked regressions; 254 / 4 skipped current-season; 150/150 admin-club-leadership-actions + auth; ESLint; git diff --check", "DEV acceptance 2026-09-12 (combined Admin Centre batch, main 3272434): 096 -> 097 -> 098 -> db:privileges -> code; production build PASS, 1533/1533 static pages; afldb.service healthy; /api/health status=ok database=ok", "Rendered acceptance 2026-09-12: captain / co-captain / vice-captain / replace / end / reinstate / correct / void / overview Captain column / public club-page revalidation / player honours PASS; responsive 1440/1024/768/375 PASS", "RESOLVED 2026-09-12 (AFLDB-ISSUE-163.md §35); §34.4 items 1-3 carried as follow-ups"]}
 -->

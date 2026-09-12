@@ -15,6 +15,44 @@ commit.
 
 ## [Unreleased]
 
+### The Admin Centre batch is accepted on DEV, and AFLDB-ISSUE-160, 161, 162 and 163 close (ISSUE-156 P3b–P3e) - 12 September 2026
+
+- Draft administration (160), season-list administration (161), fixture administration (162) and
+  club leadership (163) were deployed to DEV together from `main` `3272434` -- migrations 096, 097
+  and 098 applied in order, privileges reconciled, then the code -- and accepted there: the
+  production build clean with all 1,533 static pages generated, the service healthy, `/api/health`
+  reporting the database ok, every functional workflow of the four surfaces exercised as Admin and
+  Super Admin, and layout accepted at desktop (1440 and 1024), tablet (768) and phone (375) with
+  global navigation and accessibility/focus spot checks. All four issues are Resolved. PROD is
+  untouched; promotion is a separate, later step under the ISSUE-151 contract, and the checklist
+  it inherits from this batch is recorded on the ISSUE-156 umbrella.
+- The operator's device priority for the Admin Centre is now recorded: laptop/desktop is the
+  primary admin workspace, iPad/tablet a first-class one, and a phone a functional fallback.
+  Phone-only cosmetic polish does not hold an Admin Centre issue open.
+- **Fixed before release: a fixture admin form pulled the server-only mutation module toward the
+  browser.** The DEV production build refused the whole batch because three fixture Client
+  Components imported the round and batch-size constants from `src/db/queries/admin-fixtures.ts`,
+  which carries `server-only`; `tsc` and vitest both stub that marker, so only the bundler could
+  see it. The pure fixture vocabulary (round types, finals codes, statuses, the round and batch-row
+  bounds and their guards) now lives in a server-neutral `src/lib/fixtures/spec.ts` that the
+  mutation module re-exports unchanged -- one definition, nothing duplicated, no query or SQL
+  moved -- and a regression walks every Client Component in `src/` and fails on any value import
+  from `@/db/`.
+- Responsive fixes found by the batch acceptance: admin table headers no longer displace their
+  data rows (a shared fix, re-tested on the fixture Round 1 and Round 2 tables at 1024 and 768);
+  the Season Lists pages no longer overflow a phone viewport -- the "First authoritative season"
+  and season badges wrap instead of overlapping adjacent cells, the visually-hidden Actions
+  header stays accessible, and Remove / Transfer stay reachable through the table's own contained
+  scrolling (document width 360 against a 375 viewport on all three routes); two further admin
+  responsive-layout commits (`e638d61`, `9727ad5`) shipped with them.
+- Known, non-blocking limitations carried forward as follow-ups rather than converted into
+  features: for club leadership, the appoint-path audit row omits the derivable `entity_key`, the
+  public Captains table has no period column (so co-captains and a mid-season change read as two
+  rows for one season), and the replay validates a date's shape rather than the calendar; for
+  fixtures, the batch form is a scrolling table below 768px and the venue-slug replay limit
+  stands. Draft administration's PROD read-only probes and operator decision S-1 move to the
+  promotion checklist. Details in each runbook's Resolution section.
+
 ### Club captains and vice-captains become real records (AFLDB-ISSUE-163 Stage 1, ISSUE-156 P3e) - 12 September 2026
 
 - AFLDB has always shown club captains, but only as an imported honours list: 1,774 rows
@@ -98,8 +136,8 @@ commit.
   standing rather than replacing it with a receipt -- a club normally names a captain and two or
   three vice-captains in one sitting, and each of those should not cost a page reload.
 - Responsive: the Leadership section uses stacked controls rather than a wide table, and remains
-  usable at 375px; rendered browser acceptance across roles and widths is deferred to the combined
-  Admin Centre DEV batch, per the operator's release-batching decision.
+  usable at 375px; rendered browser acceptance across roles and widths passed on DEV on
+  12 September 2026 with the combined Admin Centre batch (see the batch entry above).
 
 ### AFLDB learns what an UNPLAYED match is (AFLDB-ISSUE-162 Stage 1, ISSUE-156 P3d) - 11 September 2026
 

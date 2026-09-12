@@ -1,13 +1,22 @@
 # AFLDB-ISSUE-162 — Fixture / season schedule administration (ISSUE-156 P3d)
 
-- **Status:** **OPEN. Stage 1 committed `cb98c67`, Stage 2 committed `6a9fbc4`; both validated
-  locally. Final local audit 2026-09-12 (Opus 5 high, 1M) — 8 Stage 2 defects fixed, UNCOMMITTED and
-  NOT RE-RUN (§39).** Not merged, not deployed; DEV and PROD untouched throughout. Migration **097
-  allocated**; its all-refs collision check (§37.10) has still never run and remains binding.
-  Combined ISSUE-160 + 161 + 162 DEV/browser acceptance is deferred to the Admin Centre batch (§34).
-  Records: **§37** Stage 1, **§38** Stage 2, **§39** the final audit.
-  **Operator decisions D-1…D-7 DECIDED 2026-09-11 (§35); D-6 approved with a condition and one
-  additional implementation constraint.**
+- **Status:** **RESOLVED 2026-09-12.** Stage 1 (`cb98c67`), Stage 2 (`6a9fbc4`), the §39 audit
+  fixes, the §40 client/server boundary fix (`src/lib/fixtures/spec.ts`), the §41 cleared-date fix
+  and the batch-wide responsive fixes (`e638d61`, `9727ad5`, `ae3c4e0` — the shared admin
+  table-header displacement fix — and `aeb41f3`) are in `main` at `3272434`, deployed to DEV with
+  migration 097 applied and privileges reconciled, and accepted there on 2026-09-12 as part of the
+  combined Admin Centre batch (160 + 161 + 162 + 163). The DEV production build PASSED (1533/1533
+  static pages) — §40's stated acceptance criterion — and the browser acceptance covered the
+  create / manage / lifecycle workflows, the date → time → clear-date re-test, responsive fixture
+  cards, the 1024/768 table layout and an explicit Round 1 / Round 2 header re-test at both widths.
+  The record is **§42**; the §39.7, §40.6/§40.7 and §41 "not yet run / uncommitted" wording below
+  is superseded by it and retained as chronology. Migration **097** allocated and applied on DEV;
+  the §37.10 all-refs collision check is included in the closeout operator commands (§42.4) and
+  this resolution stands unless it reports a second `097_*.sql` file. Records: **§37** Stage 1,
+  **§38** Stage 2, **§39** the final audit, **§40**/**§41** the DEV-rollout defects, **§42** the
+  resolution. **Operator decisions D-1…D-7 DECIDED 2026-09-11 (§35); D-6 approved with a
+  condition and one additional implementation constraint** — implemented as decided. PROD
+  untouched; no PROD validation is claimed.
 - **Severity:** Medium
 - **Area:** Admin / Data management / Match model / Acquisition boundary / Promotion lineage
 - **Planning model:** Fable 5.1, high
@@ -1630,7 +1639,7 @@ resolution. ISSUE-162 remains **OPEN**.
    it is a shared query outside this issue.
 5. Rendered acceptance of every point in §39.2 L and M is deferred to the DEV batch by design.
 
-### 39.7 Re-gate — NOT YET RUN
+### 39.7 Re-gate — NOT YET RUN (as written 2026-09-12; superseded by §42 — the audit fixes reached `main` `3272434` and the DEV build/acceptance is the retained evidence)
 
 Nothing below has executed. In order, from `D:\dev\afldb-issue-162`:
 
@@ -1653,8 +1662,9 @@ unaffected (no capability, nav or boundary changed); step 5 should be unaffected
 
 - Stage 1 backend **complete** and validated locally (committed `cb98c67`).
 - Stage 2 Admin UI **complete** and validated locally (committed `6a9fbc4`).
-- Final local code/contract audit **complete**; its fixes are **uncommitted** and **not re-run**.
-- ISSUE-162 remains **OPEN**.
+- Final local code/contract audit **complete**; its fixes are **uncommitted** and **not re-run**
+  (superseded 2026-09-12: committed, in `main` `3272434`, DEV-built and accepted — §42).
+- ISSUE-162 remains **OPEN** (superseded 2026-09-12: RESOLVED — §42).
 - Combined ISSUE-160 + 161 + 162 DEV/browser acceptance **deferred** to the Admin Centre batch (§34),
   which begins only on the operator's confirmation that no further Admin/Super Admin addition joins it.
 - PROD promotion **deferred**. No public fixture exposure. No DEV or PROD mutation was performed or
@@ -1662,7 +1672,7 @@ unaffected (no capability, nav or boundary changed); step 5 should be unaffected
 
 ---
 
-## 40. DEV build defect: a Client Component imported the `server-only` fixture module (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+## 40. DEV build defect: a Client Component imported the `server-only` fixture module (2026-09-12, Opus 5 high 1M) — UNCOMMITTED (superseded 2026-09-12 by §42: committed, and the DEV production build — this section's acceptance criterion — PASSED)
 
 ### 40.1 What happened
 
@@ -1763,7 +1773,7 @@ One `describe('the client/server module boundary')` appended to the existing
 It scans all of `src/` rather than the fixture tree because four stacked Admin Centre issues shipped
 Client Components into one batch and the failure mode is identical in each.
 
-### 40.6 Operator re-gate (the build is the acceptance criterion)
+### 40.6 Operator re-gate (the build is the acceptance criterion) — met 2026-09-12: DEV `npm run build` PASS, 1533/1533 static pages (§42)
 
 ```text
 npx tsc --noEmit
@@ -1789,7 +1799,10 @@ npm run build        # the decisive gate
   **No DEV service was deployed or restarted. PROD untouched.**
 - ISSUE-162 remains **OPEN**; ISSUE-163 remains **OPEN**. Rendered DEV acceptance has not happened.
 
-## 41. DEV acceptance defect: a cleared date left a stale visible start time (2026-09-12, Opus 5 high 1M) — UNCOMMITTED
+*Superseded 2026-09-12 (§42): the fix is in `main` `3272434`, the DEV production build passed and the
+rendered acceptance of the whole batch followed; ISSUE-162 and ISSUE-163 are both RESOLVED.*
+
+## 41. DEV acceptance defect: a cleared date left a stale visible start time (2026-09-12, Opus 5 high 1M) — UNCOMMITTED (superseded 2026-09-12 by §42: committed and re-accepted in the browser)
 
 Found by the combined ISSUE-160/161/162/163 DEV browser acceptance, alongside the blocking
 `/admin/draft/[id]` crash (`AFLDB-ISSUE-160.md` §20). **Non-blocking, presentation only.**
@@ -1822,3 +1835,64 @@ client/server boundary guard added in §40 still passes: this change adds no imp
 
 **State.** UNCOMMITTED and UNVALIDATED — no `tsc`, vitest, ESLint or `npm run build` run, no
 commit, no deploy, DEV database and PROD untouched. ISSUE-162 remains **OPEN**.
+
+*Superseded 2026-09-12 (§42): committed, deployed to DEV in `main` `3272434`, and the
+date → time → clear-date sequence re-accepted in the browser.*
+
+---
+
+## 42. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
+
+**Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
+(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. This closeout changed
+tracking only.
+
+### 42.1 What reached DEV
+
+- `main` at `3272434`: Stage 1 `cb98c67`, Stage 2 `6a9fbc4`, the §39 audit fixes, the §40 boundary
+  fix (`src/lib/fixtures/spec.ts` re-exported by `admin-fixtures.ts`, plus the client/server
+  boundary regression in `tests/admin-fixture-actions.test.ts`), the §41 `SingleFixtureForm` fix,
+  and the batch-wide responsive commits `e638d61`, `9727ad5`, `ae3c4e0` ("Fix admin table header
+  positioning" — the shared table-header displacement defect found on the fixture pages) and
+  `aeb41f3`.
+- DEV database: migration 097 applied and privileges reconciled before the code (§26's binding
+  order). Production build PASS, 1533/1533 static pages — the §40.6 acceptance criterion;
+  `afldb.service` healthy; `/api/health` `status=ok`, `database=ok`.
+
+### 42.2 §34's deferred acceptance — closed
+
+- Functional Fixture Admin acceptance PASS; create / manage / lifecycle (cancel, reinstate, void)
+  workflows PASS.
+- The §41 date → time → clear-date defect fixed and re-accepted in the browser.
+- Responsive fixture cards PASS; the 1024 and 768 table layout PASS; the shared table-header
+  displacement bug fixed (`ae3c4e0`), and the Fixtures Round 1 and Round 2 header/data layout
+  explicitly re-tested at 1024 and 768 — PASS. Desktop 1440 PASS; 375 functional fallback PASS;
+  global navigation PASS; accessibility/focus spot checks PASS; no blocking console/runtime errors.
+- Widths ran at 1440 / 1024 / 768 / 375 under the operator's device-priority decision of
+  2026-09-12 (laptop/desktop primary, iPad/tablet first-class, phone functional fallback) rather
+  than the 320 / 768 / 1000 / 1280 / 1920 set §34 named; the operator directed that the batch is
+  not held open for phone-only cosmetic polishing.
+
+### 42.3 Superseded wording, kept as chronology
+
+§37.10's "not supplied" preflight was later recorded READY by the Stage 2 validation (§38, ledger).
+§39.7 ("NOT YET RUN"), §39.8, the §40 heading, §40.6, §40.7 and §41's "UNCOMMITTED and UNVALIDATED"
+describe the working tree on 2026-09-12 before the commits that reached `main`; the retained
+evidence for all of them is the DEV production build and browser acceptance in §42.1–§42.2. The
+individual §39.7 / §40.6 command results were not recorded in this ledger separately from that
+build.
+
+### 42.4 Carried forward (non-blocking)
+
+- The §37.10 all-refs migration-097 collision check is an operator command in the closeout set:
+  `git log --all --oneline -- src/db/migrations/097_*.sql`. This resolution stands unless it lists
+  a second `097_*.sql` file, in which case the issue is reopened on that evidence.
+- §39.6 known limitations 1–4 — the venue-slug replay limit; the §37.5 register-advance tail risk;
+  the batch form being a scrolling table under 768px rather than §28's per-row cards (accepted
+  under the device-priority decision); the `listVenues()` cost — recorded, none blocking, no ID
+  allocated.
+- PROD promotion under the ISSUE-151 contract (migration 097 → `npm run db:privileges` → code;
+  `fixtures` replayed before the `data_edits` remap), recorded on the `AFLDB-ISSUE-156` umbrella's
+  promotion checklist.
+- Out of scope, unchanged (§31): a fixture importer, a reconciliation view, public exposure, venue
+  administration and the P10 played-match rekey.
