@@ -7,7 +7,22 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 13 tracked here — `-117`, `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-149`, `-150`, `-151`, `-152`, `-155`, `-156`.
+**Open issues:** 12 tracked here — `-117`, `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-150`, `-151`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-149 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): the six club-page sections (Club records, Record crowds, Players, Premiership
+     players, Awards & honours, plus the preserved Premierships/Coaches sections from
+     AFLDB-ISSUE-148) — merged into `main` as `00eea34` and deployed on DEV, with focused
+     validation already green (`tests/club-records-sections.test.ts` 14/14, the five club
+     integration suites 32/32, `npx tsc --noEmit` PASS, `npm run build` PASS, no migration) — are
+     now operator-verified by the final DEV browser acceptance gate across three cases: Richmond
+     (all six sections render correctly, existing premiership/coaches sections intact), Footscray/
+     Western Bulldogs (rename/lineage carry-through correct, whole-club totals carried across eras,
+     records/crowds/player sections render correctly, existing sections intact) and Gold Coast
+     (young-club/limited-history case renders applicable sections normally, empty/non-applicable
+     sections omit cleanly with no broken empty UI). See the `AFLDB-ISSUE-149` entry's
+     *Resolution (2026-09-13)* below. Removed from the Open Issues table and `IssuesIndex.md`;
+     13 -> 12. -->
 
 <!-- 2026-09-12 (AFLDB-ISSUE-137 RESOLVED; AFLDB-ISSUE-151 STALE PROMOTION NARRATIVE CORRECTED —
      TRACKING ONLY, NO CODE, NO MIGRATION, NO PRODUCTION MUTATION THIS SESSION): a corrected,
@@ -20212,12 +20227,13 @@ tests/integration/club-coach-records.test.ts` and `npx tsc --noEmit` are enough.
 
 ## AFLDB-ISSUE-149 — Expand club pages with historical records and player honours
 
-- **Status:** **OPEN — IMPLEMENTATION COMPLETE, all focused validation GREEN (operator, 2026-09-07):
-  `tests/club-records-sections.test.ts` 14/14, the ISSUE-149 integration set 32/32 (incl. the
-  corrected `club-honours.test.ts`), `npx tsc --noEmit` PASS, `npm run build` PASS, no migration.
-  MERGED into `main` as `00eea34` and deployed on DEV; stays Open only on the DEV browser smoke.**
-  Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`) is an ancestor of
-  `main`.
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+  As it stood earlier (retained): **OPEN — IMPLEMENTATION COMPLETE, all focused validation GREEN
+  (operator, 2026-09-07): `tests/club-records-sections.test.ts` 14/14, the ISSUE-149 integration
+  set 32/32 (incl. the corrected `club-honours.test.ts`), `npx tsc --noEmit` PASS, `npm run build`
+  PASS, no migration. MERGED into `main` as `00eea34` and deployed on DEV; stays Open only on the
+  DEV browser smoke.** Branch `fable/issue-149-club-records` (worktree `D:\dev\afldb-issue-149`)
+  is an ancestor of `main`.
 - **Severity / Area:** Low / Public UI — club pages; database queries.
 - **Reported:** 2026-09-07 (operator request — every public AFL club page should expose the
   historical club records, attendance records, complete player history, premiership players and
@@ -20397,6 +20413,37 @@ removed `brownlow_season_votes.club_id`.
 - Data-quality watch: `tests/integration/club-premiership-players.test.ts` will fail if
   `player_club_season_stats.is_premier` and the won-Grand-Final record ever disagree for a season
   both cover — that is intentional (surface, do not hide).
+
+### Resolution (2026-09-13)
+
+**Status:** Resolved. Closed on the operator's final DEV browser gate across three cases:
+Richmond, Footscray/Western Bulldogs and Gold Coast.
+
+- **Richmond:** Club records, Record crowds, Players, Premiership players and Awards / honours
+  all PASS; the existing premiership/coaches sections (AFLDB-ISSUE-148) remain intact.
+- **Footscray / Western Bulldogs:** rename/lineage carry-through is correct — whole-club totals
+  are carried across eras (`clubs.organization_id`); records/crowds/player sections render
+  correctly; existing sections intact.
+- **Gold Coast:** the young-club/limited-history case renders applicable sections normally, with
+  empty/non-applicable sections omitted cleanly (no broken empty UI).
+
+**Root cause:** not a defect — this issue implemented six new club-page sections that did not
+previously exist.
+
+**Fix:** as recorded above — `getClubMatchRecords`, `getClubCrowdRecords`, `getClubPlayers`,
+`getClubPremiershipPlayers`, `getClubBrownlowMedallists` / `getClubHonours` and their five
+components, wired into `src/app/clubs/[slug]/page.tsx`. Merged to `main` as `00eea34` and deployed
+on DEV; no migration required.
+
+**Validation:** `npx tsc --noEmit` PASS; `tests/club-records-sections.test.ts` 14/14; the five
+club integration suites (`club-match-records`, `club-crowd-records`, `club-players`,
+`club-premiership-players`, `club-honours`) 32/32; `npm run build` PASS (all operator-run,
+2026-09-07); final DEV browser acceptance gate PASS (operator, 2026-09-13) across Richmond,
+Footscray/Western Bulldogs and Gold Coast, as recorded above.
+
+**Follow-up:** none — as recorded above under *Follow-up*. Broadening the honours list (e.g.
+state-league awards with a provable club attribution) or paginating the complete-players list
+would need a separate issue.
 
 ---
 
