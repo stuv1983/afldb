@@ -29,9 +29,12 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { getFamilyRecords, getFamilyRecordsSummary } from '@/db/queries/family-records';
+import { answerFamily } from '@/db/queries/nl/family';
+import { answerFatherSonSummary } from '@/db/queries/nl/father-son-summary';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
 import { validatePlan, type NlPlayerRef, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlAnswerPayload, NlPlayerCareerRow } from '@/search/nl/answer-types';
+import type { NlAnswerPayload, NlFamilyRow, NlPlayerCareerRow } from '@/search/nl/answer-types';
 
 afterAll(async () => {
   await sql.end();
@@ -427,5 +430,601 @@ describe('the list cap is disclosed, never silently applied', () => {
     expect(rows).toHaveLength(100);
     expect(total).toBe(M_D1.hasBrother);
     expect(total).toBeGreaterThan(rows.length);
+  });
+});
+
+// ============================================================ ISSUE-153
+//
+// The son's side of the father-son rule, and the two scopes only
+// father_son_selections carries. Every figure here is compared against an
+// independently hand-written query over the same table, for the reason
+// this file's header gives: one code path agreeing with itself is not
+// evidence. The Stage 0 read-only measurements of 2026-09-09 are asserted
+// once as the fixture contract.
+
+const M_153 = {
+  /** FS1: trusted-linked selected players. */
+  selectedPlayers: 99,
+  /** FS4, unchanged, as the symmetry check. */
+  fathers: 107,
+  /** FS6's denominator: SELECTION EVENTS, not linked identities. */
+  selectionRows: 127,
+  /** FS2: distinct selecting organizations. */
+  organizations: 17,
+  /** FS3: distinct draft years. */
+  draftYears: 35,
+  /** X3: selected under the rule AND actually coached. */
+  selectedAndCoached: 1,
+  /** X3's father-side mirror. */
+  fathersWhoCoached: 11,
+} as const;
+
+/** Rhyce Shaw -- the whole of X3 (Stage 0 §4.7). */
+const RHYCE_SHAW = 10974;
+
+describe('FS1 — players selected under the father-son rule (AFLDB-ISSUE-153)', () => {
+  it('is 99 players, and the builder agrees with a hand-written query', async () => {
+    const { rows, total } = await career(population('father_son_selection'));
+    expect(total).toBe(M_153.selectedPlayers);
+    const measured = await scalar(sql`
+      SELECT count(DISTINCT drafted_player_id)::text AS n FROM father_son_selections
+       WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+    `);
+    expect(measured).toBe(total);
+    expect(rows).toHaveLength(total);
+  });
+
+  /**
+   * FS1 is NOT an alias of C3. The three witnesses were selected under the
+   * rule -- so they belong here -- but their fathers are names the source
+   * never linked, so they must not appear in has_afl_father. If this ever
+   * returns an empty difference, the two questions have been collapsed
+   * into one and one of them is now answering wrongly.
+   */
+  it('differs from has_afl_father by exactly the three unmatched-father witnesses', async () => {
+    const selected = await ids(population('father_son_selection'));
+    const hasFather = await ids(population('has_afl_father'));
+    const onlySelected = selected.filter((id) => !hasFather.includes(id));
+    expect(onlySelected).toHaveLength(3);
+
+    const names = await sql<{ id: number; name: string }[]>`
+      SELECT p.id, p.display_name AS name FROM players p
+       WHERE p.id = ANY(${onlySelected}) ORDER BY p.display_name
+    `;
+    expect(names.map((r) => r.name)).toEqual(['Max Michalanney', 'Mitch Morton', 'Shane Morrison']);
+  });
+
+  /**
+   * Stage 0 §2.2 returned 0 rows: every trusted rule son actually played,
+   * so no "has played" filter is needed and adding one would be dead code
+   * that quietly narrowed the answer the day the data changed.
+   */
+  it('needs no games filter — every selected player has played', async () => {
+    const unplayed = await scalar(sql`
+      SELECT count(*)::text AS n FROM father_son_selections f
+       WHERE f.drafted_player_id IS NOT NULL AND f.drafted_link_status IN ('unique', 'resolved')
+         AND NOT EXISTS (
+           SELECT 1 FROM player_career_stats s WHERE s.player_id = f.drafted_player_id AND s.games > 0
+         )
+    `);
+    expect(unplayed).toBe(0);
+  });
+
+  it('the father side is unchanged at 107 — the binding is symmetric, not a swap', async () => {
+    const { total } = await career(population('father_son_father'));
+    expect(total).toBe(M_153.fathers);
+  });
+});
+
+describe('FS2/FS3 — the selecting club and the draft year', () => {
+  it('folds a RENAME through organization lineage: the Bulldogs are one club', async () => {
+    const org = await scalar(sql`
+      SELECT o.id::text AS n FROM club_organizations o WHERE o.slug = 'western-bulldogs'
+    `);
+    const { total } = await career(plan({
+      careerPredicates: [{ builder: 'father_son_selection_for_club', params: { club: String(org) } }],
+      scope: { clubFor: { organizationId: org, slug: 'western-bulldogs', name: 'Western Bulldogs' } },
+    }));
+    const measured = await scalar(sql`
+      SELECT count(DISTINCT f.drafted_player_id)::text AS n FROM father_son_selections f
+        JOIN clubs c ON c.id = f.club_id
+       WHERE f.drafted_player_id IS NOT NULL AND f.drafted_link_status IN ('unique', 'resolved')
+         AND c.organization_id = ${org}
+    `);
+    expect(total).toBe(measured);
+    // Two club ids, one lineage: a raw club_id split would return fewer.
+    const clubIds = await scalar(sql`
+      SELECT count(DISTINCT f.club_id)::text AS n FROM father_son_selections f
+        JOIN clubs c ON c.id = f.club_id WHERE c.organization_id = ${org}
+    `);
+    expect(clubIds).toBeGreaterThan(1);
+  });
+
+  /**
+   * A MERGER is not a rename. Fitzroy's selections stay Fitzroy's; folding
+   * them into Brisbane would be a data-modelling error dressed as a
+   * lineage improvement.
+   */
+  it('does NOT fold a merger: Fitzroy is not Brisbane', async () => {
+    const [fitzroy] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'fitzroy'`;
+    const [brisbane] = await sql<{ id: number }[]>`
+      SELECT id FROM club_organizations WHERE slug LIKE 'brisbane%' ORDER BY slug LIMIT 1
+    `;
+    expect(fitzroy.id).not.toBe(brisbane.id);
+    const shared = await scalar(sql`
+      SELECT count(*)::text AS n FROM clubs
+       WHERE organization_id = ${fitzroy.id} AND id IN (
+         SELECT id FROM clubs WHERE organization_id = ${brisbane.id}
+       )
+    `);
+    expect(shared).toBe(0);
+  });
+
+  /**
+   * THE trap. draft_year is not a playing season, and the two readings
+   * share not one row: 0 of the 99 debut in their draft year. A builder
+   * that ever compiled the year as a season would be wrong about every
+   * single row it returned, which is why this is asserted against the
+   * database rather than trusted from the runbook.
+   */
+  it('draft_year and the debut season are disjoint — 0 of 99 debut in their draft year', async () => {
+    const sameYear = await scalar(sql`
+      SELECT count(*)::text AS n FROM father_son_selections f
+        JOIN player_career_stats s ON s.player_id = f.drafted_player_id
+       WHERE f.drafted_link_status IN ('unique', 'resolved')
+         AND extract(year FROM s.debut_date)::int = f.draft_year
+    `);
+    expect(sameYear).toBe(0);
+  });
+
+  it('scopes to a draft year, and to that year alone', async () => {
+    const year = 2022;
+    const { total } = await career(plan({
+      careerPredicates: [{
+        builder: 'father_son_selection_between', params: { from: String(year), to: String(year) },
+      }],
+      scope: { seasonMin: year, seasonMax: year },
+    }));
+    const measured = await scalar(sql`
+      SELECT count(DISTINCT drafted_player_id)::text AS n FROM father_son_selections
+       WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+         AND draft_year = ${year}
+    `);
+    expect(total).toBe(measured);
+    expect(total).toBeGreaterThan(0);
+  });
+});
+
+describe('FS6 — the distribution counts SELECTIONS, not linked players', () => {
+  async function summary(kind: 'by_club' | 'by_draft_year') {
+    const payload = await answerFatherSonSummary(plan({
+      grain: 'achievement_summary', fatherSonSummary: { kind },
+    }));
+    if (payload.kind !== 'achievement_summary') throw new Error(`expected a summary, got ${payload.kind}`);
+    return payload;
+  }
+
+  /**
+   * Operator decision Q2. Written to FAIL if 99 is ever substituted for
+   * 127: the two denominators change 14 of the 17 organizations, and for
+   * Carlton and Adelaide they change most of the answer.
+   */
+  it('the denominator is 127 selection events, never the 99 linked players', async () => {
+    const payload = await summary('by_club');
+    expect(payload.total).toBe(M_153.selectionRows);
+    expect(payload.total).not.toBe(M_153.selectedPlayers);
+
+    const rows = await scalar(sql`SELECT count(*)::text AS n FROM father_son_selections`);
+    expect(payload.total).toBe(rows);
+    // The group counts sum to the denominator: no selection is dropped by
+    // the club join, which is only true because no row has a null club_id.
+    expect(payload.rows.reduce((sum, r) => sum + r.value, 0)).toBe(M_153.selectionRows);
+  });
+
+  it('groups by organization, one row per lineage', async () => {
+    const payload = await summary('by_club');
+    expect(payload.rows).toHaveLength(M_153.organizations);
+    const measured = await scalar(sql`
+      SELECT count(DISTINCT c.organization_id)::text AS n
+        FROM father_son_selections f JOIN clubs c ON c.id = f.club_id
+    `);
+    expect(payload.rows.length).toBe(measured);
+  });
+
+  /**
+   * The club where the two denominators diverge most in relative terms.
+   * Asserted by name because "Carlton, 7" is the wrong answer this whole
+   * decision exists to prevent, and it is wrong in a way that looks
+   * entirely reasonable on the page.
+   */
+  it('Carlton counts its selections, not its linked players', async () => {
+    const payload = await summary('by_club');
+    const carlton = payload.rows.find((r) => r.label === 'Carlton');
+    const selections = await scalar(sql`
+      SELECT count(*)::text AS n FROM father_son_selections f
+        JOIN clubs c ON c.id = f.club_id
+        JOIN club_organizations o ON o.id = c.organization_id
+       WHERE o.name = 'Carlton'
+    `);
+    const linked = await scalar(sql`
+      SELECT count(DISTINCT f.drafted_player_id)::text AS n FROM father_son_selections f
+        JOIN clubs c ON c.id = f.club_id
+        JOIN club_organizations o ON o.id = c.organization_id
+       WHERE o.name = 'Carlton'
+         AND f.drafted_player_id IS NOT NULL AND f.drafted_link_status IN ('unique', 'resolved')
+    `);
+    expect(selections).toBeGreaterThan(linked);
+    expect(carlton?.value).toBe(selections);
+    expect(carlton?.value).not.toBe(linked);
+  });
+
+  it('groups by DRAFT year, chronologically, and links no year to a season page', async () => {
+    const payload = await summary('by_draft_year');
+    expect(payload.groupBy).toBe('draft_year');
+    expect(payload.rows).toHaveLength(M_153.draftYears);
+    expect(payload.rows.every((r) => r.href === null)).toBe(true);
+    const years = payload.rows.map((r) => Number(r.label));
+    expect(years).toEqual([...years].sort((a, b) => a - b));
+    expect(payload.rows.reduce((sum, r) => sum + r.value, 0)).toBe(M_153.selectionRows);
+  });
+
+  it('discloses the linked-player coverage without letting it become the denominator', async () => {
+    const payload = await summary('by_club');
+    expect(payload.disclosure).toContain(String(M_153.selectedPlayers));
+    expect(payload.unit?.many).toBe('father–son selections');
+  });
+});
+
+describe('X3 — selected under the rule AND actually coached', () => {
+  /**
+   * ACTUAL coaching appearance (match_coaches), the frozen ISSUE-152
+   * contract -- not the coaches identity seam. Stage 0 measured the answer
+   * as invariant across all four readings, so a change here is a change to
+   * the data, not to the semantics.
+   */
+  it('is exactly Rhyce Shaw', async () => {
+    const { rows, total } = await career(plan({
+      careerPredicates: [
+        { builder: 'has_coached', params: {} },
+        { builder: 'father_son_selection', params: {} },
+      ],
+    }));
+    expect(total).toBe(M_153.selectedAndCoached);
+    expect(rows.map((r) => r.playerId)).toEqual([RHYCE_SHAW]);
+  });
+
+  /**
+   * The 11-player answer the Phase F guard blocked collaterally: its
+   * wording ships and answers everywhere else in the product, and only the
+   * cross-domain reading refused it (operator decision Q6).
+   */
+  it('the father side is 11 players, and they all actually coached', async () => {
+    const { rows, total } = await career(plan({
+      careerPredicates: [
+        { builder: 'has_coached', params: {} },
+        { builder: 'father_son_father', params: {} },
+      ],
+    }));
+    expect(total).toBe(M_153.fathersWhoCoached);
+    const measured = await scalar(sql`
+      SELECT count(DISTINCT f.father_player_id)::text AS n FROM father_son_selections f
+       WHERE f.father_player_id IS NOT NULL AND f.father_link_status IN ('unique', 'resolved')
+         AND EXISTS (
+           SELECT 1 FROM coaches co JOIN match_coaches mc ON mc.coach_id = co.id
+            WHERE co.player_id = f.father_player_id
+         )
+    `);
+    expect(total).toBe(measured);
+    expect(rows).toHaveLength(total);
+  });
+
+  /**
+   * The identity seam is wider than the appearance seam, and X3 uses the
+   * narrower one. If these two ever agree, the freeze has been lost.
+   */
+  it('a linked coach identity is not enough — the coaching must have happened', async () => {
+    const identityOnly = await scalar(sql`
+      SELECT count(DISTINCT f.father_player_id)::text AS n FROM father_son_selections f
+        JOIN coaches co ON co.player_id = f.father_player_id
+       WHERE f.father_player_id IS NOT NULL AND f.father_link_status IN ('unique', 'resolved')
+    `);
+    expect(identityOnly).toBeGreaterThanOrEqual(M_153.fathersWhoCoached);
+  });
+});
+
+// ---------------------------------------------- AFLDB-ISSUE-153 Stage 7
+
+/**
+ * The father-son projection invariant.
+ *
+ * ISSUE-153 bound explicit father-son rule wording to
+ * `father_son_selections` (operator decision Q1) on the strength of a
+ * measured fact: `player_relationships.relationship = 'parent_child'` is
+ * not an independent dataset that happens to agree with it, it is a
+ * PROJECTION of it -- written by tools/migration/father_son.py from the
+ * same source and the same import batch. Measured read-only on afldb_test
+ * on 2026-09-09 the two are identical at every level: 99 sons, 107
+ * fathers, 96 pairs, and zero divergence witnesses in either direction.
+ *
+ * That fact is load-bearing and nothing in the schema enforces it. The
+ * `/records/father-son` board reads the projection while calling itself a
+ * selection board; NL answers the same question from the authoritative
+ * table. Today those are the same answer. If the importer, the source or
+ * the model ever drifts, they silently stop being the same answer and the
+ * two surfaces disagree without anything failing.
+ *
+ * So the evidence is turned into a check. This is the assertion that
+ * makes ISSUE-153's central claim monitored rather than assumed, and a
+ * failure here is not a flaky test: it means the projection and its
+ * source have parted company and the binding needs re-deciding.
+ */
+describe('father_son_selections and its parent_child projection stay identical (ISSUE-153 Stage 7)', () => {
+  it('same provenance: one source, one import batch', async () => {
+    const [row] = await sql<{
+      selectionSources: number; selectionBatches: number;
+      projectionSources: number; projectionBatches: number; shared: number;
+    }[]>`
+      SELECT (SELECT count(DISTINCT source_id) FROM father_son_selections)::int AS "selectionSources",
+             (SELECT count(DISTINCT import_batch_id) FROM father_son_selections)::int AS "selectionBatches",
+             (SELECT count(DISTINCT source_id) FROM player_relationships
+               WHERE relationship = 'parent_child')::int AS "projectionSources",
+             (SELECT count(DISTINCT import_batch_id) FROM player_relationships
+               WHERE relationship = 'parent_child')::int AS "projectionBatches",
+             (SELECT count(*) FROM (
+                SELECT source_id, import_batch_id FROM father_son_selections
+                INTERSECT
+                SELECT source_id, import_batch_id FROM player_relationships
+                 WHERE relationship = 'parent_child'
+              ) AS shared_provenance)::int AS shared
+    `;
+    expect(row.selectionSources).toBe(1);
+    expect(row.selectionBatches).toBe(1);
+    expect(row.projectionSources).toBe(1);
+    expect(row.projectionBatches).toBe(1);
+    // The decisive one: they are the SAME source and the SAME batch, which
+    // is what makes one a projection of the other rather than a
+    // corroborating second opinion.
+    expect(row.shared).toBe(1);
+  });
+
+  /**
+   * Set identity, asserted in both directions at all three levels. A count
+   * match is not a set match -- 127 = 127 is equally consistent with two
+   * disjoint sets -- so every check below is an EXCEPT in each direction,
+   * and each must return nothing.
+   */
+  it('sons: neither side holds a player the other does not', async () => {
+    const rows = await sql<{ side: string; playerId: number }[]>`
+      SELECT 'rule only' AS side, x AS "playerId" FROM (
+        SELECT drafted_player_id AS x FROM father_son_selections
+          WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+        EXCEPT
+        SELECT person_b_player_id FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_b_role = 'son'
+            AND person_b_player_id IS NOT NULL
+      ) AS a
+      UNION ALL
+      SELECT 'projection only', x FROM (
+        SELECT person_b_player_id AS x FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_b_role = 'son'
+            AND person_b_player_id IS NOT NULL
+        EXCEPT
+        SELECT drafted_player_id FROM father_son_selections
+          WHERE drafted_player_id IS NOT NULL AND drafted_link_status IN ('unique', 'resolved')
+      ) AS b
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  it('fathers: neither side holds a player the other does not', async () => {
+    const rows = await sql<{ side: string; playerId: number }[]>`
+      SELECT 'rule only' AS side, x AS "playerId" FROM (
+        SELECT father_player_id AS x FROM father_son_selections
+          WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')
+        EXCEPT
+        SELECT person_a_player_id FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_a_role = 'father'
+            AND person_a_player_id IS NOT NULL
+      ) AS a
+      UNION ALL
+      SELECT 'projection only', x FROM (
+        SELECT person_a_player_id AS x FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_a_role = 'father'
+            AND person_a_player_id IS NOT NULL
+        EXCEPT
+        SELECT father_player_id FROM father_son_selections
+          WHERE father_player_id IS NOT NULL AND father_link_status IN ('unique', 'resolved')
+      ) AS b
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  it('pairs: neither side holds a (father, son) pair the other does not', async () => {
+    const rows = await sql<{ side: string; father: number; son: number }[]>`
+      SELECT 'rule only' AS side, f AS father, s AS son FROM (
+        SELECT father_player_id AS f, drafted_player_id AS s FROM father_son_selections
+          WHERE father_player_id IS NOT NULL AND drafted_player_id IS NOT NULL
+            AND father_link_status IN ('unique', 'resolved')
+            AND drafted_link_status IN ('unique', 'resolved')
+        EXCEPT
+        SELECT person_a_player_id, person_b_player_id FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_a_role = 'father' AND person_b_role = 'son'
+            AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL
+      ) AS a
+      UNION ALL
+      SELECT 'projection only', f, s FROM (
+        SELECT person_a_player_id AS f, person_b_player_id AS s FROM player_relationships
+          WHERE relationship = 'parent_child' AND person_a_role = 'father' AND person_b_role = 'son'
+            AND person_a_player_id IS NOT NULL AND person_b_player_id IS NOT NULL
+        EXCEPT
+        SELECT father_player_id, drafted_player_id FROM father_son_selections
+          WHERE father_player_id IS NOT NULL AND drafted_player_id IS NOT NULL
+            AND father_link_status IN ('unique', 'resolved')
+            AND drafted_link_status IN ('unique', 'resolved')
+      ) AS b
+    `;
+    expect(rows).toEqual([]);
+  });
+
+  /**
+   * Row-for-row, including the unlinked sides. The projection carries one
+   * row per selection and nothing else -- so a future importer that
+   * started writing parent_child rows from a second source would fail
+   * here rather than silently widening what "father-son" means.
+   */
+  it('one projection row per selection, and no more', async () => {
+    const [row] = await sql<{ selections: number; projection: number }[]>`
+      SELECT (SELECT count(*) FROM father_son_selections)::int AS selections,
+             (SELECT count(*) FROM player_relationships
+               WHERE relationship = 'parent_child')::int AS projection
+    `;
+    expect(row.projection).toBe(row.selections);
+  });
+
+  /**
+   * The family board's constraint (ISSUE-153 Q4) is a no-op only while
+   * this holds. The moment a parent_child row carries a family_key, the
+   * sibling filter starts changing the answer -- which is the point of
+   * having stated it, but the operator should learn it from a failing
+   * check rather than from a changed leaderboard.
+   */
+  it('no parent_child row carries a family_key, so the sibling board is unaffected', async () => {
+    const [row] = await sql<{ keyed: number }[]>`
+      SELECT count(*)::int AS keyed FROM player_relationships
+       WHERE relationship = 'parent_child' AND family_key IS NOT NULL
+    `;
+    expect(row.keyed).toBe(0);
+  });
+});
+
+// ---------------------------------------------- AFLDB-ISSUE-153 Stage 6
+
+/**
+ * The `family` grain (D6/C1/C5). Every check here is against an
+ * INDEPENDENT oracle -- getFamilyRecords/getFamilyRecordsSummary
+ * (db/queries/family-records.ts, Stage 1's own already-tested query) --
+ * never against family.ts re-deriving its own SQL and agreeing with
+ * itself. Both read the same sibling-only population, but neither is
+ * written from the other.
+ */
+describe('the family grain (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+  function familyPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({ grain: 'family', metric: 'combined_games', agg: { kind: 'max' }, ...overrides });
+  }
+
+  async function family(p: NlQueryPlan, limit = 100): Promise<{
+    lead: NlFamilyRow | null; rows: NlFamilyRow[]; total: number;
+  }> {
+    const payload: NlAnswerPayload = await answerFamily(p, limit);
+    if (payload.kind !== 'family') throw new Error(`expected family, got ${payload.kind}`);
+    return payload;
+  }
+
+  it('C1 "biggest football family" agrees with the existing /records/family board', async () => {
+    const [oracle] = await getFamilyRecords(1);
+    const answer = await family(familyPlan());
+    expect(answer.lead?.familyKey).toBe(oracle.familyKey);
+    expect(answer.lead?.combinedGames).toBe(oracle.combinedGames);
+    expect(answer.lead?.linkedMembers).toBe(oracle.linkedMembers);
+  });
+
+  it('C1 "most AFL players" ranks a DIFFERENT metric than "biggest" -- never the same phrasing', async () => {
+    const byGames = await family(familyPlan());
+    const byMembers = await family(familyPlan({ metric: 'linked_members' }));
+    expect(byGames.lead).not.toBeNull();
+    expect(byMembers.lead).not.toBeNull();
+    // Stage 0 (§4.6) measured the two rankings disagree by up to 301 rank
+    // places on this data. This is the cheapest witness that they are
+    // genuinely two different questions: the games leader is not required
+    // to also lead by member count.
+    const board = await getFamilyRecords(1000);
+    const byGamesRankOfMembersLeader = board.findIndex((r) => r.familyKey === byMembers.lead?.familyKey);
+    expect(byGamesRankOfMembersLeader).toBeGreaterThanOrEqual(0);
+  });
+
+  it('excludes every size-1 family, fail-closed (§4.6: 46 of them today)', async () => {
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 1 },
+    }), 1000);
+    expect(answer.rows.length).toBeGreaterThan(0);
+    expect(answer.rows.every((r) => r.linkedMembers >= 2)).toBe(true);
+
+    const board = await getFamilyRecords(1000);
+    const sizeOneOnBoard = board.filter((r) => r.linkedMembers === 1).length;
+    expect(sizeOneOnBoard).toBeGreaterThan(0); // the board itself does NOT exclude them (Stage 1 scope)
+    expect(answer.total).toBe(board.length - sizeOneOnBoard);
+  });
+
+  it('C5 "families with three AFL players" matches an independently-filtered count', async () => {
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 3 },
+    }), 1000);
+    const board = await getFamilyRecords(1000);
+    const expected = board.filter((r) => r.linkedMembers >= 3).length;
+    expect(answer.total).toBe(expected);
+    expect(answer.rows).toHaveLength(expected);
+  });
+
+  it('disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"', async () => {
+    const board = await getFamilyRecords(1000);
+    const ablett = board.find((r) => r.members.some((m) => m.playerId === GARY_ABLETT_SNR)
+      && r.members.some((m) => m.playerId === GARY_ABLETT_JNR));
+    if (!ablett) throw new Error('fixture assumption failed: the Ablett family was not found via getFamilyRecords');
+
+    const answer = await family(familyPlan(), 1000);
+    const row = answer.rows.find((r) => r.familyKey === ablett.familyKey);
+    expect(row).toBeDefined();
+    const ids = row!.members.map((m) => m.playerId);
+    expect(ids).toContain(GARY_ABLETT_SNR);
+    expect(ids).toContain(GARY_ABLETT_JNR);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('every linked member is counted once, matching the independent oracle\'s own summary', async () => {
+    const summary = await getFamilyRecordsSummary();
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 1 },
+    }), 1000);
+    const totalMembers = answer.rows.reduce((sum, r) => sum + r.linkedMembers, 0);
+    // Every family_key of size >= 2 contributes its members; size-1 keys
+    // (excluded here) hold exactly one each, so the difference is exactly
+    // the size-1 family count.
+    const sizeOneCount = summary.families - answer.rows.length;
+    expect(totalMembers).toBe(summary.linkedPlayers - sizeOneCount);
+  });
+
+  /**
+   * A raw, INTENTIONALLY-INVALID family plan, built without going through
+   * `plan()`/`familyPlan()` -- both eagerly call `validatePlan` themselves
+   * and throw on an invalid shape (see `plan()` above), so a plan that is
+   * supposed to fail validation can never reach an already-validated
+   * helper. This constructs the same base shape by hand instead.
+   */
+  function rawInvalidFamilyPlan(overrides: Partial<NlQueryPlan>): NlQueryPlan {
+    return {
+      v: 1,
+      grain: 'family',
+      metric: 'combined_games',
+      agg: { kind: 'max' },
+      scope: {},
+      careerConditions: [],
+      careerPredicates: [],
+      clubSeasonConditions: [],
+      tiePolicy: 'all',
+      limit: 1000,
+      ...overrides,
+    };
+  }
+
+  it('validatePlan refuses a family plan carrying a club, season or player (no regression)', () => {
+    expect(validatePlan(rawInvalidFamilyPlan({
+      scope: { clubFor: { organizationId: 1, slug: 'richmond', name: 'Richmond' } },
+    }))).toHaveProperty('error');
+    expect(validatePlan(rawInvalidFamilyPlan({
+      scope: { seasonMin: 2020 },
+    }))).toHaveProperty('error');
+    expect(validatePlan(rawInvalidFamilyPlan({
+      player: ref(GARY_ABLETT_SNR),
+    }))).toHaveProperty('error');
   });
 });

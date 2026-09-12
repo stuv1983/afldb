@@ -124,8 +124,12 @@ describe('GRID_BUILDERS catalogue', () => {
     // then 6 with AFLDB-ISSUE-152 Phase D (family relationships): the three
     // parent-child population builders and the three per-player ones; then
     // 2 with AFLDB-ISSUE-152 Phase F (played AND coached): has_coached and
-    // coached_club.
-    expect(Object.keys(GRID_BUILDERS)).toHaveLength(166);
+    // coached_club; then 2 with AFLDB-ISSUE-153 Stage 3 (the father-son
+    // selection's own scopes): father_son_selection_for_club and
+    // father_son_selection_between, the selecting club folded by
+    // organization lineage and the DRAFT year -- which is not a playing
+    // season and is labelled a draft year in every parameter a reader sees.
+    expect(Object.keys(GRID_BUILDERS)).toHaveLength(168);
     expect(GRID_BUILDERS.under_22_selection).toEqual({
       key: 'under_22_selection',
       label: 'Selected in AFLPA 22Under22 team',

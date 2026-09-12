@@ -42,9 +42,11 @@
                3 Playwright batches. The accepted historical evidence
                (AFLDB-ISSUE-152 section 21.3); this is what the script has
                always checked and its expectations do not move.
-      current  the Phase D acceptance corpus -- 319 = 238 + 81, 4 batches:
-               the same 271 rows in the same order plus the 48 relationship
-               rows. Verify this before .\tools\issue-152\phase-d-corpus.ps1.
+      current  the post-ISSUE-153 re-pinned 319-row corpus -- 242 + 77,
+               4 batches: the same 271 rows in the same order plus the 48
+               relationship rows. The accepted Phase D run's 238 + 81 split
+               remains historical evidence; verify this current pin before
+               .\tools\issue-152\phase-d-corpus.ps1.
 
     Both sets are pinned INDEPENDENTLY here, in build-phase-g-corpora.ts and
     in tests/nl-ui-corpus.test.ts, so a corpus edit has to be made three times
@@ -60,7 +62,7 @@ param(
 # builder: a single source of truth cannot catch an edit made in that source.
 $EXPECTED = @{
     new     = @{ Rows = 271; Plan = 212; Decline = 59; Batches = 3 }
-    current = @{ Rows = 319; Plan = 238; Decline = 81; Batches = 4 }
+    current = @{ Rows = 319; Plan = 242; Decline = 77; Batches = 4 }
 }
 $pins = $EXPECTED[$Set]
 

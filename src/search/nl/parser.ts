@@ -70,6 +70,8 @@ import {
   FIRST_KICK_CONSECUTIVE_MAX, FIRST_KICK_CONSECUTIVE_RE, FIRST_KICK_GOAL_RE,
   FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
   FATHER_SON_FATHER_CUES, FATHER_SON_FATHER_NOISE, FATHER_SON_RULE_RE,
+  FATHER_SON_SELECTION_CUES, FATHER_SON_PLAYING_SEASON_MIX_RE, FATHER_SON_SUMMARY_CUES,
+  FAMILY_BIGGEST_RE, FAMILY_MOST_PLAYERS_RE, FAMILY_SIZE_CLAUSE_RE, FAMILY_SIZE_OP_WORDS,
   RELATIONSHIP_CLAUSE_NOISE, RELATIONSHIP_OF_PLAYER_RE, RELATIONSHIP_OUT_OF_SCOPE,
   RELATIONSHIP_POPULATION_CUES, RELATIONSHIP_POSSESSIVE_RE, RELATIONSHIP_SYMMETRIC_CUES,
   DECADE_RE,
@@ -702,7 +704,27 @@ function extractRelationship(text: string, raw: string): RelationshipExtraction 
     return finish({ builders: ['father_son_father'] }, remaining);
   }
 
-  // 2. The D8 guard.
+  // 1b. FS1 -- the son's side of the same rule (AFLDB-ISSUE-153 Stage 2,
+  // decision Q1/Q1a). Checked here, after FS4 and before the guard, so
+  // the father side keeps its claim on the wording it already ships
+  // ("fathers of father-son selections" is a father question, not a son
+  // question that happens to contain "selections"), and so the guard
+  // below is left holding only the bare and collective forms.
+  for (const cue of FATHER_SON_SELECTION_CUES) {
+    const match = cue.exec(text);
+    if (!match) continue;
+    consumed.push(match[0]);
+    let remaining = stripMatch(text, match[0]);
+    for (const noise of FATHER_SON_FATHER_NOISE) {
+      const noiseMatch = noise.exec(remaining);
+      if (!noiseMatch) continue;
+      consumed.push(noiseMatch[0]);
+      remaining = stripMatch(remaining, noiseMatch[0]);
+    }
+    return finish({ builders: ['father_son_selection'] }, remaining);
+  }
+
+  // 2. The D8 guard -- now only the bare and collective father-son forms.
   if (FATHER_SON_RULE_RE.test(text)) return { text, consumed: [] };
 
   // 3. Out of scope, by name.
@@ -761,6 +783,59 @@ function extractRelationship(text: string, raw: string): RelationshipExtraction 
   }
   if (builders.length === 0) return { text, consumed: [] };
   return finish({ builders }, remaining);
+}
+
+// --------------------------------------------------------- family grain
+
+type FamilyGrainExtraction = {
+  text: string;
+  consumed: string[];
+  family?: { metric: 'combined_games' | 'linked_members'; metricCondition?: NlMetricCondition };
+};
+
+/**
+ * AFLDB-ISSUE-153 Stage 6 (decision D6). Claims exactly the three tested
+ * family-GRAIN phrasings -- "biggest football family/families", "which
+ * family has the most AFL players", "families with three AFL players" --
+ * and nothing else. Called BEFORE extractRelationship, on purpose: a
+ * match here removes the family/families word from `text`, so
+ * RELATIONSHIP_OUT_OF_SCOPE's own family/relatives entry (checked inside
+ * extractRelationship) never gets to test a phrasing this function has
+ * already claimed. Every other family/relatives wording reaches
+ * extractRelationship completely untouched and keeps declining exactly as
+ * it did before Stage 6.
+ *
+ * Order among the three cues does not matter -- none of their trigger
+ * words overlap -- but is kept in the order the runbook lists them (C1
+ * "biggest", C1 "most players", C5 "with N players").
+ */
+function extractFamilyGrain(text: string): FamilyGrainExtraction {
+  const biggest = FAMILY_BIGGEST_RE.exec(text);
+  if (biggest) {
+    return { text: stripMatch(text, biggest[0]), consumed: [biggest[0]], family: { metric: 'combined_games' } };
+  }
+
+  const mostPlayers = FAMILY_MOST_PLAYERS_RE.exec(text);
+  if (mostPlayers) {
+    return { text: stripMatch(text, mostPlayers[0]), consumed: [mostPlayers[0]], family: { metric: 'linked_members' } };
+  }
+
+  const sizeClause = FAMILY_SIZE_CLAUSE_RE.exec(text);
+  if (sizeClause) {
+    const opPhrase = sizeClause[1];
+    const op = opPhrase ? FAMILY_SIZE_OP_WORDS[opPhrase] : 'gte';
+    const countWord = sizeClause[2];
+    const value = /^\d+$/.test(countWord) ? Number(countWord) : NUMBER_WORDS[countWord];
+    if (value !== undefined && op) {
+      return {
+        text: stripMatch(text, sizeClause[0]),
+        consumed: [sizeClause[0]],
+        family: { metric: 'linked_members', metricCondition: { op, value } },
+      };
+    }
+  }
+
+  return { text, consumed: [] };
 }
 
 // ------------------------------------------- marquee matches & rivalries
@@ -1801,6 +1876,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // question that asked who both played for AND coached Richmond (27).
   let crossDomainPlayedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
   let crossDomainCoachedClub: NlEntityMatch<NlClubDirectoryEntry> | undefined;
+  // AFLDB-ISSUE-153 Stage 5 (X3). The father-son side of a cross-domain
+  // composition, claimed inside the coaching reading because step 5e's
+  // relationship extractor is suppressed for one. Only ever one of the
+  // two explicit builders, and only when the wording named the rule.
+  let crossDomainFatherSonBuilder: 'father_son_selection' | 'father_son_father' | undefined;
   if (COACH_CUE_RE.test(text) || COACHED_BY_RE.test(text)) {
     // AFLDB-ISSUE-152 Phase F. The CROSS-DOMAIN reading is elected FIRST,
     // before coached_by, premiership_coach and coach_record. coach_record
@@ -1827,20 +1907,49 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
         return { status: 'none', reason: 'unrecognised', report };
       }
 
-      // The F-D1 boundary, made explicit. The SON side of the father-son
-      // rule is deferred with D8 (AFLDB-ISSUE-153): no witness can
-      // distinguish its two readings. Refusing it here keeps the product
-      // surface honest -- without this, a phrase that declines on its own
-      // could become answerable merely by appending "and also coached",
-      // and the coaching conjunct would be doing work no reader could
-      // predict. The D8 guard itself is untouched.
+      // The F-D1 boundary, NARROWED to its own justification
+      // (AFLDB-ISSUE-153 Stage 5, operator decision Q6).
+      //
+      // F-D1's reason was that a phrase which declines on its own must
+      // not become answerable merely by appending "and also coached".
+      // That reason applies to the BARE and COLLECTIVE forms, which still
+      // decline on their own and still decline here. It never applied to
+      // wording that names the rule, a selection, a draft or a pick: the
+      // father side of exactly that wording has shipped and answered
+      // since Phase D (rel_022-rel_024), and the son side answers as of
+      // Stage 2. As written the guard tested for father-son wording of
+      // ANY kind, so it also refused the father-side composition -- an
+      // 11-player answer whose wording is accepted everywhere else in the
+      // product.
+      //
+      // Step 5e's relationship extractor is suppressed for a coaching
+      // reading, so the cue is claimed here instead, and ONLY these two
+      // explicit cue lists are: no other relationship composes with
+      // coaching, and none is being made to.
       if (FATHER_SON_RULE_RE.test(text)) {
-        report.confidence = 1;
-        report.notes.push(
-          'AFLDB cannot yet answer what "father–son" means on its own, '
-          + 'so it cannot answer it in combination with a coaching question either.',
-        );
-        return { status: 'none', reason: 'unrecognised', report };
+        const fatherCue = FATHER_SON_FATHER_CUES.find((cue) => cue.test(text));
+        const sonCue = fatherCue ? undefined : FATHER_SON_SELECTION_CUES.find((cue) => cue.test(text));
+        const explicit = fatherCue ?? sonCue;
+        if (!explicit) {
+          report.confidence = 1;
+          report.notes.push(
+            'AFLDB cannot yet answer what "father–son" means on its own, '
+            + 'so it cannot answer it in combination with a coaching question either.',
+          );
+          return { status: 'none', reason: 'unrecognised', report };
+        }
+        const match = explicit.exec(text);
+        if (match) {
+          consumedTokens.push(match[0]);
+          text = stripMatch(text, match[0]);
+          for (const noise of FATHER_SON_FATHER_NOISE) {
+            const noiseMatch = noise.exec(text);
+            if (!noiseMatch) continue;
+            consumedTokens.push(noiseMatch[0]);
+            text = stripMatch(text, noiseMatch[0]);
+          }
+          crossDomainFatherSonBuilder = fatherCue ? 'father_son_father' : 'father_son_selection';
+        }
       }
 
       const roles = assignCrossDomainClubs(clubScanText, [
@@ -2106,6 +2215,22 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     return { status: 'none', reason: 'unrecognised', report };
   }
 
+  // 5d-bis. The family GRAIN (AFLDB-ISSUE-153 Stage 6, D6). Claimed BEFORE
+  // extractRelationship for exactly one reason: a match here removes the
+  // family/families word from `text`, so the family/relatives entry in
+  // RELATIONSHIP_OUT_OF_SCOPE (tested inside extractRelationship, next)
+  // never gets a chance to decline a phrasing D6 already answers. Every
+  // other family/relatives wording is untouched.
+  //
+  // Suppressed for a coaching or after-siren question, same as the
+  // relationship extractor immediately below and for the same reason: a
+  // family answer needs no coach/siren context to already be underway.
+  const familyGrainResult: FamilyGrainExtraction = coachReading !== null || afterSirenReading
+    ? { text, consumed: [] }
+    : extractFamilyGrain(text);
+  text = familyGrainResult.text;
+  consumedTokens.push(...familyGrainResult.consumed);
+
   // 5e. Family relationships (AFLDB-ISSUE-152 Phase D). Placed here, after
   // the achievement phrase and before every metric extractor and the
   // player-name scan, for the reason step 5a is: the relationship noun has
@@ -2128,6 +2253,29 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     return { status: 'none', reason: 'unrecognised', report };
   }
   const relationshipRead = !!relationshipResult.builders || !!relationshipResult.ofPlayerBuilder;
+
+  // 5e-bis. FS6 (AFLDB-ISSUE-153 Stage 4). A father-son SELECTION question
+  // that also says "by club" or "by year" is asking for a distribution of
+  // the selections, not a list of the players. Claimed here, immediately
+  // after the relationship cue and BEFORE any metric extractor runs: left
+  // in the text, "by club" resolves to the clubs_played metric and the
+  // question answers a career-breadth ranking instead of the grouping it
+  // asked for.
+  //
+  // Only ever elected by wording that already bound to the selection
+  // record, so "brothers by club" is untouched -- FS6 is a shape this one
+  // family has, not a generic grouping the parser now offers everyone.
+  let fatherSonSummaryKind: 'by_club' | 'by_draft_year' | undefined;
+  if (relationshipResult.builders?.includes('father_son_selection')) {
+    for (const [cue, summaryKind] of FATHER_SON_SUMMARY_CUES) {
+      const match = cue.exec(text);
+      if (!match) continue;
+      consumedTokens.push(match[0]);
+      text = stripMatch(text, match[0]);
+      fatherSonSummaryKind = summaryKind;
+      break;
+    }
+  }
 
   // 5b. "N disposal games" idiom -- resolves the metric AND acts as a
   // single-game grain cue in one step, so "games" never lingers in the
@@ -2562,7 +2710,21 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     && !matchTypeResult.matchType
   );
 
-  if (achievementResult.achievementKey && achievementResult.summaryKind) {
+  if (familyGrainResult.family) {
+    // AFLDB-ISSUE-153 Stage 6 (D6/C1/C5). Checked first, ahead of every
+    // other branch: the cue only exists because extractFamilyGrain already
+    // matched one of the three locked family-grain phrasings, so nothing
+    // else can be competing for this question.
+    grain = 'family';
+    metric = familyGrainResult.family.metric;
+  } else if (fatherSonSummaryKind) {
+    // AFLDB-ISSUE-153 Stage 4 (FS6). A distribution of SELECTIONS, which
+    // is a group-and-count and not a player list -- the same grain and the
+    // same payload shape an achievement summary uses, over a different
+    // table. Checked first for the same reason that branch is: the cue
+    // only exists because the father-son selection cue already matched.
+    grain = 'achievement_summary';
+  } else if (achievementResult.achievementKey && achievementResult.summaryKind) {
     // "which club has had the most players kick a goal with their first
     // kick" -- a group-and-count over the achievement, not a player list.
     // Checked first: the summary cue only exists because the achievement
@@ -2733,7 +2895,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // relationship would be dropped on the way to SQL and the reader would
   // be shown a 2015 goalkicking leaderboard under a question about
   // brothers. Refusing by name is the honest outcome (ISSUE-110).
-  if (relationshipRead && grain !== 'player_career') {
+  // AFLDB-ISSUE-153 Stage 4 exempts FS6, and only FS6: its grain carries
+  // no careerPredicates by design, because it does not answer with players
+  // at all. It groups the SELECTIONS -- all 127 of them, including the 28
+  // whose selected player is unlinked -- so there is nothing to drop on
+  // the way to SQL and nothing for this guard to protect. validatePlan
+  // refuses any scope it cannot honour.
+  if (relationshipRead && grain !== 'player_career' && !fatherSonSummaryKind) {
     report.confidence = 1;
     report.notes.push(
       'A family-relationship question is answered across whole careers, '
@@ -2801,6 +2969,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   //     threshold must never silently disappear.
   let metricCondition = pendingMetricCondition;
   if (grain === 'coach_record') metricCondition = coachCondition;
+  // AFLDB-ISSUE-153 Stage 6 (C5). extractFamilyGrain already bound its own
+  // threshold to the linked_members metric; nothing upstream of grain
+  // election could have produced a competing metricCondition for a family
+  // question, so this simply overwrites whatever pendingMetricCondition
+  // (always undefined here) held.
+  if (grain === 'family') metricCondition = familyGrainResult.family?.metricCondition;
   const soleCareerCondition = careerResult.conditions.length === 1 && careerResult.conditions[0].kind === 'column'
     ? careerResult.conditions[0]
     : null;
@@ -3006,6 +3180,15 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     } else {
       careerPredicates.push({ builder: 'has_coached', params: {} });
     }
+    // AFLDB-ISSUE-153 Stage 5 (X3). The father-son conjunct, claimed at
+    // the narrowed F-D1 guard above. Emitted UNSCOPED on purpose: X3
+    // names no club and no year, the coaching half owns any club that is
+    // named, and a father-son scope alongside a cross-domain club would
+    // be a composition nothing has proven. It is a conjunction, never a
+    // chronology -- exactly the frozen Phase F contract.
+    if (crossDomainFatherSonBuilder) {
+      careerPredicates.push({ builder: crossDomainFatherSonBuilder, params: {} });
+    }
   }
   // AFLDB-ISSUE-152 Phase D. The population readings are parameterless
   // predicates; the per-player reading takes the resolved person's id as
@@ -3014,7 +3197,48 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // Neither owns a club or a season, so a plan carrying either fails
   // validatePlan's ownership gate rather than answering unscoped.
   if (grain === 'player_career' && relationshipResult.builders) {
-    for (const builder of relationshipResult.builders) careerPredicates.push({ builder, params: {} });
+    for (const builder of relationshipResult.builders) {
+      // AFLDB-ISSUE-153 Stage 3 (FS2/FS3). The father-son SELECTION is the
+      // one relationship reading that owns scope, because
+      // father_son_selections is the one table that carries any: a
+      // selecting club and a draft year. Both are bound as the builder's
+      // own parameters, exactly as first_kick_goal_for_club /
+      // first_kick_goal_between bind theirs, so validatePlan's ownership
+      // gate sees the field consumed instead of failing it closed -- and
+      // so the year is compiled as draft_year and NEVER as a playing
+      // season. Each scoped builder asserts the selection itself, so the
+      // bare predicate is added only when neither scope claimed it.
+      if (builder === 'father_son_selection') {
+        const scoped: typeof careerPredicates = [];
+        if (clubFor) {
+          scoped.push({
+            builder: 'father_son_selection_for_club',
+            params: { club: String(clubFor.entity.organizationId) },
+          });
+        }
+        // The year is claimed as a DRAFT year -- unless the question also
+        // talks about playing, in which case it is genuinely ambiguous
+        // between a draft year and a playing season, the two share no
+        // rows at all, and the year is deliberately left unowned so
+        // validatePlan's ownership gate refuses the whole plan rather
+        // than answering one of the two questions at random.
+        if (
+          (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
+          && !FATHER_SON_PLAYING_SEASON_MIX_RE.test(normalised)
+        ) {
+          scoped.push({
+            builder: 'father_son_selection_between',
+            params: {
+              from: String(seasons.seasonMin ?? NL_LIMITS.minSeason),
+              to: String(seasons.seasonMax ?? NL_LIMITS.maxSeason),
+            },
+          });
+        }
+        careerPredicates.push(...(scoped.length > 0 ? scoped : [{ builder, params: {} }]));
+        continue;
+      }
+      careerPredicates.push({ builder, params: {} });
+    }
   }
   if (grain === 'player_career' && relationshipResult.ofPlayerBuilder && player) {
     careerPredicates.push({
@@ -3147,7 +3371,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // leader is exactly the shape the threshold exists to prevent. A
     // min/top_n alongside a threshold is left alone for validatePlan to
     // refuse honestly.
-    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record')
+    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record' || grain === 'family')
       && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'list')
     ? { kind: 'list' }
     // "who coached Richmond" names no statistic, so there is nothing to
@@ -3221,8 +3445,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     careerConditions,
     careerPredicates,
     clubSeasonConditions,
-    ...(grain === 'achievement_summary' && achievementResult.achievementKey && achievementResult.summaryKind
+    ...(grain === 'achievement_summary' && !fatherSonSummaryKind
+      && achievementResult.achievementKey && achievementResult.summaryKind
       ? { achievementSummary: { achievementKey: achievementResult.achievementKey, kind: achievementResult.summaryKind } }
+      : {}),
+    ...(grain === 'achievement_summary' && fatherSonSummaryKind
+      ? { fatherSonSummary: { kind: fatherSonSummaryKind } }
       : {}),
     ...(headToHead ? { headToHead } : {}),
     ...(streakResult.streakDefinition ? { streakDefinition: streakResult.streakDefinition } : {}),

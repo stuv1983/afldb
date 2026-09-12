@@ -1054,17 +1054,45 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
     expect(validatePlan(x1({ grain: 'player_game', mode: 'single', metric: 'goals' }))).toHaveProperty('error');
   });
 
-  it('V6: a father–son selection is a list, never a ranking', () => {
+  // V6 -- narrowed by AFLDB-ISSUE-153 Stage 2 to the composition D9 is
+  // actually about. The COMPOSED question is still a list and never a
+  // ranking; the plain FS1 ranking is now the exact mirror of the shipped
+  // father-side rel_024 and must answer, or the son side would be denied a
+  // wording the father side is given (decision Q1 consequence 3).
+  it('V6: a father–son selection COMPOSED with coaching is a list, never a ranking', () => {
     const fs = { builder: 'father_son_selection', params: {} };
     expect(validatePlan(basePlan({
       metric: 'games', agg: { kind: 'max' }, careerPredicates: [fs, hasCoached],
     }))).toHaveProperty('error');
   });
 
-  it('V7: a father–son selection on its own is still the deferred D8 question', () => {
+  it('V6: the UNcomposed father–son selection ranking answers, mirroring the father side', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: 'games', agg: { kind: 'max' }, careerPredicates: [fs],
+    }))).not.toHaveProperty('error');
+  });
+
+  // V7 is GONE: D8 is decided (operator decision Q1), so a father–son
+  // selection standing on its own is FS1 and answers. The bare and
+  // collective forms still decline, but they decline in the parser now,
+  // at the narrowed FATHER_SON_RULE_RE guard, which is where the
+  // explicit-versus-collective distinction actually lives.
+  it('V7 is retired: a father–son selection on its own is FS1 and answers', () => {
     const fs = { builder: 'father_son_selection', params: {} };
     expect(validatePlan(basePlan({
       metric: null, agg: { kind: 'list' }, careerPredicates: [fs],
+    }))).not.toHaveProperty('error');
+  });
+
+  // V6b. "by club" on a selection question means the SELECTING club, and
+  // the generic metric extractor reads it as clubs_played -- the number of
+  // clubs the player went on to play for. Refused rather than answered
+  // with the plausible wrong number.
+  it('V6b: a father–son selection never answers a clubs_played reading of "by club"', () => {
+    const fs = { builder: 'father_son_selection', params: {} };
+    expect(validatePlan(basePlan({
+      metric: 'clubs_played', agg: { kind: 'list' }, careerPredicates: [fs],
     }))).toHaveProperty('error');
   });
 
@@ -1085,5 +1113,61 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
       careerPredicates: [hasCoached],
       crossDomainClubs: { played: RICHMOND, coached: RICHMOND },
     }))).toHaveProperty('error');
+  });
+});
+
+// ------------------------------------------ family (AFLDB-ISSUE-153 Stage 6)
+
+function familyPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return basePlan({ grain: 'family', metric: 'combined_games', agg: { kind: 'max' }, limit: 50, ...overrides });
+}
+
+describe('validatePlan: family', () => {
+  it('accepts a ranked plan (C1) for either metric', () => {
+    expect(validatePlan(familyPlan())).not.toHaveProperty('error');
+    expect(validatePlan(familyPlan({ metric: 'linked_members' }))).not.toHaveProperty('error');
+  });
+
+  it('accepts a thresholded list (C5) and refuses a threshold with no list agg', () => {
+    expect(validatePlan(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 3 },
+    }))).not.toHaveProperty('error');
+    // Same condition, ranked instead of listed: refused, the same rule
+    // every other thresholdable grain (player_game/season, coach_record,
+    // after_siren) already enforces.
+    expect(validatePlan(familyPlan({
+      metric: 'linked_members', agg: { kind: 'max' }, metricCondition: { op: 'gte', value: 3 },
+    }))).toHaveProperty('error');
+  });
+
+  it('refuses a family list with no threshold to qualify against', () => {
+    expect(validatePlan(familyPlan({ agg: { kind: 'list' } }))).toHaveProperty('error');
+  });
+
+  it('requires a recognised family metric, and refuses a metric from another grain', () => {
+    expect(validatePlan(familyPlan({ metric: null }))).toHaveProperty('error');
+    expect(validatePlan(familyPlan({ metric: 'games' }))).toHaveProperty('error');
+  });
+
+  it.each([
+    ['player', { player: { id: 1, slug: 'p', name: 'P' } }],
+    ['coach', { coach: HARDWICK }],
+    ['playerIdIn', { scope: { playerIdIn: [1, 2] } }],
+    ['clubFor', { scope: { clubFor: RICHMOND } }],
+    ['clubAgainst', { scope: { clubAgainst: RICHMOND } }],
+    ['venue', { scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }],
+    ['matchType', { scope: { matchType: 'finals' as const } }],
+    ['roundNumber', { scope: { roundNumber: 5 } }],
+    ['seasonMin/Max', { scope: { seasonMin: 2000, seasonMax: 2010 } }],
+    ['careerConditions', { careerConditions: [{ kind: 'column' as const, column: 'games' as const, op: 'gte' as const, value: 100 }] }],
+    ['careerPredicates', { careerPredicates: [{ builder: 'has_brother', params: {} }] }],
+    ['clubSeasonConditions', { clubSeasonConditions: [{ kind: 'premier' as const }] }],
+    ['achievementSummary', { achievementSummary: { achievementKey: 'first_kick_goal' as const, kind: 'by_club' as const } }],
+    ['headToHead', { headToHead: { kind: 'record' as const } }],
+    ['streakDefinition', { streakDefinition: { kind: 'win' as const } }],
+    ['boundary', { boundary: { event: 'debut' as const, where: 'grand_final' as const } }],
+    ['debutGame', { debutGame: true }],
+  ] as [string, Partial<NlQueryPlan>][])('refuses a family plan carrying %s -- no club, season, player or career condition applies', (_label, shape) => {
+    expect(validatePlan(familyPlan(shape))).toHaveProperty('error');
   });
 });

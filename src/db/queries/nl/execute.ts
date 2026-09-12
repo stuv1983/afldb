@@ -1,9 +1,11 @@
 import 'server-only';
 
 import { answerAchievementSummary } from '@/db/queries/nl/achievement-summary';
+import { answerFatherSonSummary } from '@/db/queries/nl/father-son-summary';
 import { answerAfterSiren } from '@/db/queries/nl/after-siren';
 import { answerClubSeason } from '@/db/queries/nl/club-season';
 import { answerCoachRecord } from '@/db/queries/nl/coach-record';
+import { answerFamily } from '@/db/queries/nl/family';
 import { answerHeadToHead } from '@/db/queries/nl/head-to-head';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
 import { answerPlayerGame } from '@/db/queries/nl/player-game';
@@ -43,10 +45,18 @@ export async function executePlan(plan: NlQueryPlan): Promise<NlAnswerPayload> {
       return answerCoachRecord(plan, cappedLimit);
     case 'after_siren':
       return answerAfterSiren(plan, cappedLimit);
+    case 'family':
+      return answerFamily(plan, cappedLimit);
     case 'achievement_summary':
       // Groups, not rows: the limit above caps a player list and has no
       // meaning for a per-club or per-decade count, which is bounded by
       // how many clubs and decades exist.
-      return answerAchievementSummary(plan);
+      //
+      // AFLDB-ISSUE-153 Stage 4 (FS6). Two summaries share this grain and
+      // this payload shape, over two different tables. The plan says which
+      // -- validatePlan has already refused a plan carrying both.
+      return plan.fatherSonSummary
+        ? answerFatherSonSummary(plan)
+        : answerAchievementSummary(plan);
   }
 }

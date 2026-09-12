@@ -1307,6 +1307,39 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT father_player_id FROM father_son_selections
                            WHERE father_player_id IS NOT NULL
                              AND father_link_status IN ('unique', 'resolved'))`;
+    // AFLDB-ISSUE-153 Stage 3. The two scopes only father_son_selections
+    // carries -- player_relationships has no club and no date at all -- so
+    // these are the only shape in which FS2 and FS3 are expressible.
+    //
+    // FS2: the SELECTING club, folded through clubs.organization_id, the
+    // same lineage rule drafted_by_club above uses and every other club
+    // scope in the product follows. Renames combine (org 16 is North
+    // Melbourne + Kangaroos, 7 selections; org 24 is Footscray + Western
+    // Bulldogs, 11); a MERGER does not, so Fitzroy's one 1993 selection
+    // stays Fitzroy's and is never folded into Brisbane. This is the
+    // club that MADE the selection, which is not the same question as
+    // the club the player went on to play for.
+    case 'father_son_selection_for_club': {
+      const orgId = requireInt(axis, 'club', 'Club');
+      return sql`p.id IN (SELECT fss.drafted_player_id FROM father_son_selections fss
+                           WHERE fss.drafted_player_id IS NOT NULL
+                             AND fss.drafted_link_status IN ('unique', 'resolved')
+                             AND fss.club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgId}))`;
+    }
+    // FS3: draft_year, the year the SELECTION was made. It is NOT a
+    // playing season and must never be compiled as one: measured on
+    // afldb_test, 0 of the 99 linked selected players debuted in their
+    // draft year, 60 debuted a year later and 39 two or more years later
+    // (AFLDB-ISSUE-153 Stage 0 §4.4). The two readings share no rows at
+    // all, so folding this into the career season range would answer a
+    // different question for every row in the result.
+    case 'father_son_selection_between': {
+      const [lo, hi] = orderedRange(axis, 'from', 'From draft year', 'to', 'To draft year');
+      return sql`p.id IN (SELECT drafted_player_id FROM father_son_selections
+                           WHERE drafted_player_id IS NOT NULL
+                             AND drafted_link_status IN ('unique', 'resolved')
+                             AND draft_year BETWEEN ${lo} AND ${hi})`;
+    }
     // AFLDB-ISSUE-118 §23.31. An explicit canonical `sibling` row whose label
     // establishes brothers, both sides linked to canonical players, and the
     // brother having played a VFL/AFL match (player_career_stats.games > 0).

@@ -1122,8 +1122,16 @@ function relationshipFrame(noun: string): RegExp {
  *  - cousin, grandparent, aunt/uncle, spouse and in-law have ZERO rows;
  *  - mother/daughter cannot exist: parent_child is exhaustively
  *    father -> son (measured, 127 of 127);
- *  - "family", "relatives" and "related to" are the family GRAIN (D6) and
- *    the open question of what a family IS -- AFLDB-ISSUE-153;
+ *  - "family", "relatives" and "related to" are still declined here in
+ *    every OTHER wording. AFLDB-ISSUE-153 Stage 6 (decision D6) answers
+ *    exactly three tested phrasings -- "biggest football family/families",
+ *    "which family has the most AFL players", "families with N AFL
+ *    players" -- and FAMILY_BIGGEST_RE / FAMILY_MOST_PLAYERS_RE /
+ *    FAMILY_SIZE_CLAUSE_RE below claim those, and only those, BEFORE this
+ *    list is ever tested (see extractFamilyGrain in parser.ts). A bare
+ *    "Brent Harvey's family" or "families" with no ranking/size wording
+ *    still falls through to here and declines exactly as before; D6 did
+ *    not decide what a family answer to THAT question would be;
  *  - "pairs" asks for a pairing, which is not a player.
  */
 export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
@@ -1138,6 +1146,52 @@ export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
   [/\brelated to\b/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
   [relationshipFrame('(?:pairs?|duos?|combinations?)'), 'AFLDB answers relationship questions about players, not about pairings.'],
 ];
+
+/**
+ * AFLDB-ISSUE-153 Stage 6, decision D6 (§7.7/§11.12.5). The family GRAIN:
+ * `player_relationships` rows of type 'sibling', grouped by `family_key`
+ * (Stage 1 already narrowed `getFamilyRecords` to exactly this population).
+ * Extension is siblings only -- no parent-child fold (R3 stays a separate,
+ * unallocated issue) -- and "biggest" always means combined career games,
+ * matching what `/records/family` already ranks by; "most players" is a
+ * different, never-interchangeable wording for the member-count reading.
+ *
+ * Each cue is checked, and its match consumed, BEFORE extractRelationship
+ * runs (parser.ts) -- not inside it -- so the family/relatives entry in
+ * RELATIONSHIP_OUT_OF_SCOPE above never sees these three specific
+ * phrasings: by the time that decline is tested, the words matched here
+ * are already gone from the text. Every other family/relatives wording is
+ * untouched and keeps declining exactly as it did before Stage 6.
+ *
+ * "football"/"AFL" are decorative here, not load-bearing: canonicalise
+ * already strips a bare "afl" as conversational filler, so "which family
+ * has the most AFL players" and "which family has the most players" are
+ * the same string by the time either cue is tested. "football" is not
+ * stripped, so FAMILY_BIGGEST_RE takes it as optional instead.
+ */
+export const FAMILY_BIGGEST_RE = /\bbiggest\s+(?:football\s+)?famil(?:y|ies)\b/;
+
+/** C1's "most players" reading -- ranks by linked_members, never combined_games. */
+export const FAMILY_MOST_PLAYERS_RE =
+  /\bfamil(?:y|ies)\s+(?:has|have)\s+the\s+most\s+players?\b|\bfamilies?\s+with\s+the\s+most\s+players?\b/;
+
+/**
+ * C5 -- "families with three AFL players", a size THRESHOLD on linked
+ * membership, never a ranking. The optional operator phrase mirrors
+ * COMPARE_OP_WORDS' own wording so "with at least three players" and
+ * "with three players" (bare defaults to >=, the same convention every
+ * other bare-number threshold in this engine uses) both bind; the
+ * trailing "players?" is required so a size question is never confused
+ * with FAMILY_MOST_PLAYERS_RE above, which names no count at all.
+ */
+export const FAMILY_SIZE_OP_WORDS: Record<string, NlCompareOp> = {
+  'at least': 'gte', 'no fewer than': 'gte', 'no less than': 'gte',
+  'at most': 'lte', 'no more than': 'lte', 'no greater than': 'lte',
+  'more than': 'gt', 'less than': 'lt', 'fewer than': 'lt',
+  'exactly': 'eq',
+};
+export const FAMILY_SIZE_CLAUSE_RE =
+  /\bfamil(?:y|ies)\s+with\s+(?:(at least|at most|more than|less than|fewer than|exactly|no more than|no fewer than|no less than|no greater than)\s+)?(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+players?\b/;
 
 /**
  * FS4 -- the FATHER's side of the father-son draft rule, and the only
@@ -1162,8 +1216,95 @@ export const FATHER_SON_FATHER_CUES: RegExp[] = [
   /\bfathers? whose sons? (?:was|were) (?:a )?father[- ]son (?:selections?|picks?)\b/,
 ];
 
-/** Any father-son rule wording at all -- the D8 guard. */
+/**
+ * FS1 -- the SON's side of the same rule: the player selected under it.
+ * AFLDB-ISSUE-153 Stage 2, under operator decision Q1 (D8) and its Q1a
+ * clause.
+ *
+ * The binding these cues implement: father_son_selections is the
+ * AUTHORITATIVE record of AFL father-son selections, and
+ * player_relationships.parent_child is its projection -- written by
+ * tools/migration/father_son.py from the same source and import batch,
+ * and measured set-identical to it at son (99), father (107) and pair
+ * (96) level with zero divergence witnesses (Stage 0 §4.1). So wording
+ * that NAMES the rule, a selection, a draft or a pick is not ambiguous
+ * between two rival records; it names the one record twice written, and
+ * only father_son_selections carries the club, year and pick that FS2,
+ * FS3 and FS6 scope on.
+ *
+ * The cue list is therefore the EXPLICITNESS test, and it is the same
+ * test on both sides (decision Q1 consequence 3 -- neither side gets a
+ * wording the other is denied):
+ *
+ *  - naming the rule/selection/draft/pick qualifies:
+ *    "selected under the father-son rule", "father-son selections",
+ *    "father-son picks", "father-son draftees";
+ *  - "father-son" plus an explicit ROLE noun qualifies (Q1a option (a)),
+ *    because the role resolves the side: "father-son sons" mirrors the
+ *    shipped "father-son fathers" (rel_024);
+ *  - "father-son" plus a COLLECTIVE noun does not, and still falls
+ *    through to the guard below: "father-son players", "father-son
+ *    pairs", "father-son duos", "father-son families". That wording is
+ *    genuinely ambiguous between the rule and any father and son, and
+ *    C3/C4 already serve the relationship reading under unambiguous
+ *    wording.
+ *
+ * "recruits" is accepted here only because FATHER_SON_FATHER_CUES
+ * already accepts it on the father side; the symmetry clause is what
+ * puts it in this list, not its own explicitness.
+ */
+export const FATHER_SON_SELECTION_CUES: RegExp[] = [
+  /\bfather[- ]son (?:rule )?(?:selections?|picks?|draftees?|recruits?)\b/,
+  /\bfather[- ]son sons?\b/,
+  /\b(?:selected|drafted|taken|picked|recruited) (?:as|under) (?:a |the )?father[- ]son(?: rule)?(?: selections?| picks?)?\b/,
+  /\bunder the father[- ]son rule\b/,
+];
+
+/**
+ * Any father-son wording the two explicit cue lists did NOT claim -- the
+ * D8 guard, now narrowed by ISSUE-153 to exactly the bare and collective
+ * forms. It still stops the extractor dead and consumes nothing, so the
+ * pre-existing leftover-token decline fires and the question declines by
+ * name, as it did before.
+ */
 export const FATHER_SON_RULE_RE = /\bfather[- ]son\b/;
+
+/**
+ * FS3's fail-closed condition (AFLDB-ISSUE-153 Stage 3).
+ *
+ * A father-son selection question that names a year means the DRAFT
+ * year, and that is what the builder binds. But a question that ALSO
+ * talks about playing is asking about a playing season, and the two
+ * readings share not one row: 0 of the 99 linked selected players
+ * debuted in their draft year, 60 debuted a year later and 39 two or
+ * more years later (Stage 0 §4.4). Choosing either reading for "father-
+ * son selections who played in 2022" would answer a question nobody
+ * asked, so the year is left unowned and the pre-existing ownership gate
+ * refuses the plan.
+ *
+ * Only consulted when a year is actually present, so "which father-son
+ * sons played the most games" -- a ranking with no year at all -- is
+ * unaffected.
+ */
+export const FATHER_SON_PLAYING_SEASON_MIX_RE = /\b(?:play|plays|played|playing|debut|debuts|debuted)\b/;
+
+/**
+ * FS6 -- the father-son SELECTION distribution (AFLDB-ISSUE-153 Stage 4).
+ *
+ * These cues turn an FS1 question into a group-and-count over the
+ * selections themselves. They are matched and CONSUMED before the metric
+ * extractor runs, which is not merely tidy: left in the text, "by club"
+ * is read as the clubs_played metric -- how many clubs the player went on
+ * to play for -- and "father-son selections by club" would answer a
+ * plausible, believable, wrong question.
+ *
+ * "by year" is a DRAFT year here, like every other year in this family.
+ */
+export const FATHER_SON_SUMMARY_CUES: [RegExp, 'by_club' | 'by_draft_year'][] = [
+  [/\b(?:by|per|for each|broken down by|grouped by) (?:selecting |drafting |recruiting )?clubs?\b/, 'by_club'],
+  [/\b(?:by|per|for each|broken down by|grouped by) (?:draft )?years?\b/, 'by_draft_year'],
+  [/\bby draft\b/, 'by_draft_year'],
+];
 
 /**
  * The three per-player readings, in the two shapes a reader writes them:

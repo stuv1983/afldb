@@ -96,13 +96,15 @@ export default async function FamilyRecordsPage() {
       <section className="section">
         <h2>About this record</h2>
         <p>
-          A family is a set of players AFLDB has linked as siblings. Each player&rsquo;s career
-          games are counted once toward the family total, even if they appear in more than one
-          recorded sibling relationship. Only players AFLDB has matched to a canonical profile
-          appear here &mdash; an unmatched relative is not fabricated a link.
+          A family is a set of players AFLDB has linked as siblings, and only sibling
+          relationships are counted &mdash; a father&ndash;son selection never adds a member or
+          a game to a family here. Each player&rsquo;s career games are counted once toward the
+          family total, even if they appear in more than one recorded sibling relationship.
+          Only players AFLDB has matched to a canonical profile appear here &mdash; an
+          unmatched relative is not fabricated a link.
         </p>
         <p className="muted">
-          Looking for a father and son instead of siblings? See{' '}
+          Looking for a father&ndash;son selection instead of siblings? See{' '}
           <Link href="/records/father-son">Father&ndash;Son Records</Link>.
         </p>
       </section>

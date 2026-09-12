@@ -9,12 +9,13 @@
  */
 import { GRID_BUILDERS } from '@/search/grid-solver-spec';
 import {
-  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isCrossDomainPlan, isRelationshipPlan, NL_METRICS,
+  afterSirenRequiresMatchLink, coachWinPctQualifierNote, isCrossDomainPlan, isRelationshipPlan,
+  NL_FATHER_SON_SELECTION_BUILDERS, NL_METRICS,
   type NlQueryPlan,
 } from '@/search/nl/plan';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow, NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow,
-  NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlFamilyRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
@@ -119,6 +120,9 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   }
   if (payload.kind === 'after_siren_player') {
     return describeAfterSirenPlayerAnswer(plan, payload.lead, payload.rows, payload.total);
+  }
+  if (payload.kind === 'family') {
+    return describeFamilyAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'count') {
     // The one payload kind two grains share, so it must ask which one it
@@ -226,8 +230,14 @@ function describeTeamStreakAnswer(
 function describeAchievementSummaryAnswer(
   payload: Extract<NlAnswerPayload, { kind: 'achievement_summary' }>,
 ): { headline: string; interpretation: string } {
-  const { rows, groupBy, achievementLabel, total } = payload;
-  const held = `${total.toLocaleString('en-AU')} recorded ${total === 1 ? 'player' : 'players'}`;
+  const { rows, groupBy, achievementLabel, total, unit } = payload;
+  // AFLDB-ISSUE-153 Stage 4 (FS6). What is being counted is said out loud,
+  // because for the father-son distribution it is NOT players: 127
+  // selection events, against 99 linked selected players. Calling the 127
+  // "players" would be the single wrong word that makes the whole answer
+  // wrong -- and it would be wrong by 14 of 17 clubs.
+  const noun = unit ? (total === 1 ? unit.one : unit.many) : (total === 1 ? 'player' : 'players');
+  const held = `${total.toLocaleString('en-AU')} recorded ${noun}`;
 
   if (rows.length === 0) {
     return { headline: 'No matching records found', interpretation: `${achievementLabel}: ${held}.` };
@@ -262,11 +272,14 @@ function describeAchievementSummaryAnswer(
   const leader = tiedWith.length > 1
     ? `${tiedWith.map((r) => r.label).join(', ')} — ${top.value.toLocaleString('en-AU')} each (tied)`
     : `${top.label} — ${top.value.toLocaleString('en-AU')}`;
-  const noun = groupBy === 'club' ? 'club' : groupBy === 'decade' ? 'decade' : 'season';
+  const groupNoun = groupBy === 'club' ? 'club'
+    : groupBy === 'decade' ? 'decade'
+      : groupBy === 'draft_year' ? 'draft year'
+        : 'season';
 
   return {
     headline: leader,
-    interpretation: `${achievementLabel}, by ${noun}. Measured across ${held}.`,
+    interpretation: `${achievementLabel}, by ${groupNoun}. Measured across ${held}.`,
   };
 }
 
@@ -494,6 +507,50 @@ function describeCoachRecordAnswer(
 }
 
 
+// ----------------------------------------------------------------- family
+
+function familyMetricLabel(metric: string): string {
+  return (NL_METRICS.family[metric]?.label ?? metric).toLowerCase();
+}
+
+/** "Gary Ablett Snr (248), Kevin Ablett (117), ..." -- every linked member, most games first (the row's own order). */
+function familyMemberList(row: NlFamilyRow): string {
+  return row.members.map((m) => `${m.name} (${m.games.toLocaleString('en-AU')})`).join(', ');
+}
+
+function describeFamilyAnswer(
+  plan: NlQueryPlan,
+  lead: NlFamilyRow | null,
+  rows: NlFamilyRow[],
+  total: number,
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching family found', interpretation: '' };
+  const metricLabel = familyMetricLabel(plan.metric!);
+
+  // C5: a size threshold lists every qualifying family; it never ranks one.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'family qualifies' : 'families qualify'}`,
+      interpretation: `Sibling families with ${metricLabel} ${bound}.`,
+    };
+  }
+
+  // Identity is the family_key: two rows tied at the lead value are two
+  // different families, never the same one counted twice.
+  const labels = dedupeByIdentity(rows, lead.value, (r) => r.familyKey, (r) => r.familyName);
+  const { subject, tied } = tiedSubject(labels);
+  const value = (lead.value ?? 0).toLocaleString('en-AU');
+  const ranked = plan.agg.kind === 'top_n'
+    ? `Top ${plan.agg.n} sibling families by ${metricLabel}.`
+    : `${rankWord(plan)} sibling family by ${metricLabel}.`;
+  return {
+    headline: `${subject} \u2014 ${value} ${metricLabel}${tied ? ' (tied)' : ''}`,
+    interpretation: `${ranked} Members: ${familyMemberList(lead)}.`,
+  };
+}
+
+
 // ------------------------------------------------------- after the siren
 
 /**
@@ -622,6 +679,14 @@ function cappedListCaveat(plan: NlQueryPlan, payload: NlAnswerPayload): string |
 }
 
 export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): string[] {
+  // AFLDB-ISSUE-153 Stage 4 (operator decision Q2). The distribution's
+  // denominator is 127 SELECTION EVENTS, and the 99 linked selected
+  // players is disclosed beside it rather than substituted for it. Said
+  // first, before anything else, because a reader who assumes the wrong
+  // one of those two numbers misreads 14 of the 17 clubs.
+  if (payload.kind === 'achievement_summary' && payload.disclosure) {
+    return [payload.disclosure];
+  }
   // AFLDB-ISSUE-152 Phase D. Two boundaries a relationship answer must
   // state in its own sentence. The first is always true: the source is a
   // tracked, cited export in which both sides of a relationship may be
@@ -648,6 +713,24 @@ export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): stri
   if (isCrossDomainPlan(plan)) {
     const capped = cappedListCaveat(plan, payload);
     return capped ? [capped] : [];
+  }
+  // AFLDB-ISSUE-153 Stage 6 (D6). The same unlinked-side boundary as the
+  // relationship caveat above, worded for a family rather than a
+  // per-player answer: an unmatched relative is a name in
+  // player_relationships with no player_id, and is never counted as a
+  // family member here (§4.6/§4.7).
+  if (plan.grain === 'family') {
+    const caveats = [
+      'AFLDB\'s family board counts only siblings matched to a canonical player profile. '
+      + 'An unmatched relative is a name only, and is never counted as a family member.',
+    ];
+    if (payload.kind === 'family' && payload.total > payload.rows.length) {
+      caveats.push(
+        `${payload.total.toLocaleString('en-AU')} families qualify. This answer lists the first `
+        + `${payload.rows.length.toLocaleString('en-AU')} of them; it is not the whole list.`,
+      );
+    }
+    return caveats;
   }
   if (plan.grain !== 'after_siren') return [];
   const caveats: string[] = [
@@ -730,14 +813,16 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
     yes: 'had a son selected under the father–son rule',
     no: 'had no son selected under the father–son rule',
   },
+  // AFLDB-ISSUE-153 Stage 2 (FS1). Always "selected under the father–son
+  // rule", never the bare "father–son": the bare phrase is the wording
+  // decision Q1 keeps declining, and an answer must not use words the
+  // question is not allowed to.
+  father_son_selection: {
+    yes: 'was selected under the father–son rule',
+    no: 'was not selected under the father–son rule',
+  },
 };
 
-/**
- * The answer's subject, as a sentence-leading phrase: "Brothers of Brent
- * Harvey", "Players with a brother who played VFL/AFL", "Players whose
- * son was selected under the father-son rule". Null when the plan carries
- * no relationship, which is every pre-Phase-D answer.
- */
 /**
  * AFLDB-ISSUE-152 Phase F. The cross-domain answer's subject, as a
  * sentence-leading phrase. Truthful "also" wording only: the word
@@ -748,32 +833,102 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
  *
  * Both clubs are always named, each on its own side of the sentence,
  * from the references the plan carries beside the builders' bound ids.
+ *
+ * AFLDB-ISSUE-153 (Finding 2). Returns a CLAUSE, not a whole sentence,
+ * so it can stand beside a relationship clause instead of replacing it.
+ * When a relationship clause is already carrying the subject, the
+ * "played VFL/AFL" half is dropped: that half is what `Players` plus the
+ * relationship clause already says, and repeating it reads as a second
+ * condition rather than the same one.
  */
-function crossDomainSubjectPhrase(plan: NlQueryPlan): string | null {
+function crossDomainSubjectClause(plan: NlQueryPlan, withRelationship: boolean): string | null {
   if (plan.crossDomainClubs) {
-    return `Players who played for ${plan.crossDomainClubs.played.name} `
+    return `who played for ${plan.crossDomainClubs.played.name} `
       + `and also coached ${plan.crossDomainClubs.coached.name}`;
   }
   if (plan.careerPredicates.some((axis) => axis.builder === 'has_coached')) {
-    return 'Players who played VFL/AFL and also coached';
+    return withRelationship ? 'who also coached' : 'who played VFL/AFL and also coached';
   }
   return null;
 }
 
-function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
+/**
+ * AFLDB-ISSUE-153 Stage 3. The two scopes a father-son selection question
+ * can carry, in the ONLY words that are true of them.
+ *
+ * "by Geelong", never "for Geelong": the club made the selection, and
+ * whether the player went on to play a game for it is a different fact
+ * this predicate never checked. "in the 2022 draft", never "in 2022": 0
+ * of the 99 linked selected players debuted in the season they were
+ * drafted, 60 debuted a year later and 39 two or more years later (Stage
+ * 0 §4.4), so a sentence saying "selected under the father-son rule in
+ * 2022" would be read by most people as a playing season and would be
+ * wrong about every row beneath it.
+ */
+function fatherSonSelectionScope(plan: NlQueryPlan): string {
+  const bits: string[] = [];
+  if (plan.scope.clubFor) bits.push(`by ${plan.scope.clubFor.name}`);
+  const { seasonMin, seasonMax } = plan.scope;
+  if (seasonMin !== undefined && seasonMin === seasonMax) bits.push(`in the ${seasonMin} draft`);
+  else if (seasonMin !== undefined && seasonMax !== undefined) bits.push(`in the ${seasonMin}–${seasonMax} drafts`);
+  else if (seasonMin !== undefined) bits.push(`in the ${seasonMin} draft or later`);
+  else if (seasonMax !== undefined) bits.push(`in the ${seasonMax} draft or earlier`);
+  return bits.length > 0 ? ` ${bits.join(' ')}` : '';
+}
+
+/**
+ * The relationship half of the subject, split into the noun that leads
+ * the sentence and the clauses that qualify it, so a second family's
+ * clause can be appended rather than having to win a `??`.
+ */
+function relationshipSubjectParts(
+  plan: NlQueryPlan,
+): { head: string; clauses: string[] } | null {
   const ofAxis = plan.careerPredicates.find((axis) => RELATIONSHIP_OF_NOUN[axis.builder]);
   if (ofAxis && plan.relationshipSubject) {
-    return `${RELATIONSHIP_OF_NOUN[ofAxis.builder]} of ${plan.relationshipSubject.name}`;
+    return { head: `${RELATIONSHIP_OF_NOUN[ofAxis.builder]} of ${plan.relationshipSubject.name}`, clauses: [] };
   }
   const withPhrases = plan.careerPredicates
     .map((axis) => RELATIONSHIP_WITH_PHRASE[axis.builder])
     .filter((phrase): phrase is string => phrase !== undefined);
   const fatherSonFather = plan.careerPredicates.some((axis) => axis.builder === 'father_son_father');
+  // AFLDB-ISSUE-153 Stage 2. The son's side says the rule out loud for
+  // the same reason the father's side does, and for one more: 0 of the
+  // 99 selected players debuted in the season they were drafted (Stage 0
+  // §4.4), so a sentence that said only "father–son players" would invite
+  // a reader to read a playing season into a draft year.
+  const fatherSonSelection = plan.careerPredicates.some(
+    (axis) => NL_FATHER_SON_SELECTION_BUILDERS.includes(axis.builder),
+  );
   const clauses: string[] = [];
   if (withPhrases.length > 0) clauses.push(`with ${withPhrases.join(' and ')}`);
   if (fatherSonFather) clauses.push('whose son was selected under the father–son rule');
+  if (fatherSonSelection) clauses.push(`selected under the father–son rule${fatherSonSelectionScope(plan)}`);
   if (clauses.length === 0) return null;
-  return `Players ${clauses.join(', ')}`;
+  return { head: 'Players', clauses };
+}
+
+/**
+ * AFLDB-ISSUE-153 (Finding 2). The answer's subject, composed from EVERY
+ * family the plan carries rather than from the first one that matched.
+ *
+ * The Phase F code chose between the two with
+ * `relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan)`,
+ * which silently discarded the coaching conjunct on exactly the plans
+ * Stage 5 exists to allow: X3 ("selected under the father–son rule AND
+ * coached", 1 person) and the father side ("whose son was selected under
+ * the rule AND coached", 11). Both answered a narrower population than
+ * their sentence claimed, which is the one failure mode a subject phrase
+ * exists to prevent. Clauses are appended, in family order, and joined
+ * exactly as two relationship clauses already join.
+ */
+function answerSubjectPhrase(plan: NlQueryPlan): string | null {
+  const relationship = relationshipSubjectParts(plan);
+  const crossDomain = crossDomainSubjectClause(plan, relationship !== null);
+  if (!relationship && crossDomain === null) return null;
+  const head = relationship?.head ?? 'Players';
+  const clauses = [...(relationship?.clauses ?? []), ...(crossDomain === null ? [] : [crossDomain])];
+  return clauses.length > 0 ? `${head} ${clauses.join(', ')}` : head;
 }
 
 function describePlayerCareerAnswer(
@@ -811,7 +966,7 @@ function describePlayerCareerAnswer(
           + `every condition asked for: ${conditions}.${curatedRecordNote(plan)}`,
       };
     }
-    const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
+    const relationship = answerSubjectPhrase(plan);
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
       interpretation: relationship
@@ -827,7 +982,7 @@ function describePlayerCareerAnswer(
   // ranked WITHIN: "Most career games among players with a brother who
   // played VFL/AFL" is a different record from "most career games", and
   // the two must never read the same.
-  const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
+  const relationship = answerSubjectPhrase(plan);
   const among = relationship
     ? ` among ${relationship.charAt(0).toLowerCase()}${relationship.slice(1)}`
     : '';

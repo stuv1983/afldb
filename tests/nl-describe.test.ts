@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { answerCaveats, dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow,
-  NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlClubSeasonRow, NlCoachRecordRow, NlFamilyRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
 import type { NlQueryPlan } from '../src/search/nl/plan';
@@ -345,6 +345,81 @@ describe('describeAnswer — achievement summary distributions', () => {
       { kind: 'achievement_summary', groupBy: 'decade', achievementLabel: 'Scored a goal with their first kick', rows, total: 85 },
     );
     expect(headline).toBe('1920s, 1960s — 41 each (tied)');
+  });
+});
+
+// ------------------------------------------------- FS6 (AFLDB-ISSUE-153)
+
+/**
+ * The father-son distribution shares the achievement summary's payload
+ * shape and grain, and counts something else entirely: SELECTION EVENTS.
+ *
+ * Operator decision Q2 sets the denominator at 127 selections rather than
+ * the 99 linked selected players, so these tests are written to FAIL if
+ * 99 is ever substituted, and to fail if the sentence calls the 127
+ * "players". Both would be one word wrong and 14 of 17 clubs wrong.
+ */
+describe('describeAnswer — the father-son selection distribution (FS6)', () => {
+  const summaryPlan = plan({ grain: 'achievement_summary', metric: null, mode: undefined, agg: { kind: 'list' } });
+  const SELECTIONS = 127;
+  const LINKED_PLAYERS = 99;
+
+  // The Stage 0 measurement, at the two clubs where the denominators
+  // diverge most: Carlton 13 selections vs 7 linked players, Collingwood
+  // 17 vs 15.
+  const clubRows = [
+    { label: 'Collingwood', value: 17, href: '/clubs/collingwood' },
+    { label: 'Geelong', value: 14, href: '/clubs/geelong' },
+    { label: 'Carlton', value: 13, href: '/clubs/carlton' },
+  ];
+
+  function fs6(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: 'achievement_summary' as const,
+      groupBy: 'club',
+      achievementLabel: 'Selected under the AFL father–son rule',
+      rows: clubRows,
+      total: SELECTIONS,
+      unit: { one: 'father–son selection', many: 'father–son selections' },
+      disclosure: `${LINKED_PLAYERS} of those selections name a player AFLDB has linked to a profile.`,
+      ...overrides,
+    };
+  }
+
+  it('counts SELECTIONS, and says so — never "players"', () => {
+    const { headline, interpretation } = describeAnswer(summaryPlan, fs6());
+    expect(headline).toBe('Collingwood — 17');
+    expect(interpretation).toContain('127 recorded father–son selections');
+    // The substitution this test exists to catch.
+    expect(interpretation).not.toContain('99');
+    expect(interpretation).not.toContain('recorded players');
+  });
+
+  it('names the draft year as the grouping, never a season', () => {
+    const { interpretation } = describeAnswer(summaryPlan, fs6({
+      groupBy: 'draft_year',
+      rows: [{ label: '2021', value: 6, href: null }, { label: '2022', value: 9, href: null }],
+    }));
+    expect(interpretation).toContain('by draft year');
+    expect(interpretation).not.toContain('by season');
+  });
+
+  it('discloses the linked-player coverage as a caveat, not as the denominator', () => {
+    const payload = fs6();
+    const caveats = answerCaveats(summaryPlan, payload).join(' ');
+    expect(caveats).toContain('99');
+    expect(describeAnswer(summaryPlan, payload).interpretation).toContain('127');
+  });
+
+  it('an achievement summary is unaffected and still counts players', () => {
+    const { interpretation } = describeAnswer(summaryPlan, {
+      kind: 'achievement_summary',
+      groupBy: 'club',
+      achievementLabel: 'Scored a goal with their first kick',
+      rows: clubRows,
+      total: 56,
+    });
+    expect(interpretation).toContain('56 recorded players');
   });
 });
 
@@ -1006,5 +1081,173 @@ describe('played-and-coached answers (AFLDB-ISSUE-152 Phase F)', () => {
     const caveats = answerCaveats(crossDomainPlan(), listPayload).join(' ');
     expect(caveats).not.toContain('complete');
     expect(caveats).not.toContain('curated');
+  });
+});
+
+/**
+ * AFLDB-ISSUE-153 (Finding 2). The rule this block exists to hold: a plan
+ * that carries BOTH a relationship predicate and `has_coached` describes
+ * BOTH constraints.
+ *
+ * The Phase F code composed the subject as
+ * `relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan)`, so
+ * the relationship phrase won and the coaching conjunct vanished from the
+ * sentence while it stayed in the SQL. Exactly the two populations Stage 5
+ * exists to allow -- X3 (1 person) and the father side (11) -- therefore
+ * read as the far larger unfiltered relationship population (FS1 99,
+ * father side 107) they are not.
+ *
+ * The composition is asserted here, never a fixed pair of sentences: the
+ * scoped forms below share no literal with the bare ones, so a rule that
+ * only special-cased two wordings would fail this block.
+ */
+describe('relationship AND coaching compose (AFLDB-ISSUE-153)', () => {
+  const GEELONG = { organizationId: 6, slug: 'geelong', name: 'Geelong' };
+  const hasCoached = { builder: 'has_coached', params: {} };
+
+  function composedPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [],
+      ...overrides,
+    });
+  }
+
+  function subject(overrides: Partial<NlQueryPlan>, total: number): string {
+    const rows = [careerRow({ value: null })];
+    return describeAnswer(
+      composedPlan(overrides), { kind: 'player_career', lead: rows[0], rows, total },
+    ).interpretation;
+  }
+
+  it('X3: a father–son selection who also coached says both, not just the rule', () => {
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_selection', params: {} }, hasCoached],
+    }, 1);
+    expect(interpretation).toBe('Players selected under the father–son rule, who also coached.');
+  });
+
+  it('the father side: a father–son father who also coached says both', () => {
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_father', params: {} }, hasCoached],
+    }, 11);
+    expect(interpretation)
+      .toBe('Players whose son was selected under the father–son rule, who also coached.');
+  });
+
+  it('composes rather than matching a sentence: the scope survives too', () => {
+    // Neither of the two cases above contains "by Geelong", so a fix that
+    // hard-coded them would produce the wrong sentence here.
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_selection_for_club', params: { club: '6' } }, hasCoached],
+      scope: { clubFor: GEELONG },
+    }, 1);
+    expect(interpretation)
+      .toBe('Players selected under the father–son rule by Geelong, who also coached.');
+  });
+
+  it('never drops the coaching conjunct from a relationship sentence', () => {
+    for (const relationship of [
+      { builder: 'father_son_selection', params: {} },
+      { builder: 'father_son_father', params: {} },
+      { builder: 'has_brother', params: {} },
+    ]) {
+      const interpretation = subject({ careerPredicates: [relationship, hasCoached] }, 1);
+      expect(interpretation, relationship.builder).toContain('coached');
+      expect(interpretation, relationship.builder).not.toContain('every condition');
+    }
+  });
+
+  it('leaves each family alone when it is the only one present', () => {
+    const rows = [careerRow({ value: null })];
+    const only = (predicates: NlQueryPlan['careerPredicates']) => describeAnswer(
+      composedPlan({ careerPredicates: predicates }),
+      { kind: 'player_career', lead: rows[0], rows, total: 99 },
+    ).interpretation;
+    expect(only([hasCoached])).toBe('Players who played VFL/AFL and also coached.');
+    expect(only([{ builder: 'father_son_selection', params: {} }]))
+      .toBe('Players selected under the father–son rule.');
+  });
+});
+
+// -------------------------------------------- family (AFLDB-ISSUE-153 Stage 6)
+
+describe('describeAnswer — family (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+  function familyRow(overrides: Partial<NlFamilyRow> = {}): NlFamilyRow {
+    return {
+      familyKey: 'ablett-0004',
+      familyName: 'Ablett',
+      linkedMembers: 5,
+      combinedGames: 906,
+      members: [
+        { playerId: 101, slug: 'gary-ablett', name: 'Gary Ablett Snr', games: 248 },
+        { playerId: 102, slug: 'gary-ablett-jnr', name: 'Gary Ablett Jnr', games: 260 },
+      ],
+      value: 906,
+      ...overrides,
+    };
+  }
+
+  const rankedPlan = plan({
+    grain: 'family', metric: 'combined_games', mode: undefined, agg: { kind: 'max' },
+  });
+
+  it('C1 "biggest football family" names the family and its combined games', () => {
+    const rows = [familyRow()];
+    const { headline, interpretation } = describeAnswer(
+      rankedPlan, { kind: 'family', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Ablett — 906 combined career games');
+    expect(interpretation).toContain('Highest sibling family by combined career games.');
+    expect(interpretation).toContain('Gary Ablett Snr (248), Gary Ablett Jnr (260)');
+  });
+
+  it('two families tied at the lead value are both named, never one silently dropped', () => {
+    const rows = [
+      familyRow({ familyKey: 'a', familyName: 'Ablett', value: 500 }),
+      familyRow({ familyKey: 'b', familyName: 'Coventry', value: 500 }),
+      familyRow({ familyKey: 'c', familyName: 'Bourke', value: 100 }),
+    ];
+    const { headline } = describeAnswer(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 3 });
+    expect(headline).toBe('Ablett and Coventry — 500 combined career games (tied)');
+  });
+
+  it('C1 "most AFL players" ranks and describes linked_members, never combined games', () => {
+    const membersPlan = plan({ grain: 'family', metric: 'linked_members', mode: undefined, agg: { kind: 'max' } });
+    const rows = [familyRow({ value: 5 })];
+    const { headline, interpretation } = describeAnswer(
+      membersPlan, { kind: 'family', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Ablett — 5 linked members');
+    expect(interpretation).toContain('by linked members');
+  });
+
+  it('C5 "families with three AFL players" lists a qualifying count, never ranks one', () => {
+    const listPlan = plan({
+      grain: 'family', metric: 'linked_members', mode: undefined, agg: { kind: 'list' },
+      metricCondition: { op: 'gte', value: 3 },
+    });
+    const rows = [familyRow(), familyRow({ familyKey: 'x', familyName: 'Coventry' })];
+    const { headline, interpretation } = describeAnswer(
+      listPlan, { kind: 'family', lead: rows[0], rows, total: 2 },
+    );
+    expect(headline).toBe('2 families qualify');
+    expect(interpretation).toBe('Sibling families with linked members at least 3.');
+  });
+
+  it('no matching family names the empty result honestly', () => {
+    const { headline } = describeAnswer(rankedPlan, { kind: 'family', lead: null, rows: [], total: 0 });
+    expect(headline).toBe('No matching family found');
+  });
+
+  it('answerCaveats always states the unlinked-side boundary, and the cap only when truncated', () => {
+    const rows = [familyRow()];
+    const notTruncated = answerCaveats(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 1 });
+    expect(notTruncated).toHaveLength(1);
+    expect(notTruncated[0]).toContain('An unmatched relative is a name only');
+
+    const truncated = answerCaveats(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 40 });
+    expect(truncated).toHaveLength(2);
+    expect(truncated[1]).toContain('40 families qualify');
   });
 });

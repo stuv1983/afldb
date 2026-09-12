@@ -209,6 +209,29 @@ export type NlAfterSirenExclusions = {
   noMatchLink: number;
 };
 
+/** One linked member of a family row. Never an unlinked side (AFLDB-ISSUE-153 Stage 6, D6 fail-closed). */
+export type NlFamilyMember = {
+  playerId: number; slug: string; name: string;
+  /** Career games, counted once per player even if they appear in more than one sibling row for this family. */
+  games: number;
+};
+
+/**
+ * One sibling family (AFLDB-ISSUE-153 Stage 6, D6), mirroring
+ * FamilyRecordRow (db/queries/family-records.ts) plus the plan's ranked
+ * `value`. Never carries a size-1 family (fail-closed exclusion, §4.6) or
+ * an unlinked member.
+ */
+export type NlFamilyRow = {
+  familyKey: string;
+  familyName: string;
+  linkedMembers: number;
+  combinedGames: number;
+  members: NlFamilyMember[];
+  /** The plan's ranked/thresholded metric value -- combinedGames or linkedMembers, whichever the question asked for. */
+  value: number | null;
+};
+
 export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
@@ -239,7 +262,21 @@ export type NlAnswerPayload =
       rows: NlAchievementGroupRow[];
       /** Linked rows the summary covers, so a caveat can say what it excludes. */
       total: number;
+      /**
+       * What `total` counts, when it is not players (AFLDB-ISSUE-153 Stage
+       * 4). The father-son distribution counts SELECTION EVENTS -- 127 of
+       * them -- which is a materially different number from the 99 linked
+       * players it names, so the sentence must not call them players.
+       * Absent means players, which every achievement summary counts.
+       */
+      unit?: { one: string; many: string };
+      /**
+       * A second figure the answer discloses without letting it become the
+       * denominator (AFLDB-ISSUE-153 operator decision Q2).
+       */
+      disclosure?: string;
     }
+  | { kind: 'family'; lead: NlFamilyRow | null; rows: NlFamilyRow[]; total: number }
   | { kind: 'unanswerable'; topic: string; reason: string };
 
 export type NlAnswer = {

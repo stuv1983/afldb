@@ -4111,6 +4111,11 @@ ablett jr kick a goal with his first kick") answered, and the new `fkg_dec_007`
 changed rows, so the metamorphic groupings and the transport gates were
 re-established, not inherited.
 
+> **AFLDB-ISSUE-153 note (2026-09-09) — the run above is NOT superseded.**
+> The 271-row P3 set contains no relationship or cross-domain row, so none of
+> the five rows AFLDB-ISSUE-153 reclassified is in it. **271 = 212 plan + 59
+> decline is unchanged**, and the run result above stands exactly as run.
+
 ### 21.4 P4-r1 — the existing 1,435 + 60 regression gate, UNCHANGED and GREEN
 
 | | |
@@ -4843,6 +4848,18 @@ that 319 rows agreed with something.
 
 238 + 21 + 60 = 319, and 238 plan / 81 decline is exactly the pinned
 `PHASE_G_SETS.current` shape asserted independently in three places (§23.7).
+
+> **AFLDB-ISSUE-153 note (2026-09-09) — the run above is preserved as run; the
+> SPLIT it names is superseded.** The P5-r2 result — 319/319 observed, 238
+> answered, 0 fail — is a historical measurement of the code and corpus of
+> 2026-09-09 and is NOT rewritten. What has moved since is the pinned
+> plan/decline split: AFLDB-ISSUE-153 Stages 2-4 shipped FS1, FS2, FS3 and FS6,
+> so four rows of the relationship decline corpus are reclassified IN PLACE —
+> `rel_dec_003` (FS1), `rel_dec_004` (FS2), `rel_dec_005` (FS3) and
+> `rel_dec_006` (FS6) — and `PHASE_G_SETS.current` is re-pinned **319 = 242
+> plan + 77 decline**. Row count, row ids and row order are untouched, so every
+> position-based statement in §19.3, §23 and §24 still holds. The 238/81 shape
+> named in this section describes the run as it happened, not the current pin.
 
 ### 24.4 P4-r1 — the 1,495-row regression gate, re-run fresh and UNCHANGED
 
@@ -5973,6 +5990,16 @@ shape pinned independently in `build-phase-g-corpora.ts`, `phase-f-corpus.ps1` a
 `tests/nl-ui-corpus.test.ts` (§26.5). Every one of the 30 new cross-domain rows was
 verified against `afldb_test` **before** it was pinned, so a green row here is
 agreement with measured data and not agreement with itself.
+
+> **AFLDB-ISSUE-153 note (2026-09-09) — the run above is preserved as run; the
+> SPLIT it names is superseded.** P6 measured the code and corpus of 2026-09-09
+> and is NOT rewritten. Since then AFLDB-ISSUE-153 Stage 5 (operator decision
+> Q6) lifted the F-D1 deferral of X3, so a fifth row is reclassified IN PLACE —
+> `xd_dec_014`, "players selected under the father-son rule who also coached",
+> which now answers with 1 person (Rhyce Shaw, player 10974). With the four
+> `current` reclassifications it inherits, `PHASE_G_SETS.next` is re-pinned
+> **349 = 258 plan + 91 decline**. `xd_dec_012`, `xd_dec_013` and `xd_dec_015`
+> still decline and are pinned by name. Row count, ids and order are untouched.
 
 ### 27.3 P4-r1 — the 1,495-row regression gate, re-run fresh and UNCHANGED
 

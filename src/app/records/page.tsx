@@ -58,7 +58,7 @@ export default async function RecordsPage() {
         <Link href="/records/father-son" className="card">
           <h3>Father–Son Records</h3>
           <div className="meta">
-            Father and son pairs recorded under the AFL/VFL father-son rule.
+            Selections made under the AFL father&ndash;son rule, by combined career games.
           </div>
         </Link>
 
