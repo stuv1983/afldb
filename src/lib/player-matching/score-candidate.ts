@@ -1,10 +1,14 @@
+import { clubTextWeights } from '@/lib/player-matching/calibration';
 import { MATCH_POLICY } from '@/lib/player-matching/confidence';
+import type { ResolvedSourceClub } from '@/lib/player-matching/club-identity';
 import {
   activeSeasons,
   afldbActiveSeasons,
   assertedRange,
   draftYear,
+  type CandidateClub,
   type CandidateEvidence,
+  type ClubMatchPolicy,
   type EvidenceItem,
   type HardConflict,
   type ScoredCandidate,
@@ -129,40 +133,153 @@ function nameSignal(source: SourceEvidence, candidate: CandidateEvidence): Evide
 }
 
 /**
- * Club. Playing for the club IN the source season is a different order
- * of evidence from having played there at some point across a long
- * career, so the two never both score.
+ * Whether a candidate club row is the same continuing club as a source
+ * club (AFLDB-ISSUE-164 S1).
+ *
+ * Lineage first: `organization_id` spans Footscray/Western Bulldogs,
+ * South Melbourne/Sydney and North Melbourne/Kangaroos, which is
+ * exactly the set of cases where `player_clubs` records one identity
+ * and a source row names another. Raw ids are still compared, so a
+ * database without lineage behaves as it did before rather than losing
+ * the signal entirely. Mergers are not lineage: Fitzroy and Brisbane
+ * Lions are separate organizations by design (migration 017), so a
+ * Fitzroy source row never matches a Brisbane Lions career here.
+ *
+ * `policy` is the gate. Only sources authorised for S1 in this tranche
+ * pass 'lineage'; draft sources pass 'club_id' and are compared exactly
+ * as v2 compared them, whatever lineage the row happens to carry.
+ */
+function sameClubLineage(
+  club: CandidateClub,
+  clubId: number | null,
+  organizationId: number | null,
+  policy: ClubMatchPolicy,
+): boolean {
+  if (policy === 'lineage' && organizationId !== null && club.organizationId !== null) {
+    return club.organizationId === organizationId;
+  }
+  return clubId !== null && club.clubId === clubId;
+}
+
+/** Candidate club rows whose seasons overlap a range. */
+function clubRowsInRange(clubs: readonly CandidateClub[], range: Range): CandidateClub[] {
+  return clubs.filter(
+    (c) =>
+      c.firstSeason !== null
+      && c.lastSeason !== null
+      && c.firstSeason <= range.last
+      && range.first <= c.lastSeason,
+  );
+}
+
+/**
+ * Club. One signal, strongest first.
+ *
+ * Playing for the club IN the source season is a different order of
+ * evidence from having played there at some point across a long career,
+ * so the two never both score. The two text-resolved forms (S3/S4) sit
+ * below both: a Hall of Fame club list is a weaker assertion than a
+ * source row that carries a real club_id, and it is resolved from free
+ * text rather than a foreign key.
  */
 function clubSignal(source: SourceEvidence, candidate: CandidateEvidence): EvidenceItem | null {
-  if (source.clubId === null) return null;
   const w = MATCH_POLICY.scoring.club;
-  const clubRows = candidate.clubs.filter((c) => c.clubId === source.clubId);
-  if (clubRows.length === 0) return null;
 
-  const seasons = activeSeasons(source.temporal);
-  const corroborated = seasons.find((season) =>
-    clubRows.some(
-      (c) =>
-        c.firstSeason !== null
-        && c.lastSeason !== null
-        && season >= c.firstSeason
-        && season <= c.lastSeason,
-    ),
-  );
-  if (corroborated !== undefined) {
+  if (source.clubId !== null) {
+    const clubRows = candidate.clubs.filter((c) =>
+      sameClubLineage(c, source.clubId, source.clubOrganizationId, source.clubMatch));
+    if (clubRows.length === 0) return null;
+
+    const seasons = activeSeasons(source.temporal);
+    const corroborated = seasons.find((season) =>
+      clubRows.some(
+        (c) =>
+          c.firstSeason !== null
+          && c.lastSeason !== null
+          && season >= c.firstSeason
+          && season <= c.lastSeason,
+      ),
+    );
+    const clubLabel = source.clubNameRaw ?? `club ${source.clubId}`;
+    if (corroborated !== undefined) {
+      return {
+        family: 'club',
+        signal: 'club_in_season',
+        detail: `${clubLabel} in ${corroborated}`,
+        points: w.clubSeason,
+      };
+    }
     return {
       family: 'club',
-      signal: 'club_in_season',
-      detail: `${source.clubNameRaw ?? `club ${source.clubId}`} in ${corroborated}`,
-      points: w.clubSeason,
+      signal: 'club_anywhere',
+      detail: `played for ${clubLabel} at some point`,
+      points: w.clubAnywhere,
     };
   }
-  return {
-    family: 'club',
-    signal: 'club_anywhere',
-    detail: `played for ${source.clubNameRaw ?? `club ${source.clubId}`} at some point`,
-    points: w.clubAnywhere,
-  };
+
+  return clubTextSignal(source, candidate);
+}
+
+/**
+ * S3/S4: club evidence recovered from raw club text.
+ *
+ * Only reached by the two sources that carry club text and no club_id
+ * at all (hall_of_fame, honour_team_members), which is why those two
+ * profiles top out on name and career span today. Unresolved text is
+ * silently nothing -- most of a Hall of Fame club list is SANFL, WAFL
+ * and Tasmanian clubs AFLDB does not hold, and "not an AFLDB club" is
+ * not evidence against anybody.
+ *
+ * Both weights are 15, selected by AFLDB-ISSUE-164 P3B's measured grid.
+ * They are read through clubTextWeights() rather than straight off
+ * MATCH_POLICY so that a calibration run can declare a candidate pair
+ * on the command line instead of editing the policy between grid rows;
+ * with no override set -- which is every application code path -- it
+ * returns the shipped 15/15.
+ */
+function clubTextSignal(
+  source: SourceEvidence,
+  candidate: CandidateEvidence,
+): EvidenceItem | null {
+  const w = clubTextWeights();
+  if (source.resolvedClubs.length === 0) return null;
+
+  // Resolved club text is organization-grained by construction (D-4):
+  // it names a continuing club, never one identity of it, so there is
+  // no raw-id form of this comparison to fall back to. Only the two
+  // club-text sources reach here; draft rows carry no resolvedClubs.
+  const matched = (resolved: ResolvedSourceClub) =>
+    candidate.clubs.filter((c) => c.organizationId === resolved.organizationId);
+
+  // S3 first: a club the source places inside the career span it also
+  // asserts is two agreeing facts from one page, not one.
+  const asserted = assertedRange(source.temporal);
+  if (asserted !== null) {
+    for (const resolved of source.resolvedClubs) {
+      if (clubRowsInRange(matched(resolved), asserted).length > 0) {
+        return {
+          family: 'club',
+          signal: 'club_in_span',
+          detail:
+            `${resolved.text} within the stated career ${asserted.first}-${asserted.last}`,
+          points: w.clubTextInSpan,
+        };
+      }
+    }
+  }
+
+  // S4: the club appears somewhere in the career.
+  for (const resolved of source.resolvedClubs) {
+    if (matched(resolved).length > 0) {
+      return {
+        family: 'club',
+        signal: 'club_text_anywhere',
+        detail: `played for ${resolved.text} at some point`,
+        points: w.clubTextAnywhere,
+      };
+    }
+  }
+  return null;
 }
 
 /**
@@ -314,12 +431,18 @@ function findConflicts(source: SourceEvidence, candidate: CandidateEvidence): Ha
   // have played a senior game for it -- the cause of 249 of the 252
   // club contradictions this rule originally raised against links that
   // were already known to be correct.
+  //
+  // The comparison is lineage-aware (AFLDB-ISSUE-164 S1): player_clubs
+  // records the identity played under, so a source row naming Western
+  // Bulldogs against a Footscray career is the same club, and treating
+  // it as absence manufactured contradictions against correct links.
   if (
     source.clubId !== null
     && seasons.length > 0
     && candidate.clubHistoryComplete
     && candidate.clubs.length > 0
-    && !candidate.clubs.some((c) => c.clubId === source.clubId)
+    && !candidate.clubs.some((c) =>
+      sameClubLineage(c, source.clubId, source.clubOrganizationId, source.clubMatch))
   ) {
     conflicts.push({
       reason: 'club_not_in_history',

@@ -36,11 +36,25 @@ export type SuggestedMatch = {
   ambiguous: boolean;
   hardConflict: boolean;
   bulkEligible: boolean;
-  /** Why unattended approval is allowed, in four plain statements. */
-  bulkCriteria: string[];
+  /**
+   * The bulk criteria, evaluated. Sent for EVERY suggested row, not only
+   * eligible ones: a reviewer has to be able to see which criterion a
+   * capped row misses (AFLDB-ISSUE-164 §11 item 3).
+   */
+  bulkCriteria: { label: string; met: boolean }[];
+  /** Typed limit reasons, already worded server-side, most important first. */
+  limitReasons: string[];
+  /** "Highest score this record type can reach: 61 — never Very High". */
+  ceiling: string | null;
+  /** The source names a club, but the text resolves to no AFLDB club. */
+  clubTextUnresolved: boolean;
   evidence: EvidenceItem[];
   conflicts: ConflictItem[];
   algorithmVersion: string;
+  /** The version the running matcher declares, from the server. */
+  currentAlgorithmVersion: string;
+  /** Cached under a different version than the code now running. */
+  stale: boolean;
   alternatives: {
     playerId: number;
     playerName: string;
@@ -241,16 +255,54 @@ export function ResolveControls({
               ? 'No credible alternative candidate.'
               : `Next best candidate is ${match.gap} points behind.`}
             {' · '}algorithm {match.algorithmVersion}
+            {match.stale && <> (current: {match.currentAlgorithmVersion})</>}
           </div>
 
-          {match.bulkEligible && (
+          {match.stale && (
+            <p className="badge badge-warn" style={{ margin: 0 }}>
+              Stale suggestion: this score and its evidence were computed by matcher{' '}
+              {match.algorithmVersion}, and the current matcher is {match.currentAlgorithmVersion}.
+              Nothing here is approved on the number shown — approving rescores the record under{' '}
+              {match.currentAlgorithmVersion} and refuses if the fresh evidence names a different
+              player or no longer supports the match.
+            </p>
+          )}
+
+          {/* Bulk criteria, shown whether or not this row passes them.
+              Showing them only on eligible rows was the reason a capped
+              row and an unlucky one looked identical on the queue. */}
+          {match.bulkCriteria.length > 0 && (
             <div>
               <div className="muted" style={{ fontSize: '0.72rem', letterSpacing: '0.06em' }}>
-                BULK-READY
+                {match.bulkEligible ? 'BULK-READY' : 'BULK READINESS'}
               </div>
               {match.bulkCriteria.map((criterion) => (
-                <div key={criterion} style={{ fontSize: '0.8rem' }}>✓ {criterion}</div>
+                <div
+                  key={criterion.label}
+                  style={{ fontSize: '0.8rem' }}
+                  className={criterion.met ? undefined : 'muted'}
+                >
+                  {criterion.met ? '✓' : '✗'} {criterion.label}
+                </div>
               ))}
+              {match.ceiling && (
+                <div className="muted" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                  {match.ceiling}
+                </div>
+              )}
+              {match.clubTextUnresolved && (
+                <div className="muted" style={{ fontSize: '0.8rem' }}>
+                  The club this record names is not an AFLDB club we could resolve, so it
+                  counts neither for nor against this player.
+                </div>
+              )}
+              {!match.bulkEligible && match.limitReasons.length > 0 && (
+                <ul style={{ margin: '0.35rem 0 0 1.1rem', fontSize: '0.8rem' }}>
+                  {match.limitReasons.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
