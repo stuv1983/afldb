@@ -20,9 +20,11 @@ successfully and remain gone after reload; no console/runtime errors), the focus
 assertion in `tests/integration/privileges.test.ts` PASS), and PROD read-only proof (migration
 `091_access_code_delete.sql` applied at `2026-09-06 10:08:25.329637+10`;
 `has_table_privilege('afldb_auth', 'beta_access_codes', 'DELETE')` = `t`). The unrelated
-privilege-suite red (`external_grids`/`external_grid_axes` = `AFLDB-ISSUE-138`;
-`brownlow_season_authority`/`brownlow_vote_entry_state` = a separate drift finding) is confirmed
-present both before and after this branch and is **not** absorbed into this closure. See `issues.md`
+privilege-suite red (`external_grids`/`external_grid_axes` registration drift = `AFLDB-ISSUE-138`)
+is confirmed present both before and after this branch and is **not** absorbed into this closure;
+`brownlow_season_authority`/`brownlow_vote_entry_state` are NOT a separate drift finding — fresh
+`AFLDB-ISSUE-138` evidence (2026-09-13) confirms both already match their intended migration-094
+privilege shape with dedicated passing coverage. See `issues.md`
 Resolution (2026-09-13); runbook moved to `issues/closed/AFLDB-ISSUE-117.md`; removed from the open
 issues list below; 11 -> 10; earlier the same day: `AFLDB-ISSUE-150` **RESOLVED** — the venue-page expansion (five new
 query functions in `src/db/queries/venues.ts`, `VenueRecords` / `VenueClubRecords` /

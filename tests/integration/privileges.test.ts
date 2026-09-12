@@ -763,6 +763,15 @@ describe('afldb_import is confined to the statistical tables', () => {
     // records of administrative decisions, and the registry's loop grants
     // TRUNCATE -- the one power a reload path must never hold over them.
     // They take full row DML minus TRUNCATE, asserted exactly below.
+    //
+    // external_grids and external_grid_axes (migration 080, AFLDB-ISSUE-118
+    // Stage 1) are the seventh and eighth exception, for the same reason:
+    // registering them would hand grant_import_write()'s UPDATE, DELETE and
+    // TRUNCATE to a corpus whose entire value is that a captured board can
+    // never be quietly rewritten. The importer instead holds SELECT,
+    // INSERT, and (on external_grids only) UPDATE of the single is_current
+    // column that supersedes a revision. Their exact narrow shape is
+    // asserted in AFLDB-ISSUE-138's dedicated test below.
     const rows = await sql<{ name: string; registered: boolean; writable: boolean }[]>`
       SELECT c.relname AS name,
              (w.name IS NOT NULL) AS registered,
@@ -775,7 +784,8 @@ describe('afldb_import is confined to the statistical tables', () => {
          AND c.relname NOT IN ('data_edits', 'player_link_resolutions',
                                'canonical_applications',
                                'brownlow_vote_entry_state',
-                               'brownlow_season_authority')
+                               'brownlow_season_authority',
+                               'external_grids', 'external_grid_axes')
        ORDER BY 1
     `;
     expect(rows.length).toBeGreaterThan(0);
@@ -830,6 +840,76 @@ describe('afldb_import is confined to the statistical tables', () => {
        CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
     `;
     expect(sequences?.count).toBe(0);
+  });
+
+  it('appends captured grid boards but can never rewrite or empty the corpus (AFLDB-ISSUE-138)', async () => {
+    // Migration 080 grants these two directly instead of registering them,
+    // for the opposite reason to the Brownlow pair above: the registry
+    // loop hands out UPDATE, DELETE and TRUNCATE, and this corpus's entire
+    // value (ISSUE-118 Stage 1) is that a captured board can never be
+    // quietly rewritten. The importer gets read, append, and -- on
+    // external_grids only -- UPDATE of the single is_current column that
+    // supersedes a revision. Nothing here should ever gain DELETE,
+    // TRUNCATE or a table-level UPDATE.
+    const [tables] = await sql<{
+      gridsSelects: boolean; gridsInserts: boolean; gridsTableUpdate: boolean;
+      gridsCurrentUpdate: boolean; gridsDeletes: boolean; gridsTruncates: boolean;
+      axesSelects: boolean; axesInserts: boolean; axesTableUpdate: boolean;
+      axesDeletes: boolean; axesTruncates: boolean;
+    }[]>`
+      SELECT has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'SELECT')   AS "gridsSelects",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'INSERT')   AS "gridsInserts",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'UPDATE')   AS "gridsTableUpdate",
+             has_column_privilege(${IMPORT_ROLE}, 'external_grids', 'is_current', 'UPDATE')
+                                                                                AS "gridsCurrentUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'DELETE')   AS "gridsDeletes",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grids', 'TRUNCATE') AS "gridsTruncates",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'SELECT')   AS "axesSelects",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'INSERT')   AS "axesInserts",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'UPDATE')   AS "axesTableUpdate",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'DELETE')   AS "axesDeletes",
+             has_table_privilege(${IMPORT_ROLE}, 'external_grid_axes', 'TRUNCATE') AS "axesTruncates"
+    `;
+    expect(
+      tables,
+      'run npm run db:privileges: its migration-080 block re-grants the '
+      + 'narrow external-grid shape after the registry revoke loop',
+    ).toEqual({
+      gridsSelects: true, gridsInserts: true, gridsTableUpdate: false,
+      gridsCurrentUpdate: true, gridsDeletes: false, gridsTruncates: false,
+      axesSelects: true, axesInserts: true, axesTableUpdate: false,
+      axesDeletes: false, axesTruncates: false,
+    });
+
+    const sequences = await sql<{
+      name: string; usage: boolean; selects: boolean; updates: boolean;
+    }[]>`
+      SELECT s.name,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'USAGE')  AS usage,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'SELECT') AS selects,
+             has_sequence_privilege(${IMPORT_ROLE}, s.name, 'UPDATE') AS updates
+        FROM (VALUES ('external_grids'), ('external_grid_axes')) AS t(name)
+       CROSS JOIN LATERAL afldb_meta.owned_sequences(t.name) AS s(name)
+       ORDER BY t.name
+    `;
+    expect(sequences).toEqual([
+      { name: 'external_grid_axes_id_seq', usage: true, selects: true, updates: false },
+      { name: 'external_grids_id_seq', usage: true, selects: true, updates: false },
+    ]);
+
+    const registered = await sql<{ name: string; registered: boolean }[]>`
+      SELECT t.name,
+             EXISTS (
+               SELECT 1 FROM afldb_meta.import_writable_tables w
+                WHERE w.name = t.name
+             ) AS registered
+        FROM (VALUES ('external_grids'), ('external_grid_axes')) AS t(name)
+       ORDER BY t.name
+    `;
+    expect(registered).toEqual([
+      { name: 'external_grid_axes', registered: false },
+      { name: 'external_grids', registered: false },
+    ]);
   });
 
   it('appends its own required audit rows and can never rewrite them (AFLDB-ISSUE-027)', async () => {
