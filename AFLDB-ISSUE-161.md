@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-161 — Season list administration: authoritative club playing lists per season (ISSUE-156 P3c)
 
-**Status:** **RESOLVED 2026-09-12.** Stage 1 (`97af605`), Stage 2 (`1441a5b`), the §33.5 audit fix and the batch-wide responsive fixes (`e638d61`, `9727ad5`, `ae3c4e0`, `aeb41f3` — the last one this issue's own Season Lists mobile overflow) are in `main` at `3272434`, deployed to DEV with migration 096 applied and privileges reconciled, and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): functional add/remove/transfer/copy-forward workflows, usable 2027 club lists, Admin (read) / Super Admin (edit) permissions, desktop and tablet layout, and the final mobile acceptance at 375px — the record is **§34**. The D-3 evidence gate passed (§32); **operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)** and implemented as decided; the fixtures boundary (§9.4, §27) held throughout (2027 had no fixture and every mutation worked). PROD untouched; no PROD validation is claimed. The pre-closeout history below (§1–§33.5) is retained as written.
+**Status:** **RESOLVED 2026-09-12.** Stage 1 (`97af605`), Stage 2 (`1441a5b`), the §33.5 audit fix and the batch-wide responsive fixes (`e638d61`, `9727ad5`, `ae3c4e0`, `aeb41f3` — the last one this issue's own Season Lists mobile overflow) are in `main` at `3272434`, deployed to DEV with migration 096 applied and privileges reconciled, and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): functional add/remove/transfer/copy-forward workflows, usable 2027 club lists, Admin (read) / Super Admin (edit) permissions, desktop and tablet layout, and the final mobile acceptance at 375px — the record is **§34**. The D-3 evidence gate passed (§32); **operator decisions D-1…D-8 DECIDED 2026-09-11 (§30)** and implemented as decided; the fixtures boundary (§9.4, §27) held throughout (2027 had no fixture and every mutation worked). PROD untouched; no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098 (including this issue's own 096), applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. The pre-closeout history below (§1–§33.5) is retained as written.
 **Severity:** Medium
 **Area:** Admin / Data management / Player–club–season model / Promotion lineage
 **Created:** 2026-09-11
@@ -1084,7 +1084,11 @@ promotion/probes, and the release-time S-1 decision inherited from ISSUE-160. IS
 ## 34. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
 
 **Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
-(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. This closeout changed
+(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. **Correction
+(2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098
+(including this issue's own 096), applied 2026-09-12, and the production host checkout was
+observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not
+reconstructed as part of the `AFLDB-ISSUE-137` investigation. This closeout changed
 tracking only.
 
 ### 34.1 What reached DEV

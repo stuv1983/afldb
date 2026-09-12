@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-137 — Production remediation plan: ISSUE-136 identity splits and ISSUE-113 Brownlow restoration
 
-- **Status:** Open — **execution stage COMPLETE on production 2026-09-04 (§8.1–§8.8): T1 rehearsed then committed (batch 741, 298 re-points, four duplicates retired), T2/T4 derived rebuilds, Acceptance A and B fully green, ISSUE-113 Brownlow season load (batch 742, 16,120 / 0 rejected), build `MRjsomoqFJRsjZWElQ6A0` + restart, health ok. Verification stage A executed 2026-09-04 13:01–13:07 AEST (§8.12): A1–A7 PASS, 0 FAIL, A8/A9 blocked on a super-admin session, A10 not executable while `AFLDB_BETA_GATE=on`. Stage B pre-checked read-only 2026-09-04 15:28 AEST (§8.13): the timer next fires **Sat 2026-09-05 04:34:59 AEST** and `import_batches` still tops out at 742, so the first post-repair scheduled settle has not run. Remaining before resolution: the §8.10 B post-settle check and close-out (§5 step 14).**
+- **Status:** **Resolved 2026-09-12.** The 2026-09-04 in-place repair (path (b)) executed and held in its own lineage 2026-09-04 12:13–12:36 AEST (§8.1–§8.13): T1 committed as batch 741 (298 re-points, four duplicates retired), T2/T4 derived rebuilds, T3 Brownlow load batch 742, Acceptance A/B green, build `MRjsomoqFJRsjZWElQ6A0`, browser stage A 7/7 decidable checks PASS. **That lineage was itself superseded on 2026-09-08 01:11:24.440219 AEST by the completed `AFLDB-ISSUE-125` production promotion (stamp `20260907-234124`, `auth_audit_log` id 196), which replaced `afldb_prod` with a rebuilt lineage that already carries the `AFLDB-ISSUE-136` folds natively — the four duplicate players never existed in it, and the surrogate ids 2608/6296/6525/6626 this repair retired are now unrelated real players (Charlie Canet, Jack Grant, Jack Ryan, Jack Wright).** Closure is verified on lineage-independent stable identity (AFL Tables profile-url + name + DOB), not on this repair's surrogate ids: `issues/open/AFLDB-ISSUE-137-closure-check.sql`, run read-only against current `afldb_prod` 2026-09-12, **22/22 PASS**. See §10 for the full resolution record. The 2026-09-04 dump, `AFLDB-ISSUE-137-t1.sql` and `AFLDB-ISSUE-137-settle-check.sql` are retained as historical evidence for the superseded lineage only; the T1 SQL must **never** be re-run against current production.
 - **Severity:** High
 - **Area:** Data integrity / Operations / Database (production)
 - **Branch / worktree:** `claude/issue-137` at `D:\dev\afldb-issue-137`, base `169d738` (main, ISSUE-113 merge)
@@ -985,3 +985,133 @@ DSN — nested `\"` is mangled and silently drops `-d`, which then connects as r
   and `import_batches` still tops out at **742**. The first post-repair scheduled settle has not run,
   so §8.10 B could not be executed and no acceptance assertion was evaluated. No production mutation,
   timer change or scratch-file removal. Evidence §8.13. ISSUE-137 remains **Open** on stage B alone.
+- **2026-09-12 — lineage forensics (read-only, session handoff `ISSUE-137-HANDOFF-20260912.md`).**
+  The originally planned §8.10 B post-settle check ran against current `afldb_prod` and exited 0, but
+  its CHECK rows were discovered to be invalid: the surrogate ids 2608/6296/6525/6626 now belong to
+  unrelated real players (Charlie Canet, Jack Grant, Jack Ryan, Jack Wright), and the four repaired
+  careers sit at 2604/6292/6519/6619 — a −0/−1/−2/−3 cascade proving production was rebuilt and
+  promoted (stamp `20260907-234124`) rather than amended in place. Databases on the cluster
+  (`afldb_prod_pre_rebuild_20260907-234124`), the migration ledger (98 applied, earliest 2026-09-06)
+  and the missing batch-741/742 audit trail (replaced by batch 24 in the new lineage) all corroborate
+  the same event. ISSUE-137's own identity condition was found green under stable identity (AFL
+  Tables profile-url + name + DOB); two measurement defects in that session's own detector (an
+  over-broad split scan, a fan-out bug in the path fingerprint) were diagnosed but not yet corrected.
+  No production mutation. ISSUE-137 stayed **Open** pending correction and adjudication of those two
+  defects and reconciliation with `AFLDB-ISSUE-151`.
+- **2026-09-12 — corrected closure probe (read-only, `afldb_owner`, `default_transaction_read_only =
+  on`, `PSQL_EXIT=0`).** `issues/closed/AFLDB-ISSUE-137-closure-check.sql` (then at `issues/open/`,
+  moved to `issues/closed/` at close-out) re-run with both defects
+  fixed (the narrow, evidence-based B3a split predicate as the binding gate; B6's path fingerprint
+  de-duplicated to one identity per player): **22/22 PASS**. Corrected stable path fingerprint
+  `4523b583a2f112f7bb33572eff7bb174`. Full resolution record at §10. **ISSUE-137 Resolved.**
+
+---
+
+## 10. Resolution — 2026-09-12
+
+### 10.1 What actually closes this issue
+
+The defect this issue tracks — AFL Tables' 2025 profile-url renumbering leaving Charlie Cameron, Jack
+Graham, Jack Ross and Jack Williams each split across two `players` rows — is **absent from the
+database currently serving production**. It is absent for a different reason than this runbook
+originally executed to produce:
+
+- The 2026-09-04 in-place reconciliation (§3–§9) ran against `afldb_prod` as it stood that day, retired
+  the four duplicate ids (2608/6296/6525/6626) by count-asserted transaction, and every acceptance gate
+  in §6/§8.5–§8.13 passed **in that lineage**. That execution was real and correct at the time.
+- Production was subsequently **replaced wholesale**, not amended: the `AFLDB-ISSUE-125` promotion
+  (stamp `20260907-234124`) completed at **2026-09-08 01:11:24.440219 AEST**, recorded as
+  `auth_audit_log` id 196 (`database.promoted`), candidate `afldb_prod_candidate_20260907-234124`
+  replacing `afldb_prod`, using the staged-reinstatement fix built under `AFLDB-ISSUE-151`. The
+  promoted lineage is a fresh canonical rebuild descended from `afldb_test`, carrying the
+  `AFLDB-ISSUE-136` fold **from rebuild time** — the four duplicate players were never created in it,
+  so there was nothing for the 2026-09-04 repair to have fixed in this lineage. The old pre-promotion
+  database survives on the cluster, renamed `afldb_prod_pre_rebuild_20260907-234124`.
+- Because the promotion reassigns surrogate ids independently of the retired repair, the four careers
+  now sit at different ids than §1–§9 record (Charlie Cameron 2604 unchanged; Jack Graham 6292; Jack
+  Ross 6519; Jack Williams 6619 — a −0/−1/−2/−3 cascade, the signature of a database in which ids
+  2608/6296/6525/6626 were never allocated at all, not of an in-place delete). Ids 2608, 6296, 6525 and
+  6626 are now occupied by unrelated real historical players (Charlie Canet, Jack Grant, Jack Ryan,
+  Jack Wright respectively).
+
+Closure is therefore established on **lineage-independent stable identity** — the AFL Tables
+profile-url pairs, display names and dates of birth from §1.2, none of which depend on a surrogate id —
+rather than on the surrogate ids the 2026-09-04 repair produced.
+
+### 10.2 Closure evidence — corrected probe, 2026-09-12, 22/22 PASS
+
+`issues/closed/AFLDB-ISSUE-137-closure-check.sql` — **this is the lineage-independent closure
+evidence** (as distinct from the two superseded scripts below) — executed read-only against
+`afldb_prod` as `afldb_owner` with `default_transaction_read_only = on` (`PSQL_EXIT=0`):
+
+- **22/22 PASS.** B3a (the tracked narrow renumbered-profile-split detector, restored from
+  `AFLDB-ISSUE-137-settle-check.sql`) returns **0 rows** — no split, modern or otherwise, exists under
+  the narrow, evidence-based predicate. B3b (a deliberately broader, advisory-only scan) still surfaces
+  four unrelated same-name historical pairs (Archie Roberts, Charlie West, Luke Trainor, Will Hayes);
+  these are the opposite polarity to an ISSUE-137-style split (a modern player's *base* path owned by an
+  older namesake) and are explicitly non-binding, per the script's own header.
+- All four ISSUE-136/ISSUE-137 identity pairs resolve to exactly one player each, matching the tracked
+  name/DOB anchors; all four careers now run to **2026**; no career's game count fell below its
+  2026-09-04 tracked minimum (Cameron grew 277→278 from a post-repair match, which the `>=` criterion
+  allows).
+- Brownlow career totals intact at the tracked anchors (Harley Reid 10, Matt Rowell 89, Tom Green 73,
+  Dick Reynolds 154, Bob Skilton 180) and the four repaired players' totals (Cameron 25, Graham 9, Ross
+  0, Williams 0).
+- 2026 staging rows land on the four canonical players, not on any retired/renumbered id.
+- `brownlow_season_votes` = 16,120 rows / 79,113 votes / 112 winners / 98 seasons / 4,275 players;
+  `brownlow_round_votes` = 320,861 rows / 44,478 votes, max season 2025; derived career and season
+  Brownlow totals both 79,113. All five DB-health reconciliation checks = 0.
+- **Corrected stable path fingerprint** (one identity per player, fixing a double-count diagnosed on
+  2026-09-12 — an earlier, uncorrected run of a similar query fanned the four dual-path players'
+  round-vote rows out twice, +499 rows / +34 votes): **`4523b583a2f112f7bb33572eff7bb174`**. This is
+  the forward-stable baseline going forward; the old id-keyed fingerprint from §8.10 B3
+  (`bb2a047194c45bd643c518fb2d716ac5`) is meaningless across the lineage change and is not reused.
+
+### 10.3 Retention and rollback correction
+
+- **`afldb_prod-20260904-115413.dump`** (host `~/backups/afldb/` and `D:\backups\afldb\`) is retained
+  as **historical ISSUE-137 repair evidence only**. It is a dump of the pre-promotion lineage; restoring
+  it would not undo or re-apply the 2026-09-04 repair against current production — it would revert
+  production **past** the 2026-09-08 promotion, discarding every governed and football change made
+  since. It is **not** a live rollback point for anything and must not be used as one without a
+  deliberate, separately authorised decision.
+- **`afldb_prod_pre_rebuild_20260907-234124`** (database, on cluster) and
+  **`/home/arm/backups/afldb/afldb_prod-20260908-010422.dump`** (pre-cutover dump) are the live
+  rollback/comparison basis for the promotion itself. They are `AFLDB-ISSUE-151`/`AFLDB-ISSUE-125`
+  evidence, not ISSUE-137 evidence, and **must not be dropped** until that promotion's tracking
+  reconciliation is complete (see the `AFLDB-ISSUE-151` entry in `issues.md`).
+- `issues/closed/AFLDB-ISSUE-137-t1.sql` (moved from `issues/open/` at close-out) — **this is
+  historical repair evidence and MUST NOT be rerun against the current lineage.** Its id assumptions
+  (2608/6296/6525/6626 as the duplicates) are void in the current lineage; running it now would
+  silently mutate four unrelated real players (Charlie Canet, Jack Grant, Jack Ryan, Jack Wright).
+- `issues/closed/AFLDB-ISSUE-137-settle-check.sql` (moved from `issues/open/` at close-out) — **this
+  is historical, surrogate-ID-bound evidence and is superseded for current closure.** It was written
+  against the 2026-09-04 in-place repair's ids. Marked superseded, not deleted, not rewritten. Do not
+  quote its PASS/CHECK rows from a post-2026-09-08 run as ISSUE-137 evidence; they test the wrong ids.
+  `issues/closed/AFLDB-ISSUE-137-closure-check.sql` is the current, lineage-independent gate.
+- `afldb_prod_auth_recovery` — ISSUE-137's own hold was released 2026-09-04 (§8.11); `AFLDB-ISSUE-126`
+  owns the remaining retention decision and is unaffected by this closure.
+
+### 10.4 What this closure does not claim
+
+This closure does not assert that the `AFLDB-ISSUE-125`/`AFLDB-ISSUE-151` promotion's own tracking is
+complete, or that its state-preservation contract has been fully audited — that reconciliation belongs
+to the `AFLDB-ISSUE-151` entry in `issues.md`, corrected separately (2026-09-12) to no longer describe
+the promotion as paused. This entry closes only the identity-split defect ISSUE-137 was opened to fix,
+on evidence that the defect is absent from the database now serving production regardless of which
+lineage produced that state.
+
+### 10.5 Resolution
+
+**Resolved 2026-09-12.** Root cause: AFL Tables renumbered four modern players' profile URLs in 2025,
+and the pre-rebuild production identity register held both the old and new paths against different
+`players` rows (`AFLDB-ISSUE-136`'s rebuild-time fix does not retroactively repair an already-running
+production database). Fix: a supervised in-place identity reconciliation on 2026-09-04, whose effect
+was superseded — not invalidated — by the 2026-09-08 promotion to a rebuilt lineage carrying the same
+fold natively. Validation: `issues/closed/AFLDB-ISSUE-137-closure-check.sql`, 22/22 PASS, read-only
+against current `afldb_prod`, 2026-09-12 — the lineage-independent closure evidence, produced 22/22
+PASS on that date; superseded by nothing. Follow-up carried forward, not blocking: a general
+promotion-surviving redirect map for retired player ids remains unowned (the specific 2026-09-04 ids it
+would have served are now moot); the `AFLDB-ISSUE-151` promotion tracking/provenance reconciliation;
+whether a new process-defect issue is warranted for the days-long gap between the promotion completing
+and the tracking record reflecting it (assessed separately, not raised here).

@@ -1844,7 +1844,11 @@ date → time → clear-date sequence re-accepted in the browser.*
 ## 42. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
 
 **Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
-(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. This closeout changed
+(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. **Correction
+(2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098
+(including this issue's own 097), applied 2026-09-12, and the production host checkout was
+observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not
+reconstructed as part of the `AFLDB-ISSUE-137` investigation. This closeout changed
 tracking only.
 
 ### 42.1 What reached DEV

@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-163 — Club leadership administration and current-captain display (ISSUE-156 P3e)
 
-**Status:** **RESOLVED 2026-09-12.** Both stages (validated and committed 2026-09-12 — `8ed32b3`, `c28ea60`, `ea9f3dd`; §32.11 and §33.1 gates green) and the §34 audit fixes are in `main` at `3272434`, deployed to DEV with migration 098 applied and privileges reconciled, and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): captain, co-captain and vice-captain appointment, replace, end, reinstate, correct, void, the season overview Captain column, public club-page revalidation and the player-honours integration all passed, with responsive/design acceptance at 1440/1024/768/375 — the record is **§35**. Operator decisions D-1…D-18 (§30) **SIGNED OFF 2026-09-12 with four clarifications** and implemented as decided (§32.1); the §34 audit found no deviation and no stop condition. The five §34.4 findings are disposed in §35.3 as non-blocking follow-ups, not converted into completed work. PROD untouched; no PROD validation is claimed. Planning (§1–§31), Stage 1 (§32), Stage 2 (§33) and the audit (§34) are retained below as written.
+**Status:** **RESOLVED 2026-09-12.** Both stages (validated and committed 2026-09-12 — `8ed32b3`, `c28ea60`, `ea9f3dd`; §32.11 and §33.1 gates green) and the §34 audit fixes are in `main` at `3272434`, deployed to DEV with migration 098 applied and privileges reconciled, and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): captain, co-captain and vice-captain appointment, replace, end, reinstate, correct, void, the season overview Captain column, public club-page revalidation and the player-honours integration all passed, with responsive/design acceptance at 1440/1024/768/375 — the record is **§35**. Operator decisions D-1…D-18 (§30) **SIGNED OFF 2026-09-12 with four clarifications** and implemented as decided (§32.1); the §34 audit found no deviation and no stop condition. The five §34.4 findings are disposed in §35.3 as non-blocking follow-ups, not converted into completed work. PROD untouched; no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098 (including this issue's own 098, the current latest), applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Planning (§1–§31), Stage 1 (§32), Stage 2 (§33) and the audit (§34) are retained below as written.
 **Severity:** Medium
 **Area:** Admin / Data management / Club–season–player model / Public club page / Promotion lineage
 **Created:** 2026-09-12
@@ -1152,7 +1152,11 @@ acceptance (§24's UI row) and PROD promotion are all still ahead (§28).
 ## 35. Resolution — 2026-09-12 (combined Admin Centre DEV acceptance)
 
 **Status:** Resolved. Closed on the operator's DEV acceptance of the combined Admin Centre batch
-(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. This closeout changed
+(ISSUE-160 + 161 + 162 + 163). PROD untouched; no PROD validation is claimed. **Correction
+(2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098
+(including this issue's own 098, the current latest), applied 2026-09-12, and the production host
+checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope
+was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. This closeout changed
 tracking only: none of the §34.4 findings was implemented here.
 
 ### 35.1 What reached DEV

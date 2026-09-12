@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### Production's actual cutover is reconciled: the 20260907-234124 promotion completed under AFLDB-ISSUE-125, and AFLDB-ISSUE-137 closes on lineage-independent identity - 12 September 2026 (event: 8 September 2026)
+
+- **The paused `20260907-234124` production promotion resumed and completed** at
+  **2026-09-08 01:11:24.440219 AEST**, using the staged-reinstatement fix built under
+  `AFLDB-ISSUE-151` and attributed to `AFLDB-ISSUE-125`: `auth_audit_log` id 196
+  (`database.promoted`), candidate `afldb_prod_candidate_20260907-234124` replacing `afldb_prod`. The
+  pre-cutover database survives as `afldb_prod_pre_rebuild_20260907-234124`. A read-only
+  pre/post comparison of governed production-only state found no unexplained loss: `auth_users`,
+  `admin_invites`, `site_settings`, `site_media`, `data_edits`, `data_overrides`,
+  `data_submissions` and `player_link_resolutions` all matched exactly; `auth_audit_log` and
+  `beta_access_codes` growth and the `canonical_applications` reset to the rebuild's fresh settle
+  history are expected. This completion was not reflected in tracking until reconciled 2026-09-12.
+- **`AFLDB-ISSUE-137` is Resolved**, on different grounds than its 2026-09-04 in-place production
+  repair anticipated. That repair (identity re-point batch 741, Brownlow load batch 742) was real and
+  held in its own lineage, but the promotion above replaced that lineage with a canonical rebuild that
+  already carries the `AFLDB-ISSUE-136` folds — the four duplicate players never existed in it, and the
+  repair's retired surrogate ids (2608/6296/6525/6626) now belong to unrelated real players. Closure
+  is verified on lineage-independent stable identity (AFL Tables profile-url, name, DOB):
+  `issues/closed/AFLDB-ISSUE-137-closure-check.sql`, read-only against `afldb_prod`, **22/22 PASS**. The
+  2026-09-04 repair's dump, T1 SQL and settle-check are retained as historical evidence only and must
+  not be re-run against current production.
+- `AFLDB-ISSUE-151` stays Open — its code fix was implemented, merged and is what the completed
+  promotion above actually ran; the standalone database rehearsal script was never executed, and
+  resolving the issue on the strength of the live production result instead is an operator decision.
+
 ### The player-link queue explains why a row is where it is (AFLDB-ISSUE-164 P5) - 12 September 2026
 
 - **Every suggested row now states, in one line under its band, the single most important reason
@@ -218,7 +243,11 @@ commit.
   Super Admin, and layout accepted at desktop (1440 and 1024), tablet (768) and phone (375) with
   global navigation and accessibility/focus spot checks. All four issues are Resolved. PROD is
   untouched; promotion is a separate, later step under the ISSUE-151 contract, and the checklist
-  it inherits from this batch is recorded on the ISSUE-156 umbrella.
+  it inherits from this batch is recorded on the ISSUE-156 umbrella. **Correction (2026-09-12):
+  Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied
+  2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre
+  production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137`
+  investigation.
 - The operator's device priority for the Admin Centre is now recorded: laptop/desktop is the
   primary admin workspace, iPad/tablet a first-class one, and a phone a functional fallback.
   Phone-only cosmetic polish does not hold an Admin Centre issue open.

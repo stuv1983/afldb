@@ -1,6 +1,12 @@
 # AFLDB-ISSUE-156 — Admin Centre completion (umbrella runbook)
 
-**Status:** Open / Planning complete — no implementation started.
+**Status:** Open / Planning complete — no implementation started. **Correction (2026-09-12):** every
+"S-1" / "paused ISSUE-151 PROD promotion" reference later in this document describes the
+`20260907-234124` promotion, which has since **completed** — 2026-09-08 01:11:24.440219 AEST,
+`auth_audit_log` id 196, under `AFLDB-ISSUE-125`, using this issue's `AFLDB-ISSUE-151`
+staged-reinstatement tooling — before this umbrella's P3b–P3e children existed. There is no paused
+promotion left for a future release to sequence against; do not follow any instruction below to
+decide S-1 against it. See the `AFLDB-ISSUE-151` entry in `issues.md` for the authoritative record.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Created:** 2026-09-11
@@ -697,7 +703,12 @@ Admin Centre issue is held open for phone-only cosmetic polish. The two DEV-foun
 were committed (`e6c4e8c` and the fixture form fix) and re-accepted; the ISSUE-162 client/server
 boundary fix was proven by the DEV build. Evidence: each child's *Resolution (2026-09-12)* in
 `issues.md` and runbooks 160 §21 / 161 §34 / 162 §42 / 163 §35. **The batch is ready for the
-next release/promotion stage — a separate operator decision; PROD is untouched.** The carried
+next release/promotion stage — a separate operator decision; PROD is untouched.** **Correction
+(2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098,
+applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin
+Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137`
+investigation; this correction is conservative and does not claim the Admin Centre code itself
+reached production. The carried
 promotion checklist (deploy order; replay order before the `data_edits` remap; ISSUE-160 PROD
 probes and decision S-1; ISSUE-160 gate 9's real-importer half; the all-refs 096/097/098
 collision check) and the non-blocking follow-ups (ISSUE-163 §34.4 items 1–3; ISSUE-162 §39.6

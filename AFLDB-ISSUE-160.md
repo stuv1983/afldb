@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-160 — Draft administration and new-player intake through the draft (ISSUE-156 P3b)
 
-**Status:** **RESOLVED 2026-09-12.** Both stages (`91935b9`, `a947e52`), the 2026-09-11 audit fixes and §18 list-contract closure, and the §20 `/admin/draft/[id]` revision-read fix (`e6c4e8c`) are in `main` at `3272434`, deployed to DEV and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): production build PASS, `/api/health` ok, capability-scoped list/detail access, Super Admin editing, source-owned and linked/unlinked selections rendered, notes-override Save, stale two-tab compare-and-swap refusal, active-override/audit behaviour, and responsive acceptance at 1440/1024/768/375 — the gate 15/16 record is **§21**. Carried forward to the PROD promotion stage (owned by the `AFLDB-ISSUE-156` umbrella, not closure conditions): the gate-2 PROD probes (d)/(e)/(g)/(h), operator decision **S-1** (§11.1) and gate 9's real-importer half. Not observed in the browser and not claimed: a manual-provenance `/admin/draft/[id]` row (none existed on DEV during acceptance) — §21.3. Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided; **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a). PROD untouched throughout; no PROD validation is claimed. The pre-closeout history below (§0–§20 and the former *Next action*) is retained as written.
+**Status:** **RESOLVED 2026-09-12.** Both stages (`91935b9`, `a947e52`), the 2026-09-11 audit fixes and §18 list-contract closure, and the §20 `/admin/draft/[id]` revision-read fix (`e6c4e8c`) are in `main` at `3272434`, deployed to DEV and accepted there in the browser on 2026-09-12 as part of the combined Admin Centre batch (160 + 161 + 162 + 163): production build PASS, `/api/health` ok, capability-scoped list/detail access, Super Admin editing, source-owned and linked/unlinked selections rendered, notes-override Save, stale two-tab compare-and-swap refusal, active-override/audit behaviour, and responsive acceptance at 1440/1024/768/375 — the gate 15/16 record is **§21**. Carried forward to the PROD promotion stage (owned by the `AFLDB-ISSUE-156` umbrella, not closure conditions): the gate-2 PROD probes (d)/(e)/(g)/(h), operator decision **S-1** (§11.1) and gate 9's real-importer half. Not observed in the browser and not claimed: a manual-provenance `/admin/draft/[id]` row (none existed on DEV during acceptance) — §21.3. Operator decisions D-1…D-9 decided 2026-09-11 (§12) and implemented as decided; **D-8 resolved to the J-3 HARD-REFUSAL branch** from gate-2 probe (a). PROD untouched throughout; no PROD validation is claimed. **Correction (2026-09-12):** Production is not untouched: current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the ISSUE-137 investigation. The pre-closeout history below (§0–§20 and the former *Next action*) is retained as written.
 **Severity:** Medium
 **Area:** Admin / Data management / Acquisition (DraftGuru, AFL Tables) / Promotion lineage
 **Created:** 2026-09-11
@@ -8,6 +8,15 @@
 **Branch:** `opus/issue-160-draft-admin` · worktree `D:\dev\afldb-issue-160` (cut from `main` @ `af6379e`, which already contains the merged ISSUE-159)
 **Migration:** **none required** (§10). Next free number on this branch is **096** (highest is `095_coach_admin_overrides.sql`); it is *not* allocated here.
 **Planning model:** Fable 5.1, high. **Implementation:** Opus 5 high for Stage 1 (§17).
+
+**Correction (2026-09-12):** every "S-1" / "paused ISSUE-151 PROD promotion" reference below
+(§11.1 and elsewhere) describes the `20260907-234124` promotion, which has since **completed** —
+2026-09-08 01:11:24.440219 AEST, `auth_audit_log` id 196, under `AFLDB-ISSUE-125` — before this
+issue was created (2026-09-11), so it necessarily ran without this issue's `draft_pick_key` gate.
+S-1 is resolved by fact as option (a): the completed promotion used the then-current lineage
+contract, and the gate governs only the *next* promotion. No deployment of this issue's tooling
+change is gated on a paused promotion; none exists. See the `AFLDB-ISSUE-151` entry in `issues.md`
+for the authoritative record.
 
 This document was a planning deliverable and is now the executed Stage 1 contract. Everything
 below is the plan as approved; where implementation deviated from it, the deviation is recorded
