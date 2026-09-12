@@ -7,7 +7,25 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 12 tracked here — `-117`, `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-150`, `-151`, `-152`, `-155`, `-156`.
+**Open issues:** 11 tracked here — `-117`, `-138`, `-139`, `-140`, `-144`, `-147`, `-148`, `-151`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-150 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): the venue-page expansion (five new query functions in `src/db/queries/venues.ts`,
+     `VenueRecords` / `VenueClubRecords` / `VenuePlayerLeaders` / `VenueMatchHistory` components,
+     and the new `/venues/[slug]/matches` route) — merged into `main` as `d2a615b` and deployed on
+     DEV, with focused validation already green (`tsc --noEmit` PASS, `eslint` 0 errors,
+     `tests/venue-records-sections.test.ts` 12/12, `tests/integration/venue-records.test.ts`
+     15/15, no migration) — is now closed by: the operator's final DEV Playwright browser gate
+     (PASS across `/venues/melbourne-cricket-ground`, `/venues/hands-oval` and
+     `/venues/melbourne-cricket-ground/matches` at 1440px/375px); a fresh full
+     `ISSUE-150-venue-evidence.sql` run (15/15 sections PASS against `afldb_test`, 0 SQL errors,
+     after fixing an evidence-script-only §7 ambiguous-column defect — `m.*` vs. the computed
+     `margin` alias — with no app/query/schema/test change; MCG biggest margin 165, Hands Oval
+     124, matching the browser); and a direct-host authoritative `npm run build` PASS on
+     `streamanator` (the earlier Windows/tunnel build timeout was environmental, not a
+     regression). See the `AFLDB-ISSUE-150` entry's *Resolution (2026-09-13)* below, including a
+     non-blocking `venues.last_season` byline observation recorded as a finding only (not a new
+     tracked issue). Removed from the Open Issues table and `IssuesIndex.md`; 12 -> 11. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-149 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): the six club-page sections (Club records, Record crowds, Players, Premiership
@@ -20449,14 +20467,14 @@ would need a separate issue.
 
 ## AFLDB-ISSUE-150 — Expand AFL venue pages with historical venue records and statistics
 
-- **Status:** **OPEN — IMPLEMENTATION COMPLETE. `tsc`, `eslint`, the DB-free component suite
-  (12/12) and the `afldb_test` integration suite (15/15) all GREEN on the implementation
-  workstation (a tunnel to `afldb_test` was up). NOT yet run: `ISSUE-150-venue-evidence.sql`
-  eyeball spot-check (no `psql` here), `npm run build` against a real database, the DEV browser
-  smoke.** MERGED into `main` as `d2a615b` and deployed on DEV; branch
-  `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), bootstrapped from merged
-  `main` @ `00eea34` (after ISSUE-149), is an ancestor of `main`. Stays Open until the operator
-  runs the evidence SQL and the build and verifies on DEV.
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+  As it stood earlier (retained): **OPEN — IMPLEMENTATION COMPLETE. `tsc`, `eslint`, the DB-free
+  component suite (12/12) and the `afldb_test` integration suite (15/15) all GREEN on the
+  implementation workstation (a tunnel to `afldb_test` was up). NOT yet run:
+  `ISSUE-150-venue-evidence.sql` eyeball spot-check (no `psql` here), `npm run build` against a
+  real database, the DEV browser smoke.** MERGED into `main` as `d2a615b` and deployed on DEV;
+  branch `sonnet/issue-150-venue-records` (worktree `D:\dev\afldb-issue-150`), bootstrapped from
+  merged `main` @ `00eea34` (after ISSUE-149), is an ancestor of `main`.
 - **Severity / Area:** Low / Public UI — venue pages; database queries.
 - **Reported:** 2026-09-07 (operator request — every public AFL/VFL venue page should be a
   historical record page, not a truncated "recent 50 matches" list).
@@ -20607,6 +20625,63 @@ against `afldb_test` before considering any index — do not add one speculative
 - A "sort by any column" affordance on the club-records and player-leaders tables (currently
   fixed deterministic order) could be added with `SortableTable`, as the club page does — not
   done here to keep client state minimal.
+
+### Resolution (2026-09-13)
+
+**Status:** Resolved. Closed on the operator's final DEV Playwright browser gate plus a fresh
+full evidence SQL run and a direct-host authoritative build.
+
+- **DEV Playwright smoke (PASS):** `/venues/melbourne-cricket-ground`,
+  `/venues/hands-oval` and `/venues/melbourne-cricket-ground/matches`, at 1440px and 375px.
+  Verified: MCG overview/first/latest match, venue records, attendance records, highest score,
+  biggest margin, W-D-L + win %, all five player leaderboards, recent-match preview, full-history
+  link, 3,200-match history pagination (page 1 → page 2 → page 1), sparse Hands Oval rendering, no
+  broken/null/NaN states, no console/runtime errors, no document-level narrow-width overflow.
+- **Evidence-script defect found and fixed (evidence-only, no app/query/schema/test change):**
+  `ISSUE-150-venue-evidence.sql` §7 (biggest winning margin) selected `m.*` from `matches m` in
+  the same `WITH ranked AS (...)` CTE that also computed `ABS(m.home_score - m.away_score) AS
+  margin`; since `matches` already has its own `margin` column, the outer `SELECT r.margin` became
+  ambiguous. Fixed by replacing `m.*` with the explicit columns actually used downstream (`m.id`,
+  `m.match_date`, `m.venue_id`, `m.home_club_id`, `m.away_club_id`, `m.home_score`,
+  `m.away_score`), keeping the computed `margin` alias unchanged.
+- **Fresh full evidence run (PASS):** target confirmed as exactly `afldb_test`, `ON_ERROR_STOP=1`,
+  exit 0, all 15 sections PASS, zero SQL errors. §7 now returns real biggest-margin evidence — MCG
+  165 (Hawthorn 197 v Port Adelaide 32, 2011-08-13), Hands Oval 124 (North Melbourne 155 v
+  Fremantle 31, 2026-06-06) — matching the DEV browser rendering. Retained as
+  `ISSUE-150-test-db-evidence.txt`.
+- **Authoritative build (PASS):** an earlier Windows/tunnel `npm run build` timed out during
+  static prerender of a heavy player page under the tunnel's 5-second statement timeout — an
+  environmental artefact, not an ISSUE-150 regression. A build run directly on `streamanator`
+  (direct local PostgreSQL, normal repo configuration, no timeout weakening, no `.env`
+  modification) passed cleanly, including `/players/scott-pendlebury-11724`. No migration, no
+  deploy, no service restart.
+
+**Root cause:** not an application defect — this issue implemented five new venue-page query
+functions and two routes that did not previously exist. The one genuine defect found during
+closeout validation was in the evidence script itself (`m.*` vs. the computed `margin` alias, per
+above), not in `src/db/queries/venues.ts` or its callers.
+
+**Fix:** as recorded above (feature) plus the `ISSUE-150-venue-evidence.sql` §7 column-list
+correction (evidence-only).
+
+**Validation:** `npx tsc --noEmit` PASS; `eslint` 0 errors; `tests/venue-records-sections.test.ts`
+12/12; `tests/integration/venue-records.test.ts` 15/15; fresh full `ISSUE-150-venue-evidence.sql`
+run 15/15 sections PASS against `afldb_test`; DEV Playwright browser gate PASS (both viewports);
+direct-host (`streamanator`) authoritative `npm run build` PASS. No migration required at any
+stage.
+
+**Non-blocking observation (not ISSUE-150 scope):** the MCG page's overview byline showed
+`1897–2025` while a match rendered/evidenced in 2026 (the 2026-06-06 / 2026-09-04 rows above).
+This looks like a `venues.last_season` data-label/data-maintenance question, not a query or
+rendering defect — the underlying match data itself is correct in both the evidence and the
+browser. Recorded here as a finding only; does not meet the issue-tracking bar on its own
+(no reproducible defect, no data-integrity/security problem, no regression) and is left for the
+operator to raise separately if a `venues.last_season` refresh/maintenance job is wanted.
+
+**Follow-up:** none new — as recorded above under *Follow-up*. Charts, decade trends,
+record-progression timelines, single-match player records, finals/GF venue analytics, club×venue
+matrices, venue comparison, map/location features and a sortable-columns affordance remain
+out of scope; raise a separate issue if wanted.
 
 ---
 

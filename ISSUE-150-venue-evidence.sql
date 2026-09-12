@@ -253,7 +253,13 @@ ORDER BY v.canonical_name;
 \echo '=== 7. BIGGEST WINNING MARGIN PER VENUE ==='
 WITH ranked AS (
     SELECT
-        m.*,
+        m.id,
+        m.match_date,
+        m.venue_id,
+        m.home_club_id,
+        m.away_club_id,
+        m.home_score,
+        m.away_score,
         ABS(m.home_score - m.away_score) AS margin,
         ROW_NUMBER() OVER (
             PARTITION BY m.venue_id

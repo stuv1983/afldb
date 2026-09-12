@@ -6,7 +6,27 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-09-13 (`AFLDB-ISSUE-149` **RESOLVED** — the operator's final DEV browser
+**Last updated:** 2026-09-13 (`AFLDB-ISSUE-150` **RESOLVED** — the venue-page expansion (five new
+query functions in `src/db/queries/venues.ts`, `VenueRecords` / `VenueClubRecords` /
+`VenuePlayerLeaders` / `VenueMatchHistory` components, new `/venues/[slug]/matches` route),
+already merged to `main` as `d2a615b` and deployed on DEV with focused validation green (`tsc
+--noEmit` PASS, `eslint` 0 errors, `tests/venue-records-sections.test.ts` 12/12,
+`tests/integration/venue-records.test.ts` 15/15, no migration), is now closed by the operator's
+final DEV Playwright browser gate (PASS across `/venues/melbourne-cricket-ground`,
+`/venues/hands-oval` and `/venues/melbourne-cricket-ground/matches` at 1440px/375px — overview,
+venue/attendance records, highest score, biggest margin, W-D-L/win %, all five player
+leaderboards, recent-match preview, full-history link, 3,200-match pagination, sparse-venue
+rendering, no broken/NaN states, no console errors, no narrow-width overflow), a fresh full
+`ISSUE-150-venue-evidence.sql` run (15/15 sections PASS against `afldb_test`, exit 0, 0 SQL
+errors — after fixing an evidence-script-only §7 ambiguous-column defect, `m.*` clashing with the
+computed `margin` alias, no app/query/schema/test change; MCG biggest margin 165, Hands Oval 124,
+matching the browser), and a direct-host authoritative `npm run build` PASS on `streamanator` (the
+earlier Windows/tunnel build timeout was environmental — a 5-second SSH-tunnel statement timeout
+during static prerender of a heavy player page — not an ISSUE-150 regression). A non-blocking
+`venues.last_season` byline observation (MCG shows `1897–2025` while a match rendered/evidenced in
+2026) is recorded in `issues.md` as a finding only, not a new tracked issue. See `issues.md`
+Resolution (2026-09-13); removed from the open issues list below; 12 -> 11; earlier the same day:
+`AFLDB-ISSUE-149` **RESOLVED** — the operator's final DEV browser
 gate passed across three cases: Richmond (all six sections — Club records, Record crowds, Players,
 Premiership players, Awards & honours — plus the preserved Premierships/Coaches sections all
 render correctly), Footscray/Western Bulldogs (rename/lineage carry-through and whole-club totals
@@ -41,7 +61,7 @@ since P3B and now discharged; migration 099 re-confirmed 99/99 applied, 0 pendin
 runbook's own stop-condition rule, not a blocker to closure; see `issues.md` Resolution
 (2026-09-12) and `AFLDB-ISSUE-164.md` §12 P5.4; removed from the open issues list below;
 earlier the same day, before final validation: `AFLDB-ISSUE-164` **P5 CLOSEOUT COMPLETE** — the §11 explainability UI is implemented as a pure explanation layer (new `src/lib/player-matching/explain-limits.ts`: typed limit reasons, six evaluated bulk criteria, reachable profile ceilings reproducing the §3 arithmetic; row-level primary reason under the band badge; drawer criteria now rendered for EVERY suggested match with ✓/✗ and a ceiling line), with **no scoring change** — `ALGORITHM_VERSION` stays `v3`, S3/S4 stay 15/15, D-9 stays in force, migration 099 untouched and verified applied on `afldb_dev` (99/99, 0 pending); **§13 item 1 MET**, **§13 item 2b deliberately UNMET and deferred under D-9**, **S6 DECIDED — not implemented in ISSUE-164** (zero qualifying population, empty leave-one-out arm, no new issue raised), and the missing P2 stale-cache CHANGELOG entry added; DB-free validation clean (`tsc --noEmit`, 187/187 focused tests) with `tests/integration/player-matching.test.ts` still OWED; earlier the same day: `AFLDB-ISSUE-164` P3B grid MEASURED and SELECTED — S3 `clubTextInSpan` **15** / S4 `clubTextAnywhere` **15** are now the shipped `MATCH_POLICY` values, chosen as the lowest pair that buys the whole measurable identity improvement: labelled Top-1 99.64% → 99.67%, Hall of Fame Top-1 98.74% → 99.58% on exactly two corrections (Frank Hughes, Mark Williams), ambiguity 25 → 19, and Very High / VH FP / bulk / hard conflicts all UNCHANGED; S3 at 23, 24 and 29 REJECTED as confidence inflation with no further identity improvement; unresolved queue and `draft_person` unchanged, D-9 in force, `ALGORITHM_VERSION` stays `v3`, DB-backed validation still OWED; earlier the same day: `AFLDB-ISSUE-164` P3A non-draft evidence plumbing IMPLEMENTED — S1 lineage, exact club-text resolution, S3/S4 signals, `ALGORITHM_VERSION` `v3`, no draft change; earlier the same day: `AFLDB-ISSUE-164` P1b and P1c COMPLETE — migration 099 validated on `afldb_test` and `afldb_dev`, no labelled regression, queue Very High 38 → 2,680 with 0 bulk-eligible draft rows, the 5-row draft population reconciled to the 5 tracked human decisions and ISSUE-075's 2,319 declared NOT reproducible; **P1c Tier 1 labelling run executed** — 114 labels, Top-1 98.96%, Very High 54/54 with 0 false positives, 0 bulk-eligible rows — plus a closeout correction pass (rebuilt `player_link_resolutions` is expected to be EMPTY, Sam Chapman is NOT settled by Tier 1, and the zero-failure bound wording now distinguishes an empty sample from an observed failure); D-9 stays in force and Tier 2 is required before draft bulk re-admission or any draft-specific tuning; earlier the same day: ISSUE-164 P1a/P1/P2, ISSUE-164 allocated; earlier the same day: Admin Centre batch closeout, ISSUE-160, 161, 162 and 163 RESOLVED on the combined DEV acceptance)
-**Open issues:** 12 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-150`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`.
+**Open issues:** 11 tracked here — `AFLDB-ISSUE-117`, `AFLDB-ISSUE-138`, `AFLDB-ISSUE-139`, `AFLDB-ISSUE-140`, `AFLDB-ISSUE-144`, `AFLDB-ISSUE-147`, `AFLDB-ISSUE-148`, `AFLDB-ISSUE-151`, `AFLDB-ISSUE-152`, `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`.
 
 <!-- UPDATE 2026-09-12 (`AFLDB-ISSUE-164` ALLOCATED - PLANNING ONLY, NO CODE, NO MIGRATION, NO
      COMMAND RUN): Recalibrate player-link confidence and expand evidence-aware bulk matching.
