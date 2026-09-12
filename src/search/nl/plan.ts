@@ -423,7 +423,7 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * chronology contract, actual coaching still required, one-sided club
  * composition still fails closed.
  */
-export const PARSER_VERSION = 40;
+export const PARSER_VERSION = 41;
 
 // ------------------------------------------------------------------ grain
 
@@ -452,7 +452,19 @@ export type NlGrain =
    * statistic grain: AFLDB has no play-by-play data and never recomputes
    * one of these from scores or player_match_stats.
    */
-  | 'after_siren';
+  | 'after_siren'
+  /**
+   * A sibling FAMILY (AFLDB-ISSUE-153 Stage 6, decision D6), grouped by
+   * `player_relationships.family_key` and generalising
+   * `getFamilyRecords`/`getFamilyRecordsSummary` -- 351 linked families,
+   * 704 linked players, 46 of them size-1 (excluded: a family of one is
+   * not a family). Not a player grain: the answer is family-level rows,
+   * each carrying its own linked member list, and a member never appears
+   * unless AFLDB has matched them to a canonical player (fail-closed on
+   * the unlinked side of a family_key, §4.6/§4.7). No club, no chronology
+   * -- a family has neither.
+   */
+  | 'family';
 
 // ------------------------------------------------------------ after siren
 
@@ -898,6 +910,20 @@ export const NL_METRICS: Record<NlGrain, Record<string, NlMetricDef>> = {
      */
     siren_kicks: columnMetric('siren_kicks', 'Kicks after the siren', 'siren_kicks'),
   },
+  /**
+   * AFLDB-ISSUE-153 Stage 6 (D6/§7.7). Two metrics, never interchangeable
+   * and never sharing a phrasing: "biggest football family" ranks
+   * combined_games (what /records/family already ranks by), and "which
+   * family has the most AFL players" ranks linked_members -- the two
+   * disagree by up to 301 rank places on today's data (Stage 0 §4.6), so
+   * conflating them would answer a different family than the one asked
+   * for. C5 ("families with three AFL players") thresholds linked_members
+   * via metricCondition rather than ranking it.
+   */
+  family: {
+    combined_games: columnMetric('combined_games', 'Combined career games', 'combined_games'),
+    linked_members: columnMetric('linked_members', 'Linked members', 'linked_members'),
+  },
 };
 
 /**
@@ -1172,9 +1198,10 @@ export type NlQueryPlan = {
   crossDomainClubs?: { played: NlClubRef; coached: NlClubRef };
   scope: NlMatchScope;
   /**
-   * player_game/player_season only: qualify the selected metric against a
-   * threshold instead of ranking it. Requires agg 'list' -- the answer is
-   * the qualifying set, never a rank-one leader. See NlMetricCondition.
+   * player_game/player_season/coach_record/after_siren/family only:
+   * qualify the selected metric against a threshold instead of ranking it.
+   * Requires agg 'list' -- the answer is the qualifying set, never a
+   * rank-one leader. See NlMetricCondition.
    */
   metricCondition?: NlMetricCondition;
   /** player_career only. */
@@ -1471,7 +1498,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // NOT compiler-enforced -- a plain literal array. Omitting a grain here
   // fails CLOSED (every plan of that grain rejected as unknown) rather than
   // opening a hole, and tests/nl-plan.test.ts catches it.
-  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record', 'after_siren'];
+  const grains: NlGrain[] = ['player_career', 'player_game', 'player_season', 'team_match', 'club_season', 'team_streak', 'achievement_summary', 'head_to_head', 'coach_record', 'after_siren', 'family'];
   if (!grains.includes(raw.grain)) return { error: `Unknown grain "${raw.grain}".` };
 
   if (raw.grain === 'head_to_head') {
@@ -1677,6 +1704,29 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     return { error: 'An after-the-siren descriptor only applies to an after-the-siren question.' };
   }
 
+  // AFLDB-ISSUE-153 Stage 6 (D6/§7.7). A family question ranks or lists
+  // sibling-family groups; it has no club, no season, no named subject and
+  // no career predicate to apply (§5.1 rows 8-9: "not applicable" for a
+  // family). Every field a family plan might otherwise carry is refused BY
+  // NAME here rather than silently dropped on the way to SQL -- the same
+  // ISSUE-110 discarded-scope rule every other grain's block already
+  // follows.
+  if (raw.grain === 'family') {
+    if (
+      raw.player || raw.coach || raw.relationshipSubject || raw.crossDomainClubs
+      || raw.scope.playerIdIn || raw.scope.clubFor || raw.scope.clubAgainst || raw.scope.matchup
+      || raw.scope.venue || raw.scope.matchType !== undefined || raw.scope.roundNumber !== undefined
+      || raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined
+      || raw.careerConditions.length > 0 || raw.careerPredicates.length > 0 || raw.clubSeasonConditions.length > 0
+      || raw.achievementSummary || raw.fatherSonSummary || raw.headToHead || raw.streakDefinition
+      || raw.afterSiren || raw.boundary || raw.havingClause || raw.matchFilter || raw.coachQualifier
+      || (raw.periodSplit && raw.periodSplit !== 'FULL_MATCH') || raw.scoreCheckpoint || raw.resultFilter
+      || raw.debutGame
+    ) {
+      return { error: 'A family question has no club, season, player or career condition to apply.' };
+    }
+  }
+
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }
@@ -1684,7 +1734,11 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // with no ranked metric ("players with 300 games and no premiership").
   // Every other grain's compiler ranks by a metric and has no other
   // question shape to fall back to.
-  if (raw.metric === null && (raw.grain === 'player_game' || raw.grain === 'player_season' || (raw.grain === 'team_match' && !raw.havingClause))) {
+  if (
+    raw.metric === null
+    && (raw.grain === 'player_game' || raw.grain === 'player_season' || raw.grain === 'family'
+      || (raw.grain === 'team_match' && !raw.havingClause))
+  ) {
     return { error: 'This kind of question needs a statistic to rank by.' };
   }
 
@@ -1695,7 +1749,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   if (raw.metricCondition !== undefined) {
     if (
       raw.grain !== 'player_game' && raw.grain !== 'player_season' && raw.grain !== 'coach_record'
-      && raw.grain !== 'after_siren'
+      && raw.grain !== 'after_siren' && raw.grain !== 'family'
     ) {
       return { error: 'This statistic cannot currently be filtered by that threshold.' };
     }
@@ -1720,7 +1774,7 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // shape as a rank-one superlative -- the reader asked for a thresholded
   // list and got a single unfiltered leader -- so it fails closed instead.
   if (
-    (raw.grain === 'player_game' || raw.grain === 'player_season')
+    (raw.grain === 'player_game' || raw.grain === 'player_season' || raw.grain === 'family')
     && raw.agg.kind === 'list' && raw.metricCondition === undefined
   ) {
     return { error: 'Listing player results needs a qualifying threshold.' };
@@ -2175,6 +2229,7 @@ const GRAIN_LABEL: Record<NlGrain, string> = {
   head_to_head: 'head-to-head',
   coach_record: 'coaching',
   after_siren: 'after the siren',
+  family: 'family',
 };
 
 /** The subject noun for a grain with no ranked metric ("every matching <noun>"). */
@@ -2189,6 +2244,7 @@ const GRAIN_SUBJECT: Record<NlGrain, string> = {
   head_to_head: 'matchup',
   coach_record: 'coach',
   after_siren: 'kick',
+  family: 'family',
 };
 
 const TIE_ENTITY: Record<NlGrain, string> = {
@@ -2202,6 +2258,7 @@ const TIE_ENTITY: Record<NlGrain, string> = {
   head_to_head: 'matchup',
   coach_record: 'coach',
   after_siren: 'kick',
+  family: 'family',
 };
 
 const OP_WORDS: Record<NlCompareOp, string> = {

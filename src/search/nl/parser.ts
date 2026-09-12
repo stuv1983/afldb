@@ -71,6 +71,7 @@ import {
   FIRST_KICK_NO_FURTHER_KICKS_CUES, FIRST_KICK_ONLY_GOAL_CUES, readFirstKickCount,
   FATHER_SON_FATHER_CUES, FATHER_SON_FATHER_NOISE, FATHER_SON_RULE_RE,
   FATHER_SON_SELECTION_CUES, FATHER_SON_PLAYING_SEASON_MIX_RE, FATHER_SON_SUMMARY_CUES,
+  FAMILY_BIGGEST_RE, FAMILY_MOST_PLAYERS_RE, FAMILY_SIZE_CLAUSE_RE, FAMILY_SIZE_OP_WORDS,
   RELATIONSHIP_CLAUSE_NOISE, RELATIONSHIP_OF_PLAYER_RE, RELATIONSHIP_OUT_OF_SCOPE,
   RELATIONSHIP_POPULATION_CUES, RELATIONSHIP_POSSESSIVE_RE, RELATIONSHIP_SYMMETRIC_CUES,
   DECADE_RE,
@@ -782,6 +783,59 @@ function extractRelationship(text: string, raw: string): RelationshipExtraction 
   }
   if (builders.length === 0) return { text, consumed: [] };
   return finish({ builders }, remaining);
+}
+
+// --------------------------------------------------------- family grain
+
+type FamilyGrainExtraction = {
+  text: string;
+  consumed: string[];
+  family?: { metric: 'combined_games' | 'linked_members'; metricCondition?: NlMetricCondition };
+};
+
+/**
+ * AFLDB-ISSUE-153 Stage 6 (decision D6). Claims exactly the three tested
+ * family-GRAIN phrasings -- "biggest football family/families", "which
+ * family has the most AFL players", "families with three AFL players" --
+ * and nothing else. Called BEFORE extractRelationship, on purpose: a
+ * match here removes the family/families word from `text`, so
+ * RELATIONSHIP_OUT_OF_SCOPE's own family/relatives entry (checked inside
+ * extractRelationship) never gets to test a phrasing this function has
+ * already claimed. Every other family/relatives wording reaches
+ * extractRelationship completely untouched and keeps declining exactly as
+ * it did before Stage 6.
+ *
+ * Order among the three cues does not matter -- none of their trigger
+ * words overlap -- but is kept in the order the runbook lists them (C1
+ * "biggest", C1 "most players", C5 "with N players").
+ */
+function extractFamilyGrain(text: string): FamilyGrainExtraction {
+  const biggest = FAMILY_BIGGEST_RE.exec(text);
+  if (biggest) {
+    return { text: stripMatch(text, biggest[0]), consumed: [biggest[0]], family: { metric: 'combined_games' } };
+  }
+
+  const mostPlayers = FAMILY_MOST_PLAYERS_RE.exec(text);
+  if (mostPlayers) {
+    return { text: stripMatch(text, mostPlayers[0]), consumed: [mostPlayers[0]], family: { metric: 'linked_members' } };
+  }
+
+  const sizeClause = FAMILY_SIZE_CLAUSE_RE.exec(text);
+  if (sizeClause) {
+    const opPhrase = sizeClause[1];
+    const op = opPhrase ? FAMILY_SIZE_OP_WORDS[opPhrase] : 'gte';
+    const countWord = sizeClause[2];
+    const value = /^\d+$/.test(countWord) ? Number(countWord) : NUMBER_WORDS[countWord];
+    if (value !== undefined && op) {
+      return {
+        text: stripMatch(text, sizeClause[0]),
+        consumed: [sizeClause[0]],
+        family: { metric: 'linked_members', metricCondition: { op, value } },
+      };
+    }
+  }
+
+  return { text, consumed: [] };
 }
 
 // ------------------------------------------- marquee matches & rivalries
@@ -2161,6 +2215,22 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     return { status: 'none', reason: 'unrecognised', report };
   }
 
+  // 5d-bis. The family GRAIN (AFLDB-ISSUE-153 Stage 6, D6). Claimed BEFORE
+  // extractRelationship for exactly one reason: a match here removes the
+  // family/families word from `text`, so the family/relatives entry in
+  // RELATIONSHIP_OUT_OF_SCOPE (tested inside extractRelationship, next)
+  // never gets a chance to decline a phrasing D6 already answers. Every
+  // other family/relatives wording is untouched.
+  //
+  // Suppressed for a coaching or after-siren question, same as the
+  // relationship extractor immediately below and for the same reason: a
+  // family answer needs no coach/siren context to already be underway.
+  const familyGrainResult: FamilyGrainExtraction = coachReading !== null || afterSirenReading
+    ? { text, consumed: [] }
+    : extractFamilyGrain(text);
+  text = familyGrainResult.text;
+  consumedTokens.push(...familyGrainResult.consumed);
+
   // 5e. Family relationships (AFLDB-ISSUE-152 Phase D). Placed here, after
   // the achievement phrase and before every metric extractor and the
   // player-name scan, for the reason step 5a is: the relationship noun has
@@ -2640,7 +2710,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     && !matchTypeResult.matchType
   );
 
-  if (fatherSonSummaryKind) {
+  if (familyGrainResult.family) {
+    // AFLDB-ISSUE-153 Stage 6 (D6/C1/C5). Checked first, ahead of every
+    // other branch: the cue only exists because extractFamilyGrain already
+    // matched one of the three locked family-grain phrasings, so nothing
+    // else can be competing for this question.
+    grain = 'family';
+    metric = familyGrainResult.family.metric;
+  } else if (fatherSonSummaryKind) {
     // AFLDB-ISSUE-153 Stage 4 (FS6). A distribution of SELECTIONS, which
     // is a group-and-count and not a player list -- the same grain and the
     // same payload shape an achievement summary uses, over a different
@@ -2892,6 +2969,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   //     threshold must never silently disappear.
   let metricCondition = pendingMetricCondition;
   if (grain === 'coach_record') metricCondition = coachCondition;
+  // AFLDB-ISSUE-153 Stage 6 (C5). extractFamilyGrain already bound its own
+  // threshold to the linked_members metric; nothing upstream of grain
+  // election could have produced a competing metricCondition for a family
+  // question, so this simply overwrites whatever pendingMetricCondition
+  // (always undefined here) held.
+  if (grain === 'family') metricCondition = familyGrainResult.family?.metricCondition;
   const soleCareerCondition = careerResult.conditions.length === 1 && careerResult.conditions[0].kind === 'column'
     ? careerResult.conditions[0]
     : null;
@@ -3288,7 +3371,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     // leader is exactly the shape the threshold exists to prevent. A
     // min/top_n alongside a threshold is left alone for validatePlan to
     // refuse honestly.
-    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record')
+    : metricCondition && (grain === 'player_game' || grain === 'player_season' || grain === 'coach_record' || grain === 'family')
       && (!resolvedAgg || resolvedAgg.kind === 'max' || resolvedAgg.kind === 'list')
     ? { kind: 'list' }
     // "who coached Richmond" names no statistic, so there is nothing to

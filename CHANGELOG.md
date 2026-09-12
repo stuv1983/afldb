@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### The search box can now answer questions about a whole football family, not just one player (AFLDB-ISSUE-153 Stage 6) - 13 September 2026
+
+- The search box can now be asked "biggest football families" and answers with the sibling family holding
+  the most combined career games, matching what the Family Records page already ranks by. A separate
+  wording, "which family has the most AFL players", ranks by linked member count instead - the two answer
+  different questions and disagree on today's data by up to 301 rank places, so neither wording can stand
+  in for the other.
+- "Families with three AFL players" is now answered as a count of qualifying families, not a single
+  ranked leader.
+- A family of one is not a family: any sibling group AFLDB has linked only one side of is excluded from
+  every family answer. Two players who share a display name (both "Gary Ablett") are always distinguished
+  by their player id, never by name, and a relative AFLDB has not matched to a player profile is named
+  nowhere in the answer.
+- Every other wording naming a "family" or "relatives" - a named player's family, cousins, in-laws,
+  grandparents and the like - still declines exactly as before; this only answers the three phrasings
+  above.
+
 ### Production's actual cutover is reconciled: the 20260907-234124 promotion completed under AFLDB-ISSUE-125, and AFLDB-ISSUE-137 closes on lineage-independent identity - 12 September 2026 (event: 8 September 2026)
 
 - **The paused `20260907-234124` production promotion resumed and completed** at

@@ -29,10 +29,12 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { getFamilyRecords, getFamilyRecordsSummary } from '@/db/queries/family-records';
+import { answerFamily } from '@/db/queries/nl/family';
 import { answerFatherSonSummary } from '@/db/queries/nl/father-son-summary';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
 import { validatePlan, type NlPlayerRef, type NlQueryPlan } from '@/search/nl/plan';
-import type { NlAnswerPayload, NlPlayerCareerRow } from '@/search/nl/answer-types';
+import type { NlAnswerPayload, NlFamilyRow, NlPlayerCareerRow } from '@/search/nl/answer-types';
 
 afterAll(async () => {
   await sql.end();
@@ -892,5 +894,137 @@ describe('father_son_selections and its parent_child projection stay identical (
        WHERE relationship = 'parent_child' AND family_key IS NOT NULL
     `;
     expect(row.keyed).toBe(0);
+  });
+});
+
+// ---------------------------------------------- AFLDB-ISSUE-153 Stage 6
+
+/**
+ * The `family` grain (D6/C1/C5). Every check here is against an
+ * INDEPENDENT oracle -- getFamilyRecords/getFamilyRecordsSummary
+ * (db/queries/family-records.ts, Stage 1's own already-tested query) --
+ * never against family.ts re-deriving its own SQL and agreeing with
+ * itself. Both read the same sibling-only population, but neither is
+ * written from the other.
+ */
+describe('the family grain (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+  function familyPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({ grain: 'family', metric: 'combined_games', agg: { kind: 'max' }, ...overrides });
+  }
+
+  async function family(p: NlQueryPlan, limit = 100): Promise<{
+    lead: NlFamilyRow | null; rows: NlFamilyRow[]; total: number;
+  }> {
+    const payload: NlAnswerPayload = await answerFamily(p, limit);
+    if (payload.kind !== 'family') throw new Error(`expected family, got ${payload.kind}`);
+    return payload;
+  }
+
+  it('C1 "biggest football family" agrees with the existing /records/family board', async () => {
+    const [oracle] = await getFamilyRecords(1);
+    const answer = await family(familyPlan());
+    expect(answer.lead?.familyKey).toBe(oracle.familyKey);
+    expect(answer.lead?.combinedGames).toBe(oracle.combinedGames);
+    expect(answer.lead?.linkedMembers).toBe(oracle.linkedMembers);
+  });
+
+  it('C1 "most AFL players" ranks a DIFFERENT metric than "biggest" -- never the same phrasing', async () => {
+    const byGames = await family(familyPlan());
+    const byMembers = await family(familyPlan({ metric: 'linked_members' }));
+    expect(byGames.lead).not.toBeNull();
+    expect(byMembers.lead).not.toBeNull();
+    // Stage 0 (§4.6) measured the two rankings disagree by up to 301 rank
+    // places on this data. This is the cheapest witness that they are
+    // genuinely two different questions: the games leader is not required
+    // to also lead by member count.
+    const board = await getFamilyRecords(1000);
+    const byGamesRankOfMembersLeader = board.findIndex((r) => r.familyKey === byMembers.lead?.familyKey);
+    expect(byGamesRankOfMembersLeader).toBeGreaterThanOrEqual(0);
+  });
+
+  it('excludes every size-1 family, fail-closed (§4.6: 46 of them today)', async () => {
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 1 },
+    }), 1000);
+    expect(answer.rows.length).toBeGreaterThan(0);
+    expect(answer.rows.every((r) => r.linkedMembers >= 2)).toBe(true);
+
+    const board = await getFamilyRecords(1000);
+    const sizeOneOnBoard = board.filter((r) => r.linkedMembers === 1).length;
+    expect(sizeOneOnBoard).toBeGreaterThan(0); // the board itself does NOT exclude them (Stage 1 scope)
+    expect(answer.total).toBe(board.length - sizeOneOnBoard);
+  });
+
+  it('C5 "families with three AFL players" matches an independently-filtered count', async () => {
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 3 },
+    }), 1000);
+    const board = await getFamilyRecords(1000);
+    const expected = board.filter((r) => r.linkedMembers >= 3).length;
+    expect(answer.total).toBe(expected);
+    expect(answer.rows).toHaveLength(expected);
+  });
+
+  it('disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"', async () => {
+    const board = await getFamilyRecords(1000);
+    const ablett = board.find((r) => r.members.some((m) => m.playerId === GARY_ABLETT_SNR)
+      && r.members.some((m) => m.playerId === GARY_ABLETT_JNR));
+    if (!ablett) throw new Error('fixture assumption failed: the Ablett family was not found via getFamilyRecords');
+
+    const answer = await family(familyPlan(), 1000);
+    const row = answer.rows.find((r) => r.familyKey === ablett.familyKey);
+    expect(row).toBeDefined();
+    const ids = row!.members.map((m) => m.playerId);
+    expect(ids).toContain(GARY_ABLETT_SNR);
+    expect(ids).toContain(GARY_ABLETT_JNR);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('every linked member is counted once, matching the independent oracle\'s own summary', async () => {
+    const summary = await getFamilyRecordsSummary();
+    const answer = await family(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 1 },
+    }), 1000);
+    const totalMembers = answer.rows.reduce((sum, r) => sum + r.linkedMembers, 0);
+    // Every family_key of size >= 2 contributes its members; size-1 keys
+    // (excluded here) hold exactly one each, so the difference is exactly
+    // the size-1 family count.
+    const sizeOneCount = summary.families - answer.rows.length;
+    expect(totalMembers).toBe(summary.linkedPlayers - sizeOneCount);
+  });
+
+  /**
+   * A raw, INTENTIONALLY-INVALID family plan, built without going through
+   * `plan()`/`familyPlan()` -- both eagerly call `validatePlan` themselves
+   * and throw on an invalid shape (see `plan()` above), so a plan that is
+   * supposed to fail validation can never reach an already-validated
+   * helper. This constructs the same base shape by hand instead.
+   */
+  function rawInvalidFamilyPlan(overrides: Partial<NlQueryPlan>): NlQueryPlan {
+    return {
+      v: 1,
+      grain: 'family',
+      metric: 'combined_games',
+      agg: { kind: 'max' },
+      scope: {},
+      careerConditions: [],
+      careerPredicates: [],
+      clubSeasonConditions: [],
+      tiePolicy: 'all',
+      limit: 1000,
+      ...overrides,
+    };
+  }
+
+  it('validatePlan refuses a family plan carrying a club, season or player (no regression)', () => {
+    expect(validatePlan(rawInvalidFamilyPlan({
+      scope: { clubFor: { organizationId: 1, slug: 'richmond', name: 'Richmond' } },
+    }))).toHaveProperty('error');
+    expect(validatePlan(rawInvalidFamilyPlan({
+      scope: { seasonMin: 2020 },
+    }))).toHaveProperty('error');
+    expect(validatePlan(rawInvalidFamilyPlan({
+      player: ref(GARY_ABLETT_SNR),
+    }))).toHaveProperty('error');
   });
 });

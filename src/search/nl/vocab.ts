@@ -1122,8 +1122,16 @@ function relationshipFrame(noun: string): RegExp {
  *  - cousin, grandparent, aunt/uncle, spouse and in-law have ZERO rows;
  *  - mother/daughter cannot exist: parent_child is exhaustively
  *    father -> son (measured, 127 of 127);
- *  - "family", "relatives" and "related to" are the family GRAIN (D6) and
- *    the open question of what a family IS -- AFLDB-ISSUE-153;
+ *  - "family", "relatives" and "related to" are still declined here in
+ *    every OTHER wording. AFLDB-ISSUE-153 Stage 6 (decision D6) answers
+ *    exactly three tested phrasings -- "biggest football family/families",
+ *    "which family has the most AFL players", "families with N AFL
+ *    players" -- and FAMILY_BIGGEST_RE / FAMILY_MOST_PLAYERS_RE /
+ *    FAMILY_SIZE_CLAUSE_RE below claim those, and only those, BEFORE this
+ *    list is ever tested (see extractFamilyGrain in parser.ts). A bare
+ *    "Brent Harvey's family" or "families" with no ranking/size wording
+ *    still falls through to here and declines exactly as before; D6 did
+ *    not decide what a family answer to THAT question would be;
  *  - "pairs" asks for a pairing, which is not a player.
  */
 export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
@@ -1138,6 +1146,52 @@ export const RELATIONSHIP_OUT_OF_SCOPE: [RegExp, string][] = [
   [/\brelated to\b/, 'AFLDB cannot yet answer a question about a football family as a whole.'],
   [relationshipFrame('(?:pairs?|duos?|combinations?)'), 'AFLDB answers relationship questions about players, not about pairings.'],
 ];
+
+/**
+ * AFLDB-ISSUE-153 Stage 6, decision D6 (§7.7/§11.12.5). The family GRAIN:
+ * `player_relationships` rows of type 'sibling', grouped by `family_key`
+ * (Stage 1 already narrowed `getFamilyRecords` to exactly this population).
+ * Extension is siblings only -- no parent-child fold (R3 stays a separate,
+ * unallocated issue) -- and "biggest" always means combined career games,
+ * matching what `/records/family` already ranks by; "most players" is a
+ * different, never-interchangeable wording for the member-count reading.
+ *
+ * Each cue is checked, and its match consumed, BEFORE extractRelationship
+ * runs (parser.ts) -- not inside it -- so the family/relatives entry in
+ * RELATIONSHIP_OUT_OF_SCOPE above never sees these three specific
+ * phrasings: by the time that decline is tested, the words matched here
+ * are already gone from the text. Every other family/relatives wording is
+ * untouched and keeps declining exactly as it did before Stage 6.
+ *
+ * "football"/"AFL" are decorative here, not load-bearing: canonicalise
+ * already strips a bare "afl" as conversational filler, so "which family
+ * has the most AFL players" and "which family has the most players" are
+ * the same string by the time either cue is tested. "football" is not
+ * stripped, so FAMILY_BIGGEST_RE takes it as optional instead.
+ */
+export const FAMILY_BIGGEST_RE = /\bbiggest\s+(?:football\s+)?famil(?:y|ies)\b/;
+
+/** C1's "most players" reading -- ranks by linked_members, never combined_games. */
+export const FAMILY_MOST_PLAYERS_RE =
+  /\bfamil(?:y|ies)\s+(?:has|have)\s+the\s+most\s+players?\b|\bfamilies?\s+with\s+the\s+most\s+players?\b/;
+
+/**
+ * C5 -- "families with three AFL players", a size THRESHOLD on linked
+ * membership, never a ranking. The optional operator phrase mirrors
+ * COMPARE_OP_WORDS' own wording so "with at least three players" and
+ * "with three players" (bare defaults to >=, the same convention every
+ * other bare-number threshold in this engine uses) both bind; the
+ * trailing "players?" is required so a size question is never confused
+ * with FAMILY_MOST_PLAYERS_RE above, which names no count at all.
+ */
+export const FAMILY_SIZE_OP_WORDS: Record<string, NlCompareOp> = {
+  'at least': 'gte', 'no fewer than': 'gte', 'no less than': 'gte',
+  'at most': 'lte', 'no more than': 'lte', 'no greater than': 'lte',
+  'more than': 'gt', 'less than': 'lt', 'fewer than': 'lt',
+  'exactly': 'eq',
+};
+export const FAMILY_SIZE_CLAUSE_RE =
+  /\bfamil(?:y|ies)\s+with\s+(?:(at least|at most|more than|less than|fewer than|exactly|no more than|no fewer than|no less than|no greater than)\s+)?(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+players?\b/;
 
 /**
  * FS4 -- the FATHER's side of the father-son draft rule, and the only

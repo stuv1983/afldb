@@ -15,7 +15,7 @@ import {
 } from '@/search/nl/plan';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow, NlAnswerPayload, NlClubSeasonRow, NlCoachRecordRow,
-  NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlFamilyRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 
@@ -120,6 +120,9 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
   }
   if (payload.kind === 'after_siren_player') {
     return describeAfterSirenPlayerAnswer(plan, payload.lead, payload.rows, payload.total);
+  }
+  if (payload.kind === 'family') {
+    return describeFamilyAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'count') {
     // The one payload kind two grains share, so it must ask which one it
@@ -504,6 +507,50 @@ function describeCoachRecordAnswer(
 }
 
 
+// ----------------------------------------------------------------- family
+
+function familyMetricLabel(metric: string): string {
+  return (NL_METRICS.family[metric]?.label ?? metric).toLowerCase();
+}
+
+/** "Gary Ablett Snr (248), Kevin Ablett (117), ..." -- every linked member, most games first (the row's own order). */
+function familyMemberList(row: NlFamilyRow): string {
+  return row.members.map((m) => `${m.name} (${m.games.toLocaleString('en-AU')})`).join(', ');
+}
+
+function describeFamilyAnswer(
+  plan: NlQueryPlan,
+  lead: NlFamilyRow | null,
+  rows: NlFamilyRow[],
+  total: number,
+): { headline: string; interpretation: string } {
+  if (!lead) return { headline: 'No matching family found', interpretation: '' };
+  const metricLabel = familyMetricLabel(plan.metric!);
+
+  // C5: a size threshold lists every qualifying family; it never ranks one.
+  if (plan.metricCondition) {
+    const bound = `${COMPARE_WORDS[plan.metricCondition.op]} ${plan.metricCondition.value.toLocaleString('en-AU')}`;
+    return {
+      headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'family qualifies' : 'families qualify'}`,
+      interpretation: `Sibling families with ${metricLabel} ${bound}.`,
+    };
+  }
+
+  // Identity is the family_key: two rows tied at the lead value are two
+  // different families, never the same one counted twice.
+  const labels = dedupeByIdentity(rows, lead.value, (r) => r.familyKey, (r) => r.familyName);
+  const { subject, tied } = tiedSubject(labels);
+  const value = (lead.value ?? 0).toLocaleString('en-AU');
+  const ranked = plan.agg.kind === 'top_n'
+    ? `Top ${plan.agg.n} sibling families by ${metricLabel}.`
+    : `${rankWord(plan)} sibling family by ${metricLabel}.`;
+  return {
+    headline: `${subject} \u2014 ${value} ${metricLabel}${tied ? ' (tied)' : ''}`,
+    interpretation: `${ranked} Members: ${familyMemberList(lead)}.`,
+  };
+}
+
+
 // ------------------------------------------------------- after the siren
 
 /**
@@ -666,6 +713,24 @@ export function answerCaveats(plan: NlQueryPlan, payload: NlAnswerPayload): stri
   if (isCrossDomainPlan(plan)) {
     const capped = cappedListCaveat(plan, payload);
     return capped ? [capped] : [];
+  }
+  // AFLDB-ISSUE-153 Stage 6 (D6). The same unlinked-side boundary as the
+  // relationship caveat above, worded for a family rather than a
+  // per-player answer: an unmatched relative is a name in
+  // player_relationships with no player_id, and is never counted as a
+  // family member here (§4.6/§4.7).
+  if (plan.grain === 'family') {
+    const caveats = [
+      'AFLDB\'s family board counts only siblings matched to a canonical player profile. '
+      + 'An unmatched relative is a name only, and is never counted as a family member.',
+    ];
+    if (payload.kind === 'family' && payload.total > payload.rows.length) {
+      caveats.push(
+        `${payload.total.toLocaleString('en-AU')} families qualify. This answer lists the first `
+        + `${payload.rows.length.toLocaleString('en-AU')} of them; it is not the whole list.`,
+      );
+    }
+    return caveats;
   }
   if (plan.grain !== 'after_siren') return [];
   const caveats: string[] = [

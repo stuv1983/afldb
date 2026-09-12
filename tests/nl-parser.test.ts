@@ -2117,15 +2117,82 @@ describe('family relationships (AFLDB-ISSUE-152 Phase D)', () => {
       ['twins', 'which players had a twin brother who played AFL'],
       ['cousins', 'which AFL players are cousins'],
       ['mothers', 'which players had a mother who played'],
-      ['the family grain (D6)', 'biggest football families'],
-      ['the family grain (D6)', 'which family has the most AFL players'],
-      ['C5 families of N', 'families with three AFL players'],
+      // AFLDB-ISSUE-153 Stage 6 (D6) answers exactly three family-grain
+      // phrasings now -- see 'the family grain (AFLDB-ISSUE-153 Stage 6,
+      // D6)' below. Every OTHER family/relatives wording, vague or named,
+      // still declines here exactly as it did before Stage 6.
       ['vague family wording', "who are Dustin Martin's family members"],
       ['vague relatedness', 'AFL players related to Phil Krakouer'],
       ['pairings, not players', 'parent and child pairs who both played AFL'],
     ])('%s', async (_label, question) => {
       const parsed = await parse(question);
       expect(parsed.status, question).toBe('none');
+    });
+  });
+
+  // ------------------------------------------------ family grain (Stage 6)
+
+  describe('the family grain (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+    it('C1 "biggest football families" ranks combined career games', async () => {
+      const p = await plan('biggest football families');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('combined_games');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.metricCondition).toBeUndefined();
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C1 "which family has the most AFL players" ranks linked members, never combined games', async () => {
+      const p = await plan('which family has the most AFL players');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('linked_members');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C5 "families with three AFL players" thresholds linked members as a list, never a ranking', async () => {
+      const p = await plan('families with three AFL players');
+      expect(p.grain).toBe('family');
+      expect(p.metric).toBe('linked_members');
+      expect(p.metricCondition).toEqual({ op: 'gte', value: 3 });
+      expect(p.agg).toEqual({ kind: 'list' });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('C5 honours an explicit comparison word instead of defaulting to gte', async () => {
+      const p = await plan('families with at least four players');
+      expect(p.grain).toBe('family');
+      expect(p.metricCondition).toEqual({ op: 'gte', value: 4 });
+    });
+
+    it('C5 reads "more than" as a strict bound, not the bare-number default', async () => {
+      const p = await plan('families with more than two players');
+      expect(p.metricCondition).toEqual({ op: 'gt', value: 2 });
+    });
+
+    it('every other family/relatives wording keeps declining (no regression)', async () => {
+      for (const question of [
+        "who are Dustin Martin's family members",
+        'AFL players related to Phil Krakouer',
+      ]) {
+        const parsed = await parse(question);
+        expect(parsed.status, question).toBe('none');
+      }
+    });
+
+    it('the family grain has no club, season or player to filter by -- refused, never discarded', async () => {
+      const parsed = await parse('biggest football family for richmond');
+      if (parsed.status !== 'plan') return;
+      expect(validatePlan(parsed.plan)).toHaveProperty('error');
+    });
+
+    it('the two metrics never share a phrasing', async () => {
+      // Same underlying data, deliberately worded two ways: one must never
+      // silently answer the other's question (Stage 0 measured up to a
+      // 301-rank-place disagreement between them).
+      const biggest = await plan('biggest football families');
+      const mostPlayers = await plan('which family has the most AFL players');
+      expect(biggest.metric).not.toBe(mostPlayers.metric);
     });
   });
 

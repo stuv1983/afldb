@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { answerCaveats, dedupeByIdentity, describeAnswer, tiedSubject } from '../src/search/nl/describe';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow,
-  NlClubSeasonRow, NlCoachRecordRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
+  NlClubSeasonRow, NlCoachRecordRow, NlFamilyRow, NlPlayerCareerRow, NlPlayerGameRow, NlPlayerSeasonRow,
   NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '../src/search/nl/answer-types';
 import type { NlQueryPlan } from '../src/search/nl/plan';
@@ -1167,5 +1167,87 @@ describe('relationship AND coaching compose (AFLDB-ISSUE-153)', () => {
     expect(only([hasCoached])).toBe('Players who played VFL/AFL and also coached.');
     expect(only([{ builder: 'father_son_selection', params: {} }]))
       .toBe('Players selected under the father–son rule.');
+  });
+});
+
+// -------------------------------------------- family (AFLDB-ISSUE-153 Stage 6)
+
+describe('describeAnswer — family (AFLDB-ISSUE-153 Stage 6, D6)', () => {
+  function familyRow(overrides: Partial<NlFamilyRow> = {}): NlFamilyRow {
+    return {
+      familyKey: 'ablett-0004',
+      familyName: 'Ablett',
+      linkedMembers: 5,
+      combinedGames: 906,
+      members: [
+        { playerId: 101, slug: 'gary-ablett', name: 'Gary Ablett Snr', games: 248 },
+        { playerId: 102, slug: 'gary-ablett-jnr', name: 'Gary Ablett Jnr', games: 260 },
+      ],
+      value: 906,
+      ...overrides,
+    };
+  }
+
+  const rankedPlan = plan({
+    grain: 'family', metric: 'combined_games', mode: undefined, agg: { kind: 'max' },
+  });
+
+  it('C1 "biggest football family" names the family and its combined games', () => {
+    const rows = [familyRow()];
+    const { headline, interpretation } = describeAnswer(
+      rankedPlan, { kind: 'family', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Ablett — 906 combined career games');
+    expect(interpretation).toContain('Highest sibling family by combined career games.');
+    expect(interpretation).toContain('Gary Ablett Snr (248), Gary Ablett Jnr (260)');
+  });
+
+  it('two families tied at the lead value are both named, never one silently dropped', () => {
+    const rows = [
+      familyRow({ familyKey: 'a', familyName: 'Ablett', value: 500 }),
+      familyRow({ familyKey: 'b', familyName: 'Coventry', value: 500 }),
+      familyRow({ familyKey: 'c', familyName: 'Bourke', value: 100 }),
+    ];
+    const { headline } = describeAnswer(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 3 });
+    expect(headline).toBe('Ablett and Coventry — 500 combined career games (tied)');
+  });
+
+  it('C1 "most AFL players" ranks and describes linked_members, never combined games', () => {
+    const membersPlan = plan({ grain: 'family', metric: 'linked_members', mode: undefined, agg: { kind: 'max' } });
+    const rows = [familyRow({ value: 5 })];
+    const { headline, interpretation } = describeAnswer(
+      membersPlan, { kind: 'family', lead: rows[0], rows, total: 1 },
+    );
+    expect(headline).toBe('Ablett — 5 linked members');
+    expect(interpretation).toContain('by linked members');
+  });
+
+  it('C5 "families with three AFL players" lists a qualifying count, never ranks one', () => {
+    const listPlan = plan({
+      grain: 'family', metric: 'linked_members', mode: undefined, agg: { kind: 'list' },
+      metricCondition: { op: 'gte', value: 3 },
+    });
+    const rows = [familyRow(), familyRow({ familyKey: 'x', familyName: 'Coventry' })];
+    const { headline, interpretation } = describeAnswer(
+      listPlan, { kind: 'family', lead: rows[0], rows, total: 2 },
+    );
+    expect(headline).toBe('2 families qualify');
+    expect(interpretation).toBe('Sibling families with linked members at least 3.');
+  });
+
+  it('no matching family names the empty result honestly', () => {
+    const { headline } = describeAnswer(rankedPlan, { kind: 'family', lead: null, rows: [], total: 0 });
+    expect(headline).toBe('No matching family found');
+  });
+
+  it('answerCaveats always states the unlinked-side boundary, and the cap only when truncated', () => {
+    const rows = [familyRow()];
+    const notTruncated = answerCaveats(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 1 });
+    expect(notTruncated).toHaveLength(1);
+    expect(notTruncated[0]).toContain('An unmatched relative is a name only');
+
+    const truncated = answerCaveats(rankedPlan, { kind: 'family', lead: rows[0], rows, total: 40 });
+    expect(truncated).toHaveLength(2);
+    expect(truncated[1]).toContain('40 families qualify');
   });
 });

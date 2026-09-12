@@ -1115,3 +1115,59 @@ describe('validatePlan — played and also coached (AFLDB-ISSUE-152 Phase F)', (
     }))).toHaveProperty('error');
   });
 });
+
+// ------------------------------------------ family (AFLDB-ISSUE-153 Stage 6)
+
+function familyPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+  return basePlan({ grain: 'family', metric: 'combined_games', agg: { kind: 'max' }, limit: 50, ...overrides });
+}
+
+describe('validatePlan: family', () => {
+  it('accepts a ranked plan (C1) for either metric', () => {
+    expect(validatePlan(familyPlan())).not.toHaveProperty('error');
+    expect(validatePlan(familyPlan({ metric: 'linked_members' }))).not.toHaveProperty('error');
+  });
+
+  it('accepts a thresholded list (C5) and refuses a threshold with no list agg', () => {
+    expect(validatePlan(familyPlan({
+      metric: 'linked_members', agg: { kind: 'list' }, metricCondition: { op: 'gte', value: 3 },
+    }))).not.toHaveProperty('error');
+    // Same condition, ranked instead of listed: refused, the same rule
+    // every other thresholdable grain (player_game/season, coach_record,
+    // after_siren) already enforces.
+    expect(validatePlan(familyPlan({
+      metric: 'linked_members', agg: { kind: 'max' }, metricCondition: { op: 'gte', value: 3 },
+    }))).toHaveProperty('error');
+  });
+
+  it('refuses a family list with no threshold to qualify against', () => {
+    expect(validatePlan(familyPlan({ agg: { kind: 'list' } }))).toHaveProperty('error');
+  });
+
+  it('requires a recognised family metric, and refuses a metric from another grain', () => {
+    expect(validatePlan(familyPlan({ metric: null }))).toHaveProperty('error');
+    expect(validatePlan(familyPlan({ metric: 'games' }))).toHaveProperty('error');
+  });
+
+  it.each([
+    ['player', { player: { id: 1, slug: 'p', name: 'P' } }],
+    ['coach', { coach: HARDWICK }],
+    ['playerIdIn', { scope: { playerIdIn: [1, 2] } }],
+    ['clubFor', { scope: { clubFor: RICHMOND } }],
+    ['clubAgainst', { scope: { clubAgainst: RICHMOND } }],
+    ['venue', { scope: { venue: { id: 1, slug: 'mcg', name: 'MCG' } } }],
+    ['matchType', { scope: { matchType: 'finals' as const } }],
+    ['roundNumber', { scope: { roundNumber: 5 } }],
+    ['seasonMin/Max', { scope: { seasonMin: 2000, seasonMax: 2010 } }],
+    ['careerConditions', { careerConditions: [{ kind: 'column' as const, column: 'games' as const, op: 'gte' as const, value: 100 }] }],
+    ['careerPredicates', { careerPredicates: [{ builder: 'has_brother', params: {} }] }],
+    ['clubSeasonConditions', { clubSeasonConditions: [{ kind: 'premier' as const }] }],
+    ['achievementSummary', { achievementSummary: { achievementKey: 'first_kick_goal' as const, kind: 'by_club' as const } }],
+    ['headToHead', { headToHead: { kind: 'record' as const } }],
+    ['streakDefinition', { streakDefinition: { kind: 'win' as const } }],
+    ['boundary', { boundary: { event: 'debut' as const, where: 'grand_final' as const } }],
+    ['debutGame', { debutGame: true }],
+  ] as [string, Partial<NlQueryPlan>][])('refuses a family plan carrying %s -- no club, season, player or career condition applies', (_label, shape) => {
+    expect(validatePlan(familyPlan(shape))).toHaveProperty('error');
+  });
+});

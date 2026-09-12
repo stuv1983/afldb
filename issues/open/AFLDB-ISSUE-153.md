@@ -736,7 +736,7 @@ documented 55432 tunnel convention) so the evidence runner could execute.
 | **3** | FS2 selecting club + FS3 draft year | **COMPLETE, green** |
 | **4** | FS6 distributions, denominator 127 | **COMPLETE, green** |
 | **5** | X3 + father-side composition (Q6) | **COMPLETE, green** |
-| **6** | C1 / D6 / C5 / C6 — the `family` grain | **NOT STARTED. NOT AUTHORISED.** |
+| **6** | C1 / D6 / C5 / C6 — the `family` grain | **IMPLEMENTED and VALIDATED 2026-09-13 — migration 100 applied to `afldb_test`, focused Stage 6 gate green, still NOT COMMITTED.** See §11.14. |
 | **7** | Durability invariant (projection drift) | **IMPLEMENTED and RUN — green** (§11.11, inside the 42/42 relationships suite) |
 
 **Nothing is partially implemented.** Every stage that was started is finished. At
@@ -1269,3 +1269,68 @@ Until that lock+go exists, do not start Stage 6. If resuming without it, the
 correct next action is the one already recorded in §11.10/§11.12.5: review and
 commit the untouched Stages 1–5 + 7 diff (recommended boundaries in §11.10),
 and re-run the two focused suites named there if the branch has moved.
+
+## 11.14 Stage 6 — implemented and validated 2026-09-13 (D6 contract executed, NOT YET COMMITTED)
+
+The operator gave the D6 lock and an explicit go for Stage 6 in this session,
+exactly as specified in §11.12.5/§11.13: siblings only, "biggest" = combined
+career games, "most players" a separate never-shared wording, fail-closed on
+size-1 families and unlinked members, C5/C6 as a `metricCondition`. Implemented
+against that contract, no design questions reopened.
+
+**New `family` grain** (`src/search/nl/plan.ts`, `PARSER_VERSION` 40 → 41):
+
+- Parser: `extractFamilyGrain` (`src/search/nl/parser.ts`) claims exactly the
+  three tested phrasings — "biggest football family/families" (C1,
+  `combined_games`), "which family has the most AFL players" (C1,
+  `linked_members`), "families with three AFL players" (C5, a
+  `metricCondition` threshold on `linked_members`) — BEFORE
+  `extractRelationship` runs, so the pre-existing family/relatives decline in
+  `RELATIONSHIP_OUT_OF_SCOPE` (vocab.ts) never sees a phrasing this claims.
+  Every other family/relatives wording is untouched.
+- Compiler: `src/db/queries/nl/family.ts`, a parameterised generalisation of
+  `getFamilyRecords` (Stage 1) — same sibling-only, id-keyed population, plus
+  a `HAVING count(*) >= 2` floor (excludes the 46 size-1 families) and a bound
+  ranked metric/threshold.
+- Renderer: `describeFamilyAnswer` (describe.ts), `FamilyTable`
+  (`NlAnswerSection.tsx`), `NlFamilyRow`/`'family'` payload kind
+  (answer-types.ts).
+- **`has_relative` (the Stage table's forecast builder) was NOT built.**
+  Tracing it to its origin (ISSUE-152 §6.3), it was a speculative per-player
+  population predicate for C2–C4, already superseded by `has_brother` etc.
+  The locked D6 contract asks only for the `family` grain, not a new
+  relationship type or population predicate, so nothing needed it; C6
+  (cousins/grandparent/in-law/spouse) stays declined exactly as before,
+  untouched by D6.
+
+**Migration 100** (`src/db/migrations/100_nl_search_log_family_grain.sql`,
+written and **APPLIED to `afldb_test`** — migration status 100/100 applied,
+0 pending): widens `nl_search_log_grain_check` to include `'family'`,
+following the exact precedent of 092/093 for `coach_record` and
+`after_siren`. The Stage 9 table's "Migration: no" forecast was wrong — every
+prior new grain has needed this repair, and `family` is no exception; without
+it, every family answer's telemetry row is silently dropped by the CHECK
+constraint (logNlSearch swallows the failure by design). Must still reach
+`afldb_dev` and production **before** this code, per the same DEPLOY ORDER
+note 092/093 carry.
+
+**Tests written and RUN** (DB access is user-operated, §9 of CLAUDE.md):
+
+- DB-free: `tests/nl-parser.test.ts` (new `describe` block; the old
+  Phase-D decline list updated — the two C1 wordings and C5 no longer
+  decline), `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`. Focused
+  DB-free Stage 6 gate: **618/618 PASS**. `npx tsc --noEmit`: PASS.
+- DB-backed: `tests/integration/nl-answers-relationships.test.ts` (new
+  section): **49/49 PASS**. `tests/integration/database.test.ts` (the
+  exhaustive `SUPPORTED_NL_GRAINS` contract, which a missing migration 100
+  would fail by name) has **four stale pre-existing snapshot-count
+  failures** unrelated to Stage 6 and out of scope for this issue — they
+  are not Stage 6 defects and are not folded into ISSUE-153.
+
+Final code review has passed. The diff is reviewed and correct;
+implementation code is not to be further modified. **Exact next action:**
+Stage 6 is still **not committed** — operator commits the reviewed local
+change (Stages 1–5 + 7, still uncommitted per §11.13, and Stage 6 together
+or separately per operator judgement), then runs `npm run merge:ready`.
+Migration 100 still needs to reach `afldb_dev` and production before the
+code, per the DEPLOY ORDER note above.

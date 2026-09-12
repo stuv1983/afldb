@@ -9,7 +9,7 @@ import {
 import { afterSirenEventLabel } from '@/lib/after-siren-format';
 import type {
   NlAfterSirenEventRow, NlAfterSirenPlayerRow,
-  NlAnswer, NlClubSeasonRow, NlCoachRecordRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow,
+  NlAnswer, NlClubSeasonRow, NlCoachRecordRow, NlFamilyRow, NlHeadToHeadRow, NlPlayerCareerRow, NlPlayerGameRow,
   NlPlayerSeasonRow, NlTeamAggregateRow, NlTeamMatchRow, NlTeamStreakRow,
 } from '@/search/nl/answer-types';
 import { getQualifyingMatchesHref } from '@/search/nl/qualifying-matches-href';
@@ -100,6 +100,8 @@ function renderPayload(answer: NlAnswer) {
       return <p>{formatNumber(payload.value)}</p>;
     case 'achievement_summary':
       return <AchievementSummaryTable payload={payload} />;
+    case 'family':
+      return <FamilyTable rows={payload.rows} total={payload.total} />;
     case 'unanswerable':
       return null;
   }
@@ -653,6 +655,59 @@ function ClubSeasonTable({ rows, total }: { rows: NlClubSeasonRow[]; total: numb
                   <td className="num">{formatNumber(r.played)}</td>
                   <td className="num nowrap">{r.wins}–{r.draws}–{r.losses}</td>
                   <td className="num">{r.ladderRank ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleTable>
+      {total > rows.length && (
+        <p className="muted" style={{ marginTop: '0.6rem' }}>
+          Showing {rows.length} of {formatNumber(total)}.
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * A sibling family (AFLDB-ISSUE-153 Stage 6). Members render under the
+ * family name exactly as /records/family already lists them -- most games
+ * first, each an own link -- so the NL answer and the record page never
+ * describe the same family two different ways.
+ */
+function FamilyTable({ rows, total }: { rows: NlFamilyRow[]; total: number }) {
+  if (rows.length <= 1) return null;
+  return (
+    <>
+      <CollapsibleTable title="Every matching family" note={`${formatNumber(total)} total`}>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Family</th>
+                <th scope="col" className="num">Linked members</th>
+                <th scope="col" className="num">Combined games</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.familyKey}>
+                  <td className="wide">
+                    {r.familyName}
+                    <div className="meta">
+                      {r.members.map((m, i) => (
+                        <span key={m.playerId}>
+                          {i > 0 && ', '}
+                          <Link href={playerPath(m.slug, m.playerId)}>{m.name}</Link>
+                          {' '}
+                          ({formatNumber(m.games)})
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="num">{formatNumber(r.linkedMembers)}</td>
+                  <td className="num">{formatNumber(r.combinedGames)}</td>
                 </tr>
               ))}
             </tbody>

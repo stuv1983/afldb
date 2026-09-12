@@ -34,6 +34,7 @@ const SUPPORTED_NL_GRAINS = {
   achievement_summary: true,
   coach_record: true,
   after_siren: true,
+  family: true,
 } satisfies Record<NlGrain, true>;
 
 afterAll(async () => {
@@ -117,11 +118,11 @@ describe('schema', () => {
     // Every grain added since 046 first wrote the constraint has drifted
     // from it, and each drift needed its own repair: 055 for
     // achievement_summary, 079 for team_streak and head_to_head, 092 for
-    // coach_record, 093 for after_siren. The two most recent stay named here
-    // so reverting either migration fails this test by name, not just by
-    // list length.
-    expect(inserted).toContain('coach_record');
+    // coach_record, 093 for after_siren, 100 for family. The two most recent
+    // stay named here so reverting either migration fails this test by
+    // name, not just by list length.
     expect(inserted).toContain('after_siren');
+    expect(inserted).toContain('family');
 
     // Widening the CHECK must not have turned it into a formality: a grain
     // no NlGrain value names is still refused by the database.

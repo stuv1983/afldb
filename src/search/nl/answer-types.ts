@@ -209,6 +209,29 @@ export type NlAfterSirenExclusions = {
   noMatchLink: number;
 };
 
+/** One linked member of a family row. Never an unlinked side (AFLDB-ISSUE-153 Stage 6, D6 fail-closed). */
+export type NlFamilyMember = {
+  playerId: number; slug: string; name: string;
+  /** Career games, counted once per player even if they appear in more than one sibling row for this family. */
+  games: number;
+};
+
+/**
+ * One sibling family (AFLDB-ISSUE-153 Stage 6, D6), mirroring
+ * FamilyRecordRow (db/queries/family-records.ts) plus the plan's ranked
+ * `value`. Never carries a size-1 family (fail-closed exclusion, §4.6) or
+ * an unlinked member.
+ */
+export type NlFamilyRow = {
+  familyKey: string;
+  familyName: string;
+  linkedMembers: number;
+  combinedGames: number;
+  members: NlFamilyMember[];
+  /** The plan's ranked/thresholded metric value -- combinedGames or linkedMembers, whichever the question asked for. */
+  value: number | null;
+};
+
 export type NlAnswerPayload =
   | { kind: 'player_game'; lead: NlPlayerGameRow | null; rows: NlPlayerGameRow[]; total: number }
   | { kind: 'player_career'; lead: NlPlayerCareerRow | null; rows: NlPlayerCareerRow[]; total: number }
@@ -253,6 +276,7 @@ export type NlAnswerPayload =
        */
       disclosure?: string;
     }
+  | { kind: 'family'; lead: NlFamilyRow | null; rows: NlFamilyRow[]; total: number }
   | { kind: 'unanswerable'; topic: string; reason: string };
 
 export type NlAnswer = {
