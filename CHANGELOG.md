@@ -1772,6 +1772,28 @@ commit.
 - No data was loaded: the height source decision (AFL Tables `player_details`, already acquired,
   needs a cross-source reconciliation) is recorded for a High session.
 
+### AFLDB-ISSUE-137 — production identity reconciliation and Brownlow season restoration - 4 September 2026
+
+- **Production data repair (`afldb_prod`, 2026-09-04 12:18–12:24 AEST).** The four canonical player
+  splits that `AFLDB-ISSUE-136` fixed at rebuild time (Charlie Cameron, Jack Graham, Jack Ross, Jack
+  Williams — each a career player plus a 2025-only duplicate keyed on the renumbered AFL Tables url)
+  were reconciled in place by one count-asserted owner transaction (`issues/open/AFLDB-ISSUE-137-t1.sql`,
+  rehearsed with `ROLLBACK` first): 298 foreign-key re-points (4 identities, 146 `player_match_stats`,
+  75 `brownlow_round_votes`, 5 `award_winners`, 1 `award_nominations`, 67 settle projections),
+  `final_season` extended to 2026 on the four career rows, the four duplicate `players` rows retired
+  (ids 2608, 6296, 6525, 6626 — their URLs now 404), audit `import_batches` row 741. Derived tables
+  rebuilt; DB-health reconciliation 0 on every check.
+- **Brownlow season votes restored on production.** `tools/migration/import_brownlow_season.py` loaded
+  the tracked `data/brownlow/` artefact (`AFLDB-ISSUE-113`) into the previously empty
+  `brownlow_season_votes`: 16,120 rows / 79,113 votes / 112 winners / 98 seasons (1924–2025) / 4,275
+  players, 0 rejections (batch 742); `brownlow_round_votes` untouched (320,861 rows / 44,478 votes).
+  Derived career and season Brownlow totals now sum to 79,113 (Reid 10, Rowell 89, Green 73,
+  Reynolds 154, Skilton 180; Cameron 25, Graham 9 on the surviving ids). `/brownlow`, `/brownlow/[year]`,
+  player pages, the Grid Solver Brownlow axes and the sitemap Brownlow years are therefore populated on
+  production once the post-repair build is live.
+- Rollback point retained: `afldb_prod-20260904-115413.dump` (sha256 `b77ebce0…f499`, restore-tested,
+  off-host copy) until close-out.
+
 ### AFLDB-ISSUE-118 — Gridley compatibility corpus and Grid Solver completeness - 4 September 2026
 
 - **Grid Solver catalogue: 108 → 137 builders** (`src/search/grid-solver-spec.ts`,
