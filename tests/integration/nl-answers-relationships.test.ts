@@ -773,7 +773,7 @@ describe('father_son_selections and its parent_child projection stay identical (
                 INTERSECT
                 SELECT source_id, import_batch_id FROM player_relationships
                  WHERE relationship = 'parent_child'
-              ) AS both)::int AS shared
+              ) AS shared_provenance)::int AS shared
     `;
     expect(row.selectionSources).toBe(1);
     expect(row.selectionBatches).toBe(1);

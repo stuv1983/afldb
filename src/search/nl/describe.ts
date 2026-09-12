@@ -759,12 +759,6 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
 };
 
 /**
- * The answer's subject, as a sentence-leading phrase: "Brothers of Brent
- * Harvey", "Players with a brother who played VFL/AFL", "Players whose
- * son was selected under the father-son rule". Null when the plan carries
- * no relationship, which is every pre-Phase-D answer.
- */
-/**
  * AFLDB-ISSUE-152 Phase F. The cross-domain answer's subject, as a
  * sentence-leading phrase. Truthful "also" wording only: the word
  * "later" appears in no branch of this function and in no Phase F
@@ -774,14 +768,21 @@ const RELATIONSHIP_PINNED_PHRASE: Record<string, { yes: string; no: string }> = 
  *
  * Both clubs are always named, each on its own side of the sentence,
  * from the references the plan carries beside the builders' bound ids.
+ *
+ * AFLDB-ISSUE-153 (Finding 2). Returns a CLAUSE, not a whole sentence,
+ * so it can stand beside a relationship clause instead of replacing it.
+ * When a relationship clause is already carrying the subject, the
+ * "played VFL/AFL" half is dropped: that half is what `Players` plus the
+ * relationship clause already says, and repeating it reads as a second
+ * condition rather than the same one.
  */
-function crossDomainSubjectPhrase(plan: NlQueryPlan): string | null {
+function crossDomainSubjectClause(plan: NlQueryPlan, withRelationship: boolean): string | null {
   if (plan.crossDomainClubs) {
-    return `Players who played for ${plan.crossDomainClubs.played.name} `
+    return `who played for ${plan.crossDomainClubs.played.name} `
       + `and also coached ${plan.crossDomainClubs.coached.name}`;
   }
   if (plan.careerPredicates.some((axis) => axis.builder === 'has_coached')) {
-    return 'Players who played VFL/AFL and also coached';
+    return withRelationship ? 'who also coached' : 'who played VFL/AFL and also coached';
   }
   return null;
 }
@@ -810,10 +811,17 @@ function fatherSonSelectionScope(plan: NlQueryPlan): string {
   return bits.length > 0 ? ` ${bits.join(' ')}` : '';
 }
 
-function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
+/**
+ * The relationship half of the subject, split into the noun that leads
+ * the sentence and the clauses that qualify it, so a second family's
+ * clause can be appended rather than having to win a `??`.
+ */
+function relationshipSubjectParts(
+  plan: NlQueryPlan,
+): { head: string; clauses: string[] } | null {
   const ofAxis = plan.careerPredicates.find((axis) => RELATIONSHIP_OF_NOUN[axis.builder]);
   if (ofAxis && plan.relationshipSubject) {
-    return `${RELATIONSHIP_OF_NOUN[ofAxis.builder]} of ${plan.relationshipSubject.name}`;
+    return { head: `${RELATIONSHIP_OF_NOUN[ofAxis.builder]} of ${plan.relationshipSubject.name}`, clauses: [] };
   }
   const withPhrases = plan.careerPredicates
     .map((axis) => RELATIONSHIP_WITH_PHRASE[axis.builder])
@@ -832,7 +840,30 @@ function relationshipSubjectPhrase(plan: NlQueryPlan): string | null {
   if (fatherSonFather) clauses.push('whose son was selected under the father–son rule');
   if (fatherSonSelection) clauses.push(`selected under the father–son rule${fatherSonSelectionScope(plan)}`);
   if (clauses.length === 0) return null;
-  return `Players ${clauses.join(', ')}`;
+  return { head: 'Players', clauses };
+}
+
+/**
+ * AFLDB-ISSUE-153 (Finding 2). The answer's subject, composed from EVERY
+ * family the plan carries rather than from the first one that matched.
+ *
+ * The Phase F code chose between the two with
+ * `relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan)`,
+ * which silently discarded the coaching conjunct on exactly the plans
+ * Stage 5 exists to allow: X3 ("selected under the father–son rule AND
+ * coached", 1 person) and the father side ("whose son was selected under
+ * the rule AND coached", 11). Both answered a narrower population than
+ * their sentence claimed, which is the one failure mode a subject phrase
+ * exists to prevent. Clauses are appended, in family order, and joined
+ * exactly as two relationship clauses already join.
+ */
+function answerSubjectPhrase(plan: NlQueryPlan): string | null {
+  const relationship = relationshipSubjectParts(plan);
+  const crossDomain = crossDomainSubjectClause(plan, relationship !== null);
+  if (!relationship && crossDomain === null) return null;
+  const head = relationship?.head ?? 'Players';
+  const clauses = [...(relationship?.clauses ?? []), ...(crossDomain === null ? [] : [crossDomain])];
+  return clauses.length > 0 ? `${head} ${clauses.join(', ')}` : head;
 }
 
 function describePlayerCareerAnswer(
@@ -870,7 +901,7 @@ function describePlayerCareerAnswer(
           + `every condition asked for: ${conditions}.${curatedRecordNote(plan)}`,
       };
     }
-    const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
+    const relationship = answerSubjectPhrase(plan);
     return {
       headline: `${total.toLocaleString('en-AU')} ${total === 1 ? 'player matches' : 'players match'}`,
       interpretation: relationship
@@ -886,7 +917,7 @@ function describePlayerCareerAnswer(
   // ranked WITHIN: "Most career games among players with a brother who
   // played VFL/AFL" is a different record from "most career games", and
   // the two must never read the same.
-  const relationship = relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan);
+  const relationship = answerSubjectPhrase(plan);
   const among = relationship
     ? ` among ${relationship.charAt(0).toLowerCase()}${relationship.slice(1)}`
     : '';

@@ -1083,3 +1083,89 @@ describe('played-and-coached answers (AFLDB-ISSUE-152 Phase F)', () => {
     expect(caveats).not.toContain('curated');
   });
 });
+
+/**
+ * AFLDB-ISSUE-153 (Finding 2). The rule this block exists to hold: a plan
+ * that carries BOTH a relationship predicate and `has_coached` describes
+ * BOTH constraints.
+ *
+ * The Phase F code composed the subject as
+ * `relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan)`, so
+ * the relationship phrase won and the coaching conjunct vanished from the
+ * sentence while it stayed in the SQL. Exactly the two populations Stage 5
+ * exists to allow -- X3 (1 person) and the father side (11) -- therefore
+ * read as the far larger unfiltered relationship population (FS1 99,
+ * father side 107) they are not.
+ *
+ * The composition is asserted here, never a fixed pair of sentences: the
+ * scoped forms below share no literal with the bare ones, so a rule that
+ * only special-cased two wordings would fail this block.
+ */
+describe('relationship AND coaching compose (AFLDB-ISSUE-153)', () => {
+  const GEELONG = { organizationId: 6, slug: 'geelong', name: 'Geelong' };
+  const hasCoached = { builder: 'has_coached', params: {} };
+
+  function composedPlan(overrides: Partial<NlQueryPlan> = {}): NlQueryPlan {
+    return plan({
+      grain: 'player_career', metric: null, mode: undefined, agg: { kind: 'list' },
+      careerPredicates: [],
+      ...overrides,
+    });
+  }
+
+  function subject(overrides: Partial<NlQueryPlan>, total: number): string {
+    const rows = [careerRow({ value: null })];
+    return describeAnswer(
+      composedPlan(overrides), { kind: 'player_career', lead: rows[0], rows, total },
+    ).interpretation;
+  }
+
+  it('X3: a father–son selection who also coached says both, not just the rule', () => {
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_selection', params: {} }, hasCoached],
+    }, 1);
+    expect(interpretation).toBe('Players selected under the father–son rule, who also coached.');
+  });
+
+  it('the father side: a father–son father who also coached says both', () => {
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_father', params: {} }, hasCoached],
+    }, 11);
+    expect(interpretation)
+      .toBe('Players whose son was selected under the father–son rule, who also coached.');
+  });
+
+  it('composes rather than matching a sentence: the scope survives too', () => {
+    // Neither of the two cases above contains "by Geelong", so a fix that
+    // hard-coded them would produce the wrong sentence here.
+    const interpretation = subject({
+      careerPredicates: [{ builder: 'father_son_selection_for_club', params: { club: '6' } }, hasCoached],
+      scope: { clubFor: GEELONG },
+    }, 1);
+    expect(interpretation)
+      .toBe('Players selected under the father–son rule by Geelong, who also coached.');
+  });
+
+  it('never drops the coaching conjunct from a relationship sentence', () => {
+    for (const relationship of [
+      { builder: 'father_son_selection', params: {} },
+      { builder: 'father_son_father', params: {} },
+      { builder: 'has_brother', params: {} },
+    ]) {
+      const interpretation = subject({ careerPredicates: [relationship, hasCoached] }, 1);
+      expect(interpretation, relationship.builder).toContain('coached');
+      expect(interpretation, relationship.builder).not.toContain('every condition');
+    }
+  });
+
+  it('leaves each family alone when it is the only one present', () => {
+    const rows = [careerRow({ value: null })];
+    const only = (predicates: NlQueryPlan['careerPredicates']) => describeAnswer(
+      composedPlan({ careerPredicates: predicates }),
+      { kind: 'player_career', lead: rows[0], rows, total: 99 },
+    ).interpretation;
+    expect(only([hasCoached])).toBe('Players who played VFL/AFL and also coached.');
+    expect(only([{ builder: 'father_son_selection', params: {} }]))
+      .toBe('Players selected under the father–son rule.');
+  });
+});

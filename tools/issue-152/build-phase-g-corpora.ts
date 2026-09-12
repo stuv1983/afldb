@@ -103,7 +103,28 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    * rows 1-271 of the 271-row file and §19.3's position-based statements
    * survive unchanged. The 48 Phase D rows are 272-319.
    *
-   * 238 plan = 212 + 26. 81 decline = 59 + 22.
+   * 242 plan = 212 + 26 + 4. 77 decline = 59 + 22 - 4.
+   *
+   * AFLDB-ISSUE-153 reclassified four rows IN PLACE -- same file, same
+   * position, same id, `expected_status` decline -> plan -- because the
+   * semantics they pinned as unreachable now ship. Row count and row order
+   * are unchanged, so every position-based statement above still holds:
+   *
+   *   rel_dec_003  FS1, Stage 2  -- operator decision Q1/Q1a(a) narrowed
+   *                                the blanket D8 guard to the bare and
+   *                                collective forms; naming the RULE now
+   *                                binds to father_son_selections (99);
+   *   rel_dec_004  FS2, Stage 3  -- father_son_selection_for_club, the
+   *                                SELECTING club folded by organization;
+   *   rel_dec_005  FS3, Stage 3  -- father_son_selection_between, over
+   *                                draft_year and labelled a draft year;
+   *   rel_dec_006  FS6, Stage 4  -- the fatherSonSummary distribution,
+   *                                denominator 127 selection events (Q2).
+   *
+   * The four categories keep their `rel_decline_*` names. Renaming them
+   * would break the position-and-name pins in tests/nl-ui-corpus.test.ts
+   * for no gain: the name records which boundary the row was written for,
+   * and `expected_status` is what the sweep actually scores.
    */
   current: {
     name: 'current',
@@ -118,7 +139,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-relationships-v1-20260909.csv`,
       `${SOURCE_DIR}/afldb-ui-questions-relationships-decline-v1-20260909.csv`,
     ],
-    expected: { rows: 319, plan: 238, decline: 81, unknown: 0 },
+    expected: { rows: 319, plan: 242, decline: 77, unknown: 0 },
   },
 
   /**
@@ -128,20 +149,37 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
    *
    * A third generation, appended for the same reason Phase D appended a
    * second. Phase D's accepted evidence is "319 = 238 plan + 81 decline,
-   * green at P5-r2" (§24.3), and that statement stays checkable only
+   * green at P5-r2" (§24.3) -- a HISTORICAL run result, preserved as run,
+   * and superseded rather than rewritten by AFLDB-ISSUE-153's 242/77 --
+   * and that statement stays checkable only
    * while the corpus it names keeps its size and its row order. The eight
    * Phase B/C/E/D sources are therefore listed here in the SAME order as
    * `current`, so rows 1-319 of this file are byte-for-byte the 319-row
    * file and every position-based statement in §19.3, §23 and §24
    * survives. The 30 Phase F rows are 320-349.
    *
-   * 253 plan = 238 + 15. 96 decline = 81 + 15.
+   * 258 plan = 242 + 15 + 1. 91 decline = 77 + 15 - 1.
    *
-   * The 15/15 split deviates from the provisional 14/16 in §25.15: X3 is
-   * deferred (operator decision F-D1) and the `coach_record` collision
-   * row -- "Richmond's coaching record", which must still ANSWER -- is
-   * counted in the plan column, which is where a row expecting a plan
-   * belongs. The set total, 349, and its batch count, 4, are unchanged.
+   * The 30 Phase F rows now contribute 16 plan / 14 decline. The
+   * `coach_record` collision row -- "Richmond's coaching record", which must
+   * still ANSWER -- remains in the plan column, and AFLDB-ISSUE-153 has moved
+   * X3 from decline to plan in place. The set total, 349, and its batch count,
+   * 4, are unchanged.
+   *
+   * AFLDB-ISSUE-153 inherits the four `current` reclassifications above
+   * and adds a fifth of its own, again IN PLACE, again at the same
+   * position and id:
+   *
+   *   xd_dec_014  X3, Stage 5  -- operator decision Q6 lifted the F-D1
+   *                              deferral, so "selected under the
+   *                              father-son rule who also coached"
+   *                              composes and answers (1, Rhyce Shaw).
+   *
+   * xd_dec_012, xd_dec_013 and xd_dec_015 are its immediate neighbours in
+   * the same category and each still DECLINES -- the two vague/collective
+   * forms in the parser, the ranked form at V6 -- which is why
+   * tests/nl-ui-corpus.test.ts pins all four by name rather than pinning
+   * the category.
    */
   next: {
     name: 'next',
@@ -158,7 +196,7 @@ export const PHASE_G_SETS: Record<PhaseGSetName, PhaseGSet> = {
       `${SOURCE_DIR}/afldb-ui-questions-cross-domain-v1-20260909.csv`,
       `${SOURCE_DIR}/afldb-ui-questions-cross-domain-decline-v1-20260909.csv`,
     ],
-    expected: { rows: 349, plan: 253, decline: 96, unknown: 0 },
+    expected: { rows: 349, plan: 258, decline: 91, unknown: 0 },
   },
 
   /**

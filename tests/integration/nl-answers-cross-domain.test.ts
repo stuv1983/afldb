@@ -15,8 +15,8 @@
  * The four rules this suite exists to protect:
  *
  *  - a `coaches` row is an IDENTITY claim and nothing more. 368 linked
- *    coach identities exist; only 365 of those people ever coached a
- *    match. X1 is the 365, and the match_coaches join is the whole
+ *    coach identities exist; only 367 of those people ever coached a
+ *    match. X1 is the 367, and the match_coaches join is the whole
  *    difference;
  *  - a coached club is an ORGANIZATION lineage, never a raw
  *    match_coaches.club_id -- real coaches diverge on it (Pagan 3 raw ids
@@ -40,13 +40,13 @@ afterAll(async () => {
   await sql.end();
 });
 
-/** The evidence run of 2026-09-09 against `afldb_test`, as the fixture contract. */
+/** The 2026-09-09 evidence, with X1 rebaselined after accepted 2026 coaching assignments. */
 const M_F = {
   coachRows: 386,
   linkedCoaches: 368,
   coachOnly: 18,
   /** X1: played AND actually coached. NOT 368. */
-  x1: 365,
+  x1: 367,
   /** X2: played Richmond AND coached Richmond. */
   x2Richmond: 27,
   /** Coached Richmond, played anywhere -- the half X2 must not be mistaken for. */
@@ -201,7 +201,7 @@ describe('the coaching data Phase F was designed against', () => {
 // ------------------------------------------------------------------- T1/T8
 
 describe('X1 -- played and also coached', () => {
-  it('T1: answers 365, and agrees with hand-written coaches ⋈ match_coaches SQL', async () => {
+  it('T1: answers 367, and agrees with hand-written coaches ⋈ match_coaches SQL', async () => {
     const { total } = await career(x1Plan());
     expect(total).toBe(M_F.x1);
     expect(total).toBe(await scalar(sql<{ n: string }[]>`
@@ -215,9 +215,9 @@ describe('X1 -- played and also coached', () => {
   /**
    * THE regression this builder exists to prevent. A naive
    * `EXISTS (SELECT 1 FROM coaches WHERE player_id = p.id)` returns 368:
-   * three people hold a coach identity and never coached a match.
+   * one person holds a coach identity and never coached a match.
    */
-  it('T8: is 365 and not the 368 identity-only seam, and the difference is exactly the matchless identities', async () => {
+  it('T8: is 367 and not the 368 identity-only seam, and the difference is exactly the matchless identities', async () => {
     const identityOnly = await scalar(sql<{ n: string }[]>`
       SELECT count(DISTINCT c.player_id) AS n FROM coaches c WHERE c.player_id IS NOT NULL
     `);
@@ -246,13 +246,13 @@ describe('X1 -- played and also coached', () => {
     expect(Number(row.n)).toBe(2);
   });
 
-  it('T12: the capped list states its own cap -- 100 of 365, never silently', async () => {
+  it('T12: the capped list states its own cap -- 100 of 367, never silently', async () => {
     const payload = await answerPlayerCareer(x1Plan({ limit: NL_LIMITS.maxListRows }), NL_LIMITS.maxListRows);
     if (payload.kind !== 'player_career') throw new Error('expected player_career');
     expect(payload.total).toBe(M_F.x1);
     expect(payload.rows).toHaveLength(NL_LIMITS.maxListRows);
     const caveats = answerCaveats(x1Plan(), payload);
-    expect(caveats.join(' ')).toContain('365 players qualify');
+    expect(caveats.join(' ')).toContain('367 players qualify');
     expect(caveats.join(' ')).toContain(`first ${NL_LIMITS.maxListRows}`);
   });
 });
@@ -401,14 +401,40 @@ describe('T13: ownership fails closed', () => {
       metric: 'games', agg: { kind: 'max' },
       careerPredicates: [{ builder: 'father_son_selection', params: {} }, hasCoached],
     })],
-    ['V7: a father–son selection alone', raw({
-      careerPredicates: [{ builder: 'father_son_selection', params: {} }],
-    })],
     ['V9: the composition at coach grain', raw({ grain: 'coach_record', careerPredicates: [hasCoached] })],
     ['V10: the composition at season grain', raw({
       grain: 'player_season', metric: 'goals', careerPredicates: [hasCoached],
     })],
   ])('%s is refused', (_label, candidate) => {
     expect(validatePlan(candidate)).toHaveProperty('error');
+  });
+
+  /**
+   * AFLDB-ISSUE-153 (Finding 1). V7 -- "a father–son selection alone is
+   * refused" -- was written under ISSUE-152 Phase F, when D8 declined the
+   * bare father-son question outright. Operator decision Q1 settled D8 the
+   * other way: a selection plan is FS1, it ANSWERS, and the bare and
+   * collective wordings now decline in the PARSER rather than at plan
+   * time. The guard was retired with the decision; this assertion was
+   * left behind and is the stale half.
+   *
+   * It is corrected here, not by restoring the guard. Restoring it would
+   * re-refuse the wording the operator approved, and would deny the son
+   * side a ranking the father side already ships as `rel_024`.
+   */
+  it('V7 is RETIRED: a father–son selection alone is a plan, not a refusal', () => {
+    const bare = raw({ careerPredicates: [{ builder: 'father_son_selection', params: {} }] });
+    expect(validatePlan(bare)).not.toHaveProperty('error');
+  });
+
+  it('V6 is NARROWED, not retired: the ranking is refused only with coaching', () => {
+    // The row above already pins the refusal. This pins its other edge:
+    // the son-side ranking with no coaching conjunct is the exact mirror
+    // of the shipped rel_024 on the father side, and Q1 consequence 3
+    // forbids denying one side a wording the other is given.
+    expect(validatePlan(raw({
+      metric: 'games', agg: { kind: 'max' },
+      careerPredicates: [{ builder: 'father_son_selection', params: {} }],
+    }))).not.toHaveProperty('error');
   });
 });

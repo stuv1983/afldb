@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **OPEN — STAGES 1-5 AND 7 IMPLEMENTED 2026-09-09. Stage 6 (C1/D6/C5/C6) NOT STARTED and NOT AUTHORISED. All DB-backed tests are WRITTEN BUT UNRUN — the 55432 tunnel was down. `PARSER_VERSION` 39 -> 40, bumped once for the whole Stages 2-5 checkpoint. Operator decisions Q1, Q1a(a), Q2 (127 selection events), Q3, Q4, Q5 and Q6 are LOCKED and implemented as given. Stage 0 (§1-§10) is the settled record and must NOT be re-run. READ §11 FIRST — it is the session handoff.** |
+| Status | **OPEN — PARKED 2026-09-10 at the Stages 1-5+7 checkpoint. Operator moved to `AFLDB-ISSUE-155`; do not start Stage 6 in this session or any resumption without the explicit lock+go recorded in §11.13. STAGES 1-5 AND 7 IMPLEMENTED 2026-09-09, DB-VALIDATED against `afldb_test` (§11.11) AND RENDERED GREEN on the re-pinned 319 and 349 sets (§11.12). Stage 6 (C1/D6/C5/C6) NOT STARTED and NOT AUTHORISED — its §9 dependencies are met, but it needs an explicit operator lock of the D6 contract (§7.7) and an explicit go before any code. `PARSER_VERSION` 39 -> 40, bumped once for the whole Stages 2-5 checkpoint. Operator decisions Q1, Q1a(a), Q2 (127 selection events), Q3, Q4, Q5 and Q6 are LOCKED and implemented as given. Stage 0 (§1-§10) is the settled record and must NOT be re-run. Nothing committed, merged or deployed. READ §11 FIRST — it is the session handoff; §11.13 is the latest (parking) checkpoint.** |
 | Branch | `opus/issue-153-nl-deferred-semantics` (worktree `D:\dev\afldb-issue-153`) |
 | Base | `1476de6` — the accepted ISSUE-152 Phase F checkpoint on fresh `main` |
 | Parser baseline | `PARSER_VERSION` **39** at Stage 0 (`src/search/nl/plan.ts`) — verified, and unchanged by Stage 0. **Now 40**: bumped exactly once by the Stages 2–5 semantic checkpoint (§11.1). Do not bump again for anything already in that checkpoint. |
@@ -737,32 +737,35 @@ documented 55432 tunnel convention) so the evidence runner could execute.
 | **4** | FS6 distributions, denominator 127 | **COMPLETE, green** |
 | **5** | X3 + father-side composition (Q6) | **COMPLETE, green** |
 | **6** | C1 / D6 / C5 / C6 — the `family` grain | **NOT STARTED. NOT AUTHORISED.** |
-| **7** | Durability invariant (projection drift) | **IMPLEMENTED**, written but **UNRUN** |
+| **7** | Durability invariant (projection drift) | **IMPLEMENTED and RUN — green** (§11.11, inside the 42/42 relationships suite) |
 
-**Nothing is partially implemented.** Every stage that was started is finished; the
-only thing outstanding for Stages 1–5 is *execution* of the DB-backed tests, which
-this session could not run.
+**Nothing is partially implemented.** Every stage that was started is finished. At
+the initial handoff, execution of the DB-backed tests was still outstanding; that
+historical gap was closed in §11.11, and rendered acceptance was then completed in
+§11.12.
 
 `PARSER_VERSION` is **40** (was 39). It was bumped **exactly once**, for the whole
 Stages 2–5 semantic checkpoint, per the operator's instruction. A fresh session
 must **not** bump it again for anything already in this checkpoint.
 
-## 11.2 The one thing that was NOT done, and why
+## 11.2 Initial-handoff validation gap (historical; superseded)
 
-**Every DB-backed test is written but has never been executed.** The 55432 tunnel
-to `afldb_test` was not up in this session:
+At the session handoff that created this section, every DB-backed test was written
+but had not yet been executed because the 55432 tunnel to `afldb_test` was not up:
 
 ```
 Error: connect ECONNREFUSED 127.0.0.1:55432
 ```
 
-This is the only outstanding validation for Stages 1–5. The tests are written to be
-oracles, not smoke checks: each figure is compared against an independently
-hand-written query over the same table, and several are written to FAIL loudly on
-the specific wrong answer this issue exists to prevent (see §11.7).
+That statement records the state at the initial handoff only. It is superseded by
+the `afldb_test` results in §11.11. The tests are oracles, not smoke checks: each
+figure is compared against an independently hand-written query over the same table,
+and several fail loudly on the specific wrong answer this issue exists to prevent
+(see §11.7).
 
-No rendered Playwright sweep was run either, and none should be until §11.8 is
-settled.
+No rendered Playwright sweep had run at that point because §11.8 was unsettled.
+The operator subsequently settled the corpus conflict and both re-pinned sweeps ran
+green; §11.12 is the current rendered-acceptance record.
 
 ## 11.3 Files changed, and why each one changed
 
@@ -873,7 +876,7 @@ unmodified tree, and none imports anything this work touched:
 3. `tests/reference-data.test.ts` — `external_grid_*` tables not registered for
    `afldb_import`; that is ISSUE-151 territory.
 
-**Written but NEVER RUN — the whole outstanding validation:**
+**Written but NEVER RUN _in the session that wrote them_ — since RUN AND GREEN, 42/42, against `afldb_test` on 2026-09-09; see §11.11:**
 
 `tests/integration/nl-answers-relationships.test.ts` (the appended ISSUE-153 block).
 It asserts, each against an independently hand-written query:
@@ -892,7 +895,13 @@ It asserts, each against an independently hand-written query:
 - **Stage 7**: same source/batch, and `EXCEPT` in **both** directions at son, father
   and pair level, plus row-count parity and the `family_key` no-op Q4 rests on.
 
-## 11.8 THE ONE OPEN CONFLICT — an operator decision, not a bug
+## 11.8 THE ONE OPEN CONFLICT — SETTLED 2026-09-09 (see §11.11.5)
+
+> **SETTLED.** The operator approved **Option B — reclassify the five rows in
+> place** and re-pin `PHASE_G_SETS`: `current` **319 = 242 plan + 77 decline**,
+> `next` **349 = 258 plan + 91 decline**. Row counts, ids, positions and batch
+> counts are unchanged. The section below is preserved as the statement of the
+> conflict as it stood; §11.11.5 records the decision and what was changed.
 
 Five rows pinned as **declines** in the ISSUE-152 corpora now legitimately **answer**:
 
@@ -913,7 +922,7 @@ Those rows live in the **source CSVs that `PHASE_G_SETS.current` (319) and `.nex
 change by design, telling the operator to "update `PHASE_G_SETS` and the issue
 record together, rather than loosening the gate".
 
-**No CSV was edited and no set was re-pinned in this session.** Until this is
+**No CSV was edited and no set was re-pinned _in the session that found this_.**
 decided, a rendered sweep of the 319 or 349 set **will fail on those five rows, and
 the failure is correct behaviour meeting a stale expectation.**
 
@@ -941,28 +950,31 @@ in the same commit.
 
 **Do not re-run Stage 0. Do not reopen §8 or §11.4. Do not start Stage 6.**
 
-1. Bring up the tunnel to `afldb_test` on **55432**, then run the only outstanding
-   validation:
+The DB validation of §11.10 has been run — see **§11.11**. What remains:
+
+1. Re-run the focused suites the corrective checkpoint touched:
 
    ```
-   npx vitest run tests/integration/nl-answers-relationships.test.ts
+   npx vitest run tests/nl-describe.test.ts tests/nl-ui-corpus.test.ts
    ```
 
-   Expected: the pre-existing Phase D block plus the whole ISSUE-153 block green. A
-   failure here is a real finding — every number in it is independently derived.
-
-2. If green, run the neighbouring DB-backed NL suites to prove nothing else moved:
+   With the tunnel up on 55432, the two DB-backed suites the checkpoint
+   corrected:
 
    ```
-   npx vitest run tests/integration/nl-answers-cross-domain.test.ts tests/integration/nl-vocab.test.ts tests/integration/nl-semantic-mapping.test.ts
+   npx vitest run tests/integration/nl-answers-relationships.test.ts tests/integration/nl-answers-cross-domain.test.ts
    ```
 
-3. Then put **§11.8** to the operator. Nothing rendered should run before it is
-   answered.
+2. Review and commit. Nothing in this work is committed; git stays
+   operator-run.
 
-4. Stage 6 (C1/D6/C5/C6) remains held and unauthorised. Stage 0 proved D6 is a real
-   product decision — biggest-by-members and biggest-by-games disagree by up to
-   **301 rank places** (§4.6) — and that contract must not be invented.
+3. Rendered acceptance of the **re-pinned** 319 and 349 sets: **RUN AND GREEN
+   2026-09-09 — see §11.12.** Do not re-run either sweep without a failure
+   discriminator.
+
+4. Stage 6 (C1/D6/C5/C6) remains held and unauthorised. Stage 0 proved D6 is a
+   real product decision — biggest-by-members and biggest-by-games disagree by
+   up to **301 rank places** (§4.6) — and that contract must not be invented.
 
 Cheap re-validation of what is already done, if needed:
 
@@ -970,3 +982,290 @@ Cheap re-validation of what is already done, if needed:
 npm run typecheck
 npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/grid-solver-spec.test.ts tests/family-records-surfaces.test.ts
 ```
+
+## 11.11 DB-validation checkpoint — 2026-09-09, `afldb_test`
+
+The validation §11.10 asked for was run, against the real database, and the
+corpus conflict of §11.8 was settled by the operator in the same pass. This
+section records what was measured; it does not restate what was implemented.
+
+### 11.11.1 Target — confirmed before anything was believed
+
+| | |
+|---|---|
+| Database | **`afldb_test`** |
+| Reached via | the SSH tunnel on **`127.0.0.1:55432`** |
+| Mode | read-only oracles; no migration, no import, no state change |
+
+The target was confirmed as `afldb_test` through `127.0.0.1:55432` **before** any
+count below was accepted. This matters because `afldb_dev` lags the canonical
+rebuild, and a number measured there would not be evidence for a semantic
+decision.
+
+### 11.11.2 Suite results
+
+| Suite | Result |
+|---|---|
+| `tests/integration/nl-answers-relationships.test.ts` | **42 / 42**, after the alias repair below |
+| Six integration suites together | **104 / 105** before the stale V7 assertion was corrected |
+| The other four relationship-adjacent integration files | **90 / 90** |
+
+**One validation-only test defect was found and repaired.** In the Stage 7
+provenance oracle the derived table was aliased `AS both`; `both` is a PostgreSQL
+reserved keyword, so the statement was a syntax error rather than a failing
+assertion. The alias is now `AS shared_provenance`. **The assertion itself was
+not altered** — nothing about the invariant changed, only the name of a
+subquery.
+
+### 11.11.3 Oracle counts — measured, not copied
+
+| Quantity | Measured |
+|---|---|
+| FS1 — players selected under the father–son rule | **99** |
+| Father side — players whose son was selected | **107** |
+| FS6 denominator — recorded selection EVENTS | **127** |
+| Selecting organisations (FS6 `by club` grouping) | **17** |
+| Selecting clubs that are NULL | **0** |
+| X3 — selected under the rule AND actually coached | **1** — Rhyce Shaw, player **10974** |
+| Father side AND actually coached | **11** |
+
+The Stage 7 projection invariant held: **99 / 107 / 96 with zero divergence**.
+The `EXCEPT` comparisons ran in **both** directions at son, father and pair
+level; row-count parity held; the `family_key` no-op the Q4 constraint rests on
+held; and the same-source/same-batch provenance invariants held. All green.
+
+### 11.11.4 Two findings, both folded into ISSUE-153
+
+**Finding 1 — a stale V7 assertion (test-only).**
+`tests/integration/nl-answers-cross-domain.test.ts` still asserted that a plan
+carrying `father_son_selection` alone is refused. That was true under ISSUE-152
+Phase F; operator decision **Q1/D8** settled it the other way, the V7 guard was
+retired with the decision, and the assertion was left behind. It is the single
+failure in the 104/105 above.
+
+Corrected in the test, **not** in production validation: restoring the guard
+would re-refuse the wording the operator approved, and would deny the son side a
+ranking the father side already ships as `rel_024`. **V6 — the ranked
+cross-domain composition — is untouched and still refuses**, and the test now
+pins both of its edges.
+
+**Finding 2 — the coaching conjunct was silently discarded from the answer
+sentence (production).**
+`src/search/nl/describe.ts` composed the answer's subject as
+`relationshipSubjectPhrase(plan) ?? crossDomainSubjectPhrase(plan)`. On a plan
+carrying **both** a relationship predicate and `has_coached` the relationship
+phrase won and the coaching half vanished from the sentence while remaining in
+the SQL — so exactly the two populations Stage 5 exists to allow, X3 (**1**) and
+the father side (**11**), read as the far larger unfiltered populations (FS1
+**99**, father side **107**) they are not. The count was right; the sentence
+describing it was wrong, which is the one failure mode a subject phrase exists
+to prevent.
+
+Repaired compositionally: `relationshipSubjectParts()` now returns a head plus
+clauses, `crossDomainSubjectClause()` returns a clause rather than a whole
+sentence, and `answerSubjectPhrase()` appends every family the plan carries.
+Standalone wording is byte-identical to before. Focused regressions are in
+`tests/nl-describe.test.ts` and cover the father–son selection who also coached,
+the father–son father who also coached, a scoped selection (`by Geelong`) who
+also coached — a form sharing no literal with the other two, so a hard-coded fix
+fails it — and a guard that the coaching conjunct is never dropped.
+
+### 11.11.5 The corpus conflict of §11.8 — SETTLED (Option B)
+
+The operator approved **reclassification in place**. The five rows keep their
+files, their ids, their positions and their category names; only
+`expected_status` changed, `decline` → `plan`:
+
+| Row | Set(s) | Why it now answers |
+|---|---|---|
+| `rel_dec_003` | current, next | FS1, Stage 2 (Q1/Q1a(a)) |
+| `rel_dec_004` | current, next | FS2, Stage 3 |
+| `rel_dec_005` | current, next | FS3, Stage 3 |
+| `rel_dec_006` | current, next | FS6, Stage 4 (Q2, denominator 127) |
+| `xd_dec_014` | next | X3, Stage 5 (Q6 lifted F-D1) |
+
+`PHASE_G_SETS` is re-pinned accordingly, in all three places it is stated
+independently — `tools/issue-152/build-phase-g-corpora.ts`,
+`tests/nl-ui-corpus.test.ts` and the runner scripts:
+
+| Set | Was | Now |
+|---|---|---|
+| `current` | 319 = 238 plan + 81 decline | **319 = 242 plan + 77 decline** |
+| `next` | 349 = 253 plan + 96 decline | **349 = 258 plan + 91 decline** |
+
+Row counts, row ids, row order and batch counts are **unchanged**, so every
+position-based statement in ISSUE-152 §19.3, §23, §24 and §27 still holds. The
+accepted 271-row P3 set contains none of the five rows and does not move.
+
+The cross-domain boundary pin is strengthened rather than merely edited:
+`xd_dec_014` is now an explicit **named plan** pin, and `xd_dec_012`,
+`xd_dec_013` and `xd_dec_015` are explicit **still-decline** neighbours pinned by
+id — by id and not by category, because the category is now mixed. All four were
+live-verified during this validation.
+
+ISSUE-152's preserved acceptance evidence was **not** rewritten. §21.3, §24.3 and
+§27.2 keep their run transcripts and their run results exactly as run; each
+carries a clearly labelled ISSUE-153 note recording the superseding split and the
+five row ids.
+
+### 11.11.6 What this checkpoint does NOT cover
+
+- **Stage 6 (C1/D6/C5/C6, the `family` grain) is still UNAUTHORISED and unstarted.**
+- No rendered corpus sweep was run. The re-pinned 319 and 349 sets have **not**
+  been swept since the reclassification; that is the next rendered acceptance,
+  and it is not authorised here. **Superseded 2026-09-09 — both sets have since
+  been swept and are GREEN; see §11.12.**
+- Nothing was committed, merged, pushed or deployed. Neither DEV nor production
+  was touched.
+
+## 11.12 Rendered acceptance checkpoint — 2026-09-09, both re-pinned sets GREEN
+
+Operator-run, operator-reported, evidence preserved on disk. Nothing in `src/`
+changed between §11.11 and this checkpoint; the sweeps measure the code §11.11
+validated.
+
+### 11.12.1 Preconditions, and the discriminator that makes the runs admissible
+
+| | |
+|---|---|
+| Build | **fresh** standalone `npm run build` of this branch — required because `src/search/nl/describe.ts` changed after any earlier build |
+| Server | `node .next/standalone/server.js` on `127.0.0.1:3100` via `tools/issue-152/phase-g-server.ps1`, database `afldb_test` through the `127.0.0.1:55432` forward |
+| Playwright state | `tests/nl-ui/.auth/state.json` copied from the ISSUE-152 worktree; it holds only `afldb_consent=declined` |
+| Discriminator request | `/search?q=players+selected+under+the+father-son+rule` (`rel_dec_003`, FS1) on the running server, **before** either sweep |
+| Discriminator result | **HTTP 200**, rendered as a father–son-rule answer (the FS1 population, 99 players) |
+
+The ISSUE-152 discriminator (`players who also coached` → `365 players match`)
+was deliberately **not** used: it distinguishes a pre-Phase-F build, not a
+pre-ISSUE-153 one. Under the pre-153 parser the FS1 wording declines by name, so
+only the FS1 request separates this build from its predecessor. The discriminator
+result is operator-reported; the runner does not store it.
+
+### 11.12.2 The `current` set — `phase-d-corpus.ps1`, GREEN
+
+| | |
+|---|---|
+| Run tag | `issue153-current-r1` |
+| Preserved output | `nl-ui-out-152-phaseg/p7-issue153-current/` (`run-manifest.json`, `summary.json`, `observations-w0.jsonl`, `playwright.json`) |
+| Corpus | **319** rows — **242** plan / **77** decline (the re-pinned §11.11.5 shape) |
+| Observed | **319 / 319** |
+| Answered | **242** |
+| Unanswerable | 21 |
+| Absent | 56 |
+| Pass / Fail / Unscored | **319 / 0 / 0** |
+| Rate-limit detections | **0** |
+| `page_error` / `http_error` | **0 / 0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **4 / 4 passed** |
+| Runner result | `Phase D GREEN` |
+
+242 + 21 + 56 = 319. Against the accepted P5-r2 run (ISSUE-152 §24.3: 238 / 21 /
+60) the delta is **answered +4, absent −4, unanswerable unchanged** — exactly the
+four rows §11.11.5 reclassified (`rel_dec_003`/`004`/`005`/`006`), and nothing
+else moved.
+
+### 11.12.3 The `next` set — `phase-f-corpus.ps1`, GREEN
+
+| | |
+|---|---|
+| Run tag | `issue153-next-r1` |
+| Preserved output | `nl-ui-out-152-phaseg/p7-issue153-next/` |
+| Corpus | **349** rows — **258** plan / **91** decline (the re-pinned §11.11.5 shape) |
+| Observed | **349 / 349** |
+| Answered | **258** |
+| Unanswerable | 25 |
+| Absent | 66 |
+| Pass / Fail / Unscored | **349 / 0 / 0** |
+| Rate-limit detections | **0** |
+| `page_error` / `http_error` | **0 / 0** |
+| Filler disagreements | **0** |
+| Client-side errors | **0** |
+| Playwright batches | **4 / 4 passed** |
+| Runner result | `Phase F GREEN` |
+
+258 + 25 + 66 = 349. Against the accepted P6 run (ISSUE-152 §27.2: 253 / 25 / 71)
+the delta is **answered +5, absent −5, unanswerable unchanged** — the four
+`current` rows plus `xd_dec_014` (X3), and nothing else moved. `xd_dec_012`,
+`xd_dec_013` and `xd_dec_015` still decline.
+
+### 11.12.4 Provenance notes, recorded rather than tidied
+
+- Both `run-manifest.json` files carry `issue: AFLDB-ISSUE-152` and
+  `phase: D` / `phase: F` labels. Those are inherited from the ISSUE-152 runner
+  scripts, which were **not** edited for this work; the ISSUE-153 provenance is
+  the run tag (`issue153-*-r1`) and the preserved directory name (`p7-issue153-*`).
+- Both manifests were read back from disk and agree with the counts above
+  (`corpusRows`, `planRows`, `declineRows`, `observed`, `summary`).
+- ISSUE-152's preserved P5-r2 and P6 evidence is untouched; the §24.3 and §27.2
+  notes already record the superseding split and now have the run that proves it.
+- The **1,495-row regression gate was NOT re-run** under an ISSUE-153 tag in this
+  checkpoint. ISSUE-152 re-ran it after each phase (§24.4, §27.3); whether merge
+  readiness for Stages 1–5 requires a fresh P4 under ISSUE-153 is an operator
+  call, not a Stage 6 prerequisite.
+
+### 11.12.5 Stage 6 — what this checkpoint does and does not unlock
+
+Stage 6 (C1 / D6 / C5 / C6, the `family` grain) declares its dependencies in §9
+as **Stage 1, Q4 and Q5**. All three are satisfied — Stage 1 is complete and
+Q4/Q5 are locked (§11.4) — and no rendered gate stands in Stage 6's way: it
+shares nothing with Stages 2–5, and §9 gives every stage its **own** appended
+corpus set rather than a prerequisite sweep.
+
+What Stage 6 still lacks is not evidence but a **contract**. §7.7 is a
+recommendation, not an answer; §8 contains no operator question that locks the
+D6 metric, and §11.10(4) holds the stage for exactly that reason. Before any
+Stage 6 code the operator must lock, explicitly and in writing here:
+
+1. **Extension** — siblings only (already stated in the queries by Q4); no
+   parent–child fold (R3, +77 new / 14 extended families) — recommend **no**,
+   separate issue if wanted.
+2. **Metric** — "biggest football family" = **combined career games** (what the
+   page already ranks by); "most players" is separate wording that must never
+   share a phrasing (they disagree by up to 301 rank places, §4.6).
+3. **Fail-closed rules** — exclude the 46 size-1 families; disambiguate members
+   by **id** (`ablett-0004`, players 4700 and 4701 both display "Gary Ablett");
+   never render an unlinked side as a player.
+4. **C5 / C6** ride along as a `metricCondition` over the new grain (Q5, locked).
+5. An explicit **go** for Stage 6, which this checkpoint does not confer.
+
+Recommended before that go, not required by the runbook: commit the Stages 1–5
++ 7 checkpoint at the boundaries in the tracker row, so Stage 6 — the largest
+piece — stays independently revertible as §9 intends.
+
+### 11.12.6 Not done here
+
+- No code, parser, migration or corpus change. `PARSER_VERSION` stays **40**.
+- Nothing committed, pushed, merged or deployed. DEV and production untouched.
+- Stage 6 not started.
+
+## 11.13 Parked — 2026-09-10, operator moved to AFLDB-ISSUE-155
+
+The operator parked this issue at the §11.12 checkpoint and moved on to
+`AFLDB-ISSUE-155`. **Stage 6 was not started in this session.** Nothing in
+§11.1–§11.12 changed as a result of parking — this section only records the
+stop point and the exact next action.
+
+**Status:** stays **Open**, not Resolved. Nothing further committed, pushed,
+merged or deployed for this issue as part of parking it.
+
+**Exact next action on resumption — the Stage 6/closeout decision:**
+
+Before any Stage 6 code, the operator must lock the D6 contract in writing
+(§7.7 / §11.12.5) and give an explicit go:
+
+1. **Extension** — siblings only (Q4 wording); no parent–child fold.
+2. **Metric** — "biggest football family" = combined career games (matches
+   what the page already ranks by); "most players" is separate wording and
+   must never share a phrasing with it (they disagree by up to 301 rank
+   places, §4.6).
+3. **Fail-closed rules** — exclude the 46 size-1 families; disambiguate
+   members by id (not name — e.g. `ablett-0004`); never render an unlinked
+   side as a player.
+4. **C5/C6** ride along as a `metricCondition` over the new grain (Q5,
+   already locked).
+5. An explicit **go** for Stage 6.
+
+Until that lock+go exists, do not start Stage 6. If resuming without it, the
+correct next action is the one already recorded in §11.10/§11.12.5: review and
+commit the untouched Stages 1–5 + 7 diff (recommended boundaries in §11.10),
+and re-run the two focused suites named there if the branch has moved.

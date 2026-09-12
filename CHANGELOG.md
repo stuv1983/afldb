@@ -922,6 +922,20 @@ commit.
   "players who were father-son fathers and also coached". Both mean the two things are true of the same
   person; neither claims one came after the other, and "later coached" and "went on to coach" still
   decline for that reason.
+- Those two answers now SAY they are about coaching. The sentence above the results was built from the
+  first family the question matched, so "players selected under the father-son rule who also coached"
+  and "players who were father-son fathers and also coached" described only the father-son half and
+  dropped the coaching half. The rows were always right - one person and eleven people respectively -
+  but the sentence read as though it were describing the ninety-nine and the hundred and seven who
+  merely qualify under the rule. Every condition a question carries is now named in the answer.
+- Those answers have now been run through a real browser against a real build, and they are green.
+  The 319-question and 349-question sweeps AFLDB runs before shipping search changes came back 242
+  answered / 77 declined and 258 answered / 91 declined: exactly the five questions this work made
+  answerable moved from declined to answered, and nothing else moved. Nothing failed, nothing went
+  unscored, and not one page errored or was throttled. The build under test was proved to be this
+  one first, by asking it the father-son-rule question that every earlier build declines.
+- This checkpoint covers Stages 1-5 and the Stage 7 durability invariant only. Stage 6 (the family
+  grain and its ranking contract) has not started and is not authorised by this entry.
 
 ### Natural-language search - who both played and coached (AFLDB-ISSUE-152 Phase F) - 9 September 2026
 

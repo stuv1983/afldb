@@ -5,19 +5,21 @@
 
 .DESCRIPTION
     The Phase D corpus (319 rows: Phase G's 271 plus 48 relationship rows)
-    plus the two additive Phase F cross-domain corpora (15 plan / 15
-    decline) -- 253 plan expectations and 96 decline expectations, 349
-    rows, driven through a real browser against the local standalone build
-    on afldb_test.
+    plus the two additive Phase F cross-domain corpora (30 rows, now 16 plan /
+    14 decline after the ISSUE-153 X3 reclassification) -- 258 plan
+    expectations and 91 decline expectations, 349 rows, driven through a real
+    browser against the local standalone build on afldb_test.
 
     This does NOT redefine Phase G or Phase D. Their accepted evidence is
     and stays "271 = 212 plan + 59 decline, green at P3-r2" (ISSUE-152
     section 21.3) and "319 = 238 plan + 81 decline, green at P5-r2"
-    (section 24.3), and phase-g-new-corpus.ps1 and phase-d-corpus.ps1
-    still run exactly those. The merged 349-row file appends: its first
-    319 rows are byte-for-byte the 319-row file, so every position-based
-    statement in sections 19.3, 23 and 24 survives. The Phase F rows are
-    320-349.
+    (section 24.3). Those are historical RUN RESULTS and are preserved
+    exactly as run; phase-g-new-corpus.ps1 still runs the unchanged 271-row
+    set, while AFLDB-ISSUE-153 re-pins phase-d-corpus.ps1 to 242/77 and this
+    runner to 258/91. The merged 349-row file appends: its
+    first 319 rows are byte-for-byte the 319-row file, so every
+    position-based statement in sections 19.3, 23 and 24 survives. The
+    Phase F rows are 320-349.
 
     Every guard from P3 is kept, for the reason P3 acquired it (section
     19.2 -- attempt 1 outran /search's rate limiter and scored 240
@@ -92,8 +94,8 @@ $ErrorActionPreference = 'Stop'
 # builder asserts what it merged, and this asserts that what it merged is the
 # set this run claims to be.
 $EXPECTED_ROWS = 349
-$EXPECTED_PLAN = 253
-$EXPECTED_DECLINE = 96
+$EXPECTED_PLAN = 258
+$EXPECTED_DECLINE = 91
 $EXPECTED_BATCHES = 4   # ceil(349 / NL_UI_BATCH default 100)
 
 $RESERVED_TAGS = @('issue152-phaseg-p3', 'issue152-phaseg-p4', 'issue152-phased-p5')
@@ -144,7 +146,7 @@ if ($batches -ne $EXPECTED_BATCHES) {
 
 Write-Host ("  corpus             {0}" -f $corpus.path)
 Write-Host ("                     {0} rows -- {1} plan, {2} decline" -f $corpus.rows, $corpus.plan, $corpus.decline)
-Write-Host ("                     = Phase D 319 (238/81) + Phase F 30 (15/15); rows 1-319 unchanged")
+Write-Host ("                     = Phase D 319 (242/77) + Phase F 30 (16/14); rows 1-319 unchanged")
 Write-Host ("  playwright batches {0}" -f $batches)
 Write-Host ("  base URL           {0}" -f $BaseUrl)
 Write-Host ("  pacing             {0} ms at {1} worker  (~{2:N0} min expected)" -f `
