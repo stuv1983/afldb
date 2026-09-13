@@ -103,7 +103,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  */
 export type LineageIdentityRule =
   'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path'
-  | 'draft_pick_key' | 'fixture_key' | 'appointment_key' | 'none';
+  | 'draft_pick_key' | 'fixture_key' | 'appointment_key'
+  | 'award_winner_key' | 'hall_of_fame_key' | 'honour_team_key' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -384,11 +385,41 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         // candidate — ended and void included — before this remap runs, so
         // every leadership audit row resolves.
         { kind: 'club_leadership', entity: 'club_leadership', identity: 'appointment_key' },
+        // AFLDB-ISSUE-165 §8. Migration 058 admitted 'award_winners',
+        // 'hall_of_fame' and 'honour_team_members' into
+        // data_edits_table_name_check, and for seven migrations none of the
+        // three had a lineage target -- the same latent defect AFLDB-ISSUE-160
+        // D-3 found for draft_picks, and with a wider blast radius, because
+        // /admin/data-editor has been CREATING rows in all three since
+        // AFLDB-ISSUE-080. All three are import-writable tables rebuilt by a
+        // promotion, so an honours audit row was reinstated with its row_id
+        // integer unchanged and was never counted, listed or remapped: after a
+        // lineage-changing promotion that integer names a DIFFERENT award, a
+        // different inductee or a different team selection. Exactly the
+        // AFLDB-ISSUE-142 (B) misattribution the gate exists to prevent.
+        //
+        // Each identity is the durable natural key migration 101's durable
+        // records are keyed on, and every row resolves because none of the
+        // three is ever deleted (a wrong one is voided, and the void keeps the
+        // row) and the data_overrides replay re-creates every manual one --
+        // void included -- in the candidate before this remap runs.
+        { kind: 'award_winners', entity: 'award_winners', identity: 'award_winner_key' },
+        { kind: 'hall_of_fame', entity: 'hall_of_fame', identity: 'hall_of_fame_key' },
+        {
+          kind: 'honour_team_members',
+          entity: 'honour_team_members',
+          identity: 'honour_team_key',
+        },
       ],
       remediation: 'Every entity here has a stable identity, so every row is remappable in '
         + 'principle: resolve row_id through the AFL Tables profile url (players), '
         + 'matches.match_key, coaches.afltables_coach_path, fixtures.fixture_key, '
-        + 'club_leadership.appointment_key, or the '
+        + 'club_leadership.appointment_key, the honours natural keys '
+        + "('<source key>|<source_record_id>' for an award winner, "
+        + "'<name>|<inducted_year>' for a Hall of Fame entry and "
+        + "'<team_name>|<player identity>' for an honour-team selection, where the player "
+        + "identity is an AFL Tables profile identity or 'name:<player_name_raw>' while the "
+        + 'row is unlinked), or the '
         + 'draft selection key '
         + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), and apply the "
         + 'generated per-row UPDATEs after the reinstate. A draft audit row whose selection '
@@ -1612,6 +1643,108 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
       SELECT id::bigint AS id, fixture_key AS identity
         FROM public.fixtures
        WHERE fixture_key = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  award_winner_key: {
+    entity: 'award_winners',
+    description: "the winner's source record identity, '<sources.key>|<source_record_id>' — "
+      + 'migration 042\'s award_winners_source_uq UNIQUE NULLS NOT DISTINCT '
+      + '(source_id, source_record_id), written with the source KEY rather than the '
+      + 'per-database sources.id so it denotes the same row on both databases. A manual row '
+      + "carries the minted 'award_winner:<uuid>' createAwardWinner() writes. A row with "
+      + 'source_id or source_record_id NULL has NO key and is deliberately absent here, so it '
+      + 'reports as unresolved rather than being carried by an integer that now names a '
+      + 'different award result (the AFLDB-ISSUE-160 D-3 rule). Every current row has one: '
+      + 'measured 0 NULL of 3,712 on afldb_test, 2026-09-13',
+    byId: `
+      SELECT w.id::bigint AS id, s.key || '|' || w.source_record_id AS identity
+        FROM public.award_winners w
+        JOIN public.sources s ON s.id = w.source_id
+       WHERE w.source_record_id IS NOT NULL
+         AND w.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT w.id::bigint AS id, s.key || '|' || w.source_record_id AS identity
+        FROM public.award_winners w
+        JOIN public.sources s ON s.id = w.source_id
+       WHERE w.source_record_id IS NOT NULL
+         AND s.key || '|' || w.source_record_id = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  hall_of_fame_key: {
+    entity: 'hall_of_fame',
+    description: "the induction's natural identity, '<name>|<inducted_year>' — migration 042's "
+      + 'key for a table that has no source_record_id column at all. An absent induction year '
+      + 'is the empty half, which is why 042 used NULLS NOT DISTINCT: 45 of the 343 inductees '
+      + 'carry no year and must stay inside the key rather than exempt from it. Migration 101 '
+      + 'made the key ACTIVE-ROW-ONLY so a replacement can re-use a voided row\'s identity, '
+      + 'which means a voided row and its replacement can share a name and year — they are '
+      + 'then distinguished by their SOURCE, and a candidate holding two rows for one identity '
+      + 'is reported ambiguous rather than guessed at',
+    byId: `
+      SELECT h.id::bigint AS id,
+             h.name || '|' || COALESCE(h.inducted_year::text, '') AS identity
+        FROM public.hall_of_fame h
+       WHERE h.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT h.id::bigint AS id,
+             h.name || '|' || COALESCE(h.inducted_year::text, '') AS identity
+        FROM public.hall_of_fame h
+       WHERE h.name || '|' || COALESCE(h.inducted_year::text, '') = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  honour_team_key: {
+    entity: 'honour_team_members',
+    description: "the selection's natural identity, '<team_name>|<player identity>' — migration "
+      + "059's two identity axes in one string. A LINKED row names its player by the same "
+      + 'durable identity every other domain uses (the AFL Tables profile path, else the '
+      + "manual_admin_edit token); an unlinked one by 'name:<player_name_raw>', which 059 "
+      + 'permits as the honest fallback only while no stable identity exists. A row that IS '
+      + 'linked but whose player carries no durable identity has NO key here and reports as '
+      + 'unresolved: falling back to its display name would match a different person with the '
+      + 'same name, which is the AFLDB-ISSUE-025 defect 059 exists to prevent',
+    byId: `
+      SELECT m.id::bigint AS id,
+             m.team_name || '|' || COALESCE(
+               ei.identity,
+               CASE WHEN m.player_id IS NULL THEN 'name:' || m.player_name_raw END) AS identity
+        FROM public.honour_team_members m
+        LEFT JOIN LATERAL (
+              SELECT DISTINCT ON (e.player_id) s.key || ':' || e.external_id AS identity
+                FROM public.external_identities e
+                JOIN public.sources s ON s.id = e.source_id
+               WHERE e.player_id = m.player_id
+                 AND ((s.key = 'afltables' AND e.match_method = 'afltables_profile_url')
+                      OR (s.key = 'manual_admin_edit' AND e.match_method = 'manual_admin_edit'))
+                 AND e.status IN ('unique', 'resolved')
+               ORDER BY e.player_id, (s.key <> 'afltables'), e.external_id
+             ) ei ON true
+       WHERE COALESCE(ei.identity,
+                      CASE WHEN m.player_id IS NULL THEN 'name:' || m.player_name_raw END)
+             IS NOT NULL
+         AND m.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT m.id::bigint AS id,
+             m.team_name || '|' || COALESCE(
+               ei.identity,
+               CASE WHEN m.player_id IS NULL THEN 'name:' || m.player_name_raw END) AS identity
+        FROM public.honour_team_members m
+        LEFT JOIN LATERAL (
+              SELECT DISTINCT ON (e.player_id) s.key || ':' || e.external_id AS identity
+                FROM public.external_identities e
+                JOIN public.sources s ON s.id = e.source_id
+               WHERE e.player_id = m.player_id
+                 AND ((s.key = 'afltables' AND e.match_method = 'afltables_profile_url')
+                      OR (s.key = 'manual_admin_edit' AND e.match_method = 'manual_admin_edit'))
+                 AND e.status IN ('unique', 'resolved')
+               ORDER BY e.player_id, (s.key <> 'afltables'), e.external_id
+             ) ei ON true
+       WHERE m.team_name || '|' || COALESCE(
+               ei.identity,
+               CASE WHEN m.player_id IS NULL THEN 'name:' || m.player_name_raw END)
+             = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {

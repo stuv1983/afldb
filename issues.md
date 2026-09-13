@@ -1171,6 +1171,7 @@ created, reopened, resolved, or materially reclassified.
      per the `AFLDB-ISSUE-144.md` precedent). Removed from this table and from
      `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **P4–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
+| `AFLDB-ISSUE-165` | Medium | Admin / Data management | **OPEN — STAGES 1–3 IMPLEMENTED AND DB-GATED 2026-09-13 (24/24 on `afldb_test`, twice in immediate succession, database left exactly as found); UNCOMMITTED, UNDEPLOYED.** Migration 101 applied to `afldb_test` only. The first DB-backed run was 18/5: one real implementation bug (`insertHallOfFame()` overwrote the supplied inductee name with the linked player's display name, silently moving the durable key on the one table whose name IS its identity), one defective test query (`conname LIKE '%status%'` can never find `*_void_reason_ck`), three fixture-isolation defects — all repaired without weakening a contract, and the suite is now idempotent against an already-used test DB. Outstanding: `tests/integration/awards-reload-links.test.ts` skips all 107 tests for want of `AFLDB_TEST_IMPORT_DATABASE_URL` (pre-existing environment gap); the one new `reload_keyed()` path it would cover is proved directly in the ISSUE-165 suite instead. Earlier state: `AFLDB-ISSUE-156` P5 (awards/honours correction, voiding and replacement lifecycle), absorbing the awards/Hall of Fame/honour-team slice of P8. Branch `sonnet/issue-165-awards-admin`, base `37ac7d3`, worktree `D:\dev\afldb-issue-165`. **Migration 101** `src/db/migrations/101_awards_honours_lifecycle.sql` written and **NOT run against any database**: `status`/`status_reason`/`updated_at` plus two CHECKs on each of `award_winners`, `hall_of_fame`, `honour_team_members`; `hall_of_fame`'s and `honour_team_members`' identity keys rebuilt ACTIVE-ROW-ONLY so a replacement can re-use a voided row's identity; `data_overrides.entity_type` widened by the three names. `award_winners`' source-record key is deliberately unchanged and `(award_id, season, player_id)` is deliberately NOT made unique — the 1984 All-Australian club+state pairs are two legitimate rows per player (migration 042). New `src/db/queries/admin-awards.ts`: readers plus create / correct-safe-metadata / void / reinstate / replace for all three domains, `SELECT … FOR UPDATE` with an `updated_at` compare-and-swap, `data_edits` written in the same transaction as every canonical and override write, post-write refusals thrown so `postgres.js` rolls back rather than committing a half-done mutation, the AFLDB-ISSUE-080 §5.3 advisory lock reused for every honour-team identity writer. Three new `replay_admin_overrides()` branches in `tools/migration/common.py` (`lifecycle`/`correction`/`record` field groups, natural-key `entity_key`s, no row ids and no name matching anywhere), called from all nine `import_awards.py` reload sites — seven `award_winners` groups, Hall of Fame, honour teams — inside each group's own transaction, before its commit. Operator decisions **D-8** (no speculative indexes), **D-9** (correction/record fail closed, lifecycle warns and RETAINS), **D-10** (voided rows leave the admin player-link and candidate queues), **D-11** (`awards.first_season`/`last_season` recomputed from ACTIVE rows in the same transaction, and the importer's own span update likewise) and **D-12** (the legacy ingest writer refuses to overwrite an active lifecycle/correction override, and learns no override semantics) all implemented; blockers **B-1** (0 NULL `source_id` / 0 NULL `source_record_id` over 3,712 `award_winners` rows on `afldb_test`, with a defensive `no_durable_key` refusal kept anyway) and **B-2** (migration 101 free) closed. **Two findings the planning session missed, both now corrected in the runbook:** the public read surface is FOUR modules, not one (`awards.ts`, `grid-solver.ts`, `nl/player-career.ts`, `app/sitemap.ts`), widening the Stage 4+ status filter and the §12.6 invariance gate; and `data_edits.table_name` has admitted all three honours tables since migration 058 with **no promotion lineage target** — the fourth instance of the `AFLDB-ISSUE-160` D-3 defect — fixed here with three new identity rules in `tools/db/promotion-inventory.ts` plus a standing contract test that forces the decision for any future admitted table. DB-free validation clean: 4,535 tests over 120 files, `npm run typecheck`, `eslint` on every changed file, `py_compile` on both changed Python modules. **DB-backed gate NOT RUN** — the worktree has no `.env` and no `AFLDB_TEST_DATABASE_URL`; `tests/integration/admin-awards.test.ts` is written but unrun. Stages 4–9 not started. No `CHANGELOG.md` entry: nothing applied, nothing deployed, no behaviour changed. Runbook `AFLDB-ISSUE-165.md` §17 is the authoritative implementation record. **Next action (operator):** review the uncommitted diff, then bring up the `afldb_test` tunnel, apply migration 101 to `afldb_test` only and run the integration suite before Stage 4. The `brownlow_vote_entry_state` `data_edits` lineage gap the new standing test surfaces belongs to `AFLDB-ISSUE-155`, not here. |
 <!-- RETIRED 2026-09-12 — `AFLDB-ISSUE-160` (Draft administration, ISSUE-156 P3b), `AFLDB-ISSUE-161`
      (Season list administration, P3c), `AFLDB-ISSUE-162` (Fixture / season schedule administration,
      P3d) and `AFLDB-ISSUE-163` (Club leadership administration, P3e) are **Resolved** and are NO
@@ -26397,14 +26398,21 @@ rate) not required by this issue's acceptance criteria.
 
 ## AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
 
-- **Status:** Open — planning complete, no code, no migration, no commit, no deployment.
+- **Status:** Open — **Stages 1–3 implemented and DB-gated 2026-09-13 (24/24 on `afldb_test`,
+  twice in immediate succession); uncommitted, undeployed.** Stages 4–9 not started.
 - **Severity:** Medium
 - **Area:** Admin / Data management
 - **Found:** 2026-09-13
-- **Runbook:** `AFLDB-ISSUE-165.md`
+- **Runbook:** `AFLDB-ISSUE-165.md` — §§1–16 are the planning deliverable, **§17 is the
+  authoritative implementation record** and corrects §§3.1, 3.4, 3.7, 8 and 12 where the
+  planning turned out to be wrong.
+- **Migration:** `src/db/migrations/101_awards_honours_lifecycle.sql` — **applied to `afldb_test`
+  only** (operator, 2026-09-13: `101_awards_honours_lifecycle.sql ... ok`). DEV and PROD
+  unapplied.
+- **Branch:** `sonnet/issue-165-awards-admin`, base `37ac7d3`.
 - **Parent:** `AFLDB-ISSUE-156` (umbrella), consuming P5 — Awards/honours correction lifecycle,
   and absorbing the awards/Hall of Fame/honour-team slice of P8 — Data-editor decomposition.
-- **Planning model:** Sonnet 5, medium-high.
+- **Planning model:** Sonnet 5, medium-high. **Implementation model:** Opus 5 (1M context).
 
 ### Problem
 
@@ -26474,9 +26482,155 @@ Brownlow administration/authority; new award types or definitions; award acquisi
 redesign; player merge; match rekey; public Awards/Hall of Fame/honour-team page redesign beyond
 the minimum status filter; destructive rewrite of historical source data.
 
+### Implementation — Stages 1–3 (2026-09-13, uncommitted, unapplied, undeployed)
+
+Full record in `AFLDB-ISSUE-165.md` §17. Summary of what changed and what it proves.
+
+**Stage 1 — schema and promotion lineage.** Migration 101 adds `status text NOT NULL DEFAULT
+'active'`, `status_reason text` and `updated_at timestamptz NOT NULL DEFAULT now()` to each of the
+three tables, with `CHECK (status IN ('active','void'))` and `CHECK (status <> 'void' OR
+status_reason IS NOT NULL)`; replaces `hall_of_fame_name_uq` with an ACTIVE-ROW-ONLY partial
+unique index preserving `NULLS NOT DISTINCT`; rebuilds both migration-059 `honour_team_members`
+partial indexes with `AND status <> 'void'`; and widens `data_overrides.entity_type` by the three
+names. No `created_at`, no `CREATE INDEX` (D-8), no `GRANT`, no trigger and no data written — all
+three tables predate migrations 039/045, whose catalogue-derived registry seeds already carry
+them, so the table-level grants cover the new columns and `privileges.sql` needs no edit (§8
+items 4–5 verified, not assumed). `award_winners`' `(source_id, source_record_id)` key is
+deliberately untouched and `(award_id, season, player_id)` is deliberately NOT made unique: the
+1984 All-Australian records every player under both a club and a state selection, which migration
+042 exists to keep representable.
+
+**Stage 2 — `src/db/queries/admin-awards.ts` (new).** Readers and five mutation primitives per
+domain — create, correct safe metadata, void, reinstate, replace. `SELECT … FOR UPDATE` plus an
+`updated_at` compare-and-swap refuses a stale write before anything is written; `data_edits` is
+written in the same transaction as every canonical write and every override write; a refusal
+discovered after the first write THROWS so `postgres.js` rolls back instead of committing a
+half-done mutation. Identity-bearing fields (`award_id`, `season`, the recipient identity,
+provenance; `name`/`inducted_year`; `team_name`/player identity) are refused with one shared
+sentence per domain. The AFLDB-ISSUE-080 §5.3 advisory lock is reused unchanged for every
+honour-team identity writer, and replacement re-runs the full §4.3/§4.4 collision policy over
+ACTIVE rows.
+
+**Stage 3 — replay.** Three new `replay_admin_overrides()` branches in `tools/migration/common.py`
+over three field groups: `lifecycle` (status, reason, replacement linkage — unconditional),
+`correction` (a DELTA over a source-owned row, `jsonb_exists` semantics so an absent key leaves
+the source value and an explicit null clears it) and `record` (the whole durable row of a manual
+creation, re-created then restored). Durable keys are natural, never row ids:
+`<sources.key>:<source_record_id>`, `<sources.key>:<name>|<inducted_year>`,
+`<sources.key>:<team_name>|<player identity>`. Called from all nine `import_awards.py` reload
+sites — seven `award_winners` groups, the Hall of Fame reload and the honour-team reload — inside
+each group's own transaction and before its commit (R-2). Two further importer changes the
+lifecycle made necessary: `reload_keyed()` gained a `lifecycle_column` so a VOIDED out-of-scope
+row no longer refuses the whole awards import, and
+`_refuse_honour_team_identity_collisions()` ignores voided rows for the same reason — without
+them an ordinary, correct administrative decision would brick the importer.
+
+**Operator decisions.** D-8, D-9, D-10, D-11 and D-12 all implemented as specified; B-1 and B-2
+closed. B-1's measurement (`source_id IS NULL` = 0, `source_record_id IS NULL` = 0, 3,712 rows on
+`afldb_test`) is re-measured by the integration suite rather than trusted, and the defensive
+`no_durable_key` refusal is kept anyway in both the writer and the replay.
+
+**Two findings the planning session missed.**
+
+1. **The public read surface is four modules, not one.** §3.7 claimed every public read goes
+   through `src/db/queries/awards.ts`. It does not: `src/db/queries/grid-solver.ts` (17
+   references), `src/db/queries/nl/player-career.ts` (2) and `src/app/sitemap.ts` (2) also read
+   these tables directly. Grid Solver answers award clues off `award_winners`, natural-language
+   search counts award wins per player, and the sitemap enumerates award seasons and honour-team
+   names. All four need the Stage 4+ status filter, and §12.6's invariance gate must be written
+   against all four.
+2. **A live promotion-lineage defect, found and fixed.** Migration 058 admitted `award_winners`,
+   `hall_of_fame` and `honour_team_members` into `data_edits_table_name_check`, and none of the
+   three has ever had a lineage target in `tools/db/promotion-inventory.ts` — while
+   `/admin/data-editor` has been creating rows in all three since AFLDB-ISSUE-080. All three are
+   import-writable tables a promotion rebuilds, so an honours audit row was reinstated with its
+   `row_id` integer unchanged, counted and remapped by nothing, and after a lineage-changing
+   promotion named a different award, inductee or selection: the AFLDB-ISSUE-142 (B)
+   misattribution, and the fourth instance of exactly the defect AFLDB-ISSUE-160 D-3 found for
+   `draft_picks`. Fixed with three new `LineageIdentityRule` values and their `byId`/`byIdentity`
+   SQL. A row with no resolvable identity is reported unresolved and never matched by name — in
+   particular an honour-team row that is linked but whose player holds no durable identity is
+   excluded from the identity SQL rather than falling back to its display name, which would
+   re-create the AFLDB-ISSUE-025 defect migration 059 exists to prevent. A new standing contract
+   test in `tests/db-promotion-check.test.ts` now reads the allowlist out of the migrations and
+   requires every admitted name to carry a target or a recorded exemption, so the next table
+   admitted forces the decision at review time.
+
+**Recorded gap that the new standing test surfaces, and it is not this issue's.**
+`brownlow_vote_entry_state` is admitted by migration 094 with no lineage target. Its primary key
+is `match_id`, so a `data_edits` `row_id` for it is a match id and a lineage change does renumber
+it; it needs a `matches`/`match_key` target. That belongs to the Brownlow admin domain
+(`AFLDB-ISSUE-155`). `brownlow_season_authority` is a genuine exemption — its `row_id` is a season
+year, a permanent natural identity nothing renumbers.
+
+**Validation.** DB-free: 4,552 tests passing over 121 of 122 files (`npx vitest run` excluding
+`tests/integration/**` and `tests/nl-ui/**`), `npm run typecheck` clean, `eslint` clean on every
+changed TypeScript file, `python -m py_compile` clean on both changed Python modules. One
+pre-existing, unrelated Windows failure remains and is not touched by this work:
+`tests/finals-semantics-contract.test.ts` (the known CRLF split — Linux passes).
+
+**DB-backed: PASSED.** `tests/integration/admin-awards.test.ts` — **24/24, run twice in immediate
+succession** against `afldb_test` (`current_database()` proved before either run), leaving the
+database exactly as found: `award_winners` 3,712, `hall_of_fame` 343, `honour_team_members` 113,
+zero fixture awards, zero fixture players, zero overrides and zero audit rows for the three
+entity types. `tests/integration/player-honours.test.ts` and
+`tests/integration/club-honours.test.ts`: 14/14.
+
+**One coverage gap, recorded not worked around.** `tests/integration/awards-reload-links.test.ts`
+— the suite that exercises the REAL honours reloads, and therefore the closest existing cover for
+this issue's `import_awards.py` changes — SKIPS all 107 of its tests because it requires
+`AFLDB_TEST_IMPORT_DATABASE_URL` (the restricted importer-role DSN) and no `.env` on this machine
+defines it. That is a pre-existing environment gap, not a regression. It left the one NEW
+`reload_keyed()` code path (`lifecycle_column`) with no cover at all, so the ISSUE-165 suite now
+proves it directly under the owner role instead — an ACTIVE out-of-scope Hall of Fame row still
+refuses the reload (AFLDB-ISSUE-080 unchanged), and the same row once VOIDED does not, with
+`delete_missing=False` so the real 343-row Hall of Fame is untouched. The operator should still
+run `awards-reload-links` with the importer-role DSN set before Stage 4 merges.
+
+### The first DB-backed run, and the five failures it found (2026-09-13)
+
+18 passed / 5 failed. Full record in `AFLDB-ISSUE-165.md` §17.8.
+
+| # | Failure | Cause | Verdict |
+|---|---|---|---|
+| 1 | `applies cleanly` expected 6 CHECK constraints, found 3 | the assertion counted `conname LIKE '%status%'`, which can only ever find 3 — `<table>_void_reason_ck` does not contain "status" | **test defect**; the schema was NOT renamed to suit it, and the assertion now names all six constraints and checks each definition |
+| 2 | award span stayed 2026 after a void, expected NULL | the award still had eight ACTIVE winners left by earlier tests in the same file; NULL is only correct when the voided row was the last active winner | **fixture-isolation defect**; `recomputeAwardSpan()` was right and was not weakened |
+| 3 | the duplicate test's FIRST create was already refused | earlier tests had recorded that player on that award in that season, so the `(award, season, player)` duplicate check fired — working as designed | **fixture-isolation defect** |
+| 4 | Hall of Fame replacement key carried the linked player's display name | `insertHallOfFame()` overwrote the administrator's supplied name with `players.display_name` | **IMPLEMENTATION defect** — see below |
+| 5 | destructive-rebuild test's create refused | same as 3 | **fixture-isolation defect** |
+
+**Failure 4 was a real bug, inherited by copying the legacy creator.** `hall_of_fame.name` is not
+a display fact: migration 042 keys the table on `(name, inducted_year)` and this issue's durable
+key is `<source key>:<name>|<inducted_year>`. Deriving the name from the linked player filed the
+induction under a DIFFERENT key from the one the administrator asked for — a silent identity move
+on the one table whose name IS its identity, which R-1 forbids — and made the required case
+unexpressible: re-entering a voided inductee under the SAME name and year while linking the person
+it should have been is exactly how a mis-identified Hall of Fame row is corrected. **Fixed:** the
+supplied name is canonical; the player's display name is used only when no name was supplied.
+`award_winners` and `honour_team_members` keep the legacy behaviour deliberately, because on those
+two the display name sits beside a separate identity and moves nothing that decides which row it
+is; a source-contract test pins the asymmetry so it reads as a decision, not an oversight.
+
+**Isolation and repeatability.** Every test that writes now owns its own identity — its own award
+(`afldb-issue-165-test-<tag>`), its own Hall of Fame name, its own team name. Cleanup
+(`purgeFixtures()`) runs in `beforeAll` AND `afterAll` and keys on two STABLE prefixes, never a
+per-run nonce, so it also clears debris a crashed run left behind. The first run proved the need:
+exactly one durable record leaked, a manual award winner's `record` override keyed
+`manual_admin_edit:award_winner:<uuid>`, which carries neither prefix and names an award that had
+since been deleted — left alone it would have failed the next run's replay closed with "award_slug
+does not resolve to an award". The sweep now matches the override payload as well as the key.
+
 ### Resolution
 
-Not resolved — planning only. Next action: operator review of the runbook's §14 open questions
-(replacement-linkage write shape, `/admin/awards` merged-vs-split IA, column naming, and
-verification of the promotion-inventory/privilege registration state for the three tables at
-implementation preflight), then a Stage 1/Stage 2 implementation session.
+Not resolved. Stages 1–3 are implemented and awaiting operator review; Stages 4–9 (the
+`/admin/awards` surface, `data.awards.read`/`.edit` capabilities, nav, the `data-editor`
+disposition, the public `status` filters across the four consumer modules, and browser
+acceptance) are not started. No `CHANGELOG.md` entry has been made: nothing is applied or
+deployed, so no application, data or admin behaviour has changed yet — the entry belongs with the
+Stage 4+ deployment.
+
+**Next action (operator).** Review the uncommitted diff, then Stage 4. The DB-backed gate is
+passed; the one outstanding validation is `tests/integration/awards-reload-links.test.ts` with
+`AFLDB_TEST_IMPORT_DATABASE_URL` set, which skips on this machine. Runbook §14's D-4, D-5 and D-6
+still need answers before Stage 4; only D-5 (`/admin/awards` merged-vs-split information
+architecture) shapes the UI.

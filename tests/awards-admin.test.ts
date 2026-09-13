@@ -505,6 +505,46 @@ describe('data_edits migration contract', () => {
   });
 });
 
+describe('awards & honours lifecycle migration contract (AFLDB-ISSUE-165)', () => {
+  const migration = readFileSync(
+    join(process.cwd(), 'src', 'db', 'migrations', '101_awards_honours_lifecycle.sql'),
+    'utf8',
+  ).replace(/\r\n/g, '\n');
+  const TABLES = ['award_winners', 'hall_of_fame', 'honour_team_members'];
+
+  it('adds the same three columns and the same two CHECKs to each of the three tables', () => {
+    for (const table of TABLES) {
+      const block = migration.slice(
+        migration.indexOf(`ALTER TABLE ${table}\n  ADD COLUMN status`),
+      );
+      const statement = block.slice(0, block.indexOf(';'));
+      expect(statement, table).toContain("ADD COLUMN status        text        NOT NULL DEFAULT 'active'");
+      expect(statement, table).toContain('ADD COLUMN status_reason text');
+      expect(statement, table).toContain('ADD COLUMN updated_at    timestamptz NOT NULL DEFAULT now()');
+      expect(statement, table).toContain("CHECK (status IN ('active', 'void'))");
+      expect(statement, table).toContain("CHECK (status <> 'void' OR status_reason IS NOT NULL)");
+      // No created_at: data_edits already records when a row was made and by
+      // whom, and back-filling 3,712 rows with "whenever this migration ran"
+      // would invent evidence.
+      expect(statement, table).not.toContain('created_at');
+    }
+  });
+
+  it('changes no privilege and creates no trigger', () => {
+    // All three predate migrations 039 and 045, so the catalogue-derived seeds
+    // of afldb_meta.app_readable_tables and afldb_meta.import_writable_tables
+    // already carry them and the grants are table-level — two new columns and
+    // three rebuilt indexes need nothing further.
+    expect(migration).not.toMatch(/\bGRANT\b/);
+    expect(migration).not.toContain('grant_app_read');
+    expect(migration).not.toContain('grant_import_write');
+    expect(migration).not.toMatch(/CREATE (OR REPLACE )?(TRIGGER|FUNCTION)/);
+    // And it writes no data: status defaults to 'active' for every existing
+    // row, so there is nothing to back-fill.
+    expect(migration).not.toMatch(/\b(INSERT INTO|UPDATE \w+\s+SET|DELETE FROM)\b/);
+  });
+});
+
 describe('atomic audit grant migration contract (AFLDB-ISSUE-027)', () => {
   it('grants afldb_import append-only access to both audit tables, guarded on the role', () => {
     const migration = readFileSync(

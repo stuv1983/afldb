@@ -73,7 +73,12 @@ import type {
  * `fixtures` — so it too changes no answer here) and migration 098
  * (`AFLDB-ISSUE-163` §19: `club_leadership`, a captain or vice-captain
  * appointment, which is likewise not a settle target — nothing in the nightly
- * settle reads or writes it — so it too changes no answer here). Listed in the
+ * settle reads or writes it — so it too changes no answer here) and migration
+ * 101 (`AFLDB-ISSUE-165` §8: `award_winners`, `hall_of_fame` and
+ * `honour_team_members`, none of which is a settle target either — the nightly
+ * settle writes matches and statistics and neither reads nor writes an award,
+ * an induction or an honour team — so admitting all three changes no answer
+ * here). Listed in the
  * order
  * §3.1 / §16.1 write it, which is NOT the ASCII order `checkAdmittedEntities()`
  * returns: nothing compares the two as sequences, and nothing may.
@@ -87,6 +92,7 @@ import type {
 export const OVERRIDE_ENTITY_TYPES = [
   'coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
   'season_list_members', 'club_leadership',
+  'award_winners', 'hall_of_fame', 'honour_team_members',
 ] as const;
 
 /**

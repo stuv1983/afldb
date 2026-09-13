@@ -976,3 +976,326 @@ describe('AFLDB-ISSUE-160 source contract', () => {
     expect(pyDraftGuru).toContain('two ledger decisions claim one manual identity');
   });
 });
+
+/*
+ * AFLDB-ISSUE-165 — the awards & honours lifecycle source contract.
+ *
+ * Everything here is DB-FREE: it reads migration 101, `common.py` and
+ * `admin-awards.ts` as text and pins the three against each other. The claims
+ * that need a real PostgreSQL — that the replay actually restores a correction
+ * after a rebuild, that a missing target fails closed, that the audit row rolls
+ * back with its mutation — live in `tests/integration/admin-awards.test.ts`.
+ */
+describe('AFLDB-ISSUE-165 source contract', () => {
+  const root = process.cwd();
+  const readSource = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf-8')
+    .replace(/\r\n/g, '\n');
+  const pyCommon = readSource('tools/migration/common.py');
+  const pyAwards = readSource('tools/migration/import_awards.py');
+  const migration = readSource('src/db/migrations/101_awards_honours_lifecycle.sql');
+  /** The migration's STATEMENTS, for "the schema never does X" claims. */
+  const migrationSql = migration.split('\n')
+    .filter((line) => !line.trim().startsWith('--')).join('\n');
+  const writer = readSource('src/db/queries/admin-awards.ts');
+  const TABLES = ['award_winners', 'hall_of_fame', 'honour_team_members'] as const;
+
+  /**
+   * One function's source, from its declaration to the next top-level one.
+   *
+   * Slicing to the first `\n}` — the obvious shortcut — is wrong for any
+   * function whose signature carries a multi-line inline parameter type, whose
+   * closing `}` sits at column 0 and therefore ends the "body" after the
+   * signature. `insertHallOfFame` is exactly that shape.
+   */
+  const functionBody = (source: string, name: string): string => {
+    const start = source.indexOf(`async function ${name}`);
+    expect(start, `no function ${name}`).toBeGreaterThan(-1);
+    const rest = source.slice(start + 1);
+    const ends = ['\nasync function ', '\nexport ', '\nfunction ', '\n// ===']
+      .map((token) => rest.indexOf(token))
+      .filter((at) => at >= 0);
+    return ends.length ? rest.slice(0, Math.min(...ends)) : rest;
+  };
+
+  test('the frozen lifecycle enumeration equals the migration and the writer', () => {
+    // common.py cannot read the database schema and still fail closed, so it
+    // carries a copy. This is the assertion that stops the three drifting.
+    const checks = [...migration.matchAll(/CHECK \(status IN \(([^)]*)\)\)/g)]
+      .map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((s) => s[1]).sort());
+    // One per table, and all three identical: the lifecycle is one vocabulary.
+    expect(checks).toHaveLength(TABLES.length);
+    for (const check of checks) expect(check).toEqual(['active', 'void']);
+
+    const pyBlock = pyCommon.slice(pyCommon.indexOf('HONOUR_LIFECYCLE_STATUSES = ('));
+    expect([...pyBlock.slice(0, pyBlock.indexOf(')')).matchAll(/"([a-z_]+)"/g)]
+      .map((m) => m[1]).sort()).toEqual(['active', 'void']);
+
+    const tsStatuses = /HONOUR_STATUSES = \[([^\]]*)\]/.exec(writer)![1];
+    expect([...tsStatuses.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort())
+      .toEqual(['active', 'void']);
+
+    // There is deliberately NO 'ended' here: an award result, an induction or a
+    // team selection does not cease the way a club_leadership appointment does.
+    // Asserted on the VOCABULARIES, not on the prose: all three explain at
+    // length why 'ended' is absent, and a test that could not tell an
+    // explanation from a declaration would forbid writing one.
+    for (const vocabulary of [
+      ...checks.map((c) => c.join(',')),
+      pyBlock.slice(0, pyBlock.indexOf(')')),
+      tsStatuses,
+    ]) {
+      expect(vocabulary).not.toContain('ended');
+    }
+  });
+
+  test('the three field groups agree across the migration, the replay and the writer', () => {
+    const pyBlock = pyCommon.slice(pyCommon.indexOf('HONOUR_FIELD_GROUPS = ('));
+    const pyGroups = [...pyBlock.slice(0, pyBlock.indexOf(')')).matchAll(/"([a-z]+)"/g)]
+      .map((m) => m[1]).sort();
+    expect(pyGroups).toEqual(['correction', 'lifecycle', 'record']);
+    const tsGroups = /HONOUR_FIELD_GROUPS = \[([^\]]*)\]/.exec(writer)![1];
+    expect([...tsGroups.matchAll(/'([a-z]+)'/g)].map((m) => m[1]).sort()).toEqual(pyGroups);
+    for (const group of pyGroups) expect(migration).toContain(`'${group}'`);
+  });
+
+  test('migration 101 widens data_overrides forward and admits no settle target', () => {
+    expect(migration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members'\s*\)\)/,
+    );
+    const widening = migration.slice(
+      migration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
+    );
+    for (const settleTarget of [
+      'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
+    ]) {
+      expect(widening.slice(0, widening.indexOf('));'))).not.toContain(settleTarget);
+    }
+    // 058 already admits all three data_edits names; re-stating them would be a
+    // second allowlist that could disagree with the first.
+    expect(migrationSql).not.toContain('data_edits_table_name_check');
+  });
+
+  test('migration 101 makes the identity keys ACTIVE-ROW-ONLY, and only those', () => {
+    // Without this a replacement collides with the record of its predecessor,
+    // and "void + re-enter" — the whole correction model — is unexpressible.
+    expect(migration).toContain('DROP CONSTRAINT hall_of_fame_name_uq');
+    expect(migration).toMatch(
+      /CREATE UNIQUE INDEX hall_of_fame_active_name_uq\s*\n\s*ON hall_of_fame \(name, inducted_year\) NULLS NOT DISTINCT\s*\n\s*WHERE status <> 'void';/,
+    );
+    expect(migration).toMatch(
+      /CREATE UNIQUE INDEX honour_team_linked_player_uq[\s\S]*?WHERE player_id IS NOT NULL AND status <> 'void';/,
+    );
+    expect(migration).toMatch(
+      /CREATE UNIQUE INDEX honour_team_unlinked_name_uq[\s\S]*?WHERE player_id IS NULL AND status <> 'void';/,
+    );
+    // award_winners' key is the SOURCE RECORD, not a fact about the person, so
+    // it is deliberately untouched — and (award_id, season, player_id) must
+    // never become one: migration 042 proved the 1984 All-Australian carries two
+    // legitimate rows per player. Asserted on the STATEMENTS, because the
+    // migration explains both decisions in its commentary.
+    expect(migrationSql).not.toContain('award_winners_source_uq');
+    expect(migrationSql).not.toMatch(/UNIQUE[\s\S]{0,80}\(award_id, season, player_id\)/);
+    // D-8: no speculative index.
+    expect(migrationSql).not.toMatch(/CREATE INDEX/);
+  });
+
+  test('every replay branch fails closed, and only lifecycle warns (D-9)', () => {
+    for (const table of TABLES) {
+      const branch = replayBranch(pyCommon, table);
+      const code = executablePython(branch);
+
+      // Fail closed FIRST, over the whole active set, before anything is written.
+      expect(branch).toContain(`replay_admin_overrides(${table}): refusing to commit`);
+      expect(code.indexOf('raise RuntimeError'))
+        .toBeLessThan(code.indexOf('INSERT INTO'));
+
+      // A correction or a record override whose target is absent REFUSES.
+      expect(branch).toContain("'correction' AND");
+      expect(branch).toContain('correction target row does not exist');
+
+      // A lifecycle override whose target is absent WARNS and is RETAINED.
+      expect(code).toContain(`_warn_retained_lifecycle("${table}"`);
+      expect(code).toMatch(/field_group = 'lifecycle' AND [a-z_.]+ IS NULL/);
+
+      // The delta semantics are jsonb_exists, never COALESCE: an absent key
+      // leaves the source value and an explicit JSON null clears it, and
+      // COALESCE cannot tell those two apart (the migration-086 discipline).
+      expect(code).toContain('jsonb_exists');
+
+      // No fuzzy identity resolution anywhere, in any branch.
+      expect(code).not.toMatch(/ILIKE|similarity\(|soundex|levenshtein|display_name/i);
+
+      // The durable key is never a row id.
+      expect(code).not.toMatch(/override_values->>'(row_id|id|player_id|club_id|award_id)'/);
+    }
+  });
+
+  test('a correction never moves an identity-bearing column', () => {
+    // R-1, asserted as "this column is never an assignment target in the
+    // correction UPDATE". A correction that could rewrite who won an award is
+    // the single most damaging thing this issue could ship.
+    const forbidden: Record<string, string[]> = {
+      award_winners: ['award_id', 'season', 'player_id', 'player_name_raw',
+        'source_id', 'source_record_id'],
+      hall_of_fame: ['name', 'inducted_year', 'source_id'],
+      honour_team_members: ['team_name', 'player_id', 'source_id'],
+    };
+    for (const table of TABLES) {
+      const code = executablePython(replayBranch(pyCommon, table));
+      const correction = code.slice(code.indexOf("WHERE w.field_group = 'correction'") >= 0
+        ? code.indexOf('UPDATE ' + table + ' x\n                   SET votes')
+        : code.indexOf('UPDATE ' + table + ' x'));
+      void correction;
+      const updates = [...code.matchAll(
+        new RegExp(`UPDATE ${table} x\\n\\s+SET [\\s\\S]*?field_group = '(\\w+)'`, 'g'),
+      )];
+      const correctionUpdate = updates.find((m) => m[1] === 'correction');
+      expect(correctionUpdate, `${table} has no correction UPDATE`).toBeTruthy();
+      for (const column of forbidden[table]) {
+        expect(correctionUpdate![0]).not.toMatch(new RegExp(`\\n\\s+${column} = `));
+      }
+    }
+  });
+
+  test('import_awards.py replays IMMEDIATELY after every reload it owns (R-2)', () => {
+    // Batched at the end of the run, the replay would target rows a later group
+    // is about to overwrite. Seven award_winners groups, one Hall of Fame
+    // reload, one honour-team reload — every one of them, or a corrected row
+    // silently reverts on the next import.
+    expect(pyAwards).toContain('replay_admin_overrides,');
+    const calls = [...pyAwards.matchAll(/replay_admin_overrides\(pg, "(\w+)"\)/g)]
+      .map((m) => m[1]);
+    expect(calls.filter((t) => t === 'award_winners')).toHaveLength(7);
+    expect(calls.filter((t) => t === 'hall_of_fame')).toHaveLength(1);
+    expect(calls.filter((t) => t === 'honour_team_members')).toHaveLength(1);
+
+    // Each call sits between its own reload and that reload's commit, so the
+    // two land as one transaction — and before the next reload starts, which is
+    // R-2 exactly: batched at the end, the replay would target rows a later
+    // group is about to overwrite.
+    const code = executablePython(pyAwards);
+    for (const match of code.matchAll(/replay_admin_overrides\(pg, "\w+"\)/g)) {
+      const after = code.slice(match.index! + match[0].length);
+      const commit = after.indexOf('pg.commit()');
+      const nextReload = after.indexOf('reload_keyed(');
+      expect(commit, 'a replay call with no following commit').toBeGreaterThanOrEqual(0);
+      if (nextReload >= 0) expect(commit).toBeLessThan(nextReload);
+    }
+
+    // And no broad handler swallows the refusal: main() catches exactly the two
+    // named reload exceptions, neither of which the replay raises.
+    expect(code).toContain('except (LinkDecisionLoss, ReloadOwnershipCollision) as loss:');
+    expect(code).not.toMatch(/except Exception[\s\S]{0,200}replay_admin_overrides/);
+  });
+
+  test('D-11: every award span the importer derives counts ACTIVE rows only', () => {
+    const spans = [...pyAwards.matchAll(/(?:min|max)\(season\) FROM award_winners/g)];
+    expect(spans.length).toBeGreaterThan(0);
+    for (const span of spans) {
+      // The predicate follows within the same statement, which the source wraps
+      // across two adjacent string literals.
+      expect(pyAwards.slice(span.index!, span.index! + 160)).toContain("status = 'active'");
+    }
+    // The writer recomputes the same two values from the same predicate inside
+    // its own transaction, so the two can never disagree.
+    expect(functionBody(writer, 'recomputeAwardSpan')).toContain("status = 'active'");
+  });
+
+  test('D-12: the legacy ingest writer refuses to overwrite an active override', () => {
+    const datasets = readSource('src/lib/ingest/datasets.ts');
+    const promote = datasets.slice(
+      datasets.indexOf('const allAustralian: DatasetSpec'),
+      datasets.indexOf('// --- Dataset: Match results ---'),
+    );
+    expect(promote).toContain("o.entity_type = 'award_winners'");
+    expect(promote).toContain("o.field_group IN ('lifecycle', 'correction')");
+    expect(promote).toContain("o.entity_key = s.key || ':' || ${recordId}");
+    // The refusal comes BEFORE the upsert, or it refuses nothing.
+    expect(promote.indexOf('if (held)'))
+      .toBeLessThan(promote.indexOf('INSERT INTO award_winners'));
+    // And it is NOT a second replay: this writer learns no override semantics.
+    // Asserted on the CODE, because the refusal's own comment explains at
+    // length why a replay here would be the wrong answer.
+    const promoteCode = executableTypeScript(promote);
+    expect(promoteCode).not.toContain('jsonb_exists');
+    expect(promoteCode).not.toContain('replay');
+  });
+
+  test('D-10: a voided row leaves the admin player-link and candidate queues', () => {
+    for (const rel of [
+      'src/db/queries/player-links.ts', 'src/db/queries/player-match-candidates.ts',
+    ]) {
+      const source = readSource(rel);
+      for (const alias of ['w', 'h', 'm']) {
+        expect(source, `${rel} does not exclude voided ${alias} rows`)
+          .toContain(`${alias}.status <> 'void'`);
+      }
+    }
+  });
+
+  test('the durable keys the writer mints are the ones the replay decodes', () => {
+    // entity_key shapes, asserted on BOTH sides so a change to one fails here
+    // rather than silently orphaning every existing durable record.
+    expect(writer).toContain('return `${sourceKey}:${sourceRecordId}`;');
+    expect(writer).toContain('return `${sourceKey}:${name}|${inductedYear ?? \'\'}`;');
+    expect(writer).toContain('return `${sourceKey}:${teamName}|${playerIdentity}`;');
+    expect(writer).toContain("return identity ?? `name:${playerNameRaw}`;");
+
+    const awards = executablePython(replayBranch(pyCommon, 'award_winners'));
+    expect(awards).toContain("substring(o.entity_key from position(':' in o.entity_key) + 1)");
+    expect(awards).toContain('w.source_record_id = d.record_id');
+
+    // hall_of_fame splits on the LAST '|' (a year never contains one);
+    // honour_team_members on the FIRST (a team name never contains one, and the
+    // writer refuses one that does).
+    const hof = executablePython(replayBranch(pyCommon, 'hall_of_fame'));
+    expect(hof).toContain("position('|' in reverse(r.natural_key))");
+    const honour = executablePython(replayBranch(pyCommon, 'honour_team_members'));
+    expect(honour).toContain("left(r.natural_key, position('|' in r.natural_key) - 1)");
+    expect(writer).toContain('function carriesKeySeparator');
+  });
+
+  test('a Hall of Fame name is never replaced by a linked player display name', () => {
+    // Found by the first DB-backed run. `hall_of_fame.name` is IDENTITY —
+    // migration 042 keys the table on (name, inducted_year) and migration 101's
+    // durable key is '<source key>:<name>|<inducted_year>' — so deriving it from
+    // `players.display_name`, as the legacy `awards-admin.ts` creator does,
+    // files the induction under a different key from the one the administrator
+    // asked for, and makes a same-name/same-year replacement impossible.
+    const body = functionBody(writer, 'insertHallOfFame');
+    expect(body).toContain('if (!name) name = p.displayName;');
+    expect(body).not.toMatch(/\n\s+name = p\.displayName;/);
+    // The name reaching the key and the row is the SUPPLIED one.
+    expect(body).toContain('const entityKey = hallOfFameEntityKey(MANUAL_SOURCE_KEY, name,');
+
+    // The other two tables deliberately keep the legacy behaviour, because on
+    // them the display name is a fact beside a separate identity rather than
+    // the identity itself. Asserted so the asymmetry is a decision on the
+    // record and not an oversight.
+    for (const fn of ['insertAwardWinner', 'insertHonourTeamMember']) {
+      expect(functionBody(writer, fn), fn).toContain('playerName = p.displayName;');
+    }
+  });
+
+  test('B-1: a row with no durable key is refused, never silently unreplayable', () => {
+    // Measured 0 of 3,712 on afldb_test (2026-09-13), so this is defensive — but
+    // a row that cannot be NAMED in data_overrides cannot have its correction or
+    // void survive a rebuild, and recording one would be a decision AFLDB
+    // quietly loses.
+    expect(writer).toContain("'no_durable_key'");
+    expect(functionBody(writer, 'lockAwardWinner')).toContain(
+      'row.sourceId === null || row.sourceKey === null || !row.sourceRecordId',
+    );
+  });
+
+  test('every mutation writes its audit row in the SAME transaction (ISSUE-027)', () => {
+    const code = executableTypeScript(writer);
+    // recordDataEdit is reachable from every write path, and never from outside
+    // a transaction callback: the only connection this module opens is the
+    // import-role one, and every mutation runs inside importSql.begin().
+    expect([...code.matchAll(/recordDataEdit\(/g)].length).toBeGreaterThanOrEqual(6);
+    expect(code).not.toContain('revalidatePath(');
+    // R-7: paths are RETURNED for the caller to POST, never revalidated here.
+    expect(code).toContain('revalidatePaths');
+  });
+});

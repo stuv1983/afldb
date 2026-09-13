@@ -275,7 +275,10 @@ export async function fetchSourceEvidence(
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
+       -- AFLDB-ISSUE-165 D-10: a voided row is retracted, so it raises no
+       -- link candidates and appears in no review queue.
        WHERE w.link_status_value::text = ANY(${statuses})
+         AND w.status <> 'void'
       UNION ALL
       SELECT 'award_nominations', n.id, 'award_nominations', n.id, n.player_name_raw,
              afldb_normalise_name(n.player_name_raw),
@@ -301,6 +304,7 @@ export async function fetchSourceEvidence(
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statuses})
+         AND h.status <> 'void'
          AND ap.slug IS NULL
          AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
@@ -312,6 +316,7 @@ export async function fetchSourceEvidence(
              m.link_status_value::text, m.team_name, m.player_id
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statuses})
+         AND m.status <> 'void'
       UNION ALL
       SELECT 'captaincies', cp.id, 'captaincies', cp.id, cp.player_name_raw,
              afldb_normalise_name(cp.player_name_raw),
@@ -496,6 +501,7 @@ export async function fetchCandidateEvidence(
         FROM honour_team_members
        WHERE player_id = ANY(${playerIds})
          AND team_name = ANY(${teamNames})
+         AND status <> 'void'
          AND NOT (id = ANY(${assessedIds}))
     `;
     for (const row of taken) occupiedTeamSlots.add(`${row.teamName}|${row.playerId}`);

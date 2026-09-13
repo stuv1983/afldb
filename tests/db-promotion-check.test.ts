@@ -1066,9 +1066,12 @@ describe('lineage-safe reinstatement', () => {
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
       .toEqual([
+        'award_winners:award_winner_key',
         'club_leadership:appointment_key',
         'coaches:afltables_coach_path', 'draft_picks:draft_pick_key',
         'fixtures:fixture_key',
+        'hall_of_fame:hall_of_fame_key',
+        'honour_team_members:honour_team_key',
         'matches:match_key', 'players:afltables_profile_url',
       ]);
     // AFLDB-ISSUE-160 D-3. 'draft_picks' had been admitted by
@@ -1121,8 +1124,42 @@ describe('lineage-safe reinstatement', () => {
     });
     expect(leadershipTarget.ref.column).toBe('row_id');
     expect(leadershipTarget.ref.kindColumn).toBe('table_name');
+    // AFLDB-ISSUE-165 §8. Migration 058 admitted all three honours tables into
+    // data_edits.table_name and for seven migrations NONE of them had a lineage
+    // target — the AFLDB-ISSUE-160 D-3 defect again, and with a wider blast
+    // radius, because /admin/data-editor has been creating rows in all three
+    // since AFLDB-ISSUE-080. All three are import-writable tables that a
+    // promotion rebuilds, so an honours audit row was reinstated with its
+    // integer row_id unchanged and would name a different award, inductee or
+    // selection after a lineage change.
+    for (const [kind, identity] of [
+      ['award_winners', 'award_winner_key'],
+      ['hall_of_fame', 'hall_of_fame_key'],
+      ['honour_team_members', 'honour_team_key'],
+    ] as const) {
+      const target = edits.find((x) => x.target.kind === kind)!;
+      expect(target.target).toMatchObject({ kind, entity: kind, identity });
+      expect(target.ref.column).toBe('row_id');
+      expect(target.ref.kindColumn).toBe('table_name');
+    }
+    // award_nominations and captaincies are deliberately NOT here: neither is
+    // admitted by data_edits_table_name_check, so neither needs a target, and
+    // adding one would assert an audit path that does not exist.
+    expect(edits.some((x) => x.target.kind === 'award_nominations')).toBe(false);
+    expect(edits.some((x) => x.target.kind === 'captaincies')).toBe(false);
     expect(edits.some((x) => x.target.kind === 'season_list_members')).toBe(false);
     expect(edits.every((x) => x.target.identity !== 'none')).toBe(true);
+    // The three new identity rules must be executable, not merely declared: a
+    // target naming a rule with no SQL would pass the shape check above and
+    // then fail at remap time, on the night of a promotion.
+    for (const rule of ['award_winner_key', 'hall_of_fame_key', 'honour_team_key'] as const) {
+      expect(LINEAGE_IDENTITY_SQL[rule].byId).toContain('$1::bigint[]');
+      expect(LINEAGE_IDENTITY_SQL[rule].byIdentity).toContain('$1::text[]');
+      // Never a name match. An honours row that cannot be identified is
+      // reported unresolved; it is never attached to the closest display name,
+      // which is the AFLDB-ISSUE-025 defect migration 059 exists to prevent.
+      expect(LINEAGE_IDENTITY_SQL[rule].byId).not.toMatch(/ILIKE|display_name|similarity/i);
+    }
     const gridSource = contractByName('external_grid_sources')!;
     const gridTarget = stableLineageTargetForFootballRef(gridSource, 'ingest_source_id', 'sources');
     expect(gridTarget).toMatchObject({ entity: 'sources', identity: 'source_key' });
@@ -1153,6 +1190,77 @@ describe('lineage-safe reinstatement', () => {
     for (const { ref } of [...resolutions, ...edits, ...gridRefs, ...brownlowRefs]) {
       expect(ref.remediation.length, ref.column).toBeGreaterThan(80);
     }
+  });
+
+  /**
+   * THE STANDING CONTRACT (AFLDB-ISSUE-165 §8).
+   *
+   * Admitting a table into `data_edits_table_name_check` creates audit rows
+   * whose `row_id` is an integer in THAT table — and says nothing about whether
+   * the integer still names the same row after a promotion. Four times now the
+   * two have been allowed to come apart silently: `draft_picks` (migration 057,
+   * found by AFLDB-ISSUE-160 D-3) and `award_winners`, `hall_of_fame` and
+   * `honour_team_members` (migration 058, found here). Each time the audit rows
+   * were reinstated with their old integers, counted by nothing, and named a
+   * different row on the other side.
+   *
+   * So the allowlist is read from the migrations and compared against the
+   * declared targets, and a table may be absent from the targets ONLY by
+   * appearing in the exemption register below with a reason. Adding a table to
+   * the CHECK now forces the decision at review time rather than on the night
+   * of a promotion.
+   */
+  it('gives every admitted data_edits.table_name a lineage target or a recorded exemption', () => {
+    // The LAST definition wins: every widening restates the whole list.
+    let admitted: string[] = [];
+    for (const file of migrationFiles()) {
+      const sql = readFileSync(join(MIGRATIONS, file), 'utf8');
+      for (const m of sql.matchAll(
+        /data_edits_table_name_check CHECK \(table_name IN \(([\s\S]*?)\)\)/g,
+      )) {
+        admitted = [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+      }
+    }
+    expect(admitted.length).toBeGreaterThan(0);
+    expect(admitted).toContain('award_winners');
+
+    /**
+     * Admitted names that legitimately need NO lineage target, each with the
+     * reason. An entry here is a decision on the record, not a way to make the
+     * check pass.
+     */
+    const EXEMPT: Record<string, string> = {
+      // The audit subject is a SEASON YEAR, not a surrogate id: seasons.year is
+      // a permanent natural identity that no rebuild and no promotion
+      // renumbers, so there is nothing to remap.
+      brownlow_season_authority:
+        'row_id is a season year — a permanent natural identity, never renumbered',
+      // RECORDED GAP, not a clean exemption. brownlow_vote_entry_state's
+      // primary key IS match_id (migration 094), so a row_id here is a match id
+      // and a lineage change DOES renumber it. The table's own lineageRefs
+      // remap its columns; its data_edits rows are not covered. Raised by
+      // AFLDB-ISSUE-165's preflight and belongs to the Brownlow admin domain
+      // (AFLDB-ISSUE-155), not to this issue — recorded here so it cannot be
+      // forgotten or silently inherited.
+      brownlow_vote_entry_state:
+        'RECORDED GAP (AFLDB-ISSUE-165 preflight): row_id is a match id and IS renumbered by a '
+        + 'lineage change; needs a matches/match_key target, owned by the Brownlow admin domain',
+    };
+
+    const targeted = new Set(
+      lineageTargetsOf(contractByName('data_edits')!).map((x) => x.target.kind),
+    );
+    for (const table of admitted) {
+      if (targeted.has(table)) continue;
+      expect(
+        Object.keys(EXEMPT),
+        `data_edits admits '${table}' with no lineage target and no recorded exemption`,
+      ).toContain(table);
+      expect(EXEMPT[table].length).toBeGreaterThan(40);
+    }
+    // And nothing is targeted that the CHECK does not admit: a target for an
+    // unadmitted table describes an audit path that cannot exist.
+    for (const table of targeted) expect(admitted).toContain(table);
   });
 
   it('identifies rows by a stable external key only — never by a name', () => {
