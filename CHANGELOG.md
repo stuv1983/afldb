@@ -15,6 +15,32 @@ commit.
 
 ## [Unreleased]
 
+### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
+
+- Refusing to show someone an admin page they may not see is supposed to be an HTTP redirect. For
+  every page under `/admin` it had quietly become something weaker: the response went out as
+  `200 OK` carrying a hidden `<meta http-equiv="refresh">` tag, and the browser acted on that tag a
+  second later. To a person clicking around, the refusal looked correct — they were moved off the
+  page as expected. To anything that is not a browser — a script, a crawler, an uptime monitor — it
+  looked like the request had **succeeded**, because nothing but a browser obeys a meta-refresh.
+- **No unauthorised person could read anything they were not entitled to, and nothing could be
+  changed.** The permission check ran, and ran before any protected data was fetched, so a refused
+  request returned an empty page frame showing only "Loading…" — no data, no form, no table. Saving
+  or changing data was never affected, and neither were the API-style routes. What was wrong was
+  the *signal*, not the boundary: the refusal was real but was being announced in a way only a
+  browser understood.
+- The cause was a single shared file, `src/app/admin/loading.tsx`, which provided the brief
+  "Loading…" placeholder for the whole admin area. Because it appeared before the page's permission
+  check had finished, the response had already begun — and once a response has begun, its status can
+  no longer be changed to a redirect. Removing it restores a proper redirect for every admin page at
+  once.
+- The placeholder was there for a reason — clicking an admin menu item used to give no feedback at
+  all until the next page was ready — so that feedback has moved to the menu link itself, which now
+  shows a small pending indicator while the page is being fetched. It appears on the exact link that
+  was clicked rather than blanking the whole page.
+- A regression test now fails the build if anything reintroduces a loading placeholder above the
+  admin permission checks, so this cannot come back quietly.
+
 ### Awards, Hall of Fame and honour teams gain a correction, voiding and replacement lifecycle (AFLDB-ISSUE-165, ISSUE-156 P5) - 13 September 2026
 
 - Until now an award winner, a Hall of Fame induction and an honour-team selection could only be

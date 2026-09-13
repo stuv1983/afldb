@@ -1525,3 +1525,36 @@ change of any kind — this pass is source-only, for operator review. Stage 8 is
 `AFLDB-ISSUE-165` is **not** Resolved. Once the operator commits, pushes and redeploys, **Stage 8
 must restart from 8.1** exactly as §20.2 says, now including a check that the three cards render
 correctly (not just that they're visible) at both 1440×900 and 375×812.
+
+### 20.4 Cross-reference — `AFLDB-ISSUE-166`, found here, owned elsewhere
+
+Stage 8's role-matrix testing produced a second finding, separate from §20.1's CSS defect, which
+was opened as **`AFLDB-ISSUE-166` — Streamed admin denials return HTTP 200 + meta-refresh instead
+of an HTTP redirect**. It is recorded here only so this runbook's account of Stage 8 is complete;
+the authoritative record is the `AFLDB-ISSUE-166` entry in `issues.md`, and no part of ISSUE-166
+is ISSUE-165's work.
+
+**It is not caused by ISSUE-165 and is not ISSUE-165's to fix.** The cause is
+`src/app/admin/loading.tsx`, added 2026-08-19, which put a Suspense boundary above every guarded
+admin page so that the 200 shell committed before any page-level `redirect()` could run; Next 16
+then encoded the redirect as a `__next-page-redirect` meta-refresh inside the already-committed
+200 response. It reproduced identically on admin routes that predate this issue entirely.
+ISSUE-165's own `/admin/awards/winners/new` was simply one of the 46 routes sitting under that
+shared boundary.
+
+**The initial triage of ISSUE-166 was wrong and is withdrawn.** It was opened at High severity as
+an authorization bypass leaking privileged content, including a claim that `/admin/admins` exposed
+other administrators' session IP and device data. Investigation disproved all of it:
+`requireCapability()` was never bypassed, no privileged page body or query ever reached a denied
+request, `people.admins.read` is `ADMIN_AND_UP` by design with session rows scoped to the viewer's
+own unless `super_admin`, and no cache artifact was involved. Settled classification: **Low
+severity, an HTTP denial-signalling defect — not an authorization bypass, not information
+disclosure, not a mutation bypass.** Anyone reading the original Stage 8 notes should treat the
+ISSUE-166 claims there as superseded.
+
+**Consequence for ISSUE-165's Stage 8 restart:** none. The awards capability boundaries
+(`data.awards.read` Admin-and-up, `data.awards.edit` Super-Admin-only) were never in question and
+were independently confirmed correct during the ISSUE-166 investigation — the awards Server
+Actions guard first, like every other admin action. Stage 8 still restarts from 8.1 for the
+reasons §20.2 and §20.3 give, and the role-boundary gate should simply be re-run normally once
+both fixes are deployed.

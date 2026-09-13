@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -33,6 +33,36 @@ import {
  */
 
 const STORAGE_KEY = 'afldb.admin.nav';
+
+/**
+ * Pending feedback for the link that was actually clicked.
+ *
+ * This is what replaced src/app/admin/loading.tsx, and the replacement was
+ * forced rather than chosen (AFLDB-ISSUE-166). A route-level loading file is
+ * a Suspense boundary, and React commits the shell -- HTTP status line and
+ * all -- as soon as its fallback is ready, which is BEFORE the page component
+ * and therefore before the page's requireCapability() has run. Next can then
+ * no longer express the guard's redirect() as a 307, and degrades it to a
+ * <meta http-equiv="refresh"> inside a 200 OK body. Browsers obeyed that a
+ * second later; fetch(), curl, crawlers and monitors obeyed nothing and
+ * recorded a denied admin route as a success.
+ *
+ * useLinkStatus is Next's own answer for precisely the case that boundary
+ * covered -- a dynamic destination with no loading.js -- and it runs on the
+ * client, so it opens no server boundary above the guards. The feedback also
+ * lands on the link the reader pressed rather than blanking the whole page,
+ * which is the better answer to the 2026-08-19 report that started this
+ * ("I clicked it and nothing happened").
+ *
+ * Must be a child of the <Link> it reports on: the hook reads the pending
+ * state from the Link above it, and returns `false` anywhere else.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  // role="status" so the wait is announced, not only drawn.
+  return <span className="admin-nav-pending" role="status" aria-label="Loading" />;
+}
 
 export function AdminNav({
   groups,
@@ -110,6 +140,7 @@ export function AdminNav({
                     aria-current={isCurrentAdminPath(pathname, link) ? 'page' : undefined}
                   >
                     {link.label}
+                    <NavPending />
                   </Link>
                 </li>
               ))}

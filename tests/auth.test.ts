@@ -1257,3 +1257,76 @@ describe('requireCapability against the real guard (AFLDB-ISSUE-158)', () => {
     await expect(requireCapability('people.admins.manage')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
   });
 });
+
+/**
+ * ---------------------------------------------------------------------------
+ * Denial must reach the HTTP layer (AFLDB-ISSUE-166).
+ *
+ * Every guard above denies with `redirect()`, and Next can only turn that
+ * into a 307 + Location while the response status is still unsent. A
+ * route-level `loading.tsx` is a Suspense boundary: React commits the shell
+ * -- status line included -- as soon as the fallback is available, which is
+ * BEFORE the page component, and therefore before its guard, has run. The
+ * redirect then arrives too late to be a status code, and Next degrades it
+ * to `<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=…">`
+ * inside a 200 OK body (next/dist/server/app-render/make-get-server-inserted-html.js).
+ *
+ * A browser obeys that tag, so navigation still denies -- one second later.
+ * `fetch()`, curl, a crawler or a monitor obeys nothing and records a denied
+ * admin route as a success. Measured on DEV build 77c03e9: a plain admin
+ * GETting /admin/settings received 200 with `.admin-main` = "Loading…".
+ *
+ * No data escaped, and the contract above is why: every boundary guards
+ * before it awaits anything else, so the denial path issues no privileged
+ * query. That makes this a denial-signalling defect rather than a bypass --
+ * but it also removes the framework's status-code safety net, leaving that
+ * hand-kept ordering as the only thing between a denial and a disclosure.
+ *
+ * So the rule is structural: nothing may open a Suspense boundary above an
+ * admin guard. Keep pending UI below the guard (an explicit <Suspense>
+ * inside a page, after its guard) or on the client (`useLinkStatus`).
+ * ---------------------------------------------------------------------------
+ */
+describe('denial reaches the HTTP layer (AFLDB-ISSUE-166)', () => {
+  it('opens no route-level loading boundary at or above any guarded admin page', () => {
+    const boundaries = walk(ADMIN_ROOT)
+      .filter((file) => basename(file) === 'loading.tsx')
+      .map(repoPath);
+    expect(
+      boundaries,
+      'a loading.tsx under src/app/admin commits the 200 shell before the page guard runs, '
+      + 'so every redirect() denial beneath it degrades to a meta-refresh inside a 200 body. '
+      + 'Put the pending UI below the guard (<Suspense> inside the page) or on the client.',
+    ).toEqual([]);
+
+    // The same boundary one segment up would cover /admin just as well.
+    const ancestors = readdirSync(join(REPO, 'src', 'app'), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name === 'loading.tsx')
+      .map((entry) => `src/app/${entry.name}`);
+    expect(ancestors, 'src/app/loading.tsx sits above /admin and has the same effect').toEqual([]);
+  });
+
+  it('wraps no admin layout\'s children in a Suspense boundary', () => {
+    // Deleting loading.tsx and re-adding the identical boundary by hand in
+    // the layout would restore the defect without restoring the filename.
+    const layouts = walk(ADMIN_ROOT).filter((file) => basename(file) === 'layout.tsx');
+    expect(layouts.length, 'the admin layout that draws the chrome').toBeGreaterThanOrEqual(1);
+    for (const file of layouts) {
+      const source = readSource(file);
+      expect(
+        /<(?:React\.)?Suspense[\s>]/.test(source),
+        `${repoPath(file)} opens a Suspense boundary around the page tree; `
+        + 'that is the loading.tsx defect under another name',
+      ).toBe(false);
+    }
+  });
+
+  it('still expects the guards themselves to deny by redirect, which only 307s from the shell', () => {
+    // If a guard ever stops redirecting, the rule above stops being the
+    // thing that matters and this suite should be revisited rather than
+    // quietly kept.
+    const session = readSource(join(REPO, 'src', 'lib', 'auth', 'session.ts'));
+    expect(session).toContain("redirect('/admin/login')");
+    expect(session).toMatch(/requireCapability[\s\S]*?redirect\(admin\.role === 'contributor' \? '\/admin\/upload' : '\/admin'\)/);
+  });
+});
