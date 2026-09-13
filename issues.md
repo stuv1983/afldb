@@ -7,7 +7,29 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 7 tracked here — `-139`, `-140`, `-144`, `-148`, `-152`, `-155`, `-156`.
+**Open issues:** 6 tracked here — `-139`, `-140`, `-144`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-148 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): closeout only. The coaching and premierships club-page sections
+     (`getClubCoachRecords` / `ClubCoachRecords`, `getClubPremierships` / `ClubPremierships`, wired
+     into `src/app/clubs/[slug]/page.tsx`) were already merged into `main` as `d7a08a9` and
+     deployed on DEV. Coaching validation was already operator-run and green:
+     `tests/integration/club-coach-records.test.ts` 9/9 + `tests/club-coach-records.test.ts` 8/8 =
+     17/17 PASS. This issue's two dedicated premiership suites
+     (`tests/integration/club-premierships.test.ts`, `tests/club-premierships.test.ts`) were never
+     separately operator-run and remain unrun — **this closure does not claim they were.**
+     **Operator decision:** later evidence is accepted as stronger/current closure evidence in
+     their place: (1) `AFLDB-ISSUE-149`'s combined five-suite integration run
+     (`club-match-records`, `club-crowd-records`, `club-players`, `club-premiership-players`,
+     `club-honours`) — 32/32 PASS, 2026-09-07 — includes
+     `tests/integration/club-premiership-players.test.ts`, which cross-checks the premiership-year
+     set against both `club_seasons.is_premier` and this issue's own `getClubPremierships`, failing
+     on disagreement — the same premiership data relationship this issue relies on; and (2)
+     `AFLDB-ISSUE-149`'s final DEV browser acceptance gate (operator, 2026-09-13) across Richmond,
+     Footscray/Western Bulldogs and Gold Coast, which explicitly confirmed this issue's existing
+     premiership/coaches sections remain intact and render correctly after the later club-page
+     expansion. No remaining ISSUE-148 gate. See `issues.md` Resolution (2026-09-13). Removed from
+     the Open Issues table and `IssuesIndex.md`; 7 -> 6. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-151 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY, NO
      DATABASE MUTATION THIS SESSION): closeout on operator decision. Implementation (generic staged
@@ -20272,12 +20294,13 @@ unaddressed, not blocking, and are not re-opened as a new issue.
 
 ## AFLDB-ISSUE-148 — Show club-specific coaching records (and premierships) on club pages
 
-- **Status:** **OPEN — coaching section IMPLEMENTATION COMPLETE and operator-validated; a second
-  Premierships section added 2026-09-07 (same issue, operator request), implemented and unit/tsc
-  self-checked, its integration suite written but NOT yet operator-run. MERGED into `main` as
-  `d7a08a9` and deployed on DEV; it stays Open on the two premierships suites and the DEV browser
-  smoke.** Branch `fable/issue-148-coach-club-records` (worktree
-  `D:\dev\afldb-issue-148-coach-club-records`) is an ancestor of `main`. Not Resolved.
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+  As it stood earlier (retained): **OPEN — coaching section IMPLEMENTATION COMPLETE and
+  operator-validated; a second Premierships section added 2026-09-07 (same issue, operator
+  request), implemented and unit/tsc self-checked, its integration suite written but NOT yet
+  operator-run. MERGED into `main` as `d7a08a9` and deployed on DEV; it stays Open on the two
+  premierships suites and the DEV browser smoke.** Branch `fable/issue-148-coach-club-records`
+  (worktree `D:\dev\afldb-issue-148-coach-club-records`) is an ancestor of `main`.
 - **Severity / Area:** Low / Public UI — club pages; database queries.
 - **Reported:** 2026-09-07 (operator request — every public AFL club page should list the coaches
   who have coached that club, with each coach's record while coaching that club; and, added the
@@ -20445,6 +20468,39 @@ tests/integration/club-coach-records.test.ts` and `npx tsc --noEmit` are enough.
   exist (AFLDB-ISSUE-118 §W.4); the coach links reuse them unchanged. The Premierships section
   reuses `clubPath` / `venuePath` / `formatDate` / `formatAttendance` and the canonical
   `round_type = 'grand_final'` predicate — no new helper or definition.
+
+### Resolution (2026-09-13)
+
+**Status:** Resolved. Closed on operator decision that later evidence supersedes separately
+re-running this issue's two dedicated premiership suites as a formality.
+
+- **Implementation:** unchanged this session — already merged into `main` as `d7a08a9` and
+  deployed on DEV; no further code, migration or deployment.
+- **Coaching section:** historical validation stands — `tests/integration/club-coach-
+  records.test.ts` 9/9 PASS + `tests/club-coach-records.test.ts` 8/8 PASS = **17/17 PASS**.
+- **Premierships section — the two dedicated suites were never separately operator-run:**
+  `tests/integration/club-premierships.test.ts` and `tests/club-premierships.test.ts` remain
+  written but **NOT run by the operator**. This closure does not claim otherwise.
+- **Superseding evidence (operator-accepted):**
+  1. `AFLDB-ISSUE-149`'s combined integration run across five suites (`club-match-records`,
+     `club-crowd-records`, `club-players`, `club-premiership-players`, `club-honours`) —
+     **32/32 PASS**, 2026-09-07 (the 32 is the combined total for all five suites, not this file
+     alone). `tests/integration/club-premiership-players.test.ts` within that run independently
+     cross-checks the premiership-season set against both `club_seasons.is_premier` and this
+     issue's own `getClubPremierships`, failing on disagreement — the same premiership data
+     relationship this issue introduced.
+  2. `AFLDB-ISSUE-149`'s final DEV Playwright browser acceptance gate (operator, 2026-09-13) across
+     Richmond, Footscray/Western Bulldogs and Gold Coast: Richmond explicitly confirmed "the
+     existing premiership/coaches sections (AFLDB-ISSUE-148) remain intact"; Footscray/Western
+     Bulldogs confirmed existing sections intact through the rename/lineage carry-through; Gold
+     Coast confirmed applicable sections render normally with no broken empty UI.
+- **Root cause of the Open status:** not a defect — historical validation bookkeeping only (two
+  written suites never separately operator-run), not a missing or broken implementation.
+- **Operator decision:** the later ISSUE-149 integration and DEV browser evidence is accepted as
+  sufficient closure evidence in place of separately re-running
+  `tests/integration/club-premierships.test.ts` and `tests/club-premierships.test.ts`. No
+  remaining ISSUE-148 gate.
+- **Follow-up:** none beyond what is already recorded above under *Follow-up*.
 
 ---
 
