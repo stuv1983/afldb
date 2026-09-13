@@ -22,6 +22,16 @@ import type { FilterValues } from '@/search/table-filters';
  * A **club is named as it was at the time.** Winner rows carry the club
  * identity of their own season, so a 1980 Charles Sutton Medal reads
  * Footscray even though the source said Western Bulldogs.
+ *
+ * A **voided record is not a football fact.** Since AFLDB-ISSUE-165 every
+ * scan of `award_winners`, `hall_of_fame` and `honour_team_members` here
+ * carries `status = 'active'`. `void` means an administrator decided the
+ * record should never have existed (a duplicate, a wrong season, the wrong
+ * person); the row survives so its audit trail and its `data_overrides`
+ * decision survive with it, but the public site must not repeat the
+ * assertion. `hall_of_fame.removed_year` is NOT this: an inductee formally
+ * removed from the Hall of Fame is a true historical event, the row stays
+ * `active`, and it keeps rendering with its "Removed in …" semantics.
  */
 
 export type AwardSummary = {
@@ -44,9 +54,11 @@ const AWARD_SUMMARY_COLUMNS = sql`
   a.id, a.slug, a.name, a.category, a.competition, a.description,
   a.first_season AS "firstSeason", a.last_season AS "lastSeason",
   a.club_id AS "clubId", c.name AS "clubName", c.slug AS "clubSlug",
-  (SELECT count(*) FROM award_winners w WHERE w.award_id = a.id)::int
+  (SELECT count(*) FROM award_winners w
+    WHERE w.award_id = a.id AND w.status = 'active')::int
     AS "winnerCount",
-  (SELECT count(DISTINCT w.season) FROM award_winners w WHERE w.award_id = a.id)::int
+  (SELECT count(DISTINCT w.season) FROM award_winners w
+    WHERE w.award_id = a.id AND w.status = 'active')::int
     AS "seasonCount"
 `;
 
@@ -119,7 +131,7 @@ export async function getAwardWinners(awardId: number): Promise<AwardWinnerRow[]
       FROM award_winners w
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
-     WHERE w.award_id = ${awardId}
+     WHERE w.award_id = ${awardId} AND w.status = 'active'
      ORDER BY w.season DESC NULLS LAST, w.position NULLS LAST, "playerName"
   `;
 }
@@ -134,7 +146,7 @@ export async function getAwardSeason(
       FROM award_winners w
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
-     WHERE w.award_id = ${awardId} AND w.season = ${season}
+     WHERE w.award_id = ${awardId} AND w.season = ${season} AND w.status = 'active'
      ORDER BY w.sort_order NULLS LAST,
               w.is_captain DESC, w.position NULLS LAST, "playerName"
   `;
@@ -143,7 +155,7 @@ export async function getAwardSeason(
 export async function getAwardSeasons(awardId: number): Promise<number[]> {
   const rows = await sql<{ season: number }[]>`
     SELECT DISTINCT season FROM award_winners
-     WHERE award_id = ${awardId} AND season IS NOT NULL
+     WHERE award_id = ${awardId} AND season IS NOT NULL AND status = 'active'
      ORDER BY season DESC
   `;
   return rows.map((r) => r.season);
@@ -179,7 +191,7 @@ export async function getAwardLeaders(awardId: number, limit = 50) {
       LEFT JOIN players p
         ON p.id = w.player_id
        AND w.link_status_value IN ('unique','resolved')
-     WHERE w.award_id = ${awardId}
+     WHERE w.award_id = ${awardId} AND w.status = 'active'
      GROUP BY CASE WHEN p.id IS NOT NULL
                    THEN 'player:' || p.id
                    ELSE 'name:' || lower(w.player_name_raw) END
@@ -328,6 +340,9 @@ export async function listHallOfFame(
   const conditions = filters.ranges
     ? rangeConditions(filters.ranges, HALL_OF_FAME_FILTER_COLUMNS)
     : [];
+  // Never a caller's choice: a voided induction is not a Hall of Fame fact.
+  // A `removed_year` inductee is, and stays here.
+  conditions.push(sql`h.status = 'active'`);
   if (filters.q) conditions.push(sql`h.name ILIKE ${containsPattern(filters.q)}`);
   if (filters.category) conditions.push(sql`h.category = ${filters.category}`);
   const where = allOf(conditions);
@@ -373,7 +388,7 @@ export async function getHallOfFameInductees(year: number): Promise<HallOfFameRo
           FROM aflw.players
          ORDER BY lower(trim(display_name)), slug
       ) ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
-     WHERE h.inducted_year = ${year}
+     WHERE h.inducted_year = ${year} AND h.status = 'active'
      ORDER BY h.name
   `;
 }
@@ -381,7 +396,7 @@ export async function getHallOfFameInductees(year: number): Promise<HallOfFameRo
 export async function getHallOfFameCategories(): Promise<string[]> {
   const rows = await sql<{ category: string }[]>`
     SELECT DISTINCT category FROM hall_of_fame
-     WHERE category IS NOT NULL ORDER BY category
+     WHERE category IS NOT NULL AND status = 'active' ORDER BY category
   `;
   return rows.map((r) => r.category);
 }
@@ -406,6 +421,7 @@ export async function listHonourTeams() {
            count(*)::int AS members,
            count(*) FILTER (WHERE player_id IS NOT NULL)::int AS linked
       FROM honour_team_members
+     WHERE status = 'active'
      GROUP BY team_name
      ORDER BY team_name
   `;
@@ -421,7 +437,7 @@ export async function getHonourTeam(teamName: string): Promise<HonourTeamMemberR
            h.sort_order AS "sortOrder", h.note
       FROM honour_team_members h
       LEFT JOIN players p ON p.id = h.player_id
-     WHERE h.team_name = ${teamName}
+     WHERE h.team_name = ${teamName} AND h.status = 'active'
      ORDER BY h.sort_order, "playerName"
   `;
 }
@@ -441,6 +457,7 @@ export async function getPlayerHonours(playerId: number) {
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
        WHERE w.player_id = ${playerId}
+         AND w.status = 'active'
          AND w.link_status_value IN ('unique','resolved')
          -- All-Australian gets its own dedicated block below (with captaincy
          -- and squad detail a generic award row can't carry); the Brownlow
@@ -464,6 +481,7 @@ export async function getPlayerHonours(playerId: number) {
         JOIN awards a ON a.id = w.award_id
        WHERE w.player_id = ${playerId}
          AND a.slug = 'all-australian'
+         AND w.status = 'active'
          AND w.link_status_value IN ('unique','resolved')
        ORDER BY w.season
     `,
@@ -508,6 +526,7 @@ export async function getPlayerHonours(playerId: number) {
              legend_year AS "legendYear", category
         FROM hall_of_fame
        WHERE player_id = ${playerId}
+         AND status = 'active'
          AND link_status_value IN ('unique','resolved')
        LIMIT 1
     `,
@@ -515,6 +534,7 @@ export async function getPlayerHonours(playerId: number) {
       SELECT team_name AS "teamName", position
         FROM honour_team_members
        WHERE player_id = ${playerId}
+         AND status = 'active'
          AND link_status_value IN ('unique','resolved')
        ORDER BY team_name
     `,
@@ -578,7 +598,7 @@ export async function getClubAwards(clubId: number) {
            count(w.id)::int AS "winnerCount",
            min(w.season) AS "firstSeason", max(w.season) AS "lastSeason"
       FROM awards a
-      JOIN award_winners w ON w.award_id = a.id
+      JOIN award_winners w ON w.award_id = a.id AND w.status = 'active'
      WHERE a.club_id IN (
              SELECT id FROM clubs
               WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
@@ -607,6 +627,7 @@ export async function getClubBestAndFairest(clubId: number, limit = 20) {
       JOIN awards a ON a.id = w.award_id
       LEFT JOIN players p ON p.id = w.player_id
      WHERE a.category = 'club_best_and_fairest'
+       AND w.status = 'active'
        AND w.club_id IN (
              SELECT id FROM clubs
               WHERE organization_id = (SELECT organization_id FROM clubs WHERE id = ${clubId})
@@ -634,6 +655,7 @@ export async function getSeasonBestAndFairest(year: number) {
       LEFT JOIN players p ON p.id = w.player_id
       LEFT JOIN clubs c   ON c.id = w.club_id
      WHERE a.category = 'club_best_and_fairest' AND w.season = ${year}
+       AND w.status = 'active'
      ORDER BY c.name
   `;
 }
@@ -826,6 +848,7 @@ export async function getClubHonours(clubId: number): Promise<ClubHonourRow[]> {
       LEFT JOIN clubs c   ON c.id = w.club_id
      WHERE a.category = 'award'
        AND a.slug <> 'brownlow-medal'
+       AND w.status = 'active'
        AND w.club_id IN (${CLUB_LINEAGE_IDS(clubId)})
      ORDER BY w.season DESC NULLS LAST, a.name, "playerName"
   `;

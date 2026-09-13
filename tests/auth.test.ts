@@ -633,12 +633,13 @@ describe('adminNavFor', () => {
     // Operations appears from AFLDB-ISSUE-157 and holds exactly the audit
     // trail: every other Operations link is still super-admin-only. Fixtures
     // (AFLDB-ISSUE-162 §23: data.fixtures.read is ADMIN_AND_UP too) joins the
-    // same four.
+    // same four, and Awards & honours (AFLDB-ISSUE-165 §7: data.awards.read is
+    // ADMIN_AND_UP too) joins the same five.
     const groups = adminNavFor({ role: 'admin', canManageAdmins: false });
     expect(groups.map((g) => g.id)).toEqual([
       'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
-    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures']);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
   });
 
@@ -667,11 +668,20 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
   });
 
-  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures', () => {
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures, awards', () => {
     const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
     expect(data?.links.map((l) => l.href)).toEqual([
-      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures',
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards',
     ]);
+  });
+
+  it('shows Awards & honours to an admin and never to a contributor (AFLDB-ISSUE-165 §5.2)', () => {
+    // data.awards.read is ADMIN_AND_UP, the same capability /admin/awards
+    // enforces on arrival. An Admin browses; only a Super Admin can mutate,
+    // and that is enforced per action, not by hiding the link.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/awards');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/awards');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/awards');
   });
 
   it('groups current-season acquisition with legacy file intake', () => {
@@ -1134,6 +1144,11 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'data.seasonLists.edit': 'requireSuperAdmin',
   'data.fixtures.read': 'requireAdmin',
   'data.fixtures.edit': 'requireSuperAdmin',
+  // AFLDB-ISSUE-165 §7. The three creators this domain takes over from
+  // /admin/data-editor were data.dataEditor, itself requireSuperAdmin, so the
+  // edit half narrows the surface without widening the population.
+  'data.awards.read': 'requireAdmin',
+  'data.awards.edit': 'requireSuperAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',

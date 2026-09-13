@@ -418,9 +418,16 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
     key: 'player.hall_of_fame',
     subject: 'player',
     label: 'Hall of Fame',
-    hint: 'Hall of Fame entries linked to this player.',
+    hint: 'Hall of Fame entries linked to this player. Voided records are never returned.',
     subqueryFrom: 'hall_of_fame r_hof',
-    correlation: 'r_hof.player_id = p.id',
+    // AFLDB-ISSUE-165 §4.4. The correlation carries the lifecycle filter so
+    // it cannot be forgotten by a column: this tool is admin-facing, but it
+    // answers questions about the SAME canonical fact the public Hall of
+    // Fame page, the Grid Solver and NL search answer, and a QA tool that
+    // disagreed with them about who is in the Hall of Fame would be worse
+    // than useless. `removed_year` stays a plain correctable column below --
+    // a removed inductee was genuinely inducted and is genuinely here.
+    correlation: "r_hof.player_id = p.id AND r_hof.status = 'active'",
     targetTable: 'hall_of_fame',
     cardinality: 'many',
     columns: {
@@ -457,9 +464,10 @@ export const RELATIONSHIPS: Record<string, RelationshipDef> = {
     key: 'player.awards',
     subject: 'player',
     label: 'Awards',
-    hint: 'Award-winner records linked to this player.',
+    hint: 'Award-winner records linked to this player. Voided records are never returned.',
     subqueryFrom: 'award_winners r_aw JOIN awards r_a ON r_a.id = r_aw.award_id',
-    correlation: 'r_aw.player_id = p.id',
+    /** Same lifecycle rule, same reason as `player.hall_of_fame` above. */
+    correlation: "r_aw.player_id = p.id AND r_aw.status = 'active'",
     targetTable: 'award_winners',
     cardinality: 'many',
     columns: {

@@ -60,6 +60,7 @@ from common import (  # noqa: E402
     import_batch,
     load_env,
     reload_keyed,
+    replay_admin_overrides,
     report_reload,
     require_env,
     safe_dsn,
@@ -692,6 +693,12 @@ def import_awards(pg, lite, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
+    # AFLDB-ISSUE-165 §6.2 / R-2. IMMEDIATELY after this group's own reload and
+    # INSIDE its transaction, never batched at the end of the run: the replay's
+    # UPDATEs must land on the rows this reload just wrote, and a reload that
+    # committed without its replay would leave a corrected or voided row
+    # reverted to the source value for as long as the run took.
+    replay_admin_overrides(pg, "award_winners")
     pg.commit()
     report_reload(rep, "award_winners", winners)
 
@@ -781,6 +788,9 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", [draftguru_id, wikipedia_id], False)],
         allow_link_loss=allow_link_loss,
     )
+    # AFLDB-ISSUE-165 §6.2 / R-2, and BEFORE the span update below: a voided
+    # selection must not be able to set this award's first or last season.
+    replay_admin_overrides(pg, "award_winners")
     report_reload(rep, "all_australian", stats)
     players.report(rep, "all_australian")
 
@@ -788,8 +798,17 @@ def import_all_australian(pg, rep: Reporter, batch, clubs: ClubResolver,
         cur.execute(
             "UPDATE awards SET first_season = %s, last_season = %s WHERE id = %s",
             (
-                scalar(pg, "SELECT min(season) FROM award_winners WHERE award_id = %s", (award_id,)),
-                scalar(pg, "SELECT max(season) FROM award_winners WHERE award_id = %s", (award_id,)),
+                # AFLDB-ISSUE-165 D-11. ACTIVE rows only, on both halves. A
+                # voided row is one that never should have existed, so letting
+                # it set the span an award is presented over would publish the
+                # error this issue exists to retract. src/db/queries/admin-awards.ts
+                # recomputes the same two values from the same predicate inside
+                # every void, reinstate and replace transaction, so the importer
+                # and the administrator can never disagree about the span.
+                scalar(pg, "SELECT min(season) FROM award_winners "
+                           "WHERE award_id = %s AND status = 'active'", (award_id,)),
+                scalar(pg, "SELECT max(season) FROM award_winners "
+                           "WHERE award_id = %s AND status = 'active'", (award_id,)),
                 award_id,
             ),
         )
@@ -928,6 +947,7 @@ def import_club_best_and_fairest(pg, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
+    replay_admin_overrides(pg, "award_winners")  # AFLDB-ISSUE-165 §6.2 / R-2
     pg.commit()
     report_reload(rep, "club_best_and_fairest", stats)
     players.report(rep, "club_bf")
@@ -1089,6 +1109,7 @@ def import_named_medals(pg, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", sorted(source_ids.values()), False)],
         allow_link_loss=allow_link_loss,
     )
+    replay_admin_overrides(pg, "award_winners")  # AFLDB-ISSUE-165 §6.2 / R-2
     pg.commit()
     report_reload(rep, "named_medals", stats)
     players.report(rep, "named_medals")
@@ -1380,6 +1401,13 @@ def import_under_22(
         )
     batch.records_inserted += len(rows) - len(existing)
     batch.records_updated += len(existing)
+    # AFLDB-ISSUE-165 §6.2 / R-2. This group upserts by hand rather than through
+    # reload_keyed(), but it is an award_winners reload like any other and needs
+    # the same replay in the same transaction. Its ON CONFLICT DO UPDATE list
+    # deliberately does not name status, status_reason or updated_at, so an
+    # ORDINARY reload leaves a lifecycle decision alone and this replay is what
+    # restores one after a destructive rebuild.
+    replay_admin_overrides(pg, "award_winners")
     pg.commit()
 
     linked = status_counts["unique"] + status_counts["resolved"]
@@ -1724,6 +1752,7 @@ def import_coleman(pg: psycopg.Connection, rep: Reporter, batch,
         scopes=[("source_id", [source_id], False)],
         allow_link_loss=allow_link_loss,
     )
+    replay_admin_overrides(pg, "award_winners")  # AFLDB-ISSUE-165 §6.2 / R-2
     pg.commit()
     report_reload(rep, "coleman", stats)
     rep.result(
@@ -2089,6 +2118,7 @@ def import_rising_star(pg, rep: Reporter, batch, clubs: ClubResolver,
         scopes=[("source_id", [winner_source_id], False)],
         allow_link_loss=allow_link_loss,
     )
+    replay_admin_overrides(pg, "award_winners")  # AFLDB-ISSUE-165 §6.2 / R-2
     pg.commit()
     report_reload(rep, "rising_star winners", winner_stats)
     players.report(rep, "rising_star")
@@ -2157,8 +2187,16 @@ def import_hall_of_fame(pg, rep: Reporter, batch, sources: dict[str, int],
         target_table="hall_of_fame", name_column="name",
         scope_column="source_id", scope_values=[source_id],
         refuse_out_of_scope_key=True,
+        # AFLDB-ISSUE-165. Migration 101 made this table's identity key
+        # ACTIVE-ROW-ONLY, so a voided out-of-scope row no longer holds the
+        # key and must not refuse the whole awards import. An ACTIVE
+        # out-of-scope row still does, exactly as AFLDB-ISSUE-080 decided.
+        lifecycle_column="status",
         allow_link_loss=allow_link_loss,
     )
+    # AFLDB-ISSUE-165 §6.2 / R-2. Immediately after this domain's own reload and
+    # inside its transaction.
+    replay_admin_overrides(pg, "hall_of_fame")
     pg.commit()
     report_reload(rep, "hall_of_fame", stats)
     players.report(rep, "hall_of_fame")
@@ -2194,10 +2232,17 @@ def _refuse_honour_team_identity_collisions(
         # IS NOT TRUE is the ownership scope's exact complement: a NULL
         # source_id makes ``= ANY`` evaluate NULL, and NULL-provenance rows
         # are precisely the foreign rows this check must see.
+        # AFLDB-ISSUE-165: a VOIDED row is not a collision. Migration 101 took
+        # void rows out of both identity indexes precisely so a wrongly
+        # recorded member can be replaced by the right one in the same team, so
+        # a voided foreign row no longer occupies the place and must not refuse
+        # the whole awards import. An ACTIVE foreign row still refuses, exactly
+        # as AFLDB-ISSUE-080 decided.
         cur.execute(
             """SELECT id, team_name, player_name_raw, player_id, source_id
                  FROM honour_team_members
-                WHERE (source_id = ANY(%s)) IS NOT TRUE""",
+                WHERE (source_id = ANY(%s)) IS NOT TRUE
+                  AND status <> 'void'""",
             ([source_id],),
         )
         foreign = cur.fetchall()
@@ -2308,6 +2353,12 @@ def import_honour_teams(pg, rep: Reporter, batch, sources: dict[str, int],
         scope_column="source_id", scope_values=[source_id],
         allow_link_loss=allow_link_loss,
     )
+    # AFLDB-ISSUE-165 §6.2 / R-2. Immediately after this domain's own reload and
+    # inside its transaction, still under the §5.3 advisory lock this function
+    # took above — the replay can INSERT and UPDATE honour_team_members identity
+    # rows, so it must be serialised against every other identity writer exactly
+    # as the reload itself is.
+    replay_admin_overrides(pg, "honour_team_members")
     pg.commit()
     report_reload(rep, "honour_team_members", stats)
     players.report(rep, "honour_teams")

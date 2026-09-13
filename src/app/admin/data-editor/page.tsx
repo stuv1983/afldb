@@ -1,15 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { AwardWinnerForm } from '@/app/admin/data-editor/AwardWinnerForm';
 import { CreateMatchForm } from '@/app/admin/data-editor/CreateMatchForm';
 import { CreatePlayerForm } from '@/app/admin/data-editor/CreatePlayerForm';
 import { EditorForm } from '@/app/admin/data-editor/EditorForm';
-import { HallOfFameForm } from '@/app/admin/data-editor/HallOfFameForm';
-import { HonourTeamForm } from '@/app/admin/data-editor/HonourTeamForm';
 import { MatchSheetEditor } from '@/app/admin/data-editor/MatchSheetEditor';
 import { PlayerFinder } from '@/app/admin/data-editor/PlayerFinder';
-import { listAwards, listHonourTeams } from '@/db/queries/awards';
 import { listClubs } from '@/db/queries/clubs';
 import { listVenues } from '@/db/queries/venues';
 import { getMatch, getMatchPlayers, getRecentClubLineup } from '@/db/queries/matches';
@@ -26,11 +22,16 @@ export const metadata: Metadata = { title: 'Data editor', robots: { index: false
 export const dynamic = 'force-dynamic';
 
 /**
- * Manual corrections, player bio creation, match creation & sheet editing, and awards/honours management (see changeLog.md).
+ * Manual corrections, player bio creation, and match creation & sheet editing.
  *
- * Find or create a player, find or create a match, edit match player statistics, or record award
- * winners and representative team selections. Draft selections moved to `/admin/draft`
- * (AFLDB-ISSUE-160 D-5) -- this page refuses them rather than editing them.
+ * Find or create a player, find or create a match, or edit match player statistics.
+ *
+ * Two domains have left this page for surfaces of their own and are pointed at rather than
+ * edited here: draft selections (`/admin/draft`, AFLDB-ISSUE-160 D-5) and awards, Hall of Fame
+ * and representative-team selections (`/admin/awards`, AFLDB-ISSUE-165 §10). The awards move
+ * was not a tidy-up: a create-only form could not express correction, voiding or replacement,
+ * and the rows it wrote carried no durable record, so nothing it created survived a rebuild.
+ *
  * Every save is audited in data_edits; the CSV pipeline remains the path for bulk jobs.
  */
 export default async function DataEditorPage(
@@ -48,14 +49,11 @@ export default async function DataEditorPage(
   const roundParam = Number(firstValue(params.round)) || null;
   const matchQueryParam = firstValue(params.match_q)?.trim() ?? '';
 
-  const [clubs, venues, awards, honourTeams, seasonsList] = await Promise.all([
+  const [clubs, venues, seasonsList] = await Promise.all([
     listClubs(),
     listVenues(),
-    listAwards(),
-    listHonourTeams(),
     listSeasons(),
   ]);
-  const existingTeamNames = honourTeams.map((t) => t.teamName);
 
   const matchForSheet = (mode === 'match-sheet' && Number.isInteger(id) && id > 0)
     ? await getMatch(id)
@@ -88,7 +86,7 @@ export default async function DataEditorPage(
       <div className="page-header">
         <h1>Data editor</h1>
         <p className="subtitle">
-          One-off corrections, player creation, match creation & sheets, and awards management, saved with a note and audited.
+          One-off corrections, player creation, and match creation &amp; sheets, saved with a note and audited.
         </p>
       </div>
 
@@ -102,12 +100,14 @@ export default async function DataEditorPage(
         </div>
 
         <div>
-          <h2>Awards, Hall of Fame & Representative Teams</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-            <AwardWinnerForm awards={awards} clubs={clubs} />
-            <HallOfFameForm clubs={clubs} />
-            <HonourTeamForm existingTeams={existingTeamNames} clubs={clubs} />
-          </div>
+          <h2>Awards, Hall of Fame &amp; representative teams</h2>
+          <p className="muted">
+            Award winners, Hall of Fame inductions and representative-team selections moved to
+            their own surface (AFLDB-ISSUE-165): <Link href="/admin/awards">Awards &amp; honours</Link>.
+            This page no longer records or edits them. The new surface adds what this one never
+            had — correction, voiding, reinstatement and replacement, each recorded durably enough
+            to survive a source reload and a full rebuild.
+          </p>
         </div>
 
         <div>

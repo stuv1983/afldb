@@ -131,15 +131,21 @@ export default async function sitemap({
         SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
       `,
       sql<{ slug: string }[]>`SELECT slug FROM awards ORDER BY slug`,
+      // `status = 'active'` on both (AFLDB-ISSUE-165 §4.5): these enumerate
+      // URLs, and /awards/[slug]/[season] and /honour-teams/[slug] render
+      // from `getAwardSeason` / `getHonourTeam`, which now return nothing at
+      // all for a season or a team whose every row is void. Emitting such a
+      // URL would advertise an empty page to a crawler.
       sql<{ slug: string; season: number }[]>`
         SELECT DISTINCT a.slug, w.season
           FROM award_winners w
           JOIN awards a ON a.id = w.award_id
-         WHERE w.season IS NOT NULL
+         WHERE w.season IS NOT NULL AND w.status = 'active'
          ORDER BY a.slug, w.season
       `,
       sql<{ teamName: string }[]>`
         SELECT DISTINCT team_name AS "teamName" FROM honour_team_members
+         WHERE status = 'active'
          ORDER BY team_name
       `,
     ]);

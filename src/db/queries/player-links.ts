@@ -104,7 +104,11 @@ export async function listUnresolvedLinks(
         FROM award_winners w
         JOIN awards a ON a.id = w.award_id
         LEFT JOIN clubs c ON c.id = w.club_id
+       -- AFLDB-ISSUE-165 D-10. A voided row is one that should never have
+       -- existed, so asking a curator to identify the person in it is asking
+       -- them to do work on a record AFLDB has already retracted.
        WHERE w.link_status_value::text = ANY(${statusValues})
+         AND w.status <> 'void'
       UNION ALL
       SELECT 'award_nominations', n.id, n.player_name_raw,
              n.link_status_value::text,
@@ -126,6 +130,7 @@ export async function listUnresolvedLinks(
         FROM hall_of_fame h
         LEFT JOIN aflw.players ap ON lower(trim(ap.display_name)) = lower(trim(h.name))
        WHERE h.link_status_value::text = ANY(${statusValues})
+         AND h.status <> 'void'
          AND ap.slug IS NULL
          AND lower(COALESCE(h.category, '')) NOT IN ('media', 'umpire', 'administrator', 'pioneer')
       UNION ALL
@@ -135,6 +140,7 @@ export async function listUnresolvedLinks(
              'honour_team_members', m.id
         FROM honour_team_members m
        WHERE m.link_status_value::text = ANY(${statusValues})
+         AND m.status <> 'void'
       UNION ALL
       SELECT 'captaincies', cp.id, cp.player_name_raw,
              cp.link_status_value::text,

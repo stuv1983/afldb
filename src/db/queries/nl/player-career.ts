@@ -48,9 +48,15 @@ function metricValueExpr(plan: NlQueryPlan): SqlFragment {
     // is, and postgres.js hands a bigint back as text -- ::int keeps
     // this a number the same way NlPlayerCareerRow.value promises.
     const slug = NL_AWARDS[def.awardKey].slug;
+    // `status = 'active'` (AFLDB-ISSUE-165 §4.3): an award count is a
+    // football fact, and a voided winner row is an administrator saying the
+    // record should never have existed. The same predicate the public awards
+    // pages and the Grid Solver use, so the three never disagree about how
+    // many times one player won one award.
     return sql`(SELECT count(*)::int FROM award_winners w
                   JOIN awards a ON a.id = w.award_id
                  WHERE a.slug = ${slug} AND w.player_id = p.id
+                   AND w.status = 'active'
                    AND w.link_status_value IN ('unique', 'resolved'))`;
   }
   if (periodSplit && periodSplit !== 'FULL_MATCH') {
@@ -100,6 +106,7 @@ function conditionSql(cond: NlCareerCondition, plan: NlQueryPlan): SqlFragment {
   return sql`(SELECT count(*) FROM award_winners w
                 JOIN awards a ON a.id = w.award_id
                WHERE a.slug = ${slug} AND w.player_id = p.id
+                 AND w.status = 'active'
                  AND w.link_status_value IN ('unique', 'resolved')) ${op} ${cond.value}`;
 }
 

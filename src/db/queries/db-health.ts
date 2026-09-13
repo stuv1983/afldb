@@ -341,6 +341,17 @@ type LinkLayer = {
  * father_link_status), verified against each table's own migration rather
  * than assumed uniform -- father_son_selections carries two independent
  * link-status columns for two different people, so it appears twice.
+ *
+ * DELIBERATELY UNFILTERED BY LIFECYCLE STATUS (AFLDB-ISSUE-165 §4.7). The
+ * three honours tables gained `status` in migration 101, and every PUBLIC
+ * read of them now carries `status = 'active'`. This module must not: it is
+ * the operational health view, and its job is to report the state of the
+ * whole table as the database actually holds it. A voided row still occupies
+ * a row, still carries a link status, and is still something an operator
+ * needs to be able to see. Adding a status filter here would quietly shrink
+ * the counts every other operational reading is compared against -- so do
+ * not "tidy this up" to match the public queries; they answer a different
+ * question.
  */
 const LINK_LAYERS: LinkLayer[] = [
   { table: 'award_winners', label: 'Award winners', statusColumn: 'link_status_value' },

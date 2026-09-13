@@ -423,6 +423,7 @@ def reload_keyed(
     scope_exclude: bool = False,
     scopes: Sequence[tuple[str, Sequence[Any], bool]] = (),
     refuse_out_of_scope_key: bool = False,
+    lifecycle_column: str | None = None,
     allow_link_loss: bool = False,
     delete_missing: bool = True,
 ) -> ReloadStats:
@@ -445,6 +446,15 @@ def reload_keyed(
     (name, inducted_year) qualifies; honour_team_members' raw name does not
     (migration 059 stopped treating raw name as identity). The check reads the
     table's ``source_id`` column to name the colliding row's owner.
+
+    ``lifecycle_column`` names a ``'active'``/``'void'`` column (migration 101)
+    and narrows that same check to rows that are not void. A VOIDED row does
+    not hold its key any more -- migration 101 made hall_of_fame's and
+    honour_team_members' identity indexes active-row-only precisely so a wrong
+    row can be replaced -- so refusing the whole awards import over one would
+    let an ordinary, correct administrative decision brick the importer. An
+    ACTIVE out-of-scope row still refuses, unchanged: it genuinely holds the
+    key, and AFLDB-ISSUE-080's answer to that is still curator review.
 
     ``delete_missing=False`` upserts without removing vanished keys. A parent
     whose children are reconciled by a later call needs this: draft_persons is
@@ -512,13 +522,16 @@ def reload_keyed(
             # ``IS NOT TRUE`` is the scope's exact complement: a NULL-source
             # row makes ``source_id = ANY(...)`` evaluate NULL, not FALSE, and
             # such rows are precisely the ones this check exists to find.
+            live = (
+                f" AND e.{lifecycle_column} <> 'void'" if lifecycle_column else ""
+            )
             cur.execute(
                 f"""SELECT e.id, e.source_id,
                            {', '.join(f'i.{c}::text' for c in key_columns)}
                       FROM {_INCOMING} i
                       JOIN public.{table} e
                         ON {_key_match('e', 'i', key_columns)}
-                     WHERE ({scope_e}) IS NOT TRUE
+                     WHERE ({scope_e}) IS NOT TRUE{live}
                      ORDER BY e.id
                      LIMIT 5""",
                 tuple(scope_params),
@@ -976,6 +989,69 @@ LEADERSHIP_STATUSES = (
     "ended",
     "void",
 )
+
+# The award_winners / hall_of_fame / honour_team_members lifecycle
+# enumeration (migration 101, AFLDB-ISSUE-165). The ONE authority is the three
+# identical CHECK constraints in that migration; this copy exists because the
+# replay must fail closed WITHOUT reading the database schema, and
+# tests/data-overrides-source-contract.test.ts asserts it agrees with the
+# migration and with src/db/queries/admin-awards.ts so the three cannot drift.
+#
+# TWO states, not three. There is deliberately no club_leadership-style
+# 'ended': an award result, a Hall of Fame induction or a team selection does
+# not CEASE the way an office does, so the only honest distinction is between a
+# record that is true ('active') and one that was entered in error ('void').
+#
+# 'void' is NOT hall_of_fame.removed_year. removed_year says a real inductee
+# was later formally removed from the Hall of Fame -- a rare historical event
+# that leaves the row completely valid. 'void' says the AFLDB ROW should never
+# have existed. Neither is a DELETE: a voided row persists so its data_edits
+# rows stay resolvable at the next promotion lineage remap.
+HONOUR_LIFECYCLE_STATUSES = (
+    "active",
+    "void",
+)
+
+# The three data_overrides field groups AFLDB-ISSUE-165 writes, and the reason
+# the three replay differently (§6.2, D-9):
+#
+#   'lifecycle'   status + status_reason + replacement linkage. Unconditionally
+#                 re-applied. A MISSING target WARNS AND RETAINS the override:
+#                 a source manifest that stopped carrying a row is not a reason
+#                 to silently discard a human decision that the row was wrong.
+#   'correction'  a DELTA over a source-owned row's safely-correctable
+#                 metadata, keyed on jsonb_exists -- absent key leaves the
+#                 source value, explicit JSON null clears it. A missing target
+#                 FAILS CLOSED.
+#   'record'      the whole durable row of a manual_admin_edit creation, which
+#                 a destructive rebuild removes entirely. Re-created and then
+#                 restored. A payload that cannot be reconstructed or resolved
+#                 FAILS CLOSED.
+HONOUR_FIELD_GROUPS = (
+    "lifecycle",
+    "correction",
+    "record",
+)
+
+
+def _warn_retained_lifecycle(table: str, keys: Sequence[str]) -> None:
+    """AFLDB-ISSUE-165 D-9: a lifecycle override whose row is absent is KEPT.
+
+    The row may be absent because the source manifest stopped carrying it, or
+    because a group this run did not touch has not been reloaded yet. Neither
+    is evidence that the human decision was wrong, and deleting the override --
+    or refusing the whole reload over it, as a correction or a record override
+    does -- would discard lifecycle history that nothing else in AFLDB holds.
+    So it is reported, loudly and by key, and left in place to be re-applied by
+    the next run that does find its row.
+    """
+    for key in keys:
+        print(
+            f"    WARNING: replay_admin_overrides({table}): lifecycle override "
+            f"{key!r} names no row in this database; the override is RETAINED, "
+            f"not discarded (AFLDB-ISSUE-165 D-9)",
+            flush=True,
+        )
 
 
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
@@ -2304,4 +2380,692 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                        updated_at = now()
                   FROM appointment a
                  WHERE x.appointment_key = a.token
+            """)
+
+        elif table == "award_winners":
+            # AFLDB-ISSUE-165 §6.2. THREE field groups over ONE key shape:
+            #
+            #   '<sources.key>:<source_record_id>'
+            #
+            # award_winners_source_uq UNIQUE NULLS NOT DISTINCT (source_id,
+            # source_record_id) (migration 042) makes that pair the row's
+            # identity, and it is written with the source KEY rather than the
+            # per-database sources.id so it denotes the same row on every
+            # database. A manual row's record id is the minted
+            # 'award_winner:<uuid>' createAwardWinner() writes, which can never
+            # collide with a source's own record id by construction.
+            #
+            # A row with NO durable key -- source_id or source_record_id NULL
+            # -- cannot be named here at all. src/db/queries/admin-awards.ts
+            # refuses to correct or void one for exactly that reason, so the
+            # refusal is stated twice: once where the decision is made, and
+            # once here where it would otherwise be silently unreplayable.
+            #
+            # The three groups do NOT replay alike, and the difference is the
+            # whole point (D-9): a lifecycle decision outlives its row, a
+            # correction and a manual record do not.
+            awards_decoded = """
+                raw AS (
+                    SELECT o.entity_key, o.field_group, o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1)
+                               AS record_id
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'award_winners'
+                       AND o.is_active = true
+                ),
+                decoded AS (
+                    SELECT r.entity_key, r.field_group, r.v, r.namespace, r.record_id,
+                           s.id AS source_id,
+                           r.v->>'player_identity' AS identity
+                      FROM raw r
+                      LEFT JOIN sources s ON s.key = r.namespace
+                ),
+                winner AS (
+                    SELECT d.entity_key, d.field_group, d.v, d.namespace, d.record_id,
+                           d.source_id, d.identity,
+                           w.id AS winner_id,
+                           (SELECT a.id FROM awards a WHERE a.slug = d.v->>'award_slug')
+                               AS award_id,
+                           (SELECT c.id FROM clubs c WHERE c.slug = d.v->>'club_slug')
+                               AS club_id,
+                           -- Exactly one player or none: no fuzzy fallback, no
+                           -- display-name lookup, and min() rather than
+                           -- DISTINCT so an ambiguous identity is reported as
+                           -- the refusal it is instead of crashing with a
+                           -- cardinality error that names no key.
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS identity_matches,
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS player_id
+                      FROM decoded d
+                      LEFT JOIN award_winners w
+                        ON w.source_id = d.source_id
+                       AND w.source_record_id = d.record_id
+                )
+            """
+
+            # Fail closed FIRST, over every override, before anything is
+            # written. The one deliberate exception is a LIFECYCLE override
+            # whose row is absent: D-9 warns and retains it rather than
+            # refusing, because a source that stopped carrying a row is not
+            # evidence that voiding it was wrong.
+            cur.execute("WITH " + awards_decoded + """
+                SELECT w.entity_key,
+                       CASE
+                           WHEN position(':' in w.entity_key) = 0
+                                 OR length(w.namespace) = 0 OR length(w.record_id) = 0
+                               THEN 'entity_key is not <source key>:<source_record_id>'
+                           WHEN w.source_id IS NULL
+                               THEN 'entity_key names no source in this database'
+                           WHEN NOT (w.field_group = ANY(%(groups)s))
+                               THEN 'unknown field_group'
+                           WHEN w.field_group <> 'correction'
+                                 AND (w.v->>'status' IS NULL
+                                      OR NOT (w.v->>'status' = ANY(%(statuses)s)))
+                               THEN 'payload carries no valid status'
+                           WHEN w.field_group <> 'correction'
+                                 AND w.v->>'status' = 'void'
+                                 AND COALESCE(w.v->>'status_reason', '') = ''
+                               THEN 'a void row needs a status_reason'
+                           WHEN w.field_group = 'correction' AND w.winner_id IS NULL
+                               THEN 'correction target row does not exist'
+                           WHEN w.field_group = 'record' AND w.v->>'award_slug' IS NULL
+                               THEN 'record override carries no award_slug'
+                           WHEN w.field_group = 'record' AND w.award_id IS NULL
+                               THEN 'award_slug does not resolve to an award'
+                           WHEN w.field_group = 'record'
+                                 AND COALESCE(w.v->>'season', '') !~ '^[0-9]{4}$'
+                               THEN 'record override carries no season'
+                           WHEN w.field_group = 'record'
+                                 AND COALESCE(w.v->>'player_name_raw', '') = ''
+                               THEN 'record override carries no player_name_raw'
+                           WHEN w.field_group = 'record' AND w.identity IS NOT NULL
+                                 AND w.identity_matches <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                           WHEN w.field_group = 'record' AND w.v->>'club_slug' IS NOT NULL
+                                 AND w.club_id IS NULL
+                               THEN 'club_slug does not resolve to a club'
+                       END AS problem
+                  FROM winner w
+            """, {
+                "groups": list(HONOUR_FIELD_GROUPS),
+                "statuses": list(HONOUR_LIFECYCLE_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(award_winners): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            cur.execute("WITH " + awards_decoded + """
+                SELECT w.entity_key FROM winner w
+                 WHERE w.field_group = 'lifecycle' AND w.winner_id IS NULL
+                 ORDER BY w.entity_key
+            """)
+            _warn_retained_lifecycle("award_winners", [row[0] for row in cur.fetchall()])
+
+            # 1. Re-create every manual row a destructive rebuild removed.
+            #    player_id and link_status_value are set HERE and nowhere else:
+            #    the linkage of an award row belongs to /admin/player-links,
+            #    not to this issue, so a replay must not undo a link decision
+            #    made after the row was created (AFLDB-ISSUE-165 §5.1).
+            cur.execute("WITH " + awards_decoded + """
+                INSERT INTO award_winners
+                      (award_id, season, player_id, player_name_raw, link_status_value,
+                       candidate_count, club_id, club_name_raw, votes, position,
+                       is_captain, is_vice_captain, note, sort_order,
+                       status, status_reason, source_id, source_record_id)
+                SELECT w.award_id, (w.v->>'season')::smallint, w.player_id,
+                       w.v->>'player_name_raw',
+                       (CASE WHEN w.player_id IS NOT NULL THEN 'resolved'
+                             ELSE 'unmatched' END)::link_status,
+                       COALESCE((w.v->>'candidate_count')::smallint, 0),
+                       w.club_id, w.v->>'club_name_raw',
+                       (w.v->>'votes')::numeric, w.v->>'position',
+                       COALESCE((w.v->>'is_captain')::boolean, false),
+                       COALESCE((w.v->>'is_vice_captain')::boolean, false),
+                       w.v->>'note', (w.v->>'sort_order')::smallint,
+                       w.v->>'status', w.v->>'status_reason',
+                       w.source_id, w.record_id
+                  FROM winner w
+                 WHERE w.field_group = 'record' AND w.winner_id IS NULL
+            """)
+
+            # 2. Restore a manual row's whole payload. The override IS the row
+            #    for a manual creation, so this is unconditional rather than a
+            #    jsonb_exists patch -- which is also what makes the replay
+            #    idempotent. source_id and source_record_id are never in the
+            #    SET list: the identity is the one thing a replay may not move.
+            cur.execute("WITH " + awards_decoded + """
+                UPDATE award_winners x
+                   SET award_id = w.award_id,
+                       season = (w.v->>'season')::smallint,
+                       player_name_raw = w.v->>'player_name_raw',
+                       candidate_count = COALESCE((w.v->>'candidate_count')::smallint, 0),
+                       club_id = w.club_id,
+                       club_name_raw = w.v->>'club_name_raw',
+                       votes = (w.v->>'votes')::numeric,
+                       position = w.v->>'position',
+                       is_captain = COALESCE((w.v->>'is_captain')::boolean, false),
+                       is_vice_captain = COALESCE((w.v->>'is_vice_captain')::boolean, false),
+                       note = w.v->>'note',
+                       sort_order = (w.v->>'sort_order')::smallint,
+                       status = w.v->>'status',
+                       status_reason = w.v->>'status_reason',
+                       updated_at = now()
+                  FROM winner w
+                 WHERE w.field_group = 'record'
+                   AND x.source_id = w.source_id
+                   AND x.source_record_id = w.record_id
+            """)
+
+            # 3. The correction DELTA over a source-owned row. Key presence is
+            #    the semantics -- the migration-086 discipline: an ABSENT key
+            #    leaves whatever the source just loaded, an explicit JSON null
+            #    CLEARS the column. award_id, season, the recipient identity
+            #    and the provenance columns are absent by construction: each of
+            #    them changes WHAT the row asserts, so a wrong one is a void
+            #    plus a replacement, never a quiet rewrite (R-1).
+            cur.execute("WITH " + awards_decoded + """
+                UPDATE award_winners x
+                   SET votes = CASE WHEN jsonb_exists(w.v, 'votes')
+                                    THEN (w.v->>'votes')::numeric ELSE x.votes END,
+                       position = CASE WHEN jsonb_exists(w.v, 'position')
+                                       THEN w.v->>'position' ELSE x.position END,
+                       is_captain = CASE WHEN jsonb_exists(w.v, 'is_captain')
+                                         THEN (w.v->>'is_captain')::boolean
+                                         ELSE x.is_captain END,
+                       is_vice_captain = CASE WHEN jsonb_exists(w.v, 'is_vice_captain')
+                                              THEN (w.v->>'is_vice_captain')::boolean
+                                              ELSE x.is_vice_captain END,
+                       note = CASE WHEN jsonb_exists(w.v, 'note')
+                                   THEN w.v->>'note' ELSE x.note END,
+                       sort_order = CASE WHEN jsonb_exists(w.v, 'sort_order')
+                                         THEN (w.v->>'sort_order')::smallint
+                                         ELSE x.sort_order END,
+                       candidate_count = CASE WHEN jsonb_exists(w.v, 'candidate_count')
+                                              THEN COALESCE((w.v->>'candidate_count')::smallint, 0)
+                                              ELSE x.candidate_count END,
+                       -- The club moves as ONE fact or not at all: a club id
+                       -- without its raw name, or the reverse, is half a
+                       -- correction. The decision is stored as the SLUG,
+                       -- because ids are renumbered by a rebuild and a
+                       -- promotion and slugs are tracked reference data.
+                       club_id = CASE WHEN jsonb_exists(w.v, 'club_slug')
+                                      THEN w.club_id ELSE x.club_id END,
+                       club_name_raw = CASE WHEN jsonb_exists(w.v, 'club_slug')
+                                            THEN w.v->>'club_name_raw' ELSE x.club_name_raw END,
+                       updated_at = now()
+                  FROM winner w
+                 WHERE w.field_group = 'correction'
+                   AND x.source_id = w.source_id
+                   AND x.source_record_id = w.record_id
+            """)
+
+            # 4. The lifecycle decision, applied LAST so it wins over both of
+            #    the above, and unconditionally: status and status_reason are
+            #    the whole content of the group.
+            cur.execute("WITH " + awards_decoded + """
+                UPDATE award_winners x
+                   SET status = w.v->>'status',
+                       status_reason = w.v->>'status_reason',
+                       updated_at = now()
+                  FROM winner w
+                 WHERE w.field_group = 'lifecycle'
+                   AND x.source_id = w.source_id
+                   AND x.source_record_id = w.record_id
+            """)
+
+        elif table == "hall_of_fame":
+            # AFLDB-ISSUE-165 §6.2. hall_of_fame has NO source_record_id
+            # column at all, so migration 042's natural key carries the
+            # identity and the durable key is
+            #
+            #   '<sources.key>:<name>|<inducted_year>'
+            #
+            # The LAST '|' separates the two halves: an induction year never
+            # contains one, and src/db/queries/admin-awards.ts refuses a name
+            # that does. An empty year half means NULL -- 45 of the 343
+            # inductees genuinely carry no induction year, and NULLS NOT
+            # DISTINCT is what keeps them inside the key rather than exempt
+            # from it.
+            #
+            # removed_year is ORDINARY CORRECTABLE METADATA here and appears
+            # in the correction group like category or state. It is NOT
+            # lifecycle: a person inducted and later formally removed from the
+            # Hall of Fame is a true historical fact about a valid row, and
+            # 'void' says the row should never have existed. Conflating them
+            # would destroy the only record of which one happened.
+            hof_decoded = """
+                raw AS (
+                    SELECT o.entity_key, o.field_group, o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1)
+                               AS natural_key
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'hall_of_fame'
+                       AND o.is_active = true
+                ),
+                decoded AS (
+                    SELECT r.entity_key, r.field_group, r.v, r.namespace, r.natural_key,
+                           s.id AS source_id,
+                           CASE WHEN position('|' in r.natural_key) = 0 THEN NULL
+                                ELSE left(r.natural_key,
+                                          length(r.natural_key)
+                                          - position('|' in reverse(r.natural_key)))
+                           END AS hof_name,
+                           CASE WHEN position('|' in r.natural_key) = 0 THEN NULL
+                                ELSE right(r.natural_key,
+                                           position('|' in reverse(r.natural_key)) - 1)
+                           END AS year_text,
+                           r.v->>'player_identity' AS identity
+                      FROM raw r
+                      LEFT JOIN sources s ON s.key = r.namespace
+                ),
+                inductee AS (
+                    SELECT d.entity_key, d.field_group, d.v, d.namespace, d.natural_key,
+                           d.source_id, d.hof_name, d.year_text, d.identity,
+                           CASE WHEN d.year_text ~ '^[0-9]{4}$'
+                                THEN d.year_text::smallint END AS inducted_year,
+                           (SELECT count(*)
+                              FROM hall_of_fame h
+                             WHERE h.source_id = d.source_id
+                               AND h.name = d.hof_name
+                               AND h.inducted_year IS NOT DISTINCT FROM
+                                   (CASE WHEN d.year_text ~ '^[0-9]{4}$'
+                                         THEN d.year_text::smallint END)
+                           ) AS row_matches,
+                           (SELECT min(h.id)
+                              FROM hall_of_fame h
+                             WHERE h.source_id = d.source_id
+                               AND h.name = d.hof_name
+                               AND h.inducted_year IS NOT DISTINCT FROM
+                                   (CASE WHEN d.year_text ~ '^[0-9]{4}$'
+                                         THEN d.year_text::smallint END)
+                           ) AS hof_id,
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS identity_matches,
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS player_id
+                      FROM decoded d
+                )
+            """
+
+            cur.execute("WITH " + hof_decoded + """
+                SELECT h.entity_key,
+                       CASE
+                           WHEN position(':' in h.entity_key) = 0 OR length(h.namespace) = 0
+                               THEN 'entity_key is not <source key>:<name>|<inducted_year>'
+                           WHEN h.source_id IS NULL
+                               THEN 'entity_key names no source in this database'
+                           WHEN h.hof_name IS NULL OR length(h.hof_name) = 0
+                               THEN 'entity_key carries no inductee name'
+                           WHEN h.year_text <> '' AND h.inducted_year IS NULL
+                               THEN 'entity_key carries an induction year that is not four digits'
+                           WHEN NOT (h.field_group = ANY(%(groups)s))
+                               THEN 'unknown field_group'
+                           WHEN h.field_group <> 'correction'
+                                 AND (h.v->>'status' IS NULL
+                                      OR NOT (h.v->>'status' = ANY(%(statuses)s)))
+                               THEN 'payload carries no valid status'
+                           WHEN h.field_group <> 'correction'
+                                 AND h.v->>'status' = 'void'
+                                 AND COALESCE(h.v->>'status_reason', '') = ''
+                               THEN 'a void row needs a status_reason'
+                           WHEN h.row_matches > 1
+                               THEN 'more than one row of that source holds this name and year'
+                           WHEN h.field_group = 'correction' AND h.hof_id IS NULL
+                               THEN 'correction target row does not exist'
+                           WHEN h.field_group = 'record' AND h.identity IS NOT NULL
+                                 AND h.identity_matches <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                       END AS problem
+                  FROM inductee h
+            """, {
+                "groups": list(HONOUR_FIELD_GROUPS),
+                "statuses": list(HONOUR_LIFECYCLE_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(hall_of_fame): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            cur.execute("WITH " + hof_decoded + """
+                SELECT h.entity_key FROM inductee h
+                 WHERE h.field_group = 'lifecycle' AND h.hof_id IS NULL
+                 ORDER BY h.entity_key
+            """)
+            _warn_retained_lifecycle("hall_of_fame", [row[0] for row in cur.fetchall()])
+
+            # 1. Re-create the manual rows a destructive rebuild removed. name
+            #    and inducted_year come from the KEY, never from the payload:
+            #    the key is what binds the decision to a row, so a payload
+            #    cannot move one.
+            cur.execute("WITH " + hof_decoded + """
+                INSERT INTO hall_of_fame
+                      (name, player_id, link_status_value, category, inducted_year,
+                       is_legend, legend_year, club_name_raw, state, playing_career,
+                       removed_year, notes, status, status_reason, source_id)
+                SELECT h.hof_name, h.player_id,
+                       (CASE WHEN h.player_id IS NOT NULL THEN 'resolved'
+                             ELSE 'unmatched' END)::link_status,
+                       h.v->>'category', h.inducted_year,
+                       COALESCE((h.v->>'is_legend')::boolean, false),
+                       (h.v->>'legend_year')::smallint, h.v->>'club_name_raw',
+                       h.v->>'state', h.v->>'playing_career',
+                       (h.v->>'removed_year')::smallint, h.v->>'notes',
+                       h.v->>'status', h.v->>'status_reason', h.source_id
+                  FROM inductee h
+                 WHERE h.field_group = 'record' AND h.hof_id IS NULL
+            """)
+
+            # 2. Restore a manual row's whole payload.
+            cur.execute("WITH " + hof_decoded + """
+                UPDATE hall_of_fame x
+                   SET category = h.v->>'category',
+                       is_legend = COALESCE((h.v->>'is_legend')::boolean, false),
+                       legend_year = (h.v->>'legend_year')::smallint,
+                       club_name_raw = h.v->>'club_name_raw',
+                       state = h.v->>'state',
+                       playing_career = h.v->>'playing_career',
+                       removed_year = (h.v->>'removed_year')::smallint,
+                       notes = h.v->>'notes',
+                       status = h.v->>'status',
+                       status_reason = h.v->>'status_reason',
+                       updated_at = now()
+                  FROM inductee h
+                 WHERE h.field_group = 'record' AND x.id = h.hof_id
+            """)
+
+            # 3. The correction DELTA over a source-owned row. name and
+            #    inducted_year are absent by construction: both are
+            #    identity-bearing under migration 042's key, so a wrong one is
+            #    a void plus a replacement.
+            cur.execute("WITH " + hof_decoded + """
+                UPDATE hall_of_fame x
+                   SET category = CASE WHEN jsonb_exists(h.v, 'category')
+                                       THEN h.v->>'category' ELSE x.category END,
+                       is_legend = CASE WHEN jsonb_exists(h.v, 'is_legend')
+                                        THEN COALESCE((h.v->>'is_legend')::boolean, false)
+                                        ELSE x.is_legend END,
+                       legend_year = CASE WHEN jsonb_exists(h.v, 'legend_year')
+                                          THEN (h.v->>'legend_year')::smallint
+                                          ELSE x.legend_year END,
+                       club_name_raw = CASE WHEN jsonb_exists(h.v, 'club_name_raw')
+                                            THEN h.v->>'club_name_raw' ELSE x.club_name_raw END,
+                       state = CASE WHEN jsonb_exists(h.v, 'state')
+                                    THEN h.v->>'state' ELSE x.state END,
+                       playing_career = CASE WHEN jsonb_exists(h.v, 'playing_career')
+                                             THEN h.v->>'playing_career'
+                                             ELSE x.playing_career END,
+                       -- A genuine historical fact about the Hall of Fame,
+                       -- corrected like any other field. Never lifecycle.
+                       removed_year = CASE WHEN jsonb_exists(h.v, 'removed_year')
+                                           THEN (h.v->>'removed_year')::smallint
+                                           ELSE x.removed_year END,
+                       notes = CASE WHEN jsonb_exists(h.v, 'notes')
+                                    THEN h.v->>'notes' ELSE x.notes END,
+                       updated_at = now()
+                  FROM inductee h
+                 WHERE h.field_group = 'correction' AND x.id = h.hof_id
+            """)
+
+            # 4. The lifecycle decision, last and unconditional.
+            cur.execute("WITH " + hof_decoded + """
+                UPDATE hall_of_fame x
+                   SET status = h.v->>'status',
+                       status_reason = h.v->>'status_reason',
+                       updated_at = now()
+                  FROM inductee h
+                 WHERE h.field_group = 'lifecycle' AND x.id = h.hof_id
+            """)
+
+        elif table == "honour_team_members":
+            # AFLDB-ISSUE-165 §6.2. Migration 059 gave this table TWO identity
+            # axes -- a linked row is keyed by (team_name, player_id), an
+            # unlinked one by (team_name, player_name_raw) -- because a name is
+            # not an identity (AFLDB-ISSUE-025). The durable key carries the
+            # same distinction:
+            #
+            #   '<sources.key>:<team_name>|<player identity>'
+            #
+            # where <player identity> is 'afltables:players/...' or
+            # 'manual_admin_edit:<token>' for a LINKED row and
+            # 'name:<player_name_raw>' for an unlinked one. The FIRST '|'
+            # separates the halves: a team name never contains one, and
+            # src/db/queries/admin-awards.ts refuses one that does.
+            #
+            # A 'name:' key matches on the raw name WITHOUT requiring the row
+            # to still be unlinked. That is deliberate: linking a row is
+            # /admin/player-links' business and happens after the override was
+            # written, and a replay that insisted on the original link state
+            # would fail closed on an ordinary, correct administrative action.
+            # Ambiguity is still refused -- migration 059 permits a linked and
+            # an unlinked row to share a display name in one team, so a 'name:'
+            # key that matches two rows is reported, never guessed at.
+            honour_decoded = """
+                raw AS (
+                    SELECT o.entity_key, o.field_group, o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS namespace,
+                           substring(o.entity_key from position(':' in o.entity_key) + 1)
+                               AS natural_key
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'honour_team_members'
+                       AND o.is_active = true
+                ),
+                decoded AS (
+                    SELECT r.entity_key, r.field_group, r.v, r.namespace, r.natural_key,
+                           s.id AS source_id,
+                           CASE WHEN position('|' in r.natural_key) = 0 THEN NULL
+                                ELSE left(r.natural_key, position('|' in r.natural_key) - 1)
+                           END AS team_name,
+                           CASE WHEN position('|' in r.natural_key) = 0 THEN NULL
+                                ELSE substring(r.natural_key
+                                               from position('|' in r.natural_key) + 1)
+                           END AS identity
+                      FROM raw r
+                      LEFT JOIN sources s ON s.key = r.namespace
+                ),
+                subject AS (
+                    SELECT d.entity_key, d.field_group, d.v, d.namespace, d.natural_key,
+                           d.source_id, d.team_name, d.identity,
+                           split_part(d.identity, ':', 1) = 'name' AS by_name,
+                           CASE WHEN split_part(d.identity, ':', 1) = 'name'
+                                THEN substring(d.identity from position(':' in d.identity) + 1)
+                           END AS raw_name,
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND split_part(d.identity, ':', 1) <> 'name'
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS identity_matches,
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND split_part(d.identity, ':', 1) <> 'name'
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS player_id
+                      FROM decoded d
+                ),
+                member AS (
+                    SELECT sj.*,
+                           (SELECT count(*)
+                              FROM honour_team_members m
+                             WHERE m.source_id = sj.source_id
+                               AND m.team_name = sj.team_name
+                               AND ((sj.by_name AND m.player_name_raw = sj.raw_name)
+                                    OR (NOT sj.by_name AND sj.player_id IS NOT NULL
+                                        AND m.player_id = sj.player_id))
+                           ) AS row_matches,
+                           (SELECT min(m.id)
+                              FROM honour_team_members m
+                             WHERE m.source_id = sj.source_id
+                               AND m.team_name = sj.team_name
+                               AND ((sj.by_name AND m.player_name_raw = sj.raw_name)
+                                    OR (NOT sj.by_name AND sj.player_id IS NOT NULL
+                                        AND m.player_id = sj.player_id))
+                           ) AS member_id
+                      FROM subject sj
+                )
+            """
+
+            cur.execute("WITH " + honour_decoded + """
+                SELECT m.entity_key,
+                       CASE
+                           WHEN position(':' in m.entity_key) = 0 OR length(m.namespace) = 0
+                               THEN 'entity_key is not <source key>:<team_name>|<player identity>'
+                           WHEN m.source_id IS NULL
+                               THEN 'entity_key names no source in this database'
+                           WHEN m.team_name IS NULL OR length(m.team_name) = 0
+                               THEN 'entity_key carries no team_name'
+                           WHEN m.identity IS NULL OR length(m.identity) = 0
+                               THEN 'entity_key carries no player identity'
+                           WHEN m.by_name AND COALESCE(m.raw_name, '') = ''
+                               THEN 'a name: identity carries no name'
+                           WHEN NOT m.by_name AND m.identity_matches <> 1
+                               THEN 'player identity does not resolve to exactly one player'
+                           WHEN NOT (m.field_group = ANY(%(groups)s))
+                               THEN 'unknown field_group'
+                           WHEN m.field_group <> 'correction'
+                                 AND (m.v->>'status' IS NULL
+                                      OR NOT (m.v->>'status' = ANY(%(statuses)s)))
+                               THEN 'payload carries no valid status'
+                           WHEN m.field_group <> 'correction'
+                                 AND m.v->>'status' = 'void'
+                                 AND COALESCE(m.v->>'status_reason', '') = ''
+                               THEN 'a void row needs a status_reason'
+                           WHEN m.row_matches > 1
+                               THEN 'more than one row of that source matches this team and identity'
+                           WHEN m.field_group = 'correction' AND m.member_id IS NULL
+                               THEN 'correction target row does not exist'
+                           WHEN m.field_group = 'record'
+                                 AND COALESCE(m.v->>'player_name_raw', '') = ''
+                               THEN 'record override carries no player_name_raw'
+                       END AS problem
+                  FROM member m
+            """, {
+                "groups": list(HONOUR_FIELD_GROUPS),
+                "statuses": list(HONOUR_LIFECYCLE_STATUSES),
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(honour_team_members): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            cur.execute("WITH " + honour_decoded + """
+                SELECT m.entity_key FROM member m
+                 WHERE m.field_group = 'lifecycle' AND m.member_id IS NULL
+                 ORDER BY m.entity_key
+            """)
+            _warn_retained_lifecycle("honour_team_members", [row[0] for row in cur.fetchall()])
+
+            # 1. Re-create the manual rows a destructive rebuild removed.
+            #    team_name and the player identity come from the KEY.
+            cur.execute("WITH " + honour_decoded + """
+                INSERT INTO honour_team_members
+                      (team_name, player_id, player_name_raw, link_status_value,
+                       position, role, club_name_raw, sort_order, note,
+                       status, status_reason, source_id)
+                SELECT m.team_name, m.player_id, m.v->>'player_name_raw',
+                       (CASE WHEN m.player_id IS NOT NULL THEN 'resolved'
+                             ELSE 'unmatched' END)::link_status,
+                       m.v->>'position', m.v->>'role', m.v->>'club_name_raw',
+                       COALESCE((m.v->>'sort_order')::smallint, 0), m.v->>'note',
+                       m.v->>'status', m.v->>'status_reason', m.source_id
+                  FROM member m
+                 WHERE m.field_group = 'record' AND m.member_id IS NULL
+            """)
+
+            # 2. Restore a manual row's whole payload.
+            cur.execute("WITH " + honour_decoded + """
+                UPDATE honour_team_members x
+                   SET player_name_raw = m.v->>'player_name_raw',
+                       position = m.v->>'position',
+                       role = m.v->>'role',
+                       club_name_raw = m.v->>'club_name_raw',
+                       sort_order = COALESCE((m.v->>'sort_order')::smallint, 0),
+                       note = m.v->>'note',
+                       status = m.v->>'status',
+                       status_reason = m.v->>'status_reason',
+                       updated_at = now()
+                  FROM member m
+                 WHERE m.field_group = 'record' AND x.id = m.member_id
+            """)
+
+            # 3. The correction DELTA over a source-owned row. team_name and
+            #    the recipient identity are absent by construction.
+            cur.execute("WITH " + honour_decoded + """
+                UPDATE honour_team_members x
+                   SET position = CASE WHEN jsonb_exists(m.v, 'position')
+                                       THEN m.v->>'position' ELSE x.position END,
+                       role = CASE WHEN jsonb_exists(m.v, 'role')
+                                   THEN m.v->>'role' ELSE x.role END,
+                       club_name_raw = CASE WHEN jsonb_exists(m.v, 'club_name_raw')
+                                            THEN m.v->>'club_name_raw' ELSE x.club_name_raw END,
+                       sort_order = CASE WHEN jsonb_exists(m.v, 'sort_order')
+                                         THEN COALESCE((m.v->>'sort_order')::smallint, 0)
+                                         ELSE x.sort_order END,
+                       note = CASE WHEN jsonb_exists(m.v, 'note')
+                                   THEN m.v->>'note' ELSE x.note END,
+                       updated_at = now()
+                  FROM member m
+                 WHERE m.field_group = 'correction' AND x.id = m.member_id
+            """)
+
+            # 4. The lifecycle decision, last and unconditional.
+            cur.execute("WITH " + honour_decoded + """
+                UPDATE honour_team_members x
+                   SET status = m.v->>'status',
+                       status_reason = m.v->>'status_reason',
+                       updated_at = now()
+                  FROM member m
+                 WHERE m.field_group = 'lifecycle' AND x.id = m.member_id
             """)

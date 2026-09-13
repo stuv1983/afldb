@@ -374,6 +374,41 @@ const allAustralian: DatasetSpec = {
 
   async promoteRow(row, resolved, { sql, awardId, sourceId, batchId }) {
     const recordId = `${resolved.season}:${row.player}:${row.club ?? ''}`;
+
+    // AFLDB-ISSUE-165 D-12. This is the SECOND writer of award_winners, and it
+    // knows nothing about the correction/void lifecycle: the upsert below
+    // re-asserts season, player, club, position and the captaincy flags from
+    // the file on every promotion. If an administrator has corrected or voided
+    // the row this file names, promoting over it would silently revert a human
+    // decision that src/db/queries/admin-awards.ts recorded durably — the same
+    // failure the awards importer needed replay_admin_overrides() to avoid.
+    //
+    // The answer here is a REFUSAL, not a replay. Teaching this writer full
+    // override semantics would put a second, divergent implementation of the
+    // replay in the ingest pipeline; refusing states the conflict plainly and
+    // leaves the operator to resolve it in /admin/awards (reinstate the row,
+    // or retire the override) before re-approving the submission. A 'record'
+    // override is deliberately NOT a blocker: those name manual_admin_edit rows
+    // this pipeline can never address, because its own source key is different.
+    const [held] = await sql<{ fieldGroup: string; entityKey: string }[]>`
+      SELECT o.field_group AS "fieldGroup", o.entity_key AS "entityKey"
+        FROM data_overrides o
+        JOIN sources s ON s.id = ${sourceId}
+       WHERE o.entity_type = 'award_winners'
+         AND o.is_active = true
+         AND o.field_group IN ('lifecycle', 'correction')
+         AND o.entity_key = s.key || ':' || ${recordId}
+       ORDER BY o.field_group
+       LIMIT 1
+    `;
+    if (held) {
+      throw new Error(
+        `"${row.player}" (${resolved.season}) carries an active ${held.fieldGroup} `
+        + `decision recorded in /admin/awards (${held.entityKey}). Promoting this file `
+        + 'would overwrite it. Resolve the row there first, then re-approve this submission.',
+      );
+    }
+
     await sql`
       INSERT INTO award_winners
         (award_id, season, player_id, player_name_raw, link_status_value,
