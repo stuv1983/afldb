@@ -1413,6 +1413,28 @@ label {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+/* Pending dot for the admin nav link being navigated to (AFLDB-ISSUE-166).
+   Inline inside the existing `display: block` anchor, so it flows after the
+   label without restyling the link itself. The pulse ends at full opacity so
+   the global prefers-reduced-motion rule below -- which collapses every
+   animation to 0.01ms and therefore lands on the last keyframe -- leaves a
+   visible dot rather than a nearly invisible one. */
+.admin-nav-pending {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: admin-nav-pending 1s ease-in-out infinite;
+}
+
+@keyframes admin-nav-pending {
+  0% { opacity: 1; }
+  50% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
 .admin-nav-foot { border-top: 1px solid var(--border); padding-top: 0.8rem; }
 .admin-nav-who {
   display: flex;
