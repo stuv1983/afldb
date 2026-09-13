@@ -1,32 +1,25 @@
 # AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
 
-**Status:** Open / **Stages 1–7 complete, deployed to DEV. Stage 8 STOPPED at 8.1 on a genuine
-rendered-acceptance defect (§20); a source-only corrective fix is now written and validated but
-UNCOMMITTED, UNDEPLOYED (§20.3).** DEV is on `8250abe` (`main`) and still SERVES THE DEFECT LIVE —
-the fix has not been pushed or deployed. Root cause: a `.admin-cards` CSS class-name collision
-with the unrelated responsive-table-card pattern used by `admin/coaches`/`admin/draft`/
-`admin/fixtures` (§20.1). Fix: the awards landing page's cards renamed off the shared classes onto
-dedicated `.awards-admin-*` ones with their own always-visible grid rule (§20.3) — `typecheck`/
-`eslint`/`git diff --check` clean, shared responsive-table pattern proved untouched. Stage 8 is
-**not** PASS and this issue is **not** Resolved: once the operator commits, pushes and redeploys,
-**Stage 8 restarts from 8.1** — no role-boundary, lifecycle-fixture, direct-route/action,
-responsive or focus/accessibility gate has been run yet.
-**Earlier state — Stages 1–6 implemented and GREEN on `afldb_test` (30/30, twice in
-succession); uncommitted, undeployed.** Stage 4 (public/read-model status filters across all four
-consumers), Stage 5 (`data.awards.read`/`.edit`, nav, route and action guards) and Stage 6 (the
-`/admin/awards` surface and the `/admin/data-editor` disposition) are complete — **§18 is the
-implementation record.** The importer-role reload gate §17.8 could not run has now been run
-(96/1/10; the one failure is a pre-existing `captaincies` manifest assertion, out of scope).
+**Status:** **RESOLVED 2026-09-13.** Stages 1–7 complete; Stage 8 rendered acceptance is complete
+and PASS on DEV — the `.admin-cards` CSS defect found at 8.1 (§20.1) was fixed (§20.3), committed,
+deployed, and Stage 8 restarted from 8.1 in full: the Contributor / Admin / Super Admin role
+matrix, the full create → correct → void → reinstate → replace lifecycle fixture, responsive
+(1440×900 and 375×812), accessibility/focus and console/network acceptance are all PASS (§21).
+`AFLDB-ISSUE-166`, found during this Stage 8 pass, is independently RESOLVED and held nothing
+against this issue (§20.4). Production status is not recorded here and must not be inferred from
+this entry.
 **Severity:** Medium
 **Area:** Admin / Data management
 **Created:** 2026-09-13
+**Resolved:** 2026-09-13
 **Parent:** `AFLDB-ISSUE-156` (umbrella), consuming **P5 — Awards/honours correction lifecycle**
 and absorbing the awards-domain residue of **P8 — Data-editor decomposition**.
-**Migration:** **`src/db/migrations/101_awards_honours_lifecycle.sql` — applied to `afldb_test`
-only** (operator, 2026-09-13: `101_awards_honours_lifecycle.sql ... ok`). DEV and PROD unapplied.
-B-2 resolved at the implementation preflight (2026-09-13): a repository-wide
-inspection of `src/db/migrations/` confirmed `100_nl_search_log_family_grain.sql` as the highest
-number and no `101_*` file, so 101 was free and is now allocated.
+**Migration:** **`src/db/migrations/101_awards_honours_lifecycle.sql`** — applied to `afldb_test`
+(operator, 2026-09-13) and applied on DEV as part of the Stage 8 deploy (§20: 101/101, 0 pending).
+PROD unapplied; PROD status is not otherwise claimed. B-2 resolved at the implementation preflight
+(2026-09-13): a repository-wide inspection of `src/db/migrations/` confirmed
+`100_nl_search_log_family_grain.sql` as the highest number and no `101_*` file, so 101 was free and
+is now allocated.
 
 Sections 1–16 are the planning deliverable, written before implementation and left standing as
 the record of what was decided and why. **§17 is the implementation record for Stages 1–3 and §18
@@ -1570,3 +1563,82 @@ now the corrected one. Stage 8 resumes from the remaining acceptance gates; the 
 work of §20.3 and the lifecycle-fixture work already passed and are not re-run unless a later
 regression requires it. The authoritative record is the `AFLDB-ISSUE-166` entry in `issues.md`,
 *Resolution (2026-09-13)*.
+
+---
+
+## 21. Stage 8 final acceptance — role matrix, responsive, accessibility, console/network (2026-09-13)
+
+With the §20.3 CSS fix committed, pushed and deployed to DEV, and `AFLDB-ISSUE-166` resolved and no
+longer a blocker (§20.4), Stage 8 restarted from 8.1 in full, per §20.2/§20.3's restart
+requirement.
+
+### 21.1 Gate 8.1 re-check
+
+The fixed landing page — not just the previously-invisible cards' presence, but their correct
+rendering — re-checked at both required widths: **PASS at 1440×900 and 375×812.**
+
+### 21.2 Full DEV lifecycle fixture
+
+One complete lifecycle exercised end to end on DEV: **create → correct → void → reinstate →
+replace.** Public visibility was checked at each transition (a voided/replaced record disappears
+from the public consumers listed in §3.7/§18.5.1; a reinstated one reappears); durable
+history/override behaviour was checked (each mutation's audit row and `data_overrides` payload
+match the action taken). **Zero active fixture residue at the end of the run** — the fixture
+tables carry no ACTIVE row that should not be there.
+
+**Voided fixture audit row — award-winner row #3714.** This row remains voided, carrying the
+Stage 8 lifecycle-fixture void reason, as intentional durable audit/history evidence: the
+lifecycle design (§6) is non-destructive by construction, a void keeps the row and its trail
+rather than deleting it, and that is precisely the behaviour this fixture run exists to prove.
+**It does not contradict "zero active fixture residue"** — the row is voided, not active — and no
+cleanup was required or performed.
+
+### 21.3 Role matrix — Contributor: PASS
+
+- Awards navigation is absent from the sidebar; the Contributor's Data group exposed only its
+  permitted surface.
+- Direct navigation to `/admin/awards` was denied with a genuine HTTP 307 to `/admin/upload`.
+- Direct navigation to `/admin/awards/winners`, `/admin/awards/hall-of-fame` and
+  `/admin/awards/honour-teams` was denied in every case.
+- The honour-teams denial was explicitly confirmed as a genuine HTTP 307 — not the former
+  `AFLDB-ISSUE-166` meta-refresh behaviour.
+- No lifecycle control was reachable, and no mutation request was crafted against this role.
+- Console: 0 errors/warnings. Network: clean; denials behaved normally.
+
+### 21.4 Role matrix — Admin: PASS
+
+- `/admin/awards` is available and renders normally.
+- Award winners, Hall of Fame and honour-team list/detail surfaces are all readable. Observed
+  record counts: **3,712 award winners / 343 Hall of Fame / 113 honour-team records.**
+- All mutation controls are absent — record new, correct, void, reinstate, replace — and DOM
+  inspection confirmed this is not merely a CSS-hidden control: the server-rendered markup omits
+  them outright. Detail pages show explanatory read-only text in their place.
+- Direct navigation to the three create routes (`/admin/awards/winners/new`,
+  `/admin/awards/hall-of-fame/new`, `/admin/awards/honour-teams/new`) was denied and redirected to
+  the Admin dashboard.
+- 1440×900: PASS on the remaining list surfaces. Keyboard focus order is logical with a visible
+  focus outline.
+- Console/network: 0 errors, 0 warnings.
+
+### 21.5 Role matrix — Super Admin: PASS
+
+- Landing, winners, Hall of Fame and honour-team surfaces all load.
+- "Record a winner", "Record an induction" and "Record a selection" links are present. Active
+  records expose Correct / Void / Replace across all three domains, and a voided award row exposes
+  Reinstate as expected.
+- Direct navigation to the three create routes loads populated forms.
+- No mutation was submitted during this final acceptance pass — the §21.2 lifecycle fixture
+  already covers mutation behaviour end to end.
+- 1440×900: PASS. **375×812: PASS with no page-level horizontal overflow**
+  (`scrollWidth === clientWidth === 360`). One provenance/state table cell uses contained
+  `.table-wrap` horizontal scrolling by design at this width — expected behaviour, not a defect.
+- Keyboard focus order between lifecycle controls: PASS, with a visible focus outline.
+- Console/network: 0 errors, 0 warnings; requests successful.
+
+### 21.6 Conclusion
+
+Stage 8 is complete: the Contributor / Admin / Super Admin role matrix, responsive acceptance,
+accessibility/focus acceptance and console/network acceptance all PASS, joining the lifecycle
+behaviour already proved in §21.2. `AFLDB-ISSUE-165` is **Resolved, 2026-09-13.** DEV carries the
+resolved surface; production status is not recorded here and must not be inferred from this
+entry.

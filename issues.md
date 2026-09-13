@@ -7,7 +7,22 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 2 tracked here — `-156`, `-165`.
+**Open issues:** 1 tracked here — `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-165 RESOLVED — Stage 8 rendered acceptance restarted from 8.1 after the
+     §20.3 CSS fix was committed, pushed and redeployed to DEV, and is now fully PASS: Contributor /
+     Admin / Super Admin role matrix, a complete create → correct → void → reinstate → replace
+     lifecycle fixture (public visibility and durable history/override behaviour checked, zero
+     active fixture residue — award-winner row #3714 stays voided as intentional durable audit
+     evidence, not residue), responsive (1440×900, 375×812), accessibility/focus and console/network
+     acceptance. `AFLDB-ISSUE-166`, found during this same Stage 8 pass, was already resolved
+     independently and held nothing against this issue. Migration 101 applied on DEV (101/101, 0
+     pending). PROD untouched; PROD status is not otherwise claimed. Following the
+     `AFLDB-ISSUE-160`–`163` sibling convention, PROD promotion is carried on the
+     `AFLDB-ISSUE-156` umbrella, which now records 165 as a resolved child. Open issue count
+     2 -> 1 — the umbrella `AFLDB-ISSUE-156` is now the only tracked open issue. Removed from this
+     table and from `IssuesIndex.md`. See the AFLDB-ISSUE-165 entry below, section Resolution
+     (2026-09-13), and `AFLDB-ISSUE-165.md` §21. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-166 RESOLVED — opened, investigated to root cause, fixed, committed,
      deployed to DEV and accepted the same day. Low severity, HTTP denial-signalling defect; the
@@ -1244,8 +1259,23 @@ created, reopened, resolved, or materially reclassified.
      (2026-09-13)*. Runbook `AFLDB-ISSUE-155.md` stays at the repository root (unmoved,
      per the `AFLDB-ISSUE-144.md` precedent). Removed from this table and from
      `IssuesIndex.md`; 2 -> 1. -->
-| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **P4–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
-| `AFLDB-ISSUE-165` | Medium | Admin / Data management | **OPEN — STAGES 1–7 COMPLETE 2026-09-13; STAGE 8 BLOCKED ON ONE OPERATOR ACTION; UNCOMMITTED, UNDEPLOYED.** Stage 7 (integrated regression and security acceptance) passed every `AFLDB-ISSUE-165.md` §12 gate that does not need a running DEV deployment. **32/32 on `afldb_test` as the owner and 32/32 again under the restricted `afldb_import` role** — the second run is the Stage 7 finding that mattered: the suite had been redirecting `AFLDB_IMPORT_DATABASE_URL` at the owner test DSN, which fixes the database and silently also fixes the ROLE, so every mutation ran as `afldb_owner`. That is exactly the blind spot §18.4 item 1 already cost this issue once on the READ path, and the WRITE path has the same exposure with a narrower grant (migration 078 gives `afldb_import` COLUMN-level INSERT/UPDATE on `data_overrides`, not table-level). The suite now uses the repository's own `createImportRoleParityHarness()` and proves role, database parity and a live 42501 denial in `beforeAll`. **Two live-path refusals that reached no test were found and closed:** the Brownlow refusal — the stop condition the ISSUE-156 P5 handoff names in as many words — and historical club-identity resolution both existed in `admin-awards.ts` but were tested only through the retired `awards-admin.ts`; and the ISSUE-080 §5.3 frozen advisory-lock contract pinned the moved-FROM module, leaving the live literal unpinned. Rest of the matrix: 343/343 on the five ISSUE-165 DB-free suites, 44/44 on the honours integration set, 129 passed / 1 skipped on the Query Builder / Gridley AA oracle / NL award-predicate set, full DB-free 4,571 passed / 1 failed / 14 skipped (the one failure the known Windows CRLF `finals-semantics-contract` test), typecheck clean, ESLint 0 errors and 6 warnings all re-proved present at `HEAD`, and `npm run build` PASS at 1,533/1,533 pages with all eleven `/admin/awards` routes emitted. Zero residue: 3,712 / 343 / 113, zero non-active rows, zero fixtures, zero overrides, zero audit rows. **`awards-admin.ts`: RETAIN** — removal fails the brief's second condition, because the twenty mocked-unit tests are built on a harness intercepting the retired creators' exact query sequence and `awards-reload-links.test.ts` holds the only real-contention advisory-lock proof, so porting is a rewrite rather than a move; recorded as a self-contained follow-up. **`captaincies` 1375-vs-1774: left alone**, re-grounded from history (assertion at `30a471c` 2026-09-01; `d08591f` 2026-09-05 added exactly 399 rows, 1,375 + 399 = 1,774; 151 commits back; this diff touches no captaincies file) — ISSUE-112 manifest debt, not this issue's. **Stage 8 stops after its read-only preflight** (DEV `b43eb4a` on `main`, clean, one behind `origin/main`; `current_database() = afldb_dev`; migrations through 100 with 0 pending; `afldb` active; `/api/health` 200): `deploy/sync-dev.ps1` deploys from `origin`, `origin/sonnet/issue-165-awards-admin` is at `9a687db` (Stage 1–3 backend only), and every Stage 4–6 change is staged and uncommitted, so the surface under test cannot reach DEV and this session is forbidden to commit or push. The rendered three-role matrix and the 1440×900 / 375×812 gate are the only §12 gates still unmet. Carried forward: the session's first `npm run build` failed `42703 column w.status does not exist` against `afldb_dev`, direct evidence that migration 101 must precede the build — `sync-dev.ps1` already sequences it that way. Stage 7 record: `AFLDB-ISSUE-165.md` §19. **Earlier state — STAGES 1–6 IMPLEMENTED AND DB-GATED 2026-09-13 (30/30 on `afldb_test`, twice in immediate succession, database left exactly as found); UNCOMMITTED, UNDEPLOYED. Stages 4–6 (2026-09-13, later session):** the public/read-model `status = 'active'` filter on every scan of the three honours tables in all four consumer modules (`awards.ts` 19, `grid-solver.ts` 17, `nl/player-career.ts` 2, `app/sitemap.ts` 2) and in the Query Builder's two relation CORRELATIONS, with `db-health.ts` deliberately left unfiltered and the reason recorded in the source; `data.awards.read` (Admin and up) / `data.awards.edit` (Super Admin only), the nav link, and a `requireCapability()` guard on all ten new pages, the revalidate route handler and all fifteen Server Actions; and the `/admin/awards` surface — landing with active/void counts, three filtered paged lists, three detail pages and three create pages, provenance visible in every list, identity fields visibly read-only with the reason, a two-step replacement preview, and history rendered by the AFLDB-ISSUE-157 viewer's own reader and component rather than a second audit subsystem. `/admin/data-editor` lost the three award forms and their three Server Actions and now carries the Draft-precedent compatibility pointer, so there is ONE authoritative create path. **R-3 is held by a counting contract** (`tests/honours-lifecycle-public-contract.test.ts`: scans must equal lifecycle predicates, per module) rather than by a list in a document. **Two defects in the Stages 1–3 code, found by Stage 4 and fixed:** `readHonourOverrides()` read `data_overrides` on the APPLICATION pool, which carries no `grant_app_read()` — it worked for the owner role the integration suite uses and would have failed closed on the first `/admin/awards/*/[id]` page load; and three cached public pages the Stage 4 filters newly made stale (`/awards`, `/seasons/<year>`, `/sitemap.xml`) were missing from the server-computed revalidation set. **The importer-role suite that skipped all 107 tests last session was RUN** — a valid DSN was derivable from the operator's existing `.env` (every DSN shares the `afldb_test` endpoint) and was built in memory, never printed: 96 passed / 1 failed / 10 skipped, the one failure a stale `captaincies` manifest assertion (expects 1,375 rows; the tracked CSV has held 1,774 since `d08591f`) on a table explicitly out of this issue's scope. Validation: `npm run typecheck` clean, ESLint 0 errors over every changed file, DB-free 4,571 passed over 123 files (one pre-existing Windows CRLF failure), ISSUE-165 integration 30/30 twice. Pre-existing unrelated DB-backed failures recorded with evidence in `AFLDB-ISSUE-165.md` §18.9, including one proved by A/B against `HEAD`. Stages 7–9 (closeout, browser acceptance, deployment) NOT started; migration 101 remains `afldb_test`-only; no `CHANGELOG.md` entry. Full record: `AFLDB-ISSUE-165.md` §18. **Earlier state — STAGES 1–3 IMPLEMENTED AND DB-GATED 2026-09-13 (24/24 on `afldb_test`, twice in immediate succession, database left exactly as found); UNCOMMITTED, UNDEPLOYED.** Migration 101 applied to `afldb_test` only. The first DB-backed run was 18/5: one real implementation bug (`insertHallOfFame()` overwrote the supplied inductee name with the linked player's display name, silently moving the durable key on the one table whose name IS its identity), one defective test query (`conname LIKE '%status%'` can never find `*_void_reason_ck`), three fixture-isolation defects — all repaired without weakening a contract, and the suite is now idempotent against an already-used test DB. Outstanding: `tests/integration/awards-reload-links.test.ts` skips all 107 tests for want of `AFLDB_TEST_IMPORT_DATABASE_URL` (pre-existing environment gap); the one new `reload_keyed()` path it would cover is proved directly in the ISSUE-165 suite instead. Earlier state: `AFLDB-ISSUE-156` P5 (awards/honours correction, voiding and replacement lifecycle), absorbing the awards/Hall of Fame/honour-team slice of P8. Branch `sonnet/issue-165-awards-admin`, base `37ac7d3`, worktree `D:\dev\afldb-issue-165`. **Migration 101** `src/db/migrations/101_awards_honours_lifecycle.sql` written and **NOT run against any database**: `status`/`status_reason`/`updated_at` plus two CHECKs on each of `award_winners`, `hall_of_fame`, `honour_team_members`; `hall_of_fame`'s and `honour_team_members`' identity keys rebuilt ACTIVE-ROW-ONLY so a replacement can re-use a voided row's identity; `data_overrides.entity_type` widened by the three names. `award_winners`' source-record key is deliberately unchanged and `(award_id, season, player_id)` is deliberately NOT made unique — the 1984 All-Australian club+state pairs are two legitimate rows per player (migration 042). New `src/db/queries/admin-awards.ts`: readers plus create / correct-safe-metadata / void / reinstate / replace for all three domains, `SELECT … FOR UPDATE` with an `updated_at` compare-and-swap, `data_edits` written in the same transaction as every canonical and override write, post-write refusals thrown so `postgres.js` rolls back rather than committing a half-done mutation, the AFLDB-ISSUE-080 §5.3 advisory lock reused for every honour-team identity writer. Three new `replay_admin_overrides()` branches in `tools/migration/common.py` (`lifecycle`/`correction`/`record` field groups, natural-key `entity_key`s, no row ids and no name matching anywhere), called from all nine `import_awards.py` reload sites — seven `award_winners` groups, Hall of Fame, honour teams — inside each group's own transaction, before its commit. Operator decisions **D-8** (no speculative indexes), **D-9** (correction/record fail closed, lifecycle warns and RETAINS), **D-10** (voided rows leave the admin player-link and candidate queues), **D-11** (`awards.first_season`/`last_season` recomputed from ACTIVE rows in the same transaction, and the importer's own span update likewise) and **D-12** (the legacy ingest writer refuses to overwrite an active lifecycle/correction override, and learns no override semantics) all implemented; blockers **B-1** (0 NULL `source_id` / 0 NULL `source_record_id` over 3,712 `award_winners` rows on `afldb_test`, with a defensive `no_durable_key` refusal kept anyway) and **B-2** (migration 101 free) closed. **Two findings the planning session missed, both now corrected in the runbook:** the public read surface is FOUR modules, not one (`awards.ts`, `grid-solver.ts`, `nl/player-career.ts`, `app/sitemap.ts`), widening the Stage 4+ status filter and the §12.6 invariance gate; and `data_edits.table_name` has admitted all three honours tables since migration 058 with **no promotion lineage target** — the fourth instance of the `AFLDB-ISSUE-160` D-3 defect — fixed here with three new identity rules in `tools/db/promotion-inventory.ts` plus a standing contract test that forces the decision for any future admitted table. DB-free validation clean: 4,535 tests over 120 files, `npm run typecheck`, `eslint` on every changed file, `py_compile` on both changed Python modules. **DB-backed gate NOT RUN** — the worktree has no `.env` and no `AFLDB_TEST_DATABASE_URL`; `tests/integration/admin-awards.test.ts` is written but unrun. Stages 4–9 not started. No `CHANGELOG.md` entry: nothing applied, nothing deployed, no behaviour changed. Runbook `AFLDB-ISSUE-165.md` §17 is the authoritative implementation record. **Next action (operator):** stage and commit the reviewed working tree, `git push origin sonnet/issue-165-awards-admin`, then `deploy/sync-dev.ps1 -RemoteRef sonnet/issue-165-awards-admin` (which applies migration 101 before the build), `npm run db:privileges` on DEV as the no-op reconcile proof, and run the Stage 8 browser matrix — `AFLDB-ISSUE-165.md` §19.10 is the restart list. Superseded earlier next action: review the uncommitted diff, then bring up the `afldb_test` tunnel, apply migration 101 to `afldb_test` only and run the integration suite before Stage 4. The `brownlow_vote_entry_state` `data_edits` lineage gap the new standing test surfaces belongs to `AFLDB-ISSUE-155`, not here. |
+<!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-165` (Awards & Honours administration: correction, voiding
+     and replacement lifecycle, `AFLDB-ISSUE-156` P5) is **Resolved** and is NO LONGER an open
+     issue. Stages 1–7 were committed and deployed to DEV (`8250abe`/`main`, migration 101
+     applied); Stage 8 rendered acceptance stopped at gate 8.1 on a genuine `.admin-cards` CSS
+     class-name collision, which was fixed (dedicated `.awards-admin-*` classes), committed, pushed
+     and redeployed. Stage 8 then restarted from 8.1 in full and is PASS: Contributor / Admin /
+     Super Admin role matrix, a complete create → correct → void → reinstate → replace lifecycle
+     fixture (public visibility and durable history/override behaviour both checked, zero active
+     fixture residue — award-winner row #3714 stays voided as intentional durable audit evidence,
+     not residue), responsive (1440×900, 375×812), accessibility/focus and console/network
+     acceptance. `AFLDB-ISSUE-166`, found during this same Stage 8 pass, was resolved independently
+     the same day and held nothing against this issue. PROD untouched; PROD status is not otherwise
+     claimed. Following the `AFLDB-ISSUE-160`–`163` sibling convention, PROD promotion is carried on
+     the `AFLDB-ISSUE-156` umbrella, not this issue. Full evidence: the `AFLDB-ISSUE-165` entry
+     below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
+     from `IssuesIndex.md`; 2 -> 1. -->
+| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4, P6–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
 <!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-166` (streamed admin denials return HTTP 200 + meta-refresh
      instead of an HTTP redirect) is **Resolved** and is NO LONGER an open issue. Committed as
      `aaa24f8` on `opus/issue-166-admin-fetch-auth-bypass` and deployed to DEV as
@@ -23224,7 +23254,7 @@ runbook started under `issues/open/` (e.g. `AFLDB-ISSUE-152`, `-153`, `-137`).
 
 ## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
 
-**Status:** Open — P1, P2 and P3 resolved 2026-09-11; **P3b, P3c, P3d and P3e (`AFLDB-ISSUE-160`–`163`) resolved 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434`, so the batch is ready for the next release/promotion stage (a separate operator decision; PROD untouched). **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. P4–P12 unallocated. See *P3b–P3e complete (2026-09-12)* below for the carried promotion checklist and follow-ups. **Correction (2026-09-12):** every "S-1" / "paused ISSUE-151 PROD promotion" reference below (§11.1 and elsewhere) describes a promotion that has since **completed** — stamp `20260907-234124`, 2026-09-08 01:11:24.440219 AEST, `auth_audit_log` id 196, under `AFLDB-ISSUE-125` — before this umbrella's children existed. There is no paused promotion for this batch's own future release to sequence against; do not follow any instruction below to decide S-1 against it. See the `AFLDB-ISSUE-151` entry for the authoritative record.
+**Status:** Open — P1, P2 and P3 resolved 2026-09-11; **P3b, P3c, P3d and P3e (`AFLDB-ISSUE-160`–`163`) resolved 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434`, so the batch is ready for the next release/promotion stage (a separate operator decision; PROD untouched). **P5 (`AFLDB-ISSUE-165`) resolved 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (Stage 8 role matrix, lifecycle fixture, responsive and accessibility acceptance all PASS); see the `AFLDB-ISSUE-165` entry, *Resolution (2026-09-13)*. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. P4, P6–P12 unallocated. See *P3b–P3e complete (2026-09-12)* below for the carried promotion checklist and follow-ups. **Correction (2026-09-12):** every "S-1" / "paused ISSUE-151 PROD promotion" reference below (§11.1 and elsewhere) describes a promotion that has since **completed** — stamp `20260907-234124`, 2026-09-08 01:11:24.440219 AEST, `auth_audit_log` id 196, under `AFLDB-ISSUE-125` — before this umbrella's children existed. There is no paused promotion for this batch's own future release to sequence against; do not follow any instruction below to decide S-1 against it. See the `AFLDB-ISSUE-151` entry for the authoritative record.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Found:** 2026-09-11
@@ -26489,27 +26519,27 @@ rate) not required by this issue's acceptance criteria.
 
 ## AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
 
-- **Status:** Open — **Stages 1–7 complete and deployed to DEV 2026-09-13 (`8250abe`, migration
-  101 applied, service healthy). Stage 8 rendered acceptance STOPPED at 8.1 on a genuine defect
-  (§20); a source-only corrective fix is now written and validated but UNCOMMITTED, UNDEPLOYED
-  (§20.3) — DEV still serves the defect live.** Root cause: a `.admin-cards` CSS class-name
-  collision with the unrelated responsive-table-card pattern (`admin/coaches`, `admin/draft`,
-  `admin/fixtures`) hid `/admin/awards`'s three navigation cards at every viewport width. Fix:
-  the awards landing page's cards moved onto dedicated `.awards-admin-*` classes with their own
-  always-visible grid; typecheck/lint/whitespace clean, shared pattern proved untouched. Direct
-  URLs to all three domains work correctly. Once committed, pushed and redeployed, Stage 8 must
-  restart from 8.1 — no role-boundary, lifecycle-fixture, direct-route/action, responsive or
-  accessibility gate has been run. Full record in `AFLDB-ISSUE-165.md` §20.
+- **Status:** **RESOLVED 2026-09-13.** Stages 1–7 complete and deployed to DEV (`8250abe`,
+  migration 101 applied, service healthy). Stage 8 rendered acceptance STOPPED at 8.1 on a genuine
+  defect (§20) — a `.admin-cards` CSS class-name collision with the unrelated responsive-table-card
+  pattern (`admin/coaches`, `admin/draft`, `admin/fixtures`) hid `/admin/awards`'s three navigation
+  cards at every viewport width. The corrective fix (dedicated `.awards-admin-*` classes with their
+  own always-visible grid) was reviewed, committed, pushed and redeployed to DEV, and Stage 8
+  restarted from 8.1 in full: the Contributor / Admin / Super Admin role matrix, a complete
+  create → correct → void → reinstate → replace lifecycle fixture, responsive (1440×900, 375×812),
+  accessibility/focus and console/network acceptance are all PASS. See *Resolution (2026-09-13)*
+  below and `AFLDB-ISSUE-165.md` §21. PROD untouched; PROD status is not otherwise claimed.
 - **Severity:** Medium
 - **Area:** Admin / Data management
 - **Found:** 2026-09-13
+- **Resolved:** 2026-09-13
 - **Runbook:** `AFLDB-ISSUE-165.md` — §§1–16 are the planning deliverable, **§17 is the
   authoritative implementation record for Stages 1–3** (correcting §§3.1, 3.4, 3.7, 8 and 12
-  where the planning turned out to be wrong) and **§18 for Stages 4–6** (closing every item
-  §17.7 carried forward, and recording two defects in the code §17 describes).
-- **Migration:** `src/db/migrations/101_awards_honours_lifecycle.sql` — **applied to `afldb_test`
-  only** (operator, 2026-09-13: `101_awards_honours_lifecycle.sql ... ok`). DEV and PROD
-  unapplied.
+  where the planning turned out to be wrong), **§18 for Stages 4–6**, **§19 for Stage 7**, **§20
+  for the Stage 8 CSS defect and fix**, and **§21 for Stage 8 final acceptance**.
+- **Migration:** `src/db/migrations/101_awards_honours_lifecycle.sql` — applied to `afldb_test`
+  (operator, 2026-09-13: `101_awards_honours_lifecycle.sql ... ok`) and applied on DEV as part of
+  the Stage 8 deploy (101/101, 0 pending). PROD unapplied; PROD status is not otherwise claimed.
 - **Branch:** `sonnet/issue-165-awards-admin`, base `37ac7d3`.
 - **Parent:** `AFLDB-ISSUE-156` (umbrella), consuming P5 — Awards/honours correction lifecycle,
   and absorbing the awards/Hall of Fame/honour-team slice of P8 — Data-editor decomposition.
@@ -26785,21 +26815,77 @@ disk; `current_database() = afldb_test` and `current_user = afldb_import` were p
 rows since `d08591f`), on a table explicitly out of scope here and untouched by this diff. Not
 opened as a new issue: it is a stale assertion with a one-line fix, not a defect.
 
-### Resolution
+### Stage 8, restart and genuine acceptance failure (2026-09-13)
 
-Not resolved. Stages 1–6 are implemented and awaiting operator review; Stages 7–9 (closeout, the
-browser acceptance gate and deployment) are not started. No `CHANGELOG.md` entry has been made:
-migration 101 is applied to `afldb_test` only and nothing is deployed, so no application, data or
-admin behaviour has reached a reader yet — the entry belongs with the Stage 7–9 deployment.
+Full record in `AFLDB-ISSUE-165.md` §20. The operator committed and pushed Stages 4–6 and deployed
+to DEV (`8250abe`/`main`, migration 101 applied, service healthy); Stage 8 rendered acceptance then
+found a genuine defect at gate 8.1 before role-boundary or lifecycle testing could proceed —
+`/admin/awards`'s three navigation cards were invisible at every viewport width, root-caused to a
+`.admin-cards` CSS class-name collision with the unrelated responsive-table-card pattern shared by
+`admin/coaches`/`admin/draft`/`admin/fixtures`. A source-only corrective fix (dedicated
+`.awards-admin-*` classes with their own always-visible grid, §20.3) was written and validated but
+left uncommitted for operator review, per the session brief's stop-on-genuine-defect instruction.
 
-**Next action (operator).** Review the uncommitted Stages 4–6 diff, then Stage 7–9 closeout:
-the full browser acceptance gate (1440×900 and 375×812, and the three-role direct-URL and
-direct-POST matrix), the DEV deploy order (migration 101, then `npm run db:privileges`, then the
-code), and the `CHANGELOG.md` entry. Two pieces of residue are recorded rather than fixed:
-`src/db/queries/awards-admin.ts` (retired, no application caller, retained for the three
-contracts currently pinned through it) and the stale `captaincies` manifest assertion, which is
-not this issue's but will block a clean full-suite run. Runbook §14's D-4 and D-6 are settled by
-the implementation (§17.3, §8); D-5 is answered as three sub-routes.
+A second, unrelated finding from the same Stage 8 role-matrix pass was opened as
+`AFLDB-ISSUE-166` (streamed admin denials returning HTTP 200 + meta-refresh instead of an HTTP
+redirect). It was not caused by this issue and was resolved independently 2026-09-13 (see the
+`AFLDB-ISSUE-166` entry above); it held nothing against this issue's own closure (§20.4).
+
+### Resolution (2026-09-13)
+
+**Resolved.** The operator reviewed, committed, pushed and redeployed the §20.3 fix; Stage 8
+restarted from 8.1 in full and every remaining acceptance gate is PASS. Full record in
+`AFLDB-ISSUE-165.md` §21.
+
+**Contributor — PASS.** Awards navigation is absent from the sidebar; the Contributor's Data group
+exposed only its permitted surface. Direct navigation to `/admin/awards` was denied with a genuine
+HTTP 307 to `/admin/upload`; direct navigation to `/admin/awards/winners`,
+`/admin/awards/hall-of-fame` and `/admin/awards/honour-teams` was denied in every case, with the
+honour-teams denial explicitly confirmed as a genuine HTTP 307 and not the former `AFLDB-ISSUE-166`
+meta-refresh behaviour. No lifecycle control was reachable and no mutation request was crafted.
+Console: 0 errors/warnings; network clean.
+
+**Admin — PASS.** `/admin/awards` is available and renders normally; award winners, Hall of Fame
+and honour-team list/detail surfaces are all readable, with observed record counts of **3,712
+award winners / 343 Hall of Fame / 113 honour-team records**. All mutation controls (record new,
+correct, void, reinstate, replace) are absent, and DOM inspection confirmed the server-rendered
+markup omits them outright rather than merely CSS-hiding them; detail pages show explanatory
+read-only text instead. Direct navigation to the three create routes
+(`/admin/awards/winners/new`, `/admin/awards/hall-of-fame/new`, `/admin/awards/honour-teams/new`)
+was denied and redirected to the Admin dashboard. 1440×900 PASS on the remaining list surfaces;
+keyboard focus order logical with a visible focus outline. Console/network: 0 errors, 0 warnings.
+
+**Super Admin — PASS.** Landing, winners, Hall of Fame and honour-team surfaces all load; "Record
+a winner" / "Record an induction" / "Record a selection" links are present; active records expose
+Correct / Void / Replace across all three domains, and a voided award row exposes Reinstate as
+expected. Direct navigation to the three create routes loads populated forms. No mutation was
+submitted during this final acceptance pass — the earlier lifecycle fixture already covers
+mutation behaviour. 1440×900 PASS; 375×812 PASS with no page-level horizontal overflow
+(`scrollWidth === clientWidth === 360`) — one provenance/state table cell uses contained
+`.table-wrap` horizontal scrolling by design at this width, expected behaviour and not a defect.
+Keyboard focus order between lifecycle controls PASS with a visible focus outline. Console/network:
+0 errors, 0 warnings; requests successful.
+
+**Lifecycle fixture.** A full DEV-only fixture lifecycle — create → correct → void → reinstate →
+replace — passed with public visibility and durable history/override behaviour both checked, and
+zero active fixture residue at the end. **Award-winner row #3714 remains voided with the Stage 8
+lifecycle-fixture reason**, as intentional durable audit/history evidence under the non-destructive
+lifecycle design (§6); it does not contradict "zero active fixture residue" and no cleanup was
+required or performed.
+
+**Conclusion.** Stage 8 complete: the Contributor / Admin / Super Admin role matrix, responsive
+acceptance, accessibility/focus acceptance, console/network acceptance and lifecycle behaviour are
+all PASS. `AFLDB-ISSUE-165` is Resolved. `CHANGELOG.md` already carries the correct, DEV-scoped
+entry under `Unreleased` (13 September 2026) and needs no change: it states migration 101 is
+applied on DEV and deliberately does not claim a PROD status. Residue recorded rather than fixed,
+carried as follow-up under the parent umbrella rather than blocking this issue:
+`src/db/queries/awards-admin.ts` stays retired-with-no-caller (porting its twenty mocked-unit tests
+is a rewrite, not a move, and `awards-reload-links.test.ts` holds the only real-contention
+advisory-lock proof; its three contracts are now each proved against the live module too), and the
+`captaincies` manifest assertion (expects 1,375; the tracked CSV has held 1,774 since `d08591f`) is
+pre-existing `AFLDB-ISSUE-112` debt untouched by this diff. Following the sibling convention
+(160–163), PROD promotion is not this issue's own gate and is carried on the `AFLDB-ISSUE-156`
+umbrella.
 
 ## AFLDB-ISSUE-166 — Streamed admin denials return HTTP 200 + meta-refresh instead of an HTTP redirect
 
