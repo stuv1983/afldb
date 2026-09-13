@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Production first-kick-goal search restored after the database rebuild dropped its data (AFLDB-ISSUE-152) - 13 September 2026
+
+- "Players who kicked a goal with their first kick" and related first-kick-goal questions were
+  parsing and executing correctly on production but answering 0 results, because the curated
+  `player_achievements` first-kick-goal population had not been carried over by the canonical
+  database rebuild/cutover — not a code or parser defect.
+- Restored via the existing tracked importer (`tools/records/import-first-kick-goal.ts`), first
+  rehearsed on DEV then applied to production: 334 rows imported (330 player-linked, 328
+  match-linked, seasons 1911–2026). Production first-kick-goal search and the
+  `/records/first-kick-goal` page now answer correctly again.
+
 ### New public Records pages for football families, father-son selections, coaches and after-the-siren kicks (AFLDB-ISSUE-139) - 13 September 2026
 
 - Four new curated Records pages, each linked from `/records` and reused from the existing

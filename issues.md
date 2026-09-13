@@ -7,7 +7,30 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3 tracked here — `-152`, `-155`, `-156`.
+**Open issues:** 2 tracked here — `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-152 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO
+     DEPLOY, NO DATABASE MUTATION THIS SESSION): closeout only. The Phase F checkpoint
+     (`opus/issue-152-nl-record-expansion`, tip `6f9723a`) was already an ancestor of
+     `main`, and is independently confirmed an ancestor of PROD HEAD `0955db3`; production
+     migrations 092 and 093 are applied. The eight deferred labels (C1, FS1, FS2, FS3,
+     FS6, D6, D8, X3) were absorbed and resolved by `AFLDB-ISSUE-153` and are not
+     ISSUE-152 blockers. The previously unrun general `nl:stress` obligation is now
+     discharged: V1 (12,000-row corpus, parser v41, 10,726 clean / 1,063 soft / 211 hard,
+     0 errors) and V2 (250,000-row corpus, 244,927 scored, 226,920 clean / 10,259 soft /
+     7,748 hard, 0 errors, 0 unsafe answers, safe declines 24,393/24,393, metamorphic
+     consistency 6,788/6,788); the runbook sets no numeric pass threshold and the hard
+     findings were reviewed as outside ISSUE-152 scope. Final live PROD verification
+     found the first-kick-goal answer returning 0 despite a correct parse — root cause
+     was the curated `player_achievements` population not having been restored after the
+     canonical database rebuild/cutover, not a code defect. Remediated via the existing
+     tracked importer `tools/records/import-first-kick-goal.ts`, rehearsed on DEV (batch
+     89) then applied to PROD (batch 116, 334 inserted / 0 updated; 334 total / 330
+     player-linked / 328 match-linked). Final live PROD acceptance PASS: first-kick-goal
+     (330 players, incl. Josh Rachele), coaches Richmond (42), after-the-siren (71), no
+     runtime warnings. See `issues.md` Resolution (2026-09-13) and
+     `issues/closed/AFLDB-ISSUE-152.md` §28. Removed from the Open Issues table and
+     `IssuesIndex.md`; 3 -> 2. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-140 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): closeout only. Confirmed as a superseded historical DEV data defect. The retained
@@ -21333,7 +21356,8 @@ independently validated per above; no ISSUE-151 regression found.
 
 ## AFLDB-ISSUE-152 — Expand deterministic NL Search to newer AFLDB record families
 
-- **Status:** **OPEN — STAGE 0 COMPLETE; PHASE B (coaching) COMMITTED 2026-09-08 as `e8f5f67`,
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this
+  entry. As it stood earlier in this session (retained): **OPEN — STAGE 0 COMPLETE; PHASE B (coaching) COMMITTED 2026-09-08 as `e8f5f67`,
   F5 CLOSED; PHASE C (after the siren) COMMITTED 2026-09-08 as `47a645f`, M7 CLOSED;
   PHASE E (first-kick-goal closure) COMMITTED 2026-09-09 as `75d207d`, F4 CLOSED;
   PHASE G RENDERED ACCEPTANCE COMPLETE AND GREEN 2026-09-09 (P3-r2 271/271, P4-r1 1,495/1,495 —
@@ -21827,8 +21851,69 @@ Runbook **§25**. Superseded by §26 above; kept as the recorded contract.
    the `AFLDB-ISSUE-155` deployment (94/94, 0 pending). **For PRODUCTION the deploy ordering is
    unchanged: migrations 092 and 093 must reach production BEFORE the code.** Decide whether
    `nl:stress` runs before deploy; it has still NOT been run for B, C, D, E or F.
-7. **Do not resolve ISSUE-152.** C1, FS1, FS2, FS3, FS6, D6, D8 and X3 remain deferred to
-   `AFLDB-ISSUE-153` and are held by named decline rows, not by Phase F failures.
+7. **Superseded by events.** ISSUE-152 has been resolved — see *Resolution (2026-09-13)*
+   below. Items 1–7 above are retained as historical record of the pre-resolution state.
+
+### Resolution (2026-09-13)
+
+The Phase F checkpoint (branch `opus/issue-152-nl-record-expansion`, tip `6f9723a`) was
+already an ancestor of `main`, and is now independently confirmed an ancestor of PROD
+HEAD `0955db3`. Production migrations **092** and **093** are applied.
+
+**Deferred semantics discharged by `AFLDB-ISSUE-153`.** The eight labels this issue
+deferred — **C1, FS1, FS2, FS3, FS6, D6, D8 and X3** — were absorbed and resolved by
+`AFLDB-ISSUE-153` (its Stages 1–7, RESOLVED 2026-09-13; see that entry's *Resolution
+(2026-09-13)* and `issues/closed/AFLDB-ISSUE-153.md` §11.16). They are not remaining
+ISSUE-152 blockers.
+
+**`nl:stress` obligation discharged.** The previously unrun general `nl:stress`
+obligation (item 6 above) has now been run against `afldb_test`:
+
+- **V1** — corpus `/home/arm/nl-stress-corpus.csv`, 12,000 rows, `PARSER_VERSION` 41:
+  10,726 clean / 1,063 soft / 211 hard / **0 errors**.
+- **V2** — corpus `/home/arm/nl-killer-250k.csv`
+  (SHA256 `d2edefd572f2daa393c1d2c7d59b3fdf98de1e9eba725cde49193da9724b392d`), 250,000
+  rows, 244,927 scored: 226,920 clean / 10,259 soft / 7,748 hard / **0 errors**, 0
+  unsafe answers, safe declines 24,393/24,393, metamorphic consistency 6,788/6,788.
+
+The runbook (`issues/open/AFLDB-ISSUE-152.md`) defines no numeric `nl:stress` pass
+threshold and does not require the general corpora to contain the new ISSUE-152 grains.
+The hard findings were reviewed and are outside ISSUE-152 scope; no ISSUE-152 regression
+was identified. ISSUE-152-specific semantics were independently covered by their
+phase-specific DB-backed and rendered acceptance suites (Phases B/C/D/E/F/G, above).
+
+**Production first-kick-goal data gap — found during final verification, and repaired.**
+Initial live PROD verification found "who coached Richmond" (PASS, 42) and "goals after
+the siren" (PASS, 71) correct, but "players who kicked a goal with their first kick"
+parsed correctly and returned 0. Root cause: the curated `player_achievements`
+first-kick-goal population (Phase E, §18) had not been restored after the canonical
+database rebuild/cutover — `afldb_test` held 334 rows (330 player-linked, 328
+match-linked, 1911–2026) while both `afldb_dev` and `afldb_prod` held 0. This is a data-
+restoration gap, not a parser/code defect, and not an ISSUE-152 implementation defect.
+
+Remediation used the existing tracked importer `tools/records/import-first-kick-goal.ts`:
+rehearsed on DEV first (`--check` PASS; dry run 334 imported / 330 matched / 0 ambiguous /
+4 unmatched / 328 match-resolved; `--apply` as DEV import batch 89; post-import DEV counts
+334/330/328/23/4, seasons 1911–2026), then run on PROD via the same supported path (DB
+identity proven `afldb_prod`/`afldb_import`; `--check` PASS; dry run matched DEV exactly;
+`--apply` as **PROD import batch 116**, 334 inserted / 0 updated; post-import PROD counts
+334 total / 330 player-linked / 328 match-linked / 23 no-further-career-goals / 4
+no-further-career-kicks, seasons 1911–2026). Expected unresolved/source-quality findings
+remain and are not closure blockers: 4 unmatched 2026 source rows, 2 unresolved
+first-kick matches, a Gerald O'Loughlin source-career-kicks contradiction and an Archer
+Day-Wicks source-career-goals contradiction (all recorded by the importer).
+
+**Final live PROD verification (`https://beta.afldb.com`):** "players who kicked a goal
+with their first kick" — PASS, 330 players match (Showing 100 of 330); a known-positive
+player taken from the live PROD record page, Josh Rachele — "did josh rachele kick a
+goal with his first kick" — PASS, yes; "who coached Richmond" — PASS, 42 coaches; "goals
+after the siren" — PASS, 71 kicks after the siren. Runtime: application/API/RSC requests
+200, no warnings; the recurring CSP block of `static.cloudflareinsights.com/beacon.min.js`
+is a pre-existing, unrelated analytics-beacon issue, not ISSUE-152.
+
+**ISSUE-152 is RESOLVED — 2026-09-13.** No remaining ISSUE-152 implementation, stress,
+migration, data, deployment or browser gate remains. Full closing record:
+`issues/closed/AFLDB-ISSUE-152.md` §28.
 
 ---
 

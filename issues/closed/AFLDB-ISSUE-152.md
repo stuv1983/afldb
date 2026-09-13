@@ -6098,3 +6098,72 @@ Still outstanding:
   run for B, C, D, E or F.
 
 No deployment, no merge and no production change was made in this slice.
+
+## 28. Final closeout — RESOLVED 2026-09-13
+
+**Merge and production migrations.** The Phase F checkpoint (`opus/issue-152-nl-record-
+expansion`, tip `6f9723a`) was already an ancestor of `main`; it is now independently
+confirmed an ancestor of PROD HEAD `0955db3`. Production migrations **092**
+(`092_nl_search_log_coach_record_grain.sql`) and **093**
+(`093_nl_search_log_after_siren_grain.sql`) are applied.
+
+**§27.7's deferred-half blocker is discharged by `AFLDB-ISSUE-153`.** The eight labels
+this issue deferred — **C1, FS1, FS2, FS3, FS6, D6, D8 and X3** — were absorbed and
+resolved by `AFLDB-ISSUE-153` (its Stages 1–7, RESOLVED 2026-09-13:
+`issues/closed/AFLDB-ISSUE-153.md` §11.16). They are not remaining ISSUE-152 blockers.
+
+**§27.7's `nl:stress` blocker is discharged.** Run against `afldb_test`:
+
+- **V1** — corpus `/home/arm/nl-stress-corpus.csv`, 12,000 rows, `PARSER_VERSION` 41:
+  10,726 clean / 1,063 soft / 211 hard, **0 errors**.
+- **V2** — corpus `/home/arm/nl-killer-250k.csv`
+  (SHA256 `d2edefd572f2daa393c1d2c7d59b3fdf98de1e9eba725cde49193da9724b392d`), 250,000
+  rows, 244,927 scored: 226,920 clean / 10,259 soft / 7,748 hard, **0 errors**, 0 unsafe
+  answers, safe declines 24,393/24,393, metamorphic consistency 6,788/6,788.
+
+This runbook defines no numeric `nl:stress` pass threshold and does not require the
+general corpora to contain the ISSUE-152 grains specifically. The hard findings were
+reviewed and are outside ISSUE-152 scope; no ISSUE-152 regression was identified.
+ISSUE-152-specific semantics remain independently covered by the phase-specific
+DB-backed and rendered acceptance suites recorded in §14, §16, §18, §21, §24 and §27.
+
+**Production first-kick-goal data gap, found during final verification.** Initial live
+PROD verification found "who coached Richmond" (PASS, 42 coaches) and "goals after the
+siren" (PASS, 71 events) correct, but "players who kicked a goal with their first kick"
+parsed correctly and returned 0. Investigation proved this was **not a parser/code
+defect**: `afldb_test` held the full Phase E population (334 total / 330 player-linked /
+328 match-linked / 23 no-further-career-goals / 4 no-further-career-kicks, seasons
+1911–2026) while both `afldb_dev` and `afldb_prod` held 0 rows. Root cause: the curated
+`player_achievements` first-kick-goal population (§18) had not been restored after the
+canonical database rebuild/cutover.
+
+**Remediation.** The tracked importer `tools/records/import-first-kick-goal.ts` was
+rehearsed on DEV first — `--check` PASS; dry run 334 imported / 330 matched / 0
+ambiguous / 4 unmatched / 328 match-resolved; `--apply` completed as **DEV import batch
+89**; post-import DEV counts 334/330/328/23/4, seasons 1911–2026 — then the same
+supported path was executed on PROD: DB identity proven `afldb_prod`/`afldb_import`;
+`--check` PASS; dry run matched DEV exactly; `--apply` completed as **PROD import batch
+116**, 334 inserted / 0 updated; post-import PROD counts 334 total / 330 player-linked /
+328 match-linked / 23 no-further-career-goals / 4 no-further-career-kicks, seasons
+1911–2026. Expected unresolved/source-quality findings remain and are **not** closure
+blockers: 4 unmatched 2026 source rows, 2 unresolved first-kick matches, a Gerald
+O'Loughlin source-career-kicks contradiction, and an Archer Day-Wicks
+source-career-goals contradiction (all recorded by the importer itself).
+
+**Final live PROD verification (`https://beta.afldb.com`):**
+
+- "players who kicked a goal with their first kick" — PASS, 330 players match (Showing
+  100 of 330).
+- A known-positive player taken from the live PROD record page, Josh Rachele — "did josh
+  rachele kick a goal with his first kick" — PASS, yes.
+- "who coached Richmond" — PASS, 42 coaches.
+- "goals after the siren" — PASS, 71 kicks after the siren.
+- Runtime: application/API/RSC requests 200, no warnings. A recurring CSP block of
+  `static.cloudflareinsights.com/beacon.min.js` is a pre-existing, unrelated
+  analytics-beacon issue, not ISSUE-152.
+
+**Final verdict.** `AFLDB-ISSUE-152` final production deployment/data gate: **PASS**.
+
+**AFLDB-ISSUE-152 RESOLVED — 2026-09-13.** No remaining ISSUE-152 implementation,
+stress, migration, data, deployment or browser gate remains. Full closing record:
+`issues.md` (Status — RESOLVED 2026-09-13, and its Resolution section).
