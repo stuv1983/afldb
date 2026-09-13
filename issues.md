@@ -26458,11 +26458,17 @@ rate) not required by this issue's acceptance criteria.
 
 ## AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
 
-- **Status:** Open — **Stages 1–6 implemented and DB-gated 2026-09-13 (30/30 on `afldb_test`,
-  twice in immediate succession); uncommitted, undeployed.** Stages 4–6 landed the public
-  `status` filters, the `data.awards.read`/`.edit` capability pair with nav and guards, and the
-  `/admin/awards` surface with `/admin/data-editor` reduced to a compatibility pointer.
-  Stages 7–9 (closeout, browser acceptance, deployment) not started.
+- **Status:** Open — **Stages 1–7 complete and deployed to DEV 2026-09-13 (`8250abe`, migration
+  101 applied, service healthy). Stage 8 rendered acceptance STOPPED at 8.1 on a genuine defect
+  (§20); a source-only corrective fix is now written and validated but UNCOMMITTED, UNDEPLOYED
+  (§20.3) — DEV still serves the defect live.** Root cause: a `.admin-cards` CSS class-name
+  collision with the unrelated responsive-table-card pattern (`admin/coaches`, `admin/draft`,
+  `admin/fixtures`) hid `/admin/awards`'s three navigation cards at every viewport width. Fix:
+  the awards landing page's cards moved onto dedicated `.awards-admin-*` classes with their own
+  always-visible grid; typecheck/lint/whitespace clean, shared pattern proved untouched. Direct
+  URLs to all three domains work correctly. Once committed, pushed and redeployed, Stage 8 must
+  restart from 8.1 — no role-boundary, lifecycle-fixture, direct-route/action, responsive or
+  accessibility gate has been run. Full record in `AFLDB-ISSUE-165.md` §20.
 - **Severity:** Medium
 - **Area:** Admin / Data management
 - **Found:** 2026-09-13

@@ -1,16 +1,16 @@
 # AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
 
-**Status:** Open / **Stages 1–7 complete. Stage 8 BLOCKED on one operator action; Stage 9 written
-against that state.** Stage 7 (integrated regression and security acceptance) passed every gate
-that does not require a running DEV deployment: 32/32 on `afldb_test` as the owner **and 32/32
-again under the restricted `afldb_import` role**, 4,571-passing DB-free suite, clean typecheck,
-0 ESLint errors, and a production build of 1,533/1,533 pages against a 101-applied database —
-**§19 is the Stage 7 record**, and it also closes two live-path refusals that reached no test at
-all and one source contract that pinned the wrong module. **Stage 8 stops after its read-only
-preflight** (§19.6): `deploy/sync-dev.ps1` deploys from `origin`, Stages 4–6 are staged and
-uncommitted so they are not on `origin`, and this session is forbidden to commit or push. The
-rendered three-role matrix and the 1440×900 / 375×812 gate are the only §12 gates still unmet.
-DEV and PROD untouched; migration 101 remains `afldb_test`-only.
+**Status:** Open / **Stages 1–7 complete, deployed to DEV. Stage 8 STOPPED at 8.1 on a genuine
+rendered-acceptance defect (§20); a source-only corrective fix is now written and validated but
+UNCOMMITTED, UNDEPLOYED (§20.3).** DEV is on `8250abe` (`main`) and still SERVES THE DEFECT LIVE —
+the fix has not been pushed or deployed. Root cause: a `.admin-cards` CSS class-name collision
+with the unrelated responsive-table-card pattern used by `admin/coaches`/`admin/draft`/
+`admin/fixtures` (§20.1). Fix: the awards landing page's cards renamed off the shared classes onto
+dedicated `.awards-admin-*` ones with their own always-visible grid rule (§20.3) — `typecheck`/
+`eslint`/`git diff --check` clean, shared responsive-table pattern proved untouched. Stage 8 is
+**not** PASS and this issue is **not** Resolved: once the operator commits, pushes and redeploys,
+**Stage 8 restarts from 8.1** — no role-boundary, lifecycle-fixture, direct-route/action,
+responsive or focus/accessibility gate has been run yet.
 **Earlier state — Stages 1–6 implemented and GREEN on `afldb_test` (30/30, twice in
 succession); uncommitted, undeployed.** Stage 4 (public/read-model status filters across all four
 consumers), Stage 5 (`data.awards.read`/`.edit`, nav, route and action guards) and Stage 6 (the
@@ -1424,3 +1424,104 @@ Three test files, no application code, no migration, no Python:
 | `tests/awards-admin.test.ts` | the ISSUE-080 §5.3 frozen-literal contract now pins **both** honour-team identity writers, the live `admin-awards.ts` and the retired `awards-admin.ts`, each labelled (§19.3 item 3) |
 | `tests/integration/admin-awards.test.ts` | the importer-role harness wired in with its `beforeAll` validation (§19.4); two live-path refusal tests added (§19.3 items 1–2) |
 | `AFLDB-ISSUE-165.md`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` | tracking |
+
+## 20. Stage 8 restart, 2026-09-13 — genuine acceptance failure at 8.1
+
+The operator committed and pushed Stages 4–6 and ran `sync-dev.ps1`. DEV landed on `8250abe`
+(`main`, merge of `sonnet/issue-165-awards-admin`), migration 101 applied (101/101, 0 pending),
+service healthy (`{"status":"ok","database":"ok"}` direct and proxied). Gate 8 deployment/schema/
+service verification is genuine PASS — the §19.6 blocker is cleared.
+
+Rendered acceptance then found a real defect in the surface itself, before role-boundary or
+lifecycle testing could proceed, so this session stopped per the session brief's "stop at any
+genuine acceptance failure" instruction.
+
+### 20.1 The defect
+
+`/admin/awards` (Super Admin, DEV, `10.0.40.100:8090`) renders its header and its "What the two
+states mean" section, but the entire middle section — the three navigation cards to Award
+winners / Hall of Fame / Honour teams, each with its live counts and its "Browse" / "Record a new
+one" links — is invisible. Confirmed by evaluating the live DOM, not just the accessibility
+snapshot: the `<ul class="admin-cards">` markup is present and correctly populated (3,712 / 343 /
+113 active counts, correct hrefs) but computed `display: none`, at every viewport width tested
+(default and via direct style query — not width-dependent).
+
+**Root cause, found in source:** `src/styles/globals.css:503` defines `.admin-cards { display:
+none; ... }` as the *inactive* half of a responsive-table-to-card-list toggle used elsewhere
+(`admin/coaches`, `admin/draft`, `admin/fixtures/[season]`) — the class is shown only inside a
+`.responsive-table` wrapper below 640px (`globals.css:506`,
+`.responsive-table > .admin-cards { display: grid }`), alongside a `<table>` it replaces at narrow
+widths. `src/app/admin/awards/page.tsx` (§6.1 landing page, this issue's own Stage 6 work) reuses
+the bare class name `admin-cards` for an unrelated permanent card grid — no `.responsive-table`
+ancestor, no sibling `<table>` — so only the base `display: none` rule ever applies, at any width.
+This is a class-name collision the implementation introduced, not a regression in the shared
+component: `admin-cards`/`admin-card` was already an established convention (§18.6 built the
+awards page after coaches/draft already used it) and the new page picked the same name for a
+different purpose without the wrapper that activates it.
+
+**Effect:** the only in-app path from `/admin/awards` into the three domains is dark, for every
+role, at every width. Direct navigation to `/admin/awards/winners`, `/admin/awards/hall-of-fame`
+and `/admin/awards/honour-teams` all work correctly and are fully populated (verified for
+`winners`: table, filters, pagination — 3,712 records, page 1 of 75 — all rendered and correct).
+No test in §17/§18/§19 caught this because the suite is DB-backed and DOM-assertion-light; nothing
+in `tests/awards-admin.test.ts` or `tests/integration/admin-awards.test.ts` renders this page or
+asserts on `.admin-cards` visibility.
+
+### 20.2 Disposition
+
+Not fixed here — the session brief forbids redeploying, and a CSS fix is still a deploy. The
+smallest correct fix is a one-word scope change in `src/app/admin/awards/page.tsx`: rename the
+list's class (e.g. `awards-domain-cards`) and give it its own always-visible grid rule, rather than
+reusing `admin-cards`/`admin-card`, which stay a *responsive-table* pattern everywhere else.
+Ordering rule for whoever applies it: fix, rebuild, `sync-dev.ps1` again, then **restart Stage 8
+from 8.1** — the three-role rendered matrix, direct route/action matrix, DEV-only lifecycle
+fixture, public-lifecycle behaviour, both responsive widths, focus/accessibility and console/
+network passes are all still unrun, and the fixed landing page is itself part of what 8.1 must
+now re-check (the Browse/Record links, not just the counts).
+
+Session stopped here. No role other than Super Admin was tested; no lifecycle fixture was
+created; DEV and PROD otherwise untouched; no migration run beyond the read-only status already
+recorded above.
+
+### 20.3 Corrective fix, 2026-09-13 (fix pass, uncommitted)
+
+Fix-only session, scoped to §20.1's defect. No lifecycle/backend/security logic touched, no
+change to the shared `.admin-cards`/`.admin-card` responsive-table pattern.
+
+**Change.** `src/app/admin/awards/page.tsx`'s domain-card markup renamed off the shared classes
+entirely: `admin-cards`/`admin-card`/`admin-card-title`/`admin-card-fields`/`admin-card-action` →
+`awards-admin-cards`/`awards-admin-card`/`awards-admin-card-title`/`awards-admin-card-fields`/
+`awards-admin-card-action`. The inline `style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap'
+}}` on the action row (previously needed to out-specificity `.admin-card-action`'s `display:
+grid`) is now redundant and was folded into the new `.awards-admin-card-action` class instead.
+
+`src/styles/globals.css` gets a new, purely additive block (0 deletions from the shared rules)
+defining the five `.awards-admin-*` selectors: `.awards-admin-cards` is `display: grid` with
+`grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr))` — the same auto-fit/
+320px template already used by `.grid-panels` for other description-carrying card grids — and, unlike
+the class it replaces, is unconditional: no media query, no `.responsive-table` ancestor
+requirement, visible at every width. The other four selectors (`-card`, `-card-title`,
+`-card-fields`, `-card-action`) duplicate their `.admin-card*` counterparts' declarations verbatim
+(border/radius/padding/grid, title type scale, the dt/dd field-row layout), so the cards look
+identical to before — only the wrapper's visibility rule and the class names changed.
+
+**Verified untouched:** `winners`, `hall-of-fame` and `honour-teams` list pages still use
+`admin-cards`/`admin-card`/`admin-card-title`/`admin-card-fields`/`admin-card-action` exactly as
+before, each still correctly nested in its own `.responsive-table` wrapper alongside a `<table>`
+sibling; `admin/coaches`, `admin/draft` and `admin/fixtures/[season]` — the pages that pattern was
+built for — were not touched at all. `git diff --stat -- src/styles/globals.css` shows
+insertions-only (49 insertions, 0 deletions).
+
+**Validation (workstation, no DB, no deploy):** `npm run typecheck` clean; `eslint` on both
+changed files — 0 errors on `page.tsx` (CSS has no ESLint config, expected); `git diff --check`
+clean (no whitespace errors). No existing test renders `/admin/awards` or asserts on
+`.admin-cards`/`.awards-admin-cards` visibility, so there is no targeted regression test to
+extend for a pure presentational class rename; this gap is why §20.1's defect reached DEV
+unassisted in the first place and is left as recorded technical debt, not fixed under this
+fix-only scope.
+
+**Not done, deliberately:** no restage/commit/push, no rebuild, no `sync-dev.ps1`, no DEV or PROD
+change of any kind — this pass is source-only, for operator review. Stage 8 is **not** PASS and
+`AFLDB-ISSUE-165` is **not** Resolved. Once the operator commits, pushes and redeploys, **Stage 8
+must restart from 8.1** exactly as §20.2 says, now including a check that the three cards render
+correctly (not just that they're visible) at both 1440×900 and 375×812.

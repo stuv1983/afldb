@@ -6,7 +6,35 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-09-13 (`AFLDB-ISSUE-165` **STAGE 7 COMPLETE; STAGE 8 BLOCKED ON ONE
+**Last updated:** 2026-09-13 (`AFLDB-ISSUE-165` **STAGE 8 FIX PASS — CORRECTIVE CSS FIX WRITTEN
+AND VALIDATED, UNCOMMITTED, UNDEPLOYED** — following the rendered-acceptance defect below, a
+fix-only session renamed `/admin/awards`'s landing-page cards off the shared `.admin-cards`/
+`.admin-card` classes onto dedicated `.awards-admin-*` ones with their own always-visible
+`auto-fit`/`minmax(320px)` grid (no media query, no `.responsive-table` dependency). Confirmed:
+`winners`/`hall-of-fame`/`honour-teams` list pages and `admin/coaches`/`admin/draft`/
+`admin/fixtures` still use the shared classes exactly as before, each correctly wrapped in
+`.responsive-table`; `git diff --stat` on `globals.css` is insertions-only (49/0). `npm run
+typecheck` clean, ESLint 0 errors on the changed `.tsx`, `git diff --check` clean. **DEV still
+serves the defect live** — nothing staged, committed, pushed, rebuilt or redeployed this
+session. Stage 8 is not PASS and the issue is not Resolved: once the operator commits, pushes
+and redeploys, Stage 8 restarts from 8.1 in full. Full record: `AFLDB-ISSUE-165.md` §20.3.)
+
+**Earlier same-day update:** 2026-09-13 (`AFLDB-ISSUE-165` **DEPLOYED TO DEV; STAGE 8 RENDERED ACCEPTANCE
+STOPPED AT 8.1 ON A GENUINE DEFECT** — the operator committed, pushed and ran `sync-dev.ps1`,
+clearing the prior Stage 8 blocker: DEV is on `8250abe`/`main`, migration 101 applied (101/101,
+0 pending), service healthy. Rendered acceptance as Super Admin then found `/admin/awards`'s
+three navigation cards (to Winners/Hall of Fame/Honour teams, with their live counts and
+Browse/Record links) are invisible at every viewport width, confirmed in the live DOM: a
+`.admin-cards` CSS class-name collision — the implementation reused a class name that already
+means "hidden except inside a `.responsive-table` wrapper below 640px" (the pattern
+`admin/coaches`/`admin/draft`/`admin/fixtures` use), without that wrapper, so the base
+`display: none` rule always wins. Direct URLs to all three domains render correctly; nothing
+else has been tested — no Admin/Contributor role boundary, no direct-route/action matrix, no
+DEV-only lifecycle fixture, no responsive or focus/accessibility pass. Fix and restart point:
+`AFLDB-ISSUE-165.md` §20. DEV carries the defect live; PROD untouched. Open issue count
+unchanged at 2.)
+
+**Earlier same-day update:** 2026-09-13 (`AFLDB-ISSUE-165` **STAGE 7 COMPLETE; STAGE 8 BLOCKED ON ONE
 OPERATOR ACTION** — Stage 7 passed every `AFLDB-ISSUE-165.md` §12 gate that does not need a
 running DEV deployment. The finding that mattered: the integration suite had been redirecting
 `AFLDB_IMPORT_DATABASE_URL` at the owner test DSN, which fixes the database and silently also
@@ -3302,7 +3330,39 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
 
 - **Severity:** Medium
 - **Area:** Admin / Data management
-- **State (2026-09-13, Stages 7–9 session):** Open / **STAGES 1–7 COMPLETE, UNCOMMITTED,
+- **State (2026-09-13, Stage 8 fix-pass session):** Open / **CORRECTIVE FIX WRITTEN AND
+  VALIDATED, UNCOMMITTED, UNDEPLOYED.** `/admin/awards`'s landing-page cards moved off the shared
+  `.admin-cards`/`.admin-card`/`.admin-card-title`/`.admin-card-fields`/`.admin-card-action`
+  classes onto dedicated `.awards-admin-cards`/`.awards-admin-card`/`.awards-admin-card-title`/
+  `.awards-admin-card-fields`/`.awards-admin-card-action` ones (`src/app/admin/awards/page.tsx`),
+  with a new, purely additive CSS block (`src/styles/globals.css`, 49 insertions/0 deletions)
+  giving the wrapper its own unconditional `display: grid` with the same `auto-fit`/
+  `minmax(320px)` template `.grid-panels` uses elsewhere, and duplicating the other four
+  selectors' declarations verbatim so the cards look identical to before. Confirmed: `winners`/
+  `hall-of-fame`/`honour-teams` and `admin/coaches`/`admin/draft`/`admin/fixtures` still use the
+  shared classes exactly as before, each still correctly wrapped in `.responsive-table`.
+  `npm run typecheck` clean, ESLint 0 errors on the changed `.tsx` (CSS has no ESLint config),
+  `git diff --check` clean. No existing test renders `/admin/awards` or asserts on card
+  visibility, so no targeted regression test could be extended. **Nothing staged, committed,
+  pushed, rebuilt or redeployed** — DEV still serves the defect live. Stage 8 is not PASS and
+  the issue is not Resolved. Full record: `AFLDB-ISSUE-165.md` §20.3.
+- **Earlier state (2026-09-13, Stage 8 rendered-acceptance session):** Open / **DEPLOYED TO DEV
+  (`8250abe`/`main`, migration 101 applied, service healthy); STAGE 8 STOPPED AT 8.1 ON A GENUINE
+  DEFECT**, not on the operator-commit blocker (cleared this session). Logged in as Super Admin
+  and opened `/admin/awards`: the three navigation cards to Winners/Hall of Fame/Honour teams
+  (each with its live count and Browse/Record links) are invisible at every viewport width.
+  Confirmed in the live DOM (not just the accessibility tree): the markup is present and correctly
+  populated (3,712/343/113 active) but computed `display: none`. Root cause in
+  `src/styles/globals.css:503`: `.admin-cards` is the *inactive* half of a responsive-table-to-
+  card-list toggle shared with `admin/coaches`/`admin/draft`/`admin/fixtures` (shown only inside a
+  `.responsive-table` wrapper below 640px); `src/app/admin/awards/page.tsx` reused the same class
+  name for an unrelated permanent card grid with no such wrapper, so only the base `display: none`
+  rule ever applies. Direct URLs to all three domains render correctly and are fully populated
+  (verified for `winners`: filters, pagination, 3,712 records). Nothing else has been tested —
+  no Admin/Contributor role boundary, no direct-route/action matrix, no DEV-only lifecycle
+  fixture, no public-lifecycle check, no responsive or focus/accessibility pass, no console/
+  network sweep. Full record and the restart list: `AFLDB-ISSUE-165.md` §20.
+- **Earlier state (2026-09-13, Stages 7–9 session):** Open / **STAGES 1–7 COMPLETE, UNCOMMITTED,
   UNDEPLOYED; STAGE 8 BLOCKED ON ONE OPERATOR ACTION** on `sonnet/issue-165-awards-admin`.
   Stage 7 (integrated regression and security acceptance) reconciled the implementation against
   every §12 gate and passed all of them except the two that need a running DEV deployment
@@ -3405,18 +3465,18 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
   `tools/migration/import_awards.py`, `tools/migration/common.py` (`reload_keyed`,
   `replay_admin_overrides`); `src/db/migrations/{005,042,058,059,061,073,098,101}`;
   `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`;
-  `tests/honours-lifecycle-public-contract.test.ts` (the R-3 counting contract).
-- **Next action:** **Operator: stage and commit the reviewed working tree, then
-  `git push origin sonnet/issue-165-awards-admin`.** That single action unblocks Stage 8; nothing
-  else is outstanding on Stage 7. Then, in order: `deploy/sync-dev.ps1 -RemoteRef
-  sonnet/issue-165-awards-admin` (it runs `db:migrate` before `build`, which the session proved is
-  binding — the first local build failed `42703 column w.status does not exist` against
-  `afldb_dev` where 101 is unapplied), `npm run db:privileges` on DEV as the no-op reconcile
-  proof, `/api/health`, then the Stage 8 browser matrix: the three-role direct-URL and
-  direct-POST matrix (Contributor denied, Admin reads but cannot mutate, Super Admin both), one
+  `tests/honours-lifecycle-public-contract.test.ts` (the R-3 counting contract);
+  `src/styles/globals.css` (`.admin-cards`/`.admin-card`, the §20 defect).
+- **Next action:** **Operator: review the fix (§20.3), then stage, commit, push and redeploy.**
+  The CSS fix is written and validated but not staged, committed or deployed. Once
+  `sync-dev.ps1` runs again and `/api/health` is confirmed, **restart Stage 8 from 8.1** — every
+  rendered gate is still unrun, now also re-checking the fixed landing page itself: the
+  three-role direct-URL
+  and direct-POST matrix (Contributor denied, Admin reads but cannot mutate, Super Admin both), one
   full create → correct → void → reinstate lifecycle plus a replace on a clearly-marked DEV-only
   fixture with its public consequences verified and the fixture cleaned up, and 1440×900 and
-  375×812. `AFLDB-ISSUE-165.md` §19.10 is the restart list. **Disposition:** the sibling
+  375×812 — and must now also re-check the fixed landing page itself.
+  `AFLDB-ISSUE-165.md` §19.10/§20.2 is the restart list. **Disposition:** the sibling
   convention (160–163) resolves a child on DEV acceptance and leaves PROD promotion to the parent
   `AFLDB-ISSUE-156`, so ISSUE-165 may be marked Resolved once Stage 8 passes — not before.
   Two pieces of residue are recorded rather than fixed: `src/db/queries/awards-admin.ts` stays

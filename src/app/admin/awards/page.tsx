@@ -65,16 +65,16 @@ export default async function AwardsAdminPage() {
       </div>
 
       <section className="section">
-        <ul className="admin-cards">
+        <ul className="awards-admin-cards">
           {DOMAINS.map((domain) => {
             const count = counts[DOMAIN_TABLES[domain]];
             return (
-              <li className="admin-card" key={domain}>
-                <div className="admin-card-title">
+              <li className="awards-admin-card" key={domain}>
+                <div className="awards-admin-card-title">
                   <Link href={domainListPath(domain)}>{DOMAIN_LABELS[domain]}</Link>
                 </div>
                 <p className="muted" style={{ fontSize: '0.85rem' }}>{DOMAIN_BLURBS[domain]}</p>
-                <dl className="admin-card-fields">
+                <dl className="awards-admin-card-fields">
                   <div>
                     <dt>Active</dt>
                     <dd>{formatNumber(count.active)}</dd>
@@ -92,7 +92,7 @@ export default async function AwardsAdminPage() {
                     </dd>
                   </div>
                 </dl>
-                <div className="admin-card-action" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div className="awards-admin-card-action">
                   <Link href={domainListPath(domain)} className="btn btn-secondary">Browse</Link>
                   {canEdit && (
                     <Link href={domainNewPath(domain)} className="btn btn-secondary">Record a new one</Link>

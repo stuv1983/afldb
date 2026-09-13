@@ -535,6 +535,55 @@ td.audit-wrap code, td.audit-payload code { font-size: 0.75rem; }
 .admin-card-fields dd { margin: 0; text-align: right; }
 .admin-card-action { display: grid; }
 .admin-card-action .btn { display: block; width: 100%; text-align: center; }
+
+/* AFLDB-ISSUE-165 Stage 8 fix. `/admin/awards`'s three landing-page domain
+ * cards are a permanent navigation grid, not a narrow-viewport fallback for
+ * a table: they have no `<table>` sibling and no `.responsive-table`
+ * ancestor. They must not reuse `.admin-cards`/`.admin-card`, which stay
+ * reserved for that toggle (Coaches, Draft, Fixtures) -- reusing the name
+ * here left the cards under the toggle's unconditional `display: none`
+ * with no `.responsive-table` ancestor ever present to trigger the
+ * override, so they were invisible at every width. Card contents mirror
+ * `.admin-card`'s dense `<dl>` layout; the wrapper uses the same
+ * `auto-fit`/`minmax(320px)` grid as `.grid-panels` so three cards sit in a
+ * row on desktop and stack on a phone, with no media query needed. */
+.awards-admin-cards {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.awards-admin-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.awards-admin-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.awards-admin-card-fields { display: grid; gap: 0.4rem; margin: 0; font-size: 0.8125rem; }
+.awards-admin-card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.awards-admin-card-fields dt {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.awards-admin-card-fields dd { margin: 0; text-align: right; }
+.awards-admin-card-action { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
 /* A second line under a cell's main value: user id, IP, field group, note. */
 .audit-meta { display: block; font-size: 0.78rem; color: var(--text-muted); }
 /* auth_audit_log.detail as `key value` pairs, keys in a column of their own. */
