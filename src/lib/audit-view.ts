@@ -70,6 +70,8 @@ export const DATA_EDIT_TABLE_LABELS: Record<DataEditTableName, string> = {
   coaches: 'Coaches',
   fixtures: 'Fixtures',
   club_leadership: 'Club leadership',
+  player_achievements: 'First-kick goal',
+  after_siren_kicks: 'After the siren',
 };
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

@@ -885,6 +885,37 @@ contract and in the `issues.md` entry.
 capability is declared but enforced nowhere, or if an admin mutation ships without a
 server-side guard (`capabilities.ts:24-26`). That test is the gate, not a manual check.
 
+### 9.1 When each half is declared — **SEQUENCING CLARIFICATION, approved 2026-09-14**
+
+**`data.specialRecords.read` is declared at Stage 3. `data.specialRecords.edit` is declared
+at Stage 6, in the same change as the first mutation that guards on it.** D-4's outcome is
+unchanged — two capabilities, Contributor neither, Admin `.read` only, Super Admin both —
+and only the moment the union entry appears has moved.
+
+The contradiction this resolves was found at Stage 3 against current source, not at
+planning. `tests/auth.test.ts:1040-1046` is categorical:
+
+```ts
+const unenforced = DECLARED_CAPABILITIES.filter((capability) => !enforced.has(capability));
+expect(unenforced, 'declared in capabilities.ts but no boundary calls requireCapability() with it').toEqual([]);
+```
+
+`enforcedCapabilities()` (`:1021-1027`) counts only an **awaited `requireCapability()`** at a
+`page.tsx` / `route.ts` / `'use server'` boundary under `src/app/admin`. `hasCapability()` —
+how a detail page derives `canEdit` (`src/app/admin/awards/page.tsx:47`) — is not
+enforcement. So declaring `.edit` in a stage that ships no write leaves exactly three
+options, and two of them are forbidden by the stage's own terms: ship a write path early,
+or weaken the ISSUE-158 contract with a declared-ahead-of-enforcement exemption. The third
+is to let the declaration travel with its guard, which is what every other `.edit`
+capability in the table already did.
+
+Operator decision, 2026-09-14: **the third.** Recorded as an implementation-sequencing
+clarification to D-4, not a change to it. Neither `tests/auth.test.ts` nor any other
+existing test was weakened, and no exemption list was added. Stage 6 adds the union entry,
+the `SUPER_ADMIN_ONLY` role list, and the `EQUIVALENT_ROLE_GUARD` entry
+(`'requireSuperAdmin'`) together with the first guarded mutation; `capabilities.ts` carries
+the whole of that obligation in a comment beside `.read` so it cannot be lost.
+
 **Nav:** one `Data` group entry, after `Awards & honours`:
 
 ```ts
@@ -1014,8 +1045,17 @@ P4 re-baselines against them rather than treating them as its own regression.
 - The void reason is captured in both `status_reason` (read path) and the `data_edits`
   payload (audit path).
 - The ISSUE-157 audit viewer reads `data_edits` and needs **no change** beyond the new
-  `table_name` values appearing — **to be confirmed at Stage 6**, since the viewer may
-  carry its own table-name allowlist for labels.
+  `table_name` values appearing — ~~to be confirmed at Stage 6~~ **ANSWERED AT STAGE 3, and
+  the answer was yes, it carries one.** Two TypeScript allowlists shadow migration 102's
+  CHECK and neither is derived from it: `DataEditTableName` / `DATA_EDIT_TABLE_NAMES`
+  (`src/db/queries/audit-log.ts:59-83`) gate what `recordDataEdit()` may write and what a
+  URL-supplied `?table=` filter is allowed to bind, and `DATA_EDIT_TABLE_LABELS`
+  (`src/lib/audit-view.ts:61-73`) is a `Record<DataEditTableName, string>`, so the union and
+  the labels cannot drift from each other but both could drift from the database. Both were
+  widened in Stage 3 — read-only work, shipping no mutation — because without the union a
+  record's own history could not be typed or rendered at all. Labels: *First-kick goal*,
+  *After the siren*. `tests/special-records-admin.test.ts` now pins the TypeScript list
+  against the literals parsed out of migration 102, so the two can no longer part company.
 
 ---
 
@@ -1389,7 +1429,7 @@ Every stage writes a failing test before the fix.
 | **0** | Allocation proof; D-1…D-4 | ✅ **COMPLETE — PASS 2026-09-13.** §0.1a; all four decisions recorded (§19) |
 | **1** | Re-verify every §2 finding against current source; run probes P-1…P-4 | ✅ **COMPLETE — PASS 2026-09-13** (§15.0a). P-1/P-2/P-3 PASS; P-4 is the authoritative G-1 input. **No further Stage 1 DB evidence is required** |
 | **2** | Migration 10N (lifecycle columns + **both** CHECK widenings, §6.3/§6.4) + `privileges.sql` + RED identity/constraint tests | ✅ **COMPLETE — PASS 2026-09-13** (§21). Migration **102** allocated and green on `afldb_test`; G-3, G-4, G-7, G-8 all PASS; G-6 re-baselined PASS. `privileges.sql` **unchanged by D-5** (§19, §21.6) — the premise §6.5 rested on was contradicted by current source, the operator reviewed the evidence and approved, and the real-role privilege contract is pinned by tests instead. **No stop condition open** |
-| **3** | Capability (`data.specialRecords.*`) + nav + read-only admin surface (list/detail/provenance, incl. read-only link state per D-2) | `tests/auth.test.ts` green; three-role denial proven server-side |
+| **3** | Capability (`data.specialRecords.*`) + nav + read-only admin surface (list/detail/provenance, incl. read-only link state per D-2) | ✅ **COMPLETE — PASS 2026-09-14** (§22). Five routes, one nav entry, `data.specialRecords.read` declared and enforced on every one; `tests/auth.test.ts` green (150) and the three roles proven against the REAL guard; 14 new DB-backed admin-read assertions green on `afldb_test`. **`.edit` is deliberately NOT declared until Stage 6** — the ISSUE-158 contract fails a capability enforced at no boundary, and Stage 3 ships no write (§9, §22.2). D-4's final role matrix is unchanged. **No stop condition open** |
 | **4** | Both replay adapters + importer refusals (**the Phase E stop condition**) | Gates G-5, G-9. Reload-survival, rebuild-survival, atomicity and adapter-parity tests green. **STOP** if a suppressed fact can be resurrected by any path, or if the TS adapter cannot run on the importer's own `tx` |
 | **5** | Public read-model `status = 'active'` filters, fragment by fragment | Every consumer in §7 filtered and tested; no unfiltered reference remains |
 | **6** | Mutations: correct / void / reinstate / replace / create, atomic audit, CAS, revalidation out of the pending path | Atomicity and CAS tests green; `match-admin` refusal green |
@@ -1442,7 +1482,7 @@ phone-only polish is a follow-up, not a P4 blocker.
 | **D-1** | Family / father-son scope | **APPROVED — EXCLUDE.** P4 is limited to first-kick goal and after-the-siren. Family/father-son remains outside ISSUE-167 entirely. The `/records/family` namespace is left unclaimed (§3.3) |
 | **D-2** | After-siren player-link resolution | **APPROVED — DEFER.** P4 may display current linkage state but must **not** create another player-link queue or authority, and must not collide with `AFLDB-ISSUE-164`. `LINK_TARGET_TABLES` is not modified (§3.5) |
 | **D-3** | Where Family A's replay lives | **APPROVED WITH MODIFICATION — one durable authority, two replay adapters.** `data_overrides` stays the sole durable authority; after-siren uses the existing Python `common.py` contract; `import-first-kick-goal.ts` gets an explicit TypeScript adapter with the same `lifecycle`/`correction`/`record` semantics; both pinned by parity/contract tests; **replay atomic with the owning importer**; do not port first-kick to Python; no second authority mechanism. **Atomicity proven structurally feasible from source — §8.2.2; the STOP clause is not invoked** (§8.2.1–§8.2.3) |
-| **D-4** | Capability shape | **APPROVED — TWO capabilities.** `data.specialRecords.read` (Admin + Super Admin) / `data.specialRecords.edit` (Super Admin). Create, correct, void, suppress, reinstate and replace are all writes under `.edit`; no separate `.suppress`. Supersedes ISSUE-156 §2's working name (§9) |
+| **D-4** | Capability shape | **APPROVED — TWO capabilities.** `data.specialRecords.read` (Admin + Super Admin) / `data.specialRecords.edit` (Super Admin). Create, correct, void, suppress, reinstate and replace are all writes under `.edit`; no separate `.suppress`. Supersedes ISSUE-156 §2's working name (§9). **Sequencing clarified 2026-09-14 (§9.1):** `.read` is declared at Stage 3, `.edit` at Stage 6 beside its first guarded mutation, because the ISSUE-158 enforcement contract fails a capability declared but enforced at no boundary. The final role matrix is unchanged |
 | **D-5** | Which pool the special-record admin surface uses, and therefore whether `privileges.sql` changes | **APPROVED — `afldb_auth` gets NOTHING; `tools/maintenance/privileges.sql` stays unchanged.** Raised at Stage 2, not at planning: §6.5 had assumed the admin surface reads these tables on the auth pool, and current source contradicts that. **Supersedes §6.5.** The operator's grounds, recorded verbatim in substance: reads for these data surfaces use the app/public pool; writes use `afldb_import`; `afldb_auth` is reserved for operational/auth-owned tables; no current or planned ISSUE-167 path consumes these tables through `authSql`; and adding the grants would widen an otherwise deliberate boundary **without a caller**. The regression assertion is **retained** and must keep proving all five of: `afldb_app` can SELECT the lifecycle columns; `afldb_app` cannot mutate them; `afldb_import` holds the intended import/write privileges; `afldb_auth` has no access; and the auth privilege specification does not name either table. Evidence and consequences: §21.6 |
 
 ### 19.1 Planning findings preserved unchanged by these decisions
@@ -1844,3 +1884,193 @@ Stage 2 ends here. **Not implemented, by design:** the admin route, capability a
 (Stage 3); both replay adapters and the importer refusals (Stage 4); the public
 `status = 'active'` filters (Stage 5); the mutations, atomic audit and CAS (Stage 6). No
 DEV or PROD migration. Nothing staged or committed — the operator commits.
+
+---
+
+## 22. Stage 3 execution evidence — **PASS (2026-09-14)**
+
+Executed from the worktree with operator authorisation for this stage only. Nothing was
+staged, committed, pushed, merged or deployed; **DEV and PROD were not migrated**, and no
+database other than `afldb_test` was contacted.
+
+### 22.1 Checkpoint, before anything was edited
+
+| Claim | Evidence |
+|---|---|
+| Worktree clean | `git status --porcelain=v1` — no tracked modification. One untracked **0-byte `b.kind`** (§22.9), not part of Stage 2 or Stage 3 and left in place |
+| Branch / HEAD | `opus/issue-167-special-records-admin` @ **`8d9ac74`** |
+| Stage 2 pushed | `git rev-parse HEAD` = `git rev-parse origin/opus/issue-167-special-records-admin` = `8d9ac744492f197c85eca430c625ada818b1ac10`; `git branch -r --contains 8d9ac74` lists the remote branch |
+| Migration 102 is in that commit | `git log --oneline -1 -- src/db/migrations/102_special_records_lifecycle.sql` → `8d9ac74` |
+| DB target is `_test` on loopback | §15.0 three-condition contract re-run: `Target OK: afldb_owner@127.0.0.1:5432/afldb_test`, listener verified on the **configured** port |
+| **102 applied, checksum clean** | `npx tsx tools/db/migrate.ts --status --target test` → `102 migration file(s), 102 already applied … applied 102_special_records_lifecycle.sql … 0 pending`. The drift check runs **before** the `--status` branch (`tools/db/migrate.ts:261-279`), so a clean status listing is positive proof of no checksum drift, not merely an absence of complaint |
+
+Migration 102 was not edited and must not be. Any future schema correction is 103+ after a
+fresh G-7 collision proof.
+
+### 22.2 The one design contradiction found, and how it was resolved
+
+`tests/auth.test.ts:1040-1046` fails any capability declared in `capabilities.ts` that no
+admin boundary awaits `requireCapability()` with, and Stage 3's own stop gate is that this
+test is green. Declaring `data.specialRecords.edit` in a read-only stage therefore could
+not be reconciled with the stage's other two terms — no write path, no weakened test.
+Raised before implementation, resolved by the operator as a sequencing clarification to
+D-4: `.read` now, `.edit` at Stage 6 with its first guarded mutation. **Full reasoning and
+the decision text: §9.1.** No test was weakened and no exemption list was added.
+
+### 22.3 What was built
+
+| Route | What it does |
+|---|---|
+| `/admin/records` | Two family cards with active / void counts, both linking into a filtered list; the two-state explanation, including why an **uncited** kick is not a voided one |
+| `/admin/records/first-kick-goal` | Search (source spelling, linked display name, or `fkg-NNN`), season, status, provenance and player-link filters; table + card layouts; pager |
+| `/admin/records/first-kick-goal/[id]` | Identity, provenance, durable identity, lifecycle, read-only link state, derived detail, and the record's own `data_edits` history |
+| `/admin/records/after-the-siren` | The same, plus a kick-effect filter and a `cited` **column** |
+| `/admin/records/after-the-siren/[id]` | The same, plus the five coupled event fields shown together and the uncited notice |
+
+One `Data` nav entry — `Special records` → `/admin/records`, gated on
+`data.specialRecords.read`, placed after `Awards & honours`. **Not** two entries: §10.1.
+
+New files: `src/db/queries/admin-special-records.ts`, `src/app/admin/records/labels.ts`,
+`src/app/admin/records/SpecialRecordFacts.tsx`, the five `page.tsx` above,
+`tests/special-records-admin.test.ts`, `tests/integration/admin-special-records.test.ts`.
+Modified: `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`,
+`src/db/queries/audit-log.ts`, `src/lib/audit-view.ts`, `tests/auth.test.ts`.
+
+**Reuse rather than a second implementation.** The per-record history is the ISSUE-157
+viewer's own reader and renderer through the existing `RecordHistory` component
+(`src/app/admin/awards/RecordHistory.tsx`), which is already generic over
+`(DataEditTableName, rowId)`; an entry reads here exactly as it reads at `/admin/audit`,
+because it is the same code rendering the same row. Relocating that component to
+`src/components/admin/` is a reasonable tidy-up when Stage 6 grows this domain, and was
+**not** done here rather than modify ISSUE-165's shipped files for cosmetics.
+
+### 22.4 Query and pool architecture — **D-5 confirmed**
+
+`src/db/queries/admin-special-records.ts` is a dedicated module, not SQL embedded in pages,
+following `admin-awards.ts` / `admin-club-leadership.ts`. Both special-record tables are
+read on **`sql` from `@/db/client` — the app/public pool — and nowhere else**. The module
+does not import `@/db/authClient`, and neither does any file under
+`src/app/admin/records/`. `tools/maintenance/privileges.sql` is **unchanged**: it grants
+nothing on either table, and its only mention of `player_achievements` is a comment
+explaining a `player_link_suggestions` grant.
+
+The one auth-pool read anywhere in Stage 3 is `data_edits`, through
+`listDataEditHistory()`. That is correct and is not a D-5 exception: `data_edits` is an
+operational table that `afldb_auth` owns and the app role cannot read, and it is not one of
+the two special-record tables D-5 is about.
+
+Other properties, each pinned by a test rather than asserted here:
+
+- **every join is `LEFT`** (nine of them), so an unlinked or unresolved row is never
+  dropped by the joins that resolve a player, club, opponent or match;
+- **no admin query carries `status = 'active'`** — Stage 5's filtering is a public-read-model
+  concern, and an admin list that acquired it would hide what the surface exists to show;
+- **every list is bounded** (`LIMIT`/`OFFSET`, page size clamped to 200) and every filter is
+  a bound parameter — nothing is spliced;
+- **no N+1**: two statements per list (page + count), two for the landing counts, one per
+  detail read;
+- `data_overrides` is deliberately **not** read yet. There are no override rows for these
+  entities until Stage 4/6, and leaving it out keeps Stage 3 on one pool for these tables.
+
+**One departure from the ISSUE-165 precedent, deliberate and recorded:** the admin lists
+default to `status = 'all'`, where the awards lists default to `active`. This is the surface
+whose job is to report what the lifecycle has removed from the public site, and the two
+families hold 334 + 126 rows, so showing everything costs nothing and hides nothing. The
+default is a named constant, `DEFAULT_ADMIN_STATUS_FILTER`, and is asserted.
+
+### 22.5 Server-side access, proven for all three roles
+
+Not nav hiding: `nav-model.ts` says of itself that a link omitted there is not a link that
+is protected. All five routes `await requireCapability('data.specialRecords.read')` **before
+they await anything else**, which `tests/auth.test.ts:1048-1064` enforces structurally.
+
+The three-role proof is against the **real guard**, not a mock of the table —
+`tests/auth.test.ts:1267` runs `it.each(DECLARED_CAPABILITIES)` through `requireCapability()`
+with a signed cookie and a session row, so the new capability was covered the moment it was
+declared:
+
+```
+✓ capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158)
+  > data.specialRecords.read admits the same viewers as requireAdmin()
+✓ requireCapability against the real guard (AFLDB-ISSUE-158)
+  > data.specialRecords.read: admits the viewers the table names and bounces the rest
+    where the role guards did
+```
+
+| Role | `/admin/records/*` | Nav entry | Mechanism |
+|---|---|---|---|
+| Contributor | ✗ denied | ✗ | `requireCapability` → `NEXT_REDIRECT /admin/upload` |
+| Admin | ✓ list + detail + history | ✓ | capability held |
+| Super Admin | ✓ list + detail + history | ✓ | capability held |
+
+**ISSUE-166's transport contract is intact.** The denial is a `redirect()`, which only
+reaches the browser as a 307 if nothing has committed a 200 shell above it, so the rule is
+structural: `tests/auth.test.ts:1291-1307` fails on any `loading.tsx` under `src/app/admin`
+or at `src/app/loading.tsx`, and `:1309-1322` on any admin layout wrapping its children in
+`<Suspense>`. Stage 3 adds neither, and `tests/special-records-admin.test.ts` asserts the
+same two things again for this domain specifically, so the reason travels with the code.
+
+### 22.6 D-2 and D-1, proven rather than asserted
+
+**D-2.** `LINK_TARGET_TABLES` (`src/db/queries/player-links.ts:37-45`) is byte-for-byte
+unchanged and is asserted member-by-member; `after_siren_kicks` is still absent. No file in
+the records domain and nothing in the query module references `player_link_resolutions`,
+calls a link-resolution function, or writes either table — asserted by pattern. What the
+surface *does* do is display `link_status_value`, `candidate_count` and the resolved player
+read-only, with the reason beside them (`LINK_STATE_NOTICE`), so the gap is visible rather
+than silent. Nothing here can collide with AFLDB-ISSUE-164.
+
+**D-1.** No family or father-son route, card, capability or query. The admin list
+deliberately does **not** filter `achievement_type`: the enum has exactly one member, so a
+predicate would buy nothing today and would silently *hide* a future family row rather than
+surface it. The safety for that choice is an assertion that the enum still has one member —
+admit a second and the test fails, which is the moment to decide what the surface should do.
+
+### 22.7 No edit seam
+
+Asserted, not intended: no `'use server'` module, no `method="POST"` form, no
+`formAction` / `useActionState`, and no `/new` route anywhere under
+`src/app/admin/records/`. The two detail pages carry **no** `<input>`, `<select>`,
+`<textarea>` or `<button>` at all — the only controls in the domain are the GET filter forms
+on the two lists, which narrow a query and write nothing. The derived and identity-bearing
+fields (`link_status_value`, `candidate_count`, `player_achievements.match_id`,
+`after_siren_kicks.club_id`, `source_id`, `source_record_id`) are displayed with the reason
+they are not editable, so that when Stage 6's refusals arrive they are not the first an
+administrator hears of the rule.
+
+### 22.8 Validation
+
+RED first, then GREEN. Before implementation the suites failed with **6 failing assertions
+plus one suite that could not load** (`Cannot find package '@/db/queries/admin-special-records'`).
+
+| Command | Result |
+|---|---|
+| `npx vitest run tests/auth.test.ts tests/special-records-admin.test.ts` | **172 passed**, 0 failed (`auth.test.ts` alone: 150) |
+| `npx vitest run tests/integration/admin-special-records.test.ts` | **14 passed** on `afldb_test` — active + void both listed, unlinked rows survive every join, provenance and durable identity returned, `cited` proven independent of `status`, paging bounded |
+| `npx vitest run` × 8 affected suites — `special-records-identity`, `admin-audit-viewer`, `data-overrides-source-contract`, `db-promotion-check`, `awards-admin`, `integration/special-records-lifecycle`, `integration/admin-audit`, `integration/privileges` | **296 passed, 1 skipped, 0 failed.** The Stage 2 D-5 privilege assertions — `afldb_app` SELECT, `afldb_app` no write, `afldb_import` write, **`afldb_auth` nothing**, and the auth specification naming neither table — are all still green |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` over every changed source and test file | exit 0 |
+| `git diff --check` | exit 0 |
+
+Four DSNs were set explicitly (no worktree `.env`, per §21.10), and **each of the four was
+verified to end in `_test` before the runner was invoked** — a naive path swap had produced
+`afldb_dev` targets on the first attempt, which the pre-flight check caught before any test
+ran. No full-suite run: the focused Stage 3 surface is green and §21.10's 44-failure
+baseline is unchanged by a read-only surface. A Linux/CI run remains the authoritative
+full-suite signal (CLAUDE.md §11).
+
+### 22.9 Observation, not a Stage 3 change
+
+An untracked, empty `b.kind` sits in the worktree root (created 2026-09-14 05:38, the same
+minute as the worktree directory's own mtime). It belongs to no stage of this issue, is
+0 bytes, and was **left in place** rather than deleted — the operator owns the working tree.
+
+### 22.10 Stage boundary
+
+Stage 3 ends here. **Not implemented, by design:** both replay adapters and the importer
+refusals (Stage 4); durable suppression survival; the public `status = 'active'` filters
+(Stage 5); correct / void / reinstate / replace / create, the atomic audit, CAS and the
+`match-admin` delete refusal (Stage 6); `promotion-inventory` closeout and `npm run build`
+(Stage 7); DEV deployment and browser acceptance (Stage 8). `data.specialRecords.edit` lands
+in Stage 6 with the first mutation that guards on it (§9.1). Nothing staged or committed —
+the operator commits.

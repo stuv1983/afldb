@@ -90,6 +90,11 @@ export function adminNavFor(viewer: AdminNavViewer): AdminNavGroup[] {
     { href: '/admin/season-lists', label: 'Season lists', capability: 'data.seasonLists.read' },
     { href: '/admin/fixtures', label: 'Fixtures', capability: 'data.fixtures.read' },
     { href: '/admin/awards', label: 'Awards & honours', capability: 'data.awards.read' },
+    // ONE entry for both special-record families, not two (AFLDB-ISSUE-167
+    // §10.1): first-kick goal and after-the-siren are a few hundred rows each,
+    // and two more top-level Data entries would make nine for two small
+    // domains. The cards at /admin/records are the way in to both.
+    { href: '/admin/records', label: 'Special records', capability: 'data.specialRecords.read' },
   ]);
   if (dataLinks.length > 0) groups.push({ id: 'data', label: 'Data', links: dataLinks });
 

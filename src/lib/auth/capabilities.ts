@@ -49,6 +49,7 @@ export type Capability =
   | 'data.fixtures.edit'
   | 'data.awards.read'
   | 'data.awards.edit'
+  | 'data.specialRecords.read'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -132,6 +133,24 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // population (§7).
   'data.awards.read': ADMIN_AND_UP,
   'data.awards.edit': SUPER_ADMIN_ONLY,
+  // Special-records administration (AFLDB-ISSUE-167 D-4, §9). The two curated
+  // families -- first-kick goal (player_achievements) and kicks after the
+  // siren (after_siren_kicks). Reading a record's provenance, its lifecycle
+  // state and the reason it was voided widens no boundary an Admin does not
+  // already have: /records/first-kick-goal and /records/after-the-siren are
+  // PUBLIC pages, and operations.audit.read already gives an Admin the full
+  // data_edits trail. The `specialRecords` segment rather than `records`
+  // avoids colliding with src/db/queries/records.ts, which in this codebase
+  // means computed leaderboards and nothing stored.
+  //
+  // D-4 also approved `data.specialRecords.edit` (SUPER_ADMIN_ONLY, covering
+  // create / correct / void / suppress / reinstate / replace -- there is no
+  // separate `.suppress`). It is deliberately NOT declared yet: Stage 3 is
+  // read-only, and tests/auth.test.ts fails a capability that is declared but
+  // enforced at no boundary (AFLDB-ISSUE-158). It is declared in Stage 6, in
+  // the same change as the first mutation that guards on it, which is also
+  // when EQUIVALENT_ROLE_GUARD gains its 'requireSuperAdmin' entry.
+  'data.specialRecords.read': ADMIN_AND_UP,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

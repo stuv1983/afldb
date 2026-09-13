@@ -371,6 +371,29 @@ describe('capability policy', () => {
     expect(hasCapability(viewer('admin', true), 'data.brownlow.draft')).toBe(true);
   });
 
+  it('opens special-record reading to any admin and never to a contributor (AFLDB-ISSUE-167 D-4)', () => {
+    // D-4 (2026-09-13): data.specialRecords.read is ADMIN_AND_UP because the
+    // underlying facts are already public -- /records/first-kick-goal and
+    // /records/after-the-siren are public pages -- and operations.audit.read
+    // already gives an Admin the full data_edits trail. Reading a special
+    // record's provenance, lifecycle state and void reason widens no boundary
+    // that exists today.
+    //
+    // The .edit half of D-4 is NOT declared yet. It is a Super-Admin-only
+    // mutation capability and Stage 3 ships no mutation, so declaring it here
+    // would break the ISSUE-158 contract above ("enforces every declared
+    // capability at a real page, route or action boundary"). It is introduced
+    // in Stage 6, in the same change as its first guarded write. The final
+    // role matrix D-4 approved is unchanged: Contributor neither, Admin
+    // .read only, Super Admin both.
+    expect(hasCapability(viewer('contributor'), 'data.specialRecords.read')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'data.specialRecords.read')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'data.specialRecords.read')).toBe(true);
+    expect(hasCapability(viewer('super_admin'), 'data.specialRecords.read')).toBe(true);
+    // Until Stage 6 declares it, no .edit capability exists to be held by anyone.
+    expect(DECLARED_CAPABILITIES).not.toContain('data.specialRecords.edit');
+  });
+
   it('opens the audit trail to any admin and never to a contributor (AFLDB-ISSUE-157)', () => {
     // ISSUE-156 §2: read-only inspection of auth_audit_log and data_edits is
     // Admin-and-up. A contributor reaches one route (upload) and this is not
@@ -639,7 +662,7 @@ describe('adminNavFor', () => {
     expect(groups.map((g) => g.id)).toEqual([
       'overview', 'data', 'acquisition', 'people', 'operations', 'account',
     ]);
-    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards']);
+    expect(groups.find((g) => g.id === 'data')?.links.map((l) => l.href)).toEqual(['/admin/brownlow', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards', '/admin/records']);
     expect(groups.find((g) => g.id === 'operations')?.links.map((l) => l.href)).toEqual(['/admin/audit']);
   });
 
@@ -668,11 +691,26 @@ describe('adminNavFor', () => {
     expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/brownlow');
   });
 
-  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures, awards', () => {
+  it('keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures, awards, special records', () => {
     const data = adminNavFor({ role: 'super_admin', canManageAdmins: false }).find((g) => g.id === 'data');
     expect(data?.links.map((l) => l.href)).toEqual([
-      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards',
+      '/admin/data-editor', '/admin/brownlow', '/admin/player-links', '/admin/coaches', '/admin/draft', '/admin/season-lists', '/admin/fixtures', '/admin/awards', '/admin/records',
     ]);
+  });
+
+  it('shows Special records to an admin and never to a contributor (AFLDB-ISSUE-167 §9)', () => {
+    // ONE Data entry for both families, not two: /admin/records carries the
+    // domain cards, and first-kick goal and after-the-siren are subroutes
+    // (§10.1). Gated on data.specialRecords.read, the same capability all
+    // five routes enforce on arrival -- the link is furniture, the guard is
+    // the boundary.
+    expect(hrefsFor({ role: 'admin', canManageAdmins: false })).toContain('/admin/records');
+    expect(hrefsFor({ role: 'super_admin', canManageAdmins: false })).toContain('/admin/records');
+    expect(hrefsFor({ role: 'contributor', canManageAdmins: false })).not.toContain('/admin/records');
+    const hrefs = hrefsFor({ role: 'super_admin', canManageAdmins: false });
+    for (const family of ['/admin/records/first-kick-goal', '/admin/records/after-the-siren']) {
+      expect(hrefs, 'the two families are subroutes, never their own nav entries').not.toContain(family);
+    }
   });
 
   it('shows Awards & honours to an admin and never to a contributor (AFLDB-ISSUE-165 §5.2)', () => {
@@ -1149,6 +1187,10 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   // edit half narrows the surface without widening the population.
   'data.awards.read': 'requireAdmin',
   'data.awards.edit': 'requireSuperAdmin',
+  // AFLDB-ISSUE-167 D-4. Reading a curated special record widens nothing: the
+  // facts are already public pages. The .edit half arrives in Stage 6 with the
+  // first guarded mutation and will read 'requireSuperAdmin'.
+  'data.specialRecords.read': 'requireAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',
