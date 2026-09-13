@@ -514,6 +514,23 @@ test('reversing the pair reverses the presentation, not the canonical', async ({
     page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
   ).toBeVisible();
   await expect(page).toHaveURL(/club1=adelaide&club2=brisbane-lions/);
+
+  // AFLDB-ISSUE-144 follow-up defect: Swap is a client-side <Link>
+  // navigation, and Next's default prefetching of sibling links on this
+  // page (Reset, the era chips) populated the router's client cache with
+  // OTHER pairs' resolved <head>, which could then be shown instead of the
+  // one this navigation actually landed on -- title and canonical are the
+  // proof that this soft transition, not just the URL and h1, resolved to
+  // THIS pair. Fixed by `prefetch={false}` on those links
+  // (ClubComparisonControls.tsx / ClubComparisonEraExplorer.tsx): with no
+  // prefetch there is nothing else in the cache to bleed in.
+  await expect(page).toHaveTitle('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
+  const ogTitleAfterSwap = await page.locator('meta[property="og:title"]').first().getAttribute('content');
+  expect(ogTitleAfterSwap).toBe('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
+  const canonicalAfterSwap = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  // The pair is alphabetically ordered either way round, so the swap must
+  // not have regressed it to the bare, no-pair surface.
+  expect(new URL(canonicalAfterSwap!).search).toBe('?club1=adelaide&club2=brisbane-lions');
 });
 
 test('the match filter and the history page are shareable state', async ({ page }) => {
@@ -580,16 +597,23 @@ test('the era explorer narrows rivalry records and match history, resets paginat
   await history.locator('summary').click();
   await expect(history.locator('table caption').first()).toContainText('1990s');
 
-  // Canonical correctness is deliberately NOT re-asserted here: it is the
-  // dedicated responsibility of `tests/e2e/seo.spec.ts`'s "a club
-  // comparison canonicalises to its ordered pair alone" (which proves era,
-  // matchType and page are all dropped from the canonical, via a full
-  // `page.goto` that waits for `load`). Asserting it again here, after a
-  // client-side `<Link>` navigation, raced this page's `force-dynamic`
-  // `generateMetadata`/streaming-metadata timing under concurrent workers
-  // with no reliable fix that avoids a wait/retry/timeout this journey
-  // test has no business owning — test-scope separation, not a weakened
-  // contract.
+  // Title, og:title and canonical after this client-side <Link> navigation
+  // used to race: Next's default prefetching of the OTHER links on this
+  // page (Swap, Reset) left their resolved <head> in the router's client
+  // cache, and this era-only navigation could surface one of THOSE instead
+  // of its own (AFLDB-ISSUE-144 follow-up defect). Fixed by `prefetch=false`
+  // on every link on this route (ClubComparisonControls.tsx /
+  // ClubComparisonEraExplorer.tsx), so asserting it here is now safe and is
+  // the dedicated proof that an era-only transition — club1/club2 unchanged
+  // — does not disturb metadata that never depended on era in the first
+  // place. The ordered-pair-alone canonical CONTRACT (era, matchType and
+  // page all dropped) remains `tests/e2e/seo.spec.ts`'s "a club comparison
+  // canonicalises to its ordered pair alone", via a full `page.goto`.
+  await expect(page).toHaveTitle('Carlton vs Collingwood — Club Comparison | AFLDB');
+  const ogTitleAtEra = await page.locator('meta[property="og:title"]').first().getAttribute('content');
+  expect(ogTitleAtEra).toBe('Carlton vs Collingwood — Club Comparison | AFLDB');
+  const canonicalAtEra = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  expect(new URL(canonicalAtEra!).search).toBe('?club1=carlton&club2=collingwood');
 
   // Choosing "All time" again clears the era from the URL and the chips.
   await eraNav.getByRole('link', { name: 'All time', exact: true }).click();
