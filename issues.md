@@ -7,19 +7,21 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 3 tracked here — `-156`, `-165`, `-166`.
+**Open issues:** 2 tracked here — `-156`, `-165`.
 
-<!-- 2026-09-13 (AFLDB-ISSUE-166 OPENED AND INVESTIGATED TO ROOT CAUSE — Low severity, HTTP
-     denial-signalling defect. Found during AFLDB-ISSUE-165 Stage 8 rendered acceptance but NOT
-     caused by it. THIS ENTRY SUPERSEDES THE INITIAL REPORT IN FULL: the first triage classified
-     this High and described it as an authorization bypass leaking privileged content. That was
-     wrong on every count and the claims are withdrawn in the detailed entry below. What is real:
-     a streamed admin denial returns HTTP 200 with a `__next-page-redirect` meta-refresh instead
-     of a 307, so a browser still ends up denied (one second later) while fetch(), curl, a crawler
-     or a monitor records a denied admin route as a success. Authorization itself held throughout.
-     Fix implemented and validated on `opus/issue-166-admin-fetch-auth-bypass`, UNCOMMITTED,
-     UNDEPLOYED. Open issue count 2 -> 3. Stays OPEN until DEV deployment plus Probe 1/2
-     acceptance. See the AFLDB-ISSUE-166 entry below. -->
+<!-- 2026-09-13 (AFLDB-ISSUE-166 RESOLVED — opened, investigated to root cause, fixed, committed,
+     deployed to DEV and accepted the same day. Low severity, HTTP denial-signalling defect; the
+     final classification is NOT an authorization bypass, NOT information disclosure, NOT a
+     mutation bypass, and the initial High triage stays withdrawn in full in the detailed entry
+     below. Fix: delete `src/app/admin/loading.tsx` (one shared Suspense boundary above all 46
+     redirect-capable admin pages), `useLinkStatus()` navigation feedback in `AdminNav`, and
+     structural contracts in `tests/auth.test.ts` that refuse a restored boundary. Committed as
+     `aaa24f8` on `opus/issue-166-admin-fetch-auth-bypass` and deployed to DEV as
+     `d0b522a85e357aa41a0058f11ab23eba6f637a6e`; DEV Probe 1 returned a transport-layer redirect
+     (fetch `status=0` / `type=opaqueredirect`) on every denied admin document and no denied
+     document returned 200 + `__next-page-redirect`, while the Super Admin probe rendered the same
+     pages in full. Open issue count 3 -> 2. Removed from this table and from `IssuesIndex.md`.
+     See the AFLDB-ISSUE-166 entry below, section Resolution (2026-09-13). -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-165 STAGE 7 COMPLETE; STAGE 8 BLOCKED — THREE TEST FILES CHANGED, NO
      APPLICATION CODE, NO MIGRATION, NO COMMIT, NO PUSH, NO DEPLOY, NO DEV OR PROD MUTATION):
@@ -1244,7 +1246,23 @@ created, reopened, resolved, or materially reclassified.
      `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **P4–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
 | `AFLDB-ISSUE-165` | Medium | Admin / Data management | **OPEN — STAGES 1–7 COMPLETE 2026-09-13; STAGE 8 BLOCKED ON ONE OPERATOR ACTION; UNCOMMITTED, UNDEPLOYED.** Stage 7 (integrated regression and security acceptance) passed every `AFLDB-ISSUE-165.md` §12 gate that does not need a running DEV deployment. **32/32 on `afldb_test` as the owner and 32/32 again under the restricted `afldb_import` role** — the second run is the Stage 7 finding that mattered: the suite had been redirecting `AFLDB_IMPORT_DATABASE_URL` at the owner test DSN, which fixes the database and silently also fixes the ROLE, so every mutation ran as `afldb_owner`. That is exactly the blind spot §18.4 item 1 already cost this issue once on the READ path, and the WRITE path has the same exposure with a narrower grant (migration 078 gives `afldb_import` COLUMN-level INSERT/UPDATE on `data_overrides`, not table-level). The suite now uses the repository's own `createImportRoleParityHarness()` and proves role, database parity and a live 42501 denial in `beforeAll`. **Two live-path refusals that reached no test were found and closed:** the Brownlow refusal — the stop condition the ISSUE-156 P5 handoff names in as many words — and historical club-identity resolution both existed in `admin-awards.ts` but were tested only through the retired `awards-admin.ts`; and the ISSUE-080 §5.3 frozen advisory-lock contract pinned the moved-FROM module, leaving the live literal unpinned. Rest of the matrix: 343/343 on the five ISSUE-165 DB-free suites, 44/44 on the honours integration set, 129 passed / 1 skipped on the Query Builder / Gridley AA oracle / NL award-predicate set, full DB-free 4,571 passed / 1 failed / 14 skipped (the one failure the known Windows CRLF `finals-semantics-contract` test), typecheck clean, ESLint 0 errors and 6 warnings all re-proved present at `HEAD`, and `npm run build` PASS at 1,533/1,533 pages with all eleven `/admin/awards` routes emitted. Zero residue: 3,712 / 343 / 113, zero non-active rows, zero fixtures, zero overrides, zero audit rows. **`awards-admin.ts`: RETAIN** — removal fails the brief's second condition, because the twenty mocked-unit tests are built on a harness intercepting the retired creators' exact query sequence and `awards-reload-links.test.ts` holds the only real-contention advisory-lock proof, so porting is a rewrite rather than a move; recorded as a self-contained follow-up. **`captaincies` 1375-vs-1774: left alone**, re-grounded from history (assertion at `30a471c` 2026-09-01; `d08591f` 2026-09-05 added exactly 399 rows, 1,375 + 399 = 1,774; 151 commits back; this diff touches no captaincies file) — ISSUE-112 manifest debt, not this issue's. **Stage 8 stops after its read-only preflight** (DEV `b43eb4a` on `main`, clean, one behind `origin/main`; `current_database() = afldb_dev`; migrations through 100 with 0 pending; `afldb` active; `/api/health` 200): `deploy/sync-dev.ps1` deploys from `origin`, `origin/sonnet/issue-165-awards-admin` is at `9a687db` (Stage 1–3 backend only), and every Stage 4–6 change is staged and uncommitted, so the surface under test cannot reach DEV and this session is forbidden to commit or push. The rendered three-role matrix and the 1440×900 / 375×812 gate are the only §12 gates still unmet. Carried forward: the session's first `npm run build` failed `42703 column w.status does not exist` against `afldb_dev`, direct evidence that migration 101 must precede the build — `sync-dev.ps1` already sequences it that way. Stage 7 record: `AFLDB-ISSUE-165.md` §19. **Earlier state — STAGES 1–6 IMPLEMENTED AND DB-GATED 2026-09-13 (30/30 on `afldb_test`, twice in immediate succession, database left exactly as found); UNCOMMITTED, UNDEPLOYED. Stages 4–6 (2026-09-13, later session):** the public/read-model `status = 'active'` filter on every scan of the three honours tables in all four consumer modules (`awards.ts` 19, `grid-solver.ts` 17, `nl/player-career.ts` 2, `app/sitemap.ts` 2) and in the Query Builder's two relation CORRELATIONS, with `db-health.ts` deliberately left unfiltered and the reason recorded in the source; `data.awards.read` (Admin and up) / `data.awards.edit` (Super Admin only), the nav link, and a `requireCapability()` guard on all ten new pages, the revalidate route handler and all fifteen Server Actions; and the `/admin/awards` surface — landing with active/void counts, three filtered paged lists, three detail pages and three create pages, provenance visible in every list, identity fields visibly read-only with the reason, a two-step replacement preview, and history rendered by the AFLDB-ISSUE-157 viewer's own reader and component rather than a second audit subsystem. `/admin/data-editor` lost the three award forms and their three Server Actions and now carries the Draft-precedent compatibility pointer, so there is ONE authoritative create path. **R-3 is held by a counting contract** (`tests/honours-lifecycle-public-contract.test.ts`: scans must equal lifecycle predicates, per module) rather than by a list in a document. **Two defects in the Stages 1–3 code, found by Stage 4 and fixed:** `readHonourOverrides()` read `data_overrides` on the APPLICATION pool, which carries no `grant_app_read()` — it worked for the owner role the integration suite uses and would have failed closed on the first `/admin/awards/*/[id]` page load; and three cached public pages the Stage 4 filters newly made stale (`/awards`, `/seasons/<year>`, `/sitemap.xml`) were missing from the server-computed revalidation set. **The importer-role suite that skipped all 107 tests last session was RUN** — a valid DSN was derivable from the operator's existing `.env` (every DSN shares the `afldb_test` endpoint) and was built in memory, never printed: 96 passed / 1 failed / 10 skipped, the one failure a stale `captaincies` manifest assertion (expects 1,375 rows; the tracked CSV has held 1,774 since `d08591f`) on a table explicitly out of this issue's scope. Validation: `npm run typecheck` clean, ESLint 0 errors over every changed file, DB-free 4,571 passed over 123 files (one pre-existing Windows CRLF failure), ISSUE-165 integration 30/30 twice. Pre-existing unrelated DB-backed failures recorded with evidence in `AFLDB-ISSUE-165.md` §18.9, including one proved by A/B against `HEAD`. Stages 7–9 (closeout, browser acceptance, deployment) NOT started; migration 101 remains `afldb_test`-only; no `CHANGELOG.md` entry. Full record: `AFLDB-ISSUE-165.md` §18. **Earlier state — STAGES 1–3 IMPLEMENTED AND DB-GATED 2026-09-13 (24/24 on `afldb_test`, twice in immediate succession, database left exactly as found); UNCOMMITTED, UNDEPLOYED.** Migration 101 applied to `afldb_test` only. The first DB-backed run was 18/5: one real implementation bug (`insertHallOfFame()` overwrote the supplied inductee name with the linked player's display name, silently moving the durable key on the one table whose name IS its identity), one defective test query (`conname LIKE '%status%'` can never find `*_void_reason_ck`), three fixture-isolation defects — all repaired without weakening a contract, and the suite is now idempotent against an already-used test DB. Outstanding: `tests/integration/awards-reload-links.test.ts` skips all 107 tests for want of `AFLDB_TEST_IMPORT_DATABASE_URL` (pre-existing environment gap); the one new `reload_keyed()` path it would cover is proved directly in the ISSUE-165 suite instead. Earlier state: `AFLDB-ISSUE-156` P5 (awards/honours correction, voiding and replacement lifecycle), absorbing the awards/Hall of Fame/honour-team slice of P8. Branch `sonnet/issue-165-awards-admin`, base `37ac7d3`, worktree `D:\dev\afldb-issue-165`. **Migration 101** `src/db/migrations/101_awards_honours_lifecycle.sql` written and **NOT run against any database**: `status`/`status_reason`/`updated_at` plus two CHECKs on each of `award_winners`, `hall_of_fame`, `honour_team_members`; `hall_of_fame`'s and `honour_team_members`' identity keys rebuilt ACTIVE-ROW-ONLY so a replacement can re-use a voided row's identity; `data_overrides.entity_type` widened by the three names. `award_winners`' source-record key is deliberately unchanged and `(award_id, season, player_id)` is deliberately NOT made unique — the 1984 All-Australian club+state pairs are two legitimate rows per player (migration 042). New `src/db/queries/admin-awards.ts`: readers plus create / correct-safe-metadata / void / reinstate / replace for all three domains, `SELECT … FOR UPDATE` with an `updated_at` compare-and-swap, `data_edits` written in the same transaction as every canonical and override write, post-write refusals thrown so `postgres.js` rolls back rather than committing a half-done mutation, the AFLDB-ISSUE-080 §5.3 advisory lock reused for every honour-team identity writer. Three new `replay_admin_overrides()` branches in `tools/migration/common.py` (`lifecycle`/`correction`/`record` field groups, natural-key `entity_key`s, no row ids and no name matching anywhere), called from all nine `import_awards.py` reload sites — seven `award_winners` groups, Hall of Fame, honour teams — inside each group's own transaction, before its commit. Operator decisions **D-8** (no speculative indexes), **D-9** (correction/record fail closed, lifecycle warns and RETAINS), **D-10** (voided rows leave the admin player-link and candidate queues), **D-11** (`awards.first_season`/`last_season` recomputed from ACTIVE rows in the same transaction, and the importer's own span update likewise) and **D-12** (the legacy ingest writer refuses to overwrite an active lifecycle/correction override, and learns no override semantics) all implemented; blockers **B-1** (0 NULL `source_id` / 0 NULL `source_record_id` over 3,712 `award_winners` rows on `afldb_test`, with a defensive `no_durable_key` refusal kept anyway) and **B-2** (migration 101 free) closed. **Two findings the planning session missed, both now corrected in the runbook:** the public read surface is FOUR modules, not one (`awards.ts`, `grid-solver.ts`, `nl/player-career.ts`, `app/sitemap.ts`), widening the Stage 4+ status filter and the §12.6 invariance gate; and `data_edits.table_name` has admitted all three honours tables since migration 058 with **no promotion lineage target** — the fourth instance of the `AFLDB-ISSUE-160` D-3 defect — fixed here with three new identity rules in `tools/db/promotion-inventory.ts` plus a standing contract test that forces the decision for any future admitted table. DB-free validation clean: 4,535 tests over 120 files, `npm run typecheck`, `eslint` on every changed file, `py_compile` on both changed Python modules. **DB-backed gate NOT RUN** — the worktree has no `.env` and no `AFLDB_TEST_DATABASE_URL`; `tests/integration/admin-awards.test.ts` is written but unrun. Stages 4–9 not started. No `CHANGELOG.md` entry: nothing applied, nothing deployed, no behaviour changed. Runbook `AFLDB-ISSUE-165.md` §17 is the authoritative implementation record. **Next action (operator):** stage and commit the reviewed working tree, `git push origin sonnet/issue-165-awards-admin`, then `deploy/sync-dev.ps1 -RemoteRef sonnet/issue-165-awards-admin` (which applies migration 101 before the build), `npm run db:privileges` on DEV as the no-op reconcile proof, and run the Stage 8 browser matrix — `AFLDB-ISSUE-165.md` §19.10 is the restart list. Superseded earlier next action: review the uncommitted diff, then bring up the `afldb_test` tunnel, apply migration 101 to `afldb_test` only and run the integration suite before Stage 4. The `brownlow_vote_entry_state` `data_edits` lineage gap the new standing test surfaces belongs to `AFLDB-ISSUE-155`, not here. |
-| `AFLDB-ISSUE-166` | Low | Admin / Auth / Next.js rendering | **OPEN — ROOT CAUSE PROVEN, FIX IMPLEMENTED AND VALIDATED 2026-09-13; UNCOMMITTED, UNDEPLOYED.** Streamed admin denials returned HTTP 200 + `__next-page-redirect` meta-refresh instead of an HTTP redirect, because `src/app/admin/loading.tsx` put a Suspense boundary above every guarded admin page and the 200 shell committed before any page-level `redirect()` ran. **Reclassified from the initial High triage: NOT an authorization bypass, NOT information disclosure, NOT a mutation bypass** — every privileged page and query path guards before privileged data access, denied renders contained only the "Loading…" fallback with zero forms/inputs/selects/textareas/tables/rows/buttons and one Flight chunk (versus three on a permitted `/admin/awards`), Route Handlers return real HTTP redirects, and Server Actions remain independently capability-guarded. Fix: delete `src/app/admin/loading.tsx`; `useLinkStatus()` in `AdminNav` for navigation feedback; structural contracts in `tests/auth.test.ts` prevent restoring a route-level loading boundary or a layout `<Suspense>` above the guards. Key files: `src/app/admin/loading.tsx` (deleted), `src/app/admin/AdminNav.tsx`, `src/styles/globals.css`, `tests/auth.test.ts`, `src/lib/auth/session.ts`, `src/lib/auth/capabilities.ts`. | **Operator:** review the branch `opus/issue-166-admin-fetch-auth-bypass`, then commit, push and deploy to DEV. **The issue stays OPEN until DEV Probe 1/2 confirm real HTTP redirects on denied admin pages** — no test harness can assert the streamed HTTP status without a running server, so that probe is mandatory acceptance evidence, not a formality. |
+<!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-166` (streamed admin denials return HTTP 200 + meta-refresh
+     instead of an HTTP redirect) is **Resolved** and is NO LONGER an open issue. Committed as
+     `aaa24f8` on `opus/issue-166-admin-fetch-auth-bypass` and deployed to DEV as
+     `d0b522a85e357aa41a0058f11ab23eba6f637a6e` (build PASS 1534/1534 pages; migrations 101/101
+     with nothing applied; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`).
+     DEV acceptance PASS on both sides of the boundary: the plain-Admin probe returned a
+     transport-layer redirect (`status=0`, `type=opaqueredirect`) for `/admin/settings`,
+     `/admin/query-builder`, `/admin/awards/winners/new` and `/admin/nl-search/export`, `200`
+     `type=basic` for the permitted `/admin/awards` and `/admin/admins`, and NO denied document
+     returned `200` + `__next-page-redirect`; the Super Admin probe rendered all three formerly
+     denied pages in full and downloaded the export CSV. The settled classification is retained:
+     **Low — HTTP denial-signalling defect; not an authorization bypass, not information
+     disclosure, not a mutation bypass**, and the initial High triage stays withdrawn in full.
+     All six pass criteria are MET, including criterion 6 — the sidebar pending-navigation
+     indicator was visually confirmed on DEV by the operator on 2026-09-13. PROD
+     untouched; no PROD validation claimed. Full evidence: the `AFLDB-ISSUE-166` entry below,
+     *Resolution (2026-09-13)*. Removed from this table and from `IssuesIndex.md`; 3 -> 2. -->
 <!-- RETIRED 2026-09-12 — `AFLDB-ISSUE-160` (Draft administration, ISSUE-156 P3b), `AFLDB-ISSUE-161`
      (Season list administration, P3c), `AFLDB-ISSUE-162` (Fixture / season schedule administration,
      P3d) and `AFLDB-ISSUE-163` (Club leadership administration, P3e) are **Resolved** and are NO
@@ -26785,9 +26803,9 @@ the implementation (§17.3, §8); D-5 is answered as three sub-routes.
 
 ## AFLDB-ISSUE-166 — Streamed admin denials return HTTP 200 + meta-refresh instead of an HTTP redirect
 
-- **Status:** Open — **root cause proven and fix implemented and validated 2026-09-13 on
-  `opus/issue-166-admin-fetch-auth-bypass`; UNCOMMITTED, UNDEPLOYED.** Stays open until the fix
-  is deployed to DEV and Probe 1/2 confirm real HTTP redirects on denied admin pages.
+- **Status:** **RESOLVED 2026-09-13** — root cause proven, fix implemented and validated, committed
+  as `aaa24f8`, deployed to DEV as `d0b522a85e357aa41a0058f11ab23eba6f637a6e`, and accepted on DEV
+  by the plain-Admin and Super Admin probes. See *Resolution (2026-09-13)*. PROD untouched.
 - **Severity:** Low
 - **Classification:** HTTP denial-signalling defect. **Not an authorization bypass. Not
   information disclosure. Not a mutation bypass.**
@@ -26947,10 +26965,11 @@ using the existing super-admin state. Neither was built under this issue's scope
 
 **Consequence: DEV Probe 1/2 are mandatory acceptance evidence for this issue, not a formality.**
 
-### Remaining acceptance — the only thing keeping this issue open
+### Acceptance criteria — MET on DEV 2026-09-13
 
-`AFLDB-ISSUE-166` stays **OPEN** until the fix is deployed to DEV and Probe 1/2 confirm real HTTP
-redirects on denied admin pages. Pass criteria:
+These were the criteria that kept the issue open. They were run on DEV against
+`d0b522a85e357aa41a0058f11ab23eba6f637a6e` and are **PASS**; the per-criterion evidence is in
+*Resolution (2026-09-13)* below. Pass criteria as originally written:
 
 1. `/admin/settings`, `/admin/query-builder` and `/admin/awards/winners/new`, requested by a plain
    Admin session, return a genuine HTTP redirect (`307` + `Location: /admin`).
@@ -26960,6 +26979,87 @@ redirects on denied admin pages. Pass criteria:
 4. `/admin/nl-search/export` is unchanged.
 5. A Super Admin session still reaches all three formerly denied pages with content.
 6. Clicking an admin sidebar link still shows visible pending feedback.
+
+### Resolution (2026-09-13)
+
+**Resolved.** The fix is committed, deployed to DEV and accepted on both sides of the
+authorization boundary.
+
+**Commit and deployment.** Committed as `aaa24f8` ("AFLDB-ISSUE-166: deny admin routes at the HTTP
+layer, not by meta-refresh") on `opus/issue-166-admin-fetch-auth-bypass`, base `77c03e9`. DEV
+deployed at `d0b522a85e357aa41a0058f11ab23eba6f637a6e`: production build PASS at **1,534/1,534**
+pages, migration ledger **101/101 with nothing applied** (this fix carries no migration),
+`afldb.service` healthy, `/api/health` `status=ok` / `database=ok`.
+
+**Probe 1 — plain Admin session, after deploy.** Documents under `/admin`, `fetch()` with manual
+redirect handling:
+
+| Route | Result |
+|---|---|
+| `/admin/settings` | `status=0`, `type=opaqueredirect` |
+| `/admin/query-builder` | `status=0`, `type=opaqueredirect` |
+| `/admin/awards/winners/new` | `status=0`, `type=opaqueredirect` |
+| `/admin/awards` | `status=200`, `type=basic` |
+| `/admin/admins` | `status=200`, `type=basic` |
+| `/admin/nl-search/export` | `status=0`, `type=opaqueredirect` |
+
+**No denied document response returned `200` + `__next-page-redirect`.** An `opaqueredirect` result
+is what a redirect looks like to a manual-redirect `fetch()` — the redirect is made at the HTTP
+layer, which is the property this issue is about. The exact status line and `Location` value are
+deliberately not claimed here: an opaque redirect does not expose them to the probe, so the
+recorded evidence is that the denial reached the transport, not that it was specifically a `307`.
+Before the fix these same six requests returned `200` with a `__next-page-redirect` meta tag.
+
+**Probe 2 — Super Admin session, immediately preceding.** `/admin/settings`, `/admin/query-builder`
+and `/admin/awards/winners/new` each rendered the full page, and `/admin/nl-search/export` returned
+its CSV successfully. Authorization behaviour is therefore correct on **both** sides of the
+boundary: the permitted role is not over-denied by the fix, and the denied role is refused at the
+HTTP layer.
+
+**Against the six pass criteria.** 1 — PASS as recorded above, with the status-code caveat stated.
+2 — PASS, no `__next-page-redirect` in any denied response. 3 — PASS, `/admin/awards` and
+`/admin/admins` still `200` `type=basic` for the same Admin session (the Flight-chunk count was not
+re-counted in this probe and is not claimed). 4 — PASS, `/admin/nl-search/export` behaves as the
+route requires on each side: refused at the HTTP layer for the Admin session, CSV for the Super
+Admin session. 5 — PASS, Probe 2. 6 — PASS, operator visual confirmation on DEV (below).
+
+**Criterion 6 — sidebar pending feedback, operator-confirmed on DEV 2026-09-13.** The
+`useLinkStatus()` pending dot rendered beside the clicked **Player links** nav entry while the RSC
+navigation was in flight, and the destination page then completed normally. Confirmed visually and
+by screenshot, with the pending window made observable under network throttling:
+
+| RSC request | Duration |
+|---|---|
+| `player-links?_rsc=17qrm` | ~2.03 s |
+| `player-links?_rsc=tg9kl` | ~2.05 s |
+| `player-links?_rsc=72j5p` | ~3.64 s |
+
+This is the criterion that replaces what the deleted `loading.tsx` was originally added for on
+2026-08-19 — navigation feedback — and it confirms the feedback now appears on the specific link
+that was clicked rather than by blanking the page behind a server boundary above the guards. The
+throttled durations are evidence that the indicator was observable during a real pending window,
+not a timing measurement of the route.
+
+**All six pass criteria are MET.**
+
+**Classification retained, unchanged by acceptance:** **Low — HTTP denial-signalling defect. Not an
+authorization bypass, not information disclosure, not a mutation bypass.** The four withdrawn
+claims of the initial High triage stay withdrawn in full.
+
+**Root cause, as fixed:** `src/app/admin/loading.tsx` — one shared route-level Suspense boundary
+above all 46 redirect-capable admin pages, which committed a `200` shell before any page-level
+`redirect()` could run. Deleted. Navigation feedback moved to `useLinkStatus()` in `AdminNav`, and
+three structural contracts in `tests/auth.test.ts` refuse a restored boundary (proven RED before
+the fix, GREEN after).
+
+**Follow-ups, neither a blocker and neither allocated an ID:** the test-harness limitation recorded
+above (no harness asserts a streamed HTTP status without a running server; closing it properly
+needs a lower-privileged admin credential set plus a `testMatch` widening in
+`playwright.admin-nav.config.ts`), and the pre-existing Next 16 `middleware` → `proxy` deprecation
+noted below.
+
+**Not done:** no PROD deployment, no PROD probe, and no PROD claim of any kind. Reaching production
+is the normal release-lifecycle step for this branch, not an open defect.
 
 ### Files
 
