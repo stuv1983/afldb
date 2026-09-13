@@ -7,7 +7,21 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 4 tracked here — `-140`, `-152`, `-155`, `-156`.
+**Open issues:** 3 tracked here — `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-140 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): closeout only. Confirmed as a superseded historical DEV data defect. The retained
+     pre-rebuild snapshot `afldb_dev_pre_rebuild_20260906-112500` still holds the original 17
+     duplicate fixture groups (34 rows) / 17 stat-less 2026 matches, with exact provenance traced: 9
+     rows from `squiggle_api` import batch 69 (2026-08-20), 8 rows from `kali_afl_stats` import batch
+     80 (2026-08-25), both written by the now-retired `tools/current-season/update-current-season.ts`
+     canonical write path, itself retired by `AFLDB-ISSUE-122` ahead of the `AFLDB-ISSUE-139`
+     rebuild/promotion that replaced `afldb_dev`. Current `afldb_dev`: 0 duplicate groups / 0
+     stat-less 2026 matches (unchanged from the 2026-09-06 re-measurement). Operator-verified current
+     `afldb_prod`: 0 duplicate groups, 0 stat-less 2026 matches, no canonical `matches` rows sourced
+     from `squiggle_api` or `kali_afl_stats`, and no `import_batches` rows matching the retired
+     current-season writer. No live code defect and no data repair remain. See `issues.md` Resolution
+     (2026-09-13); removed from the Open Issues table and `IssuesIndex.md`; 4 -> 3. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-144 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): closeout only. Implementation (core Club vs Club comparison `2102b51`/PR #2, and the
@@ -18582,10 +18596,11 @@ and `IssuesIndex.md` (6 -> 5).
 ## AFLDB-ISSUE-140 — `afldb_dev` holds 17 duplicate, stat-less 2026 matches under an off-by-one round number
 
 - **Status:** Open — found 2026-09-06 during the `AFLDB-ISSUE-118` DEV load. **Not started.** Nothing was deleted or corrected. **Re-measured 2026-09-06 after the `AFLDB-ISSUE-139` DEV promotion (read-only, no repair):** on the promoted lineage (`afldb_dev` = rebuilt `afldb_test` + one settle, batch 86) the count is **0 duplicate fixtures / 0 rows / 0 stat-less 2026 matches** against this entry's baseline 17 / 34 / 17 — 209 matches over 25 Opening-Round-inclusive rounds, every one with stat and period rows; the duplicates were a property of the bootstrap lineage, which is retained as `afldb_dev_pre_rebuild_20260906-112500` and in the pre-cutover dump for the writer identification this entry still asks for. Evidence: ISSUE-139 Phase 4E-3, host record `14-issue-140-remeasure.out`.
+- **Status addendum (2026-09-13, RESOLVED — closeout tracking only):** the writer identification this entry asked for is now complete against the retained pre-rebuild snapshot, current `afldb_dev` and current `afldb_prod` are both confirmed clean, and no evidence of PROD ever carrying the defect exists. No code change, no migration, no deploy, no repair performed — the defect was already absent from every live database. See Resolution below.
 - **Severity:** Medium — duplicate canonical matches in the current season, with one measured downstream effect already.
 - **Area:** Data integrity / Import (current season)
 - **Found:** 2026-09-06
-- **Resolved:** N/A
+- **Resolved:** 2026-09-13
 - **Related:** `AFLDB-ISSUE-099` (the in-season settle), `AFLDB-ISSUE-131` (the upstream-rekey-duplicates-a-match precedent and its fail-closed rekey-in-place fix), `AFLDB-ISSUE-118` (the after-siren loader that surfaced it).
 - **Migration:** none expected.
 
@@ -18610,6 +18625,49 @@ issue's only evidence source for the writer identification. `AFLDB-ISSUE-139` Ph
 item 4 authorises `sudo -u postgres dropdb "afldb_dev_pre_rebuild_20260906-112500"`; that cleanup
 must NOT run until this issue is closed. Whether the database still exists has not been checked
 here.
+
+### Resolution — 2026-09-13
+
+Closeout tracking only; no implementation, migration, or deployment work this session. No
+implementation code was ever written for this issue — the "Exact next action" above (writer
+identification, then a read-only PROD measurement) is the work this closure completes.
+
+**Writer identification, against the retained pre-rebuild snapshot `afldb_dev_pre_rebuild_20260906-112500`:**
+
+* 17 duplicate 2026 fixture groups (34 rows) and 17 stat-less 2026 matches confirmed present on that
+  snapshot, matching this entry's original baseline exactly.
+* Exact provenance of the 17 stat-less rows: 9 rows from `squiggle_api`, import batch 69
+  (2026-08-20); 8 rows from `kali_afl_stats`, import batch 80 (2026-08-25).
+* Writer identified: `tools/current-season/update-current-season.ts` — the canonical current-season
+  write path in place before `AFLDB-ISSUE-122`. That path used AFL Tables' own round-number
+  convention (no Opening Round), which the AFLDB-numbered fixture/settle path (Opening-Round-inclusive)
+  could not upsert against, producing the duplicate `match_key`s described under Problem above.
+* That writer was **retired by `AFLDB-ISSUE-122`**, before the `AFLDB-ISSUE-139` rebuild/promotion
+  replaced `afldb_dev` with the rebuilt lineage. The defect is therefore a property of a since-retired
+  write path on a since-superseded database, not of any code currently in `main`.
+
+**Current DEV** (`afldb_dev`, the `AFLDB-ISSUE-139`-promoted lineage): 0 duplicate fixture groups, 0
+stat-less 2026 matches — unchanged from the 2026-09-06 re-measurement already recorded above and in
+`CHANGELOG.md`.
+
+**Current PROD, operator-verified 2026-09-13** (`current_database() = afldb_prod`):
+
+* 0 duplicate fixture groups.
+* 0 stat-less 2026 matches.
+* No canonical `matches` rows with `source` `squiggle_api` or `kali_afl_stats`.
+* No `import_batches` rows matching `update-current-season` / a current-season external refresh.
+
+**Conclusion:** no live code defect remains, no data repair remains, and there is no evidence PROD
+was ever affected by the retired DEV canonical-write path. This issue is a superseded historical DEV
+data defect, fully explained and fully absent from both current DEV and current PROD. Closed by the
+operator per the standard issue lifecycle.
+
+**Hold lifted:** the 2026-09-12 HOLD above is satisfied — `afldb_dev_pre_rebuild_20260906-112500` was
+this issue's only remaining reason to retain that snapshot, so `AFLDB-ISSUE-139` Phase 4E close-out
+item 4 (`sudo -u postgres dropdb "afldb_dev_pre_rebuild_20260906-112500"`) is now unblocked. Dropping
+it is a separate operator database action and is not performed by this closure.
+
+Removed from the Open Issues table and `IssuesIndex.md`; 4 -> 3.
 
 ## AFLDB-ISSUE-141 — The promotion contract cannot preserve migration-080 state and is hard-bound to production names
 
