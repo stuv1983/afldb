@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import {
@@ -264,7 +264,37 @@ describe.skipIf(!canRunImporter)(
       expect(importRole.validation?.owner.database).toBe(importRole.validation?.restricted.database);
     });
 
+    /**
+     * The afterAll purge below, keyed on STABLE identifiers rather than on the
+     * ids this run is about to create, and run BEFORE anything is set up.
+     *
+     * afterAll deletes by `adminUserId`, which exists only once beforeAll has
+     * created it, so a run that is interrupted never purges at all. The fixture
+     * admin is then re-created ON CONFLICT with the same email and therefore the
+     * same id, and the next run inherits decisions it never made: the importer
+     * reports "N manual identity decision(s) read" and preserves them over the
+     * source, so a test asserting source-derived link state fails on a
+     * precondition instead of on anything real. Observed, not hypothesised.
+     *
+     * Idempotent, and a no-op when there is nothing to clean. The foreign-source
+     * fixture row deliberately has no entry here: beforeAll already deletes it by
+     * source_id immediately before re-creating it.
+     */
+    async function purgeInterruptedRunFixtures(): Promise<void> {
+      await sql`
+        DELETE FROM player_link_resolutions
+         WHERE admin_user_id IN (SELECT id FROM auth_users WHERE email = ${FIXTURE_EMAIL})
+      `;
+      await sql`
+        DELETE FROM player_link_suggestions
+         WHERE target_table = 'player_achievements' AND note = ${NOTE}
+      `;
+    }
+
     beforeAll(async () => {
+      // Debris from an earlier run that never reached its afterAll.
+      await purgeInterruptedRunFixtures();
+
       // A dedicated fixture admin. Picking the first real admin by id is the
       // trap AFLDB-ISSUE-074 records against the email-intake suite.
       const [admin] = await sql<{ id: number }[]>`
@@ -942,5 +972,302 @@ describe.skipIf(!canRunImporter)(
       expect(accepted.stdout).toContain('reader suggestions');
       expect(await readById(row.id)).toBeUndefined();
     }, 120_000);
+
+    // =====================================================================
+    // AFLDB-ISSUE-167 Stage 4 — durable suppression through the importer
+    // =====================================================================
+    // The Phase E stop condition, tested where the importer really runs: gate
+    // G-5 (the TypeScript replay adapter is atomic with this importer's own
+    // transaction) and the reload/rebuild-survival half of §16.
+    //
+    // Every one of these spawns the REAL importer as afldb_import. A
+    // reimplementation of the replay in the test would prove only that two
+    // pieces of test code agree.
+    describe('durable admin decisions survive the reload (AFLDB-ISSUE-167 Stage 4)', () => {
+      const OVERRIDE_MARKER = 'afldb-issue-167-stage4';
+
+      async function seedOverride(
+        entityKey: string, fieldGroup: string, values: Record<string, unknown>,
+      ): Promise<void> {
+        await sql`
+          INSERT INTO data_overrides
+            (entity_type, entity_key, field_group, override_values, is_active, admin_user_id)
+          VALUES ('player_achievements', ${entityKey}, ${fieldGroup},
+                  ${sql.json(values as never)}, true, ${adminUserId})
+        `;
+      }
+
+      async function clearOverrides(): Promise<void> {
+        await sql`
+          DELETE FROM data_overrides
+           WHERE entity_type = 'player_achievements'
+             AND (entity_key LIKE ${`%${OVERRIDE_MARKER}%`}
+                  OR override_values->>'status_reason' LIKE ${`%${OVERRIDE_MARKER}%`})
+        `;
+        await sql`
+          DELETE FROM player_achievements WHERE source_record_id LIKE ${`%${OVERRIDE_MARKER}%`}
+        `;
+      }
+
+      async function lifecycleOf(stableId: string): Promise<{ status: string; reason: string | null } | undefined> {
+        // Read the MIGRATION 102 column, never the importer's own
+        // `link_status_value::text AS status` alias (AFLDB-ISSUE-167 §21.8).
+        const [row] = await sql<{ status: string; reason: string | null }[]>`
+          SELECT status, status_reason AS reason FROM player_achievements
+           WHERE achievement_type = 'first_kick_goal' AND source_record_id = ${stableId}
+        `;
+        return row;
+      }
+
+      async function countIssues(): Promise<number> {
+        const [row] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM data_issues WHERE entity_type = 'player_achievements'
+        `;
+        return row.n;
+      }
+
+      async function countBatches(): Promise<number> {
+        const [row] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM import_batches
+           WHERE tool = 'tools/records/import-first-kick-goal.ts'
+        `;
+        return row.n;
+      }
+
+      /** Put the two fixture files back the way beforeAll left them. */
+      function restoreSourceFiles(): void {
+        writeFileSync(extractPath, readFileSync(REAL_CSV, 'utf8'), 'utf8');
+        writeFileSync(manifestPath, pristineManifest, 'utf8');
+      }
+
+      /**
+       * Retire a row the way the curator does, which is BOTH halves: drop it
+       * from the extract AND mark its manifest line `retired`. Dropping it from
+       * the extract alone leaves the manifest claiming an active id the extract
+       * no longer supplies, and the importer refuses at the manifest join —
+       * before it reaches anything this stage is testing. The same two-step the
+       * AFLDB-ISSUE-083 test at `:924-944` performs.
+       */
+      function retire(nameClean: string): void {
+        removeLineContaining(extractPath, nameClean);
+        const line = readFileSync(manifestPath, 'utf8')
+          .split('\n').find((candidate) => candidate.includes(`,${nameClean},`))!;
+        editFile(manifestPath, line, line.replace(/,active$/, ',retired'));
+      }
+
+      // Every test here starts from the pristine fixture copies. Several of
+      // them deliberately retire a row, and a test that fails mid-way skips its
+      // own restore — without this, one failure cascades into the next as a
+      // second, unrelated one. (The AFLDB-ISSUE-165 repeatability lesson,
+      // applied forward rather than after the fact.)
+      beforeEach(restoreSourceFiles);
+
+      beforeAll(clearOverrides);
+      afterAll(async () => {
+        await clearOverrides();
+        restoreSourceFiles();
+        const restore = runImporter();
+        expect(restore.status, output(restore)).toBe(0);
+      }, 240_000);
+
+      it('leaves the lifecycle columns alone on an ordinary reload (Layer 1)', async () => {
+        // The free half of §5.1: neither the INSERT's 21 columns nor the
+        // UPDATE's 18 name status, status_reason or updated_at, so a scoped
+        // reload cannot revert them even with no override in play at all.
+        const row = await takeSourceLinked(used);
+        await sql`
+          UPDATE player_achievements
+             SET status = 'void', status_reason = ${`${OVERRIDE_MARKER}: voided by hand`}
+           WHERE id = ${row.id}
+        `;
+
+        const run = runImporter();
+        expect(run.status, output(run)).toBe(0);
+
+        const after = await lifecycleOf(row.sourceRecordId!);
+        expect(after?.status).toBe('void');
+        expect(after?.reason).toContain(OVERRIDE_MARKER);
+
+        await sql`
+          UPDATE player_achievements SET status = 'active', status_reason = NULL
+           WHERE id = ${row.id}
+        `;
+      }, 240_000);
+
+      it('re-asserts a lifecycle decision the canonical row lost (Layer 2)', async () => {
+        // The durable half. A destructive rebuild takes the row and every
+        // column on it; the importer puts the ROW back from source, and only
+        // the data_overrides replay can put the DECISION back. Simulated by
+        // clearing the columns rather than by TRUNCATE players CASCADE, which
+        // would take the whole fixture database with it — the mechanism under
+        // test is "the replay restores what the source cannot", and that is
+        // exactly what is exercised here.
+        const row = await takeSourceLinked(used);
+        await seedOverride(
+          `wikipedia_first_kick_goal:${row.sourceRecordId}`,
+          'lifecycle',
+          { status: 'void', status_reason: `${OVERRIDE_MARKER}: recorded in error` },
+        );
+        await sql`
+          UPDATE player_achievements SET status = 'active', status_reason = NULL
+           WHERE id = ${row.id}
+        `;
+
+        const run = runImporter();
+        expect(run.status, output(run)).toBe(0);
+        expect(run.stdout).toContain('lifecycle decision(s) re-asserted');
+
+        const after = await lifecycleOf(row.sourceRecordId!);
+        expect(after?.status).toBe('void');
+        expect(after?.reason).toBe(`${OVERRIDE_MARKER}: recorded in error`);
+
+        await clearOverrides();
+        await sql`
+          UPDATE player_achievements SET status = 'active', status_reason = NULL
+           WHERE id = ${row.id}
+        `;
+      }, 240_000);
+
+      it('re-creates a manual record row, and an ordinary reload leaves it alone', async () => {
+        // A manual row carries source_id = manual_admin_edit, so it is outside
+        // `owned` (:331-336) and no reload touches it — §8.2's claim, proven
+        // rather than asserted. The `record` override is what puts it back
+        // after a rebuild removes it.
+        const recordId = `first_kick_goal:${OVERRIDE_MARKER}-manual`;
+        await seedOverride(
+          `manual_admin_edit:${recordId}`,
+          'record',
+          {
+            player_name_raw: 'Stage Four Manual',
+            player_name_clean: 'Stage Four Manual',
+            club_name_raw: 'Manual Club',
+            season: 1900,
+            round_raw: 'R1',
+            notes: `${OVERRIDE_MARKER}: created by an administrator`,
+            status: 'active',
+            status_reason: null,
+          },
+        );
+
+        const created = runImporter();
+        expect(created.status, output(created)).toBe(0);
+        expect(created.stdout).toContain('manual row(s) re-created');
+
+        const [manual] = await sql<{ id: number; name: string; sourceKey: string }[]>`
+          SELECT a.id, a.player_name_clean AS name, s.key AS "sourceKey"
+            FROM player_achievements a JOIN sources s ON s.id = a.source_id
+           WHERE a.source_record_id = ${recordId}
+        `;
+        expect(manual, 'the record override must re-create the row').toBeDefined();
+        expect(manual.sourceKey).toBe('manual_admin_edit');
+
+        // A second ordinary reload must neither retire it nor duplicate it.
+        const again = runImporter();
+        expect(again.status, output(again)).toBe(0);
+        const [{ n }] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM player_achievements
+           WHERE source_record_id = ${recordId}
+        `;
+        expect(n).toBe(1);
+        expect((await readById(manual.id))?.id).toBe(manual.id);
+
+        await clearOverrides();
+      }, 420_000);
+
+      it('WARNS AND RETAINS a lifecycle override whose row is absent, and proceeds', async () => {
+        // §8.4. The asymmetry that matters: this one does NOT stop the run,
+        // and the override is still there afterwards to be re-applied by the
+        // next run that does find its row.
+        const key = `wikipedia_first_kick_goal:${OVERRIDE_MARKER}-absent`;
+        await seedOverride(key, 'lifecycle', {
+          status: 'void', status_reason: `${OVERRIDE_MARKER}: names nothing yet`,
+        });
+
+        const run = runImporter();
+        expect(run.status, output(run)).toBe(0);
+        expect(run.stdout).toContain(key);
+        expect(run.stdout).toContain('RETAINED');
+
+        const [{ n }] = await sql<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM data_overrides
+           WHERE entity_type = 'player_achievements' AND entity_key = ${key} AND is_active = true
+        `;
+        expect(n, 'warn-and-retain must not discard the override').toBe(1);
+
+        await clearOverrides();
+      }, 240_000);
+
+      it('REFUSES to retire a row carrying an active override, and writes nothing', async () => {
+        // The third refusal class. Not overridable by --accept-retirement or
+        // --allow-link-loss: those authorise losing a REFERENCE and a LINK
+        // DECISION respectively, and neither is authority to destroy the row a
+        // durable decision is attached to.
+        const row = await takeSourceLinked(used);
+        await seedOverride(
+          `wikipedia_first_kick_goal:${row.sourceRecordId}`,
+          'lifecycle',
+          { status: 'void', status_reason: `${OVERRIDE_MARKER}: protected from retirement` },
+        );
+
+        retire(row.nameClean);
+        const before = await fingerprint();
+        const batches = await countBatches();
+
+        const refused = runImporter(['--accept-retirement', row.sourceRecordId!, '--allow-link-loss']);
+        expect(refused.status, output(refused)).not.toBe(0);
+        expect(output(refused)).toContain('carries an active lifecycle override');
+        expect(output(refused)).toContain('cannot be retired');
+
+        expect(await readById(row.id), 'the protected row must survive').toBeDefined();
+        expect(await fingerprint()).toBe(before);
+        expect(await countBatches(), 'a refused run writes no batch row').toBe(batches);
+
+        restoreSourceFiles();
+        await clearOverrides();
+      }, 240_000);
+
+      it(
+        'rolls the ENTIRE importer transaction back when the replay fails closed (gate G-5)',
+        async () => {
+          // THE ATOMICITY GATE. The forced failure is real contract behaviour,
+          // not an injected hook: a `correction` override naming an absent row
+          // FAILS CLOSED by §8.4, and the replay runs AFTER the upsert phase
+          // and the retirement DELETE have already written inside the same
+          // transaction. So if the adapter were not on the importer's own `tx`
+          // handle, the retirement would survive the failure — and that is
+          // precisely what this asserts did not happen.
+          const row = await takeSourceLinked(used);
+          await seedOverride(
+            `wikipedia_first_kick_goal:${OVERRIDE_MARKER}-no-such-row`,
+            'correction',
+            { notes: `${OVERRIDE_MARKER}: names a row that does not exist` },
+          );
+
+          // Make the run genuinely want to write: retire a row, which deletes
+          // from player_achievements AND from data_issues before the replay.
+          retire(row.nameClean);
+
+          const beforeFingerprint = await fingerprint();
+          const beforeOwned = await countOwned();
+          const beforeIssues = await countIssues();
+          const beforeBatches = await countBatches();
+
+          const failed = runImporter(['--accept-retirement', row.sourceRecordId!, '--allow-link-loss']);
+          expect(failed.status, output(failed)).not.toBe(0);
+          expect(output(failed)).toContain('correction target row does not exist');
+
+          // Every one of the four §8.2.3 surfaces, unchanged.
+          expect(await readById(row.id), 'the retirement DELETE must have rolled back').toBeDefined();
+          expect(await fingerprint(), 'player_achievements').toBe(beforeFingerprint);
+          expect(await countOwned(), 'player_achievements row count').toBe(beforeOwned);
+          expect(await countIssues(), 'data_issues').toBe(beforeIssues);
+          expect(await countBatches(), 'import_batches').toBe(beforeBatches);
+
+          restoreSourceFiles();
+          await clearOverrides();
+        },
+        120_000,
+      );
+    });
   },
 );

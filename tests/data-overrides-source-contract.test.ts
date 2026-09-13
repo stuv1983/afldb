@@ -1299,3 +1299,175 @@ describe('AFLDB-ISSUE-165 source contract', () => {
     expect(code).toContain('revalidatePaths');
   });
 });
+
+describe('AFLDB-ISSUE-167 source contract — two adapters, one authority', () => {
+  const root = process.cwd();
+  const readSource = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf-8')
+    .replace(/\r\n/g, '\n');
+  const pyCommon = readSource('tools/migration/common.py');
+  const pyAfterSiren = readSource('tools/migration/after_siren.py');
+  const tsAdapter = readSource('tools/records/special-records-replay.ts');
+  const tsImporter = readSource('tools/records/import-first-kick-goal.ts');
+  const branch = replayBranch(pyCommon, 'after_siren_kicks');
+  const branchCode = executablePython(branch);
+  /**
+   * The two helpers the branch composes its column SQL from. They are
+   * module-level by design — the TypeScript adapter factors the same two
+   * expressions the same way — so a "the SQL does X" claim has to read them,
+   * not just the branch that calls them.
+   */
+  const pyHelpers = pyCommon.slice(
+    pyCommon.indexOf('def _special_payload_expr'),
+    pyCommon.indexOf('def replay_admin_overrides'));
+  /** TypeScript with its commentary removed, for "the CODE never does X" claims. */
+  const executableTs = (source: string) => source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+  const adapterCode = executableTs(tsAdapter);
+
+  /**
+   * The `'...'` problem literals a validation query can return. D-3 allowed TWO
+   * adapters only on condition the SEMANTICS are pinned, and the semantics begin
+   * with what each one refuses. tests/special-records-replay-parity.test.ts
+   * proves the two BEHAVE the same against a live database; this proves they
+   * still SAY the same thing, which is what an operator actually reads, and it
+   * catches a drift in a file nobody happened to run.
+   */
+  function refusalReasons(source: string): string[] {
+    return [...source.matchAll(/THEN '((?:[^']|'')+)'/g)]
+      .map((m) => m[1].replace(/''/g, "'"))
+      .sort();
+  }
+
+  test('the two adapters refuse exactly the same things, in the same words', () => {
+    const python = refusalReasons(branch);
+    const typescript = refusalReasons(tsAdapter);
+    expect(python.length).toBeGreaterThanOrEqual(11);
+    expect(typescript).toEqual(python);
+  });
+
+  test('the after_siren_kicks branch fails closed before it writes anything', () => {
+    expect(branch).toContain('replay_admin_overrides(after_siren_kicks): refusing to commit');
+    expect(branchCode.indexOf('raise RuntimeError'))
+      .toBeLessThan(branchCode.indexOf('INSERT INTO'));
+
+    // The three missing-target answers, and only lifecycle warns.
+    expect(branch).toContain('correction target row does not exist');
+    expect(branchCode).toContain('_warn_retained_lifecycle("after_siren_kicks"');
+    expect(branchCode).toMatch(/field_group = 'lifecycle' AND [a-z_.]+ IS NULL/);
+
+    // Key presence is the semantics, never COALESCE over the payload read:
+    // COALESCE cannot tell an absent key from an explicit JSON null, and those
+    // two mean opposite things (the migration-086 discipline). The delta is
+    // composed by _special_delta_expr, so the claim is asserted there and the
+    // branch is asserted to use it.
+    expect(pyHelpers).toContain('jsonb_exists');
+    expect(branchCode).toContain('_special_delta_expr');
+
+    // No fuzzy identity resolution, and the durable key is never a row id.
+    expect(branchCode).not.toMatch(/ILIKE|similarity\(|soundex|levenshtein/i);
+    expect(branchCode).not.toMatch(/override_values->>'(row_id|id|club_id|match_id)'/);
+  });
+
+  test('NEITHER adapter writes data_overrides — migration 073 grants SELECT only', () => {
+    for (const [name, code] of [
+      ['common.py after_siren_kicks branch', branchCode],
+      ['the TypeScript adapter', adapterCode],
+    ] as const) {
+      expect(code, name).not.toMatch(/INSERT\s+INTO\s+data_overrides/i);
+      expect(code, name).not.toMatch(/UPDATE\s+data_overrides/i);
+      expect(code, name).not.toMatch(/DELETE\s+FROM\s+data_overrides/i);
+    }
+  });
+
+  test('a correction never moves an identity, link or derived column', () => {
+    // §3.4/§3.4.1. link_status_value and candidate_count are owned by the link
+    // pipeline and bound by *_link_ck; player_achievements.match_id is DERIVED
+    // from kickless_matches_before_first_kick (053:103-105); after_siren's
+    // club_id is derived from the resolved match (after_siren.py:554-559). A
+    // correction that could move any of them would let an administrator create
+    // a row that contradicts its own decoding rule.
+    const forbidden = [
+      'source_id', 'source_record_id', 'achievement_type',
+      'player_id', 'club_id', 'opponent_club_id', 'match_id',
+      'link_status_value', 'candidate_count', 'import_batch_id',
+    ];
+    const tsColumns = tsAdapter.slice(
+      tsAdapter.indexOf('const COLUMNS'), tsAdapter.indexOf('const RECORD_FIXED'));
+    const pyColumns = pyCommon.slice(
+      pyCommon.indexOf('AFTER_SIREN_COLUMNS = ('),
+      pyCommon.indexOf('def _special_payload_expr'));
+    for (const column of forbidden) {
+      expect(tsColumns, `TypeScript amendable set names ${column}`)
+        .not.toContain(`column: '${column}'`);
+      expect(pyColumns, `Python amendable set names ${column}`)
+        .not.toContain(`("${column}",`);
+    }
+  });
+
+  test('G-5: the TypeScript replay runs on the importer OWN tx, at the documented seam', () => {
+    // The structural half of gate G-5, asserted from source so that a refactor
+    // moving the call out of the transaction fails HERE as well as in the
+    // atomicity test. The adapter takes a handle and never opens a transaction
+    // of its own — there is deliberately no overload that could.
+    expect(adapterCode).not.toMatch(/\.begin\(/);
+    expect(adapterCode).not.toMatch(/postgres\(/);
+
+    const begin = tsImporter.indexOf('await sql.begin(async (tx) => {');
+    const call = tsImporter.indexOf('await replaySpecialRecordOverrides(tx,');
+    const upserts = tsImporter.indexOf('// ---- Re-apply the human decisions');
+    const refile = tsImporter.indexOf('// ---- Data issues, refiled against the ids that just survived');
+    expect(begin).toBeGreaterThan(-1);
+    expect(call, 'the replay must be inside sql.begin').toBeGreaterThan(begin);
+    expect(call, 'after the upsert phase').toBeGreaterThan(upserts);
+    expect(call, 'before the data_issues refiling').toBeLessThan(refile);
+  });
+
+  test('both importers refuse to delete a row carrying a durable decision', () => {
+    // §8.1/§8.2, and deliberately NOT reachable past a flag:
+    // --accept-retirement authorises losing a REFERENCE and --allow-link-loss a
+    // LINK DECISION, and neither is authority to destroy the row a durable
+    // decision is attached to.
+    expect(tsImporter).toContain('await findProtectedRecordKeys(');
+    expect(tsImporter).toContain('cannot be retired');
+    expect(tsAdapter).toContain("o.field_group IN ('lifecycle', 'correction')");
+
+    expect(pyAfterSiren).toContain('def refuse_protected_retirements');
+    expect(pyAfterSiren).toContain("o.field_group IN ('lifecycle', 'correction')");
+    // Refused BEFORE any write, the batch row included.
+    expect(pyAfterSiren.indexOf('refuse_protected_retirements(pg, source_id'))
+      .toBeLessThan(pyAfterSiren.indexOf('with import_batch(pg, SOURCE_KEY'));
+    // And the replay runs INSIDE the load transaction, before the commit.
+    const replayAt = pyAfterSiren.indexOf('replay_admin_overrides(pg, TARGET_TABLE)');
+    expect(replayAt).toBeGreaterThan(pyAfterSiren.indexOf('with import_batch(pg, SOURCE_KEY'));
+    expect(replayAt).toBeLessThan(pyAfterSiren.indexOf('pg.commit()'));
+  });
+
+  test('the lifecycle columns are never source-owned', () => {
+    // §5.1 Layer 1, and gate G-8 restated as a regression: the moment any of
+    // these enters a written-column list, an ordinary reload starts reverting
+    // administrative decisions for free.
+    const written = pyAfterSiren.slice(
+      pyAfterSiren.indexOf('WRITTEN_COLUMNS = ('),
+      pyAfterSiren.indexOf('COMPARED_COLUMNS'));
+    for (const column of ['status', 'status_reason', 'updated_at']) {
+      expect(written, `after_siren WRITTEN_COLUMNS names ${column}`)
+        .not.toContain(`"${column}"`);
+    }
+    // The first-kick importer writes an explicit column list in both its
+    // INSERT and its UPDATE; neither may assign one of the three.
+    const insert = tsImporter.slice(
+      tsImporter.indexOf('INSERT INTO player_achievements ('),
+      tsImporter.indexOf('RETURNING id'));
+    expect(insert).not.toMatch(/\bstatus\b|\bstatus_reason\b|\bupdated_at\b/);
+    // Anchored on the RELOAD update specifically. `UPDATE player_achievements
+    // SET` also matches the one-off --rekey path, which rewrites
+    // source_record_id and is not a reload at all.
+    const updateAt = tsImporter.indexOf('const match = ownedByKey.get(key);');
+    expect(updateAt, 'the reload UPDATE moved').toBeGreaterThan(-1);
+    const update = tsImporter.slice(
+      updateAt, tsImporter.indexOf('rowIds.set(key, match.id);'));
+    expect(update.length, 'the reload UPDATE slice is empty').toBeGreaterThan(200);
+    expect(update).not.toMatch(/\bstatus\s*=|\bstatus_reason\s*=|\bupdated_at\s*=/);
+  });
+});

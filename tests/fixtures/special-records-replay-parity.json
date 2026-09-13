@@ -1,0 +1,487 @@
+{
+  "$comment": [
+    "AFLDB-ISSUE-167 Stage 4, gate G-9. The SHARED contract both special-record",
+    "replay adapters are measured against: the TypeScript adapter in",
+    "tools/records/special-records-replay.ts (player_achievements, run by",
+    "tools/records/import-first-kick-goal.ts) and the Python branch in",
+    "tools/migration/common.py's replay_admin_overrides (after_siren_kicks, run",
+    "by tools/migration/after_siren.py).",
+    "",
+    "D-3 (2026-09-13) approved ONE durable authority with TWO replay adapters, on",
+    "the condition that the two are pinned by parity tests. This file is that pin.",
+    "It is deliberately LANGUAGE-NEUTRAL data rather than two hand-written test",
+    "suites: hand-written cases on either side drift independently and the drift is",
+    "invisible until a rebuild loses somebody's decision. Here a case is written",
+    "once and BOTH adapters are asserted against it, so a semantic divergence fails",
+    "the suite instead of hiding.",
+    "",
+    "EVERY case is expressed in columns BOTH tables carry -- player_name_raw,",
+    "player_name_clean, club_name_raw, season, round_raw, source_annotation, notes,",
+    "status, status_reason -- all of which AFLDB-ISSUE-167 §3.4 classifies amendable",
+    "for both families. The schemas genuinely differ beyond that (migration 053 vs",
+    "089), so each table carries its own `seedDefaults`/`recordDefaults` block",
+    "supplying only its own remaining NOT NULL columns. The SEMANTICS under test are",
+    "neutral; only the scaffolding needed to make a legal row is not.",
+    "",
+    "The runner is tests/special-records-replay-parity.test.ts."
+  ],
+
+  "neutralColumns": [
+    "player_name_raw",
+    "player_name_clean",
+    "club_name_raw",
+    "season",
+    "round_raw",
+    "source_annotation",
+    "notes",
+    "status",
+    "status_reason"
+  ],
+
+  "tables": {
+    "player_achievements": {
+      "adapter": "typescript",
+      "sourceKey": "wikipedia_first_kick_goal",
+      "family": "first_kick_goal",
+      "$comment": "achievement_type and link_status_value are the only NOT NULL columns migration 053 leaves without a default beyond the neutral set. link_status_value MUST stay outside ('unique','resolved') while player_id is NULL or player_achievements_link_ck refuses the row.",
+      "seedDefaults": {
+        "achievement_type": "first_kick_goal",
+        "link_status_value": "unmatched"
+      },
+      "recordDefaults": {
+        "achievement_type": "first_kick_goal",
+        "link_status_value": "unmatched"
+      }
+    },
+    "after_siren_kicks": {
+      "adapter": "python",
+      "sourceKey": "wikipedia_after_siren_kicks",
+      "family": "after_siren",
+      "$comment": "Migration 089 leaves fourteen more NOT NULL columns without a default, and four CHECKs couple them. kick_effect='none' + kicker_result='loss' + siren='final' satisfies after_siren_kicks_effect_ck's third branch and after_siren_kicks_regulation_ck; premiership_season=true satisfies after_siren_kicks_match_ck with a NULL match_id; non-negative points satisfy after_siren_kicks_points_ck.",
+      "seedDefaults": {
+        "link_status_value": "unmatched",
+        "opponent_name_raw": "Fixture Opponent",
+        "competition": "VFL/AFL",
+        "premiership_season": true,
+        "kick_scored": "none",
+        "kick_effect": "none",
+        "kicker_result": "loss",
+        "siren": "final",
+        "kicker_score_raw": "0.0 (0)",
+        "opponent_score_raw": "0.0 (0)",
+        "kicker_points": 0,
+        "opponent_points": 0
+      },
+      "recordDefaults": {
+        "link_status_value": "unmatched",
+        "opponent_name_raw": "Fixture Opponent",
+        "competition": "VFL/AFL",
+        "premiership_season": true,
+        "kick_scored": "none",
+        "kick_effect": "none",
+        "kicker_result": "loss",
+        "siren": "final",
+        "kicker_score_raw": "0.0 (0)",
+        "opponent_score_raw": "0.0 (0)",
+        "kicker_points": 0,
+        "opponent_points": 0
+      }
+    }
+  },
+
+  "seedRow": {
+    "$comment": "The starting state of a target row, in neutral columns only.",
+    "player_name_raw": "Parity Fixture",
+    "player_name_clean": "Parity Fixture",
+    "club_name_raw": "Fixture Club",
+    "season": 1900,
+    "round_raw": "R1",
+    "source_annotation": "seeded annotation",
+    "notes": "seeded notes",
+    "status": "active",
+    "status_reason": null
+  },
+
+  "cases": [
+    {
+      "name": "lifecycle on a present row applies the decision",
+      "id": "lifecycle-present",
+      "requirement": "§5.2 lifecycle — unconditionally re-applied",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        {
+          "field_group": "lifecycle",
+          "values": { "status": "void", "status_reason": "recorded in error (parity fixture)" }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "row": {
+          "status": "void",
+          "status_reason": "recorded in error (parity fixture)",
+          "notes": "seeded notes",
+          "club_name_raw": "Fixture Club"
+        }
+      }
+    },
+    {
+      "name": "lifecycle naming an absent row WARNS AND RETAINS",
+      "id": "lifecycle-absent",
+      "requirement": "§8.4 — a manifest that stopped carrying a row is not a reason to discard the decision",
+      "keySource": "source",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "lifecycle",
+          "values": { "status": "void", "status_reason": "still void (parity fixture)" }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": false,
+        "warnContainsEntityKey": true
+      }
+    },
+    {
+      "name": "correction on a present row applies a DELTA, key presence being the semantics",
+      "id": "correction-present",
+      "requirement": "§5.2 correction — absent key leaves the source value, explicit JSON null clears it (migration 086 discipline)",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        {
+          "field_group": "correction",
+          "values": { "notes": "corrected notes", "source_annotation": null }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "row": {
+          "notes": "corrected notes",
+          "source_annotation": null,
+          "club_name_raw": "Fixture Club",
+          "player_name_clean": "Parity Fixture",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "name": "correction naming an absent row FAILS CLOSED",
+      "id": "correction-absent",
+      "requirement": "§8.4 — the reload stops rather than silently reverting a human decision",
+      "keySource": "source",
+      "seed": false,
+      "overrides": [
+        { "field_group": "correction", "values": { "notes": "corrected notes" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "correction target row does not exist",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "record re-creates the manual row a destructive rebuild removed",
+      "id": "record-recreate",
+      "requirement": "§5.2 record — RE-CREATE, then restore the payload",
+      "keySource": "manual",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Manual Parity",
+            "player_name_clean": "Manual Parity",
+            "club_name_raw": "Manual Club",
+            "season": 1901,
+            "round_raw": "R2",
+            "source_annotation": null,
+            "notes": "created by an administrator",
+            "status": "active",
+            "status_reason": null
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "rowIsManual": true,
+        "row": {
+          "player_name_clean": "Manual Parity",
+          "club_name_raw": "Manual Club",
+          "season": 1901,
+          "round_raw": "R2",
+          "notes": "created by an administrator",
+          "status": "active"
+        }
+      }
+    },
+    {
+      "name": "record re-creates a VOIDED manual row and voids it again",
+      "id": "record-recreate-void",
+      "requirement": "§5.2 — is_active is always true; the lifecycle lives in the payload's status, because a voided row must be re-created and voided again, never suppressed",
+      "keySource": "manual",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Manual Voided",
+            "player_name_clean": "Manual Voided",
+            "club_name_raw": "Manual Club",
+            "season": 1902,
+            "round_raw": "R3",
+            "source_annotation": null,
+            "notes": null,
+            "status": "void",
+            "status_reason": "created then retracted (parity fixture)"
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "rowIsManual": true,
+        "row": {
+          "player_name_clean": "Manual Voided",
+          "status": "void",
+          "status_reason": "created then retracted (parity fixture)"
+        }
+      }
+    },
+    {
+      "name": "a record payload whose player_identity does not resolve FAILS CLOSED",
+      "id": "record-identity-unresolvable",
+      "requirement": "§8.4 — a record override whose player/match identity cannot be resolved FAILS CLOSED. A manual row silently coming back UNLINKED would lose the linkage without saying so.",
+      "keySource": "manual",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Unresolvable Identity",
+            "player_name_clean": "Unresolvable Identity",
+            "club_name_raw": "Manual Club",
+            "season": 1905,
+            "round_raw": "R6",
+            "source_annotation": null,
+            "notes": null,
+            "status": "active",
+            "status_reason": null,
+            "player_identity": "afldb-issue-167-parity-nosuch:nobody"
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "player_identity does not resolve to exactly one player",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "a record payload whose player_identity resolves restores the link",
+      "id": "record-identity-resolves",
+      "requirement": "The positive half: a manual row comes back LINKED, and player_achievements_link_ck / after_siren_kicks_link_ck make (link_status IN ('unique','resolved')) = (player_id IS NOT NULL) a hard invariant, so a replay that set one without the other would be refused by the database.",
+      "keySource": "manual",
+      "seed": false,
+      "playerIdentityFromDatabase": true,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Resolvable Identity",
+            "player_name_clean": "Resolvable Identity",
+            "club_name_raw": "Manual Club",
+            "season": 1906,
+            "round_raw": "R7",
+            "source_annotation": null,
+            "notes": null,
+            "status": "active",
+            "status_reason": null
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "rowIsManual": true,
+        "rowLinked": true,
+        "row": { "player_name_clean": "Resolvable Identity", "status": "active" }
+      }
+    },
+    {
+      "name": "a record payload that cannot be reconstructed FAILS CLOSED",
+      "id": "record-unreconstructable",
+      "requirement": "§8.4 — a record override that cannot be reconstructed FAILS CLOSED",
+      "keySource": "manual",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Incomplete Parity",
+            "club_name_raw": "Manual Club",
+            "season": 1903,
+            "round_raw": "R4",
+            "status": "active"
+          }
+        }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "record payload is missing a required field",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "two applicable overrides resolving to one entity_key FAIL CLOSED",
+      "id": "collision",
+      "requirement": "§8.4 — Phase E §12 verbatim. A 'record' override owns the whole row INCLUDING its status, so pairing it with a second authority over the same row makes the outcome order-dependent. 'correction' + 'lifecycle' is NOT a collision: they own disjoint fields and replay in a defined order.",
+      "keySource": "manual",
+      "seed": false,
+      "overrides": [
+        {
+          "field_group": "record",
+          "values": {
+            "player_name_raw": "Collision Parity",
+            "player_name_clean": "Collision Parity",
+            "club_name_raw": "Manual Club",
+            "season": 1904,
+            "round_raw": "R5",
+            "source_annotation": null,
+            "notes": null,
+            "status": "active",
+            "status_reason": null
+          }
+        },
+        {
+          "field_group": "lifecycle",
+          "values": { "status": "void", "status_reason": "second authority (parity fixture)" }
+        }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "more than one active override resolves to this row",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "correction and lifecycle on one row are NOT a collision",
+      "id": "correction-plus-lifecycle",
+      "requirement": "The negative half of the collision rule: disjoint authority replays in a defined order (correction, then lifecycle) in both adapters.",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        { "field_group": "correction", "values": { "notes": "corrected before voiding" } },
+        {
+          "field_group": "lifecycle",
+          "values": { "status": "void", "status_reason": "voided after correction (parity fixture)" }
+        }
+      ],
+      "expect": {
+        "outcome": "ok",
+        "rowExists": true,
+        "row": {
+          "notes": "corrected before voiding",
+          "status": "void",
+          "status_reason": "voided after correction (parity fixture)"
+        }
+      }
+    },
+    {
+      "name": "an entity_key that is not '<source key>:<source_record_id>' FAILS CLOSED",
+      "id": "entity-key-malformed",
+      "requirement": "§5.3 grammar parity — an unparseable key is worse than no key, because it attaches a durable decision to nothing",
+      "keySource": "literal",
+      "literalEntityKey": "no-colon-anywhere",
+      "seed": false,
+      "overrides": [
+        { "field_group": "lifecycle", "values": { "status": "void", "status_reason": "unparseable (parity fixture)" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "entity_key is not",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "an entity_key whose source key names no source FAILS CLOSED",
+      "id": "entity-key-unknown-source",
+      "requirement": "§5.3 grammar parity — the source key half must resolve, or the record id half is bound to nothing",
+      "keySource": "literal",
+      "literalEntityKey": "afldb-issue-167-no-such-source:parity-unknown",
+      "seed": false,
+      "overrides": [
+        { "field_group": "lifecycle", "values": { "status": "void", "status_reason": "unknown source (parity fixture)" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "entity_key names no source in this database",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "an entity_key whose record id half is empty FAILS CLOSED",
+      "id": "entity-key-empty-record-id",
+      "requirement": "§5.3 grammar parity — both halves must be non-empty; the source uniqueness constraints are UNIQUE NULLS NOT DISTINCT, so an empty identity collapses distinct rows rather than distinguishing them",
+      "keySource": "literalSourcePrefixed",
+      "seed": false,
+      "overrides": [
+        { "field_group": "lifecycle", "values": { "status": "void", "status_reason": "empty half (parity fixture)" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "entity_key carries no source record id",
+        "rowExists": false
+      }
+    },
+    {
+      "name": "an unknown field_group FAILS CLOSED",
+      "id": "unknown-field-group",
+      "requirement": "§5.2 — the three groups are closed; a fourth is a decision nothing knows how to replay",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        { "field_group": "suppression", "values": { "status": "void", "status_reason": "wrong group (parity fixture)" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "unknown field_group",
+        "rowExists": true
+      }
+    },
+    {
+      "name": "a lifecycle payload carrying no valid status FAILS CLOSED",
+      "id": "lifecycle-no-status",
+      "requirement": "§6.1 — status IN ('active','void') is a CHECK on both tables; a payload that cannot satisfy it must be refused before it is written, not after",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        { "field_group": "lifecycle", "values": { "status_reason": "no status at all (parity fixture)" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "payload carries no valid status",
+        "rowExists": true
+      }
+    },
+    {
+      "name": "a void payload carrying no status_reason FAILS CLOSED",
+      "id": "lifecycle-void-without-reason",
+      "requirement": "§6.1 — *_void_reason_ck. Leaving a void unexplained loses the only thing separating a data-entry error from a fact that really happened",
+      "keySource": "source",
+      "seed": true,
+      "overrides": [
+        { "field_group": "lifecycle", "values": { "status": "void" } }
+      ],
+      "expect": {
+        "outcome": "fail_closed",
+        "messageContains": "a void row needs a status_reason",
+        "rowExists": true
+      }
+    }
+  ]
+}

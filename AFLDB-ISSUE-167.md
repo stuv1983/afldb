@@ -2074,3 +2074,349 @@ refusals (Stage 4); durable suppression survival; the public `status = 'active'`
 (Stage 7); DEV deployment and browser acceptance (Stage 8). `data.specialRecords.edit` lands
 in Stage 6 with the first mutation that guards on it (§9.1). Nothing staged or committed —
 the operator commits.
+
+---
+
+## 23. Stage 4 execution evidence — **PASS (2026-09-14)**
+
+Both replay adapters, both importer refusals, and the two gates D-3 made the
+condition of its approval: **G-5** (the TypeScript adapter runs on the importer's
+own `tx`) and **G-9** (the two adapters are pinned to identical semantics).
+
+### 23.1 Checkpoint, before anything was edited
+
+| Fact | Evidence |
+|---|---|
+| Branch / HEAD / upstream | `opus/issue-167-special-records-admin`, `2a544441af3e105a4b353198d18e75cec9f2b417`, and `@{u}` at the same commit — nothing ahead or behind |
+| Tracked tree | clean |
+| Target database | `127.0.0.1:5432/afldb_test` — `_test` suffix, loopback host, live listener, the §15.0 three-condition contract |
+| Migration 102 | `applied 102_special_records_lifecycle.sql`, **0 pending**, checksum clean — `migrate.ts --status` runs the drift check at `:262-270` *before* its status return, so one command proves both |
+
+**One deviation, non-material and not touched:** an untracked **zero-byte** file
+literally named `'status_reason'` (the quotes are part of the filename), created
+2026-09-14 06:22:37 — a shell-quoting accident from an earlier session, not a
+Stage 3 artefact. It cannot affect code, tests or the build, but it is why the
+staging command in §23.9 is path-scoped and never `git add -A`.
+
+### 23.2 What was built
+
+**One durable authority, two adapters (D-3), and the semantics live in one place.**
+
+| File | Role |
+|---|---|
+| `tools/records/special-records-replay.ts` (new) | The TypeScript adapter for `player_achievements`. Takes a **transaction handle**, never a pool — typed `Pick<TransactionSql, 'unsafe'>`, so the only thing it can do with the caller's transaction is run a statement on it: it cannot commit, roll back, or open a nested one |
+| `tools/migration/common.py` | An `after_siren_kicks` branch of `replay_admin_overrides`, plus the `AFTER_SIREN_COLUMNS` amendable set and the two expression helpers the branch composes its SQL from |
+| `tools/migration/after_siren.py` | `refuse_protected_retirements()` before the batch opens; `replay_admin_overrides(pg, TARGET_TABLE)` inside the load transaction |
+| `tools/records/import-first-kick-goal.ts` | The third refusal class, and the replay call on the importer's own `tx` |
+
+Six statements per adapter, in the same order on both sides: **validate the whole
+active set and refuse** → **warn and retain** → **re-create `record` rows** →
+**restore `record` payloads** → **apply the `correction` delta** → **apply the
+`lifecycle` decision**. That is `hall_of_fame`'s shape (`common.py:2637-2857`),
+which is the point: P4 adds no new mechanism.
+
+### 23.3 The seam, and why atomicity needed no structural change
+
+§8.2.2 proved the seam from source before a line was written, and execution
+confirmed it unchanged. The call sits inside the existing
+`await sql.begin(async (tx) => { … })`, **after** the human-decision re-apply and
+**before** the `data_issues` refiling:
+
+```
+import-first-kick-goal.ts
+  sql.begin(async (tx) => {                     ← one transaction, max: 1 pool
+    INSERT import_batches … 'running'
+    … ReloadAbort preflight, including the NEW protected-retirement refusal …
+    DELETE data_issues / DELETE player_achievements   (retirement)
+    UPDATE / INSERT player_achievements               (the upsert phase)
+    … re-apply the human link decisions …
+    replaySpecialRecordOverrides(tx, 'player_achievements')   ← HERE
+    DELETE + INSERT data_issues                       (the refiling)
+    UPDATE import_batches … 'completed'
+  })
+```
+
+`ReloadAbort` is never caught anywhere in the importer, so any throw — the
+adapter's `SpecialRecordReplayAbort` included — unwinds out of `sql.begin` and
+rolls the whole run back. **No change to the transaction structure, and nothing
+weakened.** The D-3 escape clause is not invoked.
+
+### 23.4 The collision rule, defined rather than assumed
+
+§8.4 requires "two applicable overrides resolving to one `entity_key`" to fail
+closed, and execution had to make that precise, because the obvious reading is
+**structurally unreachable**: `entity_key → (source key, source record id)` is
+injective under the first-colon split, and both tables carry
+`UNIQUE NULLS NOT DISTINCT (source_id, source_record_id)`, so two rows cannot
+resolve to one key and two keys cannot resolve to one row.
+
+What IS reachable is two overrides on **one key** — `data_overrides_uq` is
+`(entity_type, entity_key, field_group)`, so different groups coexist freely. The
+rule both adapters implement:
+
+> A **`record`** override owns the whole durable row, its `status` included, so
+> pairing it with any second authority over the same row makes the outcome
+> order-dependent. **`record` + anything = FAIL CLOSED.**
+> **`correction` + `lifecycle` is NOT a collision** — disjoint fields, defined
+> order (correction, then lifecycle).
+
+The structural `row_matches > 1` guard is retained as defence in depth. Both
+halves — the refusal and the deliberate non-refusal — are corpus cases.
+
+### 23.5 Gate G-9 — adapter parity
+
+`tests/fixtures/special-records-replay-parity.json` is a **language-neutral
+corpus**, and `tests/special-records-replay-parity.test.ts` drives **both**
+adapters from it: the TypeScript one in-process on a transaction handle, the
+Python one spawned out of the real `common.py`. Seeding is shared byte-for-byte,
+so a divergence can only come from the replay. Every case asserts against the
+corpus **and** against the other adapter.
+
+| Corpus case | Both adapters |
+|---|---|
+| `lifecycle` on a present row | applied |
+| `lifecycle` on a missing row | **warn and retain**, run proceeds, override still present |
+| `correction` on a present row | delta applied; absent key leaves the source value, explicit JSON `null` clears it |
+| `correction` on a missing row | **fail closed** |
+| `record` re-creation | row re-created from the payload, `source_id` = `manual_admin_edit` |
+| `record` re-creation of a **voided** row | re-created **and voided again** (§5.2's "no tombstone") |
+| `record` that cannot be reconstructed | **fail closed** |
+| `record` whose `player_identity` does not resolve | **fail closed** |
+| `record` whose `player_identity` resolves | row comes back **linked**, `*_link_ck` satisfied |
+| two applicable overrides on one `entity_key` | **fail closed** |
+| `correction` + `lifecycle` on one row | **not** a collision |
+| malformed `entity_key` (no colon) | **fail closed** |
+| `entity_key` naming no source | **fail closed** |
+| `entity_key` with an empty record-id half | **fail closed** |
+| unknown `field_group` | **fail closed** |
+| `lifecycle` payload with no valid status | **fail closed** |
+| `void` payload with no `status_reason` | **fail closed** |
+| **every** case | `data_overrides` fingerprint **unchanged** — neither adapter writes it |
+
+**Result: 19 passed, 0 failed.** Seventeen corpus cases, plus a test that proves
+the suite's own target is a `_test` database on loopback before it mutates
+anything, plus one that proves the corpus really does cover both tables and both
+adapters.
+
+**The identity grammar is shared, not merely agreed.** Every fixture key is
+minted by `src/lib/special-records/identity.ts`'s `specialRecordEntityKey()`, and
+both adapters' SQL then has to resolve it to the right row — so the Stage 2
+helper, the Python parser and the TypeScript parser are proven to agree by
+construction rather than by inspection. `findProtectedRecordKeys()` was changed
+during execution to take **minted keys** and match them whole, rather than
+re-deriving the grammar in SQL, for the same reason.
+
+### 23.5a G-9 RED → GREEN, and what the RED proved
+
+The RED was unusually informative and is worth recording. With the **TypeScript
+adapter written and the Python branch not yet added**, the suite reported
+**16 failures — every one of them on the `after_siren_kicks (python)` side**, and
+the `player_achievements (typescript)` half of every single case passed first.
+Adding the `common.py` branch turned all 16 green with no change to the corpus or
+to the TypeScript adapter.
+
+That is the parity claim demonstrated rather than asserted: one corpus, two
+independent implementations, and the corpus was expressive enough to fail one
+side completely while the other satisfied it.
+
+### 23.6 Gate G-5 — atomicity, RED before and GREEN after
+
+**The forced failure is real contract behaviour, not an injected hook**, which is
+the discipline ISSUE-165's audit-rollback gate established
+(`admin-awards.test.ts:732-744` forces a foreign-key violation rather than adding
+a test-only switch). A `correction` override naming an absent row fails closed by
+§8.4; the replay runs after the retirement `DELETE` and the upsert phase have
+already written inside the same transaction. So if the adapter were **not** on
+the importer's own `tx`, the retirement would survive the failure.
+
+All four §8.2.3 surfaces asserted unchanged after the refused run:
+`player_achievements` (row present, id-set fingerprint, row count), `data_issues`,
+`import_batches` (**no batch row at all** — the `INSERT … 'running'` rolls back
+with everything else), and the retirement effect itself.
+
+**Result: the six Stage 4 tests in
+`tests/integration/first-kick-goal-reload-links.test.ts` are green** — 6 passed,
+0 failed, 892 s, every one of them driving the REAL importer as `afldb_import`.
+
+| Test | Time | Proves |
+|---|---|---|
+| Layer 1 — lifecycle columns untouched by an ordinary reload | 90.2 s | §5.1's free protection, with no override in play at all |
+| Layer 2 — a lifecycle decision the canonical row lost is re-asserted | 91.8 s | the durable authority actually restores what the source cannot |
+| a `record` row is re-created, and a second reload leaves it alone | 182.5 s | manual rows survive, and are outside `owned` (§8.2, re-proven) |
+| `lifecycle` on an absent row warns, retains, and the run proceeds | 90.9 s | §8.4's asymmetry |
+| the importer **refuses** to retire a row carrying an active override | **70.5 s** | the third refusal class — and the shorter time is itself evidence: it aborts in the preflight, before the write phase |
+| **gate G-5** — the whole transaction rolls back on a fail-closed replay | 92.0 s | atomicity on the importer's own `tx` |
+
+### 23.7 The two refusals
+
+| Importer | Refusal |
+|---|---|
+| `import-first-kick-goal.ts` | A third `ReloadAbort` class beside `--accept-retirement` and `--allow-link-loss`, evaluated in the preflight at `:1115-1140` — **before** the retirement `DELETE` at `:1180` |
+| `after_siren.py` | `refuse_protected_retirements()` runs **before `import_batch` even opens**, so a refused run writes nothing at all, not even a batch row |
+
+**Neither is reachable past a flag, and that is deliberate.**
+`--accept-retirement` authorises losing a durable *reference*;
+`--allow-link-loss` authorises discarding a *link decision*. Neither is authority
+to destroy the row a lifecycle or correction decision is attached to, because a
+**source-owned row cannot be re-created from a lifecycle payload** — only a
+`record` override carries a whole row, and a `record` override names a
+`manual_admin_edit` row, which carries a different `source_id` and is outside
+every source-owned retirement scope in the first place. The operator's route is
+to reinstate or resolve the decision in Special records, which is a decision, not
+a flag.
+
+`record` is deliberately **not** consulted by either refusal, for that same
+ownership reason.
+
+**The after-siren half is proven against the REAL loader**, ten tests in
+`tests/integration/after-siren.test.ts` driving `after_siren.py load`: Layer 1,
+Layer 2, `record` re-creation surviving the stale-row `DELETE`, warn-and-retain,
+and the refusal itself — plus the four pre-existing
+`getPlayerAfterSirenEvents` tests, which are unaffected.
+
+One fixture note, recorded because it is not obvious: the stale row the refusal
+test protects is seeded **in the database**, not produced by trimming the
+artefact. `cmd_load` validates the tracked `after-siren-events.source.json`
+measures against whatever artefact it is handed, so a trimmed copy is refused
+with *"measures disagree with the artefact"* — a provenance guard — long before
+the lifecycle refusal is reached. Seeding a source-owned row the artefact never
+carried models "the source stopped carrying this row" exactly, and leaves the
+tracked artefact untouched.
+
+### 23.8 One deliberate improvement on the ISSUE-165 replay, applied to both adapters
+
+Every write in both adapters is guarded by `IS DISTINCT FROM` over the tuple it
+would assign. `hall_of_fame`'s replay is unguarded, and on an **ordinary** reload
+that would bump `updated_at` on every override-bearing row on every run — because
+the lifecycle columns are Layer 1 and already carry the decision — invalidating a
+concurrent administrator's compare-and-swap for no actual change. `updated_at` is
+the CAS column the Stage 6 mutations depend on (§6.1), so the churn is not
+cosmetic. This is the same discipline `after_siren.py:586-588` already applies to
+its own upsert, and it is applied **identically on both sides**, so parity holds.
+
+**Flagged for Stage 6, not decided here:** the replay still *does* set
+`updated_at` when a value genuinely changes. That is correct — the row did change
+— but Stage 6's CAS contract should state explicitly that a reload which
+re-asserts a decision can legitimately invalidate an in-flight edit.
+
+### 23.9 Files changed, and validation
+
+**New**
+
+| File | Purpose |
+|---|---|
+| `tools/records/special-records-replay.ts` | The TypeScript adapter, and `findProtectedRecordKeys()` |
+| `tests/fixtures/special-records-replay-parity.json` | The language-neutral parity corpus (G-9) |
+| `tests/special-records-replay-parity.test.ts` | The G-9 runner, driving both adapters from that corpus |
+
+**Modified**
+
+| File | Change |
+|---|---|
+| `tools/migration/common.py` | `SPECIAL_RECORD_FIELD_GROUPS` / `SPECIAL_RECORD_STATUSES` / `AFTER_SIREN_COLUMNS` + two expression helpers; the `after_siren_kicks` replay branch |
+| `tools/migration/after_siren.py` | `refuse_protected_retirements()`; the replay call inside the load transaction; `replay_admin_overrides` imported. `WRITTEN_COLUMNS` / `COMPARED_COLUMNS` **unchanged** |
+| `tools/records/import-first-kick-goal.ts` | The protected-retirement refusal; the replay call on `tx` at the §8.2.2 seam; the Stage 2 identity helper imported |
+| `tests/integration/first-kick-goal-reload-links.test.ts` | Six Stage 4 tests, including gate G-5 |
+| `tests/integration/after-siren.test.ts` | Six Stage 4 tests driving the REAL `after_siren.py load` |
+| `tests/data-overrides-source-contract.test.ts` | Seven source-contract assertions, including "the two adapters refuse exactly the same things, in the same words" |
+
+**Validation**
+
+| Check | Result |
+|---|---|
+| `tests/special-records-replay-parity.test.ts` (**G-9**) | **19 passed, 0 failed** — both adapters, one corpus |
+| `tests/integration/first-kick-goal-reload-links.test.ts`, Stage 4 block (**G-5**) | **6 passed, 0 failed**, 892 s, real importer as `afldb_import` |
+| `tests/integration/after-siren.test.ts` | **10 passed, 0 failed**, 132 s, real `after_siren.py load` |
+| `tests/special-records-identity.test.ts`, `special-records-admin.test.ts`, `integration/special-records-lifecycle.test.ts`, `integration/admin-special-records.test.ts`, `auth.test.ts`, `data-overrides-source-contract.test.ts` | **272 passed, 1 skipped, 0 failed** — Stage 2 and Stage 3 unregressed, and the new source-contract assertions green |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` over every changed TS file | exit 0 |
+| `python -m py_compile` + import of `common.py` and `after_siren.py` | exit 0 |
+| `git diff --check` | clean |
+
+The repository has **no Python lint or type-check configuration** (no
+`pyproject.toml`, `setup.cfg`, `.flake8`, `ruff.toml` or `mypy.ini`), so
+`py_compile` plus the two suites that spawn the real module are the Python checks
+this repo actually has.
+
+**A full-suite run was not performed.** §17 does not require one at this stage,
+and the runbook's own instruction is to compare against the recorded baseline
+rather than re-derive it; the §21.10 baseline differential is what a full run
+would be measured against, and nothing in this stage touches a path outside the
+suites above. The environment findings in §23.10 would also make a full run's
+result unreadable without first resolving them.
+
+**Not changed, deliberately:** `src/db/migrations/102_special_records_lifecycle.sql`
+(untouched, as instructed), `tools/maintenance/privileges.sql` (D-5), migration
+073's `GRANT SELECT ON data_overrides TO afldb_import` (neither adapter writes
+it), `LINK_TARGET_TABLES` (D-2), every public read path (Stage 5), every admin
+mutation surface (Stage 6), and `src/lib/auth/capabilities.ts` — **`.edit` is
+still not declared**, per the §9.1 sequencing clarification.
+
+### 23.10 Three environment findings, none of them Stage 4 defects
+
+**1. The first-kick suite was silently skipping, entirely.**
+`data/records/first-kick-goal.csv` is **gitignored** (`.gitignore:76`,
+`/data/records/*` with tracked exceptions) and was **absent from this worktree**,
+present only in `D:\dev\afldb`. The suite's `canSpawnImporter` guard therefore
+made all 22 of its tests skip, and they would have gone on skipping. Copied in
+from the main worktree — an ignored path, so not a repository change. **A
+`describe.skipIf` keyed on a gitignored fixture reports a clean run whether the
+fixture is there or not**, and this worktree had been reporting one since it was
+created. That is why §21.10's "0 failed" for this suite is not evidence it ever
+ran here.
+
+**2. The importer takes ~93 s on this workstation, and several of the suite's own
+timeouts assume far less.** Five tests (`:446`, `:483`, `:779`, `:851`, `:880`)
+carry no explicit timeout and get vitest's 30 s default; others carry
+`120_000` but perform **two** importer runs, needing ~186 s. So the suite cannot
+pass here as written, independently of anything in this stage.
+
+**Proven, not argued.** The pre-Stage-4 importer was extracted from `HEAD`
+(`git show 2a54444:tools/records/import-first-kick-goal.ts`) into the same
+directory so its relative imports resolved identically, and both were run
+`--apply` against `afldb_test` back to back:
+
+| Importer | Wall time | Result |
+|---|---|---|
+| **Baseline `2a54444`** (no replay adapter) | **93.6 s** | exit 0, 334 rows reconciled |
+| **Stage 4** (replay adapter on the importer's `tx`) | **93.0 s** | exit 0, 334 rows reconciled |
+
+**The replay adds no measurable cost** — it validates the whole active override
+set in one statement and its four write statements match nothing when there is
+nothing to replay. The ~93 s is the existing per-row match resolution over 334
+rows. The affected runs were therefore re-run with `--testTimeout` raised **at the
+CLI**; no test file's timeout was edited, because raising a committed timeout to
+suit one workstation is the operator's call, not this stage's.
+
+**3. Retiring a row in this suite is a TWO-part edit, and half of it fails
+silently in a way that looks like a product bug.** Dropping a row from the temp
+extract is not enough: the manifest still claims that id is `active`, so the
+importer refuses at the **manifest join** and exits having printed only its parse
+summary — before it reaches any refusal, replay or write. Two Stage 4 tests were
+written with the one-part edit and failed in ~0.5 s against output that never
+mentioned the thing under test. The established two-part form is at `:924-944`;
+it is now factored as a `retire()` helper in the Stage 4 block, and each test
+starts from pristine copies via `beforeEach` so a failure cannot cascade into the
+next test as a second, unrelated one.
+
+**4. This suite purges its fixtures in `afterAll` only, so a crashed run poisons
+the next one.** A run of it had to be interrupted during this stage; that skipped
+the `afterAll` at `:363-370` and left four `player_link_resolutions` rows and the
+`issue-078-foreign` fixture row behind, which then made the next run fail in
+647 ms on a precondition rather than on anything real. Cleaned by hand, doing
+exactly what that `afterAll` does, and the baseline verified back to 334 canonical
+rows / 0 decisions / 0 overrides before re-running. **The suite is not modified.**
+`tests/integration/admin-awards.test.ts:124-131` already records this exact
+lesson — purge on stable prefixes in `beforeAll` **and** `afterAll`, never a
+per-run nonce — and this suite predates it. Both AFLDB-ISSUE-167 suites added in
+this stage follow the ISSUE-165 pattern and purge at both ends.
+
+### 23.11 Stage boundary
+
+Stage 4 is green and **stops here**. No public `status = 'active'` filter, no
+admin mutation, no `.edit` declaration, no `match-admin` change, no DEV or PROD
+migration, and nothing staged, committed, pushed, merged or deployed.
+
+**ISSUE-167 is NOT resolved.** Stage 5 is the next stage, and §17 is explicit that
+Stages 4 and 5 are the two that can invalidate the design, and that neither may be
+merged into another stage.

@@ -64,6 +64,8 @@ import postgres from 'postgres';
 
 import { asImportBatchId } from '../../src/lib/import-batch-id';
 import { resolveClub, resolvePlayer } from '../../src/lib/ingest/datasets';
+import { specialRecordEntityKey } from '../../src/lib/special-records/identity';
+import { findProtectedRecordKeys, replaySpecialRecordOverrides } from './special-records-replay';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -1075,6 +1077,28 @@ async function main(): Promise<void> {
         }
       }
 
+      // A THIRD refusal class, beside --accept-retirement and
+      // --allow-link-loss and deliberately not overridable by either
+      // (AFLDB-ISSUE-167 §8.2). Deleting a row that carries an active
+      // lifecycle or correction override would destroy the row and leave the
+      // override orphaned, and the replay's warn-and-retain could not put it
+      // back: a SOURCE-OWNED row is not re-creatable from a lifecycle payload.
+      // Only a `record` override carries a whole row, and a `record` override
+      // names a manual_admin_edit row, which carries a different source_id and
+      // so falls outside `owned` in the first place.
+      //
+      // Read here, classified with everything else, and reported by the one
+      // abort below -- so the refusal happens BEFORE the retirement DELETE at
+      // the write phase and the transaction rolls back untouched.
+      const protectedRecords = await findProtectedRecordKeys(
+        tx,
+        'player_achievements',
+        // Minted through the Stage 2 grammar, never assembled by hand here:
+        // one implementation of '<source key>:<source_record_id>', shared with
+        // the admin writer and both replay adapters.
+        retirements.map((row) => specialRecordEntityKey(SOURCE_KEY, row.key!)),
+      );
+
       // Renames: same stable id, different clean name -- the source says
       // this is still the same achievement with corrected descriptive data.
       // An undecided row updates in place (reported); a decided row needs
@@ -1122,6 +1146,15 @@ async function main(): Promise<void> {
           + `${JSON.stringify(rename.newName)} but carries a human decision `
           + `(${decision.action}${decision.playerId === null ? '' : `, player ${decision.playerId}`}); `
           + `review it, then rerun with --accept-rename ${rename.row.key}`,
+        );
+      }
+      for (const record of protectedRecords) {
+        problems.push(
+          `${record.entityKey} carries an active ${record.fieldGroup} override`
+          + (record.status ? ` (status ${record.status})` : '')
+          + ' and cannot be retired: a source-owned row cannot be re-created from one. '
+          + 'Reinstate or resolve that decision in Special records '
+          + '(/admin/records/first-kick-goal) first.',
         );
       }
       problems.push(...retirementsAtRisk);
@@ -1298,6 +1331,25 @@ async function main(): Promise<void> {
              WHERE id = ${id}
           `;
         }
+      }
+
+      // ---- Replay the durable admin decisions -------------------------
+      // AFLDB-ISSUE-167 D-3, and gate G-5. On the importer's OWN `tx` handle,
+      // inside its existing sql.begin, after the upsert phase and before the
+      // data_issues refiling below. It therefore sees the rows this run just
+      // wrote, and a fail-closed refusal from it throws inside the transaction
+      // and rolls the ENTIRE run back -- the batch row, the upserts, the
+      // retirement DELETE and the refiling with it. That atomicity is the
+      // contract D-3 made non-negotiable, and it needed no change to the
+      // transaction structure: §8.2.2 proved the seam from source before a
+      // line of this was written.
+      const replay = await replaySpecialRecordOverrides(tx, 'player_achievements');
+      if (replay.recreated + replay.restored + replay.corrected + replay.lifecycle > 0) {
+        console.log(
+          `\nDurable admin decisions replayed: ${replay.recreated} manual row(s) re-created, `
+          + `${replay.restored} restored, ${replay.corrected} correction(s) re-applied, `
+          + `${replay.lifecycle} lifecycle decision(s) re-asserted.`,
+        );
       }
 
       // ---- Data issues, refiled against the ids that just survived ----
