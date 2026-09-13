@@ -64,6 +64,9 @@ open.
 document** — Stage 2 allocates it after re-running the all-refs collision check, because
 other worktrees (ISSUE-164, ISSUE-111) may claim 102 first.
 
+**Allocated at Stage 2 (2026-09-13): `102_special_records_lifecycle.sql`.** Gate G-7 was
+re-run first and is recorded in §21.1.
+
 ### 0.3 Parent decisions inherited from ISSUE-156
 
 Read from `AFLDB-ISSUE-156.md`:
@@ -610,23 +613,38 @@ manual-authority introspection fail closed*. The `data_edits` widening is purely
 (it admits more names, refuses none) and so carries no such hazard — **but this must be
 stated and re-checked, not assumed.**
 
-### 6.5 Privileges
+### 6.5 Privileges — **SUPERSEDED by D-5 (operator decision, 2026-09-13)**
+
+> **This section's original requirement was wrong and is not in force.** It asserted that
+> the admin surface reads these tables on the **auth pool** and that Stage 2 must therefore
+> add `afldb_auth` SELECT entries to `tools/maintenance/privileges.sql`. Stage 2 read
+> current source and found the premise contradicted; the operator reviewed that evidence
+> and **approved leaving `privileges.sql` unchanged (D-5, §19)**. The paragraph below is
+> retained only so the superseded reasoning is legible. **The binding text is §21.6.**
+>
+> *Original: "But `afldb_auth` does. The admin surface reads these tables on the auth pool,
+> and `privileges.sql`'s `afldb_auth` list is hand-typed and subtractive … Stage 2 must add
+> `player_achievements` and `after_siren_kicks` SELECT for `afldb_auth` to
+> `tools/maintenance/privileges.sql` in the same change."*
+
+What remains true and in force:
 
 Both tables already carry `grant_app_read` and `grant_import_write` (`053:151-152`,
-`089:159-160`). Grants are **table-level**, so new columns need nothing further.
+`089:159-160`). Grants are **table-level**, so new columns need nothing further — and this
+is the whole privilege requirement, because the reads run on the **app** pool and the
+writes as **`afldb_import`**.
 
-**But `afldb_auth` does.** The admin surface reads these tables on the **auth pool**, and
-`privileges.sql`'s `afldb_auth` list is **hand-typed and subtractive** — any operational
-table missing from it is silently revoked. This is the exact class of defect the umbrella
-recorded as *"an admin page reading an operational table on the wrong pool (only a real
-role enforces it)"* (`AFLDB-ISSUE-156.md:730-733`).
+Umbrella R-2 (*a new read surface without a `privileges.sql` entry in the same change →
+stop*) is discharged on the **correct pool**: both tables are in the catalogue registries
+`afldb_meta.app_readable_tables` and `afldb_meta.import_writable_tables`, which
+`privileges.sql` reconciles from without a hand-typed entry, and the whole contract —
+including `afldb_auth`'s **absence** — is pinned by
+`tests/integration/special-records-lifecycle.test.ts` rather than left to inspection.
 
-**Stage 2 must add `player_achievements` and `after_siren_kicks` SELECT for `afldb_auth`
-to `tools/maintenance/privileges.sql` in the same change** (umbrella R-2: *a new read
-surface without a `privileges.sql` entry in the same change → stop*). Additionally,
 `data_overrides` admin write already exists via migration 078's COLUMN-level grants —
-**re-verify against 078, since ISSUE-165's memory records that owner-role tests hid exactly
-this**.
+**re-verified against 078 at Stage 2**, since ISSUE-165's memory records that owner-role
+tests hid exactly this. They are 7 INSERT columns, 4 UPDATE columns and a table-level
+SELECT, for `afldb_import` alone (§21.5).
 
 ### 6.6 No new table
 
@@ -873,7 +891,9 @@ server-side guard (`capabilities.ts:24-26`). That test is the gate, not a manual
 { href: '/admin/records', label: 'Special records', capability: 'data.specialRecords.read' }
 ```
 
-**Privileges:** §6.5 — `afldb_auth` SELECT on both tables in `privileges.sql`, same change.
+**Privileges:** §6.5 as superseded by **D-5** — `privileges.sql` is **unchanged**. The admin
+surface reads on the app pool and writes as `afldb_import`; `afldb_auth` gets nothing on
+either table. See §21.6.
 
 ---
 
@@ -966,10 +986,14 @@ Current state read from `tools/db/promotion-inventory.ts`:
    it has been since the ISSUE-078 rekey. This is a genuine correctness improvement that
    P4 is uniquely positioned to make, and it removes a real promotion hazard (a stale
    `target_id` silently reinstating and attaching a link decision to a different row).
-4. **`after_siren_kicks` must not remain unclassified** — the file's own
-   `kind: 'unclassified'` problem class (`:2082-2104`) reports a public table in neither
-   the registry nor the contract, and umbrella **R-3** says an unclassified table breaks
-   production promotion for unrelated phases → **stop before merge**.
+4. ~~**`after_siren_kicks` must not remain unclassified**~~ — **WITHDRAWN at Stage 2: the
+   premise was false.** `classifyPublicTables()` (`:2082-2104`) accepts a public table that
+   is in EITHER `afldb_meta.import_writable_tables` OR `PROMOTION_CONTRACT`, and migration
+   089's `grant_import_write('after_siren_kicks')` put it in the registry on the day it was
+   created — as `053:152` did for `player_achievements`. Measured on `afldb_test`, and the
+   live gate reports `[PASS] Table classification (fail-closed)`. **Umbrella R-3 was never
+   at risk, and no classification entry was needed or added.** Items 1–3 above were the
+   genuine work and all three were done (§21).
 
 **Gate G-6:** `npm run db:promotion-check` must pass, and the **existing** ISSUE-139 /
 ISSUE-143 pre-cutover refusals (UNKNOWN 079 + PENDING 091) must be **unchanged** — P4 must
@@ -998,21 +1022,27 @@ P4 re-baselines against them rather than treating them as its own regression.
 ## 13. Migration / deploy order
 
 ```
-1. Migration 10N                     (lifecycle columns; data_overrides entity widening;
+1. Migration 102                     (lifecycle columns; data_overrides entity widening;
                                       data_edits table_name widening)
-2. npm run db:privileges             (afldb_auth SELECT on both tables — §6.5)
-3. Code                              (queries, actions, routes, capability, nav,
+2. Code                              (queries, actions, routes, capability, nav,
                                       public status filters, importer refusals, replay,
                                       promotion-inventory)
-4. UI exposure                       (nav entry becomes reachable)
+3. UI exposure                       (nav entry becomes reachable)
 ```
 
 **Why this order.** The `data_overrides` widening is order-independent (§6.3: neither
 table is a settle target, and `manual-authority.ts`'s refusal proof is order-independent
-about non-settle-targets). The **privileges step is not** — the admin pages read both
-tables on the auth pool, and `privileges.sql` is subtractive, so code deployed before
-privileges fails closed at runtime in a way no local gate catches. This is the umbrella's
-own recorded lesson (`AFLDB-ISSUE-156.md:730-733`).
+about non-settle-targets), so the migration may land before or after the code.
+
+**There is no `db:privileges` step, per D-5 (§21.6).** The earlier plan placed one here on
+the belief that the admin pages read on the auth pool; they do not — they read on the app
+pool, where both tables have been readable since 053 and 089, and they write as
+`afldb_import`. `privileges.sql` is unchanged by P4, so there is nothing for a reconcile to
+apply. The umbrella's recorded lesson (*"an admin page reading an operational table on the
+wrong pool — only a real role enforces it"*, `AFLDB-ISSUE-156.md:730-733`) is honoured by
+**proving the pool with real roles** (§21.5) rather than by widening a role that no code
+path uses. Running `npm run db:privileges` on DEV remains harmless and is still worth doing
+as routine reconciliation — it is simply not a P4 deploy dependency.
 
 **Rollback.** Forward-only in production (ISSUE-155 §14). Rollback means **disabling the
 new routes and actions while preserving every new `data_overrides` and `data_edits` row**.
@@ -1052,7 +1082,7 @@ re-runs. This is the designed outcome, not a failure mode.
 | P4 would require a general player merge or fixture rekey | **NOT triggered** — identity edits are refused and routed to P9/P10 (§4, §10.2) |
 | Current provenance cannot distinguish source-owned from manual records | **NOT triggered** — `source_id` distinguishes them, and `UNIQUE NULLS NOT DISTINCT` forces a manual row to carry a real source (§3.2) |
 | A proposed migration conflicts with current main | **NOT triggered** — 102 free at planning time; re-checked at G-7 |
-| Privileges/promotion behaviour cannot be made fail-closed | **NOT triggered** — but §6.5 and §11 are both **blocking** work, not optional |
+| Privileges/promotion behaviour cannot be made fail-closed | **NOT triggered, and CLOSED at Stage 2.** §11's promotion work was blocking and is done (§21.1–§21.4). §6.5's privilege work turned out to be a **premise error, not a task**: the pools were already correct, and D-5 approved leaving `privileges.sql` unchanged with the contract pinned by restricted-role tests (§21.5, §21.6). **No stop condition remains open on this issue** |
 
 ---
 
@@ -1358,13 +1388,13 @@ Every stage writes a failing test before the fix.
 |---|---|---|
 | **0** | Allocation proof; D-1…D-4 | ✅ **COMPLETE — PASS 2026-09-13.** §0.1a; all four decisions recorded (§19) |
 | **1** | Re-verify every §2 finding against current source; run probes P-1…P-4 | ✅ **COMPLETE — PASS 2026-09-13** (§15.0a). P-1/P-2/P-3 PASS; P-4 is the authoritative G-1 input. **No further Stage 1 DB evidence is required** |
-| **2** | Migration 10N (lifecycle columns + **both** CHECK widenings, §6.3/§6.4) + `privileges.sql` + RED identity/constraint tests | Gates G-3, G-4, G-7, G-8 (**G-1 already satisfied**) |
+| **2** | Migration 10N (lifecycle columns + **both** CHECK widenings, §6.3/§6.4) + `privileges.sql` + RED identity/constraint tests | ✅ **COMPLETE — PASS 2026-09-13** (§21). Migration **102** allocated and green on `afldb_test`; G-3, G-4, G-7, G-8 all PASS; G-6 re-baselined PASS. `privileges.sql` **unchanged by D-5** (§19, §21.6) — the premise §6.5 rested on was contradicted by current source, the operator reviewed the evidence and approved, and the real-role privilege contract is pinned by tests instead. **No stop condition open** |
 | **3** | Capability (`data.specialRecords.*`) + nav + read-only admin surface (list/detail/provenance, incl. read-only link state per D-2) | `tests/auth.test.ts` green; three-role denial proven server-side |
 | **4** | Both replay adapters + importer refusals (**the Phase E stop condition**) | Gates G-5, G-9. Reload-survival, rebuild-survival, atomicity and adapter-parity tests green. **STOP** if a suppressed fact can be resurrected by any path, or if the TS adapter cannot run on the importer's own `tx` |
 | **5** | Public read-model `status = 'active'` filters, fragment by fragment | Every consumer in §7 filtered and tested; no unfiltered reference remains |
 | **6** | Mutations: correct / void / reinstate / replace / create, atomic audit, CAS, revalidation out of the pending path | Atomicity and CAS tests green; `match-admin` refusal green |
 | **7** | `promotion-inventory.ts` entries + `db:promotion-check` + `npm run build` | Gate G-6. **STOP before merge** on any new refusal class (umbrella R-3) |
-| **8** | Operator commits; DEV deploy (migration → `db:privileges` → code); browser acceptance | Acceptance matrix §18 |
+| **8** | Operator commits; DEV deploy (migration → code — **no `db:privileges` dependency, per D-5**; a routine reconcile is harmless but applies nothing for P4); browser acceptance | Acceptance matrix §18 |
 
 Stages 4 and 5 are the two that can invalidate the design. Neither may be skipped or
 merged into another stage.
@@ -1405,7 +1435,7 @@ phone-only polish is a follow-up, not a P4 blocker.
 
 ---
 
-## 19. Operator decisions — **all four RECORDED 2026-09-13**
+## 19. Operator decisions — **all five RECORDED 2026-09-13**
 
 | # | Decision | Outcome |
 |---|---|---|
@@ -1413,6 +1443,7 @@ phone-only polish is a follow-up, not a P4 blocker.
 | **D-2** | After-siren player-link resolution | **APPROVED — DEFER.** P4 may display current linkage state but must **not** create another player-link queue or authority, and must not collide with `AFLDB-ISSUE-164`. `LINK_TARGET_TABLES` is not modified (§3.5) |
 | **D-3** | Where Family A's replay lives | **APPROVED WITH MODIFICATION — one durable authority, two replay adapters.** `data_overrides` stays the sole durable authority; after-siren uses the existing Python `common.py` contract; `import-first-kick-goal.ts` gets an explicit TypeScript adapter with the same `lifecycle`/`correction`/`record` semantics; both pinned by parity/contract tests; **replay atomic with the owning importer**; do not port first-kick to Python; no second authority mechanism. **Atomicity proven structurally feasible from source — §8.2.2; the STOP clause is not invoked** (§8.2.1–§8.2.3) |
 | **D-4** | Capability shape | **APPROVED — TWO capabilities.** `data.specialRecords.read` (Admin + Super Admin) / `data.specialRecords.edit` (Super Admin). Create, correct, void, suppress, reinstate and replace are all writes under `.edit`; no separate `.suppress`. Supersedes ISSUE-156 §2's working name (§9) |
+| **D-5** | Which pool the special-record admin surface uses, and therefore whether `privileges.sql` changes | **APPROVED — `afldb_auth` gets NOTHING; `tools/maintenance/privileges.sql` stays unchanged.** Raised at Stage 2, not at planning: §6.5 had assumed the admin surface reads these tables on the auth pool, and current source contradicts that. **Supersedes §6.5.** The operator's grounds, recorded verbatim in substance: reads for these data surfaces use the app/public pool; writes use `afldb_import`; `afldb_auth` is reserved for operational/auth-owned tables; no current or planned ISSUE-167 path consumes these tables through `authSql`; and adding the grants would widen an otherwise deliberate boundary **without a caller**. The regression assertion is **retained** and must keep proving all five of: `afldb_app` can SELECT the lifecycle columns; `afldb_app` cannot mutate them; `afldb_import` holds the intended import/write privileges; `afldb_auth` has no access; and the auth privilege specification does not name either table. Evidence and consequences: §21.6 |
 
 ### 19.1 Planning findings preserved unchanged by these decisions
 
@@ -1448,3 +1479,368 @@ Explicitly reconfirmed as still binding:
   operator-CLI-only *"until refactored into a bounded, idempotent library and manual-override
   survival tests pass"*. P4 delivers exactly those survival tests (Stage 4), so it **unblocks**
   a future P7 decision without taking it.
+
+---
+
+## 21. Stage 2 execution evidence — **PASS (2026-09-13)**
+
+Everything below was executed from the worktree with operator authorisation for this
+stage. Nothing was staged, committed, pushed, merged or deployed. **DEV and PROD were not
+migrated.**
+
+### 21.1 Gate G-7 — migration-number collision proof
+
+Re-run before a number was allocated, across all four surfaces rather than the working
+directory alone:
+
+| Surface | Method | Result |
+|---|---|---|
+| Working tree | `ls src/db/migrations` | highest `101_awards_honours_lifecycle.sql` |
+| **All 27 worktrees, including uncommitted files** | filesystem scan of every `D:\dev\afldb*/src/db/migrations` for a `102`–`199` prefix | **no match** |
+| All local + remote refs | `git ls-tree -r <ref> -- src/db/migrations` over every `refs/heads` and `refs/remotes` | highest is `101` on `main`, `origin/main`, `opus/issue-166-…`, `sonnet/issue-165-…` and this branch; `100` elsewhere |
+| Reachable history | `git log --all --diff-filter=A -- 'src/db/migrations/1[0-9][0-9]_*.sql'`; `git rev-list --all --objects` | only `100` and `101` were ever added; **0 objects** named `10[2-9]` |
+
+The uncommitted-file scan is the one that matters here, because ISSUE-164's and
+ISSUE-165's work is recorded as uncommitted in project memory and a `git`-only check
+would not have seen a claim on 102. **102 is free. Allocated:
+`src/db/migrations/102_special_records_lifecycle.sql`.**
+
+### 21.2 Database identity proof
+
+Re-proven before any migration or test command, by the §15.0 three-condition contract:
+database name ends `_test`; host is loopback; a live listener answers on the **configured**
+port.
+
+```
+Target OK: 127.0.0.1:5432/afldb_test  (user=afldb_owner)
+```
+
+`AFLDB_TEST_DATABASE_URL` was read from the shared `D:\dev\afldb\.env` (the worktree
+carries none) with the trailing CR stripped. `psql` is not on `PATH` on this workstation;
+it is at `C:\Program Files\PostgreSQL\16\bin\psql.exe`. Migration status before applying
+read `101 already applied, 102 PENDING`; after, `Applied 1 migration(s)`.
+
+**Recorded lesson — the runner refuses an edited applied migration, and it is right to.**
+After 102 had been applied, its header comments were amended to cite D-5 (§21.6). The next
+`--status` refused:
+
+```
+ERROR: these applied migrations have been modified since they ran:
+  - 102_special_records_lifecycle.sql
+Add a new migration instead of editing an applied one.
+```
+
+`tools/db/migrate.ts` stores a SHA-256 per applied migration, so **any** edit — comment-only
+included — is drift. Reconciled the only way that is correct while 102 is uncommitted and
+exists on no other database: reversed it on `afldb_test` inside one transaction (drop the
+six lifecycle columns, which drops their CHECKs with them; restore both allowlists to the
+eleven literals 101 and 098 left, with their original constraint comments; delete the
+`afldb_meta.schema_migrations` row), then re-applied from the amended file — `ok (272 ms)`,
+`0 pending`, checksum clean. Verified immediately beforehand that nothing depended on it:
+**0** `data_overrides` rows and **0** `data_edits` rows using either new literal, and **0**
+non-`active` rows in either table.
+
+**This is a local-development reconciliation and nothing else.** Once 102 is committed, or
+on DEV or PROD, the answer is a **new migration**, never an edit — §13's rollback rule is
+forward-only. Two further consequences worth carrying: a full-suite run was in flight
+against `afldb_test` while the columns were briefly absent, so **that run was discarded and
+re-run** rather than reported; and the migration file must not be touched again now that
+its checksum is recorded.
+
+### 21.3 Stage 2 gates
+
+| Gate | Result | Evidence |
+|---|---|---|
+| **G-1** | PASS (carried from P-4) | both live CHECKs re-read on the §21.2 database; both allowlists were exactly as §15.0a recorded |
+| **G-3** | **PASS** | `after_siren_kicks.cited` is an EVIDENCE flag — 089's comment is *"false when the source row carried no reference; recorded as an evidence gap, not dropped"*. Grep of every consumer (`src/db/queries/after-siren.ts:177`, `src/db/queries/nl/after-siren.ts:144`, `src/search/grid-solver-spec.ts:232`) shows it **projected, never filtered on**. Migration 102 does not touch it, states the distinction in the `status` column comment, and an integration test asserts migration 102 voided **no** uncited row |
+| **G-4** | **PASS** | `manual-authority.ts` read directly, not trusted from 101's comment. The proof is `overrideScopeProvenFrom()`'s four conditions; condition 4 is `editor ⊆ CHECK`, which only ever gets **easier** as the CHECK grows, and neither new entity is a settle target or an `EDITABLE_ENTITIES` key. Order-independent in both directions, and now asserted as a fact: `tests/current-season-import.test.ts` extends the equality chain with `overrideScopeProvenFrom([CHECK_AFTER_101]) === overrideScopeProvenFrom([CHECK_AFTER_102])` |
+| **G-7** | **PASS** | §21.1 |
+| **G-8** | **PASS** | `tools/records/import-first-kick-goal.ts` (NOT `tools/migration/` — the planning path was wrong) read directly. Its `INSERT` names 21 columns and its `UPDATE` names 18; `status`, `status_reason` and `updated_at` appear in **neither**. `owned` is scoped by `achievement_type` AND `source_id`, and the retirement `DELETE` carries both predicates, so a `manual_admin_edit` row — a different `source_id` — falls outside both by construction |
+| **G-6** | **PASS, re-baselined** | `--phase source --database afldb_test` → `PASS — 8 gate(s) evaluated, none failed`, including `[PASS] Table classification (fail-closed)`. No new refusal class. The ISSUE-139/143 refusals live in the **pre-cutover** phase and are untouched by this change |
+
+### 21.4 RED → GREEN
+
+| # | RED | Evidence of RED | GREEN by |
+|---|---|---|---|
+| 1 | `tests/db-promotion-check.test.ts` — the standing contract that every admitted `data_edits.table_name` has a lineage target | `data_edits admits 'player_achievements' with no lineage target and no recorded exemption` — the existing test read the widened CHECK **out of migration 102** and refused | two new lineage targets in `promotion-inventory.ts` |
+| 2 | `tests/special-records-identity.test.ts` (new) | `Cannot find package '@/lib/special-records/identity'` | new pure module |
+| 3 | `tests/integration/special-records-lifecycle.test.ts` (new) | same | new pure module + migration applied |
+| 4 | `tests/db-promotion-check.test.ts` — the seven `target_id` targets | `expected 'first_kick_goal_key' to be 'none'` | test updated to the corrected classification, plus a new assertion that ISSUE-139 D1 is **not** reopened |
+| 5 | `tests/current-season-import.test.ts` — `OVERRIDE_ENTITY_TYPES` vs the live CHECK | `expected [ 'coaches', 'draft_picks', …(11) ] to deeply equal [ …(9) ]` | `CHECK_AFTER_102` fixture + inventory list extended |
+
+Gate 1 is worth recording separately: **the repository's own standing contract caught the
+omission before a human did**, which is exactly what ISSUE-165 built it for after four
+issues had let the same obligation slip.
+
+### 21.5 Restricted-role evidence
+
+The owner-role trap ISSUE-165 recorded was closed rather than repeated.
+`AFLDB_TEST_DATABASE_URL` authenticates as **`afldb_owner`**, so every privilege claim is
+asked of the **catalogue for a named role**, and the importer's is additionally
+**exercised over a real `afldb_import` connection** through
+`createImportRoleParityHarness` (`AFLDB_TEST_IMPORT_DATABASE_URL` derived by swapping the
+database name in `AFLDB_IMPORT_DATABASE_URL`).
+
+| Role | Contract | Result |
+|---|---|---|
+| `afldb_app` | `SELECT` on all three new columns of both tables | **held** |
+| `afldb_app` | no `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` on either table | **none held** — the public role still cannot void a record |
+| `afldb_import` | `SELECT`/`INSERT`/`UPDATE` on all three new columns of both tables | **held** — `grant_import_write()` is table-level, so the new columns are covered without a further grant. Asserted rather than assumed |
+| `afldb_import` (real session) | `current_user = afldb_import`; counts both tables; `UPDATE … SET status='void'` inside a rolled-back transaction | **PASS**, 1,282 ms — a genuine restricted connection, and the row is verified still `active` afterwards |
+| `afldb_auth` | `SELECT`/`INSERT`/`UPDATE`/`DELETE` on either table | **none held — and this is the decision, see §21.6** |
+
+`data_overrides` grants were re-verified against migration 078 as §6.5 required: they are
+**COLUMN-level** for `afldb_import` (7 `INSERT` columns, 4 `UPDATE` columns) plus a
+table-level `SELECT`, and `has_table_privilege(…, 'INSERT')` correctly answers `false` for
+them — which is exactly the shape ISSUE-165's memory records an owner-role test hiding.
+`afldb_app` and `afldb_auth` hold nothing on `data_overrides`.
+
+### 21.6 Decision D-5 — `privileges.sql` unchanged — **RAISED AND RESOLVED 2026-09-13**
+
+**Status: APPROVED by the operator. Not an open stop condition.** It was raised as one
+during execution, the evidence below was reviewed, and the decision is recorded as **D-5**
+in §19. §6.5's original requirement is **superseded**.
+
+§6.5 asserted that *"the admin surface reads these tables on the **auth pool**"* and
+therefore required `player_achievements` and `after_siren_kicks` `SELECT` for `afldb_auth`
+in `privileges.sql`. **Current source contradicts that premise**, so the change was not
+made.
+
+The evidence, read directly rather than inferred:
+
+1. **`src/db/queries/player-links.ts:86-88`** says it in words, about this exact family of
+   tables including `player_achievements`: *"Reads run on the public client: all seven
+   tables are app-readable, and the queue needs nothing the public pages cannot see."*
+2. **Every comparable admin data surface follows a three-pool shape.** Reads go through
+   `@/db/client` (`afldb_app`); the canonical write plus its `data_edits` and
+   `data_overrides` rows go through a short-lived `AFLDB_IMPORT_DATABASE_URL` transaction
+   (`admin-awards.ts:274`, `admin-club-leadership.ts:336`, `admin-coaches.ts:53`,
+   `admin-brownlow.ts:683`); `authSql` is used only for **operational** tables —
+   `admin-draft.ts:361` reads `data_edits`, `admin-brownlow-ui.ts:82` reads `auth_users`,
+   and both are already in the `afldb_auth` spec.
+3. **ISSUE-165, the immediately preceding sibling with the identical shape, made no
+   `privileges.sql` change at all**, and migration 101 states why at `:73-81`.
+4. **`src/db/authClient.ts` documents the invariant the change would erode**: *"a
+   compromise of the auth path still cannot touch statistics."*
+5. **Live measurement** on `afldb_test`: `afldb_app` `SELECT` = true and `afldb_auth`
+   `SELECT` = false on both tables — i.e. the pools are already exactly as the code
+   expects.
+
+So the R-2 obligation (*a new read surface without a `privileges.sql` entry in the same
+change → stop*) is **discharged on the correct pool** instead: both tables already carry
+`grant_app_read()` and `grant_import_write()` (`053:151-152`, `089:159-160`), both are
+present in `afldb_meta.app_readable_tables` and `afldb_meta.import_writable_tables`
+(measured), `privileges.sql` reconciles both registries from the catalogue with no
+hand-typed entry, and the whole contract — including `afldb_auth`'s **absence** — is now
+pinned by tests rather than left to inspection.
+
+**The operator's decision (2026-09-13): APPROVED — do not add the grants; keep
+`tools/maintenance/privileges.sql` unchanged.** The grounds recorded: reads for these data
+surfaces use the app/public pool; writes use `afldb_import`; `afldb_auth` is reserved for
+operational/auth-owned tables; no current or planned ISSUE-167 path consumes these tables
+through `authSql`; and adding the grants would widen an otherwise deliberate boundary
+**without a caller**.
+
+**Binding consequences for the remaining stages.**
+
+1. **`tools/maintenance/privileges.sql` is not to be edited by this issue.** A later stage
+   that finds itself wanting an `afldb_auth` grant on either table has almost certainly
+   put a read on the wrong pool — fix the query, not the grant.
+2. **Stage 3 onwards must read these tables through `@/db/client`** and write them on a
+   short-lived `AFLDB_IMPORT_DATABASE_URL` transaction, the `admin-awards.ts:274` shape.
+   `authSql` is for `auth_users`, `data_edits` reads and the other operational tables only.
+3. **§13's deploy order loses its `db:privileges` step** — there is nothing for it to
+   apply. Updated in place.
+4. **The regression assertion is RETAINED**, by explicit operator instruction, and must
+   keep proving all five clauses:
+
+   | Clause | Where |
+   |---|---|
+   | `afldb_app` can SELECT the lifecycle columns | *"gives afldb_app SELECT on both tables, including the new columns"* |
+   | `afldb_app` cannot mutate them | *"gives afldb_app no write, so the public role still cannot void a record"* |
+   | `afldb_import` holds the intended import/write privileges | *"keeps afldb_import write on both tables, new columns included"* + the real-connection test |
+   | `afldb_auth` has no access | *"leaves afldb_auth without either table…"* |
+   | the auth privilege specification does not name either table | same test, which parses `privileges.sql`'s `afldb_auth` section |
+
+   All five live in `tests/integration/special-records-lifecycle.test.ts`. The fifth is
+   what stops the decision drifting on one side only: a future edit to `privileges.sql`'s
+   `spec` array fails the test, and a future edit to the test fails against the live
+   grants.
+
+### 21.7 Two planning claims corrected by execution
+
+Both were found by reading current source, and neither changes a decision.
+
+1. **§11.4 is wrong: `after_siren_kicks` was never "unclassified".**
+   `classifyPublicTables()` requires every public table to be in EITHER
+   `afldb_meta.import_writable_tables` OR `PROMOTION_CONTRACT`. Migration 089 called
+   `grant_import_write('after_siren_kicks')`, so it has been in the registry — and
+   therefore classified as rebuilt data — since the day it was created. Measured on
+   `afldb_test`, and the live gate reports `[PASS] Table classification (fail-closed)`.
+   The same is true of `player_achievements` via `053:152`. **Umbrella R-3 was never at
+   risk.** The genuine promotion work was §11.1–§11.3, and all three were done.
+2. **§5.3's colon refusal cannot be universal, and is now scoped.** §5.3 requires the
+   writer to refuse a `source_record_id` containing a colon, but its own manual example
+   — `'manual_admin_edit:first_kick_goal:<uuid>'` — contains one by construction, exactly
+   as ISSUE-165's `'award_winner:<uuid>'` does. Resolved in the narrowest safe way: the
+   **absolute** refusal is on a colon in the **source key**, which would steal the
+   first-colon split point and make the two halves unrecoverable; the **manifest** guard
+   (`assertSourceOwnedRecordId`) refuses a colon in a source-owned id, which is the
+   forward guard P-3 evidenced. Both are tested, including a 500-mint collision check.
+
+Also corrected in passing: the first-kick importer is at
+**`tools/records/import-first-kick-goal.ts`**, not `tools/migration/`, which §8.2 / §14.1
+imply. Stage 4 should use the real path.
+
+### 21.8 A name collision Stage 4 must not be caught by
+
+`tools/records/import-first-kick-goal.ts:928` aliases `link_status_value::text AS status`
+into its `OwnedRow` type. That alias is TypeScript-local, predates migration 102's
+`status` column and is unrelated to it — the importer writes neither. Recorded in the
+migration header so the replay adapter's author sees it before writing a query that reads
+`status` and gets the wrong one.
+
+### 21.9 Files changed, and validation
+
+**New**
+
+| File | Purpose |
+|---|---|
+| `src/db/migrations/102_special_records_lifecycle.sql` | lifecycle columns on both tables; both CHECK widenings |
+| `src/lib/special-records/identity.ts` | the pure `entity_key` grammar, minting and the two refusals. No `server-only`, no DB handle — the migration, the promotion inventory, both replay adapters and the admin writer all have to be able to import it |
+| `tests/special-records-identity.test.ts` | the identity contract (§16 Stage 2) |
+| `tests/integration/special-records-lifecycle.test.ts` | the migration, the CHECKs as **enforced**, both live allowlists, and the restricted-role privilege contract |
+
+**Modified**
+
+| File | Change |
+|---|---|
+| `tools/db/promotion-inventory.ts` | `LineageIdentityRule` += `first_kick_goal_key`, `after_siren_key` (+ doc block); two `data_edits` lineage targets; two `LINEAGE_IDENTITY_SQL` entries; `player_link_resolutions.target_id`'s `player_achievements` target corrected from `identity: 'none'`, with its remediation and the ISSUE-139 D1 `reason` made factually accurate **without changing the decision** |
+| `src/lib/acquisition/manual-authority.ts` | `OVERRIDE_ENTITY_TYPES` inventory += both tables (documentation only — never the proof) |
+| `tests/db-promotion-check.test.ts` | seven-target assertion updated to the corrected classification; `data_edits` target list += both; new assertion that D1 is not reopened |
+| `tests/current-season-import.test.ts` | `CHECK_AFTER_102` fixture; migration-102 regex; `OVERRIDE_ENTITY_TYPES` expectations; order-independence chain extended |
+
+**Not changed, deliberately:** `tools/maintenance/privileges.sql` (§21.6),
+`LINK_TARGET_TABLES` (D-2), `data_overrides` structure (§6.6), both `*_source_uq`
+constraints (§6.2), and every public read path (Stage 5).
+
+**Validation**
+
+| Check | Result |
+|---|---|
+| `tools/db/migrate.ts --target test` | `applying 102_special_records_lifecycle.sql ... ok (272 ms)`, `0 pending`, checksum clean (see §21.2 on the reverse-and-reapply) |
+| `tests/special-records-identity.test.ts` + `tests/integration/special-records-lifecycle.test.ts` | **29 passed, 1 skipped** (the skip is the "restricted validation was skipped" reporter, correctly inactive because the harness IS configured) |
+| `tests/db-promotion-check.test.ts`, `tests/current-season-import.test.ts`, `tests/data-overrides-source-contract.test.ts` | **405 passed, 4 skipped** |
+| `after-siren`, `first-kick-goal-reload-links`, `privileges`, `nl-answers-after-siren`, `nl-answers-first-kick-goal`, `player-link-mutations`, `admin-awards` | **162 passed, 16 skipped**, 0 failed |
+| **Full suite** (`npx vitest run`) | **44 failed / 7110 passed / 101 skipped (7275)**, 1,970 s — and **every one of the 44 also fails at baseline `9faba6f` with the identical set**. §21.10 |
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint` over every changed file | exit 0 |
+| `npm run db:promotion:check -- --phase source --database afldb_test` | **PASS — 8 gates, none failed** |
+| `git diff --check` | clean |
+
+### 21.10 Full suite, and the baseline that makes it mean something
+
+**Zero regressions attributable to Stage 2, proven by differential rather than argued.**
+
+The run:
+
+```powershell
+# From the worktree, with NO .env present (see the environment note below).
+$env:AFLDB_TEST_DATABASE_URL        = <shared .env value>                     # afldb_owner@afldb_test
+$env:AFLDB_TEST_IMPORT_DATABASE_URL = <AFLDB_IMPORT_DATABASE_URL, db swapped> # afldb_import@afldb_test
+$env:AFLDB_IMPORT_DATABASE_URL      = $env:AFLDB_TEST_IMPORT_DATABASE_URL
+$env:AFLDB_AUTH_DATABASE_URL        = <AFLDB_AUTH_DATABASE_URL, db swapped>   # afldb_auth@afldb_test
+npx vitest run --reporter=dot
+```
+
+| | Stage 2 (this branch) | Baseline `9faba6f` (same 11 files) |
+|---|---|---|
+| Test files | 11 failed, 174 passed, 2 skipped (187) | 11 failed (11) |
+| Tests | **44 failed**, 7,110 passed, 101 skipped (7,275) | **44 failed**, 1,679 passed, 61 skipped (1,784) |
+| Duration | 1,970 s | 877 s |
+
+The baseline was a detached `git worktree` at `9faba6f` — the planning commit, i.e. this
+branch **without any Stage 2 change** — in the same environment, against the same
+`afldb_test`, running exactly the 11 files that failed. Comparing the two failing-test
+lists as sets:
+
+```
+stage2 fail lines:   46
+baseline fail lines: 46
+=== IDENTICAL: every failing test in the Stage 2 run also fails at baseline 9faba6f,
+    and vice versa ===
+```
+
+(46 lines = 44 failing tests plus the two-line suite-level entry for `admin-brownlow`.)
+The baseline worktree was removed afterwards and `git worktree prune` run.
+
+**The 44 pre-existing failures, by file and kind.** Every one is football-data semantics
+against an `afldb_test` that lags the canonical rebuild — none touches special records,
+lifecycle state, either widened allowlist, or promotion lineage.
+
+| File | n | Kind |
+|---|---|---|
+| `club-comparison` | 24 | head-to-head, crossover, player averages/leaders, period-score rivalry |
+| `database` | 4 | advanced-search regression cases; full player-match dataset count |
+| `gridley-corpus` | 4 | dataset gaps — e.g. *"override Willem Duursma/2026 matched 0 players"* |
+| `release-gates` | 4 | attendance `complete`/`not_collected` split; birth dates `expected 83 to be 18`; ladder rows; advanced search |
+| `awards-reload-links` | 2 | captaincies + named-medals manifest reloads (`expected length 863, got 1191`) |
+| `club-comparison-route` | 2 | route state for the same comparison data |
+| `grid-solver` | 2 | finals-win cells, `expected 282 to be 283` |
+| `finals-semantics-contract` | 1 | the known Windows CRLF case — splits on bare `\n`; passes on Linux |
+| `admin-brownlow` | 1 | `Hook timed out in 30000ms` in `beforeAll` on `SELECT id FROM auth_users LIMIT 1` — contention in a 33-minute serial run |
+| `data-editor` | 1 | targeted `club_seasons` rebuild refusal |
+| `nl-answers-coaching` | 1 | Richmond coaching threshold vs hand-written `HAVING` |
+
+Eight of these were already recorded as failing on this database earlier the same day,
+before any ISSUE-167 change existed (`release-gates` x4, `grid-solver` x2, `data-editor`,
+the captaincies manifest), which corroborates the differential independently.
+
+**Corroborating structural argument**, which the differential now merely confirms:
+migration 102 is **strictly additive** (six columns, all defaulted, on two tables) and
+**strictly widening** (two CHECKs admit more and refuse nothing). No read path filters on
+`status` yet — Stage 5 has not landed — so a defaulted column cannot change any query
+result. The only vector that could have mattered is a test enumerating columns on those two
+tables, and none of the 44 is of that kind.
+
+**Environment note, which cost two invalid runs and belongs in the record.**
+
+This worktree has **no `.env`** (worktrees do not carry one) and `tests/setup.ts` loads
+`<root>/.env`, tolerating its absence. Two ways of supplying the configuration were wrong:
+
+1. **Setting only the two test DSNs.** Every auth-pool test then fails with
+   `AFLDB_AUTH_DATABASE_URL is not set` from `src/db/authClient.ts:35` — not a defect, a
+   missing variable. 71 failures.
+2. **Copying the shared `D:\dev\afldb\.env` into the worktree.** Worse: it drags in
+   dev-oriented configuration, and — the real trap — `tools/migration/common.py`'s
+   `load_env()` does `path.read_text()`, which on Windows decodes as **cp1252**. A copy
+   written as UTF-8 raises `UnicodeDecodeError` and **every Python-importer test dies at
+   startup**. 147 failures.
+
+**The correct configuration is no `.env` plus the four explicit DSNs above**, which is also
+what `tests/setup.ts` describes for CI (*".env is absent in CI; variables are expected to be
+set already"*). A worktree `.env` is gitignored, so neither mistake could reach the
+repository — but both invalidated a 30-minute run.
+
+Also recorded: a full-suite run was in flight against `afldb_test` while migration 102 was
+being reversed and re-applied (§21.2). **Stop the run first.** That run was discarded, not
+reported.
+
+**Database integrity after all four runs**, probed read-only: `award_winners` 3,712,
+`players` 13,338, `matches` 17,051, `player_achievements` 334, `after_siren_kicks` 126,
+`data_overrides` 0, `data_edits` 0, every special-record row `status = 'active'`, and **no
+leftover `issue_167_fixture_source`**. The reload suites restore their own state, and this
+issue's fixtures are removed in `afterAll`.
+
+**Standing caveat.** Linux is the supported runtime (CLAUDE.md §11); a Windows run does not
+prove Linux integration behaviour, and one of the 44 (`finals-semantics-contract`) is a
+Windows-only artefact. The authoritative full-suite signal is a Linux/CI run. What this
+differential establishes is narrower and is the thing that was asked: **Stage 2 introduces
+no new failure.**
+
+### 21.11 Stage boundary
+
+Stage 2 ends here. **Not implemented, by design:** the admin route, capability and nav
+(Stage 3); both replay adapters and the importer refusals (Stage 4); the public
+`status = 'active'` filters (Stage 5); the mutations, atomic audit and CAS (Stage 6). No
+DEV or PROD migration. Nothing staged or committed — the operator commits.

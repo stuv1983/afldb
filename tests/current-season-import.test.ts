@@ -3648,6 +3648,9 @@ const seasonListMigration = readSource('src/db/migrations/096_season_list_member
 const fixtureMigration = readSource('src/db/migrations/097_fixtures.sql');
 const leadershipMigration = readSource('src/db/migrations/098_club_leadership.sql');
 const honoursMigration = readSource('src/db/migrations/101_awards_honours_lifecycle.sql');
+const specialRecordsMigration = readSource(
+  'src/db/migrations/102_special_records_lifecycle.sql',
+);
 
 /** A `pg_get_constraintdef()` string of the shape PostgreSQL actually prints. */
 function entityTypeCheck(...entities: readonly string[]): string {
@@ -3679,6 +3682,12 @@ const CHECK_AFTER_098 = entityTypeCheck(
 const CHECK_AFTER_101 = entityTypeCheck(
   'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
   'fixtures', 'club_leadership', 'award_winners', 'hall_of_fame', 'honour_team_members',
+);
+/** The CHECK as migration 102 leaves it — the post-102 database (AFLDB-ISSUE-167). */
+const CHECK_AFTER_102 = entityTypeCheck(
+  'players', 'matches', 'draft_picks', 'coaches', 'match_coaches', 'season_list_members',
+  'fixtures', 'club_leadership', 'award_winners', 'hall_of_fame', 'honour_team_members',
+  'player_achievements', 'after_siren_kicks',
 );
 
 function authoritySnapshot(over: Partial<ManualAuthoritySnapshot> = {}): ManualAuthoritySnapshot {
@@ -3729,11 +3738,19 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect(honoursMigration).toMatch(
       /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members'\s*\)\)/,
     );
-    // And the three unrepresentable settle targets are still absent from all three.
+    // AFLDB-ISSUE-167 §6.3. Migration 102 admits the two curated special-record
+    // families. Neither is a settle target — the nightly settle writes matches
+    // and statistics and touches neither a first-kick achievement nor an
+    // after-siren event — so admitting both changes no answer below either.
+    expect(specialRecordsMigration).toMatch(
+      /ADD CONSTRAINT data_overrides_entity_type_check CHECK \(entity_type IN \(\s*'players',\s*'matches',\s*'draft_picks',\s*'coaches',\s*'match_coaches',\s*'season_list_members',\s*'fixtures',\s*'club_leadership',\s*'award_winners',\s*'hall_of_fame',\s*'honour_team_members',\s*'player_achievements',\s*'after_siren_kicks'\s*\)\)/,
+    );
+    // And the three unrepresentable settle targets are still absent from all four.
     for (const settleTarget of [
       'match_period_scores', 'player_match_stats', 'brownlow_round_votes',
     ]) {
-      for (const migration of [fixtureMigration, leadershipMigration, honoursMigration]) {
+      for (const migration of [fixtureMigration, leadershipMigration, honoursMigration,
+        specialRecordsMigration]) {
         const widening = migration.slice(
           migration.indexOf('ADD CONSTRAINT data_overrides_entity_type_check'),
         );
@@ -3750,9 +3767,10 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
     expect([...OVERRIDE_ENTITY_TYPES])
       .toEqual(['coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
         'season_list_members', 'club_leadership',
-        'award_winners', 'hall_of_fame', 'honour_team_members']);
+        'award_winners', 'hall_of_fame', 'honour_team_members',
+        'player_achievements', 'after_siren_kicks']);
     expect([...OVERRIDE_ENTITY_TYPES].sort())
-      .toEqual(checkAdmittedEntities([CHECK_AFTER_101]));
+      .toEqual(checkAdmittedEntities([CHECK_AFTER_102]));
     // And the order-independence D-1 requires, stated as a fact rather than a
     // hope: the settle's answer is identical against the pre-096 and pre-097
     // constraints, so each migration and its code may deploy in either order.
@@ -3764,6 +3782,8 @@ describe('AFLDB-ISSUE-122 §8 — the pinned contracts the provider stands on', 
       overrideScopeProvenFrom([CHECK_AFTER_098]));
     expect(overrideScopeProvenFrom([CHECK_AFTER_098])).toBe(
       overrideScopeProvenFrom([CHECK_AFTER_101]));
+    expect(overrideScopeProvenFrom([CHECK_AFTER_101])).toBe(
+      overrideScopeProvenFrom([CHECK_AFTER_102]));
     // ...but it is documentation, NOT the proof. AFLDB-ISSUE-159 §3.1 / D-1: an
     // exact-set proof has no safe deploy order in either direction, so the proof
     // itself must not consult this list at all.
