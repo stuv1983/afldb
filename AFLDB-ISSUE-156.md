@@ -11,7 +11,7 @@ decide S-1 against it. See the `AFLDB-ISSUE-151` entry in `issues.md` for the au
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Created:** 2026-09-11
 **Parent lineage:** `AFLDB-ISSUE-155` (Phases D–I transferred here by reference; see §0)
-**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2), `AFLDB-ISSUE-159` (P3), `AFLDB-ISSUE-160` (P3b — Draft administration, a supplemental child inserted after P3 on 2026-09-11; P4–P12 keep their labels), `AFLDB-ISSUE-161` (P3c — Season list administration, a supplemental child inserted after P3b on 2026-09-11, Stage 1 AND Stage 2 complete/uncommitted; P4–P12 keep their labels), `AFLDB-ISSUE-162` (P3d — Fixture / season schedule administration, a supplemental child inserted after P3c on 2026-09-11, owning migration **097**; Stage 1 backend only, uncommitted and not yet validated, Stage 2 not built; P4–P12 keep their labels), `AFLDB-ISSUE-163` (P3e — Club leadership administration, owning migration **098**), `AFLDB-ISSUE-165` (P5 — Awards & Honours administration: correction, voiding and replacement lifecycle, allocated 2026-09-13, planning only; absorbs P8's awards/Hall of Fame/honour-team decomposition slice). P4, P6, P7, P9–P12 are named placeholders and receive an ID only when each phase starts; P6 and P7 were checked for supersession evidence during the 2026-09-13 reconciliation and found insufficient to mark either superseded (see "Next action").
+**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2), `AFLDB-ISSUE-159` (P3), `AFLDB-ISSUE-160` (P3b — Draft administration, a supplemental child inserted after P3 on 2026-09-11; P4–P12 keep their labels), `AFLDB-ISSUE-161` (P3c — Season list administration, a supplemental child inserted after P3b on 2026-09-11, Stage 1 AND Stage 2 complete/uncommitted; P4–P12 keep their labels), `AFLDB-ISSUE-162` (P3d — Fixture / season schedule administration, a supplemental child inserted after P3c on 2026-09-11, owning migration **097**; Stage 1 backend only, uncommitted and not yet validated, Stage 2 not built; P4–P12 keep their labels), `AFLDB-ISSUE-163` (P3e — Club leadership administration, owning migration **098**), `AFLDB-ISSUE-165` (P5 — Awards & Honours administration: correction, voiding and replacement lifecycle, allocated 2026-09-13, owning migration **101**; **Stages 1–7 complete 2026-09-13, uncommitted and undeployed, Stage 8 DEV rollout blocked on the operator commit/push — see the P5 handoff contract below**; absorbs P8's awards/Hall of Fame/honour-team decomposition slice). P4, P6, P7, P9–P12 are named placeholders and receive an ID only when each phase starts; P6 and P7 were checked for supersession evidence during the 2026-09-13 reconciliation and found insufficient to mark either superseded (see "Next action").
 
 This document is a planning deliverable. No application code, migration, privilege, test or
 deployment change was made while producing it. Every later phase must re-verify the repository
@@ -354,7 +354,7 @@ contract remaps.
 | P3d | **AFLDB-ISSUE-162** | Fixture / season schedule administration — a future season's schedule inside AFLDB | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3c | medium-high (new canonical table beside `matches`; one migration; promotion lineage) | §P3d below — Stage 1 (`cb98c67`) and Stage 2 (`6a9fbc4`) validated; the DEV-rollout client/server boundary fix and cleared-date fix committed. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 097 applied on DEV, production build PASS); the all-refs 097 collision check is a closeout operator command |
 | P3e | **AFLDB-ISSUE-163** | Club leadership administration and current-captain display | new (no ISSUE-155 phase) — inserted 2026-09-12, stacked on P3d; the batch's first item with public output | medium (club–season–player model; one migration; public club page) | §P3e below — D-1…D-18 signed off with four clarifications; both stages validated (`ea9f3dd`), audit found no deviation. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 098 applied on DEV); §34.4 items 1–3 carried as follow-ups |
 | P4 | placeholder | Special records — first-kick / after-siren / family | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe |
-| P5 | **AFLDB-ISSUE-165** | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority — see §P5 handoff contract below. **Planning complete 2026-09-13, not implemented** |
+| P5 | **AFLDB-ISSUE-165** | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority — see §P5 handoff contract below. **Stages 1–7 complete 2026-09-13; uncommitted, undeployed; Stage 8 DEV rollout blocked on the operator commit/push** |
 | P6 | placeholder | Site content and versioning | Phase F (§23, §11) | medium | reuse root-layout revalidation |
 | P7 | placeholder | Safe refresh and operational controls | Phase G (§23, §13) | high | allowlist + single-flight + settle-timer interaction proven |
 | P8 | placeholder | Data-editor decomposition into domain routes | §7, §15 | medium | move, don't rewrite; existing tests still green |
@@ -933,9 +933,55 @@ P9, P10, P12 are unaffected by this reconciliation.
 
 ### P5 handoff contract — AFLDB-ISSUE-165: Awards & Honours Administration
 
-**Allocated 2026-09-13. Status: Planning complete — not implemented, no migration, no code, no
-commit, no deployment.** The authoritative contract is `AFLDB-ISSUE-165.md`; this section is the
-umbrella's summary of it.
+**Allocated 2026-09-13. Status (updated 2026-09-13, Stages 7–9 session): Stages 1–7 COMPLETE on
+`sonnet/issue-165-awards-admin`; Stage 8 (DEV rollout and rendered browser acceptance) BLOCKED on
+one operator action; uncommitted, undeployed. Migration 101 written and applied to `afldb_test`
+only. DEV and PROD untouched.** The authoritative contract and the full record are
+`AFLDB-ISSUE-165.md` (§17 Stages 1–3, §18 Stages 4–6, §19 Stage 7); this section is the umbrella's
+summary of it.
+
+**Acceptance gate status.** Every gate in the "Acceptance gate" paragraph below is met except the
+two that need a running DEV deployment of this branch — the per-role **rendered** direct-route
+matrix and the 1440×900 / 375×812 responsive gate. Met and recorded: unit and capability
+source-contracts; `afldb_test` integration create/correct/void/reinstate/replace across all three
+domains with duplicate prevention (**32/32, and 32/32 again under the restricted `afldb_import`
+role** — see below); the reload-survival proof with the real `import_awards.py`, both an ordinary
+scoped reload and a destructive rebuild; public read-model invariance and voided/replaced public
+behaviour across all four consumer modules plus the Query Builder correlations; audit atomicity;
+`npm run typecheck`; and privilege impact (migration 101 adds no table, so no
+`afldb_meta.grant_app_read()` is required, and a read-only probe confirms the three tables'
+existing table-level grants already cover the new `status` column).
+
+**Stage 7 added three things the earlier stages had not.** (1) The integration suite had been
+redirecting `AFLDB_IMPORT_DATABASE_URL` at the owner test DSN, which fixes the *database* and
+silently also fixes the *role* — every mutation ran as `afldb_owner`. That is the same blind spot
+§18.4 item 1 already cost this issue once on the read path, and the write path has a narrower grant
+(migration 078 gives `afldb_import` COLUMN-level INSERT/UPDATE on `data_overrides`, not
+table-level). Rewired to this repository's own `createImportRoleParityHarness()`, which proves
+role, database parity and a live `42501` denial before the first write. (2) The Brownlow refusal —
+**this umbrella's own named P5 stop condition, "never a second Brownlow authority"** — and
+historical club-identity resolution both existed in the live `admin-awards.ts` but were tested only
+through the retired `awards-admin.ts`; both are now asserted against the live module. (3) The
+`AFLDB-ISSUE-080` §5.3 frozen advisory-lock contract was pinning the moved-from module, leaving the
+literal the running application contends on unpinned; it now pins both writers.
+
+**Why Stage 8 is blocked, and what unblocks it.** `deploy/sync-dev.ps1` deploys by
+`git fetch` + `git pull --ff-only` from `origin`. `origin/sonnet/issue-165-awards-admin` is at
+`9a687db`, the Stage 1–3 backend commit; every Stage 4–6 change (the public status filters, both
+capabilities, the nav entry, all ten `/admin/awards` pages, the route handler and all fifteen
+Server Actions) is staged and uncommitted, so the surface under test is not on `origin`. One
+operator action — commit and push — unblocks it. The DEV preflight itself passed read-only: host
+`b43eb4a` on `main` (clean, and one behind `origin/main`), `current_database() = afldb_dev`,
+migrations through 100 with **0 pending** so 101 would be the only pending one, `afldb` active,
+`/api/health` 200. The deploy order is confirmed binding by direct evidence: a build run against
+`afldb_dev` (101 unapplied) fails `42703 column w.status does not exist`, and `sync-dev.ps1`
+already sequences `db:migrate` before `build`.
+
+**Disposition of the child.** Following the 160–163 precedent, a child of this umbrella is marked
+**Resolved on DEV acceptance**, and PROD promotion is a separate decision carried under this
+umbrella's own entry rather than under the child. ISSUE-165 therefore becomes resolvable once
+Stage 8 passes on DEV — not before, and its PROD promotion joins the carried Admin Centre
+promotion checklist here.
 
 **Objective.** A void/end + replacement correction lifecycle for `award_winners`,
 `hall_of_fame` and `honour_team_members` — today all three support create only, gated on the

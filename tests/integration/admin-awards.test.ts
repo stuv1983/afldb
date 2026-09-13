@@ -19,6 +19,8 @@
  */
 import './guard';
 
+import { createImportRoleParityHarness } from './import-role-parity';
+
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,6 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import {
+  BROWNLOW_AWARD_SLUG,
   awardWinnerEntityKey,
   correctAwardWinner,
   correctHallOfFameInductee,
@@ -41,6 +44,8 @@ import {
   readHallOfFameInductee,
   readHonourTeamMember,
   reinstateAwardWinner,
+  reinstateHallOfFameInductee,
+  reinstateHonourTeamMember,
   replaceAwardWinner,
   replaceHallOfFameInductee,
   voidAwardWinner,
@@ -48,14 +53,49 @@ import {
   voidHonourTeamMember,
 } from '@/db/queries/admin-awards';
 import { listUnresolvedLinks } from '@/db/queries/player-links';
+import {
+  getAward,
+  getAwardSeason,
+  getAwardSeasons,
+  getAwardWinners,
+  getHallOfFameInductees,
+  getHonourTeam,
+  getPlayerHonours,
+  listHallOfFame,
+  listHonourTeams,
+} from '@/db/queries/awards';
+import { axisPlayerIds } from '@/db/queries/grid-solver';
+import { runQueryBuilder } from '@/db/queries/query-builder';
+import type { GridAxisState } from '@/search/grid-solver-spec';
+import type { QueryBuilderState } from '@/search/query-builder-spec';
+import sitemap from '@/app/sitemap';
 
 /*
  * TEST DATABASE SAFETY. tests/setup.ts redirects DATABASE_URL to afldb_test and
  * refuses anything not ending in `_test`. It does NOT touch
  * AFLDB_IMPORT_DATABASE_URL, and the repository .env points that at afldb_dev —
  * so without this redirect every mutation here would land in afldb_dev.
+ *
+ * ROLE, not just database (AFLDB-ISSUE-165 Stage 7). Redirecting to
+ * AFLDB_TEST_DATABASE_URL alone makes every mutation below run as the database
+ * OWNER, which can do anything — and §18.4 item 1 is the record of what that
+ * hides: a `data_overrides` read that passed 24/24 as owner and would have
+ * failed closed for the running application. The durable-record WRITE has the
+ * same exposure and a narrower grant: migration 078 gives `afldb_import`
+ * COLUMN-level INSERT/UPDATE on `data_overrides`, not table-level, so a
+ * mutation that touches one ungranted column fails closed on DEV and nowhere
+ * here. When the operator has configured the restricted DSN, the suite runs its
+ * mutations as `afldb_import` and that gap closes; `tests/integration/guard.ts`
+ * has already proved both DSNs name the same `_test` database, and
+ * `importRole.validate()` re-proves the role and a real 42501 denial in
+ * `beforeAll` before a single row is written.
  */
-process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_DATABASE_URL;
+const importRole = createImportRoleParityHarness(
+  process.env.AFLDB_TEST_DATABASE_URL,
+  process.env.AFLDB_TEST_IMPORT_DATABASE_URL,
+);
+process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL
+  ?? process.env.AFLDB_TEST_DATABASE_URL;
 
 const root = process.cwd();
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
@@ -315,6 +355,16 @@ async function purgeFixtures(): Promise<void> {
 }
 
 beforeAll(async () => {
+  // Proves current_database(), current_user = afldb_import and a live 42501
+  // denial before the first mutation, so a suite that claims importer-role
+  // coverage cannot silently be running as the owner.
+  if (importRole.isConfigured) {
+    const proof = await importRole.validate();
+    expect(proof.restricted.role).toBe('afldb_import');
+    expect(proof.restricted.database).toBe(proof.owner.database);
+    expect(proof.restricted.database).toMatch(/_test$/);
+  }
+
   const [bound] = await sql<{ year: number }[]>`SELECT max(year)::int AS year FROM seasons`;
   season = bound.year;
 
@@ -720,6 +770,98 @@ describe('award_winners — correction, void, reinstate, replace', () => {
     });
     expect(voided.ok, JSON.stringify(voided)).toBe(true);
     expect(await inQueue()).toBe(false);
+  });
+});
+
+/**
+ * The two create-path refusals AFLDB-ISSUE-165 §18.6 recorded as reaching a
+ * test only through the RETIRED `awards-admin.ts`.
+ *
+ * Both are reimplemented in `admin-awards.ts` — the module `/admin/awards`
+ * actually calls — and neither had a test pointed at that copy, so the Brownlow
+ * stop condition the ISSUE-156 P5 handoff names ("never a second Brownlow
+ * authority") was enforced only by a contract on a module with no caller. These
+ * assert the LIVE path. Nothing is written: both cases refuse before any INSERT
+ * and `RollbackRefusal` takes the transaction with it.
+ */
+describe('create-path refusals on the live module (§18.6 residue)', () => {
+  it('refuses to write a Brownlow winner into award_winners at all', async () => {
+    const [brownlow] = await admin<{ id: number }[]>`
+      SELECT id::int AS id FROM awards WHERE slug = ${BROWNLOW_AWARD_SLUG}`;
+    expect(brownlow, 'afldb_test carries the brownlow-medal award').toBeTruthy();
+
+    const before = await admin<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM award_winners WHERE award_id = ${brownlow.id}`;
+
+    const refused = await createAwardWinner({
+      awardId: brownlow.id, season, playerId: linkedPlayerId, adminUserId: actorId,
+    });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.reason).toBe('forbidden');
+      expect(refused.error).toContain('brownlow_season_votes');
+    }
+
+    // The refusal is a refusal, not a partial write.
+    const after = await admin<{ n: string }[]>`
+      SELECT count(*)::text AS n FROM award_winners WHERE award_id = ${brownlow.id}`;
+    expect(after[0].n).toBe(before[0].n);
+  });
+
+  it('stamps the HISTORICAL club identity on a club best-and-fairest season', async () => {
+    // A club whose season identity in some past season is a DIFFERENT clubs row
+    // from the modern one (a rename carried on one organization_id). Skipped
+    // rather than asserted if this database holds no such lineage, because the
+    // claim is about identity resolution, not about the fixture data.
+    const [lineage] = await admin<{
+      modernId: number; historicalId: number; historicalName: string; year: number;
+    }[]>`
+      SELECT modern.id::int AS "modernId",
+             historical.id::int AS "historicalId",
+             historical.name AS "historicalName",
+             s.year::int AS year
+        FROM clubs modern
+        CROSS JOIN LATERAL (
+          SELECT year FROM seasons ORDER BY year LIMIT 200
+        ) s
+        JOIN clubs historical
+          ON historical.id = afldb_identity_for_season(modern.organization_id, s.year::smallint)
+       WHERE historical.id <> modern.id
+       LIMIT 1`;
+    if (!lineage) {
+      expect.soft(lineage, 'no renamed club lineage on this database').toBeUndefined();
+      return;
+    }
+
+    const slug = `${AWARD_PREFIX}bandf`;
+    const [award] = await admin<{ id: number }[]>`
+      INSERT INTO awards (slug, name, category, competition, club_id)
+      VALUES (${slug}, ${`${MARKER} best and fairest`}, 'club_best_and_fairest', 'AFL',
+              ${lineage.modernId})
+      RETURNING id`;
+
+    // The admin supplies no club at all: the award's own organization plus the
+    // season decide it, and the answer is the historical row, not the modern one.
+    const created = await createAwardWinner({
+      awardId: award.id, season: lineage.year, playerId: linkedPlayerId, adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+
+    const [row] = await admin<{ clubId: number; clubNameRaw: string | null }[]>`
+      SELECT club_id::int AS "clubId", club_name_raw AS "clubNameRaw"
+        FROM award_winners WHERE id = ${created.rowId}`;
+    expect(row.clubId).toBe(lineage.historicalId);
+    expect(row.clubNameRaw).toBe(lineage.historicalName);
+
+    // And an explicit club that contradicts the season identity is refused,
+    // rather than quietly overwritten with the right one.
+    const conflicting = await createAwardWinner({
+      awardId: award.id, season: lineage.year, playerId: secondPlayerId,
+      clubId: lineage.modernId, adminUserId: actorId,
+    });
+    expect(conflicting.ok).toBe(false);
+    if (!conflicting.ok) expect(conflicting.reason).toBe('validation');
   });
 });
 
@@ -1158,5 +1300,286 @@ describe('D-12 — the legacy ingest writer refuses to overwrite a decision', ()
     expect((await winnerRow(seeded.id))!.status).toBe('void');
     const key = awardWinnerEntityKey('sports_data_lab', recordId);
     expect((await overridesFor('award_winners', key))[0].values.status).toBe('void');
+  });
+});
+
+// -------------------------------------------------------------------------
+
+/**
+ * STAGE 4: the public read model (§4.8, gates 6 and 7).
+ *
+ * Two claims, and they are not the same claim.
+ *
+ *   1. INVARIANCE. With nothing voided, every public reader returns exactly
+ *      what it returned before migration 101. Proved by counting: a filtered
+ *      reader and an unfiltered count of the same rows must agree, which they
+ *      can only do while every existing row is active — which is the point.
+ *   2. DISAPPEARANCE. A voided record leaves every surface that treats it as a
+ *      football fact, and comes back when it is reinstated.
+ *
+ * The consumers are exercised through their own entry points — the public
+ * `awards.ts` readers, `axisPlayerIds`, `runQueryBuilder`, `sitemap` — never
+ * through a restatement of their SQL here, which would prove only that two
+ * pieces of test code agree. That EVERY consumer is covered, rather than the
+ * ones this file happened to remember, is the separate counting contract in
+ * `tests/honours-lifecycle-public-contract.test.ts`; R-3 needs both.
+ */
+describe('Stage 4 — the public read model', () => {
+  it('changes nothing at all while nothing is voided (gate 6)', async () => {
+    // REAL rows, which this suite never writes to or voids — it owns its own
+    // awards, its own Hall of Fame names and its own team names, all carrying
+    // the marker. Every real row is active, because migration 101 defaulted it
+    // so and nothing has changed it, so each filtered reader must agree exactly
+    // with an unfiltered count of the same rows. A missed default, or a filter
+    // that excluded more than voided rows, shows up here as a shortfall.
+    //
+    // Deliberately NOT 'the whole table has nothing voided': the tests above
+    // this one void fixture rows on purpose, and an assertion that forbade that
+    // would be asserting the suite had not run.
+    const [aw] = await admin<{ id: number; n: number }[]>`
+      SELECT w.award_id AS id, count(*)::int AS n
+        FROM award_winners w
+        JOIN awards a ON a.id = w.award_id
+       WHERE a.slug NOT LIKE ${`${AWARD_PREFIX}%`}
+       GROUP BY w.award_id
+       ORDER BY count(*) DESC
+       LIMIT 1`;
+    const [voidedReal] = await admin<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM award_winners
+       WHERE award_id = ${aw.id} AND status <> 'active'`;
+    expect(voidedReal.n, 'a real award must reach this gate with nothing voided').toBe(0);
+    expect(await getAwardWinners(aw.id)).toHaveLength(aw.n);
+
+    const [hof] = await admin<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM hall_of_fame WHERE name NOT LIKE ${`${MARKER}%`}`;
+    const publicHof = (await listHallOfFame()).filter((r) => !r.name.startsWith(MARKER));
+    expect(publicHof).toHaveLength(hof.n);
+
+    const [teams] = await admin<{ n: number }[]>`
+      SELECT count(DISTINCT team_name)::int AS n FROM honour_team_members
+       WHERE team_name NOT LIKE ${`${MARKER}%`}`;
+    const publicTeams = (await listHonourTeams()).filter((t) => !t.teamName.startsWith(MARKER));
+    expect(publicTeams).toHaveLength(teams.n);
+  });
+
+  it('takes a voided award winner out of every public surface, and puts it back (gate 7)', async () => {
+    const awardId = await makeAward('public-winner');
+    const [award] = await admin<{ slug: string }[]>`
+      SELECT slug FROM awards WHERE id = ${awardId}`;
+    const seeded = await seedSourceWinner(awardId, `${MARKER}-public-winner-1`);
+
+    // The Grid Solver answers over `players JOIN player_career_stats`, so a
+    // fixture player with no career row is invisible to it whatever the clue
+    // says. Giving this one a minimal career row is what makes the assertion
+    // below about the LIFECYCLE FILTER rather than about the join.
+    await admin`
+      INSERT INTO player_career_stats (player_id, games, clubs_played, seasons_played)
+      VALUES (${linkedPlayerId}, 1, 1, 1)
+      ON CONFLICT (player_id) DO NOTHING`;
+
+    const winnerAxis: GridAxisState = {
+      builder: 'award_winner',
+      params: { award: String(awardId) },
+    };
+    const builderState: QueryBuilderState = {
+      table: 'player_career_stats',
+      page: 1,
+      cards: [{
+        join: 'AND',
+        card: {
+          match: 'AND',
+          domain: 'player.awards',
+          quantifier: 'any',
+          conditions: [{ column: 'award_slug', op: 'equals', value: award.slug }],
+        },
+      }],
+    };
+
+    // --- active: visible everywhere ---------------------------------------
+    expect((await getAwardWinners(awardId)).map((r) => r.id)).toContain(seeded);
+    expect((await getAwardSeason(awardId, season)).map((r) => r.id)).toContain(seeded);
+    expect(await getAwardSeasons(awardId)).toContain(season);
+    expect((await getAward(award.slug))!.winnerCount).toBe(1);
+    expect((await getPlayerHonours(linkedPlayerId)).awards.map((a) => a.slug)).toContain(award.slug);
+    expect([...await axisPlayerIds(winnerAxis)]).toContain(linkedPlayerId);
+    expect((await runQueryBuilder(builderState)).total).toBe(1);
+
+    // --- voided: gone from every one of them ------------------------------
+    const voided = await voidAwardWinner({
+      rowId: seeded,
+      expectedUpdatedAt: (await winnerRow(seeded))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'recorded against the wrong season',
+    });
+    expect(voided.ok, JSON.stringify(voided)).toBe(true);
+
+    expect(await getAwardWinners(awardId)).toHaveLength(0);
+    expect(await getAwardSeason(awardId, season)).toHaveLength(0);
+    expect(await getAwardSeasons(awardId)).toHaveLength(0);
+    expect((await getAward(award.slug))!.winnerCount).toBe(0);
+    expect((await getPlayerHonours(linkedPlayerId)).awards.map((a) => a.slug))
+      .not.toContain(award.slug);
+    expect([...await axisPlayerIds(winnerAxis)]).not.toContain(linkedPlayerId);
+    expect((await runQueryBuilder(builderState)).total).toBe(0);
+
+    // --- reinstated: back, unchanged --------------------------------------
+    const back = await reinstateAwardWinner({
+      rowId: seeded,
+      expectedUpdatedAt: (await winnerRow(seeded))!.updatedAt,
+      adminUserId: actorId,
+    });
+    expect(back.ok, JSON.stringify(back)).toBe(true);
+    expect((await getAwardWinners(awardId)).map((r) => r.id)).toContain(seeded);
+    expect([...await axisPlayerIds(winnerAxis)]).toContain(linkedPlayerId);
+  });
+
+  it('takes a voided Hall of Fame entry out of every public surface', async () => {
+    // Its own player. `getPlayerHonours` returns ONE Hall of Fame row per
+    // player (LIMIT 1 — a person is inducted once), so sharing the suite's
+    // linked player with the Stage 1-3 Hall of Fame tests would leave one of
+    // THEIR active rows answering for this one after the void.
+    const inducteePlayerId = await createPlayer(`${MARKER} Inductee`);
+    const name = `${MARKER} Public Inductee`;
+    const created = await createHallOfFameInductee({
+      name, playerId: inducteePlayerId, category: 'Player', inductedYear: 2001,
+      adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    const rowId = (created as { rowId: number }).rowId;
+
+    const visible = async () => (await listHallOfFame()).some((r) => r.id === rowId);
+    expect(await visible()).toBe(true);
+    expect((await getHallOfFameInductees(2001)).some((r) => r.id === rowId)).toBe(true);
+    expect((await getPlayerHonours(inducteePlayerId)).hallOfFame).not.toBeNull();
+
+    const voided = await voidHallOfFameInductee({
+      rowId,
+      expectedUpdatedAt: (await readHallOfFameInductee(rowId))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'this induction was entered twice',
+    });
+    expect(voided.ok, JSON.stringify(voided)).toBe(true);
+
+    expect(await visible()).toBe(false);
+    expect((await getHallOfFameInductees(2001)).some((r) => r.id === rowId)).toBe(false);
+    expect((await getPlayerHonours(inducteePlayerId)).hallOfFame).toBeNull();
+
+    const back = await reinstateHallOfFameInductee({
+      rowId,
+      expectedUpdatedAt: (await readHallOfFameInductee(rowId))!.updatedAt,
+      adminUserId: actorId,
+    });
+    expect(back.ok, JSON.stringify(back)).toBe(true);
+    expect(await visible()).toBe(true);
+  });
+
+  it('keeps a REMOVED Hall of Fame inductee public: removal is history, not lifecycle (§6.6)', async () => {
+    // The distinction this whole issue turns on. A person inducted and later
+    // formally removed from the Hall of Fame WAS inducted; the site must go on
+    // saying so, with the removal shown. Only status='void' hides a record, and
+    // that says something else entirely: the RECORD should never have existed.
+    const name = `${MARKER} Removed Inductee`;
+    const created = await createHallOfFameInductee({
+      name, category: 'Player', inductedYear: 2002, removedYear: 2012, adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    const rowId = (created as { rowId: number }).rowId;
+
+    const row = (await listHallOfFame()).find((r) => r.id === rowId);
+    expect(row, 'a removed inductee must still be public').toBeDefined();
+    expect(row!.removedYear).toBe(2012);
+    expect((await getHallOfFameInductees(2002)).some((r) => r.id === rowId)).toBe(true);
+    // And the row is ACTIVE: a removal never touches status.
+    expect((await readHallOfFameInductee(rowId))!.status).toBe('active');
+  });
+
+  it('takes a voided honour-team selection out of every public surface', async () => {
+    const teamName = `${MARKER} Public Team`;
+    const created = await createHonourTeamMember({
+      teamName, playerId: linkedPlayerId, position: 'Full Forward', sortOrder: 1,
+      adminUserId: actorId,
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    const rowId = (created as { rowId: number }).rowId;
+
+    expect((await listHonourTeams()).map((t) => t.teamName)).toContain(teamName);
+    expect((await getHonourTeam(teamName)).map((m) => m.id)).toContain(rowId);
+    expect((await getPlayerHonours(linkedPlayerId)).honourTeams.map((t) => t.teamName))
+      .toContain(teamName);
+
+    const voided = await voidHonourTeamMember({
+      rowId,
+      expectedUpdatedAt: (await readHonourTeamMember(rowId))!.updatedAt,
+      adminUserId: actorId,
+      reason: 'this person was never selected in that team',
+    });
+    expect(voided.ok, JSON.stringify(voided)).toBe(true);
+
+    // The whole team disappears here because this was its only member, which
+    // is right: a team of nobody is not a team.
+    expect((await listHonourTeams()).map((t) => t.teamName)).not.toContain(teamName);
+    expect(await getHonourTeam(teamName)).toHaveLength(0);
+    expect((await getPlayerHonours(linkedPlayerId)).honourTeams.map((t) => t.teamName))
+      .not.toContain(teamName);
+
+    const back = await reinstateHonourTeamMember({
+      rowId,
+      expectedUpdatedAt: (await readHonourTeamMember(rowId))!.updatedAt,
+      adminUserId: actorId,
+    });
+    expect(back.ok, JSON.stringify(back)).toBe(true);
+    expect((await getHonourTeam(teamName)).map((m) => m.id)).toContain(rowId);
+  });
+
+  it('stops advertising a season and a team the sitemap can no longer fill (§4.5)', async () => {
+    // `/awards/[slug]/[season]` and `/honour-teams/[slug]` now render nothing
+    // at all when every underlying row is void, so emitting the URL would point
+    // a crawler at an empty page.
+    const previousIndexing = process.env.AFLDB_INDEXING;
+    const previousGate = process.env.AFLDB_BETA_GATE;
+    process.env.AFLDB_INDEXING = 'on';
+    delete process.env.AFLDB_BETA_GATE;
+    try {
+      const awardId = await makeAward('sitemap');
+      const [award] = await admin<{ slug: string }[]>`
+        SELECT slug FROM awards WHERE id = ${awardId}`;
+      const winner = await seedSourceWinner(awardId, `${MARKER}-sitemap-1`);
+      const teamName = `${MARKER} Sitemap Team`;
+      const member = await createHonourTeamMember({
+        teamName, playerId: secondPlayerId, sortOrder: 1, adminUserId: actorId,
+      });
+      expect(member.ok, JSON.stringify(member)).toBe(true);
+      const memberId = (member as { rowId: number }).rowId;
+
+      const urls = async (): Promise<string[]> =>
+        (await sitemap({ id: 1 })).map((entry) => entry.url);
+      const seasonUrl = `/awards/${award.slug}/${season}`;
+
+      const before = await urls();
+      expect(before.some((u) => u.endsWith(seasonUrl))).toBe(true);
+      const teamsBefore = before.filter((u) => u.includes('/honour-teams/')).length;
+      expect(teamsBefore).toBeGreaterThan(0);
+
+      await voidAwardWinner({
+        rowId: winner,
+        expectedUpdatedAt: (await winnerRow(winner))!.updatedAt,
+        adminUserId: actorId,
+        reason: 'wrong recipient',
+      });
+      await voidHonourTeamMember({
+        rowId: memberId,
+        expectedUpdatedAt: (await readHonourTeamMember(memberId))!.updatedAt,
+        adminUserId: actorId,
+        reason: 'never selected',
+      });
+
+      const after = await urls();
+      expect(after.some((u) => u.endsWith(seasonUrl))).toBe(false);
+      expect(after.filter((u) => u.includes('/honour-teams/'))).toHaveLength(teamsBefore - 1);
+    } finally {
+      if (previousIndexing === undefined) delete process.env.AFLDB_INDEXING;
+      else process.env.AFLDB_INDEXING = previousIndexing;
+      if (previousGate !== undefined) process.env.AFLDB_BETA_GATE = previousGate;
+    }
   });
 });

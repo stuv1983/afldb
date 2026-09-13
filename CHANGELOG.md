@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### Awards, Hall of Fame and honour teams gain a correction, voiding and replacement lifecycle (AFLDB-ISSUE-165, ISSUE-156 P5) - 13 September 2026
+
+- Until now an award winner, a Hall of Fame induction and an honour-team selection could only be
+  **created**. Nothing in AFLDB could edit, void, replace or restore one, and there was no
+  domain-specific permission — every awards action shared the single Data Editor capability.
+- All three records now have a full lifecycle: correct the safely-correctable facts, void a record
+  that should never have existed, reinstate one voided in error, and replace a wrong record with
+  the right one. Nothing is ever deleted and nothing is silently overwritten: a void keeps the row
+  and its audit trail, and a wrong *identity* (who won, which award, which season, which team) can
+  only be void-and-replaced, never edited in place. Every mutation writes its audit row in the same
+  transaction as the change itself, so a failure takes both.
+- **A correction now survives the next import.** This is the substance of the change rather than a
+  detail of it. `tools/migration/import_awards.py` reloads every award group from its source on
+  every run, and previously had no knowledge of a human decision — so a correction made today would
+  have been silently reverted the next time that award group was imported. Each lifecycle decision
+  is now recorded durably beside the row and replayed by the importer immediately after the group it
+  belongs to, which also means a decision survives a full database rebuild, where the rows
+  themselves are re-created from scratch.
+- Voided records disappear from the public site everywhere they appeared — award pages, season
+  pages, the Hall of Fame, honour-team pages, player and club honours, the Grid Solver,
+  natural-language search and the sitemap — and reappear if reinstated. A Hall of Fame inductee
+  recorded as *removed* in a given year stays public: that is history, and is kept distinct from
+  "this row was a data-entry error".
+- New **Admin Centre → Data → Awards & honours** surface at `/admin/awards`, with separate sections
+  for award winners, the Hall of Fame and honour teams: filtered lists showing where each record
+  came from and whether it is active or voided, detail pages that show identity facts as read-only
+  with the reason, a two-step preview before any replacement, and each record's own audit history.
+  Admins and above can read it; only a Super Admin can change anything.
+- The three awards forms move out of `/admin/data-editor`, which now carries a pointer to the new
+  home, so there is exactly one place an awards record can be created.
+- Migration `101_awards_honours_lifecycle.sql`. **Not yet deployed** — applied to the test database
+  only; DEV and production are untouched, and no reader sees any of this yet.
+
 ### Brownlow round administration confirmed live in production (AFLDB-ISSUE-155) - 13 September 2026
 
 - Final production browser acceptance confirms Brownlow round administration (Admin Centre →

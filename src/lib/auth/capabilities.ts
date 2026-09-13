@@ -47,6 +47,8 @@ export type Capability =
   | 'data.seasonLists.edit'
   | 'data.fixtures.read'
   | 'data.fixtures.edit'
+  | 'data.awards.read'
+  | 'data.awards.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -116,6 +118,20 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // scores live in matches and stay owned by data.dataEditor / the settle.
   'data.fixtures.read': ADMIN_AND_UP,
   'data.fixtures.edit': SUPER_ADMIN_ONLY,
+  // Awards & honours administration (AFLDB-ISSUE-165 §7). Reading a winner,
+  // an induction or an honour-team selection -- its provenance, its lifecycle
+  // state and the reason it was voided -- widens no boundary an Admin does
+  // not already have: the underlying facts are public, and
+  // operations.audit.read already gives an Admin the full data_edits trail.
+  // Correcting, voiding, reinstating, replacing or creating one becomes a
+  // public fact immediately with no draft stage, so only a Super Admin may
+  // write -- the same reasoning as data.coaches.edit / data.draft.edit /
+  // data.seasonLists.edit / data.fixtures.edit. The three create actions this
+  // domain takes over from /admin/data-editor were data.dataEditor, itself
+  // SUPER_ADMIN_ONLY, so the move narrows the surface without widening the
+  // population (§7).
+  'data.awards.read': ADMIN_AND_UP,
+  'data.awards.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

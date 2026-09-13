@@ -1003,9 +1003,16 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     }
 
     // -- Awards & honours -------------------------------------------------
+    // Every builder in this section reads a canonical honours row as a
+    // FOOTBALL FACT, so every one of them carries `status = 'active'`
+    // (AFLDB-ISSUE-165 §4.2). A voided record is an administrator saying the
+    // record should never have existed; it must not satisfy a clue. Nothing
+    // here reads `hall_of_fame.removed_year`: a removed inductee WAS inducted,
+    // and the grid answers "is a Hall of Fame player" from the induction.
     case 'hall_of_fame_player':
       return sql`p.id IN (SELECT player_id FROM hall_of_fame
-                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
+                            WHERE player_id IS NOT NULL AND status = 'active'
+                              AND link_status_value IN ('unique', 'resolved'))`;
     case 'brownlow_medallist':
       return sql`p.id IN (SELECT player_id FROM brownlow_season_votes WHERE is_winner)`;
 
@@ -1068,14 +1075,16 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     case 'award_winner': {
       const awardId = requireInt(axis, 'award', 'Award');
       return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                            WHERE player_id IS NOT NULL AND status = 'active'
+                              AND link_status_value IN ('unique', 'resolved')
                               AND award_id = ${awardId})`;
     }
     case 'award_winner_min_times': {
       const awardId = requireInt(axis, 'award', 'Award');
       const n = requireInt(axis, 'times', 'Times');
       return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                            WHERE player_id IS NOT NULL AND status = 'active'
+                              AND link_status_value IN ('unique', 'resolved')
                               AND award_id = ${awardId}
                            GROUP BY player_id HAVING count(*) >= ${n})`;
     }
@@ -1083,33 +1092,37 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const awardId = requireInt(axis, 'award', 'Award');
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT player_id FROM award_winners
-                            WHERE player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
+                            WHERE player_id IS NOT NULL AND status = 'active'
+                              AND link_status_value IN ('unique', 'resolved')
                               AND award_id = ${awardId} AND season BETWEEN ${lo} AND ${hi})`;
     }
     case 'under_22_selection':
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = '22-under-22'
-                             AND w.player_id IS NOT NULL
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
                              AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'all_australian_captain':
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian' AND w.is_captain
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'all_australian_position': {
       const position = requireParam(axis, 'position', 'Position');
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian' AND w.position = ${position}
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     }
     case 'club_best_and_fairest_min_times': {
       const n = requireInt(axis, 'times', 'Times');
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.category = 'club_best_and_fairest'
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved')
                            GROUP BY w.player_id HAVING count(*) >= ${n})`;
     }
     case 'best_and_fairest_multi_club': {
@@ -1122,7 +1135,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.category = 'club_best_and_fairest'
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved')
                            GROUP BY w.player_id HAVING count(DISTINCT w.award_id) >= ${n})`;
     }
     case 'brownlow_finish_exact':
@@ -1189,14 +1203,16 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian' AND w.position = ANY(${positions})
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     }
     case 'all_australian_squad_in_season': {
       const seasonYear = requireInt(axis, 'season', 'Season');
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug IN ('all-australian-squad', 'all-australian') AND w.season = ${seasonYear}
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     }
     // The final team (slug all-australian) versus the squad (slug
     // all-australian-squad) are distinct awards and stay distinct here.
@@ -1204,7 +1220,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian'
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'all_australian_team_min_times': {
       // DISTINCT seasons, not rows: the 1984 team carries club and state
       // rows for the same player, and both are one selection.
@@ -1212,7 +1229,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian'
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved')
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved')
                            GROUP BY w.player_id HAVING count(DISTINCT w.season) >= ${n})`;
     }
     case 'all_australian_team_between_seasons': {
@@ -1220,7 +1238,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       return sql`p.id IN (SELECT w.player_id FROM award_winners w
                             JOIN awards a ON a.id = w.award_id
                            WHERE a.slug = 'all-australian' AND w.season BETWEEN ${lo} AND ${hi}
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     }
     case 'all_australian_squad_member':
       // A squad row, or a final-team row in a season that had a squad
@@ -1232,8 +1251,10 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                                   OR (a.slug = 'all-australian'
                                       AND w.season >= (SELECT min(w2.season) FROM award_winners w2
                                                          JOIN awards a2 ON a2.id = w2.award_id
-                                                        WHERE a2.slug = 'all-australian-squad')))
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                                                        WHERE a2.slug = 'all-australian-squad'
+                                                          AND w2.status = 'active')))
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
     case 'best_and_fairest_in_premiership_season':
       // The club the player represented that season (player_club_season_stats)
       // won the flag (club_seasons.is_premier) in the season of the B&F.
@@ -1242,7 +1263,8 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
                             JOIN player_club_season_stats pcs ON pcs.player_id = w.player_id AND pcs.season = w.season
                             JOIN club_seasons cs ON cs.season = pcs.season AND cs.club_id = pcs.club_id
                            WHERE a.category = 'club_best_and_fairest' AND cs.is_premier
-                             AND w.player_id IS NOT NULL AND w.link_status_value IN ('unique', 'resolved'))`;
+                             AND w.player_id IS NOT NULL AND w.status = 'active'
+                             AND w.link_status_value IN ('unique', 'resolved'))`;
 
     // -- Draft & recruitment -- draft_picks_link_ck (migration 019)
     // already guarantees link_status_value IN ('unique','resolved')

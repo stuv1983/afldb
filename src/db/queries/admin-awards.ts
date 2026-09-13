@@ -8,7 +8,7 @@ import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { MANUAL_SOURCE_KEY, resolvePlayerIdentity } from '@/db/queries/player-identity';
 import {
-  awardPath, awardSeasonPath, clubPath, honourTeamPath, playerPath,
+  awardPath, awardSeasonPath, clubPath, honourTeamPath, playerPath, seasonPath,
 } from '@/lib/format';
 import { honourTeamSlug } from '@/lib/slugs';
 
@@ -362,7 +362,13 @@ export type HonourTeamMemberRow = {
   updatedAt: string;
 };
 
-const AWARD_WINNER_COLUMNS = `
+/**
+ * Columns and FROM are separate so a list and its `count(*)` share one join
+ * shape: a total that counted a different set of rows from the page it labels
+ * is worse than no total. `<X>_COLUMNS` remains columns-plus-FROM so every
+ * single-row read below still reads `SELECT ${COLUMNS} WHERE …`.
+ */
+const AWARD_WINNER_SELECT = `
   w.id::int AS id, w.award_id AS "awardId", a.slug AS "awardSlug", a.name AS "awardName",
   w.season::int AS season, w.player_id AS "playerId", p.slug AS "playerSlug",
   w.player_name_raw AS "playerNameRaw", w.link_status_value::text AS "linkStatus",
@@ -373,14 +379,18 @@ const AWARD_WINNER_COLUMNS = `
   w.note AS note, w.sort_order::int AS "sortOrder",
   w.source_id::int AS "sourceId", s.key AS "sourceKey",
   w.source_record_id AS "sourceRecordId",
-  w.status AS status, w.status_reason AS "statusReason", w.updated_at::text AS "updatedAt"
+  w.status AS status, w.status_reason AS "statusReason", w.updated_at::text AS "updatedAt"`;
+
+const AWARD_WINNER_FROM = `
   FROM award_winners w
   JOIN awards a ON a.id = w.award_id
   LEFT JOIN players p ON p.id = w.player_id
   LEFT JOIN clubs c ON c.id = w.club_id
   LEFT JOIN sources s ON s.id = w.source_id`;
 
-const HALL_OF_FAME_COLUMNS = `
+const AWARD_WINNER_COLUMNS = AWARD_WINNER_SELECT + AWARD_WINNER_FROM;
+
+const HALL_OF_FAME_SELECT = `
   h.id::int AS id, h.name AS name, h.player_id AS "playerId", p.slug AS "playerSlug",
   h.link_status_value::text AS "linkStatus", h.category AS category,
   h.inducted_year::int AS "inductedYear", h.is_legend AS "isLegend",
@@ -388,56 +398,151 @@ const HALL_OF_FAME_COLUMNS = `
   h.state AS state, h.playing_career AS "playingCareer",
   h.removed_year::int AS "removedYear", h.notes AS notes,
   h.source_id::int AS "sourceId", s.key AS "sourceKey",
-  h.status AS status, h.status_reason AS "statusReason", h.updated_at::text AS "updatedAt"
+  h.status AS status, h.status_reason AS "statusReason", h.updated_at::text AS "updatedAt"`;
+
+const HALL_OF_FAME_FROM = `
   FROM hall_of_fame h
   LEFT JOIN players p ON p.id = h.player_id
   LEFT JOIN sources s ON s.id = h.source_id`;
 
-const HONOUR_TEAM_COLUMNS = `
+const HALL_OF_FAME_COLUMNS = HALL_OF_FAME_SELECT + HALL_OF_FAME_FROM;
+
+const HONOUR_TEAM_SELECT = `
   m.id::int AS id, m.team_name AS "teamName", m.player_id AS "playerId", p.slug AS "playerSlug",
   m.player_name_raw AS "playerNameRaw", m.link_status_value::text AS "linkStatus",
   m.position AS position, m.role AS role, m.club_name_raw AS "clubNameRaw",
   m.sort_order::int AS "sortOrder", m.note AS note,
   m.source_id::int AS "sourceId", s.key AS "sourceKey",
-  m.status AS status, m.status_reason AS "statusReason", m.updated_at::text AS "updatedAt"
+  m.status AS status, m.status_reason AS "statusReason", m.updated_at::text AS "updatedAt"`;
+
+const HONOUR_TEAM_FROM = `
   FROM honour_team_members m
   LEFT JOIN players p ON p.id = m.player_id
   LEFT JOIN sources s ON s.id = m.source_id`;
 
+const HONOUR_TEAM_COLUMNS = HONOUR_TEAM_SELECT + HONOUR_TEAM_FROM;
+
 // --- admin reads ---------------------------------------------------------
 
-export type HonourListFilter = {
-  /** Defaults to active-only; an admin reviewing "what did we void" opts in. */
-  includeVoided?: boolean;
-  search?: string | null;
-  limit?: number;
-  offset?: number;
-};
+/**
+ * Three states, not a boolean: an administrator reviewing "what did we void,
+ * and why" wants the voided rows ALONE, not the whole table with them mixed
+ * back in. `active` is always the default, so no list ever opens showing
+ * records the public site has stopped repeating.
+ */
+export type HonourStatusFilter = 'active' | 'void' | 'all';
 
-function listBounds(filter: HonourListFilter): { limit: number; offset: number } {
-  const limit = Math.min(Math.max(Number(filter.limit ?? 100), 1), 500);
-  const offset = Math.max(Number(filter.offset ?? 0), 0);
-  return { limit, offset };
+/**
+ * Who owns the row's fields. `source` is a row an importer reloads — its
+ * correctable metadata needs a durable `data_overrides` delta or the next
+ * reload reverts it. `manual` is an administrator's own row: nothing reloads
+ * its fields. This is the distinction §6.3 turns on, so it is a first-class
+ * filter and a first-class column, not a detail-page footnote.
+ */
+export type HonourProvenance = 'manual' | 'source';
+
+export function isHonourStatusFilter(value: unknown): value is HonourStatusFilter {
+  return value === 'active' || value === 'void' || value === 'all';
 }
 
+export function isHonourProvenance(value: unknown): value is HonourProvenance {
+  return value === 'manual' || value === 'source';
+}
+
+/** Whether a row's own source key makes it an administrator's row. */
+export function provenanceOf(sourceKey: string | null): HonourProvenance {
+  return isManual(sourceKey) ? 'manual' : 'source';
+}
+
+export type HonourPage<TRow> = { rows: TRow[]; total: number };
+
+export type HonourListFilter = {
+  status?: HonourStatusFilter;
+  provenance?: HonourProvenance | null;
+  search?: string | null;
+  page?: number;
+  pageSize?: number;
+};
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
+function listBounds(filter: HonourListFilter): { limit: number; offset: number } {
+  const size = Number(filter.pageSize ?? DEFAULT_PAGE_SIZE);
+  const limit = Number.isInteger(size) ? Math.min(Math.max(size, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
+  const requested = Number(filter.page ?? 1);
+  const page = Number.isInteger(requested) && requested > 0 ? requested : 1;
+  return { limit, offset: (page - 1) * limit };
+}
+
+/**
+ * The two predicates every domain shares, as bound parameters $1 and $2.
+ *
+ * `$1` is the status filter ('all' matches everything); `$2` is the
+ * provenance filter (NULL matches everything), compared against the row's own
+ * source key rather than against a list of source names, so a new importer
+ * needs no change here. A row with NO source at all reads as source-owned,
+ * which is what it is: `manual_admin_edit` is a source, and its absence is
+ * not a claim of administrative ownership.
+ */
+function sharedHonourPredicate(alias: string): string {
+  return `($1::text = 'all' OR ${alias}.status = $1::text)
+        AND ($2::text IS NULL OR ($2::text = 'manual') = (COALESCE(s.key, '') = $3::text))`;
+}
+
+/** Every list filter binds as one of these; nothing here is ever spliced. */
+type BoundValue = string | number | boolean | null;
+
+const sharedHonourValues = (filter: HonourListFilter): BoundValue[] => [
+  filter.status ?? 'active',
+  filter.provenance ?? null,
+  MANUAL_SOURCE_KEY,
+];
+
+async function pageOf<TRow>(
+  select: string, from: string, where: string, order: string,
+  values: BoundValue[], limit: number, offset: number,
+): Promise<HonourPage<TRow>> {
+  const [rows, totals] = await Promise.all([
+    sql.unsafe(
+      `SELECT ${select} ${from} WHERE ${where} ORDER BY ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      [...values, limit, offset],
+    ) as unknown as Promise<TRow[]>,
+    sql.unsafe(
+      `SELECT count(*)::int AS total ${from} WHERE ${where}`, values,
+    ) as unknown as Promise<{ total: number }[]>,
+  ]);
+  return { rows, total: totals[0]?.total ?? 0 };
+}
+
+export type AwardWinnerListFilter = HonourListFilter & {
+  awardSlug?: string | null;
+  season?: number | null;
+  clubSlug?: string | null;
+};
+
 export async function listAwardWinners(
-  filter: HonourListFilter & { awardSlug?: string | null; season?: number | null } = {},
-): Promise<AwardWinnerRow[]> {
+  filter: AwardWinnerListFilter = {},
+): Promise<HonourPage<AwardWinnerRow>> {
   const { limit, offset } = listBounds(filter);
-  const search = (filter.search ?? '').trim() || null;
-  return await sql.unsafe(
-    `SELECT ${AWARD_WINNER_COLUMNS}
-      WHERE ($1::boolean OR w.status <> 'void')
-        AND ($2::text IS NULL OR a.slug = $2::text)
-        AND ($3::int IS NULL OR w.season = $3::int)
-        AND ($4::text IS NULL OR w.player_name_raw ILIKE '%' || $4::text || '%')
-      ORDER BY a.slug, w.season DESC NULLS LAST, w.sort_order NULLS LAST, w.id
-      LIMIT $5 OFFSET $6`,
+  return pageOf<AwardWinnerRow>(
+    AWARD_WINNER_SELECT, AWARD_WINNER_FROM,
+    `${sharedHonourPredicate('w')}
+        AND ($4::text IS NULL OR a.slug = $4::text)
+        AND ($5::int IS NULL OR w.season = $5::int)
+        AND ($6::text IS NULL OR c.slug = $6::text)
+        AND ($7::text IS NULL OR w.player_name_raw ILIKE '%' || $7::text || '%'
+             OR p.display_name ILIKE '%' || $7::text || '%')`,
+    'a.slug, w.season DESC NULLS LAST, w.sort_order NULLS LAST, w.id',
     [
-      filter.includeVoided ?? false, filter.awardSlug ?? null, filter.season ?? null,
-      search, limit, offset,
+      ...sharedHonourValues(filter),
+      filter.awardSlug ?? null,
+      filter.season ?? null,
+      filter.clubSlug ?? null,
+      (filter.search ?? '').trim() || null,
     ],
-  ) as unknown as AwardWinnerRow[];
+    limit, offset,
+  );
 }
 
 export async function readAwardWinner(id: number): Promise<AwardWinnerRow | null> {
@@ -447,20 +552,34 @@ export async function readAwardWinner(id: number): Promise<AwardWinnerRow | null
   return rows[0] ?? null;
 }
 
+export type HallOfFameListFilter = HonourListFilter & {
+  inductedYear?: number | null;
+  category?: string | null;
+  /** `true` = Legends only, `false` = everyone else, absent = both. */
+  isLegend?: boolean | null;
+};
+
 export async function listHallOfFame(
-  filter: HonourListFilter & { inductedYear?: number | null } = {},
-): Promise<HallOfFameRow[]> {
+  filter: HallOfFameListFilter = {},
+): Promise<HonourPage<HallOfFameRow>> {
   const { limit, offset } = listBounds(filter);
-  const search = (filter.search ?? '').trim() || null;
-  return await sql.unsafe(
-    `SELECT ${HALL_OF_FAME_COLUMNS}
-      WHERE ($1::boolean OR h.status <> 'void')
-        AND ($2::int IS NULL OR h.inducted_year = $2::int)
-        AND ($3::text IS NULL OR h.name ILIKE '%' || $3::text || '%')
-      ORDER BY h.inducted_year DESC NULLS LAST, h.name, h.id
-      LIMIT $4 OFFSET $5`,
-    [filter.includeVoided ?? false, filter.inductedYear ?? null, search, limit, offset],
-  ) as unknown as HallOfFameRow[];
+  return pageOf<HallOfFameRow>(
+    HALL_OF_FAME_SELECT, HALL_OF_FAME_FROM,
+    `${sharedHonourPredicate('h')}
+        AND ($4::int IS NULL OR h.inducted_year = $4::int)
+        AND ($5::text IS NULL OR h.category = $5::text)
+        AND ($6::boolean IS NULL OR h.is_legend = $6::boolean)
+        AND ($7::text IS NULL OR h.name ILIKE '%' || $7::text || '%')`,
+    'h.inducted_year DESC NULLS LAST, h.name, h.id',
+    [
+      ...sharedHonourValues(filter),
+      filter.inductedYear ?? null,
+      filter.category ?? null,
+      filter.isLegend ?? null,
+      (filter.search ?? '').trim() || null,
+    ],
+    limit, offset,
+  );
 }
 
 export async function readHallOfFameInductee(id: number): Promise<HallOfFameRow | null> {
@@ -470,20 +589,32 @@ export async function readHallOfFameInductee(id: number): Promise<HallOfFameRow 
   return rows[0] ?? null;
 }
 
+export type HonourTeamListFilter = HonourListFilter & {
+  teamName?: string | null;
+  /** `true` = linked to a player, `false` = unlinked, absent = both. */
+  linked?: boolean | null;
+};
+
 export async function listHonourTeamMembers(
-  filter: HonourListFilter & { teamName?: string | null } = {},
-): Promise<HonourTeamMemberRow[]> {
+  filter: HonourTeamListFilter = {},
+): Promise<HonourPage<HonourTeamMemberRow>> {
   const { limit, offset } = listBounds(filter);
-  const search = (filter.search ?? '').trim() || null;
-  return await sql.unsafe(
-    `SELECT ${HONOUR_TEAM_COLUMNS}
-      WHERE ($1::boolean OR m.status <> 'void')
-        AND ($2::text IS NULL OR m.team_name = $2::text)
-        AND ($3::text IS NULL OR m.player_name_raw ILIKE '%' || $3::text || '%')
-      ORDER BY m.team_name, m.sort_order, m.id
-      LIMIT $4 OFFSET $5`,
-    [filter.includeVoided ?? false, filter.teamName ?? null, search, limit, offset],
-  ) as unknown as HonourTeamMemberRow[];
+  return pageOf<HonourTeamMemberRow>(
+    HONOUR_TEAM_SELECT, HONOUR_TEAM_FROM,
+    `${sharedHonourPredicate('m')}
+        AND ($4::text IS NULL OR m.team_name = $4::text)
+        AND ($5::boolean IS NULL OR (m.player_id IS NOT NULL) = $5::boolean)
+        AND ($6::text IS NULL OR m.player_name_raw ILIKE '%' || $6::text || '%'
+             OR p.display_name ILIKE '%' || $6::text || '%')`,
+    'm.team_name, m.sort_order, m.id',
+    [
+      ...sharedHonourValues(filter),
+      filter.teamName ?? null,
+      filter.linked ?? null,
+      (filter.search ?? '').trim() || null,
+    ],
+    limit, offset,
+  );
 }
 
 export async function readHonourTeamMember(id: number): Promise<HonourTeamMemberRow | null> {
@@ -491,6 +622,94 @@ export async function readHonourTeamMember(id: number): Promise<HonourTeamMember
     `SELECT ${HONOUR_TEAM_COLUMNS} WHERE m.id = $1`, [id],
   ) as unknown as HonourTeamMemberRow[];
   return rows[0] ?? null;
+}
+
+// --- filter vocabularies and the landing page's counts -------------------
+
+export type HonourCounts = { active: number; void: number };
+
+/**
+ * One grouped count per table, for the landing page's three cards.
+ *
+ * Deliberately NOT filtered to active: this is the one admin surface whose
+ * job is to say how many records the lifecycle has taken out of the public
+ * site, so the void figure IS the number being reported.
+ */
+export async function honourLifecycleCounts(): Promise<Record<HonourTable, HonourCounts>> {
+  const [winners, inductees, members] = await Promise.all([
+    sql<{ status: HonourStatus; n: number }[]>`
+      SELECT status, count(*)::int AS n FROM award_winners GROUP BY status`,
+    sql<{ status: HonourStatus; n: number }[]>`
+      SELECT status, count(*)::int AS n FROM hall_of_fame GROUP BY status`,
+    sql<{ status: HonourStatus; n: number }[]>`
+      SELECT status, count(*)::int AS n FROM honour_team_members GROUP BY status`,
+  ]);
+  const fold = (rows: { status: HonourStatus; n: number }[]): HonourCounts => ({
+    active: rows.find((r) => r.status === 'active')?.n ?? 0,
+    void: rows.find((r) => r.status === 'void')?.n ?? 0,
+  });
+  return {
+    award_winners: fold(winners),
+    hall_of_fame: fold(inductees),
+    honour_team_members: fold(members),
+  };
+}
+
+/**
+ * Every honour-team name the table holds, VOIDED ROWS INCLUDED.
+ *
+ * Not `listHonourTeams()` from the public module: that one is now active-only
+ * (§4.1), so a team whose every member had been voided would vanish from the
+ * admin filter that is the only way to find them again.
+ */
+export async function listHonourTeamNamesForAdmin(): Promise<string[]> {
+  const rows = await sql<{ teamName: string }[]>`
+    SELECT DISTINCT team_name AS "teamName" FROM honour_team_members ORDER BY team_name`;
+  return rows.map((r) => r.teamName);
+}
+
+/**
+ * One honour-team row's durable key, for the admin detail page to SHOW.
+ *
+ * The award-winner and Hall of Fame keys are pure functions of columns the row
+ * already carries, so a page computes them itself. This one is not: a LINKED
+ * selection's key half is the player's durable identity (`afltables:<path>`,
+ * else a minted `manual_admin_edit:<token>`), which only `resolvePlayerIdentity`
+ * knows how to derive — and deriving it any other way here would be a second
+ * implementation of the rule that decides which row is which, which is the
+ * ISSUE-025 defect migration 059 exists to prevent.
+ *
+ * Returns null for a row whose key cannot be formed at all. That is the same
+ * condition `lockHonourTeamMember()` refuses on, so a page that shows null is
+ * showing the truth: this record cannot be administered until its provenance
+ * or its player identity is reconciled.
+ */
+export async function readHonourTeamEntityKey(
+  row: Pick<HonourTeamMemberRow, 'sourceKey' | 'teamName' | 'playerId' | 'playerNameRaw'>,
+): Promise<string | null> {
+  const { sourceKey, teamName, playerId, playerNameRaw } = row;
+  if (sourceKey === null || carriesKeySeparator(teamName)) return null;
+  if (playerId === null) {
+    return honourTeamEntityKey(sourceKey, teamName, honourTeamPlayerIdentity(null, playerNameRaw));
+  }
+  return withImportConnection(async (importSql) => {
+    const key = await importSql.begin(async (tx) => {
+      const resolved = await resolvePlayerIdentity(tx as Tx, playerId);
+      if (!resolved.ok || resolved.identity === null) return null;
+      return honourTeamEntityKey(
+        sourceKey, teamName, honourTeamPlayerIdentity(resolved.identity, playerNameRaw),
+      );
+    });
+    return key as string | null;
+  });
+}
+
+/** Hall of Fame categories, voided rows included, for the same reason. */
+export async function listHallOfFameCategoriesForAdmin(): Promise<string[]> {
+  const rows = await sql<{ category: string }[]>`
+    SELECT DISTINCT category FROM hall_of_fame
+     WHERE category IS NOT NULL ORDER BY category`;
+  return rows.map((r) => r.category);
 }
 
 export type HonourOverrideRow = {
@@ -502,11 +721,22 @@ export type HonourOverrideRow = {
   updatedAt: string;
 };
 
-/** The durable records themselves, for the admin history panel and the tests. */
+/**
+ * The durable records themselves, for the admin history panel and the tests.
+ *
+ * ON THE IMPORT CONNECTION, not the application pool. `data_overrides` has no
+ * `afldb_meta.grant_app_read()` — migration 073 grants SELECT to `afldb_import`
+ * and to nobody else, deliberately, because the table is not application data.
+ * Application reads have been fail-closed since migration 039, so reading this
+ * on `sql` works for a database owner (which is what the integration suite
+ * connects as) and fails closed for the running application, where it matters.
+ * `readDraftOverrides()` in `admin-draft.ts` reaches the same table the same
+ * way for the same reason.
+ */
 export async function readHonourOverrides(
   entityType: HonourTable, entityKey?: string,
 ): Promise<HonourOverrideRow[]> {
-  return sql<HonourOverrideRow[]>`
+  return withImportConnection((importSql) => importSql<HonourOverrideRow[]>`
     SELECT entity_type AS "entityType", entity_key AS "entityKey",
            field_group AS "fieldGroup", override_values AS "overrideValues",
            is_active AS "isActive", updated_at::text AS "updatedAt"
@@ -514,7 +744,7 @@ export async function readHonourOverrides(
      WHERE entity_type = ${entityType}
        AND (${entityKey ?? null}::text IS NULL OR entity_key = ${entityKey ?? null}::text)
      ORDER BY entity_key, field_group
-  `;
+  `);
 }
 
 // --- the durable record --------------------------------------------------
@@ -612,29 +842,51 @@ async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void> {
 
 // --- revalidation paths (computed server-side) ---------------------------
 
+/**
+ * Every CACHED public page a lifecycle change can move, named from the row's
+ * own ids (§11). Widened in Stage 4 beyond §11's original list, because
+ * Stage 4's own status filters are what made the extra pages movable:
+ *
+ *   - `/awards` is ISR 24h and renders each award's winner and season COUNTS,
+ *     both of which now exclude voided rows;
+ *   - `/seasons/<year>` is ISR 1h and renders that season's club
+ *     best-and-fairest winners and its Hall of Fame inductees;
+ *   - `/sitemap.xml` enumerates award seasons and honour-team names, and
+ *     §4.5 now drops a season or a team whose every row is void.
+ *
+ * `/hall-of-fame` is `force-dynamic` and needs no invalidation; it is listed
+ * so the set reads as the complete consumer list rather than a filtered one.
+ */
 function awardWinnerPaths(row: {
   awardSlug: string; season: number | null; playerId: number | null;
   playerSlug: string | null; clubSlug: string | null;
 }): string[] {
-  const paths = [awardPath(row.awardSlug)];
-  if (row.season !== null) paths.push(awardSeasonPath(row.awardSlug, row.season));
+  const paths = ['/awards', awardPath(row.awardSlug), '/sitemap.xml'];
+  if (row.season !== null) {
+    paths.push(awardSeasonPath(row.awardSlug, row.season), seasonPath(row.season));
+  }
   if (row.playerId !== null && row.playerSlug) paths.push(playerPath(row.playerSlug, row.playerId));
   if (row.clubSlug) paths.push(clubPath(row.clubSlug));
   return [...new Set(paths)];
 }
 
-function hallOfFamePaths(row: { playerId: number | null; playerSlug: string | null }): string[] {
+function hallOfFamePaths(row: {
+  playerId: number | null; playerSlug: string | null; inductedYear?: number | null;
+}): string[] {
   const paths = ['/hall-of-fame'];
+  if (row.inductedYear !== null && row.inductedYear !== undefined) {
+    paths.push(seasonPath(row.inductedYear));
+  }
   if (row.playerId !== null && row.playerSlug) paths.push(playerPath(row.playerSlug, row.playerId));
-  return paths;
+  return [...new Set(paths)];
 }
 
 function honourTeamPaths(row: {
   teamName: string; playerId: number | null; playerSlug: string | null;
 }): string[] {
-  const paths = [honourTeamPath(honourTeamSlug(row.teamName))];
+  const paths = [honourTeamPath(honourTeamSlug(row.teamName)), '/sitemap.xml'];
   if (row.playerId !== null && row.playerSlug) paths.push(playerPath(row.playerSlug, row.playerId));
-  return paths;
+  return [...new Set(paths)];
 }
 
 // --- the shared edit core (§6.3) -----------------------------------------
