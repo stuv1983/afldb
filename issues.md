@@ -7,7 +7,36 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 2 tracked here — `-155`, `-156`.
+**Open issues:** 1 tracked here — `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-155 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY, NO
+     DATABASE MUTATION THIS SESSION): PROD closeout only. The PROD leg was the sole remaining
+     scope after the 2026-09-11 narrowing (Phases D-I already transferred by reference to
+     AFLDB-ISSUE-156). Preflight proven before the browser gate: PROD HEAD `0955db3` with
+     implementation `3eb6739` (`codex/issue-155-admin-overhaul`) a confirmed ancestor; migration
+     `094_brownlow_admin_workflow.sql` applied, migrations 001-098 applied, 0 pending; privilege
+     shape on `brownlow_vote_entry_state` / `brownlow_season_authority` verified as designed
+     (afldb_app SELECT only; afldb_import SELECT/INSERT/UPDATE/DELETE, no TRUNCATE; afldb_auth no
+     grants; PUBLIC no grants); live reconciliation `brownlow_round_votes.match_id IS NULL` = 0;
+     `/api/health` HTTP 200 (`{"status":"ok","database":"ok","latencyMs":1}`). Live PROD browser
+     acceptance against `https://beta.afldb.com` all PASS: Super Admin nav exposes Brownlow in
+     Data; `/admin/brownlow` season list and `/admin/brownlow/2026` round grid render correctly;
+     `/admin/brownlow/2026/1` match editor renders with working duplicate-prevention; Save Draft
+     (the approved mutation path) exercised on match #17795 (Sydney v Carlton, 2026 Round 1: 3
+     votes Chad Warner, 2 Errol Gulden, 1 Patrick Cripps); public `/brownlow` and `/brownlow/2026`
+     rendered unchanged before and after; Admin capability boundary PASS (Finalise/Void/Publish
+     render disabled with the exact "Super Admin only" reasons); Contributor capability boundary
+     PASS (server-side redirect to `/admin/upload` before any Brownlow markup); responsive
+     1440x900 and 375x812 PASS; only console/network noise was a pre-existing unrelated
+     Cloudflare Insights beacon blocked by CSP. Match #17795 is deliberately left at
+     status `draft`, revision 1, with the test selections: `AFLDB-ISSUE-155.md` §27.7 defines
+     `draft` as having zero public effect, the DEV acceptance precedent used no cleanup for the
+     same reason, and no supported transition from `draft` back to "not entered" exists (only
+     `draft -> draft` via `saveDraft` and `draft -> final` via `finaliseMatch` are defined); no
+     Finalise, Correct, Void or Publish action was performed. See `issues.md` Resolution
+     (2026-09-13); runbook `AFLDB-ISSUE-155.md` stays at the repository root, unmoved, per the
+     `AFLDB-ISSUE-144.md` precedent for a root-level runbook. Removed from the open issues list
+     below; 2 -> 1. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-152 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO
      DEPLOY, NO DATABASE MUTATION THIS SESSION): closeout only. The Phase F checkpoint
@@ -1123,7 +1152,24 @@ created, reopened, resolved, or materially reclassified.
 
 | Issue | Severity | Area | Current state |
 |---|---|---|---|
-| `AFLDB-ISSUE-155` | Medium | Admin / Auth / Data management / Acquisition / Operations | **OPEN — PROD CLOSEOUT ONLY.** Phases A (capability policy + Admin Centre IA), B (Super Admin user lifecycle), C1 and C2 (Brownlow administration, migration `094`) are implemented, committed (`3eb6739`, `e27e985`) and **MERGED** — branch `codex/issue-155-admin-overhaul` (tip `12b4338`) is an ancestor of `main`. **DEV DEPLOYED AND ACCEPTED 2026-09-11:** all twelve §27.20 preflights green on `afldb_dev` itself, migrations 092/093/094 applied (94/94, 0 pending), `db:privileges` reconciled and independently re-verified, pre-deploy `_test` suites green (44/44, 32/32, 35/36 with only the known `AFLDB-ISSUE-138` drift), live-DB reconciliation clean, and full browser acceptance on the deployed service; §27.27 is fully PASS A–K. The `PROMOTION_CONTRACT` follow-up (§27.28 / §27.22, the `AFLDB-ISSUE-151` promotion-lineage item) is **DONE and committed** — `brownlow_vote_entry_state` and `brownlow_season_authority` are declared in `tools/db/promotion-inventory.ts`; do NOT use `grant_import_write()` for either. **Scope narrowed 2026-09-11: Phases D–I transferred by reference to `AFLDB-ISSUE-156`.** PROD is untouched and no PROD command has been given or run. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098 (including this issue's own 092/093/094), applied 2026-09-12, and the production host checkout was observed at `0955db3`. Whether this issue's own PROD leg ran was not reconstructed as part of the `AFLDB-ISSUE-137` investigation; do not infer full acceptance from the migration alone. | **Operator:** the PROD leg only — the equivalent §27.21 sequence against production (preflights, migration `094` plus the same 092/093 prerequisite check against PROD’s own ledger, privilege reconciliation, deploy, live reconciliation, browser acceptance), plus whatever the `AFLDB-ISSUE-151` promotion/restore-lineage pipeline additionally requires on a production host. Plan and execute it as its own deliberate session; it is not a blocker for `AFLDB-ISSUE-156` or any of its children. Runbook `AFLDB-ISSUE-155.md` §27. |
+<!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-155` is **Resolved** and is NO LONGER an open issue. The
+     PROD leg (the only remaining scope after the 2026-09-11 narrowing) is closed on the
+     operator's final live PROD browser acceptance gate against `https://beta.afldb.com`:
+     PROD HEAD `0955db3` with implementation `3eb6739` a confirmed ancestor; migration `094`
+     applied, migrations 001–098 applied, 0 pending; privilege shape on
+     `brownlow_vote_entry_state` / `brownlow_season_authority` verified as designed;
+     `brownlow_round_votes.match_id IS NULL` = 0; `/api/health` PASS. All required browser
+     journeys PASS — Super Admin nav/season-list/round-editor, Save Draft on match #17795
+     (Sydney v Carlton, 2026 Round 1), Admin and Contributor capability boundaries, public
+     regression, responsive 1440×900/375×812 — with only a pre-existing unrelated Cloudflare
+     CSP beacon as console noise. Match #17795 is left at `draft`/revision 1 with the test
+     selections, accepted intentionally (draft has no public effect per §27.7; no supported
+     draft → "not entered" transition exists; no Finalise/Correct/Void/Publish performed).
+     Phases D–I remain transferred by reference to `AFLDB-ISSUE-156` and were never this
+     issue's blocker. Full record: the `AFLDB-ISSUE-155` entry above, *Resolution
+     (2026-09-13)*. Runbook `AFLDB-ISSUE-155.md` stays at the repository root (unmoved,
+     per the `AFLDB-ISSUE-144.md` precedent). Removed from this table and from
+     `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **P4–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
 <!-- RETIRED 2026-09-12 — `AFLDB-ISSUE-160` (Draft administration, ISSUE-156 P3b), `AFLDB-ISSUE-161`
      (Season list administration, P3c), `AFLDB-ISSUE-162` (Fixture / season schedule administration,
@@ -22093,7 +22139,8 @@ Full closing record: `issues/closed/AFLDB-ISSUE-153.md` §11.16.
 
 ## AFLDB-ISSUE-155 — Admin / Super Admin overhaul
 
-**Status:** Open — **PROD CLOSEOUT ONLY.** Scope narrowed 2026-09-11: Phases D–I are transferred by reference to `AFLDB-ISSUE-156`, and this issue now owns only the PROD closeout of A/B/C1/C2 — all of which are committed, merged into `main` (branch `codex/issue-155-admin-overhaul`, tip `12b4338`, is an ancestor of `main`), DEV-deployed and DEV-accepted on 2026-09-11. The `PROMOTION_CONTRACT` follow-up (§27.28 / §27.22) is DONE and committed. As recorded through 2026-09-11: Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented, committed at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` (branch `codex/issue-155-admin-overhaul`), and **DEPLOYED TO DEV, fully accepted** (migrations 092/093/094 applied, privileges reconciled, schema/privilege verified, pre-deploy `_test` suites green, live-DB reconciliation clean, Super Admin/Admin/Contributor capability-boundary and Save Draft browser acceptance all PASS on the deployed service — full record below). **DEV is COMPLETE. PROD is PENDING** — not started, not scheduled in this entry. **Correction (2026-09-12): this issue's own migrations (092–094) are among the migrations now confirmed applied to current `afldb_prod` on 2026-09-12** (the ledger shows 092–098 applied that day), and the production host checkout was observed at `0955db3`. Whether this issue's own PROD leg (§27.21: privilege reconciliation, deploy, live reconciliation, browser acceptance) was actually run was not reconstructed as part of the `AFLDB-ISSUE-137` investigation — do not infer it from the migration alone. Phases D–I not started.
+**Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+As it stood earlier in this session (retained): Open — **PROD CLOSEOUT ONLY.** Scope narrowed 2026-09-11: Phases D–I are transferred by reference to `AFLDB-ISSUE-156`, and this issue now owns only the PROD closeout of A/B/C1/C2 — all of which are committed, merged into `main` (branch `codex/issue-155-admin-overhaul`, tip `12b4338`, is an ancestor of `main`), DEV-deployed and DEV-accepted on 2026-09-11. The `PROMOTION_CONTRACT` follow-up (§27.28 / §27.22) is DONE and committed. As recorded through 2026-09-11: Phases A and B complete and validated; Phase C (C1 + C2, Brownlow administration) implemented, committed at `3eb6739f1ca13e63b43beb20bce5ff5ce5ad003d` (branch `codex/issue-155-admin-overhaul`), and **DEPLOYED TO DEV, fully accepted** (migrations 092/093/094 applied, privileges reconciled, schema/privilege verified, pre-deploy `_test` suites green, live-DB reconciliation clean, Super Admin/Admin/Contributor capability-boundary and Save Draft browser acceptance all PASS on the deployed service — full record below). **DEV is COMPLETE. PROD is PENDING** — not started, not scheduled in this entry. **Correction (2026-09-12): this issue's own migrations (092–094) are among the migrations now confirmed applied to current `afldb_prod` on 2026-09-12** (the ledger shows 092–098 applied that day), and the production host checkout was observed at `0955db3`. Whether this issue's own PROD leg (§27.21: privilege reconciliation, deploy, live reconciliation, browser acceptance) was actually run was not reconstructed as part of the `AFLDB-ISSUE-137` investigation — do not infer it from the migration alone. Phases D–I not started.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition
 **Found:** 2026-09-10
@@ -23026,6 +23073,62 @@ recorded in `AFLDB-ISSUE-156.md` §10 and repeated here so the D-phase owner can
 - The audit viewer prerequisite (ISSUE-157) reads `auth_audit_log` and `data_edits` with no
   migration or privilege change; `data_overrides` visibility needs separate privilege/deploy
   treatment and is outside that phase's default scope.
+
+### Resolution (2026-09-13)
+
+**Status:** Resolved. Closed on the operator's final live PROD browser acceptance gate.
+Tracking-only closeout this session — no implementation code changed, nothing deployed, no
+migration run, no production data altered, no commit/push performed.
+
+**PROD preflight, proven before the browser gate:** PROD HEAD `0955db3` confirmed with
+implementation commit `3eb6739` (`codex/issue-155-admin-overhaul`) an ancestor of it; migration
+`094_brownlow_admin_workflow.sql` applied, migrations 001–098 applied, 0 pending; privilege shape
+on `brownlow_vote_entry_state` / `brownlow_season_authority` confirmed as designed —
+`afldb_app` SELECT only, `afldb_import` SELECT/INSERT/UPDATE/DELETE with no TRUNCATE, `afldb_auth`
+no grants, `PUBLIC` no grants; live reconciliation `SELECT count(*) FROM brownlow_round_votes
+WHERE match_id IS NULL` = 0; `afldb.service` active, `/api/health` HTTP 200
+(`{"status":"ok","database":"ok","latencyMs":1}`).
+
+**Live PROD browser acceptance (`https://beta.afldb.com`), all journeys PASS:** Super Admin
+login → Admin Centre nav exposes Brownlow in the Data section; `/admin/brownlow` season list
+renders (Season/Status/H&A/Final/Draft/Source/Left/Unattached/Last activity/Authority columns,
+no error); `/admin/brownlow/2026` round grid renders with per-round completeness and a
+correctly-disabled Publish panel ("Not ready to publish"); `/admin/brownlow/2026/1` match editor
+renders with working duplicate-prevention across the 3/2/1 selects. **Save Draft (the
+ISSUE-155-approved mutation path) exercised on one real match** — see "Accepted PROD test
+residue" below. Public regression: `/brownlow` and `/brownlow/2026` rendered normally both before
+and after the draft save (2026 correctly 404 — season not yet published — unchanged by the
+draft). **Admin capability boundary PASS:** on `/admin/brownlow/2026/1`, Finalise and Void
+rendered disabled with the visible reason "Finalise, correct and void are Super Admin only. An
+Admin may save a draft."; on `/admin/brownlow/2026`, Publish rendered disabled with "Publishing a
+season is Super Admin only." **Contributor capability boundary PASS:** both `/admin/brownlow` and
+`/admin/brownlow/2026/1` redirected server-side to `/admin/upload` before any Brownlow markup was
+exposed. **Responsive/runtime PASS** at 1440×900 and 375×812 (mobile nav collapses to a toggle by
+default on a fresh load; no horizontal overflow); the only console error observed on any page,
+throughout, was a pre-existing unrelated Cloudflare Insights beacon blocked by CSP
+(`script-src 'self' 'unsafe-inline'`), present on the public homepage before any admin
+interaction; no failed network requests other than that same blocked beacon.
+
+**Accepted PROD test residue.** The Save Draft mutation used match **#17795, Sydney v Carlton,
+2026 Round 1** (3 votes #1 Chad Warner, 2 votes #21 Errol Gulden, 1 vote #9 Patrick Cripps),
+chosen for the same reason recorded in the DEV acceptance above: `runMatchMutation()`
+(`src/db/queries/admin-brownlow.ts:996-1109`) proves in source that `action === 'saveDraft'`
+never calls `writeMatchFacts` and never touches `brownlow_season_authority`, so a draft is
+structurally incapable of reaching any public table. The match is left at **status `draft`,
+revision 1**, with the three test selections, **intentionally and by operator decision**: §27.7
+of `AFLDB-ISSUE-155.md` defines `draft` as having **no public effect**, the DEV acceptance
+precedent used no cleanup for the same reason, and the §27.7 state-transition table defines no
+supported transition from `draft` back to "not entered" (the only transitions out of `draft` are
+`draft → draft` via `saveDraft` and `draft → final` via `finaliseMatch`). No Finalise, Correct,
+Void or Publish action was performed at any point. Public Brownlow pages remained unchanged
+throughout, confirmed both immediately after the draft save and again after the capability-
+boundary checks.
+
+**Scope.** Phases D–I remain transferred by reference to `AFLDB-ISSUE-156` (see "Scope transfer"
+above) and are not a blocker to this closure. Runbook `AFLDB-ISSUE-155.md` stays at the
+repository root, unmoved — consistent with `AFLDB-ISSUE-144.md`'s precedent for a root-level
+runbook, as distinct from the `issues/open/` → `issues/closed/` convention used for issues whose
+runbook started under `issues/open/` (e.g. `AFLDB-ISSUE-152`, `-153`, `-137`).
 
 ## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
 

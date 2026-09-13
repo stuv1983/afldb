@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Brownlow round administration confirmed live in production (AFLDB-ISSUE-155) - 13 September 2026
+
+- Final production browser acceptance confirms Brownlow round administration (Admin Centre →
+  Data → Brownlow, implemented 10 September 2026) is live and working correctly against the real
+  production database: Super Admins and Admins can enter and save draft votes per match; only a
+  Super Admin can finalise, correct, void a match or publish a season's total; a Contributor has
+  no access at all. A draft carries no public effect until a Super Admin finalises and publishes
+  it, confirmed live by an accepted test draft that left the public Brownlow pages unchanged.
+- No behaviour changed this session — this is a closeout confirmation, not a new deployment.
+
 ### Production first-kick-goal search restored after the database rebuild dropped its data (AFLDB-ISSUE-152) - 13 September 2026
 
 - "Players who kicked a goal with their first kick" and related first-kick-goal questions were
