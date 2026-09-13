@@ -15952,10 +15952,11 @@ No remaining gate. Closed by the operator per the standard issue lifecycle; remo
 
 - **Status:** Open — found 2026-09-06 while executing the `AFLDB-ISSUE-118` follow-up DEV load. **Phases 1–3 done; Phase 4A–4C done 2026-09-06 (read-only); Phase 4C′ re-gate done 2026-09-06 on merged `main` `59250a6` (`claude/issue-139`, read-only) and STOPPED at the §7.4c decision boundary:** `source` on `afldb_test` **PASSES** (7 gates), `pre-cutover` on `afldb_dev` refuses on migration parity only (`UNKNOWN 079` + `PENDING 091`, both truthful), and the `restored` phase **could not pass on DEV under either §7.4c answer** because the checker/plan had no supported way to express the chosen disposition (Finding D). **Cleared 2026-09-06:** the operator recorded D0–D3 below and `AFLDB-ISSUE-143` is **Resolved** — `docs/production-promotion.md` §7.4d's historical-only / recorded-gap disposition is now executable, `player_link_resolutions` and `data_edits` are declared for `--environment dev`, and Phase 4E is unblocked (nothing of 4E has been executed). **Phase 4E executed 2026-09-06 end to end** (see the Phase 4E-1/4E-2/4E-3 records and close-out below): `afldb_dev` is the promoted rebuilt lineage, 2026 re-acquired, ISSUE-140 re-measured at 0/0. **Phase 5 (Final UI exposure) implemented 2026-09-06**, uncommitted on `claude/issue-139`: Family/Father–Son/Coach/After-the-Siren Records pages and a Coaches nav entry, `tsc`/`eslint` clean, one DB-free test passed. **Still open** pending the operator's DEV deploy + browser smoke (Phase 4E close-out item 1 and the new Phase 5 close-out) before resolution. Earlier 4C findings stand: the promotion checker refuses `source` and `pre-cutover` on unclassified `player_match_period_stats` (`AFLDB-ISSUE-142` A), DEV's ledger carries the unmerged `079_access_code_delete.sql`, and id-keyed ledgers are in the bootstrap id space (`AFLDB-ISSUE-142` B). §7.4b settled: option 1. No rebuild, candidate, dump or swap has run; no convergence write was attempted.
 - **Status addendum (2026-09-12, tracking only):** branch `claude/issue-139` is **MERGED** into `main` (`6b55812`; tip `c270896` is an ancestor of `main`) and the code is deployed on DEV, so the "uncommitted" and "merge this branch" items recorded below are historical. What remains is the Phase 4E and Phase 5 operator **browser** checks. **HOLD:** `afldb_dev_pre_rebuild_20260906-112500` must NOT be dropped (Phase 4E close-out item 4) while `AFLDB-ISSUE-140` still needs it as its only evidence source for the writer identification.
+- **Status addendum (2026-09-13, RESOLVED — closeout tracking only):** the final DEV browser/operator closure gate is now fully PASS. `/records/coaches`, `/records/after-the-siren`, coaches navigation (desktop and phone via More), the 2025 season page, a player page, the AFLW page and the search/NL path all render correctly at desktop and phone width with 0 console errors/warnings and no document-level overflow on the new records pages. `/admin/player-links` was checked operator-side, logged in manually: the page loaded and refreshed cleanly, unresolved/canonical-link state rendered correctly, the resolution detail panel opened correctly, and no changes were made. No remaining gate. See Resolution below.
 - **Severity:** High — three ISSUE-118 canonical domains (coaches, father-son, siblings) cannot exist on `afldb_dev` at all, and any future loader that resolves by AFL Tables profile url inherits the same wall.
 - **Area:** Data integrity / Import architecture / Database (dev)
 - **Found:** 2026-09-06
-- **Resolved:** N/A
+- **Resolved:** 2026-09-13
 - **Related:** `AFLDB-ISSUE-118` (the loaders and the recorded "DEV load" follow-up; `issues/closed/AFLDB-ISSUE-118.md` §23.19 already measured DEV at 12,472 identities and §23.38 records the follow-up), `AFLDB-ISSUE-090` (the retired register pass and the 12,472 -> 13,275 pin repair), `AFLDB-ISSUE-112` (`data/awards/player-identity.csv` — the precedent for a tracked bootstrap-id -> profile-url census), `AFLDB-ISSUE-125` (rebuild-and-promote), `AFLDB-ISSUE-136` / `AFLDB-ISSUE-137` (the renumbered-profile identity split).
 - **Migration:** none expected.
 
@@ -18517,6 +18518,41 @@ a canonical data failure — the canonical `afldb_app` query against the promote
    `player-links` refresh, a 2025 season/player/`/aflw`/`/search` glance), mark this issue **Resolved**
    per the Phase 4E close-out item 5 above and hand the Post-139 hardening handoff (already written
    above, unchanged) to Codex as its own issue set.
+
+### Resolution — 2026-09-13
+
+Closeout tracking only; no implementation, migration, or deployment work this session. The
+implementation (Phases 1–5) was already merged (`claude/issue-139` → `main` `6b55812`) and DEV-deployed
+before this closeout.
+
+**Rebuilt DEV/canonical convergence outcome (recap, executed 2026-09-06):** Phase 4E ran the supported
+rebuild/promote contract end to end (stamp `20260906-112500`) — `afldb_dev` is now the promoted rebuilt
+lineage, `--phase production` PASSED (8 gates), 2026 was re-acquired, and `AFLDB-ISSUE-140` was
+re-measured at 0/0/0 duplicate matches. `afldb_dev_pre_rebuild_20260906-112500` is retained (still held
+for `AFLDB-ISSUE-140` evidence; not dropped by this closure). Phase 5 then added the final UI exposure —
+`src/app/records/family`, `.../father-son`, `.../coaches`, `.../after-the-siren` pages, a `Coaches`
+`SiteNav` entry, and the supporting query functions in `src/db/queries/{family-records,coaches,after-siren}.ts`
+— with no migration and no duplicated canonical state.
+
+**Final DEV browser acceptance gate (operator, 2026-09-13) — ALL PASS:**
+
+1. `/records/coaches` — PASS.
+2. `/records/after-the-siren` — PASS.
+3. Coaches navigation — PASS (desktop nav; phone via More).
+4. `/admin/player-links` — PASS: operator logged in manually, the page loaded and refreshed cleanly,
+   unresolved/canonical-link state rendered correctly, the resolution detail panel opened correctly, and
+   no changes were made.
+5. 2025 season page — PASS.
+6. Player page — PASS.
+7. AFLW page — PASS.
+8. Search/NL path — PASS.
+9. Phone/responsive — PASS, including no document-level overflow on the new records pages.
+10. Console/runtime — 0 errors, 0 warnings.
+
+No remaining gate. Closed by the operator per the standard issue lifecycle; the
+`issues/open/AFLDB-ISSUE-139-ui-query-handoff.sql` / `-output.txt` evidence files (the Phase 5 query
+shapes named above) move to `issues/closed/` alongside this closure; removed from the Open Issues table
+and `IssuesIndex.md` (6 -> 5).
 
 ## AFLDB-ISSUE-140 — `afldb_dev` holds 17 duplicate, stat-less 2026 matches under an off-by-one round number
 

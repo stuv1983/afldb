@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### New public Records pages for football families, father-son selections, coaches and after-the-siren kicks (AFLDB-ISSUE-139) - 13 September 2026
+
+- Four new curated Records pages, each linked from `/records` and reused from the existing
+  `/records/first-kick-goal` design: `/records/family` (sibling families ranked by combined career
+  games), `/records/father-son` (players selected under the father-son rule), `/records/coaches`
+  (career games and win percentage) and `/records/after-the-siren` (attempts and goals kicked after
+  the final siren).
+- A new `Coaches` entry was added to the site navigation (desktop nav and the phone `More` menu),
+  alongside the existing individual coach profile pages.
+- This closes out the `afldb_dev` identity-convergence work that unblocked the pages: `afldb_dev` is
+  now the promoted, rebuilt canonical-identity lineage, so every AFL Tables profile-url-based loader
+  (father-son, siblings, coaches) can resolve on it.
+
 ### The search box can now answer questions about a whole football family, not just one player (AFLDB-ISSUE-153 Stage 6) - 13 September 2026
 
 - The search box can now be asked "biggest football families" and answers with the sibling family holding
