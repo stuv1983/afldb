@@ -79,8 +79,9 @@ commit.
   Admins and above can read it; only a Super Admin can change anything.
 - The three awards forms move out of `/admin/data-editor`, which now carries a pointer to the new
   home, so there is exactly one place an awards record can be created.
-- Migration `101_awards_honours_lifecycle.sql`. **Not yet deployed** — applied to the test database
-  only; DEV and production are untouched, and no reader sees any of this yet.
+- Migration `101_awards_honours_lifecycle.sql`. Applied on DEV (101/101, 0 pending) and this
+  lifecycle's code is deployed there. Production status is not recorded here and must not be
+  inferred from this entry.
 
 ### Brownlow round administration confirmed live in production (AFLDB-ISSUE-155) - 13 September 2026
 
