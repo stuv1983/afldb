@@ -7,7 +7,32 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 6 tracked here — `-139`, `-140`, `-144`, `-152`, `-155`, `-156`.
+**Open issues:** 4 tracked here — `-140`, `-152`, `-155`, `-156`.
+
+<!-- 2026-09-13 (AFLDB-ISSUE-144 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
+     SESSION): closeout only. Implementation (core Club vs Club comparison `2102b51`/PR #2, and the
+     additive Club Rivalry Explorer `71f0563`/PR #3) was already merged into `main` and deployed on
+     DEV, with the historical Linux warm-route performance gate and focused comparison tests already
+     PASS. Final operator acceptance surfaced a real client-side defect: era-chip and Swap soft
+     navigation could desynchronise `<title>`/`og:title`/canonical from the visible comparison
+     (root cause: Next.js client-router prefetch/cache interaction on sibling links); hard navigation
+     was unaffected. Fixed by `AFLDB-ISSUE-144: fix comparison metadata on soft navigation`
+     (`b43eb4a`, on `main`): `prefetch={false}` on Swap/Reset/era-chip links plus new soft-navigation
+     metadata regression assertions. DEV re-deployed `08a218e` -> `b43eb4a`, build PASS,
+     `/api/health` PASS. Final DEV browser gate (era-chip and Swap soft navigation, each repeated
+     twice, in-page clicks only): URL/H1/title/og:title/canonical stayed aligned, canonical stayed
+     ordered-pair-only and never regressed to bare `/clubs/compare`, 0 console errors/warnings. No
+     remaining gate. See `issues.md` Resolution (2026-09-13); removed from the Open Issues table and
+     `IssuesIndex.md`; 6 -> 5. NOTE (superseded — see the following comment): this table was flagged as
+     still separately listing `-139` despite it being RESOLVED 2026-09-13; the operator directed that
+     correction immediately after this closeout. -->
+
+<!-- 2026-09-13 (AFLDB-ISSUE-139 table-sync correction — TRACKING ONLY, NO CODE, NO MIGRATION, NO
+     DEPLOY, OPERATOR-DIRECTED): `AFLDB-ISSUE-139` was RESOLVED 2026-09-13 (see its own entry's
+     Resolution and `IssuesIndex.md`) but was left in this quick-index table by that closeout. Removed
+     from the table here; `AFLDB-ISSUE-139`'s own Status/Resolution entry below is unchanged. 5 -> 4;
+     remaining open set agrees with `IssuesIndex.md`: `AFLDB-ISSUE-140`, `AFLDB-ISSUE-152`,
+     `AFLDB-ISSUE-155`, `AFLDB-ISSUE-156`. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-148 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY THIS
      SESSION): closeout only. The coaching and premierships club-page sections
@@ -19498,7 +19523,8 @@ disposition, that is a new decision and a new issue.
 
 ## AFLDB-ISSUE-144 — Club vs Club comparison and connected history
 
-- **Status:** **OPEN — the V1.7 implementation below is now MERGED into `main` (commit `2102b51`,
+- **Status:** **RESOLVED — 2026-09-13.** See *Resolution (2026-09-13)* at the foot of this entry.
+  As it stood earlier (retained): **OPEN — the V1.7 implementation below is now MERGED into `main` (commit `2102b51`,
   via PR #2); the two Linux acceptance items noted below are unchanged and still outstanding. A
   SEPARATE, ADDITIVE follow-up — "Club Rivalry Explorer" (all-time-first with era/decade drill-down) —
   is **also MERGED into `main` as `71f0563` (PR #3)** and deployed on DEV; it was IMPLEMENTATION
@@ -19560,6 +19586,7 @@ disposition, that is a new decision and a new issue.
 - **Severity:** Medium — public product enhancement. No data-integrity, security or operational risk.
 - **Area:** Public UI / club history / database queries
 - **Found:** 2026-09-06 (allocated at the ISSUE-143 closeout)
+- **Resolved:** 2026-09-13
 - **Related:** `AFLDB-ISSUE-129` (finals-series semantics — `matches.is_finals_series` is the only
   finals-series definition this feature may read), `AFLDB-ISSUE-118` (organisation-grain precedent in
   the Grid Solver), `AFLDB-ISSUE-113` (Brownlow season-grain authority).
@@ -19927,6 +19954,41 @@ breakpoint sweep.
 message, push command, PR title/body, and the post-merge DEV rebuild/restart + browser smoke
 checklist) is recorded in full in `AFLDB-ISSUE-144.md`'s final "Git handoff" section — not duplicated
 here to avoid drift between the two ledgers.
+
+### Resolution (2026-09-13)
+
+Both the core Club vs Club comparison (`2102b51`, PR #2) and the Club Rivalry Explorer follow-up
+(`71f0563`, PR #3) recorded above are merged into `main`, DEV-deployed, and validated: 214/214
+DB-free comparison tests, the focused comparison/SEO Playwright suite (11/11), and the historical
+Linux warm-route budget gate (Adelaide/Brisbane Lions median 205.6 ms; Carlton/Collingwood median
+236.7 ms; threshold < 1,500 ms) all PASS.
+
+A real defect surfaced during final acceptance, after the above was already merged: client-side
+soft navigation could desynchronise page metadata from the visible comparison — an era-chip link
+could leave the wrong `<title>`/`og:title` in place, and the Swap control could regress the
+canonical URL to the bare `/clubs/compare`. Hard navigation was unaffected. Root cause: Next.js
+client-router prefetch/cache interaction on the sibling era-chip/Swap/Reset links racing this
+route's streaming `generateMetadata`.
+
+**Fix (`b43eb4a`):** `prefetch={false}` on Swap, Reset, and every era-chip link, plus new
+soft-navigation metadata regression assertions. No application behaviour beyond the metadata
+timing changed; no migration.
+
+**Final post-fix validation:**
+
+* DEV advanced `08a218e` → `b43eb4a`; build PASS; migrations already at 100/100 (none required);
+  service restarted; `/api/health` PASS.
+* Final DEV browser gate: Carlton/Collingwood era-chip soft navigation (repeated twice) and
+  Adelaide/Brisbane Lions Swap soft navigation (repeated twice), both via in-page clicks (no
+  `page.goto()`) — URL, H1, `<title>`, `og:title` and canonical stayed aligned on every transition;
+  canonical remained ordered-pair-only and never regressed to bare `/clubs/compare`; canonical
+  continued to exclude era/matchType/page; 0 console errors, 0 console warnings. Three unrelated
+  stale `_rsc` prefetch requests for other (home/match) links were cancelled with
+  `net::ERR_ABORTED` during navigation — pre-existing Next.js prefetch cancellation noise, not an
+  ISSUE-144 defect.
+
+No remaining acceptance gate. Closed by the operator per the standard issue lifecycle; removed
+from the Open Issues table and `IssuesIndex.md`.
 
 ## AFLDB-ISSUE-145 — Venues missing from site navigation
 
