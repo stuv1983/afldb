@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 1 tracked here — `-156`.
+**Open issues:** 2 tracked here — `-156`, `-165`.
 
 <!-- 2026-09-13 (AFLDB-ISSUE-155 RESOLVED — TRACKING ONLY, NO CODE, NO MIGRATION, NO DEPLOY, NO
      DATABASE MUTATION THIS SESSION): PROD closeout only. The PROD leg was the sole remaining
@@ -23140,6 +23140,27 @@ runbook started under `issues/open/` (e.g. `AFLDB-ISSUE-152`, `-153`, `-137`).
 **Lineage:** `AFLDB-ISSUE-155` Phases D–I (transferred by reference, see that entry's
 "Scope transfer" record). ISSUE-155 retains only its PROD closeout.
 
+<!-- UPDATE 2026-09-13 (P5 ALLOCATED AS `AFLDB-ISSUE-165` — PLANNING ONLY, NO CODE, NO
+     MIGRATION, NO COMMIT, NO DEPLOYMENT): Awards & Honours administration — correction, voiding
+     and replacement lifecycle. Runbook `AFLDB-ISSUE-165.md`. Reconciliation findings: creation
+     already exists in `/admin/data-editor` for award winners, Hall of Fame inductees and
+     honour/representative-team members (`src/db/queries/awards-admin.ts`), but no edit, void,
+     replace or restore path exists for any of the three, and no domain-specific capability
+     exists (all three gate on `data.dataEditor`). P8's awards/HOF/honour-team slice of
+     `/admin/data-editor` is absorbed into 165, to move (not rewrite) when 165 implements. P11's
+     Rising Star / All-Australian CSV acquisition ownership is confirmed unchanged and out of
+     165's scope (D2). P6 (site content) and P7 (safe refresh) were checked for supersession
+     evidence at the same reconciliation and found insufficient to mark either superseded — both
+     remain unallocated placeholders, untouched. Central planning finding: `import_awards.py`
+     reloads every award group via `reload_keyed()`, which overwrites every column in its own
+     column list from parsed source data on every run with no `data_overrides` consultation, so a
+     correction to a source-owned row has no protection today; full detail and the proposed
+     two-tier durability design (an additive `status` column safe from an ordinary reload, plus a
+     `data_overrides`-backed replay branch required to survive a full rebuild because all three
+     tables FK to `players`) is in the runbook §3.4/§6. No migration allocated; next free number
+     at this snapshot is 101. Capabilities `data.awards.read`/`data.awards.edit` proposed,
+     matching the established `data.<domain>.read`/`.edit` convention. Open issues 1 -> 2. -->
+
 ### Problem
 
 ISSUE-155 delivered the Admin Centre shell, Super Admin lifecycle and Brownlow administration
@@ -26373,3 +26394,89 @@ only once ordinary admin use creates a meaningful human-decision population and 
 re-run only once the confirmed population grows; the remaining P1 backtest instrumentation
 (per-source×bucket precision, per-signal lift, per-row reachable ceiling, exact-name collision
 rate) not required by this issue's acceptance criteria.
+
+## AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
+
+- **Status:** Open — planning complete, no code, no migration, no commit, no deployment.
+- **Severity:** Medium
+- **Area:** Admin / Data management
+- **Found:** 2026-09-13
+- **Runbook:** `AFLDB-ISSUE-165.md`
+- **Parent:** `AFLDB-ISSUE-156` (umbrella), consuming P5 — Awards/honours correction lifecycle,
+  and absorbing the awards/Hall of Fame/honour-team slice of P8 — Data-editor decomposition.
+- **Planning model:** Sonnet 5, medium-high.
+
+### Problem
+
+`/admin/data-editor` can create an award winner, a Hall of Fame inductee and a
+representative/honour-team member (`src/db/queries/awards-admin.ts`), but nothing in the
+repository can edit, void, replace or restore any of the three once created. There is no
+domain-specific capability (all three gate on the single `data.dataEditor`), and — the
+load-bearing finding — no reload-survival mechanism exists for a correction to a source-owned
+row: `tools/migration/import_awards.py` reloads every award group through `reload_keyed()`,
+which overwrites every column in its own explicit column list from freshly parsed source data on
+every run, with no `data_overrides` consultation anywhere in the three tables' path. A correction
+made today, if a mutation existed to make one, would be silently reverted by the next reload of
+that award group.
+
+### Planning findings (2026-09-13, verified natively — full evidence in `AFLDB-ISSUE-165.md` §3)
+
+- Three canonical tables, three different identity keys: `award_winners` keys on its own source
+  record id (NOT `award, season, player` — the 1984 All-Australian club+state pairing makes that
+  key genuinely wrong, migration 042); `hall_of_fame` keys on `(name, inducted_year)`; linked
+  `honour_team_members` rows key on `player_id`, unlinked ones on `player_name_raw` (migration
+  059). None of the three has a `status`/lifecycle column today.
+- Duplicate prevention is inconsistent: `honour_team_members` already runs a pre-insert collision
+  check (`AFLDB-ISSUE-025`/`080`); `award_winners` and `hall_of_fame` run none at all.
+- `hall_of_fame.removed_year` already exists and already means something (a real, historical
+  Hall of Fame removal) — this must not be confused with "voided because the admin record was a
+  data-entry error"; the two stay distinct concepts in the plan.
+- `data_edits.table_name` already admits all three tables (migration 058) — no widening needed
+  for the audit log. `data_overrides.entity_type` does not admit any of the three — widening
+  needed if the durable lifecycle record uses it.
+- **Central proof (from reading `reload_keyed()` and `import_awards.py` directly, not
+  inference):** an ordinary reload's `UPDATE` only sets the columns explicitly listed by the
+  caller, so a new column outside that list (like `award_winners.sort_order`, migration 061,
+  already) survives an ordinary reload for free. But all three tables carry a foreign key to
+  `players`, and `import_awards.py` itself defends elsewhere against a `TRUNCATE … CASCADE` on a
+  foundational table emptying tables it does not expect to be touched
+  (`import_awards.py:2674-2679`) — direct evidence that a full rebuild truncates `players` with
+  cascade, which empties all three award tables regardless of any additive column. A bare
+  `status` column is therefore safe from an ordinary reload but not from a full rebuild; only a
+  `data_overrides` record replayed by a new `replay_admin_overrides()` branch survives both,
+  matching the precedent every other umbrella phase already established for exactly this reason.
+- Capability naming convention confirmed exactly from `src/lib/auth/capabilities.ts`:
+  `data.<domain>.read` (Admin and up) / `data.<domain>.edit` (Super Admin only) — so
+  `data.awards.read`/`data.awards.edit`, not the umbrella's earlier working name
+  `data.honours.correct`.
+- All public reads for the three tables go through one module, `src/db/queries/awards.ts`, with
+  no active/voided filter anywhere today — every consumer needs the same new predicate, with an
+  explicit before/after invariance proof that an untouched row's output does not change.
+
+### Recommended design (runbook §6–§12)
+
+`status IN ('active','void')` (two states, no `ended` — an award fact does not "cease" the way an
+ongoing appointment does) plus `status_reason`, added to each table by one additive migration
+(next free number 101 at this snapshot); identity-bearing fields (`award_id`/`season`/recipient
+for `award_winners`; `name`/`inducted_year` for `hall_of_fame`; `team_name`/player identity for
+`honour_team_members`) are void + replace only, never corrected in place, matching the
+`AFLDB-ISSUE-163` boundary. `data_overrides.entity_type` widened for the three tables, replayed
+by new branches in `tools/migration/common.py`'s `replay_admin_overrides()`, called by
+`import_awards.py` immediately after each group's own `reload_keyed()` — the durability layer a
+bare column cannot provide across a full rebuild. New `/admin/awards` surface (D-3),
+`data.awards.read`/`.edit` capabilities, the three existing `data-editor` create forms relocated
+(not rewritten) per the umbrella's P8 rule. `rising_star`/`all_australian` CSV acquisition
+ownership unchanged (D2); Brownlow untouched.
+
+### Non-goals
+
+Brownlow administration/authority; new award types or definitions; award acquisition/CSV
+redesign; player merge; match rekey; public Awards/Hall of Fame/honour-team page redesign beyond
+the minimum status filter; destructive rewrite of historical source data.
+
+### Resolution
+
+Not resolved — planning only. Next action: operator review of the runbook's §14 open questions
+(replacement-linkage write shape, `/admin/awards` merged-vs-split IA, column naming, and
+verification of the promotion-inventory/privilege registration state for the three tables at
+implementation preflight), then a Stage 1/Stage 2 implementation session.

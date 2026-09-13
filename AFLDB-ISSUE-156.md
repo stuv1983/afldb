@@ -11,7 +11,7 @@ decide S-1 against it. See the `AFLDB-ISSUE-151` entry in `issues.md` for the au
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Created:** 2026-09-11
 **Parent lineage:** `AFLDB-ISSUE-155` (Phases D–I transferred here by reference; see §0)
-**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2), `AFLDB-ISSUE-159` (P3), `AFLDB-ISSUE-160` (P3b — Draft administration, a supplemental child inserted after P3 on 2026-09-11; P4–P12 keep their labels), `AFLDB-ISSUE-161` (P3c — Season list administration, a supplemental child inserted after P3b on 2026-09-11, Stage 1 AND Stage 2 complete/uncommitted; P4–P12 keep their labels), `AFLDB-ISSUE-162` (P3d — Fixture / season schedule administration, a supplemental child inserted after P3c on 2026-09-11, owning migration **097**; Stage 1 backend only, uncommitted and not yet validated, Stage 2 not built; P4–P12 keep their labels). P4–P12 are named placeholders and receive an ID only when each phase starts.
+**Children allocated:** `AFLDB-ISSUE-157` (P1), `AFLDB-ISSUE-158` (P2), `AFLDB-ISSUE-159` (P3), `AFLDB-ISSUE-160` (P3b — Draft administration, a supplemental child inserted after P3 on 2026-09-11; P4–P12 keep their labels), `AFLDB-ISSUE-161` (P3c — Season list administration, a supplemental child inserted after P3b on 2026-09-11, Stage 1 AND Stage 2 complete/uncommitted; P4–P12 keep their labels), `AFLDB-ISSUE-162` (P3d — Fixture / season schedule administration, a supplemental child inserted after P3c on 2026-09-11, owning migration **097**; Stage 1 backend only, uncommitted and not yet validated, Stage 2 not built; P4–P12 keep their labels), `AFLDB-ISSUE-163` (P3e — Club leadership administration, owning migration **098**), `AFLDB-ISSUE-165` (P5 — Awards & Honours administration: correction, voiding and replacement lifecycle, allocated 2026-09-13, planning only; absorbs P8's awards/Hall of Fame/honour-team decomposition slice). P4, P6, P7, P9–P12 are named placeholders and receive an ID only when each phase starts; P6 and P7 were checked for supersession evidence during the 2026-09-13 reconciliation and found insufficient to mark either superseded (see "Next action").
 
 This document is a planning deliverable. No application code, migration, privilege, test or
 deployment change was made while producing it. Every later phase must re-verify the repository
@@ -354,7 +354,7 @@ contract remaps.
 | P3d | **AFLDB-ISSUE-162** | Fixture / season schedule administration — a future season's schedule inside AFLDB | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3c | medium-high (new canonical table beside `matches`; one migration; promotion lineage) | §P3d below — Stage 1 (`cb98c67`) and Stage 2 (`6a9fbc4`) validated; the DEV-rollout client/server boundary fix and cleared-date fix committed. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 097 applied on DEV, production build PASS); the all-refs 097 collision check is a closeout operator command |
 | P3e | **AFLDB-ISSUE-163** | Club leadership administration and current-captain display | new (no ISSUE-155 phase) — inserted 2026-09-12, stacked on P3d; the batch's first item with public output | medium (club–season–player model; one migration; public club page) | §P3e below — D-1…D-18 signed off with four clarifications; both stages validated (`ea9f3dd`), audit found no deviation. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 098 applied on DEV); §34.4 items 1–3 carried as follow-ups |
 | P4 | placeholder | Special records — first-kick / after-siren / family | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe |
-| P5 | placeholder | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority |
+| P5 | **AFLDB-ISSUE-165** | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority — see §P5 handoff contract below. **Planning complete 2026-09-13, not implemented** |
 | P6 | placeholder | Site content and versioning | Phase F (§23, §11) | medium | reuse root-layout revalidation |
 | P7 | placeholder | Safe refresh and operational controls | Phase G (§23, §13) | high | allowlist + single-flight + settle-timer interaction proven |
 | P8 | placeholder | Data-editor decomposition into domain routes | §7, §15 | medium | move, don't rewrite; existing tests still green |
@@ -908,4 +908,101 @@ paragraph at the top of this section)*: the operator re-runs the Stage 2-only ga
 ESLint over `AppointLeaderPanel.tsx`/`LeadershipActions.tsx`/the test file, `git diff --check`),
 commits the audit fixes, and then runs the combined 160+161+162+163 DEV batch (096 → 097 → 098 →
 `npm run db:privileges` → code) whose rendered Playwright acceptance is the remaining proof for all
-four children. P4–P12 remain unallocated placeholders.
+four children. P4, P6, P7, P9–P12 remain unallocated placeholders; **P5 was allocated 2026-09-13
+as `AFLDB-ISSUE-165`** (see §P5 handoff contract below).
+
+**2026-09-13 reconciliation (P5 allocation and placeholder review).** Native repository
+inspection (no commands executed) confirmed: creation already exists in `/admin/data-editor` for
+award winners, Hall of Fame inductees and honour/representative-team members
+(`src/db/queries/awards-admin.ts`), but no edit/void/replace/restore path exists for any of the
+three, and no domain-specific capability exists (all three gate on `data.dataEditor`). P5 is
+allocated as `AFLDB-ISSUE-165` and absorbs P8's awards/Hall of Fame/honour-team decomposition
+slice; P11's Rising Star/All-Australian CSV acquisition ownership is confirmed unchanged and
+stays out of scope (no follow-up issue raised). **P6 and P7 were reviewed for supersession
+evidence at the same reconciliation.** `/admin/content` and `/admin/current-season` both already
+exist with substantial implementations (`ContentEditor.tsx`, `PublishPanel.tsx`, `MediaLibrary.tsx`,
+`CurrentSeasonControls.tsx`, `SettleRunPanel.tsx`), but both predate ISSUE-155/156 entirely —
+`AFLDB-ISSUE-155.md` §Phase F/G always planned to **reuse**, not create, these routes, and neither
+phase's specific scope (an approved public-copy key registry with safe-render validation and
+revision audit for P6; a fixed, observable, single-flight refresh-job boundary for P7) was traced
+against the existing implementation in this session. Marking either superseded would overclaim
+evidence this session does not have, so **both remain unallocated placeholders, untouched**. P4,
+P9, P10, P12 are unaffected by this reconciliation.
+
+---
+
+### P5 handoff contract — AFLDB-ISSUE-165: Awards & Honours Administration
+
+**Allocated 2026-09-13. Status: Planning complete — not implemented, no migration, no code, no
+commit, no deployment.** The authoritative contract is `AFLDB-ISSUE-165.md`; this section is the
+umbrella's summary of it.
+
+**Objective.** A void/end + replacement correction lifecycle for `award_winners`,
+`hall_of_fame` and `honour_team_members` — today all three support create only, gated on the
+single `data.dataEditor` capability, with no edit, void, replace or restore path at all.
+
+**Central planning finding.** `tools/migration/import_awards.py` reloads every award group
+through `reload_keyed()`, which overwrites the columns in its own explicit list from freshly
+parsed source data on every run with no `data_overrides` consultation — a correction to a
+source-owned row has no protection today. All three tables carry a foreign key to `players`, and
+`import_awards.py` itself defends elsewhere against a `TRUNCATE … CASCADE` on a foundational
+table (`import_awards.py:2674-2679`), direct evidence that a full rebuild empties them too. An
+additive `status` column alone is therefore safe against an *ordinary* scoped reload but not a
+full rebuild; the durable record must live in `data_overrides`, replayed by a new
+`replay_admin_overrides()` branch per table called immediately after each group's own
+`reload_keyed()` — the same two-tier shape every prior phase in this umbrella already
+established, applied here for the first time to a domain with an *active* importer rather than
+none (`club_leadership` had none).
+
+**No migration allocated.** Next free number at the 2026-09-13 planning snapshot is **101**
+(`100_nl_search_log_family_grain.sql` is the current highest); re-verify at implementation
+preflight. Expected content: additive `status`/`status_reason`/`updated_at` columns and a
+partial active-row index on each of the three tables; `data_overrides.entity_type` widened for
+the three table names (order-independent per the §10 R-4/ISSUE-159 D-1 proof — none of the three
+is a settle target). `data_edits.table_name` already admits all three (migration 058); **no**
+widening needed there.
+
+**Capabilities `data.awards.read` (Admin and up) / `data.awards.edit` (Super Admin only)**,
+matching the `data.<domain>.read`/`.edit` convention exactly (superseding this umbrella's earlier
+§2 working name `data.honours.correct`).
+
+**Dedicated surface `/admin/awards`** (D-3), replacing the awards/Hall of Fame/honour-team block
+of `/admin/data-editor` (P8's award-domain residue, moved not rewritten, per the umbrella's
+standing P8 rule).
+
+**Domains do not need identical lifecycle operations** (verified per-domain in the runbook §5):
+`hall_of_fame` already carries a `removed_year` column meaning something distinct from "voided
+for data-entry error" and the plan keeps the two concepts separate; `honour_team_members`
+already has duplicate-prevention (`AFLDB-ISSUE-025`/`080`) that `award_winners` and
+`hall_of_fame` conspicuously lack and must gain.
+
+**Out of scope, confirmed.** Brownlow administration/authority (already refused by
+`createAwardWinner` today, unchanged); new award types/definitions; `rising_star`/
+`all_australian` CSV acquisition ownership (D2, unchanged, no follow-up raised); player merge
+(P9); match rekey (P10); public Awards/Hall of Fame/honour-team page redesign beyond the minimum
+status filter every consumer in `src/db/queries/awards.ts` needs.
+
+**Dependencies.** P1 (audit viewer) and P2 (capability enforcement) only, both resolved and
+merged. No dependency on P3/P3b–P3e.
+
+**Preflight (implementation session).** Re-verify `src/db/migrations/` highest number; confirm
+`award_winners`/`hall_of_fame`/`honour_team_members`'s `tools/db/promotion-inventory.ts`
+source-table classification and `afldb_meta.import_writable_tables` registration state (not
+exhaustively traced in the planning session, per `AFLDB-ISSUE-165.md` §8/§14 D-7); confirm which
+script issues the `TRUNCATE … CASCADE` referenced at `import_awards.py:2674` and its trigger
+conditions.
+
+**Acceptance gate.** Unit (status/reason shape, identity-field immutability) → capability
+source-contract → per-role direct-route/action authorisation → `afldb_test` integration
+(create/correct/void/reinstate/replace per table, duplicate-prevention closing the
+`award_winners`/`hall_of_fame` gap) → **the reload-survival proof** (a real `import_awards.py`
+run after a correction/void, both an ordinary scoped reload and a simulated full rebuild,
+proving §3.4/§6's central finding) → public read-model invariance (before/after
+row-count-and-content diff, every consumer in `src/db/queries/awards.ts` unaffected for an
+untouched row) → responsive/browser acceptance at 1440×900 and 375×812 → typecheck →
+privilege/release-gate impact.
+
+**Stop conditions.** A "correction" mutation permitted to change an identity-bearing field in
+place instead of refusing (§5's per-table identity-field list); a new `replay_admin_overrides()`
+branch running out of order relative to its own group's `reload_keyed()` call; any public query
+in `src/db/queries/awards.ts` left unfiltered by the new status predicate.

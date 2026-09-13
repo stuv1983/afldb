@@ -6,7 +6,11 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Last updated:** 2026-09-13 (`AFLDB-ISSUE-155` **RESOLVED** — PROD closeout only, tracking-only
+**Last updated:** 2026-09-13 (`AFLDB-ISSUE-165` ALLOCATED — Awards & Honours administration
+correction/void/replacement lifecycle, `AFLDB-ISSUE-156` P5, planning only, no code, no
+migration, no commit, no deployment; open issues 1 -> 2, see the `AFLDB-ISSUE-165` entry below).
+
+**Earlier same-day update:** 2026-09-13 (`AFLDB-ISSUE-155` **RESOLVED** — PROD closeout only, tracking-only
 this session, no implementation code changed, nothing deployed, no migration run, no production
 data altered. The PROD leg was the sole remaining scope after the 2026-09-11 narrowing (Phases
 D-I already transferred by reference to `AFLDB-ISSUE-156`). Preflight proven before the browser
@@ -3214,7 +3218,7 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
 - **Area:** Admin / Auth / Data management / Acquisition / Operations
 - **State:** Open / P1 complete 2026-09-11 (`AFLDB-ISSUE-157` resolved, merged at `3bbcab0`); P2 complete 2026-09-11 (`AFLDB-ISSUE-158` resolved: every `/admin` boundary enforces its capability, validated, and since merged into `main` at `92a898f` — the branch `fable/issue-158-capability-enforcement` is an ancestor of `main`). Umbrella for the former ISSUE-155 Phases Dâ€“I plus two newly identified prerequisites: the audit trail has no usable read surface (`src/app/admin/page.tsx:46-51` is the only `auth_audit_log` reader; `data_edits` has none), and 15 of 18 declared capabilities are nav-only, never reaching `requireCapability()`. Children allocated: 157 (P1), 158 (P2). P3 Coach admin (155 Phase D), P4 Special records (E), P5 Honours lifecycle, P6 Site content (F), P7 Safe refresh (G), P8 Data-editor decomposition, P9 Player lifecycle/merge (HIGH), P10 Fixture-identity correction (HIGH), P11 CSV transition (H), P12 Integrated acceptance (I) are named placeholders with no ID until each starts. ISSUE-155 PROD and ISSUE-151 are not blockers; ISSUE-151's promotion-inventory contract applies to P3/P4/P5/P7/P9/P10. ISSUE-154 not reused. **P3 ALLOCATED 2026-09-11 as `AFLDB-ISSUE-159`** (Coach administration): stop condition C-1 is DECIDED (synthetic `manual:<token>` identity under `manual_admin_edit`, durable state in `data_overrides`, nothing relaxed) and migration **095 is allocated to 159**, no longer a planning snapshot.
 - **Key files/subsystems:** `AFLDB-ISSUE-156.md` (runbook); baseline architecture `AFLDB-ISSUE-155.md` Â§5/Â§6/Â§7/Â§17/Â§18/Â§23; `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`, `src/db/queries/audit-log.ts`, `tools/maintenance/privileges.sql:435-470`, `tools/db/promotion-inventory.ts`.
-- **Next action:** P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). **P3b (`AFLDB-ISSUE-160`), P3c (`-161`), P3d (`-162`) and P3e (`-163`) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` — see the retirement note below; removed from this index. The batch is ready for the next release/promotion stage, a separate operator decision (PROD untouched — **correction (2026-09-12): production is not untouched**, current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`; the exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation); the carried promotion checklist (deploy order 096 → 097 → 098 → `db:privileges` → code; replay order before the `data_edits` remap; ISSUE-160 PROD probes (d)/(e)/(g)/(h); the all-refs 096/097/098 migration collision check) and the non-blocking follow-ups (ISSUE-163 §34.4 items 1–3, ISSUE-162 §39.6 items 1–4, ISSUE-161 D-8) are recorded under *P3b–P3e complete (2026-09-12)* in the `issues.md` ISSUE-156 entry. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion `20260907-234124`" — is moot; that promotion completed 2026-09-08 01:11:24.440219 AEST (`auth_audit_log` id 196, `AFLDB-ISSUE-125`), before ISSUE-160 existed. See the `AFLDB-ISSUE-151` entry in `issues.md`.** P4–P12 remain unallocated placeholders and each receives an ID only at phase start.
+- **Next action:** P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). **P3b (`AFLDB-ISSUE-160`), P3c (`-161`), P3d (`-162`) and P3e (`-163`) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` — see the retirement note below; removed from this index. The batch is ready for the next release/promotion stage, a separate operator decision (PROD untouched — **correction (2026-09-12): production is not untouched**, current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`; the exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation); the carried promotion checklist (deploy order 096 → 097 → 098 → `db:privileges` → code; replay order before the `data_edits` remap; ISSUE-160 PROD probes (d)/(e)/(g)/(h); the all-refs 096/097/098 migration collision check) and the non-blocking follow-ups (ISSUE-163 §34.4 items 1–3, ISSUE-162 §39.6 items 1–4, ISSUE-161 D-8) are recorded under *P3b–P3e complete (2026-09-12)* in the `issues.md` ISSUE-156 entry. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion `20260907-234124`" — is moot; that promotion completed 2026-09-08 01:11:24.440219 AEST (`auth_audit_log` id 196, `AFLDB-ISSUE-125`), before ISSUE-160 existed. See the `AFLDB-ISSUE-151` entry in `issues.md`.** P4–P12 remain unallocated placeholders and each receives an ID only at phase start. **P5 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-165`** (Awards & Honours administration — correction, voiding and replacement lifecycle; planning only, runbook `AFLDB-ISSUE-165.md`); absorbs P8's award/Hall of Fame/honour-team decomposition slice; P11's Rising Star/All-Australian CSV ownership confirmed unchanged and out of scope. P6 and P7 were checked for supersession evidence during the same reconciliation and found insufficient — both remain unallocated placeholders, untouched. P4, P9, P10, P12 unaffected.
 
 <!-- UPDATE 2026-09-11 (ISSUE-159 closeout): `AFLDB-ISSUE-159` (Coach administration,
      ISSUE-156 P3) is **Resolved**. Both Stage 1 (G0-G8) and Stage 2 (gates 6-13) passed every
@@ -3243,3 +3247,32 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
      the production host checkout was observed at `0955db3`; the exact Admin Centre production
      acceptance/deployment scope was not reconstructed as part of `AFLDB-ISSUE-137`. Removed from this index and from the
      `issues.md` Open Issues table. -->
+
+## AFLDB-ISSUE-165 — Awards & Honours Administration: correction, voiding and replacement lifecycle
+
+- **Severity:** Medium
+- **Area:** Admin / Data management
+- **State:** Open / planning complete 2026-09-13 — no code, no migration, no commit, no
+  deployment. Parent `AFLDB-ISSUE-156` P5 (consumes P5; absorbs the awards/Hall of
+  Fame/honour-team slice of P8; P11's Rising Star/All-Australian CSV ownership confirmed
+  unchanged, out of scope). Current admin surface (`src/db/queries/awards-admin.ts`,
+  `/admin/data-editor`) can only CREATE an award winner, Hall of Fame inductee or
+  honour/representative-team member; nothing can edit, void, replace or restore one, and all
+  three gate on the single `data.dataEditor` capability. Central finding: `import_awards.py`
+  reloads every award group through `reload_keyed()`, which overwrites the columns in its own
+  list from freshly parsed source data on every run with no `data_overrides` consultation, so a
+  correction to a source-owned row has no protection today; because all three tables FK to
+  `players`, a full rebuild's `TRUNCATE … CASCADE` empties them too, so the durable lifecycle
+  record must live in `data_overrides` (replayed after each group's reload), not merely in an
+  additive `status` column, which is only safe against an *ordinary* scoped reload.
+- **Key files/subsystems:** `AFLDB-ISSUE-165.md` (runbook); `src/db/queries/awards-admin.ts`,
+  `src/db/queries/awards.ts`, `src/app/admin/data-editor/{AwardWinnerForm,HallOfFameForm,
+  HonourTeamForm}.tsx`, `tools/migration/import_awards.py`, `tools/migration/common.py`
+  (`reload_keyed`, `replay_admin_overrides`), `src/db/migrations/{005,042,058,059,061,073,098}`,
+  `src/lib/auth/capabilities.ts`, `src/app/admin/nav-model.ts`.
+- **Next action:** Operator review of the runbook's §14 open questions (replacement-linkage
+  write shape, `/admin/awards` merged-vs-split IA, column naming, and verification of the
+  `tools/db/promotion-inventory.ts`/`afldb_meta.import_writable_tables` registration state for
+  the three tables at implementation preflight — not resolved in this planning session to avoid
+  a repository-wide scan outside this issue's scope). No migration allocated; next free number
+  at this snapshot is 101, to be re-verified at implementation preflight.
