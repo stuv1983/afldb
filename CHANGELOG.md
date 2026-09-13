@@ -40,6 +40,14 @@ commit.
   was clicked rather than blanking the whole page.
 - A regression test now fails the build if anything reintroduces a loading placeholder above the
   admin permission checks, so this cannot come back quietly.
+- **Live on DEV and confirmed working there.** Checked on the deployed site from both sides of the
+  boundary: an ordinary administrator asking for a page they may not see is now turned away by the
+  response itself rather than by a tag inside it, with no page frame returned at all, while the
+  pages they *are* entitled to still open normally — and a Super Admin still reaches every one of
+  those pages, and the admin CSV export, exactly as before. The replacement navigation feedback was
+  checked on DEV too: clicking an admin menu item shows the small pending marker beside that link
+  while the next page is being fetched, and the page then opens normally. No migration was needed.
+  Production is untouched.
 
 ### Awards, Hall of Fame and honour teams gain a correction, voiding and replacement lifecycle (AFLDB-ISSUE-165, ISSUE-156 P5) - 13 September 2026
 

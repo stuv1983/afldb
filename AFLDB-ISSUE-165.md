@@ -1558,3 +1558,15 @@ were independently confirmed correct during the ISSUE-166 investigation — the 
 Actions guard first, like every other admin action. Stage 8 still restarts from 8.1 for the
 reasons §20.2 and §20.3 give, and the role-boundary gate should simply be re-run normally once
 both fixes are deployed.
+
+**Update 2026-09-13 — `AFLDB-ISSUE-166` is RESOLVED and no longer open.** Its fix is committed
+(`aaa24f8`), deployed to DEV (`d0b522a85e357aa41a0058f11ab23eba6f637a6e`) and accepted there:
+denied admin documents now refuse at the HTTP layer (plain-Admin probe `status=0`,
+`type=opaqueredirect`, with no denied document returning 200 + `__next-page-redirect`), and a Super
+Admin still renders `/admin/settings`, `/admin/query-builder` and `/admin/awards/winners/new` in
+full and downloads `/admin/nl-search/export`. **It therefore no longer holds anything on this
+issue**, and the `/admin/awards/winners/new` denial behaviour Stage 8's role matrix exercises is
+now the corrected one. Stage 8 resumes from the remaining acceptance gates; the landing-page card
+work of §20.3 and the lifecycle-fixture work already passed and are not re-run unless a later
+regression requires it. The authoritative record is the `AFLDB-ISSUE-166` entry in `issues.md`,
+*Resolution (2026-09-13)*.
