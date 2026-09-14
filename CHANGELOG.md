@@ -84,6 +84,15 @@ commit.
   databases**. This work is **live on the development site and accepted there; production is
   unchanged** and is a later, separate decision.
 
+### Admin player-link suggestion URLs no longer 404 (AFLDB-ISSUE-168) - 14 September 2026
+
+- On **Admin → Player links**, the link to a suggested AFLDB player next to a queue row 404'd on
+  click, and Next's prefetch logged a 404 per suggestion. The link was missing the player id its
+  route requires; it now uses the same canonical `/players/<slug>-<id>` path every other
+  player-link on the site already used. Admin-only; no public page, matching logic or routing
+  changed. **Implemented and validated; not yet merged or deployed** — production keeps the
+  pre-existing 404 until this ships through the normal workflow.
+
 ### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
 
 - Refusing to show someone an admin page they may not see is supposed to be an HTTP redirect. For

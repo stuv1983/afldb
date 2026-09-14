@@ -40,7 +40,7 @@ import {
   profileFromSourceDetail,
 } from '@/lib/player-matching/explain-limits';
 import type { ConfidenceBand } from '@/lib/player-matching/types';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, playerPath } from '@/lib/format';
 import { firstValue } from '@/lib/params';
 
 export const metadata: Metadata = { title: 'Player links', robots: { index: false, follow: false } };
@@ -636,7 +636,7 @@ export default async function PlayerLinksPage(
                               </>
                             ) : match ? (
                               <>
-                                <Link href={`/players/${match.playerSlug}`}>{match.playerName}</Link>
+                                <Link href={playerPath(match.playerSlug, match.playerId)}>{match.playerName}</Link>
                                 <div className="muted" style={{ fontSize: '0.85rem' }}>
                                   {formatPlayerSummary(summary)}
                                 </div>
