@@ -81,7 +81,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from common import (  # noqa: E402
-    Reporter, connect_pg, import_batch, load_env, require_env, safe_dsn,
+    Reporter, connect_pg, import_batch, load_env, replay_admin_overrides, require_env,
+    safe_dsn,
 )
 from father_son import normalise_name  # noqa: E402
 
@@ -948,8 +949,57 @@ def resolution_measures(resolutions: list[Resolution]) -> dict[str, int]:
     }
 
 
+def refuse_protected_retirements(pg: Any, source_id: int, keys: list[str]) -> None:
+    """AFLDB-ISSUE-167 §8.1. Refuse the whole run rather than delete a row that
+    carries a durable operator decision.
+
+    The stale-row DELETE below removes anything this source owns that the
+    artefact no longer carries. That is right for an ordinary retirement and
+    WRONG for a row an administrator has voided or corrected: deleting it would
+    destroy the row and leave the override orphaned, and the replay's
+    warn-and-retain could not put it back, because a SOURCE-OWNED row is not
+    re-creatable from a lifecycle payload -- only a `record` override carries a
+    whole row, and a `record` override names a manual_admin_edit row, which
+    carries a different source_id and is outside this scope entirely.
+
+    Raised BEFORE the import batch opens, so a refused run writes nothing at all
+    -- not even a batch row. The refusal deliberately has no --force: the
+    operator's route is to reinstate or resolve the decision in Special records,
+    which is a decision, not a flag.
+    """
+    with pg.cursor() as cur:
+        cur.execute(
+            f"""SELECT o.entity_key, o.field_group, o.override_values->>'status'
+                  FROM {TARGET_TABLE} x
+                  JOIN data_overrides o
+                    ON o.entity_type = %s
+                   AND o.is_active = true
+                   AND o.field_group IN ('lifecycle', 'correction')
+                   AND split_part(o.entity_key, ':', 1) = %s
+                   AND substring(o.entity_key from position(':' in o.entity_key) + 1)
+                       = x.source_record_id
+                 WHERE x.source_id = %s AND NOT (x.source_record_id = ANY(%s))
+                 ORDER BY 1""",
+            (TARGET_TABLE, SOURCE_KEY, source_id, keys))
+        protected = cur.fetchall()
+    if protected:
+        detail = "; ".join(
+            f"{key} carries an active {group} override"
+            + (f" (status {status})" if status else "")
+            for key, group, status in protected[:10])
+        raise RuntimeError(
+            f"Refusing this {TARGET_TABLE} reload: {len(protected)} row(s) the artefact no "
+            "longer carries hold a durable operator decision and cannot be deleted -- a "
+            "source-owned row cannot be re-created from one. Reinstate or resolve them in "
+            f"Special records (/admin/records/after-the-siren) first. {detail}")
+
+
 def write_rows(pg: Any, resolutions: list[Resolution], source_id: int,
                provenance: dict[str, Any] | None, rep: Reporter) -> dict[str, Any]:
+    # Before ANY write, including the batch row (AFLDB-ISSUE-167 §8.4: "REFUSE
+    # the whole run, before any write").
+    refuse_protected_retirements(pg, source_id, [r.row["event_key"] for r in resolutions])
+
     assignments = ", ".join(f"{c} = EXCLUDED.{c}" for c in WRITTEN_COLUMNS)
     compare_left = ", ".join(f"{TARGET_TABLE}.{c}" for c in COMPARED_COLUMNS)
     compare_right = ", ".join(f"EXCLUDED.{c}" for c in COMPARED_COLUMNS)
@@ -997,6 +1047,17 @@ def write_rows(pg: Any, resolutions: list[Resolution], source_id: int,
                       FROM {TARGET_TABLE} WHERE source_id = %s""", (batch.id, source_id))
             changed, total = cur.fetchone()
         batch.records_inserted += changed
+
+        # AFLDB-ISSUE-167 §8.1 / D-3. Re-assert the durable operator decisions
+        # over the rows this run just wrote, INSIDE the same transaction: the
+        # lifecycle columns survive an ordinary reload for free (they are in
+        # neither WRITTEN_COLUMNS nor COMPARED_COLUMNS), but they do not survive
+        # a destructive rebuild, and the manual rows do not survive one at all.
+        # data_overrides is the durable authority; these columns are its cheap
+        # read-path cache. A fail-closed refusal in here rolls this whole load
+        # back through import_batch's own except branch.
+        replay_admin_overrides(pg, TARGET_TABLE)
+
     rep.result("after_siren_kicks rows", total)
     rep.result("rows inserted or changed", changed)
     rep.result("stale rows removed", stale)

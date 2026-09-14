@@ -539,7 +539,10 @@ export async function getPlayerHonours(playerId: number) {
        ORDER BY team_name
     `,
     // A curated achievement (player_achievements, migration 053) rather
-    // than an award: no ceremony, no votes, just a recorded feat.
+    // than an award: no ceremony, no votes, just a recorded feat. Carries
+    // `status = 'active'` for the same reason every honours read above does
+    // (migration 102, AFLDB-ISSUE-167 §7): a voided record never happened,
+    // and the player page is the surface where saying otherwise matters most.
     sql<{
       season: number; roundRaw: string; clubName: string | null; clubSlug: string | null;
       consecutiveGoalKicks: number; noFurtherCareerGoals: boolean; noFurtherCareerKicks: boolean;
@@ -564,6 +567,7 @@ export async function getPlayerHonours(playerId: number) {
         END
        WHERE a.player_id = ${playerId}
          AND a.achievement_type = 'first_kick_goal'
+         AND a.status = 'active'
          AND a.link_status_value IN ('unique','resolved')
        LIMIT 1
     `,

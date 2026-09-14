@@ -1275,7 +1275,33 @@ created, reopened, resolved, or materially reclassified.
      the `AFLDB-ISSUE-156` umbrella, not this issue. Full evidence: the `AFLDB-ISSUE-165` entry
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
-| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4, P6–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase receives an ID at its start. |
+| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`, not merged to `main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` only, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS but UNCOMMITTED in the worktree** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is the next action**, and neither DEV nor PROD has been migrated or deployed. **P6–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+<!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-167` (special records administration and durable
+     suppression; `AFLDB-ISSUE-156` P4, the transferred `AFLDB-ISSUE-155` Phase E) is RESOLVED on
+     DEV acceptance. All nine stages complete, committed and pushed on
+     `opus/issue-167-special-records-admin` (Stage 6 `077bf2a`, Stage 7 `c847b88`, Stage 8 fix
+     `026ec2a`); not merged to `main`. Migration `102_special_records_lifecycle.sql` is applied to
+     `afldb_test` and `afldb_dev` (checksum-clean, 0 pending); DEV runs `026ec2a` from a clean
+     checkout with built BUILD_ID `84-5g6y04iLdEo5FhrwxG` equal to the live `x-afldb-build`,
+     4 workers, health ok/ok. §18's acceptance matrix is green against REAL Contributor / Admin /
+     Super Admin accounts, including durable-authority replay proven through BOTH real importers,
+     CAS zero-write with focus retained, bounded revalidation, both match-delete refusals, and
+     public / NL / Grid Solver smoke. Stage 8 found and fixed two defects no earlier gate could
+     reach: a `'use server'` module exporting const arrays, which made every mutation return HTTP
+     500 because Next.js enforces that rule at first invocation rather than at build; and a
+     read-only notice shown to Super Admins above the controls that change records. The committed
+     build was then proven by a real rendered mutation (action POST 200, revalidate POST 200, zero
+     console errors) and the record restored exactly — both whole-table fingerprints identical,
+     216 requests since with zero 5xx and zero application errors. One intentional DEV fixture is
+     retained: manual `player_achievements` row 335, VOID with its reason recorded, because this
+     design has no hard delete by construction and voiding is the supported cleanup path. Two
+     follow-ups carried on the `AFLDB-ISSUE-156` umbrella, neither a blocker: the record detail
+     page overflows at 320px (§18 makes phone-only polish a follow-up), and `/players/compare`'s
+     first-kick honour was not separately rendered. PROD untouched and not otherwise claimed;
+     following the `AFLDB-ISSUE-160`–`165` sibling convention, PROD promotion is carried on the
+     umbrella, not this issue. Full evidence: the `AFLDB-ISSUE-167` entry below, *Resolution
+     (2026-09-14)*, and `AFLDB-ISSUE-167.md` §27. Removed from this table and from
+     `IssuesIndex.md`; 2 -> 1. -->
 <!-- RETIRED 2026-09-13 — `AFLDB-ISSUE-166` (streamed admin denials return HTTP 200 + meta-refresh
      instead of an HTTP redirect) is **Resolved** and is NO LONGER an open issue. Committed as
      `aaa24f8` on `opus/issue-166-admin-fetch-auth-bypass` and deployed to DEV as
@@ -27160,3 +27186,1192 @@ The production build emits a pre-existing Next 16 deprecation: `The "middleware"
 is deprecated. Please use "proxy" instead.` It is unrelated to this defect and out of scope, but
 it will matter on a future Next upgrade and `src/middleware.ts` is a security-relevant file. It is
 recorded here only so the observation is not lost; it has no ID and no owner.
+
+---
+
+## AFLDB-ISSUE-167 — Special records administration and durable suppression (ISSUE-156 P4)
+
+**Status:** **RESOLVED 2026-09-14** on DEV acceptance — see *Resolution (2026-09-14)* at the foot of this entry. As it stood before the closeout (retained): Open — **Stages 0–8 run; Stage 8 DEV acceptance GREEN**; the schema / privilege / promotion-lineage foundation, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters, the Super Admin mutation surface (correct / suppress / reinstate / replace / create, atomic audit, compare-and-swap, bounded revalidation, and the closed match-delete destruction path) and the promotion/build gate are implemented and green on `afldb_test`. **Stages 0–8 are COMMITTED AND PUSHED (Stage 6 `077bf2a`, Stage 7 `c847b88`, Stage 8 fix `026ec2a`).** **Stage 7 (2026-09-14):** G-6 PASS with no new refusal class, `npm run build` exit 0 at 1534/1534 static pages, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed — `identity.ts` reached a Client Component carrying a `node:crypto` import, so the production build failed until the manual id was minted from Web Crypto instead. **Stage 5 is signed off (operator, 2026-09-14) with no stop condition open** — its only outstanding item, whether the four drifted Grid Solver / NL after-siren fixture assertions should be re-baselined, was decided **DO NOT re-baseline** (D-6). Operator decisions: five recorded 2026-09-13 with D-4's declaration sequencing clarified at Stage 3, plus **D-6 (2026-09-14)**. **Stage 8 RUN 2026-09-14 (§27) — DEV acceptance GREEN.** Migration 102 applied to `afldb_dev` with the documented DEV-only `--allow-branch-local` acknowledgement (102/102, 0 pending), then the code, in that order — the service stayed on the old build until after the migration. Migration 102 had **never** reached DEV, proven directly (`db:status` 101/101/0 pending and zero lifecycle columns in `information_schema`) rather than inferred from `origin/main`, which proves nothing about what a host has checked out; that earlier wording is corrected in the runbook header and §26.7. D-5 held: no `db:privileges` run was needed and `privileges.sql` was not touched. **Two real defects found by rendered acceptance, both fixed:** (F-1) `actions.ts` carries `'use server'` and exported two const arrays, so Next.js refused the module at first invocation and **every mutation returned HTTP 500** — a class no gate before Stage 8 could see, because the rule is enforced at invocation, not at build, and every unit test imports the module directly as TypeScript; fixed by moving both lists to the directive-free sibling `validation.ts` (the shape the awards surface already uses), keeping the Stage 6 invariant test at full coverage, plus a new comment-stripping source gate proven RED by in-place differential and a repo-wide scan showing no other `'use server'` module offends. (F-2) the hub rendered Stage 3's unconditional read-only notice above the Super Admin mutation controls; the sentence is now chosen by the same `.edit` capability check that gates the controls, verified in both directions against real roles. **Replay proven through the REAL importers, not just the standalone adapters:** a 334-row first-kick reload reported `1 correction(s) re-applied` with an identical whole-table fingerprint, and a full 126-event after-siren reload left the suppressed record **125 active / 1 void** instead of resurrecting it; `data_overrides` was unmodified by replay and `data_edits` gained no rows from it. **§18's matrix is green against real Contributor / Admin / Super Admin accounts** signed in through the real login form with real TOTP — no session was minted and no gate relaxed — with denials as HTTP-layer redirects and zero meta-refresh on all seven surfaces (ISSUE-166's contract). Also proven live: the CAS stale form refuses readably, writes nothing **and does not drop keyboard focus to `body`** (the ISSUE-155 §27.27 H defect, verified not assumed); revalidation happens in a separate POST after the action resolves; both match-delete refusals name their own family and record, with both matches and all 17,052 rows intact; and the public/NL/Grid Solver smoke is clean, including the first-kick page's EARLIEST tile moving 1911→1920 under suppression, which shows the filter reaches the derived aggregates. Responsive clean at 768/1000/1280/1920. **That sole blocker — the Stage 8 fix being uncommitted, with DEV running it as a five-file working-tree overlay — is now CLOSED (`026ec2a`, deployed; see the Resolution below).** Two recorded follow-ups, neither a blocker: the record detail page overflows at 320px (§18 makes phone-only polish a follow-up), and `/players/compare`'s first-kick honour was not separately rendered (same proven `status = 'active'` fragment). PRODUCTION was not contacted at any point in Stage 8.
+**Severity:** Medium-high
+**Area:** Admin / Data management / Acquisition / Public read models
+**Created:** 2026-09-13
+**Parent:** `AFLDB-ISSUE-156` P4; inherited scope is the transferred `AFLDB-ISSUE-155` Phase E (§12, §14.4, §23 Phase E)
+**Runbook:** `AFLDB-ISSUE-167.md`
+**Branch / worktree:** `opus/issue-167-special-records-admin` / `D:\dev\afldb-issue-167`
+
+Stages 0 and 1 were a planning session only. **Stage 2 (2026-09-13) is the first session that
+changed the repository.** Migration 102 was applied to `afldb_test` only, and **neither DEV nor
+PROD has been migrated or touched**.
+
+**Repository state — operator-proven 2026-09-14.** Stages 0–5 are **committed and pushed** on
+`opus/issue-167-special-records-admin`: planning/allocation `9faba6f`, Stage 2 `8d9ac74`, Stage 3
+`2a54444`, Stage 4 `5de87dd`, Stage 5 `e8b44f6`, tracking reconcile `c5a0df7`; `HEAD = @{u} =
+c5a0df7a64663bfe8dbfbeb56d65e0a5879defc0`. **Stage 6's own change is in the worktree and is NOT
+committed** — see the Stage 6 files list below. **Nothing is merged to `main`**, and
+no DEV or PROD migration or deployment has been made — §13 of the runbook places that at Stage 8.
+Each stage's own "nothing staged, committed, pushed" note below records the state at the close of
+that session and is superseded, on the commit/push half only, by this paragraph.
+
+### Allocation proof
+
+`AFLDB-ISSUE-167` was unused before this entry. A native repository-wide search for `ISSUE-167`
+over the whole worktree returned **no files** — covering `issues.md`, `IssuesIndex.md`,
+`CHANGELOG.md` and every runbook. The highest `issues.md` heading was `AFLDB-ISSUE-166`; the
+highest root runbook was `AFLDB-ISSUE-165.md`.
+
+**Stage 0 is PASS.** The operator executed the `AFLDB-ISSUE-167.md` §0.5 command block on
+2026-09-13: branch `opus/issue-167-special-records-admin`; HEAD, `main` and `origin/main` all
+`bb2e0af2dcb744e81de324d3d2dfb5377a0970cd`; `git log main..HEAD` and `git log HEAD..main` both
+empty, so the worktree is based cleanly on current main with nothing ahead or behind; `worktree
+list` shows exactly one ISSUE-167 worktree; branch search finds only
+`opus/issue-167-special-records-admin`; `git log --all --grep="ISSUE-167"` is empty; a repository
+search now finds `ISSUE-167` only in the four planning files this session created; `git diff
+--check` clean, with the working tree holding only those four planning changes. The ID is unused
+across tracking files, runbooks, branches, worktrees and history alike.
+
+Highest migration on this branch is `101_awards_honours_lifecycle.sql`, so the next free number is
+**102**. It is **deliberately not allocated** — other open worktrees may claim it first, and the
+all-refs collision check is an operator command that has not been run.
+
+### Objective
+
+One authoritative, audited, capability-gated, replay-safe Admin surface for the two Phase E
+special-record families, so that a wrong source fact can be corrected without touching identity, a
+fact that should never have been published can be suppressed without a destructive `DELETE` and
+cannot be resurrected by any importer or rebuild path, a genuinely manual record can be created
+under `manual_admin_edit` provenance, and a suppressed record disappears from every public read
+model while staying fully visible in admin and audit history.
+
+### Current-state findings
+
+**Family A — first-kick goal (`player_achievements`, migration 053).** Source
+`wikipedia_first_kick_goal`; `source_record_id` is `fkg-NNN`, assigned in the **tracked, committed**
+manifest `data/records/first-kick-goal-ids.csv`, under
+`player_achievements_source_uq UNIQUE NULLS NOT DISTINCT (source_id, source_record_id)`. Importer
+`tools/records/import-first-kick-goal.ts` (TypeScript) scopes ownership by
+`achievement_type AND source_id`, aborts via `ReloadAbort` before writing anything in the owned
+scope, and deletes on retirement only behind `--accept-retirement`. It is a `LINK_TARGET_TABLE`, so
+unlinked rows reach `/admin/player-links`.
+
+**Family B — after the siren (`after_siren_kicks`, migration 089).** Source
+`wikipedia_after_siren_kicks`; `source_record_id` is the tracked artefact's `event_key`, under the
+same `UNIQUE NULLS NOT DISTINCT` discipline. Loader `tools/migration/after_siren.py` upserts on
+`(source_id, event_key)` and rewrites a column only when it differs. It is **not** a
+`LINK_TARGET_TABLE`, so an unlinked after-siren row has no admin queue anywhere.
+
+**Neither family lacks stable identity.** That stop condition is **not triggered**.
+
+**Neither table has any correction, lifecycle or override seam today.**
+`data_overrides.entity_type` (073, widened by 095/096/097/098/101) admits neither, and neither table
+carries `status`, `status_reason` or `updated_at`.
+
+**Three destruction paths exist, not one.** The first-kick retirement `DELETE`
+(`import-first-kick-goal.ts`); the after-siren
+`DELETE FROM after_siren_kicks WHERE source_id = %s AND NOT (source_record_id = ANY(%s))`
+(`tools/migration/after_siren.py:992`, broader and less guarded — no acknowledgement flag); and
+**`src/db/queries/match-admin.ts:401`**, `DELETE FROM player_achievements WHERE match_id = $1`,
+which runs when an admin deletes a match and is outside both importers and outside every
+reload-survival mechanism.
+
+**Three apparently-manual fields are actually derived** and are therefore classified read-only
+rather than designed around — this stop condition **was triggered and is resolved in the plan**:
+`link_status_value` / `candidate_count` are owned by the link pipeline and bound by the
+`*_link_ck` CHECKs on both tables; `player_achievements.match_id` is *"resolved by career game
+position (1 + kickless_matches_before_first_kick), never by season/round/club lookup"* (053's own
+column comment), so the real correction is to `kickless_matches_before_first_kick`; and
+`after_siren_kicks.club_id` is taken from the resolved match wherever there is one
+(`after_siren.py:554-559`), so it is editable only on a match-less row.
+
+**Nothing is retired from `/admin/data-editor`.** A repository search for
+`achievement|first_kick|firstKick|siren` under `src/app/admin/**` returns only the player-link queue
+label and two unrelated Hall-of-Fame form fields. Unlike P5, P4 takes over no existing action.
+
+**Promotion inventory is incomplete for both tables.** `after_siren_kicks` does not appear in
+`tools/db/promotion-inventory.ts` at all — the file's own `unclassified` problem class plus umbrella
+R-3 make that a stop-before-merge. `player_achievements` appears only as a
+`player_link_resolutions.target_id` target classified `identity: 'none'`, whose remediation text
+(*"nothing in the tree carries an external key for one of their rows"*) is **now factually wrong for
+this table**: the tracked `fkg-NNN` manifest is exactly such a key.
+
+**`privileges.sql` is subtractive and hand-typed for `afldb_auth`.** The admin pages read both
+tables on the auth pool, so both need an explicit `afldb_auth` SELECT entry in the same change
+(umbrella R-2). This is the umbrella's own recorded class of defect — an admin page reading an
+operational table on the wrong pool, which only a real role catches.
+
+### Design summary
+
+Reuses the `AFLDB-ISSUE-165` two-layer model, which matches this grain genuinely: lifecycle columns
+(`status IN ('active','void')`, mandatory `status_reason` on void, `updated_at` as the
+compare-and-swap column) are the cheap read-path cache that survives an ordinary scoped reload for
+free, and the durable record is a `data_overrides` row replayed by `replay_admin_overrides` with
+three field groups — `lifecycle` (warn-and-retain when the target row is absent), `correction`
+(fail closed), `record` (re-create then restore, fail closed). `entity_key` is
+`'<sources.key>:<source_record_id>'` for both families, which is **simpler** than ISSUE-165's shapes
+because both tables already carry a real tracked source record id on every row.
+
+**Adds no new table** (Phase E §12 forbids a parallel records table) and **no `data_overrides`
+structural change** — `field_group` + `override_values` already carry the suppress operation.
+Capabilities follow the ISSUE-165 precedent: `data.records.read` (Admin-and-up),
+`data.records.edit` (Super Admin only). Route is `/admin/records` with per-family subroutes, per
+ISSUE-155 §12 verbatim. The "delete" control is presented as **Suppress record**; physical deletion
+stays operator CLI repair only.
+
+### Operator decisions — all four recorded 2026-09-13, none open
+
+- **D-1 — APPROVED, EXCLUDE.** Family/father-son is outside ISSUE-167 entirely; P4 is limited to
+  first-kick goal and after-the-siren. The evidence: ISSUE-156's route parenthetical implied three
+  domains, but the authoritative ISSUE-155 §12 names two and closes *"No other record family is added
+  merely because it is manually curated."* Migration 088 adds no table — it constrains
+  `father_son_selections`, a migration 006 draft-relationships table with plain nullable
+  `source_record_id text UNIQUE`, no provenance quartet and two independent person links: materially
+  weaker identity, in P3b/P9 territory. The `/records/family` namespace is left unclaimed.
+- **D-2 — APPROVED, DEFER.** P4 may display current linkage state but must **not** create another
+  player-link queue or authority, and must not collide with the uncommitted `AFLDB-ISSUE-164`.
+  `LINK_TARGET_TABLES` is **not** modified. The admin row shows `link_status_value`,
+  `candidate_count` and the resolved player read-only, so the gap stays visible rather than silent.
+- **D-3 — APPROVED WITH MODIFICATION: one durable authority, two replay adapters.** `data_overrides`
+  remains the sole durable authority. After-siren uses the existing Python `common.py` replay
+  contract; `tools/records/import-first-kick-goal.ts` gets an explicit TypeScript replay adapter
+  implementing the same `lifecycle`/`correction`/`record` semantics; **both adapters are pinned by
+  parity/contract tests**; **replay must be atomic with the owning importer**; first-kick is not
+  ported to Python merely to share `common.py`; no second authority table or mechanism is introduced.
+  The modification draws the right line — *one authority* is a property of the durable store and the
+  semantics, not of the implementation language, and two adapters over one authority is not two
+  authorities provided the semantics are pinned.
+- **D-4 — APPROVED, TWO capabilities.** `data.specialRecords.read` (Admin + Super Admin) and
+  `data.specialRecords.edit` (Super Admin). Create, correct, void, suppress, reinstate and replace
+  are all writes under `.edit`; there is **no separate `.suppress`**. This supersedes ISSUE-156 §2's
+  written `data.records.edit` / `.suppress`: both writes would be Super-Admin-only, so a split
+  separates nobody, and ISSUE-165 and ISSUE-160 D-6 both refused the extra capability on the same
+  reasoning. The `specialRecords` segment also avoids colliding conceptually with
+  `src/db/queries/records.ts`, which in this codebase means computed leaderboards and nothing stored
+  — the naming hazard migration 053 called out at `:21-23`.
+
+### D-3 atomicity — structurally feasible, proven from source
+
+D-3's escape clause (*"if the current TypeScript importer cannot replay overrides atomically within
+its existing transaction structure, STOP and report rather than weakening the contract"*) is **NOT
+invoked**. Evidence from `tools/records/import-first-kick-goal.ts`:
+
+- `postgres(dsn, { max: 1, onnotice: () => {} })` at `:740` — a single pooled connection, so there
+  is no second implicit session to diverge.
+- `await sql.begin(async (tx) => { … })` opens at `:888` and closes at `:1353`. **One transaction
+  wraps the entire apply phase**: the `import_batches` insert (`:892-896`), every preflight
+  `ReloadAbort` (`:916, :936, :947, :1136`), the retirement `DELETE` and all upserts
+  (`:1174-1301`), the `data_issues` refiling (`:1309-1336`) and the batch completion
+  (`:1339-1344`).
+- `ReloadAbort` is the documented ISSUE-078 contract at `:94-98` — raised *before anything in the
+  owned scope is written*, so the surrounding transaction rolls back untouched.
+- `await sql.end({ timeout: 5 })` sits in a `finally` **outside** `begin` (`:1354-1356`), so
+  connection teardown commits nothing.
+- `rowIds`, the stable-key→surviving-row-id map, is already in scope at `:1308-1319`.
+
+A TypeScript adapter placed on that same `tx` handle between the upsert phase (`:1301`) and the
+`data_issues` refiling (`:1309`) is therefore atomic **by construction**: it sees the same
+uncommitted state, has the key→id map it needs, and can throw `ReloadAbort` to roll everything back.
+**No change to the transaction structure is required and nothing is weakened.**
+
+Two supporting facts. First, **the replay contract is read-only against `data_overrides`** — every
+one of `common.py`'s override references is a `FROM data_overrides` read; none writes, updates or
+deletes one. That matches migration 073's `GRANT SELECT ON data_overrides TO afldb_import` and its
+comment *"SELECT only: `data_overrides` is not importer-owned"* (`073:29-38`). Neither adapter may
+write it, including the `lifecycle` warn-and-retain branch, whose whole point is that it does not
+delete the override. Second, the `record` group's INSERT into `player_achievements` is already
+covered by `grant_import_write` (`053:152`), so the replay needs no privilege change.
+
+Gate **G-5** is revised accordingly — it no longer asks whether `rebuild-test.ts` can sequence a
+subprocess call, but requires the adapter to run on the importer's own `tx` with a RED-then-GREEN
+atomicity test — and a new gate **G-9** covers the adapter parity suite.
+
+### Stage 1 evidence gate — PASS (2026-09-13)
+
+Probes P-1…P-4 executed **read-only** against `afldb_test` at `127.0.0.1:5432/afldb_test` — host
+`127.0.0.1`, port `5432`, listener verified, PostgreSQL client 16.15 — wrapped by
+`--single-transaction` with `SET TRANSACTION READ ONLY`. Nothing was written and no DEV or PROD
+database was contacted.
+
+**P-1 — PASS.**
+
+| Table | Source | Rows | Unlinked | Unmatched |
+|---|---|---|---|---|
+| `after_siren_kicks` | `wikipedia_after_siren_kicks` | 126 | 6 | 10 |
+| `player_achievements` | `wikipedia_first_kick_goal` | 334 | 4 | 6 |
+
+**No NULL-source ownership group in either family.** The single `(NULL, NULL)` slot that
+`UNIQUE NULLS NOT DISTINCT` permits is unoccupied in both tables, so the manual-creation design
+(a manual row must carry the `manual_admin_edit` source and a minted `source_record_id`) stands
+unchanged. The 334 also reconciles with migration 053's recorded note that the extract carried 334
+rows against the source's stale prose claim of 332 — the table is at its expected size, not short.
+
+**P-2 — PASS. Every current row in both families has stable source identity.**
+`player_achievements` rows 334 / `with_key` 334 / `off_pattern` 0; `after_siren_kicks` rows 126 /
+`with_key` 126. **The after-siren `off_pattern` column was a deliberate NULL placeholder in the
+probe and must not be described as a failed or skipped pattern check:** the after-siren identity is
+the artefact's own `event_key`, which has no fixed regular shape to assert against. Its guarantee
+comes from `with_key = rows` plus `after_siren_kicks_source_uq`, both of which hold.
+
+**P-3 — PASS.** `with_colon = 0` in both tables. The planned `'<source key>:<record id>'`
+`entity_key` grammar is **admissible as designed**; no separator change is needed, and the writer's
+refusal of a colon-bearing `source_record_id` is a forward guard rather than a data migration.
+
+**P-4 — PASS, and the authoritative migration input for gate G-1.** Read live:
+
+- `data_edits_table_name_check`: `players`, `matches`, `draft_picks`, `award_winners`,
+  `hall_of_fame`, `honour_team_members`, `brownlow_vote_entry_state`, `brownlow_season_authority`,
+  `coaches`, `fixtures`, `club_leadership`.
+- `data_overrides_entity_type_check`: `players`, `matches`, `draft_picks`, `coaches`,
+  `match_coaches`, `season_list_members`, `fixtures`, `club_leadership`, `award_winners`,
+  `hall_of_fame`, `honour_team_members`.
+
+**`player_achievements` and `after_siren_kicks` are absent from BOTH allowlists.** Stage 2's
+migration therefore **explicitly widens `data_edits.table_name` and `data_overrides.entity_type` to
+include both table names**, retaining every existing literal verbatim. Unlike ISSUE-165, which
+needed no `data_edits` widening because migration 058 already admitted its three tables, P4 needs
+one for both of its tables.
+
+Three corroborations that the probe read a database at the expected schema state rather than a
+drifted one: the `data_overrides` list matches migration 101's eleven literals exactly;
+`season_list_members` is absent from `data_edits` exactly as migration 096 documented; and
+`match_coaches` is absent from `data_edits` exactly as migration 095 documented.
+
+**This does not change the decision that P4 adds no new table and no structural change to
+`data_overrides`.** Widening a CHECK constraint's allowlist is additive and admits more values; it
+alters no column, no index and no key.
+
+**No further Stage 1 DB evidence is required.** P-5 (access-path `EXPLAIN` baseline) and P-6
+(match-delete collateral sizing) remain non-blocking Stage 2 inputs, as already planned.
+
+### Probe environment — corrections recorded
+
+Corrected against the actual run, so the earlier wording is not re-derived:
+
+- **Worktrees do not carry their own `.env`.** Use the established shared env at
+  `D:\dev\afldb\.env`.
+- **Do not hard-code port 55432.** That was one historical tunnel arrangement, not a property of
+  `afldb_test`. Take the port from the configured DSN.
+- **Safety contract:** a `_test` database name **plus** a `localhost`/`127.0.0.1` host **plus** a
+  live listener on the configured local port. Proven endpoint: `127.0.0.1:5432/afldb_test`.
+- **PowerShell scratch-SQL generation must write UTF-8 without BOM** —
+  `[System.IO.File]::WriteAllText(path, sql, [System.Text.UTF8Encoding]::new($false))`. `Out-File`
+  and `Set-Content` add a BOM or the ANSI codepage, and psql fails on a BOM before the first
+  statement.
+- **Retain** `--single-transaction`, `SET TRANSACTION READ ONLY`, `-X` and `ON_ERROR_STOP=1`.
+
+### Stop conditions at end of planning
+
+Not triggered: missing stable identity; general player merge or fixture rekey required; provenance
+cannot distinguish source-owned from manual (it can — `source_id`, and `UNIQUE NULLS NOT DISTINCT`
+forces a manual row to carry a real source); migration conflict with `main`; privileges/promotion
+cannot be made fail-closed. **Also not triggered:** suppression surviving importer and rebuild —
+D-3 is settled and its atomicity requirement is proven structurally feasible from source (above), so
+the Phase E stop condition and D-3's own STOP clause both stand down. **Triggered and resolved in
+the plan:** an apparently manual field is actually derived elsewhere — three of them, now classified
+read-only. No stop condition remains open.
+
+### Stage 2 — PASS (2026-09-13), the schema / privilege / promotion-lineage foundation
+
+Full evidence is `AFLDB-ISSUE-167.md` §21. Summary:
+
+**Migration `102_special_records_lifecycle.sql` allocated and applied to `afldb_test` only.**
+Gate G-7 was re-run first across four surfaces, not just the working directory: the working tree;
+**all 27 worktrees including uncommitted files** (the check that matters, because ISSUE-164's and
+ISSUE-165's work is uncommitted and a git-only scan would miss a claim); every local and remote ref
+via `git ls-tree`; and reachable history via `git log --diff-filter=A` plus `git rev-list --objects`.
+**Zero claims on 102 anywhere.** Database identity was re-proven by the §15.0 three-condition
+contract before any command — `127.0.0.1:5432/afldb_test`, loopback, live listener.
+
+The migration adds `status`/`status_reason`/`updated_at` plus `<table>_status_ck` and
+`<table>_void_reason_ck` to both `player_achievements` and `after_siren_kicks`; widens
+`data_overrides.entity_type` and `data_edits.table_name` to 13 literals each, **retaining every
+existing literal verbatim and still refusing all three settle targets**; adds **no table, no index,
+no `created_at`**, and leaves both `*_source_uq` constraints untouched (unlike migration 101, no
+active-row-only uniqueness is needed — the only uniqueness IS the source key, and a manual
+replacement mints a new one).
+
+**Gates.** G-1 carried from P-4; **G-3 PASS** (`after_siren_kicks.cited` is an evidence-gap flag,
+projected by every consumer and filtered on by none — never conflated with `void`, and a test
+asserts migration 102 voided no uncited row); **G-4 PASS** (`manual-authority.ts` read directly:
+`overrideScopeProvenFrom()`'s condition 4 is `editor ⊆ CHECK`, which only gets easier as the CHECK
+grows, so the widening is order-independent — now asserted as an equality in
+`tests/current-season-import.test.ts`); **G-7 PASS**; **G-8 PASS** (the first-kick importer's
+`INSERT` names 21 columns and its `UPDATE` 18, and none of the three lifecycle columns is in either;
+`owned` and the retirement `DELETE` are both scoped by `achievement_type` AND `source_id`, so a
+`manual_admin_edit` row falls outside both by construction); **G-6 PASS, re-baselined**
+(`db:promotion:check --phase source --database afldb_test` → PASS, 8 gates, including
+`[PASS] Table classification (fail-closed)`; no new refusal class, and the ISSUE-139/143 refusals
+live in the pre-cutover phase and are untouched).
+
+**Promotion inventory (§11).** `LineageIdentityRule` gains `first_kick_goal_key` and
+`after_siren_key`, both resolving `'<sources.key>|<source_record_id>'` — the `award_winner_key`
+shape. `data_edits` gains a lineage target for each, **in the same change that admits them**, which
+is the first time that obligation has been discharged at the point it was created rather than found
+by a later issue (it slipped four times before: `draft_picks` in 057, and the three honours tables
+in 058). The stale `player_link_resolutions.target_id` classification for `player_achievements` was
+corrected from `identity: 'none'` to `first_kick_goal_key`: `fkg-NNN` in the tracked, committed
+`data/records/first-kick-goal-ids.csv` **is** an external key for one of its rows, and has been since
+the ISSUE-078 rekey. **ISSUE-139 D1 is NOT reopened** — six of the seven targets still carry no key,
+so the table as a whole is still withheld from a DEV promotion, and a test now asserts that.
+
+**Two planning claims corrected by execution.** (1) **§11.4 was wrong**: `after_siren_kicks` was
+never unclassified — migration 089's `grant_import_write` put it in
+`afldb_meta.import_writable_tables`, which is one of the two halves `classifyPublicTables()` accepts,
+so **umbrella R-3 was never at risk**. The same holds for `player_achievements` via `053:152`. The
+genuine promotion work was §11.1–§11.3, and all three were done. (2) **§5.3's colon refusal cannot be
+universal** — its own manual example `'manual_admin_edit:first_kick_goal:<uuid>'` contains a colon by
+construction, exactly as ISSUE-165's `'award_winner:<uuid>'` does. It is now scoped: absolute refusal
+of a colon in the **source key** (which would steal the first-colon split point), plus a manifest
+guard refusing one in a source-owned id. Also: the first-kick importer is at
+`tools/records/import-first-kick-goal.ts`, not `tools/migration/` as §8.2/§14.1 imply.
+
+**Decision D-5 (raised at Stage 2, APPROVED by the operator 2026-09-13, §21.6): the
+`privileges.sql` change §6.5 asked for was NOT made, and `tools/maintenance/privileges.sql` stays
+unchanged.** It was raised as a stop condition during execution and **closed the same day**;
+nothing about it remains open. §6.5's premise — that the admin surface reads these tables on the
+**auth pool** — is
+contradicted by current source. `src/db/queries/player-links.ts:86-88` states the opposite about
+these exact tables (*"Reads run on the public client"*); every comparable admin data surface reads on
+`@/db/client` (`afldb_app`) and writes on a short-lived `AFLDB_IMPORT_DATABASE_URL` transaction, with
+`authSql` reserved for operational tables; **ISSUE-165 made no `privileges.sql` change for the
+identical shape** and migration 101 says why at `:73-81`; and `src/db/authClient.ts` documents the
+invariant the change would erode (*"a compromise of the auth path still cannot touch statistics"*).
+Live measurement agrees: `afldb_app` SELECT = true, `afldb_auth` SELECT = false on both tables. The
+umbrella R-2 obligation is instead discharged on the correct pool — both tables already carry
+`grant_app_read()`/`grant_import_write()`, both are in the catalogue registries `privileges.sql`
+reconciles from, and the whole contract including `afldb_auth`'s **absence** is now pinned by tests.
+**Operator's grounds, recorded:** reads for these data surfaces use the app/public pool; writes use
+`afldb_import`; `afldb_auth` is reserved for operational/auth-owned tables; no current or planned
+ISSUE-167 path consumes these tables through `authSql`; and adding the grants would widen an
+otherwise deliberate boundary **without a caller**. **Binding on Stages 3–8:** `privileges.sql` is
+not to be edited by this issue; a later stage wanting an `afldb_auth` grant on either table has put
+a read on the wrong pool and should fix the query; §13's deploy order loses its `db:privileges`
+step; and the five-clause regression assertion in
+`tests/integration/special-records-lifecycle.test.ts` is **retained by explicit instruction** —
+`afldb_app` can SELECT the lifecycle columns, `afldb_app` cannot mutate them, `afldb_import` holds
+the intended import/write privileges, `afldb_auth` has no access, and the auth privilege
+specification does not name either table. That last clause is what stops the decision drifting on
+one side only.
+
+**Restricted-role evidence.** The owner-role trap ISSUE-165 recorded was closed rather than
+repeated: `AFLDB_TEST_DATABASE_URL` authenticates as `afldb_owner`, so every grant is asked of the
+catalogue for a named role, and the importer's is additionally **exercised over a real `afldb_import`
+connection** via `createImportRoleParityHarness`. `afldb_app` holds SELECT on all three new columns
+of both tables and no write of any kind; `afldb_import` holds SELECT/INSERT/UPDATE on all three
+(table-level `grant_import_write` covers new columns without a further grant) and a real restricted
+session read both tables and performed a rolled-back lifecycle `UPDATE`; `afldb_auth` holds nothing.
+`data_overrides`' migration-078 grants were re-verified and are **COLUMN-level** for `afldb_import`
+(7 INSERT columns, 4 UPDATE columns) plus table-level SELECT — the exact shape an owner-role test
+hides.
+
+### Validation
+
+**Stages 0 and 1** — the allocation proof and the read-only `afldb_test` probes P-1…P-4, both
+executed by the operator.
+
+**Stage 2** — executed with operator authorisation, against `afldb_test` only:
+`tools/db/migrate.ts --target test` applied 102 (`0 pending`, checksum clean); the two new suites
+(`tests/special-records-identity.test.ts`, `tests/integration/special-records-lifecycle.test.ts`)
+**29 passed / 1 skipped** — the skip is the "restricted validation was skipped" reporter, correctly
+inactive because the harness *is* configured; `tests/db-promotion-check.test.ts`,
+`tests/current-season-import.test.ts` and `tests/data-overrides-source-contract.test.ts`
+**405 passed / 4 skipped**; the seven affected integration suites (`after-siren`,
+`first-kick-goal-reload-links`, `privileges`, both NL answer suites, `player-link-mutations`,
+`admin-awards`) **162 passed / 16 skipped / 0 failed**; `npx tsc --noEmit` exit 0; `npx eslint` over
+every changed file exit 0; `db:promotion:check --phase source` PASS; `git diff --check` clean.
+
+Five RED tests were established before the fix, and **the first was raised by the repository's own
+standing contract rather than by a human**: widening `data_edits.table_name` in migration 102 made
+`tests/db-promotion-check.test.ts` fail with *"data_edits admits 'player_achievements' with no
+lineage target and no recorded exemption"* — exactly what ISSUE-165 built that check for.
+
+**Full suite, with a differential baseline — zero regressions attributable to Stage 2** (§21.10).
+`npx vitest run` on this branch: **44 failed / 7,110 passed / 101 skipped (7,275)**, 1,970 s. The
+same 11 failing files re-run in a detached worktree at **`9faba6f`** — this branch *without any
+Stage 2 change* — in the same environment against the same `afldb_test`: **44 failed / 1,679 passed
+/ 61 skipped**. Comparing the two failing-test lists as sets returns **IDENTICAL**, both directions.
+All 44 are football-data semantics against an `afldb_test` that lags the canonical rebuild
+(`club-comparison` 24, `database` 4, `gridley-corpus` 4, `release-gates` 4, `awards-reload-links` 2,
+`club-comparison-route` 2, `grid-solver` 2, and one each in `finals-semantics-contract` — the known
+Windows CRLF case that passes on Linux — `admin-brownlow` (a 30 s hook timeout under contention),
+`data-editor` and `nl-answers-coaching`). Eight were already recorded as failing on this database
+earlier the same day, before any ISSUE-167 change existed, which corroborates the differential
+independently. The baseline worktree was removed and pruned.
+
+**Environment note worth carrying (§21.10).** A worktree has no `.env`, and two ways of supplying
+the configuration are wrong: setting only the two test DSNs leaves every auth-pool test failing on
+`AFLDB_AUTH_DATABASE_URL is not set`; and copying the shared `.env` in is worse, because
+`tools/migration/common.py`'s `load_env()` reads it with the Windows cp1252 codec, so a UTF-8 copy
+raises `UnicodeDecodeError` and every Python-importer test dies at startup. The correct
+configuration is **no `.env` plus four explicit DSNs** — the CI contract `tests/setup.ts` describes.
+Also: **stop a running suite before migrating the database it is using.** Both errors invalidated a
+30-minute run; neither could reach the repository (a worktree `.env` is gitignored) and neither
+altered `afldb_test`'s contents — probed after all runs at `award_winners` 3,712, `players` 13,338,
+`matches` 17,051, `player_achievements` 334, `after_siren_kicks` 126, every special-record row
+`active`, no leftover fixtures.
+
+**Standing caveat:** Linux is the supported runtime (CLAUDE.md §11); a Windows run does not prove
+Linux integration behaviour, and one of the 44 is a Windows-only artefact. The differential
+establishes the narrower claim that was asked for — **Stage 2 introduces no new failure** — not that
+the suite is green.
+
+**No DEV or PROD migration, deployment, commit, push or merge was performed.** The RED-first test
+strategy (including the still-unwritten adapter-parity and atomicity suites), the nine evidence gates
+G-1…G-9, the eight-stage plan and the acceptance matrix are all in `AFLDB-ISSUE-167.md`.
+
+### Stage 3 — PASS (2026-09-14), the capability, the nav entry and the read-only admin surface
+
+Full evidence is `AFLDB-ISSUE-167.md` §22. The checkpoint was re-proven before anything was edited:
+worktree clean, HEAD `8d9ac74` identical to `origin/opus/issue-167-special-records-admin`, migration
+102 carried in that commit, and `migrate.ts --status --target test` reporting `102 already applied,
+0 pending` — which is positive checksum proof, because the drift refusal runs *before* the status
+branch. `afldb_test` on loopback was re-proven by the three-condition contract first.
+
+**Five routes under one nav entry.** `/admin/records` (two family cards with active / void counts),
+`/admin/records/first-kick-goal` and `/admin/records/after-the-siren` (searchable, filterable lists),
+and a detail page for each family showing identity, provenance, durable identity, lifecycle state and
+reason, read-only link state, the derived football context, and the record's own `data_edits`
+history. One `Data` entry — `Special records` — not two, per §10.1. **No `/new` route**: creation
+implies a mutation and belongs to Stage 6.
+
+**D-4 declaration sequencing clarified (`AFLDB-ISSUE-167.md` §9.1), approved 2026-09-14.** Only
+`data.specialRecords.read` is declared; `.edit` is declared at Stage 6 beside its first guarded
+mutation. `tests/auth.test.ts:1040-1046` fails any capability declared but awaited by no
+`requireCapability()` at a real boundary, so declaring `.edit` in a read-only stage could only be
+reconciled by shipping a write path early or weakening that contract — both forbidden by the stage's
+own terms. The contradiction was raised before implementation rather than worked around. **D-4's
+final role matrix is unchanged** (Contributor neither, Admin `.read`, Super Admin both), no test was
+weakened and no declared-ahead-of-enforcement exemption was added.
+
+**Server-side enforcement, all three roles, against the real guard.** All five routes await
+`requireCapability('data.specialRecords.read')` before anything else, which `tests/auth.test.ts`
+enforces structurally. The role proof is not a mock of the capability table: `it.each` over every
+declared capability drives the real `requireCapability()` with a signed cookie and a session row —
+Contributor bounced to `/admin/upload`, Admin and Super Admin admitted. **ISSUE-166's transport
+contract is intact**: the denial is a `redirect()`, and no `loading.tsx` or layout `<Suspense>` was
+added anywhere (asserted repo-wide by the existing suite and again for this domain).
+
+**D-5 confirmed in practice.** Both tables are read on the app/public pool (`@/db/client`) and
+nowhere else; neither the query module nor any records page imports `@/db/authClient`;
+`tools/maintenance/privileges.sql` is unchanged and grants nothing on either table. The single
+auth-pool read is `data_edits` through the ISSUE-157 reader, which is an operational table the app
+role cannot read and is not one of the two D-5 is about. **Stage 2's five privilege assertions are
+still green.**
+
+**D-2 and D-1 proven, not asserted.** `LINK_TARGET_TABLES` is unchanged member-by-member and
+`after_siren_kicks` remains absent; nothing in the domain references `player_link_resolutions`, calls
+a link-resolution function, or writes either table; link status, candidate count and the resolved
+player are shown read-only with the reason beside them, so the deferred gap is visible rather than
+silent. No family or father-son surface exists. The list deliberately does **not** filter
+`achievement_type` — the enum has one member, and a predicate would silently hide a future family row
+rather than surface it — so a test pins the enum to one member as the alarm.
+
+**A §12 question answered early.** The ISSUE-157 audit viewer *does* carry its own table-name
+allowlist: `DataEditTableName` / `DATA_EDIT_TABLE_NAMES` (`src/db/queries/audit-log.ts`) gate what may
+be written and what a URL `?table=` filter may bind, and `DATA_EDIT_TABLE_LABELS`
+(`src/lib/audit-view.ts`) is keyed on the union. Both were widened — read-only work, no mutation —
+because without the union a record's own history could not be typed or rendered at all. A test now
+pins the TypeScript list against the literals parsed out of migration 102.
+
+**One deliberate departure from the ISSUE-165 precedent:** the admin lists default to *all* statuses
+rather than *active*. This is the surface whose job is to report what the lifecycle removed from the
+public site, and the families hold 334 + 126 rows. The default is a named constant and is asserted;
+Stage 5's `status = 'active'` filtering stays a public-read-model concern and is asserted absent from
+every admin query.
+
+**Validation.** RED first — 6 failing assertions plus one unloadable suite before implementation.
+Then: `tests/auth.test.ts` + `tests/special-records-admin.test.ts` **172 passed**;
+`tests/integration/admin-special-records.test.ts` **14 passed** on `afldb_test`; eight affected
+suites (identity, audit viewer, overrides source contract, promotion check, awards admin, Stage 2
+lifecycle, integration audit, integration privileges) **296 passed, 1 skipped, 0 failed**;
+`npx tsc --noEmit` exit 0; ESLint over every changed file exit 0; `git diff --check` exit 0. Each of
+the four explicit DSNs was verified to end in `_test` before the runner was invoked — a naive path
+swap produced `afldb_dev` targets on the first attempt and the pre-flight check caught it before any
+test ran. No full-suite run: the focused surface is green and §21.10's 44-failure baseline is
+unchanged by a read-only surface; Linux/CI remains the authoritative full-suite signal.
+
+**Nothing staged, committed, pushed, merged or deployed; DEV and PROD untouched.**
+
+### Stage 4 — both replay adapters and the importer refusals — PASS (2026-09-14)
+
+Full evidence is `AFLDB-ISSUE-167.md` §23. This is the **Phase E stop-condition stage**, and neither
+gate it turns on is now open.
+
+**Checkpoint before any edit:** branch `opus/issue-167-special-records-admin`, HEAD and `@{u}` both
+`2a544441af3e105a4b353198d18e75cec9f2b417` with nothing ahead or behind, tracked tree clean,
+`127.0.0.1:5432/afldb_test` proven `_test` + loopback + live listener, and migration **102 applied
+with no checksum drift** (`migrate.ts --status` runs the drift check at `:262-270` *before* its
+status return, so one read-only command proves both). Migration 102 was not touched.
+
+**D-3 implemented as approved: one durable authority, two replay adapters.** New
+`tools/records/special-records-replay.ts` replays `player_achievements`; a new `after_siren_kicks`
+branch of `common.py`'s `replay_admin_overrides` replays the other. Six statements per adapter in the
+same order — validate-and-refuse, warn-and-retain, re-create `record`, restore `record`, apply the
+`correction` delta, apply `lifecycle` — the `hall_of_fame` shape, so P4 adds no new mechanism.
+**Neither adapter writes `data_overrides`**, matching migration 073's SELECT-only import grant.
+
+**Gate G-5 PASS — atomicity.** The TypeScript adapter takes a **transaction handle**, typed
+`Pick<TransactionSql, 'unsafe'>` so it cannot commit, roll back or nest, and the importer calls it
+inside its existing `sql.begin` between the human-decision re-apply and the `data_issues` refiling —
+the exact seam §8.2.2 proved from source. The atomicity test forces a **real** fail-closed case (a
+`correction` override naming an absent row) rather than an injected hook, after the retirement
+`DELETE` and the upserts have already written, and asserts `player_achievements`, `data_issues`,
+`import_batches` (no batch row at all) and the retirement effect all unchanged. RED before the
+adapter, GREEN after. **No change to the transaction structure and nothing weakened; D-3's STOP
+clause is not invoked.**
+
+**Gate G-9 PASS — adapter parity.** One language-neutral corpus,
+`tests/fixtures/special-records-replay-parity.json`, drives **both** adapters with byte-identical
+seeding, and every case asserts against the corpus *and* against the other adapter: lifecycle
+present/absent, correction present/absent, `record` re-creation including a voided row and a resolving
+and a non-resolving `player_identity`, entity-key collision, three malformed-key shapes, unknown
+field group, invalid status, void without a reason, and — on every case — a `data_overrides`
+fingerprint proving neither adapter wrote it. **19 passed, 0 failed.** The RED was informative: with
+the TypeScript adapter written and the Python branch absent, **all 16 failures were on the
+`after_siren_kicks (python)` side** and the TypeScript half of every case passed first.
+
+**The collision rule was defined rather than assumed.** §8.4's literal reading — two rows resolving
+to one `entity_key` — is structurally unreachable: the first-colon split is injective and both tables
+carry `UNIQUE NULLS NOT DISTINCT (source_id, source_record_id)`. What *is* reachable is two overrides
+on one key, since `data_overrides_uq` is `(entity_type, entity_key, field_group)`. Both adapters
+therefore fail closed when a **`record`** override — which owns the whole row including its `status` —
+shares a key with any second authority, and deliberately do **not** treat `correction` + `lifecycle`
+as a collision, because those own disjoint fields and replay in a defined order. Both halves are
+corpus cases.
+
+**Both importer refusals implemented, neither reachable past a flag.** `--accept-retirement`
+authorises losing a durable *reference* and `--allow-link-loss` a *link decision*; neither is
+authority to destroy the row a lifecycle or correction decision is attached to, because a
+source-owned row cannot be re-created from a lifecycle payload. The first-kick refusal is a third
+`ReloadAbort` class evaluated in the preflight before the retirement `DELETE`; the after-siren refusal
+runs **before `import_batch` even opens**, so a refused run writes nothing at all, not even a batch
+row. `record` is deliberately not consulted by either: a `record` override names a `manual_admin_edit`
+row, which carries a different `source_id` and is outside every source-owned retirement scope.
+
+**One deliberate improvement on the ISSUE-165 replay, applied identically to both adapters:** every
+write is guarded by `IS DISTINCT FROM` over the tuple it would assign. `hall_of_fame`'s replay is
+unguarded, which on an ordinary reload would bump `updated_at` on every override-bearing row every
+run — the lifecycle columns are Layer 1 and already carry the decision — and invalidate a concurrent
+administrator's compare-and-swap for no actual change. `updated_at` is the CAS column Stage 6 depends
+on. **Flagged for Stage 6:** the replay still sets `updated_at` when a value genuinely changes, which
+is correct, so Stage 6's CAS contract should state that a reload re-asserting a decision can
+legitimately invalidate an in-flight edit.
+
+**Validation.** RED first throughout. `tests/special-records-replay-parity.test.ts` **19 passed**;
+the Stage 4 block of `tests/integration/first-kick-goal-reload-links.test.ts` **6 passed** in 892 s
+against the REAL importer as `afldb_import`; `tests/integration/after-siren.test.ts` **10 passed** in
+132 s against the REAL `after_siren.py load`; the Stage 2 + Stage 3 regression set (identity, admin
+source contract, lifecycle, admin reads, `auth.test.ts`, overrides source contract) **272 passed, 1
+skipped, 0 failed**; `npx tsc --noEmit` exit 0; ESLint over every changed TypeScript file exit 0;
+`python -m py_compile` and a live import of both changed modules exit 0; `git diff --check` clean.
+The repository carries **no Python lint or type-check configuration**, so `py_compile` plus the two
+suites that spawn the real module are the Python checks it actually has.
+
+**Three environment findings, none of them Stage 4 defects, all recorded in §23.10:**
+
+1. **`data/records/first-kick-goal.csv` is gitignored and was absent from this worktree**, so all 22
+   tests of the first-kick reload suite were **silently skipping** and had been since the worktree was
+   created. Copied in from `D:\dev\afldb` (an ignored path, so not a repository change). A
+   `describe.skipIf` keyed on a gitignored fixture reports a clean run either way — which is why
+   §21.10's "0 failed" for that suite is not evidence it ever ran here.
+2. **The importer takes ~93 s on this workstation**, and several of the suite's own timeouts assume
+   far less: five tests use vitest's 30 s default and others cap at `120_000` while performing two
+   importer runs. **Proven not to be Stage 4's doing** by extracting the pre-Stage-4 importer from
+   `HEAD` into the same directory and running both `--apply` back to back: **baseline 93.6 s, Stage 4
+   93.0 s**, both exit 0 with 334 rows reconciled. The affected runs were re-run with `--testTimeout`
+   raised **at the CLI**; no committed timeout was edited, because raising one to suit a single
+   workstation is an operator decision, not this stage's.
+3. **That suite purges its fixtures in `afterAll` only**, so an interrupted run poisons the next one —
+   which happened here, leaving four `player_link_resolutions` rows, the `issue-078-foreign` fixture
+   and an `fkg-335 "Zzyzx Fixture"` row that made the importer refuse outright. Cleaned by hand, doing
+   exactly what that `afterAll` does, with the baseline verified back to 334 canonical rows / 0
+   decisions / 0 overrides before re-running. **The suite's cleanup is not modified.**
+   `tests/integration/admin-awards.test.ts:124-131` already records this exact lesson; both suites
+   added by this stage purge at **both** ends.
+
+**Nothing staged, committed, pushed, merged or deployed; DEV and PROD untouched; migration 102
+applied to `afldb_test` only, exactly as Stages 2 and 3 left it.**
+
+### Stage 5 — the public read-model `status = 'active'` filters — PASS (2026-09-14)
+
+Full evidence is `AFLDB-ISSUE-167.md` §24. Checkpoint re-proven before anything was edited:
+worktree clean, `HEAD` = branch = `origin/opus/issue-167-special-records-admin` = `5de87dd`,
+and `migrate.ts --status --target test` reporting migration 102 applied with 0 pending —
+positive checksum proof, because the edited-migration refusal runs *before* the status
+branch. `afldb_test` re-proven on loopback by the three-condition contract. Migration 102
+was not edited.
+
+**§7's planning inventory was not trusted, and was wrong in four places.** Re-derived from
+current source: every SQL reference to either table lives in `src/db/queries/` — **eight
+modules, 31 fragments**. The corrections: `src/search/grid-solver-spec.ts`,
+`gridley-compat.ts`, `nl/plan.ts` and `nl/parser.ts` hold **no SQL at all** (each is a
+prose comment naming the table, and §7 listed them as fragments needing a filter);
+**`/players/compare` is a second consumer of `getPlayerHonours`** and was unlisted;
+**`src/db/queries/player-match-candidates.ts` is a consumer** (the link-candidate evidence
+set plus an id-keyed detail hydrator) and was unlisted. Page wiring was proven rather than
+assumed — `/records/first-kick-goal`, `/records/after-the-siren`, `/players/[slug]` and
+`/players/compare` each import only these query functions and hold no SQL of their own.
+
+**The filter is `status = 'active'`, never `<> 'void'` and never null-tolerant.** Migration
+102 gave both tables `status text NOT NULL DEFAULT 'active'` under a two-value CHECK, so
+there is no null to tolerate and a negated test would silently admit any third state added
+later. This deliberately differs from the neighbouring `AFLDB-ISSUE-165` branches in the
+same `UNION` in `player-links.ts` / `player-match-candidates.ts`, which correctly use
+`<> 'void'` because their tables carry a wider lifecycle vocabulary; the comment at each
+site records why the two spellings sit side by side.
+
+**RED → GREEN: 26 failed / 7 passed before any source edit, 33 passed / 0 failed after.**
+The RED caught a defect no integration test could have: the first draft of two SQL comments
+used backticks around identifier names **inside a `sql` template literal**, which terminates
+the literal and broke both files at parse time. The per-fragment contract test reported it
+as "1 reference but 0 filters" — the literal had been torn in half — where a whole-file
+"contains the string" check would have passed.
+
+**Suppression is proved by decisive fixtures, not by counts.** Each fixture is discovered by
+the property that makes it decisive, so each assertion is "the answer changed" rather than
+"a count went down": the sole linked row in its season (the Grid Solver
+`first_kick_goal_between` cell empties; the NL `by_season` group vanishes); the sole linked
+row for its organization (the club moves *into* `getClubsWithoutFirstKickGoal` and the NL
+`clubs_without` answer); the earliest row (the records board's `earliest` highlight moves);
+the sole holder of `max(imported_at)`, proven unique first (the provenance instant moves
+back); a player with exactly one winner-qualifying kick (leaves the `after_siren_winner`
+cell); a player with exactly one after-siren attempt (leaves the records board); an
+`unmatched` first-kick row (leaves the player-link queue and the candidate evidence set).
+Each test voids ONE real row and restores it in a `finally`, and the suite asserts zero void
+rows in both tables at `beforeAll` **and** `afterAll` — the ISSUE-165 purge-at-both-ends
+lesson applied from the start.
+
+**Two placements that had to be got right.** The NL caveat line is counted by `exclusions()`
+from `baseClauses` alone, deliberately excluding the ownership rules so the caveat describes
+the same set the reader asked about; putting the filter in `ownershipClauses` would have
+removed a voided row from the answer while still quoting it in the caveat underneath, so it
+goes in `baseClauses`, unconditionally and first. And `readSourceDetails` is keyed by ids
+that come from the now-filtered evidence query so it can subtract nothing today — it is
+filtered anyway, and says so, because a future caller assembling its own id list would
+otherwise reintroduce a retracted row through a detail lookup.
+
+**Admin and D-2 proven under the same transient void, not asserted:** both admin lists still
+return the voided row, both detail reads return it with `status = 'void'` and its reason,
+`specialRecordLifecycleCounts()` reports `void: 1`, and `status: 'void'` filtering returns
+exactly that row; `LINK_TARGET_TABLES` is asserted equal to its seven members with
+`after_siren_kicks` absent, and every other target table's queue is byte-identical before
+and after.
+
+**One new suite rather than the four §16 names**, recorded as a deliberate deviation: the
+claim is a single atomic one spanning eight query modules, three of which (the records-board
+queries, the player-page honours query and the player-link queue) are in none of those four
+files. No existing suite was modified, weakened or skipped.
+
+**Validation.** Stage 5 suites 33/33; Stage 2+3+4 regression 234 passed / 1 skipped;
+`player-matching` + `data-overrides-source-contract` + `nl-parser` + `nl-plan` 686 passed;
+`player-link-mutations` 49 passed; Grid Solver / NL / after-siren / Gridley 1,448 passed with
+**10 failed, every one proven pre-existing**; `tsc --noEmit` clean; ESLint 0 errors over the
+10 changed files (4 pre-existing warnings outside the edited region); `git diff --check`
+clean.
+
+**The 10 failures were proven pre-existing by differential, not argued.** §21.10's recorded
+baseline lists `grid-solver` × 2 and `gridley-corpus` × 4; this run showed `grid-solver` × 3,
+`gridley-corpus` × 4 and `nl-answers-after-siren` × 3 — **more than the recorded baseline**,
+so the recorded list alone was insufficient evidence. The `after_siren_winner` builder and
+`baseClauses` were reverted in place, the two suites re-run, and the files restored from
+saved copies: **6 failed / 226 passed both with and without the filters, identical assertions
+and identical values.** The cause is `afldb_test` gaining player links since those fixtures
+were written — Stage 4 ran the real `after_siren.py load` repeatedly, and all 68
+`kick_effect = 'won'` rows are now linked where `grid-solver.test.ts:635-636` asserts an
+unlinked premiership-season winner exists. A suppression filter can only remove rows, never
+add links or widen a tie, which corroborates the differential independently.
+
+**Operator decision D-6 (2026-09-14) — DO NOT re-baseline; CLOSED, not an open operator
+item.** The differential is accepted as proof that the failures are independent of the
+Stage 5 filters (identical failures, assertions and values with the implicated filters
+present and reverted), and they are recorded as **pre-existing / test-data-state drift
+caused by the current `afldb_test` linkage state, not an ISSUE-167 regression**. The four
+assertions in `tests/integration/grid-solver.test.ts` and
+`tests/integration/nl-answers-after-siren.test.ts` are not to be altered and Stage 5 scope
+is not widened. **Stage 5 is signed off with no stop condition open.**
+
+**Stage boundary.** No mutation, no `data.specialRecords.edit` declaration, no `/new` route,
+no `match-admin` change, no DEV or PROD migration, and — at the close of the Stage 5 session —
+nothing staged, committed, pushed or deployed. **Superseded on the commit/push half only
+(2026-09-14): Stages 2–5 are committed and the branch is pushed** (Stage 5 = `e8b44f6`,
+`HEAD = @{u}`, clean worktree); nothing is merged to `main` and neither DEV nor PROD is
+migrated or deployed. **Stage 6 has since been completed** (below); with D-6 closed, the next
+open action is Stage 7.
+
+### Stage 6 — the mutations, the atomic audit, CAS and bounded revalidation — PASS (2026-09-14)
+
+**Checkpoint before anything was edited.** Worktree clean; branch, HEAD and upstream all
+`c5a0df7a64663bfe8dbfbeb56d65e0a5879defc0`; migration **102 applied and checksum-clean** on
+`afldb_test` (`migrate.ts --status --target test` → `0 pending`; the runner's drift check runs
+before the status branch, so a clean status run is the proof) and **unedited** (one commit,
+`8d9ac74`; sha256 `dec12080…f5f173`); target proven `127.0.0.1:5432/afldb_test`, loopback, live
+listener. Mutations ran as **`afldb_import`**, proven by `createImportRoleParityHarness` before a
+row was written — not as the database owner, which can do anything.
+
+**The capability.** `data.specialRecords.edit` is declared `SUPER_ADMIN_ONLY` in
+`src/lib/auth/capabilities.ts` **in the same change as its first guarded mutation** (D-4 as
+clarified by runbook §9.1), with the `EQUIVALENT_ROLE_GUARD` entry `'requireSuperAdmin'` beside
+it. `tests/auth.test.ts` was not weakened and no declared-ahead-of-enforcement exemption was
+added. Final role matrix, asserted: Contributor neither; Admin `.read` only (including an Admin
+carrying `can_manage_admins`); Super Admin both.
+
+**The write boundary is the server, not the button.** One `'use server'` module,
+`src/app/admin/records/actions.ts`, holds all ten mutations, and every one of them asserts
+`await requireCapability('data.specialRecords.edit')` **before it awaits anything else** —
+which is what `tests/auth.test.ts`'s ISSUE-158 contract detects. The two `/new` routes and
+`/admin/records/revalidate` take the same capability. The five read routes keep `.read`; an
+Admin sees every record, its provenance and its whole history, and no mutation control — and a
+direct POST still fails at the guard.
+
+**One mutation contract.** `runSpecialRecordEdit()` does lock → compare-and-swap on
+`updated_at` → precheck → apply → `data_overrides` → `data_edits`, in one `afldb_import`
+transaction. Every refusal reachable before the first write RETURNS; every refusal after it
+THROWS (`RollbackRefusal`), because `postgres.js` commits when the `begin()` callback resolves —
+returning past the first write would commit a half-done, unaudited mutation while reporting
+failure.
+
+**What a correction may touch is not a judgement call.** The correctable columns are asserted
+**exactly equal, both directions, to the Stage 4 replay adapter's own `COLUMNS` lists** (12 for
+`player_achievements`, 21 for `after_siren_kicks`), which are in turn §3.4's amendable
+classification. A column the replay cannot carry would be silently reverted by the next rebuild;
+a replay column the surface cannot reach would be an amendable field with no way to amend it.
+Every derived, link and identity field is refused twice — excluded by the typed parameter, and
+refused again at run time so a crafted POST naming `matchId`, `playerId`, `clubId`,
+`linkStatus`, `candidateCount` or `sourceRecordId` gets a sentence rather than silence.
+
+**Family B's coupled fields are checked as a combination.** New pure module
+`src/lib/special-records/after-siren-rules.ts` transcribes migration 089's `_effect_ck`,
+`_regulation_ck`, `_match_ck` and `_points_ck`, and is used in three places and implemented
+once: the correction panel as the operator types, the mutation before any SQL is issued, and the
+CHECK constraints inside the same transaction. The row is validated **as it will stand once the
+delta lands**, never field by field, because three of the four constraints are broken by a
+*combination*. No refusal ever names a constraint — asserted.
+
+**Suppress / reinstate / replace / create.** The button reads *"Suppress record"*; the reason is
+mandatory; the row is kept so its `data_edits` history stays resolvable through the next
+promotion's lineage remap. Reinstate appends a second audit row and erases nothing. Replace is
+suppress + manual create **in one transaction**, cross-referenced by natural key
+(`replaces_key` / `replaced_by_key`) and sharing one `replacement_id` across both audit rows —
+never an identity edit, never a delete-and-reinsert under the original source identity. Manual
+creation mints `manual_admin_edit` + `<family>:<uuid>` and carries the player and the match as
+**natural identities** (`player_identity`, `match_key`), which is what lets a rebuild resolve
+them back after every id has been renumbered. A source-owned row's decisions are
+`correction` + `lifecycle`; a manual row's live inside its single `record` payload, because
+`record` + anything is the collision the replay fails the whole reload closed on —
+`refuseOverrideCollision()` refuses it at mutation time so an administrator meets a sentence now
+rather than an operator meeting a refused rebuild months later.
+
+**The third destruction path is closed.** `DELETE FROM player_achievements WHERE match_id = $1`
+is **gone** from `src/db/queries/match-admin.ts`. Both families are inspected before anything
+destructive runs, and a match carrying either is refused by name, in the shape the Brownlow
+refusal already established — including when the curated record is already **suppressed**,
+because suppression says the record should never have existed, not that the row may be
+destroyed. `after_siren_kicks.match_id` was never deleted there at all: migration 089 declares
+it `REFERENCES matches(id)` with no `ON DELETE` clause, so the same delete had been raising a
+raw foreign-key violation, which is not control flow a Data Editor user can act on.
+
+**Two design contradictions found against current source, both resolved by NARROWING.** Neither
+weakens the authority, audit, CAS or replay contracts.
+
+- **F-1 — `player_achievements.match_id` is not derived from what §3.4.1 says it is.** Migration
+  `053:103-105` says *"resolved by career game position (1 + kickless_matches_before_first_kick),
+  never by season/round/club lookup"*. `tools/records/import-first-kick-goal.ts:797-808` does the
+  opposite and says so: *"The match is the one the SOURCE says it happened in — the player's game
+  in that season at that round — not one inferred from career position"*, with Brent Harvey's
+  1996 debut as the recorded reason; `findMatchForRound(sql, playerId, season, roundRaw)` at
+  `:607-647` is the real resolver. §10.3's consequential sentence (*"editing
+  `kickless_matches_before_first_kick` re-derives `match_id`, and the form says so"*) is wrong on
+  both halves. **`match_id` stays derived and never editable**, exactly as §3.4.1 requires; what
+  changed is that a correction does **not** re-derive it, because the replay carries a correction
+  as a delta over the amendable columns and touches no link column — so a re-derived link would
+  be state a rebuild cannot reproduce. Leaving it alone is the only outcome identical before and
+  after a rebuild, and the detail page and correction panel say so. No migration is edited: 102
+  is immutable and 053's comment is a pre-existing documentation defect in a migration that has
+  already run.
+- **F-2 — a manually created record carries no club link, by construction.** The replay's
+  `record` INSERT sets no club column, so a manual row created with a `club_id` would not be the
+  row a rebuild reconstructs — which the Stage 6 contract forbids outright. The creator therefore
+  sets none; the club travels as `club_name_raw`, which is in the replay's column list and is
+  what every public read already falls back to (`COALESCE(cl.name, a.club_name_raw)`). Giving
+  manual records a durable club identity is a change to **both** replay adapters and their shared
+  parity corpus — Stage 4 work, outside Stage 6's contract — and is recorded as a follow-up
+  candidate.
+
+**Four Stage 3 source-contract assertions were about a read-only stage, not about the design,
+and were replaced by the precise form of the same rule** rather than deleted: *"five routes and
+no `/new`"* → the five read routes and the two creation routes exactly; *"every route enforces
+`.read`"* → read routes `.read`, creation routes the narrower `.edit`; *"no edit seam, no
+`'use server'` anywhere"* → exactly one `'use server'` module and every guard in it `.edit`; *"no
+control on a detail page"* → no control **named after** a derived, link or identity field
+anywhere, with `matchId`/`playerId` admitted only in a creation field set; *"no `UPDATE
+player_achievements`"* → no statement anywhere in the domain **assigns** a link column; *"no
+`status = 'active'`"* → every occurrence is a `SET` assignment, none is a filter, and the
+assertion fails vacuously if the assignment disappears. No regression coverage was deleted,
+skipped, disabled or weakened.
+
+**Two RED assertions were tightened rather than satisfied**, and the distinction is recorded
+because it matters: `not.toContain('revalidatePath')` failed on the action module's own header
+sentence *explaining* that it never calls it, and the match-admin assertion failed on the
+refusal's own comment *quoting* the statement it replaced. Both now read code rather than
+prose — a call, not a mention; a comment-stripped source, not the raw file.
+
+**RED → GREEN.** `tests/auth.test.ts` 5 failed / 149 passed → **155 passed**;
+`tests/special-records-admin.test.ts` 22 → **42 passed**;
+`tests/integration/admin-special-records.test.ts` 14 → **33 passed** (as `afldb_import`);
+`tests/admin-match-mutations.test.ts` 14 → **16 passed**.
+
+**Evidence, all DB-backed on `afldb_test`:** a source-owned correction writes a delta override
+naming only the changed columns plus one audit row carrying `entity_key` and
+`lineage_identity`; a crafted derived/identity payload is refused `forbidden` with nothing
+written; an after-siren margin of 11 points on a "won the match" goal is refused in words
+(*"leaves a final margin of 1 to 6 points"*) and asserted not to name a constraint; a
+whitespace-only suppression reason is refused; suppression writes a `lifecycle` override plus
+one audit row and the row is kept; reinstatement adds a second audit row and the suppression's
+reason survives in the first; replace leaves the old row void with its own `source_record_id`
+intact beside a new `manual_admin_edit` row, both payloads cross-referencing by natural key
+under one `replacement_id`; **a stale `expectedUpdatedAt` refuses all four mutations and leaves
+the canonical row, `data_overrides`, `data_edits` AND any replacement row untouched**; a forced
+audit failure (`adminUserId: -1`) rolls back the canonical change, the override and a whole
+replacement's both halves; a manual record was **deleted to simulate a destructive rebuild and
+rebuilt by the Stage 4 adapter with both links resolved**; a correction and a lifecycle decision
+coexist and both replay after a simulated ordinary reload; a planted second authority makes the
+replay throw *"more than one active override resolves to this row"* and makes the mutation
+refuse `conflict` after its canonical UPDATE, with the rollback leaving the row unchanged; a
+suppressed record leaves `getFirstKickGoalList()` and stays on the admin list; every returned
+revalidation path is asserted against the allowlist; and a match carrying either family — active
+or suppressed — cannot be deleted.
+
+**D-2 and D-5 non-regression.** `LINK_TARGET_TABLES` is unchanged and no statement in the domain
+assigns a link column; `tools/maintenance/privileges.sql` is untouched, reads stay on the app
+pool, writes run as `afldb_import`, and Stage 2's five real-role privilege assertions are still
+green.
+
+**Validation.** `tests/auth.test.ts` 155; `tests/special-records-admin.test.ts` 42;
+`tests/integration/admin-special-records.test.ts` 33; `tests/admin-match-mutations.test.ts` 16;
+`special-records-lifecycle`, `special-records-public-suppression`, `special-records-replay-parity`,
+`special-records-identity`, `data-overrides-source-contract`,
+`special-records-public-filter-contract` 138 passed / 1 skipped;
+`tests/integration/after-siren.test.ts` 10 passed against the REAL `after_siren.py load`; and in
+`tests/integration/first-kick-goal-reload-links.test.ts` **all six Stage 4 special-record tests
+pass, gate G-5 (`rolls the ENTIRE importer transaction back when the replay fails closed`)
+included** — so lifecycle source-survival, manual-record replay, warn-and-retain, the
+protected-retirement refusal and importer atomicity are all re-proven under Stage 6. `npx tsc
+--noEmit` clean; ESLint clean on every changed and new `.ts`/`.tsx`; `git diff --check` clean.
+
+**Nine failures in that file's ISSUE-078 identity block are environmental and cannot be Stage 6's.**
+None is a behavioural assertion: every one is `Test timed out in 120000ms`, plus one
+`canceling statement due to statement timeout` / `write CONNECT_TIMEOUT` under ~45 minutes of
+sustained load. The importer measures ~93 s here and those tests run it twice against a per-test
+cap written inline in the source, which the CLI `--testTimeout` cannot override — raising it took
+the file from 12 failures to 9 and no further. **Stage 6 changed no file in that suite's dependency
+closure**: `git diff --name-only HEAD -- tools/ src/db/migrations/` is empty, there are no untracked
+files under `tools/`, and the suite imports only `@/db/client` and `@/db/queries/player-links`
+besides the CLI importer. This is the environment finding already recorded at Stage 4, not a
+regression.
+
+**Stage boundary.** At the close of the Stage 6 session nothing was staged, committed, pushed or
+merged. **Superseded on the commit half only:** the operator reviewed and committed that change as
+`077bf2a`, which is now `HEAD = @{u}`. No DEV or PROD migration, no deployment and no browser
+acceptance were performed then or since.
+
+### Stage 7 — the promotion/build gate — PASS (2026-09-14)
+
+Full evidence is `AFLDB-ISSUE-167.md` §26. Checkpoint re-proven before anything was edited: branch
+`opus/issue-167-special-records-admin`, `HEAD = @{u} = 077bf2af95e1bd116f7aa1ade00015fe3457c6ae`,
+clean worktree, `git diff --check` clean, and migration 102 applied to `afldb_test` with **0
+pending** and no checksum drift (the drift check in `tools/db/migrate.ts` runs before `--status`
+returns, so a clean listing is also a clean-checksum proof). `git show --stat 077bf2a` is exactly
+the 31 files §25.11 lists. **DEV and PROD are untouched, provable without connecting to either:**
+`origin/main` carries no migration past `101_awards_honours_lifecycle.sql` and a DEV deploy pulls
+from `origin`, so 102 cannot have reached either host; every database command named `afldb_test`
+on `127.0.0.1` behind an explicit precondition.
+
+**The promotion inventory needed no new classification — it needed the replay STEP.** §11 items
+1–3 (both identity rules, both `data_edits` lineage targets, the corrected
+`player_link_resolutions.target_id`) were already discharged at Stage 2, and item 4 was withdrawn
+there as a false premise; `[PASS] Table classification (fail-closed)` re-measures that both tables
+are rebuilt data with no `PROMOTION_CONTRACT` entry, as they must be. What was missing is that
+**neither operator surface told the operator to replay them**: `ACCEPTANCE_CHECKLIST` in
+`tools/db/promotion-inventory.ts` and §8 step 1 of `docs/production-promotion.md` named neither
+entity type. Following the runbook as written would have **republished every voided record** (the
+suppression lives in `status`, the candidate is rebuilt from source, only the replay re-asserts
+it), **lost every administrator-created record** (a manual row exists nowhere but in
+`data_overrides` until the replay re-creates it), and then **STOPPED the promotion at the
+`data_edits` remap**, because those manual rows' audit rows resolve through `first_kick_goal_key`
+/ `after_siren_key` and a row that does not exist cannot be resolved. This is the
+`AFLDB-ISSUE-162` / `-163` obligation arriving for a third and a fourth entity type.
+
+**One authority, two adapters — and only one is in the Python loop.** `after_siren_kicks` joins
+the loop (placed before `'fixtures'` so the existing ISSUE-162 assertion still anchors on the
+tuple's closing parenthesis). `player_achievements` cannot: D-3 put its adapter in TypeScript
+(`tools/records/special-records-replay.ts`) because its importer is TypeScript, so the runbook now
+prints a separate invocation for it, run as the import role against `AFLDB_IMPORT_DATABASE_URL`.
+`data_overrides` remains the sole durable authority. The runbook deliberately instructs writing
+that snippet to a **file**: measured here, `npx tsx -e` evaluates as CommonJS and the adapter's
+named exports arrive under `.default`, so a copied one-liner reads `undefined` and throws *is not
+a function*. **That command was not executed** — this stage was a read-only gate and the
+environment refused the attempt; its import shape is proven and its arguments are pinned by
+`tests/data-overrides-source-contract.test.ts`, but its first real run belongs to Stage 8's DEV
+window.
+
+**Gate G-6 PASS, unchanged by P4.** `npm run db:promotion:check -- --phase source --database
+afldb_test` reports **8 gates evaluated, none failed** (Database identity, Table classification,
+no leftover `promotion_staging`, Migration parity 102/102, plus four INFO gates), identically
+before and after the Stage 7 edit, so **ISSUE-167 adds no new refusal class** and umbrella R-3's
+STOP is not invoked. The ISSUE-139 / ISSUE-143 pre-cutover refusals (UNKNOWN 079 + PENDING 091)
+are a different phase against `afldb_prod`, were not re-run here, and stand as recorded.
+
+**The build gate caught a real defect Stage 6 could not have seen.** `npm run build` FAILED
+first time: `Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled
+by plugins`, traced `node:crypto` → `src/lib/special-records/identity.ts` →
+`src/app/admin/records/labels.ts` → `src/app/admin/records/SpecialRecordCreatePanel.tsx`. Stage 2
+put `mintManualSourceRecordId()` in the **pure** grammar module, which was correct until Stage 6
+shipped a **Client** Component that reaches it; `tsc`, ESLint and every vitest suite run in Node,
+where the import resolves perfectly, so only the production build sees it — the `AFLDB-ISSUE-162`
+lesson restated. Fixed the smallest true way: `identity.ts` now mints from **Web Crypto**
+(`crypto.randomUUID()`, a global in Node since 19, in the Edge runtime and in the browser),
+returning the same v4 uuid, and the module is now import-free altogether, which is what its own
+"deliberately pure" contract always meant. The other five minting sites are `server-only` and keep
+`node:crypto` untouched. No identity, grammar, refusal or replay semantic changed. Rebuild: **exit
+0, 1534/1534 static pages, standalone bundle ready**, all seven `/admin/records` routes present
+and dynamic. Two warnings, both classified non-defects: the Next 16.3.1 `middleware`→`proxy`
+deprecation, and an Edge-runtime `process.cwd` notice whose import trace lies entirely inside
+`next/dist/esm/server/…` and which was present in the failed build too.
+
+**Validation.** G-6 PASS ×2; build exit 0; `tests/db-promotion-check.test.ts` +
+`tests/data-overrides-source-contract.test.ts` 160 passed; `tests/special-records-identity.test.ts`
+15 passed; those three with `tests/auth.test.ts` and `tests/special-records-admin.test.ts`, 372
+passed / 0 failed; `tests/special-records-replay-parity.test.ts` 19 passed on `afldb_test` (both adapters,
+one corpus); `tests/integration/admin-special-records.test.ts` +
+`tests/integration/special-records-lifecycle.test.ts` 48 passed / 1 skipped as `afldb_import` —
+the suite that exercises the changed mint on its real production path; `npx tsc --noEmit`, ESLint
+on every changed file and `git diff --check` all clean.
+
+**`CHANGELOG.md` deliberately not touched again.** Stage 6's `Unreleased` entry already describes
+the retained behaviour; Stage 7 changed nothing a changelog reader can observe.
+
+**Stage boundary.** Nothing staged, committed, pushed or merged; no DEV or PROD migration; no
+deployment; no browser acceptance; **Stage 8 not begun**. **The next action is Stage 8** — the
+operator commits Stage 7, then DEV migration → code (no `db:privileges` dependency, per D-5), then
+browser acceptance against §18.
+
+### Files
+
+Planning (Stages 0–1):
+
+- `AFLDB-ISSUE-167.md` — the runbook; **§21 added at Stage 2** with the full execution evidence
+- `issues.md` — this entry, the Open Issues row, the open count, and the `AFLDB-ISSUE-156` P4
+  allocation note
+- `IssuesIndex.md` — the open-issue entry
+- `AFLDB-ISSUE-156.md` — P4 placeholder replaced with the allocated ID
+
+Stage 2 — new:
+
+- `src/db/migrations/102_special_records_lifecycle.sql`
+- `src/lib/special-records/identity.ts` — the pure `entity_key` grammar, minting and refusals; no
+  `server-only` and no DB handle, because the migration, the promotion inventory, both replay
+  adapters and the admin writer all have to import it
+- `tests/special-records-identity.test.ts`
+- `tests/integration/special-records-lifecycle.test.ts`
+
+Stage 2 — modified:
+
+- `tools/db/promotion-inventory.ts` — two identity rules, two `data_edits` lineage targets, two
+  `LINEAGE_IDENTITY_SQL` entries, and the corrected `player_achievements` classification
+- `src/lib/acquisition/manual-authority.ts` — `OVERRIDE_ENTITY_TYPES` inventory (documentation only,
+  never the proof)
+- `tests/db-promotion-check.test.ts`, `tests/current-season-import.test.ts`
+
+Stage 3 — new:
+
+- `src/db/queries/admin-special-records.ts` — the dedicated admin read module, on the app/public pool
+- `src/app/admin/records/labels.ts` — the pure vocabulary and URL helpers
+- `src/app/admin/records/SpecialRecordFacts.tsx` — the read-only identity / provenance / link head
+- `src/app/admin/records/page.tsx`, `first-kick-goal/page.tsx`, `first-kick-goal/[id]/page.tsx`,
+  `after-the-siren/page.tsx`, `after-the-siren/[id]/page.tsx`
+- `tests/special-records-admin.test.ts` — the source contract (routes, guards, D-1/D-2/D-5, no edit
+  seam, ISSUE-166 boundaries, allowlist parity with migration 102)
+- `tests/integration/admin-special-records.test.ts` — the admin reads against `afldb_test`
+
+Stage 3 — modified:
+
+- `src/lib/auth/capabilities.ts` — `data.specialRecords.read` (ADMIN_AND_UP), with `.edit`'s Stage 6
+  obligation recorded beside it
+- `src/app/admin/nav-model.ts` — one `Data` entry, `Special records` → `/admin/records`
+- `src/db/queries/audit-log.ts`, `src/lib/audit-view.ts` — both special-record tables admitted to the
+  read-side `data_edits` allowlist and given viewer labels (§12)
+- `tests/auth.test.ts` — the capability role matrix, the nav assertions and the
+  `EQUIVALENT_ROLE_GUARD` entry
+
+Stage 4 — new:
+
+- `tools/records/special-records-replay.ts` — the TypeScript adapter, and `findProtectedRecordKeys()`
+- `tests/fixtures/special-records-replay-parity.json` — the language-neutral parity corpus (G-9)
+- `tests/special-records-replay-parity.test.ts` — the G-9 runner, driving both adapters from it
+
+Stage 4 — modified:
+
+- `tools/migration/common.py` — the `after_siren_kicks` replay branch, its amendable column set and
+  the two expression helpers it composes its SQL from
+- `tools/migration/after_siren.py` — `refuse_protected_retirements()` before the batch opens, and
+  the replay inside the load transaction; `WRITTEN_COLUMNS`/`COMPARED_COLUMNS` unchanged
+- `tools/records/import-first-kick-goal.ts` — the third refusal class, and the replay on the
+  importer's own `tx` at the §8.2.2 seam
+- `tests/integration/first-kick-goal-reload-links.test.ts` — six Stage 4 tests incl. gate G-5
+- `tests/integration/after-siren.test.ts` — ten tests driving the REAL `after_siren.py load`
+- `tests/data-overrides-source-contract.test.ts` — seven source-contract assertions, including that
+  the two adapters refuse exactly the same things in the same words
+
+
+Stage 6 — new:
+
+- `src/lib/special-records/after-siren-rules.ts` — the pure coupled-event rules transcribed from
+  migration 089's four CHECK constraints; no `server-only`, no DB handle, so the panel, the action
+  and the mutation all reach the same implementation
+- `src/app/admin/records/actions.ts` — the ten Server Actions, the domain's only `'use server'`
+  module, every one asserting `data.specialRecords.edit` first
+- `src/app/admin/records/validation.ts` — pure form parsing (a `'use server'` module may export
+  only async functions, so these cannot live beside the actions)
+- `src/app/admin/records/revalidate-paths.ts`, `revalidate/route.ts` — the shape allowlist and the
+  one capability-gated endpoint where `revalidatePath` is ever called
+- `src/app/admin/records/submit-helper.ts` — the domain's `useAdminActionSubmit` wrapper: posts
+  revalidation AFTER the action resolves, and restores focus so a refusal does not strand a
+  keyboard operator on `document.body`
+- `src/app/admin/records/FirstKickFields.tsx`, `AfterSirenFields.tsx` — the creation field sets,
+  shared with the replace panel under a prefix
+- `src/app/admin/records/FirstKickCorrectionPanel.tsx`, `AfterSirenCorrectionPanel.tsx` — the two
+  correction panels, posting only the fields actually edited
+- `src/app/admin/records/SpecialRecordLifecyclePanel.tsx` — suppress / reinstate
+- `src/app/admin/records/SpecialRecordReplacePanel.tsx` — the two-step replace
+- `src/app/admin/records/SpecialRecordCreatePanel.tsx`
+- `src/app/admin/records/first-kick-goal/new/page.tsx`, `after-the-siren/new/page.tsx`
+
+Stage 6 — modified:
+
+- `src/lib/auth/capabilities.ts` — `data.specialRecords.edit` declared SUPER_ADMIN_ONLY
+- `src/db/queries/admin-special-records.ts` — the whole write half: the shared edit core, the
+  correctable specs, the durable-record payloads, and the ten mutations
+- `src/db/queries/match-admin.ts` — the third destruction path closed for both families
+- `src/app/admin/records/first-kick-goal/page.tsx`, `after-the-siren/page.tsx` — a create link,
+  shown only to a viewer who holds `.edit`
+- `src/app/admin/records/first-kick-goal/[id]/page.tsx`, `after-the-siren/[id]/page.tsx` — the
+  three write panels, behind `hasCapability(admin, 'data.specialRecords.edit')`
+- `tests/auth.test.ts` — the `.edit` role matrix, the real-enforcement assertions and the R-7 rule
+- `tests/special-records-admin.test.ts` — the Stage 6 source contract, and the six Stage 3
+  read-only-stage assertions restated in their precise form
+- `tests/integration/admin-special-records.test.ts` — the Stage 6 mutation contract against
+  `afldb_test`, as `afldb_import`
+- `tests/admin-match-mutations.test.ts` — the match-delete refusal, in its designated home
+- `CHANGELOG.md` — the `Unreleased` entry, added on the operator's instruction (2026-09-14)
+
+
+Stage 7 — modified:
+
+- `tools/db/promotion-inventory.ts` — `ACCEPTANCE_CHECKLIST`: both special-record entity types in
+  the replay step, and BOTH adapters named, the TypeScript one by file
+- `docs/production-promotion.md` — §8 step 1: `after_siren_kicks` added to the Python replay loop
+  (before `fixtures`, so the ISSUE-162 assertion still anchors), and the TypeScript
+  `player_achievements` invocation printed beside it with its ordering and its file-not-`-e` warning
+- `src/lib/special-records/identity.ts` — the build fix: the manual id is minted from Web Crypto,
+  and the module now imports nothing at all, so no client bundle can pull a `node:` builtin through it
+- `tests/db-promotion-check.test.ts` — new: both families are rebuilt data with no contract entry,
+  and the checklist names both adapters and the remap ordering
+- `tests/data-overrides-source-contract.test.ts` — new: the promotion runbook names both adapters,
+  and does NOT hand the operator the `tsx -e` form
+- `tests/special-records-identity.test.ts` — new: `identity.ts` imports nothing, and still mints a v4 uuid
+
+Deliberately **not** changed: `tools/maintenance/privileges.sql` (§21.6, re-proven at Stage 3),
+`LINK_TARGET_TABLES` (D-2), `data_overrides` structure (§6.6), both `*_source_uq` constraints (§6.2),
+and every public read path (Stage 5). Also unchanged at Stage 6: `data_overrides` structure, both
+replay adapters and the parity corpus, both importers, `LINK_TARGET_TABLES`, and every migration —
+102 is immutable and no new migration was needed.
+
+`CHANGELOG.md` **is updated at Stage 6**, under `Unreleased`, on the operator's instruction
+(2026-09-14) — the reading the Stage 5 note had nominated: Stage 6 is where a row can first become
+void, and therefore where site behaviour can first differ. The entry is operator-facing and states
+its own limits: migration 102 is applied to the **test database only**, the work is **not
+deployed**, DEV and production are unchanged, and ISSUE-167 **remains open** with the promotion and
+deployment stages still to come. It claims no DEV or PROD deployment and does not describe Stages 7
+or 8 as complete.
+
+### Resolution (2026-09-14)
+
+**Resolved on DEV acceptance.** `AFLDB-ISSUE-156` **P4 is closed with it.** Not merged to `main`;
+**production was never contacted** and no production claim is made — following the
+`AFLDB-ISSUE-160`–`165` sibling convention, PROD promotion is carried on the ISSUE-156 umbrella.
+
+**Root cause of the work itself.** The two curated special-record families —
+`player_achievements` (first-kick goals, migration 053) and `after_siren_kicks` (migration 089) —
+were load-and-read only. Neither carried a lifecycle or override seam, `data_overrides.entity_type`
+and `data_edits.table_name` admitted neither, and three separate paths could destroy a curated
+record: the first-kick retirement `DELETE`, the after-siren stale-row `DELETE`, and
+`match-admin.ts`'s `DELETE FROM player_achievements WHERE match_id = $1` on admin match deletion.
+A wrong row could only be repaired by editing the tracked source manifest and reloading.
+
+**Fix, as actually built.** Migration `102_special_records_lifecycle.sql` added
+`status`/`status_reason`/`updated_at` with their CHECKs to both tables and widened both allowlists
+to 13 literals, retaining every existing one. One capability pair (`data.specialRecords.read` for
+Admin and up, `.edit` for Super Admin only) gates five routes and ten Server Actions, enforced
+server-side rather than by hiding controls. Every public read model filters `status = 'active'`
+across 8 query modules and 31 fragments. `data_overrides` remains the **sole** durable authority,
+replayed by **two adapters** — Python `common.py` for after-siren, TypeScript
+`tools/records/special-records-replay.ts` for first-kick — driven from one language-neutral parity
+corpus so they cannot drift, each running inside its own importer's transaction. The match-delete
+collateral path is closed: both families now refuse the deletion by name. Two design contradictions
+found against current source were resolved by **narrowing** (§25.3 match derivation, §25.4 manual
+club link), weakening no authority, audit, CAS or replay contract.
+
+**The two defects only a rendered DEV run could find, and their fixes.**
+
+1. **Every mutation returned HTTP 500.** `src/app/admin/records/actions.ts` carries `'use server'`
+   and exported two const arrays. Next.js enforces "a `'use server'` file can only export async
+   functions" **at first Server Action invocation, not at build** — so `npm run build` passed at
+   1534/1534 pages, `tsc` passed, and every unit test passed, because a test imports the module
+   directly as TypeScript and never applies the directive. Fixed by moving both lists to
+   `validation.ts`, the domain's existing directive-free sibling (the shape
+   `src/app/admin/awards/actions.ts` already uses), and repointing the contract test so the Stage 6
+   invariant keeps full coverage. A repo-wide scan found no other offender in `src/`. A new source
+   gate in `tests/special-records-admin.test.ts` strips comments before matching — both modules
+   *discuss* `export const` in a `'use server'` file in order to forbid it — and was **proven RED
+   by in-place differential** before being left GREEN.
+2. **The hub told a Super Admin the surface was read-only**, directly above the controls that
+   change records: Stage 3's unconditional notice had never been revisited when Stage 6 shipped the
+   mutations. The sentence is now chosen by the same `hasCapability(admin,
+   'data.specialRecords.edit')` check that decides whether those controls render, verified in both
+   directions against the real Admin and Super Admin accounts.
+
+**Validation.** Migration 102 applied to `afldb_test` and `afldb_dev`, checksum-clean
+(`dec12080…` recorded == file sha256), 0 pending. DEV runs `026ec2a` from a **clean** checkout,
+built BUILD_ID `84-5g6y04iLdEo5FhrwxG` equal to the live `x-afldb-build`, 4 workers, health
+`ok`/`ok`. §18's acceptance matrix is green against **real** Contributor / Admin / Super Admin
+accounts signed in through the real login form with real TOTP — no session minted, no gate relaxed
+— with denials as HTTP-layer redirects and zero meta-refresh on all seven surfaces (ISSUE-166's
+contract preserved). Durable authority proven through **both real importers**: a 334-row first-kick
+reload re-applied 1 correction with an identical whole-table fingerprint, and a full 126-event
+after-siren reload left the suppressed record 125 active / 1 void rather than resurrecting it, with
+`data_overrides` unmodified and no `data_edits` rows written by replay. Also proven live: CAS
+refuses readably, writes nothing and **does not drop keyboard focus to `body`** (the ISSUE-155
+§27.27 H defect, verified not assumed); revalidation is a separate POST after the action resolves;
+both match-delete refusals name their own family and record with all 17,052 matches intact;
+suppression moved the first-kick page's EARLIEST tile 1911→1920, showing the filter reaches derived
+aggregates; NL and Grid Solver smoke clean. Responsive clean at 768/1000/1280/1920. Finally, the
+**committed** build was proven by a real rendered mutation — action POST **200** (it was 500 before
+the fix), revalidate POST 200, zero console errors — and the record restored exactly, both
+fingerprints byte-identical, with 216 requests since and **zero 5xx and zero application errors**.
+
+**Retained DEV state, deliberate and recorded.** One manual `player_achievements` row (id 335) is
+retained **void**, labelled an acceptance fixture in both its notes and its void reason. This
+design has **no hard delete by construction**, so voiding is the supported cleanup path; deleting
+it would break the very guarantee the issue exists to provide. Both source records used for
+acceptance were restored exactly. The append-only `data_edits` trail (12 rows) was **not** erased —
+those edits really happened, and erasing them to tidy up would violate the audit contract.
+
+**Follow-ups, carried on the `AFLDB-ISSUE-156` umbrella, neither a blocker.** (1) The record detail
+page overflows horizontally at **320px** — 768 / 1000 / 1280 / 1920 are clean — even though its
+tables sit in the repo's `.table-wrap`, which the family list page contains correctly at the same
+width; §18 sets device priority desktop > tablet > phone and makes phone-only polish a follow-up.
+(2) `/players/compare`'s first-kick honour was not separately rendered; it reads the same
+`status = 'active'` fragment (`src/db/queries/awards.ts:569-570`) proven live on the player page.
+(3) **When the Admin Centre work is promoted, `docs/production-promotion.md` §8's replay step must
+run BOTH special-record adapters** — the Python loop and the separate TypeScript invocation —
+because skipping either republishes every voided record and loses every manual one.
+
+Full evidence: `AFLDB-ISSUE-167.md` §21–§27, with the closeout at §27.11.

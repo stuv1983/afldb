@@ -1052,27 +1052,50 @@ describe('lineage-safe reinstatement', () => {
     const resolutions = lineageTargetsOf(contractByName('player_link_resolutions')!);
     expect(resolutions.find((x) => x.ref.column === 'player_id')!.target)
       .toMatchObject({ entity: 'players', identity: PROFILE });
-    // The seven honours tables target_id points into have NO stable external identity, and
+    // SIX of the seven tables target_id points into have NO stable external identity, and
     // saying so explicitly is the decision: the checker refuses instead of reinstating an id
     // that now names a different honours row.
+    //
+    // AFLDB-ISSUE-167 §11.3 corrected the seventh. player_achievements was classified 'none'
+    // with the rest, and had been wrong since the AFLDB-ISSUE-078 rekey: every row carries a
+    // tracked, COMMITTED 'fkg-NNN' from data/records/first-kick-goal-ids.csv, which is an
+    // external key for one of its rows and is evidenced in the repository rather than only in
+    // the database. Understating that is not the safe direction — it is what makes a stale
+    // target_id look unresolvable when it could have been resolved, and it left a real
+    // promotion hazard classified as an accepted one.
     const targets = resolutions.filter((x) => x.ref.column === 'target_id');
     expect(targets).toHaveLength(7);
     for (const { ref, target } of targets) {
-      expect(target.identity).toBe('none');
       expect(ref.kindColumn).toBe('target_table');
       expect(target.kind).toBe(target.entity);
     }
+    expect(targets.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
+      .toEqual([
+        'award_nominations:none', 'award_winners:none', 'captaincies:none',
+        'draft_picks:none', 'hall_of_fame:none', 'honour_team_members:none',
+        'player_achievements:first_kick_goal_key',
+      ]);
+    // And the correction does NOT reopen AFLDB-ISSUE-139 D1: the table is still withheld from a
+    // DEV promotion, because six of its seven targets still cannot be evidenced.
+    expect(isHistoricalOnlyColumn('player_link_resolutions', 'target_id', 'dev')).toBe(true);
 
     const edits = lineageTargetsOf(contractByName('data_edits')!);
     expect(edits.map((x) => `${x.target.kind}:${x.target.identity}`).sort())
       .toEqual([
+        // AFLDB-ISSUE-167 §11.2: migration 102 admits both special-record tables into
+        // data_edits_table_name_check, and each is given its lineage target in the SAME
+        // change — the first time that obligation has been discharged at the point it was
+        // created rather than found by a later issue.
+        'after_siren_kicks:after_siren_key',
         'award_winners:award_winner_key',
         'club_leadership:appointment_key',
         'coaches:afltables_coach_path', 'draft_picks:draft_pick_key',
         'fixtures:fixture_key',
         'hall_of_fame:hall_of_fame_key',
         'honour_team_members:honour_team_key',
-        'matches:match_key', 'players:afltables_profile_url',
+        'matches:match_key',
+        'player_achievements:first_kick_goal_key',
+        'players:afltables_profile_url',
       ]);
     // AFLDB-ISSUE-160 D-3. 'draft_picks' had been admitted by
     // data_edits_table_name_check since migration 057 with NO lineage target, so a
@@ -1455,6 +1478,35 @@ describe('lineage-safe reinstatement', () => {
     expect(checklist).toContain('season_list_members');
     expect(checklist).toContain('fixtures');
     expect(checklist).toContain('club_leadership');
+  });
+
+  it('AFLDB-ISSUE-167 §11: both special-record families are rebuilt data, and the '
+    + 'checklist names BOTH replay adapters', () => {
+    // Same shape once more, and §11.4 withdrew the planning premise that said
+    // otherwise: player_achievements (053:152) and after_siren_kicks (089) were
+    // each registered in afldb_meta.import_writable_tables on the day they were
+    // created, so both are rebuilt data and must have NO PROMOTION_CONTRACT
+    // entry. A doubly-classified table is {kind:'both'}, which refuses.
+    for (const name of ['player_achievements', 'after_siren_kicks']) {
+      expect(contractByName(name), name).toBeUndefined();
+    }
+    expect(() => assertContractCoherent()).not.toThrow();
+
+    // Migration 102 widened data_overrides.entity_type with both, so the replay
+    // step has TWO MORE entity types -- and, uniquely so far, two adapters
+    // (D-3): after_siren_kicks replays in Python with the rest, and
+    // player_achievements replays through the TypeScript adapter, because its
+    // importer is TypeScript. An operator who runs only the Python loop
+    // republishes every voided first-kick goal and loses every manual one, so
+    // the checklist has to name the second adapter by file, not just the entity.
+    const checklist = ACCEPTANCE_CHECKLIST.join('\n');
+    expect(checklist).toContain('player_achievements');
+    expect(checklist).toContain('after_siren_kicks');
+    expect(checklist).toContain('tools/records/special-records-replay.ts');
+    // And the ordering that makes their data_edits rows resolvable at all.
+    expect(checklist).toContain('first_kick_goal_key');
+    expect(checklist).toContain('after_siren_key');
+    expect(checklist).toMatch(/BEFORE the data_edits row_id remap/);
   });
 
   it('remaps Gridley preservation by source key when source and candidate ids differ', () => {

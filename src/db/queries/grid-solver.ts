@@ -1018,19 +1018,22 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
 
     // player_achievements: curated facts AFLDB cannot recompute from its
     // own match data (there is no play-by-play table), so these read the
-    // stored claim rather than deriving anything. Linked rows only.
+    // stored claim rather than deriving anything. Linked rows only, and --
+    // exactly as the honours builders above -- ACTIVE rows only (migration
+    // 102, AFLDB-ISSUE-167 §7). A voided record is one an administrator has
+    // said never happened; it must not satisfy a clue.
     case 'first_kick_goal_player':
       return sql`p.id IN (SELECT player_id FROM player_achievements
-                            WHERE achievement_type = 'first_kick_goal'
+                            WHERE achievement_type = 'first_kick_goal' AND status = 'active'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
     case 'first_kick_goal_only_career_goal':
       return sql`p.id IN (SELECT player_id FROM player_achievements
-                            WHERE achievement_type = 'first_kick_goal'
+                            WHERE achievement_type = 'first_kick_goal' AND status = 'active'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND no_further_career_goals)`;
     case 'first_kick_goal_consecutive_min':
       return sql`p.id IN (SELECT player_id FROM player_achievements
-                            WHERE achievement_type = 'first_kick_goal'
+                            WHERE achievement_type = 'first_kick_goal' AND status = 'active'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND consecutive_goal_kicks >= ${requireInt(axis, 'kicks', 'Kicks')})`;
     // AFLDB-ISSUE-118 §23.35. after_siren_kicks (migration 089) is the same
@@ -1040,7 +1043,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
     // linked kicker. Misses, draws and other competitions never qualify.
     case 'after_siren_winner':
       return sql`p.id IN (SELECT player_id FROM after_siren_kicks
-                            WHERE premiership_season
+                            WHERE premiership_season AND status = 'active'
                               AND kick_scored IN ('goal', 'behind') AND kick_effect = 'won'
                               AND siren IN ('final', 'end_of_extra_time')
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved'))`;
@@ -1050,7 +1053,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       const orgId = requireInt(axis, 'club', 'Club');
       return sql`p.id IN (SELECT a.player_id FROM player_achievements a
                             JOIN clubs cl ON cl.id = a.club_id
-                           WHERE a.achievement_type = 'first_kick_goal'
+                           WHERE a.achievement_type = 'first_kick_goal' AND a.status = 'active'
                              AND a.player_id IS NOT NULL AND a.link_status_value IN ('unique', 'resolved')
                              AND cl.organization_id = ${orgId})`;
     }
@@ -1059,7 +1062,7 @@ export function compileAxis(axis: GridAxisState): SqlFragment {
       // the two differ whenever the first kick came after the first game.
       const [lo, hi] = orderedRange(axis, 'from', 'From season', 'to', 'To season');
       return sql`p.id IN (SELECT player_id FROM player_achievements
-                            WHERE achievement_type = 'first_kick_goal'
+                            WHERE achievement_type = 'first_kick_goal' AND status = 'active'
                               AND player_id IS NOT NULL AND link_status_value IN ('unique', 'resolved')
                               AND season BETWEEN ${lo} AND ${hi})`;
     }

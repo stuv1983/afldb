@@ -56,7 +56,19 @@ export type DataEditTableName =
   // because the row is about a club, a season and an office, and one person may
   // hold several. row_id = club_leadership.id therefore always resolves,
   // through the appointment_key lineage rule in tools/db/promotion-inventory.ts.
-  | 'club_leadership';
+  | 'club_leadership'
+  // The two curated special-record families (migration 102,
+  // AFLDB-ISSUE-167 §6.4). The fixtures / club_leadership shape once more:
+  // neither is ever deleted -- voiding keeps the row precisely so its audit
+  // rows stay resolvable -- and neither has an allowlisted parent to be a
+  // property of. A first-kick achievement is deliberately not audited against
+  // its player, because the row is about a source's claim rather than about
+  // the person, and its match_id is derived. row_id therefore always resolves,
+  // through the first_kick_goal_key and after_siren_key lineage rules in
+  // tools/db/promotion-inventory.ts, both of which read the durable
+  // '<sources.key>|<source_record_id>' identity rather than the integer.
+  | 'player_achievements'
+  | 'after_siren_kicks';
 
 /**
  * The same allowlist as a runtime value, for the read side
@@ -76,6 +88,8 @@ export const DATA_EDIT_TABLE_NAMES: readonly DataEditTableName[] = [
   'coaches',
   'fixtures',
   'club_leadership',
+  'player_achievements',
+  'after_siren_kicks',
 ];
 
 export function isDataEditTableName(value: string): value is DataEditTableName {

@@ -91,6 +91,20 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
  *                          (club, season, player, role): that tuple RECURS when a player is
  *                          re-appointed later in the same season, and every other candidate
  *                          component is a fact an administrator is expected to change.
+ *   first_kick_goal_key    player_achievements: '<sources.key>|<source_record_id>' — migration
+ *                          053's player_achievements_source_uq UNIQUE NULLS NOT DISTINCT
+ *                          (source_id, source_record_id). Since the AFLDB-ISSUE-078 rekey the
+ *                          source half is a tracked, COMMITTED manifest id ('fkg-NNN' in
+ *                          data/records/first-kick-goal-ids.csv), so unlike the honours
+ *                          tables this identity is carried in the repository and not only in
+ *                          the database. A row an administrator created carries the minted
+ *                          'first_kick_goal:<uuid>' instead (AFLDB-ISSUE-167 §5.3).
+ *   after_siren_key        after_siren_kicks: '<sources.key>|<source_record_id>' — migration
+ *                          089's after_siren_kicks_source_uq, carrying the curated artefact's
+ *                          own event_key. Deliberately NOT derived from (season, round, club,
+ *                          opponent): migration 089 keeps pre-season and night-series rows
+ *                          that resolve to no match at all, so that tuple is not unique and
+ *                          not always present.
  *   none                   NO stable identity exists in this repository for the entity this
  *                          column points at. The column therefore CANNOT be remapped, and
  *                          across a lineage change the checker refuses rather than
@@ -104,7 +118,8 @@ export type CompareRule = 'equal' | 'zero' | 'atLeast' | 'any';
 export type LineageIdentityRule =
   'afltables_profile_url' | 'match_key' | 'source_key' | 'afltables_coach_path'
   | 'draft_pick_key' | 'fixture_key' | 'appointment_key'
-  | 'award_winner_key' | 'hall_of_fame_key' | 'honour_team_key' | 'none';
+  | 'award_winner_key' | 'hall_of_fame_key' | 'honour_team_key'
+  | 'first_kick_goal_key' | 'after_siren_key' | 'none';
 
 /**
  * AFLDB-ISSUE-151. The schema a STAGED table is restored into before its rows meet a
@@ -410,6 +425,32 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
           entity: 'honour_team_members',
           identity: 'honour_team_key',
         },
+        // AFLDB-ISSUE-167 §11.2. Migration 102 admits 'player_achievements' and
+        // 'after_siren_kicks' into data_edits_table_name_check, which OBLIGES a
+        // lineage target for each -- the fifth and sixth time this obligation
+        // has had to be discharged, and the first time it is discharged in the
+        // SAME change that creates it rather than issues later. Both are
+        // import-writable tables rebuilt by a promotion, so without a target a
+        // special-record audit row would be reinstated with its row_id integer
+        // unchanged and would name a DIFFERENT achievement or a different kick:
+        // the AFLDB-ISSUE-142 (B) misattribution this gate exists to prevent.
+        //
+        // Every row resolves. Neither table is ever deleted by the admin surface
+        // -- a wrong row is VOIDED and the void keeps the row (migration 102) --
+        // and the data_overrides replay re-creates every manual one, void
+        // included, in the candidate before this remap runs. Measured on
+        // afldb_test 2026-09-13: 334 of 334 and 126 of 126 rows carry a
+        // source_record_id, so no row is silently absent from the identity.
+        {
+          kind: 'player_achievements',
+          entity: 'player_achievements',
+          identity: 'first_kick_goal_key',
+        },
+        {
+          kind: 'after_siren_kicks',
+          entity: 'after_siren_kicks',
+          identity: 'after_siren_key',
+        },
       ],
       remediation: 'Every entity here has a stable identity, so every row is remappable in '
         + 'principle: resolve row_id through the AFL Tables profile url (players), '
@@ -421,7 +462,12 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
         + "identity is an AFL Tables profile identity or 'name:<player_name_raw>' while the "
         + 'row is unlinked), or the '
         + 'draft selection key '
-        + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), and apply the "
+        + "'<source key>|<player_url>|<draft_year>|<draft_kind>' (draft_picks), or the "
+        + "special-record source identity '<source key>|<source_record_id>' "
+        + '(player_achievements and after_siren_kicks alike, where the record id is the '
+        + "tracked manifest key -- 'fkg-NNN' for a first-kick goal, the artefact's event_key "
+        + "for an after-siren kick -- or the minted '<family>:<uuid>' on a row an "
+        + 'administrator created), and apply the '
         + 'generated per-row UPDATEs after the reinstate. A draft audit row whose selection '
         + 'carries no source_id at all (a pre-AFLDB-ISSUE-160 admin row) has NO stable key and '
         + 'is reported unresolved: adopt that selection in /admin/draft first, which mints its '
@@ -515,12 +561,39 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       {
         column: 'target_id', kindColumn: 'target_table',
         targets: [
-          'award_winners', 'award_nominations', 'hall_of_fame', 'honour_team_members',
-          'captaincies', 'player_achievements', 'draft_picks',
-        ].map((t) => ({ kind: t, entity: t, identity: 'none' as const })),
-        remediation: 'NO stable identity exists for an honours row: the seven target tables '
-          + 'are import-writable, the rebuild assigns their ids, and nothing in the tree '
-          + 'carries an external key for one of their rows. target_id is deliberately not a '
+          ...[
+            'award_winners', 'award_nominations', 'hall_of_fame', 'honour_team_members',
+            'captaincies', 'draft_picks',
+          ].map((t) => ({ kind: t, entity: t, identity: 'none' as const })),
+          // AFLDB-ISSUE-167 §11.3. This entry was 'none' with the other six, and
+          // for player_achievements that had been FACTUALLY WRONG since the
+          // AFLDB-ISSUE-078 rekey: 'fkg-NNN' in the tracked, committed
+          // data/records/first-kick-goal-ids.csv IS an external key for one of
+          // its rows, carried in the repository rather than only in the
+          // database. Leaving it 'none' understated what can be evidenced; a
+          // stale target_id reinstated for want of a key attaches a human link
+          // decision to a DIFFERENT achievement, which is the hazard this
+          // column's whole treatment exists to prevent. Measured 334 of 334 rows
+          // carrying the key on afldb_test, 2026-09-13.
+          //
+          // This corrects the CLASSIFICATION only. It does not reopen the
+          // historicalOnly decision below: six of the seven targets still carry
+          // no key, so the table as a whole still cannot be reinstated as live
+          // state, and AFLDB-ISSUE-139 D1 stands unchanged.
+          {
+            kind: 'player_achievements',
+            entity: 'player_achievements',
+            identity: 'first_kick_goal_key' as const,
+          },
+        ],
+        remediation: 'Six of the seven target tables have NO stable identity for one of their '
+          + 'rows: they are import-writable, the rebuild assigns their ids, and nothing in the '
+          + 'tree carries an external key for an award, a nomination, an induction, an '
+          + 'honour-team selection, a captaincy or a draft selection reached THROUGH THIS '
+          + 'COLUMN. player_achievements is the exception, and the only one: since the '
+          + "AFLDB-ISSUE-078 rekey every row carries a tracked, committed 'fkg-NNN' manifest "
+          + 'id, so a first-kick link decision CAN be resolved through first_kick_goal_key '
+          + 'rather than through an id the rebuild reassigns. target_id is deliberately not a '
           + 'foreign key (migration 056), so a stale value reinstates silently and either '
           + 'hides the decision from the admin queue or attaches it to a different honours '
           + 'row. Across a lineage change there are exactly two supportable answers, and the '
@@ -541,9 +614,14 @@ export const PROMOTION_CONTRACT: readonly TableTreatment[] = [
       summary: 'player_link_resolutions: NOT reinstated on a DEV promotion — the human link '
         + 'decisions are kept as historical evidence in the pre-cutover dump and the retained '
         + 'pre-rebuild database',
-      reason: "target_id's seven honours tables carry no external key of any kind, so its "
-        + 'identity is `none` and NOT ONE target_id row can be evidenced across a lineage '
-        + 'change. Remapping player_id alone is explicitly not an answer (§7.4c): it produces a '
+      reason: 'Six of the seven tables target_id points into carry no external key of any '
+        + 'kind, so their identity is `none` and a target_id row naming one of them cannot be '
+        + 'evidenced across a lineage change. (AFLDB-ISSUE-167 corrected the seventh: a '
+        + 'player_achievements row IS evidenced, through first_kick_goal_key. That narrows the '
+        + 'unresolvable set; it does NOT change this decision, which turns on the table as a '
+        + 'whole being unreinstatable while any of its rows cannot be evidenced, and '
+        + 'AFLDB-ISSUE-139 D1 is the operator decision of record either way.) '
+        + 'Remapping player_id alone is explicitly not an answer (§7.4c): it produces a '
         + 'row that looks resolved, names the right person and points at the wrong honours row. '
         + 'The whole table is therefore historical evidence rather than live state — the '
         + 'promotion_decisions treatment, on the same reasoning that a decision cannot outlive '
@@ -1745,6 +1823,62 @@ export const LINEAGE_IDENTITY_SQL: Readonly<Record<
                ei.identity,
                CASE WHEN m.player_id IS NULL THEN 'name:' || m.player_name_raw END)
              = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  first_kick_goal_key: {
+    entity: 'player_achievements',
+    description: "the achievement's source record identity, '<sources.key>|<source_record_id>' "
+      + "— migration 053's player_achievements_source_uq UNIQUE NULLS NOT DISTINCT "
+      + '(source_id, source_record_id), written with the source KEY rather than the '
+      + 'per-database sources.id so it denotes the same row on both databases. The source half '
+      + "is a TRACKED, COMMITTED manifest id since the AFLDB-ISSUE-078 rekey ('fkg-NNN' in "
+      + 'data/records/first-kick-goal-ids.csv), which is what makes this identity stronger '
+      + 'than the honours keys: it is evidenced in the repository, not only in the database. A '
+      + "row an administrator created carries the minted 'first_kick_goal:<uuid>' instead. A "
+      + 'row with source_id or source_record_id NULL has NO key and is deliberately absent '
+      + 'here, so it reports as unresolved rather than being carried by an integer that now '
+      + 'names a different achievement (the AFLDB-ISSUE-160 D-3 rule). Every current row has '
+      + 'one: measured 0 NULL of 334 on afldb_test, 2026-09-13',
+    byId: `
+      SELECT a.id::bigint AS id, s.key || '|' || a.source_record_id AS identity
+        FROM public.player_achievements a
+        JOIN public.sources s ON s.id = a.source_id
+       WHERE a.source_record_id IS NOT NULL
+         AND a.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT a.id::bigint AS id, s.key || '|' || a.source_record_id AS identity
+        FROM public.player_achievements a
+        JOIN public.sources s ON s.id = a.source_id
+       WHERE a.source_record_id IS NOT NULL
+         AND s.key || '|' || a.source_record_id = ANY ($1::text[])
+       ORDER BY 1, 2`,
+  },
+  after_siren_key: {
+    entity: 'after_siren_kicks',
+    description: "the kick's source record identity, '<sources.key>|<source_record_id>' — "
+      + "migration 089's after_siren_kicks_source_uq UNIQUE NULLS NOT DISTINCT "
+      + '(source_id, source_record_id), carrying the curated artefact\'s own event_key and '
+      + 'written with the source KEY rather than the per-database sources.id. Deliberately NOT '
+      + 'derived from (season, round, club, opponent): migration 089 keeps pre-season and '
+      + 'night-series rows that resolve to no match at all, so that tuple is neither unique nor '
+      + "always present. A row an administrator created carries the minted 'after_siren:<uuid>' "
+      + 'instead. A row with source_id or source_record_id NULL has NO key and is deliberately '
+      + 'absent here rather than carried by a renumbered integer. Every current row has one: '
+      + 'measured 0 NULL of 126 on afldb_test, 2026-09-13',
+    byId: `
+      SELECT k.id::bigint AS id, s.key || '|' || k.source_record_id AS identity
+        FROM public.after_siren_kicks k
+        JOIN public.sources s ON s.id = k.source_id
+       WHERE k.source_record_id IS NOT NULL
+         AND k.id = ANY ($1::bigint[])
+       ORDER BY 1, 2`,
+    byIdentity: `
+      SELECT k.id::bigint AS id, s.key || '|' || k.source_record_id AS identity
+        FROM public.after_siren_kicks k
+        JOIN public.sources s ON s.id = k.source_id
+       WHERE k.source_record_id IS NOT NULL
+         AND s.key || '|' || k.source_record_id = ANY ($1::text[])
        ORDER BY 1, 2`,
   },
   match_key: {
@@ -3111,7 +3245,7 @@ export const ACCEPTANCE_CHECKLIST: readonly string[] = [
   '`--phase production` passed on the live afldb_prod (same gates as candidate).',
   'Health: /api/health 200, a season page, a player page, an AFLW page, and /search all render.',
   'Real production super admin logged in with password + TOTP (a new session — the old ones were reset by design).',
-  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season.',
+  'data_overrides replayed onto the promoted canonical rows for EVERY entity type the CHECK admits — players, matches, draft_picks, season_list_members, coaches, match_coaches, fixtures, player_achievements, after_siren_kicks — not just players and matches. The coaches replay is what re-creates every admin-created coach in the candidate (AFLDB-ISSUE-159 §7): until it runs, a manual coach does not exist there and its /coaches/<slug>-<id> URL 404s. The season_list_members replay (AFLDB-ISSUE-161 §19) is what re-creates every administered playing list, and it must run AFTER players, because a membership names its player by identity; it is also the only branch that acts on INACTIVE overrides, which are tombstones that must delete any row found for a deliberately removed membership. It must run BEFORE the data_edits row_id remap, which resolves coach edits through afltables_coach_path. The fixtures replay (AFLDB-ISSUE-162 §20) re-creates every administered fixture — cancelled and void rows included, because a fixture is never deleted and its data_edits rows must stay resolvable — and depends on no other branch, because a fixture names its clubs and venue by slug and names no player, match or selection; it too must run BEFORE the data_edits row_id remap, which resolves fixture edits through fixture_key. The club_leadership replay (AFLDB-ISSUE-163 §19) re-creates every administered captain and vice-captain appointment — ended and void rows included, because an appointment is never deleted and its data_edits rows must stay resolvable — and must run AFTER players, because an appointment names its player by identity; it depends on no other branch (it names its club by slug and deliberately does NOT re-check season-list membership, which is a precondition of making an appointment and not a property of a recorded one), and it too must run BEFORE the data_edits row_id remap, which resolves leadership edits through appointment_key. Until it runs, the promoted public club pages show no current leadership and their Captains history stops at the last pre-2027 season. The two special-record replays (AFLDB-ISSUE-167 §11, migration 102) are TWO ADAPTERS OVER THE ONE AUTHORITY and BOTH must run: after_siren_kicks replays through this same Python replay_admin_overrides, and player_achievements replays through replaySpecialRecordOverrides() in tools/records/special-records-replay.ts, because its importer is TypeScript and D-3 refused porting it to Python merely to share common.py. data_overrides is still the sole durable authority. Neither branch depends on another: a special-record override payload carries the raw name fields only — every link and derived column is reconstructed by the importer, never by an override — so both may run anywhere in the order, and both must run BEFORE the data_edits row_id remap, which resolves their audit rows through first_kick_goal_key and after_siren_key. Void rows are re-created and re-voided, never dropped, because the row must stay resolvable; and a record an administrator created does not exist in the candidate at all until its replay re-creates it. Skip either and the promoted site shows voided first-kick goals and after-siren kicks publicly again, on /records/first-kick-goal, /records/after-the-siren, the player pages, NL answers and the Grid Solver alike.',
   'player_link_match_candidates regenerated from /admin; derived tables recomputed if canonical rows changed.',
   'Current season re-acquired by a supervised settle (--dry-run first), then the timer left enabled.',
   'Rollback rehearsed on paper: stop service, rename afldb_prod back to the candidate name, rename afldb_prod_pre_rebuild_<stamp> to afldb_prod, start service.',

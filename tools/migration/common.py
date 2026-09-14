@@ -1054,6 +1054,87 @@ def _warn_retained_lifecycle(table: str, keys: Sequence[str]) -> None:
         )
 
 
+# AFLDB-ISSUE-167 Stage 4 (D-3, 2026-09-13). The special-record families share
+# the honours vocabulary above -- three groups, two statuses -- because the three
+# replay semantics are genuinely the same three. What differs is the KEY: both
+# after_siren_kicks and player_achievements already carry a real tracked
+# source_record_id on every row, so the durable key is simply
+#
+#     '<sources.key>:<source_record_id>'
+#
+# split on the FIRST colon. That is materially simpler than hall_of_fame's
+# '<source key>:<name>|<inducted_year>', and it is the direct payoff of the
+# identity discipline migrations 053 and 089 established.
+#
+# THIS IS ONE OF TWO ADAPTERS OVER ONE AUTHORITY. after_siren_kicks replays
+# here, in Python, inside after_siren.py's load transaction. player_achievements
+# replays in tools/records/special-records-replay.ts, inside
+# import-first-kick-goal.ts's own sql.begin -- because that importer is
+# TypeScript and has no access to this module, and D-3 refused the alternative
+# of porting it to Python merely to share this function. data_overrides remains
+# the SOLE durable authority; two adapters over one authority is not two
+# authorities, PROVIDED the semantics are pinned. They are, by
+# tests/special-records-replay-parity.test.ts, which drives BOTH from the one
+# language-neutral corpus at tests/fixtures/special-records-replay-parity.json.
+# Any change to the semantics here must be made there too, or that suite fails.
+SPECIAL_RECORD_FIELD_GROUPS = HONOUR_FIELD_GROUPS
+SPECIAL_RECORD_STATUSES = HONOUR_LIFECYCLE_STATUSES
+
+# AFLDB-ISSUE-167 §3.4's amendable classification for after_siren_kicks, and
+# NOTHING wider. The identity columns (source_id, source_record_id), the link
+# columns (player_id, club_id, opponent_club_id, match_id) and the derived
+# columns (link_status_value, candidate_count, the provenance quartet) are all
+# absent by design -- §3.4.1 proved the three apparently-manual ones are
+# genuinely derived, which is why P4 is a designed correction surface and not a
+# generic field editor.
+#
+# The third element is the column's NOT NULL disposition, and it is what makes a
+# `record` payload reconstructable or not:
+#   'required'   NOT NULL with no default -- a payload omitting it FAILS CLOSED
+#   'optional'   nullable
+#   anything else  the SQL default expression, used when the payload omits it
+AFTER_SIREN_COLUMNS = (
+    ("player_name_raw", "", "required"),
+    ("player_name_clean", "", "required"),
+    ("club_name_raw", "", "required"),
+    ("opponent_name_raw", "", "required"),
+    ("competition", "", "required"),
+    ("premiership_season", "::boolean", "required"),
+    ("season", "::smallint", "required"),
+    ("round_raw", "", "required"),
+    ("kick_scored", "::after_siren_score", "required"),
+    ("kick_effect", "::after_siren_effect", "required"),
+    ("kicker_result", "::after_siren_result", "required"),
+    ("kicker_score_raw", "", "required"),
+    ("opponent_score_raw", "", "required"),
+    ("kicker_points", "::smallint", "required"),
+    ("opponent_points", "::smallint", "required"),
+    ("siren", "::after_siren_siren", "'final'::after_siren_siren"),
+    ("supergoal_scoring", "::boolean", "false"),
+    ("cited", "::boolean", "true"),
+    ("shot_detail", "", "optional"),
+    ("source_annotation", "", "optional"),
+    ("notes", "", "optional"),
+)
+
+
+def _special_payload_expr(column: str, cast: str, disposition: str) -> str:
+    """(t.v->>'col')::cast, or the column's default when the payload omits it."""
+    read = f"(t.v->>'{column}'){cast}"
+    if disposition in ("required", "optional"):
+        return read
+    return f"COALESCE({read}, {disposition})"
+
+
+def _special_delta_expr(column: str, cast: str, disposition: str) -> str:
+    """A correction DELTA. Key presence is the semantics, the migration 086
+    discipline: an absent key leaves the source value, an explicit JSON null
+    clears it."""
+    return (f"CASE WHEN jsonb_exists(t.v, '{column}') "
+            f"THEN {_special_payload_expr(column, cast, disposition)} "
+            f"ELSE x.{column} END")
+
+
 def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
     """Replay durable admin overrides for the given table over newly imported rows.
 
@@ -3068,4 +3149,222 @@ def replay_admin_overrides(conn: psycopg.Connection, table: str) -> None:
                        updated_at = now()
                   FROM member m
                  WHERE m.field_group = 'lifecycle' AND x.id = m.member_id
+            """)
+
+        elif table == "after_siren_kicks":
+            # AFLDB-ISSUE-167 §8.1 / D-3. The straightforward half of P4: one
+            # table, one key shape, no natural-key decomposition, because
+            # migration 089 gave every row the artefact's own event_key in
+            # source_record_id. Measured on afldb_test 2026-09-13: 126 of 126
+            # rows carry one and none contains a colon.
+            #
+            # THE PARSE RULE IS FIRST-COLON, the same rule
+            # src/lib/special-records/identity.ts and the TypeScript adapter
+            # use. It is what lets a minted manual id carry its own family
+            # prefix -- 'after_siren:<uuid>' -- without a second separator, and
+            # it locates the one refusal that really matters: a colon in the
+            # SOURCE KEY would steal the split point and make the two halves
+            # unrecoverable.
+            #
+            # `cited` IS NOT LIFECYCLE and must never be treated as one
+            # (AFLDB-ISSUE-167 gate G-3). Migration 089 defines it as an
+            # evidence gap on a kick that really happened; 'void' says the ROW
+            # should never have existed. It appears below as ordinary amendable
+            # metadata, in the correction group, exactly like shot_detail.
+            as_columns = AFTER_SIREN_COLUMNS
+            as_required = [c for c, _, d in as_columns if d == "required"]
+            as_payload = ", ".join(_special_payload_expr(*c) for c in as_columns)
+            as_names = ", ".join(c for c, _, _ in as_columns)
+            as_set_record = ", ".join(
+                f"{c} = {_special_payload_expr(c, cast, disp)}" for c, cast, disp in as_columns)
+            as_set_delta = ", ".join(
+                f"{c} = {_special_delta_expr(c, cast, disp)}" for c, cast, disp in as_columns)
+            as_delta = ", ".join(_special_delta_expr(*c) for c in as_columns)
+            as_current = ", ".join(f"x.{c}" for c, _, _ in as_columns)
+
+            as_decoded = """
+                raw AS (
+                    SELECT o.entity_key, o.field_group, o.override_values AS v,
+                           split_part(o.entity_key, ':', 1) AS source_key,
+                           CASE WHEN position(':' in o.entity_key) = 0 THEN NULL
+                                ELSE substring(o.entity_key
+                                               from position(':' in o.entity_key) + 1)
+                           END AS record_id
+                      FROM data_overrides o
+                     WHERE o.entity_type = 'after_siren_kicks'
+                       AND o.is_active = true
+                ),
+                decoded AS (
+                    SELECT r.entity_key, r.field_group, r.v, r.source_key, r.record_id,
+                           s.id AS source_id,
+                           r.v->>'player_identity' AS identity,
+                           r.v->>'match_key'       AS match_key,
+                           (SELECT count(*) FROM raw r2
+                             WHERE r2.entity_key = r.entity_key) AS key_overrides,
+                           (SELECT count(*) FROM raw r2
+                             WHERE r2.entity_key = r.entity_key
+                               AND r2.field_group = 'record') AS record_overrides
+                      FROM raw r
+                      LEFT JOIN sources s ON s.key = r.source_key
+                ),
+                target AS (
+                    SELECT d.*,
+                           (SELECT count(*) FROM after_siren_kicks x
+                             WHERE x.source_id = d.source_id
+                               AND x.source_record_id = d.record_id) AS row_matches,
+                           (SELECT min(x.id) FROM after_siren_kicks x
+                             WHERE x.source_id = d.source_id
+                               AND x.source_record_id = d.record_id) AS row_id,
+                           (SELECT count(DISTINCT ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS identity_matches,
+                           (SELECT min(ei.player_id)
+                              FROM external_identities ei
+                              JOIN sources ps ON ps.id = ei.source_id
+                             WHERE ei.status IN ('unique', 'resolved')
+                               AND ei.player_id IS NOT NULL
+                               AND d.identity IS NOT NULL
+                               AND ps.key = split_part(d.identity, ':', 1)
+                               AND ei.external_id = substring(d.identity
+                                                              from position(':' in d.identity) + 1)
+                           ) AS resolved_player_id,
+                           (SELECT count(*) FROM matches m
+                             WHERE d.match_key IS NOT NULL
+                               AND m.match_key = d.match_key) AS match_matches,
+                           (SELECT min(m.id) FROM matches m
+                             WHERE d.match_key IS NOT NULL
+                               AND m.match_key = d.match_key) AS resolved_match_id
+                      FROM decoded d
+                )
+            """
+
+            # 0. Refuse the whole run before writing anything. One report, every
+            #    unresolvable override named, bounded at ten.
+            cur.execute("WITH " + as_decoded + f"""
+                SELECT t.entity_key,
+                       CASE
+                           WHEN position(':' in t.entity_key) = 0 OR length(t.source_key) = 0
+                               THEN 'entity_key is not ''<source key>:<source record id>'''
+                           WHEN t.record_id IS NULL OR length(t.record_id) = 0
+                               THEN 'entity_key carries no source record id'
+                           WHEN t.source_id IS NULL
+                               THEN 'entity_key names no source in this database'
+                           WHEN NOT (t.field_group = ANY(%(groups)s))
+                               THEN 'unknown field_group'
+                           -- A 'record' override owns the WHOLE durable row,
+                           -- its status included, so a second authority over
+                           -- the same row makes the outcome order-dependent.
+                           -- 'correction' + 'lifecycle' is NOT a collision:
+                           -- disjoint fields, defined order.
+                           WHEN t.record_overrides > 0 AND t.key_overrides > 1
+                               THEN 'more than one active override resolves to this row'
+                           WHEN t.row_matches > 1
+                               THEN 'more than one row carries this source record id'
+                           WHEN t.field_group <> 'correction'
+                                 AND (t.v->>'status' IS NULL
+                                      OR NOT (t.v->>'status' = ANY(%(statuses)s)))
+                               THEN 'payload carries no valid status'
+                           WHEN t.field_group <> 'correction'
+                                 AND t.v->>'status' = 'void'
+                                 AND COALESCE(t.v->>'status_reason', '') = ''
+                               THEN 'a void row needs a status_reason'
+                           WHEN t.field_group = 'correction' AND t.row_id IS NULL
+                               THEN 'correction target row does not exist'
+                           WHEN t.field_group = 'record' AND t.row_id IS NULL
+                                 AND EXISTS (SELECT 1 FROM unnest(%(required)s::text[]) k
+                                              WHERE t.v->>k IS NULL)
+                               THEN 'record payload is missing a required field'
+                           WHEN t.field_group = 'record' AND t.identity IS NOT NULL
+                                 AND t.identity_matches <> 1
+                               THEN 'player_identity does not resolve to exactly one player'
+                           WHEN t.field_group = 'record' AND t.match_key IS NOT NULL
+                                 AND t.match_matches <> 1
+                               THEN 'match_key does not resolve to exactly one match'
+                       END AS problem
+                  FROM target t
+                 ORDER BY t.entity_key, t.field_group
+            """, {
+                "groups": list(SPECIAL_RECORD_FIELD_GROUPS),
+                "statuses": list(SPECIAL_RECORD_STATUSES),
+                "required": as_required,
+            })
+            unresolvable = [(key, problem) for key, problem in cur.fetchall() if problem]
+            if unresolvable:
+                raise RuntimeError(
+                    "replay_admin_overrides(after_siren_kicks): refusing to commit, "
+                    + str(len(unresolvable)) + " override(s) do not resolve: "
+                    + "; ".join(f"{key} -- {problem}" for key, problem in unresolvable[:10]))
+
+            cur.execute("WITH " + as_decoded + """
+                SELECT t.entity_key FROM target t
+                 WHERE t.field_group = 'lifecycle' AND t.row_id IS NULL
+                 ORDER BY t.entity_key
+            """)
+            _warn_retained_lifecycle("after_siren_kicks", [row[0] for row in cur.fetchall()])
+
+            # 1. Re-create the manual rows a destructive rebuild removed.
+            #    source_id and source_record_id come from the KEY, never from
+            #    the payload: the key is what binds the decision to a row, so a
+            #    payload cannot move one.
+            cur.execute("WITH " + as_decoded + f"""
+                INSERT INTO after_siren_kicks
+                      ({as_names}, status, status_reason,
+                       source_id, source_record_id, player_id, link_status_value, match_id)
+                SELECT {as_payload}, t.v->>'status', t.v->>'status_reason',
+                       t.source_id, t.record_id, t.resolved_player_id,
+                       (CASE WHEN t.resolved_player_id IS NOT NULL THEN 'resolved'
+                             ELSE 'unmatched' END)::link_status,
+                       t.resolved_match_id
+                  FROM target t
+                 WHERE t.field_group = 'record' AND t.row_id IS NULL
+            """)
+
+            # 2. Restore a manual row's whole payload. Link columns are
+            #    deliberately NOT restored: linkage is /admin/player-links'
+            #    business, and after-siren has no queue at all (D-2).
+            cur.execute("WITH " + as_decoded + f"""
+                UPDATE after_siren_kicks x
+                   SET {as_set_record},
+                       status = t.v->>'status', status_reason = t.v->>'status_reason',
+                       updated_at = now()
+                  FROM target t
+                 WHERE t.field_group = 'record' AND x.id = t.row_id
+                   AND ({as_current}, x.status, x.status_reason)
+                       IS DISTINCT FROM
+                       ({as_payload}, t.v->>'status', t.v->>'status_reason')
+            """)
+
+            # 3. The correction DELTA over a source-owned row.
+            cur.execute("WITH " + as_decoded + f"""
+                UPDATE after_siren_kicks x
+                   SET {as_set_delta},
+                       updated_at = now()
+                  FROM target t
+                 WHERE t.field_group = 'correction' AND x.id = t.row_id
+                   AND ({as_current}) IS DISTINCT FROM ({as_delta})
+            """)
+
+            # 4. The lifecycle decision, last and unconditional -- but guarded
+            #    by IS DISTINCT FROM for one reason that matters: on an ORDINARY
+            #    reload the lifecycle columns already carry this decision (they
+            #    are Layer 1 and this loader never writes them), so an unguarded
+            #    UPDATE would bump updated_at on every override-bearing row on
+            #    every run and invalidate a concurrent administrator's
+            #    compare-and-swap for no actual change. The same discipline
+            #    after_siren.py:586-588 already applies to its own upsert.
+            cur.execute("WITH " + as_decoded + """
+                UPDATE after_siren_kicks x
+                   SET status = t.v->>'status', status_reason = t.v->>'status_reason',
+                       updated_at = now()
+                  FROM target t
+                 WHERE t.field_group = 'lifecycle' AND x.id = t.row_id
+                   AND (x.status, x.status_reason)
+                       IS DISTINCT FROM (t.v->>'status', t.v->>'status_reason')
             """)

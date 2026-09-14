@@ -78,6 +78,10 @@ import type {
  * `honour_team_members`, none of which is a settle target either — the nightly
  * settle writes matches and statistics and neither reads nor writes an award,
  * an induction or an honour team — so admitting all three changes no answer
+ * here) and migration 102 (`AFLDB-ISSUE-167` §6.3: `player_achievements` and
+ * `after_siren_kicks`, the two curated special-record families, neither of which
+ * is a settle target either — the nightly settle touches neither a first-kick
+ * achievement nor an after-siren event — so admitting both changes no answer
  * here). Listed in the
  * order
  * §3.1 / §16.1 write it, which is NOT the ASCII order `checkAdmittedEntities()`
@@ -93,6 +97,7 @@ export const OVERRIDE_ENTITY_TYPES = [
   'coaches', 'draft_picks', 'fixtures', 'matches', 'match_coaches', 'players',
   'season_list_members', 'club_leadership',
   'award_winners', 'hall_of_fame', 'honour_team_members',
+  'player_achievements', 'after_siren_kicks',
 ] as const;
 
 /**

@@ -36,6 +36,13 @@ export type PlayerAfterSirenEvent = {
  * club when the source's club string links to one; `clubSlug` /
  * `opponentSlug` are null otherwise, same fallback-to-raw-name convention as
  * `getPlayerMatches`.
+ *
+ * Every query in this module carries `a.status = 'active'` (migration 102,
+ * AFLDB-ISSUE-167 §7). It is repeated per CTE rather than lifted into a
+ * shared fragment on purpose: `getAfterSirenRecords` has five separate scans
+ * of the table, and filtering four of them would produce a board whose totals
+ * and whose first/last occurrences disagreed. `status` is NOT `cited` --
+ * an uncited kick is evidence-thin but happened, and is still shown.
  */
 export type AfterSirenOccurrence = {
   season: number;
@@ -87,7 +94,7 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
                WHERE a.kick_scored = 'goal' AND a.kick_effect = 'drew'
              )::int AS goals_to_draw
         FROM after_siren_kicks a
-       WHERE a.player_id IS NOT NULL
+       WHERE a.player_id IS NOT NULL AND a.status = 'active'
        GROUP BY a.player_id
     ),
     first_attempt AS (
@@ -97,7 +104,7 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
         FROM after_siren_kicks a
         LEFT JOIN matches m ON m.id = a.match_id
         LEFT JOIN clubs op ON op.id = a.opponent_club_id
-       WHERE a.player_id IS NOT NULL
+       WHERE a.player_id IS NOT NULL AND a.status = 'active'
        ORDER BY a.player_id, a.season, a.id
     ),
     last_attempt AS (
@@ -107,7 +114,7 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
         FROM after_siren_kicks a
         LEFT JOIN matches m ON m.id = a.match_id
         LEFT JOIN clubs op ON op.id = a.opponent_club_id
-       WHERE a.player_id IS NOT NULL
+       WHERE a.player_id IS NOT NULL AND a.status = 'active'
        ORDER BY a.player_id, a.season DESC, a.id DESC
     ),
     first_goal AS (
@@ -117,7 +124,7 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
         FROM after_siren_kicks a
         LEFT JOIN matches m ON m.id = a.match_id
         LEFT JOIN clubs op ON op.id = a.opponent_club_id
-       WHERE a.player_id IS NOT NULL AND a.kick_scored = 'goal'
+       WHERE a.player_id IS NOT NULL AND a.status = 'active' AND a.kick_scored = 'goal'
        ORDER BY a.player_id, a.season, a.id
     ),
     last_goal AS (
@@ -127,7 +134,7 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
         FROM after_siren_kicks a
         LEFT JOIN matches m ON m.id = a.match_id
         LEFT JOIN clubs op ON op.id = a.opponent_club_id
-       WHERE a.player_id IS NOT NULL AND a.kick_scored = 'goal'
+       WHERE a.player_id IS NOT NULL AND a.status = 'active' AND a.kick_scored = 'goal'
        ORDER BY a.player_id, a.season DESC, a.id DESC
     )
     SELECT t.player_id AS "playerId", p.display_name AS "displayName", p.slug,
@@ -178,7 +185,7 @@ export async function getPlayerAfterSirenEvents(playerId: number): Promise<Playe
       FROM after_siren_kicks a
       LEFT JOIN clubs cl ON cl.id = a.club_id
       LEFT JOIN clubs op ON op.id = a.opponent_club_id
-     WHERE a.player_id = ${playerId}
+     WHERE a.player_id = ${playerId} AND a.status = 'active'
      ORDER BY a.season DESC, a.id DESC
   `;
 }
