@@ -155,17 +155,28 @@ export type CoachSchemaInput = {
   description: string;
   dob: Date | string | null;
   clubs: { name: string; slug: string }[];
+  /**
+   * The same person's player page, for a coach who also played
+   * (AFLDB-ISSUE-170 Stage 1E). `null` for a coach-only person.
+   */
+  sameAsPath?: string | null;
 };
 
 /**
- * A coach as `Person`, coaching-only.
+ * A coach as `Person`, describing the coaching career.
  *
- * Deliberately does not reuse `playerSchema`'s `jobTitle` -- a coach-only
- * person (`coaches.player_id IS NULL`) never played, so asserting
- * "Australian rules footballer" of them would be an athlete claim the data
- * does not support. `memberOf` names the clubs the coaching record links,
- * same shape as `playerSchema`, but describing a coaching relationship
- * rather than a playing one.
+ * Deliberately does not reuse `playerSchema`'s `jobTitle`: this document
+ * describes a coaching record, and for a coach-only person
+ * (`coaches.player_id IS NULL`) asserting "Australian rules footballer"
+ * would be an athlete claim the data does not support. `memberOf` names the
+ * clubs the coaching record links, same shape as `playerSchema`, but
+ * describing a coaching relationship rather than a playing one.
+ *
+ * A player-linked coach has a second, differently-scoped document at their
+ * player page. The two are distinct `@id`s with distinct self-canonicals —
+ * they describe different careers — and `sameAs` states that they are the
+ * same individual, which is what stops a consumer reading them as two
+ * people who happen to share a name.
  */
 export function coachSchema(input: CoachSchemaInput): Json {
   const birthDate = input.dob
@@ -181,6 +192,7 @@ export function coachSchema(input: CoachSchemaInput): Json {
     description: input.description,
     birthDate,
     jobTitle: 'Australian rules football coach',
+    sameAs: input.sameAsPath ? [absoluteUrl(input.sameAsPath)] : undefined,
     memberOf: input.clubs.map((club) => ({
       '@type': 'SportsTeam',
       name: club.name,

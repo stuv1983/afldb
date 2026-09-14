@@ -28815,3 +28815,120 @@ No application, CSP, or deployment configuration was changed — no file under `
 None. Follow-up (not blocking, not part of this issue): `AFLDB-ISSUE-169.md` §9's two
 recorded-not-acted-on observations (no test covers any security header; the Next/Caddy CSP strings
 are hand-synchronised with no drift detection) remain open for a future issue if picked up.
+
+## AFLDB-ISSUE-170 — Coach profile expansion and coach comparison
+
+- **Status:** **RESOLVED 2026-09-14.** Implementation is complete and committed on
+  `feature/issue-170-coach-overhaul` (`798e28b`, `2d6c9d1`, `2c0b8c6`, `36835b1`, `560dddb`,
+  `51eb138`), worktree left clean after the final commit. This entry is
+  added directly as resolved — the issue was tracked only in its runbook (`AFLDB-ISSUE-170.md`)
+  during implementation and never previously appeared in this ledger's Open Issues table or in
+  `IssuesIndex.md`, so it does not change either open-issue count.
+- **Severity:** Feature
+- **Area:** Public coaches / Player coaching history / Comparison
+- **Found:** 2026-09-14
+- **Resolved:** 2026-09-14
+- **Runbook:** `AFLDB-ISSUE-170.md` — Stage 0 is the discovery record establishing that the feature
+  is derivable entirely from canonical `coaches` / `match_coaches` / `matches` / `clubs` / `venues`
+  data with no new persistence; Stages 1A–1D are the shared rich coaching read model, venue history,
+  history-against-club-organisation and shared coach/player presentation; **Stage 1E is the
+  acceptance correction** that changed the routing/product model (below); Stages 2A–2D are the
+  coach comparison surface; Stage 3 is validation.
+- **Branch:** `feature/issue-170-coach-overhaul`, worktree `D:\dev\afldb-issue-170`.
+
+### Objective
+
+Expand AFLDB's coaching surfaces from a career-summary line into a richer historical record —
+career totals, biggest win/loss, venue history, and record against a selected opponent club — for
+every coach including those whose canonical public identity is a player, then add a two-coach
+comparison surface with direct head-to-head. The feature derives entirely from canonical match
+data; it introduces no second source of truth for coach totals and no stored coach-summary tables.
+
+### Final product model
+
+- `/players/[slug]` is **player-centric**. It keeps a Coaching Career section but leads with playing
+  statistics and "Compare with another player".
+- `/coaches/[slug]` is **coach-centric for every coach**, including a person who also played. The
+  permanent redirect that previously sent a player-linked coach's slug to the player route was
+  removed (Stage 1E) — each route is now self-canonical, not an alias of the other, and the coach
+  page's `Person` structured data carries `sameAs` pointing at the player page.
+- The two pages cross-link: the coach page offers **View playing career →** to a player-linked
+  coach's player page; the player page offers **View coaching career →** to a coach's coach page.
+- Coach comparison is available through **`/coaches/compare`**, linked from the coach page as
+  "Compare with another coach" (preselected with that coach), operating on canonical coach identity
+  for both coach-only and player-linked coaches.
+- `coachProfilePath`, the shared helper every coaching surface links through (coaches index, coach
+  records board, club coaching tables, comparison), now always resolves to the coach route; every
+  coach page is consequently sitemap-published (~368 previously-redirecting player-linked coaches
+  were unpublishable before this fix).
+- Deliberately unchanged: `searchCoaches` stays scoped to `player_id IS NULL`, so the site search box
+  still returns a person who both played and coached as a player. Revisit only with evidence a reader
+  expects both.
+
+### Implemented coach-career expansion
+
+- **Career totals:** games, wins, losses, draws, win % (`(wins + draws*0.5) / games * 100`), finals,
+  Grand Finals, premierships, reusing/extending the existing `getCoachCareer` read model as the one
+  shared boundary for both routes.
+- **Club history:** club coaching stints from canonical `match_coaches`.
+- **Biggest win / biggest loss:** coach-perspective margin (`home_score - away_score` for the home
+  coach, the reverse for the away coach) with deterministic tie-break — largest absolute margin,
+  then explicit date ordering, then match ID as final tie-break — carrying season, date, club,
+  opponent, venue and finals context so the record links to its match.
+- **Venue history:** per-venue games/wins/losses/draws/win %/finals/Grand Finals plus first and most
+  recent coached match, derived from canonical `venue_id` (100% mapped, no raw-name fallback
+  needed), sorted by coaching games then a deterministic venue-name tie-break.
+- **History against club organisation:** scoped by `clubs.organization_id` rather than a single
+  historical club identity, so a lineage rename does not split the record; shareable/bookmarkable URL
+  state; shows games/wins/losses/draws/win %/finals/Grand Finals/biggest win/biggest loss/venue
+  history for the selected opponent from the selected coach's perspective.
+- **Zero-game edge case:** a coach with no `match_coaches` rows (one identity in the data, Jim
+  Adamson) renders an explicit "no canonical coaching match record" state rather than crashing or
+  dividing by zero.
+
+### Implemented coach comparison
+
+- **Career side-by-side:** both selected coaches' full career totals, biggest win/loss, career
+  seasons, clubs/organisations coached and a venue-record summary, independent of whether the two
+  coaches ever directly opposed each other.
+- **Direct head-to-head:** derived only where both coaches were assigned to opposing clubs in the
+  same canonical match (never inferred from a missing/single coach assignment) — meetings, wins for
+  each side, draws, finals meetings, Grand Final meetings, first meeting, most recent meeting,
+  biggest win each way, and venues where they met. When two coaches never directly opposed each
+  other, career comparison still renders and H2H explicitly states no canonical direct meetings are
+  recorded.
+- **Finals/GF context:** finals and Grand Final meeting counts folded into the H2H summary.
+- **Venue records:** per-coach venue summaries in the side-by-side view.
+- **Career-overlap seasons:** number of common active coaching seasons between the two coaches.
+- **First/latest direct meetings:** surfaced as part of the H2H record above.
+- Selection supports canonical/shareable URL state, swap direction, and deliberate handling of a
+  same-coach comparison and the pre-selection empty state.
+
+### Responsive comparison overflow fix
+
+The coach comparison page overflowed horizontally on mobile (measured ~782–785px of page width
+against a 390px viewport). The fix reduced page-level overflow to 375px against the 390px viewport.
+Playwright acceptance covered 390×844, 768×1024 and 1440×900.
+
+### Validation evidence
+
+- Stage 1E focused route/format/club tests: **62/62 passed.**
+- Coach comparison integration tests: **32/32 passed.**
+- Final reciprocal-link focused route test: **15/15 passed.**
+- Typecheck: **passed.**
+- Production build: **passed**, generating 1,516 static pages.
+- Targeted production-mode Playwright player-linked coach journey: **2/2 passed** (desktop and
+  mobile).
+- Comparison responsive Playwright acceptance: **passed** at 390×844, 768×1024 and 1440×900.
+- Worktree was clean after the final commit (`51eb138`).
+
+An unrelated test-infrastructure quirk was hit during this work — the standalone production server
+needed `PORT=3100` to match `playwright.config.ts` — and is **not** an ISSUE-170 defect. That
+configuration was not modified as part of this issue.
+
+### Next action
+
+None. The feature is complete, validated and committed on `feature/issue-170-coach-overhaul`. Merge
+and deploy follow the standard issue lifecycle (`merge:ready`, operator push/merge,
+`deploy/sync-dev.ps1`, DEV smoke) at the user's discretion; no code change remains outstanding under
+this issue.

@@ -13,7 +13,8 @@ import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
 import { getPlayerAfterSirenEvents } from '@/db/queries/after-siren';
 import { getPlayerHonours } from '@/db/queries/awards';
-import { getPlayerCoachingCareer } from '@/db/queries/coaches';
+import { getComparisonOrganizations } from '@/db/queries/club-comparison';
+import { getCoach, getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
   getPlayer,
@@ -30,6 +31,7 @@ import {
   awardSeasonPath,
   brownlowStatusNote,
   clubPath,
+  coachPath,
   formatBrownlow,
   formatDate,
   formatNumber,
@@ -43,7 +45,7 @@ import {
   seasonPath,
 } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
-import { honourTeamSlug } from '@/lib/slugs';
+import { coachSlug, honourTeamSlug } from '@/lib/slugs';
 import { playerSchema } from '@/lib/structured-data';
 
 // Player careers are historical and change only when an import runs.
@@ -176,6 +178,28 @@ export default async function PlayerPage({
       getPlayerCoachingCareer(player.id),
       getPlayerAfterSirenEvents(player.id),
     ]);
+
+  // The Stage 1C opponent-history selector's option list (AFLDB-ISSUE-170
+  // Stage 1D), fetched only for a coach with a real canonical coaching
+  // record -- a sequential await after the main fan-out rather than a
+  // member of it, since which coach (if any) is only known once
+  // coachingCareer itself has resolved. Cheap and canonical
+  // (getComparisonOrganizations already backs /clubs/compare), so no
+  // second organisation source is introduced.
+  const coachOrganizations = coachingCareer && coachingCareer.totals.games > 0
+    ? await getComparisonOrganizations()
+    : [];
+
+  // A player-linked coach record: their coach page is a different
+  // presentation of the same person (AFLDB-ISSUE-170 Stage 1E's reciprocal),
+  // offered as a secondary cross-context link, never a redirect. Reuses the
+  // same canonical coachSlug/coachPath helpers the coach page links back
+  // with, rather than rebuilding the URL.
+  const coachingCareerPath = coachingCareer
+    ? await getCoach(coachingCareer.coachId).then(
+        (coach) => coach && coachPath(coachSlug(coach.displayName), coach.id),
+      )
+    : null;
 
   const risingStarNominations = honours.nominations;
   const risingStarWin = risingStarNominations.find((n) => n.isWinner);
@@ -724,7 +748,7 @@ export default async function PlayerPage({
     sections.push({
       id: 'coaching-career',
       label: 'Coaching Career',
-      node: <PlayerCoachingCareer career={coachingCareer} />,
+      node: <PlayerCoachingCareer career={coachingCareer} organizations={coachOrganizations} />,
     });
   }
 
@@ -772,6 +796,12 @@ export default async function PlayerPage({
         <p className="lede">{careerSentence(player)}</p>
         <p className="section-note">
           <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
+          {coachingCareerPath && (
+            <>
+              {' · '}
+              <Link href={coachingCareerPath}>View coaching career →</Link>
+            </>
+          )}
         </p>
       </div>
 

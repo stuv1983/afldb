@@ -23,8 +23,8 @@ describe('coachSlug', () => {
   // and knows nothing of manual vs. AFL Tables identity (§1.1) -- an
   // admin-typed manual coach's display name slugs exactly as a sourced
   // one's does, and a display_name correction slugs to a new value, which
-  // is what makes the [slug]-<id> canonical-redirect at
-  // src/app/coaches/[slug]/page.tsx:93-97 fire for a renamed coach.
+  // is what makes the [slug]-<id> canonical-redirect in
+  // src/app/coaches/[slug]/page.tsx fire for a renamed coach.
   it('slugs an admin-typed manual coach display name the same way', () => {
     expect(coachSlug('Pat O\'Brien-Smith')).toBe('pat-o-brien-smith');
   });

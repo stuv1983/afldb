@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SortableTable } from '@/components/SortableTable';
 import type { ClubCoachRecordRow } from '@/db/queries/coaches';
-import { coachPath, formatNumber, formatPercentage, formatSpan, playerPath } from '@/lib/format';
+import { coachProfilePath, formatNumber, formatPercentage, formatSpan } from '@/lib/format';
 import { coachSlug } from '@/lib/slugs';
 
 /**
@@ -12,14 +12,12 @@ import { coachSlug } from '@/lib/slugs';
  * from {@link getClubCoachRecords}; this only renders it, so the club
  * page keeps the same shape as its other sections.
  *
- * A coach who also played at senior level links to their player profile
- * (the same rule the /records/coaches board and the linked-coach redirect
- * apply); a coach-only person links to the `/coaches/[slug]-id` route.
+ * Every coach here links to their `/coaches/[slug]-id` page, player-linked
+ * or not: this is a coaching table, so the coaching profile is what the
+ * name promises (AFLDB-ISSUE-170 Stage 1E, via {@link coachProfilePath}).
  */
 function coachCell(row: ClubCoachRecordRow) {
-  const href = row.playerId !== null && row.playerSlug !== null
-    ? playerPath(row.playerSlug, row.playerId)
-    : coachPath(coachSlug(row.displayName), row.coachId);
+  const href = coachProfilePath({ slug: coachSlug(row.displayName), coachId: row.coachId });
   return <Link href={href}>{row.displayName}</Link>;
 }
 
