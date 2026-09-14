@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-167 — Special records administration and durable suppression
 
-**Status:** Planning (approved runbook pending operator sign-off)
+**Status:** **Stages 0–5 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14); Stage 6 is next. No stop condition open; D-6 closed the last outstanding Stage 5 operator item
 **Severity:** Medium-high
 **Area:** Admin / Data management / Acquisition / Public read models
 **Created:** 2026-09-13
@@ -9,9 +9,28 @@
 **Branch:** `opus/issue-167-special-records-admin`
 **Worktree:** `D:\dev\afldb-issue-167`
 
-This document is a planning deliverable. No application code, migration, privilege,
-test or deployment change was made while producing it. Every stage below re-verifies
-current repository evidence before it writes anything.
+This document began as a planning deliverable: no application code, migration, privilege,
+test or deployment change was made while producing Stages 0–1, and every stage below
+re-verifies current repository evidence before it writes anything. **Stages 2–5 have since
+changed the repository, and that work is now committed and pushed.**
+
+### Repository state — operator-proven 2026-09-14
+
+```
+planning / allocation   9faba6f
+Stage 2                 8d9ac74
+Stage 3                 2a54444
+Stage 4                 5de87dd
+Stage 5                 e8b44f6
+HEAD = @{u}             e8b44f6b6e630a6900ae1e6c6788750771942bce
+worktree                clean
+```
+
+Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 5
+and is level with its upstream. **Nothing is merged to `main`, and DEV and PROD are still
+not migrated or deployed** — §13 places that at Stage 8. Each stage-boundary paragraph
+below ("nothing staged, committed, pushed…") records the state at the close of that
+stage's own session and is superseded on the commit/push half only by this block.
 
 ---
 
@@ -1482,7 +1501,7 @@ phone-only polish is a follow-up, not a P4 blocker.
 
 ---
 
-## 19. Operator decisions — **all five RECORDED 2026-09-13**
+## 19. Operator decisions — **five RECORDED 2026-09-13, D-6 RECORDED 2026-09-14**
 
 | # | Decision | Outcome |
 |---|---|---|
@@ -1491,6 +1510,7 @@ phone-only polish is a follow-up, not a P4 blocker.
 | **D-3** | Where Family A's replay lives | **APPROVED WITH MODIFICATION — one durable authority, two replay adapters.** `data_overrides` stays the sole durable authority; after-siren uses the existing Python `common.py` contract; `import-first-kick-goal.ts` gets an explicit TypeScript adapter with the same `lifecycle`/`correction`/`record` semantics; both pinned by parity/contract tests; **replay atomic with the owning importer**; do not port first-kick to Python; no second authority mechanism. **Atomicity proven structurally feasible from source — §8.2.2; the STOP clause is not invoked** (§8.2.1–§8.2.3) |
 | **D-4** | Capability shape | **APPROVED — TWO capabilities.** `data.specialRecords.read` (Admin + Super Admin) / `data.specialRecords.edit` (Super Admin). Create, correct, void, suppress, reinstate and replace are all writes under `.edit`; no separate `.suppress`. Supersedes ISSUE-156 §2's working name (§9). **Sequencing clarified 2026-09-14 (§9.1):** `.read` is declared at Stage 3, `.edit` at Stage 6 beside its first guarded mutation, because the ISSUE-158 enforcement contract fails a capability declared but enforced at no boundary. The final role matrix is unchanged |
 | **D-5** | Which pool the special-record admin surface uses, and therefore whether `privileges.sql` changes | **APPROVED — `afldb_auth` gets NOTHING; `tools/maintenance/privileges.sql` stays unchanged.** Raised at Stage 2, not at planning: §6.5 had assumed the admin surface reads these tables on the auth pool, and current source contradicts that. **Supersedes §6.5.** The operator's grounds, recorded verbatim in substance: reads for these data surfaces use the app/public pool; writes use `afldb_import`; `afldb_auth` is reserved for operational/auth-owned tables; no current or planned ISSUE-167 path consumes these tables through `authSql`; and adding the grants would widen an otherwise deliberate boundary **without a caller**. The regression assertion is **retained** and must keep proving all five of: `afldb_app` can SELECT the lifecycle columns; `afldb_app` cannot mutate them; `afldb_import` holds the intended import/write privileges; `afldb_auth` has no access; and the auth privilege specification does not name either table. Evidence and consequences: §21.6 |
+| **D-6** | Whether the four Grid Solver / NL after-siren fixture assertions that fail on current `afldb_test` should be re-baselined in ISSUE-167 | **DECIDED 2026-09-14 — DO NOT re-baseline; the item is CLOSED, not an open operator item.** Raised at Stage 5 (§24.9). The in-place differential is accepted as proof that the failures are independent of the Stage 5 filters — identical failures, assertions and values with the implicated filters present and reverted. They are recorded as **pre-existing / test-data-state drift caused by the current `afldb_test` linkage state, not an ISSUE-167 regression**. `tests/integration/grid-solver.test.ts` and `tests/integration/nl-answers-after-siren.test.ts` are **not** to be altered and Stage 5 scope is **not** widened; no product or test code changes under this decision — tracking clarification only. **Stage 5 is signed off with no stop condition open** |
 
 ### 19.1 Planning findings preserved unchanged by these decisions
 
@@ -2627,14 +2647,28 @@ failures are the same drift in the other direction — a *wider* tie, a later "m
 kick, and 2 excluded rows where the fixture records 6. **A suppression filter can only
 remove rows, never add links or widen a tie**, which corroborates the differential.
 These belong to the §21.10 class of football-data-state failures and are **not** Stage 5
-defects. Recorded here so the next stage does not re-investigate them, and left for the
-operator to decide whether those fixtures should be re-baselined.
+defects. Recorded here so the next stage does not re-investigate them.
+
+**Operator decision D-6 (2026-09-14) — DO NOT re-baseline. This item is CLOSED; it is not
+an open operator item.** The differential is accepted as proof that the failures are
+independent of the Stage 5 filters — the same failures, the same assertions and the same
+values with the implicated filters present and reverted. They are recorded as
+**pre-existing test-data-state drift caused by the current `afldb_test` linkage state, not
+an ISSUE-167 regression**. The four assertions in `tests/integration/grid-solver.test.ts`
+and `tests/integration/nl-answers-after-siren.test.ts` are **not** to be altered, and Stage
+5 scope is **not** widened. Stage 5 is signed off with **no stop condition open**. See
+§19 D-6.
 
 ### 24.10 Stage boundary
 
 Stage 5 is green and **stops here**. No mutation, no `data.specialRecords.edit`, no `/new`
-route, no `match-admin` change, no DEV or PROD migration, and nothing staged, committed,
-pushed, merged or deployed.
+route, no `match-admin` change, no DEV or PROD migration, and — at the close of the Stage 5
+session — nothing staged, committed, pushed, merged or deployed.
+
+**Superseded on the commit/push half only (2026-09-14):** the operator has since committed
+Stages 2–5 and pushed the branch; Stage 5 is `e8b44f6` and `HEAD = @{u}` with a clean
+worktree (header **Repository state**). Nothing is merged to `main` and neither DEV nor
+PROD is migrated or deployed.
 
 **ISSUE-167 is NOT resolved.** Stage 6 (mutations, atomic audit, CAS, revalidation out of
-the pending path) is next.
+the pending path) is **the next action** — with D-6 closed, it is the only one.
