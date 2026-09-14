@@ -681,6 +681,13 @@ suppression a lie.
 that fails if a new unfiltered reference appears. A count-based assertion alone is not
 enough — the test names the fragments.
 
+> **Superseded in four places by the Stage 5 execution inventory (§24.2), which was
+> re-derived from current source and is authoritative.** The `src/search/*` rows above
+> (`grid-solver-spec.ts`, `gridley-compat.ts`, `nl/plan.ts`, `nl/parser.ts`) hold **no SQL
+> at all** — every one is a prose comment naming the table. `/players/compare` is a second
+> consumer of `getPlayerHonours` and was missing. `src/db/queries/player-match-candidates.ts`
+> is a consumer and was missing. All SQL over both tables lives in `src/db/queries/`.
+
 **Revalidation** (ISSUE-156 revalidation table, R-7): player pages, records pages, match
 pages. The Server Action returns `revalidatePaths`; the client POSTs them to the bounded
 allowlisted route **after** the action resolves. `revalidatePath` is **never** called
@@ -1431,7 +1438,7 @@ Every stage writes a failing test before the fix.
 | **2** | Migration 10N (lifecycle columns + **both** CHECK widenings, §6.3/§6.4) + `privileges.sql` + RED identity/constraint tests | ✅ **COMPLETE — PASS 2026-09-13** (§21). Migration **102** allocated and green on `afldb_test`; G-3, G-4, G-7, G-8 all PASS; G-6 re-baselined PASS. `privileges.sql` **unchanged by D-5** (§19, §21.6) — the premise §6.5 rested on was contradicted by current source, the operator reviewed the evidence and approved, and the real-role privilege contract is pinned by tests instead. **No stop condition open** |
 | **3** | Capability (`data.specialRecords.*`) + nav + read-only admin surface (list/detail/provenance, incl. read-only link state per D-2) | ✅ **COMPLETE — PASS 2026-09-14** (§22). Five routes, one nav entry, `data.specialRecords.read` declared and enforced on every one; `tests/auth.test.ts` green (150) and the three roles proven against the REAL guard; 14 new DB-backed admin-read assertions green on `afldb_test`. **`.edit` is deliberately NOT declared until Stage 6** — the ISSUE-158 contract fails a capability enforced at no boundary, and Stage 3 ships no write (§9, §22.2). D-4's final role matrix is unchanged. **No stop condition open** |
 | **4** | Both replay adapters + importer refusals (**the Phase E stop condition**) | Gates G-5, G-9. Reload-survival, rebuild-survival, atomicity and adapter-parity tests green. **STOP** if a suppressed fact can be resurrected by any path, or if the TS adapter cannot run on the importer's own `tx` |
-| **5** | Public read-model `status = 'active'` filters, fragment by fragment | Every consumer in §7 filtered and tested; no unfiltered reference remains |
+| **5** | Public read-model `status = 'active'` filters, fragment by fragment | ✅ **COMPLETE — PASS 2026-09-14** (§24). Eight query modules, 31 fragments, filtered and tested; §7's inventory re-derived from current source and **corrected in four places** (§24.2). Every public read path is filtered directly or by a proven helper, and a per-fragment source gate fails on any new unclassified reference. Admin still sees void rows; D-2 intact. 10 pre-existing failures proven pre-existing by in-place differential (§24.9). **No stop condition open** |
 | **6** | Mutations: correct / void / reinstate / replace / create, atomic audit, CAS, revalidation out of the pending path | Atomicity and CAS tests green; `match-admin` refusal green |
 | **7** | `promotion-inventory.ts` entries + `db:promotion-check` + `npm run build` | Gate G-6. **STOP before merge** on any new refusal class (umbrella R-3) |
 | **8** | Operator commits; DEV deploy (migration → code — **no `db:privileges` dependency, per D-5**; a routine reconcile is harmless but applies nothing for P4); browser acceptance | Acceptance matrix §18 |
@@ -2420,3 +2427,214 @@ migration, and nothing staged, committed, pushed, merged or deployed.
 **ISSUE-167 is NOT resolved.** Stage 5 is the next stage, and §17 is explicit that
 Stages 4 and 5 are the two that can invalidate the design, and that neither may be
 merged into another stage.
+
+---
+
+## 24. Stage 5 execution evidence — **PASS (2026-09-14)**
+
+Public read-model filtering only. No mutation, no `.edit`, no `/new` route, no
+`match-admin` change, nothing migrated beyond `afldb_test`, nothing staged or committed.
+
+### 24.1 Checkpoint, before anything was edited
+
+Worktree clean; `HEAD` = branch = `origin/opus/issue-167-special-records-admin` =
+`5de87ddfcb5b71db9f348c9f4d977cdeb398cd04`. `migrate.ts --status --target test` reported
+`102_special_records_lifecycle.sql applied`, **0 pending** — which is positive checksum
+proof, because the runner's edited-migration refusal runs *before* the status branch.
+The `afldb_test` target was re-proven by the §15.0 three-condition contract first:
+`127.0.0.1:5432/afldb_test`, `_test` suffix, loopback host, live listener. Migration 102
+was not edited.
+
+### 24.2 The consumer inventory, re-derived from current source
+
+The planning inventory in §7 was **not trusted**. Every reference to either table in
+`src/` was re-enumerated, and the result differs from §7 in four places.
+
+| # | Consumer | File | Fragments | Family |
+|---|---|---|---|---|
+| 1 | `/records/first-kick-goal` | `src/db/queries/player-achievements.ts` | **8** (list, summary, 2 highlight branches, by-club, by-decade, clubs-without, provenance) | A |
+| 2 | Player page + **`/players/compare`** honours | `src/db/queries/awards.ts` (`getPlayerHonours`) | 1 | A |
+| 3 | `/records/after-the-siren` + player page | `src/db/queries/after-siren.ts` | **6** (5 CTEs in the records board, 1 player query) | B |
+| 4 | Grid Solver | `src/db/queries/grid-solver.ts` | **6** (5 first-kick builders, `after_siren_winner`) | A + B |
+| 5 | NL achievement summary | `src/db/queries/nl/achievement-summary.ts` | **6** | A |
+| 6 | NL `after_siren` grain | `src/db/queries/nl/after-siren.ts` | 1 helper (`baseClauses`) covering **5** query sites | B |
+| 7 | `/admin/player-links` queue | `src/db/queries/player-links.ts` (`listUnresolvedLinks`) | 1 | A |
+| 8 | Link candidate evidence + detail | `src/db/queries/player-match-candidates.ts` (`fetchSourceEvidence`, `readSourceDetails`) | **2** | A |
+
+**Four corrections to §7's planning inventory:**
+
+1. **`/players/compare` is a second consumer of `getPlayerHonours`** and was not listed.
+   It is filtered by the same one-line change, but the page was unlisted.
+2. **`src/search/grid-solver-spec.ts:232,369`, `src/search/gridley-compat.ts:533`,
+   `src/search/nl/plan.ts:319,1642` and `src/search/nl/parser.ts:3265-3267` hold no SQL
+   at all** — every one is a prose comment naming the table. §7 listed them as fragments
+   requiring a filter; they require nothing. All SQL over both tables lives in
+   `src/db/queries/`.
+3. **`player-match-candidates.ts` is a consumer and §7 did not name it.** It holds two
+   references: `fetchSourceEvidence` (the candidate-evidence source set, a real public
+   read path) and `readSourceDetails` (an id-keyed detail hydrator).
+4. **`src/db/queries/after-siren.ts` has 6 fragments, not the 6 line numbers §7 quoted** —
+   the count is right but `:178` is the player query and `:89…:127` are five separate
+   scans inside one statement, which is why the filter is repeated per CTE rather than
+   lifted: filtering four of five would produce a board whose totals and whose
+   first/last occurrences disagreed.
+
+**Classified non-public, with reasons:** `admin-special-records.ts` (Stage 3 deliberately
+shows both states), `match-admin.ts:401` (an administrative `DELETE`, Stage 6's subject),
+`audit-log.ts` / `audit-view.ts` / `capabilities.ts` / `identity.ts` /
+`acquisition/manual-authority.ts` / `player-matching/confidence.ts` (table-name constants
+and label maps, no relation reference), every migration, importer and test.
+
+**Page wiring proven, not assumed:** `/records/first-kick-goal`,
+`/records/after-the-siren`, `/players/[slug]` and `/players/compare` each import only the
+query functions above; no page holds its own SQL.
+
+### 24.3 The filter, and why `= 'active'`
+
+`status = 'active'`, never `status <> 'void'` and never `status IS NULL OR …`. Migration
+102 gave both tables `status text NOT NULL DEFAULT 'active'` under a two-value
+`CHECK (status IN ('active','void'))`, so there is no null to tolerate and a negated test
+would silently admit any third state a later migration adds.
+
+This **deliberately differs from the neighbouring AFLDB-ISSUE-165 branches** in
+`player-links.ts` and `player-match-candidates.ts`, which use `<> 'void'` — correctly,
+because their tables carry a wider lifecycle vocabulary. Both spellings now sit in the
+same `UNION`, and the comment at each site says why.
+
+### 24.4 RED → GREEN
+
+RED was run before any source edit: **26 failed, 7 passed**. Every failure was a real
+missing filter; the 7 passes were the classification gate, the D-2 `LINK_TARGET_TABLES`
+assertion, the other-target-tables-untouched check and the Admin-still-sees-void tests,
+all of which are true before and after by design. GREEN: **33 passed, 0 failed**.
+
+**The RED found a real defect that no integration test could have.** The first draft of
+the two player-link comments used backticks around `after_siren_kicks` and
+`LINK_TARGET_TABLES` inside a `sql` **template literal**, which terminates the literal and
+broke both files at parse time. The source-contract test reported it as "1 reference but
+0 filters" — because the literal had been torn in half — and `vitest` then surfaced the
+parse error. A whole-file "contains the string" assertion would have passed.
+
+### 24.5 Suppression proved by decisive fixtures, not by counts
+
+Each fixture is **discovered by the property that makes it decisive**, so the assertion is
+"the answer changed", not "a count went down":
+
+| Fixture | Discovery rule | What it proves |
+|---|---|---|
+| Sole linked row in its season | `GROUP BY season HAVING count(*) = 1` | the Grid Solver `first_kick_goal_between` cell empties; the NL `by_season` group vanishes |
+| Sole linked row for its organization | `GROUP BY organization_id HAVING count(*) = 1` | the club moves *into* `getClubsWithoutFirstKickGoal` and into the NL `clubs_without` answer; the club-scoped grid cell empties |
+| The earliest row | `ORDER BY season, id LIMIT 1` | the records board's `earliest` highlight moves |
+| Sole holder of `max(imported_at)` | proven unique before use | the provenance instant moves back |
+| A player with exactly one winner-qualifying kick | `GROUP BY player_id HAVING count(*) = 1` | the player leaves the `after_siren_winner` grid cell |
+| A player with exactly one after-siren attempt | `GROUP BY player_id HAVING count(*) = 1` | the player leaves the records board entirely |
+| An `unmatched` first-kick row | `link_status_value = 'unmatched'` | the row leaves the player-link queue and the candidate evidence set |
+
+**Safety.** Each test voids ONE real row inside `withVoid`, restoring
+`status = 'active', status_reason = NULL` in a `finally` whether the assertions pass, fail
+or throw. The suite asserts **zero void rows in both tables at `beforeAll` and again at
+`afterAll`** — the ISSUE-165 purge-at-both-ends lesson §23.10 recorded, applied here from
+the start. `fileParallelism: false` means no other suite observes the transient void.
+
+### 24.6 Two things the filter had to be placed carefully to get right
+
+**1. The NL caveat line.** `exclusions()` in `nl/after-siren.ts` is built from
+`baseClauses` **alone**, deliberately excluding the ownership rules, so the caveat counts
+against the same set the reader asked about. Putting the filter in `ownershipClauses`
+would have removed a voided row from the answer while still quoting it in the caveat
+underneath. It goes in `baseClauses`, unconditionally and first, and a test voids a
+player-unlinked kick and asserts `excluded.noPlayerLink` drops by exactly one.
+
+**2. The detail hydrator.** `readSourceDetails` is keyed by ids that come from the
+now-filtered `fetchSourceEvidence`, so it can subtract nothing today. It is filtered
+anyway, and says so, because a future caller assembling its own id list would otherwise
+reintroduce a retracted row through the back door of a detail lookup.
+
+### 24.7 Admin still sees everything, and D-2 is intact
+
+Proven under the same transient void, not asserted: `listFirstKickGoals` and
+`listAfterSirenKicks` still return the voided row, `readFirstKickGoal` /
+`readAfterSirenKick` return it with `status = 'void'` and its reason,
+`specialRecordLifecycleCounts()` reports `void: 1`, and `status: 'void'` filtering returns
+exactly that row. **D-2**: `LINK_TARGET_TABLES` is asserted equal to its seven members
+with `after_siren_kicks` absent; every other target table's queue is asserted
+byte-identical before and after.
+
+### 24.8 Files changed, and validation
+
+**New**
+
+| File | Purpose |
+|---|---|
+| `tests/integration/special-records-public-suppression.test.ts` | The DB-backed sweep: one void, every public consumer, plus Admin and D-2 |
+| `tests/special-records-public-filter-contract.test.ts` | The §7 per-fragment gate — parses each `sql` literal, resolves its fragment constants, requires the filter **under the same alias**, and fails on any unclassified new reference |
+
+**Why one suite and not the four §16 named.** §16's Stage 5 row names four existing
+integration homes. The claim is a single atomic one — void it once, and it is gone
+everywhere public while Admin still sees it — spanning eight query modules, **three of
+which (the records-board queries, the player-page honours query and the player-link
+queue) are in none of those four files**. Splitting it would mean voiding and restoring
+the same row four times, four copies of the same helper, and no single place that fails
+when a ninth consumer appears. This is the same reason Stage 4 created
+`special-records-replay-parity.test.ts`. No existing suite was modified, weakened or
+skipped.
+
+**Modified** — eight query modules, filter-only; no signature, no shape, no behaviour
+beyond the exclusion of voided rows:
+
+`player-achievements.ts` (new `ACTIVE` fragment, 8 sites) · `after-siren.ts` (6 sites) ·
+`awards.ts` (1) · `grid-solver.ts` (6) · `nl/achievement-summary.ts` (new `ACTIVE`
+fragment, 6 sites) · `nl/after-siren.ts` (`baseClauses`) · `player-links.ts` (1) ·
+`player-match-candidates.ts` (2)
+
+**Validation**
+
+| Check | Result |
+|---|---|
+| Stage 5 suites (RED → GREEN) | **33 passed, 0 failed** (RED was 26 failed / 7 passed) |
+| Stage 2 + 3 + 4 regression — `special-records-admin`, `integration/admin-special-records`, `integration/special-records-lifecycle`, `special-records-identity`, `special-records-replay-parity`, `auth` | **234 passed, 1 skipped, 0 failed** |
+| `player-matching`, `data-overrides-source-contract`, `nl-parser`, `nl-plan` | **686 passed, 0 failed** |
+| `player-link-mutations` | **49 passed, 0 failed** |
+| Grid Solver / NL / after-siren / Gridley (6 files) | 1,448 passed, **10 failed — all pre-existing, proven by differential (§24.9)** |
+| `npx tsc --noEmit` | clean |
+| ESLint over the 10 changed files | **0 errors**; 4 pre-existing `no-unused-vars` warnings in `nl/after-siren.ts` at `:216,:300,:317`, outside the edited region |
+| `git diff --check` | clean |
+
+### 24.9 The 10 failures are pre-existing, proven by differential
+
+§21.10's recorded baseline lists `grid-solver` × 2 and `gridley-corpus` × 4. This run
+showed `grid-solver` × 3, `gridley-corpus` × 4 and `nl-answers-after-siren` × 3 — **more
+than the recorded baseline**, so the recorded list alone was not sufficient evidence and a
+differential was run rather than an argument made.
+
+`grid-solver.ts`'s `after_siren_winner` builder and `nl/after-siren.ts`'s `baseClauses`
+were reverted in place, the two suites re-run, and the files restored from saved copies:
+
+```
+with filters:     6 failed | 226 passed   (grid-solver 3, nl-answers-after-siren 3)
+filters reverted: 6 failed | 226 passed   (IDENTICAL assertions, IDENTICAL values)
+```
+
+**Zero regressions attributable to Stage 5.** The Stage 5 gate was re-run after the
+restore (33/33) and `tsc` / `git diff --check` re-confirmed clean.
+
+**What the four beyond-§21.10 failures actually are.** `afldb_test` has gained player
+links since those fixtures were written — Stage 4 ran the real `after_siren.py load`
+repeatedly. Measured now: all 68 `kick_effect = 'won'` rows are linked, where
+`grid-solver.test.ts:635-636` asserts an unlinked premiership-season winner exists (the
+suite names Cameron Zurhaar, 2026, as that row). The three `nl-answers-after-siren`
+failures are the same drift in the other direction — a *wider* tie, a later "most recent"
+kick, and 2 excluded rows where the fixture records 6. **A suppression filter can only
+remove rows, never add links or widen a tie**, which corroborates the differential.
+These belong to the §21.10 class of football-data-state failures and are **not** Stage 5
+defects. Recorded here so the next stage does not re-investigate them, and left for the
+operator to decide whether those fixtures should be re-baselined.
+
+### 24.10 Stage boundary
+
+Stage 5 is green and **stops here**. No mutation, no `data.specialRecords.edit`, no `/new`
+route, no `match-admin` change, no DEV or PROD migration, and nothing staged, committed,
+pushed, merged or deployed.
+
+**ISSUE-167 is NOT resolved.** Stage 6 (mutations, atomic audit, CAS, revalidation out of
+the pending path) is next.

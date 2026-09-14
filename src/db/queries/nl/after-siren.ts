@@ -70,6 +70,17 @@ function foldAnd(clauses: SqlFragment[]): SqlFragment {
  */
 function baseClauses(plan: NlQueryPlan): SqlFragment[] {
   const clauses: SqlFragment[] = [];
+
+  // The lifecycle filter (migration 102, AFLDB-ISSUE-167 §7), emitted
+  // UNCONDITIONALLY and FIRST so that it is the one clause no question shape
+  // can omit. It belongs here rather than in ownershipClauses precisely
+  // because `exclusions()` is built from the base clauses alone: the caveat
+  // line ("N of these rows have no player link") is counted over the
+  // question's own filters, so a filter applied only to the answer would
+  // leave a retracted row being quoted at the reader in the caveat it had
+  // just been removed from in the result.
+  clauses.push(sql`a.status = 'active'`);
+
   const siren = plan.afterSiren;
 
   // Three INDEPENDENT dimensions, ANDed and never merged: what the kick

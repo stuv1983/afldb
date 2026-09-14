@@ -335,7 +335,14 @@ export async function fetchSourceEvidence(
              concat_ws(' · ', replace(pa.achievement_type::text, '_', ' '), pa.season::text),
              pa.link_status_value::text, NULL, pa.player_id
         FROM player_achievements pa
+      -- AFLDB-ISSUE-167 sec 7, the same rule as the AFLDB-ISSUE-165 D-10
+      -- branches above: a voided row is retracted, so it raises no link
+      -- candidates and appears in no review queue. Stated as = 'active'
+      -- rather than <> 'void' because migration 102 gave this table a
+      -- two-value NOT NULL lifecycle; the ISSUE-165 tables above have a
+      -- wider vocabulary and correctly negate instead.
        WHERE pa.link_status_value::text = ANY(${statuses})
+         AND pa.status = 'active'
       UNION ALL
       SELECT 'draft_picks', first_pick.id, 'draft_person', per.id, per.display_name_raw,
              afldb_normalise_name(per.display_name_raw),
@@ -1047,7 +1054,12 @@ export async function readSourceDetails(
            )
       FROM player_achievements pa
       LEFT JOIN clubs pac ON pac.id = pa.club_id
-     WHERE pa.id = ANY(${achievements})
+     -- Belt and braces (AFLDB-ISSUE-167 sec 7). The ids reaching here come
+     -- from fetchSourceEvidence, which already excludes voided rows, so this
+     -- can subtract nothing today; it is stated anyway so a future caller
+     -- that assembles its own id list cannot reintroduce a retracted row
+     -- through the back door of a detail lookup.
+     WHERE pa.id = ANY(${achievements}) AND pa.status = 'active'
     UNION ALL
     SELECT 'draft_picks', dp.id,
            jsonb_build_object(

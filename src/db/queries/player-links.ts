@@ -156,7 +156,12 @@ export async function listUnresolvedLinks(
                        pa.season::text),
              'player_achievements', pa.id
         FROM player_achievements pa
+      -- AFLDB-ISSUE-167 sec 7 / D-2: a voided achievement leaves the queue
+      -- (it is retracted, so there is nothing left to link), while
+      -- after_siren_kicks deliberately never enters LINK_TARGET_TABLES at
+      -- all. Same rule as hall_of_fame and honour_team_members above.
        WHERE pa.link_status_value::text = ANY(${statusValues})
+         AND pa.status = 'active'
       UNION ALL
       SELECT 'draft_picks', dp.id, dp.player_name_raw,
              dp.link_status_value::text,
