@@ -69,6 +69,30 @@ type CoachCareerMatchRaw = Omit<CoachCareerMatch, 'margin'> & {
   awayScore: number;
 };
 
+/**
+ * One venue a coach has at least one canonical assignment at
+ * (AFLDB-ISSUE-170 Stage 1B). Counted the same way as {@link CoachingClubStint}
+ * (all assignments, not just decided ones), but grouped by `venue_id`
+ * instead of `club_id` -- a coach's record travels with them across every
+ * club they coached at that ground.
+ */
+export type CoachVenueRecord = {
+  venueId: number;
+  venueName: string;
+  venueSlug: string;
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  winPct: number | null;
+  finals: number;
+  grandFinals: number;
+  firstMatchId: number;
+  firstMatchDate: Date;
+  lastMatchId: number;
+  lastMatchDate: Date;
+};
+
 export type CoachCareer = {
   coachId: number;
   clubs: CoachingClubStint[];
@@ -76,6 +100,12 @@ export type CoachCareer = {
   /** The coach's biggest win/loss across their whole career, or null with no qualifying (decided) match. */
   biggestWin: CoachCareerMatch | null;
   biggestLoss: CoachCareerMatch | null;
+  /**
+   * Every venue with at least one canonical assignment, ordered `games
+   * DESC, venue name ASC, venue id ASC` (AFLDB-ISSUE-170 Stage 1B). A
+   * zero-game coach yields `[]`, never a fabricated venue.
+   */
+  venues: CoachVenueRecord[];
 };
 
 function winPct(wins: number, draws: number, games: number): number | null {
@@ -198,12 +228,46 @@ export async function getCoachCareer(coachId: number): Promise<CoachCareer | nul
     margin: coachPerspectiveMargin({ coachedClubId: rest.coachedClubId, homeClubId, homeScore, awayScore }),
   }));
 
+  // One row per venue the coach has at least one canonical assignment at
+  // (AFLDB-ISSUE-170 Stage 1B). `array_agg(... ORDER BY ...)` picks out the
+  // first/most-recent match id and date per venue in the same aggregation
+  // pass, rather than a per-venue round trip -- Stage 0 measured whole-
+  // history aggregations at <=126ms, so this stays one query. A coach with
+  // zero match_coaches rows safely yields [].
+  const venueRows = await sql<Omit<CoachVenueRecord, 'winPct'>[]>`
+    WITH assignments AS (
+      SELECT mc.club_id AS coached_club_id, m.id AS match_id, m.match_date,
+             m.is_finals_series, m.round_type, m.winner_club_id,
+             v.id AS venue_id, v.canonical_name AS venue_name, v.slug AS venue_slug
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN venues v ON v.id = m.venue_id
+       WHERE mc.coach_id = ${coach.id}
+    )
+    SELECT venue_id AS "venueId", venue_name AS "venueName", venue_slug AS "venueSlug",
+           count(*)::int AS games,
+           count(*) FILTER (WHERE winner_club_id = coached_club_id)::int AS wins,
+           count(*) FILTER (WHERE winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (WHERE winner_club_id IS NOT NULL AND winner_club_id <> coached_club_id)::int AS losses,
+           count(*) FILTER (WHERE is_finals_series)::int AS finals,
+           count(*) FILTER (WHERE round_type = 'grand_final')::int AS "grandFinals",
+           (array_agg(match_id ORDER BY match_date ASC, match_id ASC))[1] AS "firstMatchId",
+           (array_agg(match_date ORDER BY match_date ASC, match_id ASC))[1] AS "firstMatchDate",
+           (array_agg(match_id ORDER BY match_date DESC, match_id DESC))[1] AS "lastMatchId",
+           (array_agg(match_date ORDER BY match_date DESC, match_id DESC))[1] AS "lastMatchDate"
+      FROM assignments
+     GROUP BY venue_id, venue_name, venue_slug
+     ORDER BY count(*) DESC, venue_name ASC, venue_id ASC
+  `;
+  const venues = venueRows.map((r) => ({ ...r, winPct: winPct(r.wins, r.draws, r.games) }));
+
   return {
     coachId: coach.id,
     clubs,
     totals: { ...totals, winPct: winPct(totals.wins, totals.draws, totals.games) },
     biggestWin: selectCareerRecordMatch(decided, 'win'),
     biggestLoss: selectCareerRecordMatch(decided, 'loss'),
+    venues,
   };
 }
 

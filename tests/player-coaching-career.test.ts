@@ -41,6 +41,7 @@ function career(overrides: Partial<CoachCareer> = {}): CoachCareer {
     },
     biggestWin: null,
     biggestLoss: null,
+    venues: [],
     ...overrides,
   };
 }
