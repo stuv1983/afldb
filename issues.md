@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 1 tracked here — `-156`.
+**Open issues:** 2 tracked here — `-156`, `-168`.
 
 <!-- 2026-09-13 (AFLDB-ISSUE-165 RESOLVED — Stage 8 rendered acceptance restarted from 8.1 after the
      §20.3 CSS fix was committed, pushed and redeployed to DEV, and is now fully PASS: Contributor /
@@ -1276,6 +1276,7 @@ created, reopened, resolved, or materially reclassified.
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+| `AFLDB-ISSUE-168` | Low | Admin / Player links (`/admin/player-links`) | **OPEN — IMPLEMENTED AND VALIDATED 2026-09-14; UNCOMMITTED, UNDEPLOYED.** The suggested-player link on the Player Links queue was built as `/players/${match.playerSlug}`, omitting the `-${id}` suffix the canonical route requires, so the link 404s (found during the `AFLDB-ISSUE-156` P4 authenticated PROD acceptance on 2026-09-14; predates that release, introduced by `88c2681` / `AFLDB-ISSUE-075`). Fixed by using the existing `playerPath(slug, id)` helper (`src/lib/format.ts`) in `src/app/admin/player-links/page.tsx:639`, the sole call site of this shape — every other player-link site already used it. New regression test `tests/player-links-page.test.ts` renders the page with faked queries and asserts the generated href is the slug-id form; confirmed it fails against the pre-fix slug-only href and passes after the fix. `tests/player-link-mutations.test.ts` (92 tests), `tests/player-matching.test.ts` and `tests/format.test.ts` unaffected — 192/192 focused tests pass; `git diff --check` clean (CRLF-normalisation warning only). No matching/confidence logic, migration or routing change. PROD unaffected either way — it already carries this defect and stays unfixed until this branch is committed, merged and deployed. | **Operator:** review `sonnet/issue-168-player-link-url`, commit, merge and deploy to DEV per the standard workflow; then confirm one suggestion link resolves on DEV and mark Resolved. |
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-167` (special records administration and durable
      suppression; `AFLDB-ISSUE-156` P4, the transferred `AFLDB-ISSUE-155` Phase E) is RESOLVED on
      DEV acceptance. All nine stages complete, committed and pushed on
@@ -28499,5 +28500,79 @@ width; §18 sets device priority desktop > tablet > phone and makes phone-only p
 (3) **When the Admin Centre work is promoted, `docs/production-promotion.md` §8's replay step must
 run BOTH special-record adapters** — the Python loop and the separate TypeScript invocation —
 because skipping either republishes every voided record and loses every manual one.
+
+## AFLDB-ISSUE-168 — Admin player-link suggestion URLs omit player ID and 404
+
+- **Status:** **OPEN — implemented and validated 2026-09-14; UNCOMMITTED, UNDEPLOYED.** PROD
+  already carries this defect (predates the 2026-09-14 release) and stays unfixed until this
+  branch is reviewed, committed, merged and deployed.
+- **Severity:** Low
+- **Area:** Admin / Player links (`/admin/player-links`)
+- **Found:** 2026-09-14, during the `AFLDB-ISSUE-156` P4 authenticated rendered PROD acceptance
+  (see the `AFLDB-ISSUE-156` entry, *Authenticated rendered PROD acceptance — PASS (2026-09-14)*,
+  "Two non-blocking defects found"). Not allocated an ID at the time; allocated here.
+- **Branch:** `sonnet/issue-168-player-link-url`, worktree `D:\dev\afldb-issue-168`, base
+  `origin/main` @ `9874222`.
+
+### Symptom
+
+On `/admin/player-links`, the suggested-AFLDB-player link next to each queue row 404s when
+clicked, and Next's prefetch logs a 404 for every suggestion on the page. Normal public player
+pages (`/players/<slug>-<id>`) are unaffected — the defect is confined to this one admin link.
+
+### Root cause
+
+`src/app/admin/player-links/page.tsx:639` built the link as:
+
+```tsx
+<Link href={`/players/${match.playerSlug}`}>{match.playerName}</Link>
+```
+
+omitting the `-${id}` suffix the public player route requires. The canonical helper,
+`playerPath(slug, id)` in `src/lib/format.ts`, already returns `/players/<slug>-<id>` and is used
+at every other player-link call site in the codebase (`src/app/sitemap.ts`,
+`src/search/constants.ts`, `src/app/admin/data-editor/MatchSheetEditor.tsx`,
+`src/app/admin/coaches/[id]/page.tsx`, `src/app/admin/coaches/LinkagePanel.tsx`) — this was the
+sole exception. A repository-wide search for the same `/players/${...}` shape (and for
+`playerSlug` anywhere else in `src/app/admin/player-links/`) confirmed no second instance of the
+defect. Introduced by `88c2681` (`AFLDB-ISSUE-075`), well before the current release; unrelated to
+any ISSUE-156/-164/-167 work.
+
+### Fix
+
+`src/app/admin/player-links/page.tsx`: import `playerPath` from `@/lib/format` and replace the
+literal template string with `playerPath(match.playerSlug, match.playerId)`. No other line
+changed; no refactor of the page, no change to matching/confidence logic, no routing change.
+
+### Regression test
+
+New `tests/player-links-page.test.ts` (no existing suite renders this page — the closest
+existing home, `tests/player-link-mutations.test.ts`, covers server actions/mutations only, not
+the page's own rendering). It mocks the page's query and auth dependencies (the pattern already
+used by `tests/admin-audit-viewer.test.ts`), stubs the three `'use client'` leaf components
+(`RefreshSuggestionsControls`, `SuggestionControls`, `ResolvePanel` — irrelevant to this link and
+otherwise need an app-router context this unit test has none of), renders `PlayerLinksPage` with
+one queue row and one cached suggestion via `renderToStaticMarkup`, and asserts the rendered
+markup contains `href="/players/jonathan-smith-42"` and not `href="/players/jonathan-smith"`.
+Confirmed red/green by hand: reverting the fix locally reproduces the failure
+(`Received: ...href="/players/jonathan-smith"...`) before the fix is restored.
+
+### Validation
+
+- `npx vitest run tests/player-links-page.test.ts` — 1/1 pass.
+- `npx vitest run tests/player-links-page.test.ts tests/player-link-mutations.test.ts
+  tests/player-matching.test.ts tests/format.test.ts` — 192/192 pass (the closest existing
+  Player Links / matching / `playerPath` suites, none regressed).
+- `git diff --check` — clean (one benign CRLF-normalisation warning on the touched file, expected
+  in this autocrlf-true worktree; no actual whitespace defect).
+- `tsc`/`npm run build` not run — the change is a single-expression href fix inside an existing,
+  already-typechecked call, and the focused test/type boundary does not need it.
+
+### PROD status
+
+Unaffected by this branch. `afldb_prod` already serves the pre-fix code (the defect was found
+there) and will keep 404ing this one admin link until the branch above is committed, merged and
+deployed through the normal workflow. No production system was touched to investigate or fix
+this issue.
 
 Full evidence: `AFLDB-ISSUE-167.md` §21–§27, with the closeout at §27.11.
