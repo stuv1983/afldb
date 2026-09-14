@@ -6,7 +6,47 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Current update:** 2026-09-15 (`AFLDB-ISSUE-172` **RESOLVED.** Bounded public UI/UX cleanup —
+**Current update:** 2026-09-15 (`AFLDB-ISSUE-173` **RESOLVED.** Super Admin selectable frontend
+layout styles (worktree `D:\dev\afldb-issue-173`, branch `claude/issue-173-layout-styles`, unmerged).
+Phase 1 (independent `frontendLayout` setting, `'classic' | 'sidebar'`, default `'classic'`) was
+implemented earlier the same day — see the prior entry below for that detail. The Vercel Web
+Interface Guidelines quality-gate review then found one ISSUE-173 MUST FIX (the `sidebar` preset's
+"Skip to content" link no longer bypassed `PrimaryNav`, because `PrimaryNav` was rendered inside
+`<main id="main">` before page content) and one SHOULD FIX (the persistent `PrimaryNav` landmark
+nested inside the `<main>` landmark) — both introduced by this issue, treated as one structural
+defect. Remediated same day in `src/app/layout.tsx`/`src/styles/layouts.css`: the `sidebar` preset
+now renders `PrimaryNav` and `<main id="main">` as siblings under a non-landmark grid wrapper
+instead of `<main>` wrapping both; `classic` unchanged. A narrow re-audit confirmed both findings
+**RESOLVED** with no new findings. Manual DEV rendered acceptance via Playwright (authenticated as
+the existing Super Admin account through the real `/admin/login` form) then **PASSED**: settings UI
+(Layout section separate from Appearance, persistence, theme independence), `classic`/`sidebar`
+desktop rendering on `/`, `/players`, `/clubs`, `/coaches`, `/admin/settings` (1440×900), mobile
+convergence onto the existing `TabBar` (375×800), sibling nav/main landmark structure confirmed via
+the accessibility tree, no duplicate navigation, no horizontal overflow, `/players` usable as the
+table-heavy route, and clean console/network/hydration — zero ISSUE-173 defects found. DEV's live
+`frontendLayout` was returned to `classic` afterwards via the normal Super Admin settings UI
+(`frontendTheme` unaffected throughout, held at `editorial`). Focused unit (41/41) and typecheck
+stayed green throughout. PROD untouched. Open issue count 2 -> 1. Removed from this index and the
+Open Issues table. See the `AFLDB-ISSUE-173` entry in `issues.md`, *Resolution (2026-09-15)*, and
+`AFLDB-ISSUE-173.md` §15-§17.)
+
+**Previous update:** 2026-09-15 (`AFLDB-ISSUE-173` **Phase 1 implemented** — Super Admin
+selectable frontend layout styles. Added an independent `frontendLayout` setting
+(`SiteLayout = 'classic' | 'sidebar'`, default `'classic'`, safe fallback to `'classic'` on any
+malformed value) alongside the existing `frontendTheme` setting: `SETTING_KEYS`/`SITE_LAYOUTS`/
+`parseSiteLayout` in `src/lib/site-settings.ts`, `getSiteLayout()` in
+`src/db/queries/site-settings.ts`, persisted through the existing `saveSiteSettings` transaction
+in `src/app/admin/settings/actions.ts` (no new `revalidatePath` call needed — the existing
+unconditional `revalidatePath('/', 'layout')` already covers it), a new "Layout" admin section in
+`SettingsForm.tsx` separate from "Appearance" (whose copy was also corrected), and resolution in
+`src/app/layout.tsx` via `data-site-layout` on `<html>` plus a structural branch that moves only
+`PrimaryNav` placement for the `sidebar` preset (new `src/styles/layouts.css`, no theme-token
+redeclaration). Shared nav model/components, single root-layout revalidation, and mobile `TabBar`
+convergence are unchanged. No database migration. Extended `tests/site-settings.test.ts` and
+`tests/admin-settings-actions.test.ts`; operator-run `npm test` (2 files, 41/41 passed) and
+`npm run typecheck` (clean) both green. Superseded by the resolution recorded above.)
+
+**Last updated:** 2026-09-15 (`AFLDB-ISSUE-172` **RESOLVED.** Bounded public UI/UX cleanup —
 seven sub-items: Match Search and Brownlow removed from `PRIMARY_NAV` (both routes and their
 home-page browse tiles unchanged, Brownlow now linked from `/awards`); `/clubs` advanced-search/
 filtering removed entirely; Players' "Example searches" section removed; `/coaches/[slug]`'s
@@ -3514,6 +3554,7 @@ the ISSUE-116 timing regression remains separately routed and did not affect thi
   clean rebuild. Preserved `afldb_test_pre_rebuild_20260825` stays locked, never an input.
   ISSUE-092 Â§11 tests 24â€“27 still pending.
 -->
+
 
 ## AFLDB-ISSUE-156 â€” Admin Centre completion (umbrella)
 

@@ -53,6 +53,7 @@ export const SETTING_KEYS = {
   searchPlaceholderAnimation: 'search.placeholder_animation',
   pageIntros: 'site.page_intros',
   frontendTheme: 'site.frontend_theme',
+  frontendLayout: 'site.frontend_layout',
 } as const;
 
 // --- Home page layout ---
@@ -571,6 +572,32 @@ export function parseSiteTheme(value: unknown): SiteTheme {
     : DEFAULT_SITE_THEME;
 }
 
+// --- Frontend Layout ---
+
+/**
+ * The overall page/navigation structure, independent of `SiteTheme` above.
+ *
+ * Theme owns colour, typography and the `--measure`/`--gutter` density
+ * tokens; layout owns composition — where navigation sits and how the
+ * content column is arranged. Neither reads the other, and every
+ * theme/layout combination is valid. See `AFLDB-ISSUE-173.md` for the full
+ * design rationale.
+ */
+export type SiteLayout = 'classic' | 'sidebar';
+
+export const SITE_LAYOUTS: { value: SiteLayout; label: string; help: string }[] = [
+  { value: 'classic', label: 'Classic', help: 'The current top navigation bar and single-column page layout.' },
+  { value: 'sidebar', label: 'Sidebar', help: 'A persistent left-hand navigation with a wider content area for browsing stats. Falls back to the same bottom navigation as Classic on phones and tablets.' },
+];
+
+export const DEFAULT_SITE_LAYOUT: SiteLayout = 'classic';
+
+export function parseSiteLayout(value: unknown): SiteLayout {
+  return SITE_LAYOUTS.some((option) => option.value === value)
+    ? value as SiteLayout
+    : DEFAULT_SITE_LAYOUT;
+}
+
 export type SiteSettings = {
   homeLayout: HomeLayout;
   homeRecord: HomeRecordCategory;
@@ -594,6 +621,7 @@ export type SiteSettings = {
   searchPlaceholderAnimation: SearchAnimationType;
   pageIntros: PageIntros;
   frontendTheme: SiteTheme;
+  frontendLayout: SiteLayout;
 };
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -613,6 +641,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
   pageIntros: DEFAULT_PAGE_INTROS,
   frontendTheme: DEFAULT_SITE_THEME,
+  frontendLayout: DEFAULT_SITE_LAYOUT,
 };
 
 /**
@@ -682,5 +711,8 @@ export function parseSiteSettings(
     frontendTheme: byKey.has(SETTING_KEYS.frontendTheme)
       ? parseSiteTheme(byKey.get(SETTING_KEYS.frontendTheme))
       : DEFAULT_SITE_THEME,
+    frontendLayout: byKey.has(SETTING_KEYS.frontendLayout)
+      ? parseSiteLayout(byKey.get(SETTING_KEYS.frontendLayout))
+      : DEFAULT_SITE_LAYOUT,
   };
 }
