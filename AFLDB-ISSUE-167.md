@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-167 — Special records administration and durable suppression
 
-**Status:** **Stages 0–7 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14; Stage 7 = `c847b88`); **Stage 8 IN PROGRESS — migration and code deployed to DEV and healthy, rendered acceptance BLOCKED on operator-entered authentication** (§27). Not resolved
+**Status:** **RESOLVED 2026-09-14 on DEV acceptance.** All nine stages complete, committed and pushed on `opus/issue-167-special-records-admin` (Stage 7 `c847b88`, Stage 8 fix `026ec2a`); migration 102 and the code are deployed to `afldb_dev`, §18's acceptance matrix is green against real roles, and the committed build is proven to mutate successfully. **Not merged to `main`; PRODUCTION untouched** — promotion stays with the `AFLDB-ISSUE-156` umbrella
 **Severity:** Medium-high
 **Area:** Admin / Data management / Acquisition / Public read models
 **Created:** 2026-09-13
@@ -25,12 +25,13 @@ Stage 5                 e8b44f6
 tracking reconcile      c5a0df7
 Stage 6                 077bf2a
 Stage 7                 c847b88
-HEAD = @{u}             c847b8896a1bd66e51dca8e120c80a4883ef30ea
+Stage 8 fix             026ec2a
+HEAD = @{u}             026ec2ab9c41f9a1ca3f1f80d5256d38d346d4f4
 ```
 
-Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 7 and
-is level with its upstream. **Nothing is merged to `main`.** Stage 8 has since deployed this
-exact commit to **DEV only**; §27 records it.
+Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 8 and
+is level with its upstream. **Nothing is merged to `main`.** DEV runs `026ec2a` from a clean
+checkout; §27 records the stage and §27.11 its closeout.
 
 **A claim Stage 8 had to correct.** This block previously argued that because `origin/main`
 carried no migration past 101, "neither host can have seen 102". That is not what a ref
@@ -3636,7 +3637,10 @@ fingerprints player_achievements dfef2342..., after_siren 88c57296... (post-rest
 PRODUCTION   never contacted -- no prod host, DSN, database or service touched in this stage
 ```
 
-### 27.10 Stage boundary — why this is NOT resolved yet
+### 27.10 Stage boundary — the one blocker, as it stood before the closeout
+
+> **SUPERSEDED by §27.10a and §27.11 (2026-09-14).** The blocker below was real when written and
+> is recorded unchanged; it has since been closed. Do not read this section as current state.
 
 Every §18 acceptance row is **green**, both defects Stage 8 found are **fixed and regression-
 gated**, and DEV is healthy. One thing remains, and it is an operator action by design:
@@ -3651,3 +3655,100 @@ Closing sequence: operator reviews and commits the five files → pushes → `sy
 (`-RemoteRef opus/issue-167-special-records-admin`) to restore clean provenance → confirm one
 mutation still succeeds → **then** ISSUE-167 may be resolved on DEV acceptance, and ISSUE-156 P4
 closed with it. Production remains a separate, unauthorised, future decision.
+
+### 27.10a Superseded
+
+The closing sequence above was carried out in full on 2026-09-14: the operator committed and
+pushed the fix as `026ec2a`, DEV was redeployed from it through `sync-dev.ps1`, and one mutation
+was proven to succeed on the committed build. **ISSUE-167 is RESOLVED.** §27.11 is the evidence.
+
+### 27.11 Closeout — the committed build, deployed and proven (2026-09-14)
+
+§27.10 named one blocker: the Stage 8 fix was uncommitted and DEV ran it as a working-tree
+overlay. The operator has since committed and pushed it as **`026ec2a`**, and DEV has been
+redeployed from that commit through the established `sync-dev.ps1` path. **The blocker is closed.**
+
+**The overlay was discarded losslessly, not overwritten.** Before redeploying, each of the five
+overlay files on DEV was checksummed against the committed blob and all five matched exactly
+(`actions.ts` `3f5df9fd…`, `labels.ts` `c600f2a8…`, `page.tsx` `fe1c1418…`, `validation.ts`
+`cd55b0fd…`, `tests/special-records-admin.test.ts` `a7cead28…`), so `git checkout --` on those
+paths could not lose work. The DEV tree was clean before the deploy ran.
+
+**Migration 102 was NOT reapplied, and was proven already correct first:**
+
+```
+afldb_meta.schema_migrations 102_special_records_lifecycle.sql
+  checksum dec12080ca270d7dcdd32c026a11b0025cc2352e0c0d247b11af1aa701f5f173
+  applied  2026-09-14 12:52:23
+sha256sum src/db/migrations/102_special_records_lifecycle.sql
+           dec12080ca270d7dcdd32c026a11b0025cc2352e0c0d247b11af1aa701f5f173   <- identical
+npm run db:status -> 102 file(s), 102 already applied, 0 pending
+```
+
+The deploy therefore ran `sync-dev.ps1 -RemoteRef opus/issue-167-special-records-admin
+-SkipMigrate`.
+
+**Deployment proof:**
+
+```
+DEV HEAD      026ec2ab9c41f9a1ca3f1f80d5256d38d346d4f4  == @{u} == local HEAD
+branch        opus/issue-167-special-records-admin
+worktree      git status --porcelain -> EMPTY (no overlay, no untracked debris)
+BUILD_ID      built 84-5g6y04iLdEo5FhrwxG == live x-afldb-build 84-5g6y04iLdEo5FhrwxG
+service       afldb active, MainPID 3069523, 4 worker processes, clean Next.js 16.3.1 startup
+health        {"status":"ok","database":"ok","latencyMs":31}
+migrations    102 applied, 0 pending
+```
+
+**The defect is gone on the committed build — proven by a real mutation, not by inspection.**
+One narrow Super Admin correction was made through the rendered UI on `player_achievements` 1
+(`fkg-001`, Jack Kirby): set `notes`, save, then clear it again.
+
+```
+POST /admin/records/first-kick-goal/1  -> 200      (this returned 500 before the fix)
+POST /admin/records/revalidate         -> 200      (still the separate, post-action request)
+GET  /admin/records/first-kick-goal/1  -> 200
+banner: "First-kick-goal record corrected."     browser console errors: 0
+```
+
+**The record was then restored exactly.** Both whole-table fingerprints are byte-identical to
+their pre-mutation values — `player_achievements` `2f942ff0d72fac30e851829e609d521a`,
+`after_siren_kicks` `88c572969fd2dc25eedc7ba296986c50` — `notes` is empty, `status` active, and
+the existing `correction` override is back to `{"notes": null}`. **No new override row was
+created**: the count stayed at five, because a correction reuses its row rather than accumulating
+one per edit. `data_edits` went 10 → 12 rows (max id 52 → 54), which is correct and deliberate —
+the log is append-only, the two corrections really happened, and erasing them to tidy up would
+violate the audit contract this issue exists to protect.
+
+**Since the committed build started: 216 requests, ZERO 5xx, ZERO application errors.**
+
+**Final DEV fixture state — every row intentional and accounted for:**
+
+| Row | State | Why it is there |
+|---|---|---|
+| `player_achievements` 1 (`fkg-001`) | active, `notes` empty | source record, restored to its loaded state |
+| `after_siren_kicks` 1 (Billy Schmidt) | active, original `notes` | source record, restored to its loaded state |
+| `player_achievements` 335 (manual) | **void**, reason recorded | the one deliberate DEV acceptance fixture |
+| `data_overrides` | 5 rows | 2 restored corrections, 2 lifecycle-active, 1 manual whole-row |
+| `data_edits` | 12 rows | append-only audit of every acceptance action |
+
+`after_siren_kicks` is **126 active / 0 void**; `player_achievements` is **334 active / 1 void**.
+**There is no accidental DEV-only record.** The single retained row is the manual fixture, void,
+labelled as an acceptance fixture in both its notes and its void reason — and it is retained
+because **this design has no hard delete by construction** (§4): voiding is the supported cleanup
+path, and a hard delete would break the very guarantee the issue exists to provide.
+
+**Two follow-ups, recorded and neither a blocker**, carried on the `AFLDB-ISSUE-156` umbrella
+rather than reopening this issue:
+
+1. the record detail page overflows horizontally at **320px** (768 / 1000 / 1280 / 1920 are clean)
+   even though its tables sit in the repo's `.table-wrap`, which the family list page contains
+   correctly at the same width — §18 sets device priority desktop > tablet > phone and makes
+   phone-only polish a follow-up;
+2. `/players/compare`'s first-kick honour was not separately rendered — it reads the same
+   `status = 'active'` fragment (`src/db/queries/awards.ts:569-570`) proven live on the player page.
+
+**ISSUE-167 is RESOLVED on DEV acceptance**, and `AFLDB-ISSUE-156` **P4 is closed with it**.
+**Production deployment is not part of this issue** and was never contacted: promotion of the
+Admin Centre work remains an umbrella decision under ISSUE-156, and when it happens the
+`docs/production-promotion.md` §8 replay step must run **both** special-record adapters.
