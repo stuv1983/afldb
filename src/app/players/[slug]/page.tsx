@@ -14,7 +14,7 @@ import { SortableTable } from '@/components/SortableTable';
 import { getPlayerAfterSirenEvents } from '@/db/queries/after-siren';
 import { getPlayerHonours } from '@/db/queries/awards';
 import { getComparisonOrganizations } from '@/db/queries/club-comparison';
-import { getPlayerCoachingCareer } from '@/db/queries/coaches';
+import { getCoach, getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
   getPlayer,
@@ -31,6 +31,7 @@ import {
   awardSeasonPath,
   brownlowStatusNote,
   clubPath,
+  coachPath,
   formatBrownlow,
   formatDate,
   formatNumber,
@@ -44,7 +45,7 @@ import {
   seasonPath,
 } from '@/lib/format';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
-import { honourTeamSlug } from '@/lib/slugs';
+import { coachSlug, honourTeamSlug } from '@/lib/slugs';
 import { playerSchema } from '@/lib/structured-data';
 
 // Player careers are historical and change only when an import runs.
@@ -188,6 +189,17 @@ export default async function PlayerPage({
   const coachOrganizations = coachingCareer && coachingCareer.totals.games > 0
     ? await getComparisonOrganizations()
     : [];
+
+  // A player-linked coach record: their coach page is a different
+  // presentation of the same person (AFLDB-ISSUE-170 Stage 1E's reciprocal),
+  // offered as a secondary cross-context link, never a redirect. Reuses the
+  // same canonical coachSlug/coachPath helpers the coach page links back
+  // with, rather than rebuilding the URL.
+  const coachingCareerPath = coachingCareer
+    ? await getCoach(coachingCareer.coachId).then(
+        (coach) => coach && coachPath(coachSlug(coach.displayName), coach.id),
+      )
+    : null;
 
   const risingStarNominations = honours.nominations;
   const risingStarWin = risingStarNominations.find((n) => n.isWinner);
@@ -784,6 +796,12 @@ export default async function PlayerPage({
         <p className="lede">{careerSentence(player)}</p>
         <p className="section-note">
           <Link href={`/players/compare?a=${player.id}`}>Compare with another player →</Link>
+          {coachingCareerPath && (
+            <>
+              {' · '}
+              <Link href={coachingCareerPath}>View coaching career →</Link>
+            </>
+          )}
         </p>
       </div>
 

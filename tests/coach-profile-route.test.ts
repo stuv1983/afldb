@@ -22,6 +22,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CoachCareer } from '@/db/queries/coaches';
+import type { PlayerProfile } from '@/db/queries/players';
 
 const nav = vi.hoisted(() => ({ redirects: [] as string[], notFound: 0 }));
 const data = vi.hoisted(() => ({
@@ -29,6 +30,11 @@ const data = vi.hoisted(() => ({
     id: number; displayName: string; dob: Date | null;
     playerId: number | null; playerSlug: string | null;
   } | null,
+  player: null as PlayerProfile | null,
+  // The coach id a player is uniquely linked to, or null for no link at
+  // all -- mirrors getPlayerCoachingCareer's own null-vs-real-career
+  // convention, independent of `data.coach` (which id getCoach resolves).
+  playerLinkedCoachId: null as number | null,
 }));
 
 // notFound()/permanentRedirect() are `never`-returning throws in Next; the
@@ -42,6 +48,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/db/queries/coaches', () => ({
   getCoach: async (id: number) => (data.coach?.id === id ? data.coach : null),
   getCoachCareer: async (coachId: number) => career(coachId),
+  getPlayerCoachingCareer: async (_playerId: number) => (
+    data.playerLinkedCoachId !== null ? career(data.playerLinkedCoachId) : null
+  ),
 }));
 
 vi.mock('@/db/queries/club-comparison', () => ({
@@ -52,6 +61,36 @@ vi.mock('@/lib/coach-opponent-history', () => ({
   resolveCoachOpponentSelection: async () => ({ kind: 'none' as const }),
 }));
 
+// The player-page half of the reciprocal Stage 1E contract: minimal,
+// mostly-empty query results so the page renders without a real database --
+// only the coach-link section-note under test needs real content, the same
+// "zero-game"/"no-record" convention the rest of the app already relies on
+// for a sparse player.
+vi.mock('@/db/queries/players', () => ({
+  getPlayer: async (id: number) => (data.player?.id === id ? data.player : null),
+  getPlayerClubs: async () => [],
+  getPlayerSeasons: async () => [],
+  getPlayerBrownlow: async () => [],
+  getPlayerMatches: async () => ({ rows: [], total: 0 }),
+  getPlayerFamily: async () => ({ relationships: [], fatherSonAsSon: [], fatherSonAsFather: [] }),
+  listMostViewedPlayers: async () => [],
+}));
+
+vi.mock('@/db/queries/awards', () => ({
+  getPlayerHonours: async () => ({
+    awards: [], nominations: [], allAustralian: [], captaincies: [],
+    hallOfFame: null, honourTeams: [], firstKickGoal: null, total: 0,
+  }),
+}));
+
+vi.mock('@/db/queries/draft', () => ({
+  getPlayerDraftHistory: async () => [],
+}));
+
+vi.mock('@/db/queries/after-siren', () => ({
+  getPlayerAfterSirenEvents: async () => [],
+}));
+
 const MALTHOUSE = {
   id: 3, displayName: 'Mick Malthouse', dob: null,
   playerId: 900, playerSlug: 'mick-malthouse',
@@ -59,6 +98,26 @@ const MALTHOUSE = {
 const FAGAN = {
   id: 4, displayName: 'Chris Fagan', dob: null,
   playerId: null, playerSlug: null,
+};
+
+// The player-side identity for Malthouse, id/slug matching MALTHOUSE.playerId
+// / .playerSlug above so the two fixtures describe the same person. Zeroed
+// career figures: the reciprocal coach link does not depend on a real
+// playing record, so the fixture stays as small as the "no record" convention
+// already permits.
+const MALTHOUSE_PLAYER: PlayerProfile = {
+  id: 900, slug: 'mick-malthouse', displayName: 'Mick Malthouse',
+  givenName: null, surname: null, heightCm: null, weightKg: null, notes: null,
+  dob: null, dobConfidence: 'unknown', dobDisputed: false,
+  birthYear: null, birthYearConfidence: 'unknown',
+  games: 0, goals: 0, behinds: null, behindsRecordedGames: 0,
+  kicks: null, kicksRecordedGames: 0, handballs: null, handballsRecordedGames: 0,
+  disposals: null, disposalsRecordedGames: 0, marks: null, marksRecordedGames: 0,
+  tackles: null, tacklesRecordedGames: 0, hitouts: null, hitoutsRecordedGames: 0,
+  finals: 0, premierships: 0, wins: 0, draws: 0, losses: 0,
+  brownlowVotes: 0, brownlowMedals: 0, clubsPlayed: 0, seasonsPlayed: 0,
+  debutSeason: null, finalSeason: null, debutDate: null, lastMatchDate: null,
+  bestGoalsGame: null, bestDisposalsGame: null,
 };
 
 function career(coachId: number): CoachCareer {
@@ -110,6 +169,19 @@ async function renderCoachPage(slug: string): Promise<string> {
   return html.replace(/<!-- -->/g, '');
 }
 
+async function renderPlayerPage(slug: string): Promise<string> {
+  const page = (await import('@/app/players/[slug]/page')).default;
+  const html = renderToStaticMarkup(await page({ params: Promise.resolve({ slug }) }));
+  return html.replace(/<!-- -->/g, '');
+}
+
+/** Every VISIBLE link out to the coach route, with its link text -- the player-page mirror of {@link playerAnchors}. */
+function coachAnchors(html: string): { href: string; text: string }[] {
+  const visible = html.replace(/<script[\s\S]*?<\/script>/g, '');
+  return [...visible.matchAll(/<a[^>]*href="(\/coaches\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/g)]
+    .map((m) => ({ href: m[1], text: m[2].replace(/<[^>]*>/g, '').trim() }));
+}
+
 /**
  * Every VISIBLE link out to the player route, with its link text.
  *
@@ -150,6 +222,8 @@ beforeEach(() => {
   nav.redirects.length = 0;
   nav.notFound = 0;
   data.coach = null;
+  data.player = null;
+  data.playerLinkedCoachId = null;
 });
 
 describe('a player-linked coach gets a coach page, not a redirect (Stage 1E)', () => {
@@ -288,5 +362,45 @@ describe('coach-context surfaces link to coach pages (Stage 1E)', () => {
     const { coachProfilePath } = await import('@/lib/format');
     // The entry point the acceptance defect was found through.
     expect(coachProfilePath({ slug: 'mick-malthouse', coachId: 3 })).toBe('/coaches/mick-malthouse-3');
+  });
+});
+
+/**
+ * The reciprocal of Stage 1E's coach->player link: `/players/[slug]` names
+ * a player-linked coach's coach page too, as a secondary cross-context link
+ * only -- never a redirect, never a change to the player page's own primary
+ * comparison action.
+ */
+describe('a player-linked coach gets a reciprocal link to their coach page', () => {
+  it('shows exactly one visible "View coaching career →" link, to the canonical coach route', async () => {
+    data.player = MALTHOUSE_PLAYER;
+    data.coach = MALTHOUSE;
+    data.playerLinkedCoachId = MALTHOUSE.id;
+    const html = await renderPlayerPage('mick-malthouse-900');
+
+    expect(coachAnchors(html)).toEqual([
+      { href: '/coaches/mick-malthouse-3', text: 'View coaching career →' },
+    ]);
+  });
+
+  it('gets no coach-profile link at all when the player never coached', async () => {
+    data.player = MALTHOUSE_PLAYER;
+    data.playerLinkedCoachId = null;
+    const html = await renderPlayerPage('mick-malthouse-900');
+
+    expect(coachAnchors(html)).toEqual([]);
+    expect(html).not.toContain('View coaching career');
+  });
+
+  it('keeps "Compare with another player" as the primary comparison action, unchanged', async () => {
+    data.player = MALTHOUSE_PLAYER;
+    data.coach = MALTHOUSE;
+    data.playerLinkedCoachId = MALTHOUSE.id;
+    const html = await renderPlayerPage('mick-malthouse-900');
+
+    expect(html).toContain('Compare with another player →');
+    expect(html).toContain('/players/compare?a=900');
+    // Secondary, not a redirect: the reader stays on the player page.
+    expect(nav.redirects).toEqual([]);
   });
 });
