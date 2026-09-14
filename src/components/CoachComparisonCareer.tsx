@@ -66,7 +66,7 @@ export function CoachComparisonCareer({
     <>
       <section className="section">
         <h2>Career</h2>
-        <div className="grid grid-panels">
+        <div className="grid grid-panels grid-shrink">
           {pairs.map(({ coach, career }) => (
             <div key={coach.coach.id}>
               <h3>{coach.coach.displayName}</h3>
@@ -78,7 +78,7 @@ export function CoachComparisonCareer({
 
       <section className="section">
         <h2>Biggest win and loss</h2>
-        <div className="grid grid-panels">
+        <div className="grid grid-panels grid-shrink">
           {pairs.map(({ coach, career }) => (
             <div key={coach.coach.id}>
               <h3>{coach.coach.displayName}</h3>
@@ -94,7 +94,7 @@ export function CoachComparisonCareer({
 
       <section className="section">
         <h2>Venue history</h2>
-        <div className="grid grid-panels">
+        <div className="grid grid-panels grid-shrink">
           {pairs.map(({ coach, career }) => (
             <div key={coach.coach.id}>
               <h3>{coach.coach.displayName}</h3>
