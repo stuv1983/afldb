@@ -19,6 +19,7 @@ import {
   parsePlaceholderInterval,
   parsePlaceholders,
   parseSearchAnimation,
+  parseSiteLayout,
   parseSiteTheme,
   type HomeSectionId,
 } from '@/lib/site-settings';
@@ -89,6 +90,7 @@ export async function saveSiteSettings(
   );
   
   const frontendTheme = parseSiteTheme(formData.get('frontendTheme'));
+  const frontendLayout = parseSiteLayout(formData.get('frontendLayout'));
 
   await authSql.begin(async (tx) => {
     for (const [key, value] of [
@@ -106,6 +108,7 @@ export async function saveSiteSettings(
       [SETTING_KEYS.searchPlaceholderInterval, searchPlaceholderInterval],
       [SETTING_KEYS.searchPlaceholderAnimation, searchPlaceholderAnimation],
       [SETTING_KEYS.frontendTheme, frontendTheme],
+      [SETTING_KEYS.frontendLayout, frontendLayout],
     ] as const) {
       await tx`
         INSERT INTO site_settings (key, value, updated_by)
@@ -129,6 +132,7 @@ export async function saveSiteSettings(
     searchPlaceholderInterval,
     searchPlaceholderAnimation,
     frontendTheme,
+    frontendLayout,
   }, { userId: admin.id, label: admin.email });
 
   revalidatePath('/', 'layout');

@@ -15,6 +15,35 @@ commit.
 
 ## [Unreleased]
 
+### Super Admin selectable frontend layout styles (AFLDB-ISSUE-173) - 15 September 2026
+
+- Added a new, independent Super Admin setting, **Layout** (`classic | sidebar`, default
+  `classic`), alongside the existing **Appearance** theme setting. `classic` is today's frontend,
+  unchanged; `sidebar` moves the primary navigation to a persistent left-hand column beside a
+  wider content area. Any theme can be combined with any layout. An unrecognised or malformed
+  stored value falls back safely to `classic`.
+- Resolved server-side in the root layout, alongside the existing theme read, and exposed via a
+  new `data-site-layout` attribute on `<html>`. The shared navigation model and every
+  `PrimaryNav`/`TabBar` component are reused unmodified between presets — only `PrimaryNav`'s
+  placement in the DOM differs. Both presets converge on the existing mobile `TabBar`; no new
+  mobile navigation was added.
+- Corrected the Appearance section's admin copy, which previously overstated that changing the
+  theme also changed page layout.
+- No database migration — the setting is a new key in the existing generic `site_settings` table.
+  No new cache-invalidation work — the existing unconditional root-layout revalidation already
+  covers it.
+- A Vercel Web Interface Guidelines quality-gate review found that the `sidebar` preset's "Skip to
+  content" link no longer bypassed `PrimaryNav`, and that the persistent `PrimaryNav` landmark was
+  nested inside the `<main>` landmark — both because `PrimaryNav` was rendered inside
+  `<main id="main">`. Fixed the same day: `<main id="main">` now wraps only page content, and in
+  the `sidebar` preset `PrimaryNav` is a sibling of `<main>` under a non-landmark wrapper rather
+  than a child of it; `classic` is unchanged. A re-audit confirmed both findings resolved with no
+  new findings.
+- Validated with focused unit tests (41/41), a clean typecheck, and a manual DEV rendered-
+  acceptance pass (Playwright) across `classic`/`sidebar` on desktop and mobile, settings
+  persistence and theme independence, and landmark/skip-link structure, with no ISSUE-173 defects
+  found.
+
 ### Public site UI/UX cleanup: navigation, redundant search controls, Coaches interaction, expandable tables, comparison ordering (AFLDB-ISSUE-172) - 15 September 2026
 
 - Removed **Match Search** and **Brownlow** from the main navigation. Both routes are unchanged and

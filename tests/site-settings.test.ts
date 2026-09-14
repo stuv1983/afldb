@@ -24,6 +24,7 @@ import {
   DEFAULT_PAGE_INTROS,
   DEFAULT_PLACEHOLDER_INTERVAL,
   DEFAULT_SEARCH_ANIMATION,
+  DEFAULT_SITE_LAYOUT,
   DEFAULT_SITE_THEME,
   EARLY_ACCESS_LIMITS,
   HOME_SECTIONS,
@@ -38,6 +39,7 @@ import {
   parsePlaceholderInterval,
   parsePlaceholders,
   parseSearchAnimation,
+  parseSiteLayout,
   parseSiteSettings,
   visibleHomeSections,
   type HomeSectionId,
@@ -197,6 +199,7 @@ describe('parseSiteSettings', () => {
       searchPlaceholderAnimation: DEFAULT_SEARCH_ANIMATION,
       pageIntros: DEFAULT_PAGE_INTROS,
       frontendTheme: DEFAULT_SITE_THEME,
+      frontendLayout: DEFAULT_SITE_LAYOUT,
     });
   });
 
@@ -237,6 +240,49 @@ describe('parseSiteSettings', () => {
     expect(settings.gridAudience).toBe('admin');
     expect(settings.homeRecord).toBe('most-premierships');
     expect(settings.homeLayout).toEqual(DEFAULT_HOME_LAYOUT);
+  });
+
+  it('keeps the frontend theme and the frontend layout as independent settings', () => {
+    // AFLDB-ISSUE-173: a layout preset is a separate axis from the colour/
+    // typography theme, stored under a separate key, and neither read
+    // depends on the other.
+    const both = parseSiteSettings([
+      { key: SETTING_KEYS.frontendTheme, value: 'modern' },
+      { key: SETTING_KEYS.frontendLayout, value: 'sidebar' },
+    ]);
+    expect(both.frontendTheme).toBe('modern');
+    expect(both.frontendLayout).toBe('sidebar');
+
+    // Setting one must not move the other off its own default.
+    const themeOnly = parseSiteSettings([
+      { key: SETTING_KEYS.frontendTheme, value: 'editorial' },
+    ]);
+    expect(themeOnly.frontendTheme).toBe('editorial');
+    expect(themeOnly.frontendLayout).toBe(DEFAULT_SITE_LAYOUT);
+
+    const layoutOnly = parseSiteSettings([
+      { key: SETTING_KEYS.frontendLayout, value: 'sidebar' },
+    ]);
+    expect(layoutOnly.frontendLayout).toBe('sidebar');
+    expect(layoutOnly.frontendTheme).toBe(DEFAULT_SITE_THEME);
+  });
+});
+
+describe('parseSiteLayout', () => {
+  it('accepts every declared layout value', () => {
+    expect(parseSiteLayout('classic')).toBe('classic');
+    expect(parseSiteLayout('sidebar')).toBe('sidebar');
+  });
+
+  it('falls back to classic for a missing or unrecognised value', () => {
+    // The same direction as `parseGridAudience`: a settings row that fails
+    // to parse must not be the thing that restructures the public site.
+    expect(parseSiteLayout(undefined)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout(null)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout('')).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout('dashboard')).toBe(DEFAULT_SITE_LAYOUT);
+    expect(parseSiteLayout(42)).toBe(DEFAULT_SITE_LAYOUT);
+    expect(DEFAULT_SITE_LAYOUT).toBe('classic');
   });
 });
 
