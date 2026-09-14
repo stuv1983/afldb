@@ -18,6 +18,7 @@ import {
   parseEntitySlug,
   playerPath,
 } from '@/lib/format';
+import { coachComparePath } from '@/lib/coach-comparison-url';
 import { resolveCoachOpponentSelection, type CoachOpponentSelection } from '@/lib/coach-opponent-history';
 import { firstValue } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
@@ -25,12 +26,23 @@ import { coachSlug } from '@/lib/slugs';
 import { coachSchema } from '@/lib/structured-data';
 
 /**
- * Stage 1D (AFLDB-ISSUE-170) adds a shareable `?opponent=` selection,
- * which needs `searchParams` — trading this route's previous ISR
- * (`revalidate = 3600` + `generateStaticParams`) for full server
- * rendering, the same trade-off `/clubs/compare` already makes. This
- * route is a small, low-traffic set (18 coach-only identities per Stage 0
- * §0.2), so the trade costs nothing meaningful.
+ * THE coach-centric profile for every coach (AFLDB-ISSUE-170 Stage 1E).
+ *
+ * Route context decides presentation, not identity. A person who both
+ * played and coached has two legitimate pages: `/players/[slug]` leads with
+ * the playing career and carries coaching lower down, and this route leads
+ * with the coaching record and links out to the playing career. Stage 1E
+ * removed the permanent redirect that used to send a player-linked coach to
+ * their player page, which made "select a coach from /coaches" silently
+ * deliver a player profile — the acceptance defect. Neither page is a
+ * redirect alias of the other; each is canonical to itself.
+ *
+ * Stage 1D added a shareable `?opponent=` selection, which needs
+ * `searchParams` — trading this route's previous ISR (`revalidate = 3600`
+ * + `generateStaticParams`) for full server rendering, the same trade-off
+ * `/clubs/compare` already makes. Even after Stage 1E widened the route to
+ * all 386 coaches it remains a small, low-traffic set, so the trade still
+ * costs nothing meaningful.
  *
  * `/players/[slug]` cannot make the same trade — it is static ISR for
  * ~13,000 players — so the player-linked coaching surface resolves the
@@ -101,14 +113,6 @@ export default async function CoachPage({
   const coach = await getCoach(parsed.id);
   if (!coach) notFound();
 
-  // A coach who also played gets no separate coach-only profile: their
-  // canonical page is their player page, which already carries their
-  // coaching record via PlayerCoachingCareer.
-  if (coach.playerId !== null) {
-    if (coach.playerSlug === null) notFound();
-    permanentRedirect(playerPath(coach.playerSlug, coach.playerId));
-  }
-
   const canonicalSlug = coachSlug(coach.displayName);
   if (parsed.slug !== canonicalSlug) {
     permanentRedirect(coachPath(canonicalSlug, coach.id));
@@ -134,6 +138,13 @@ export default async function CoachPage({
   const { totals } = career;
   const path = coachPath(canonicalSlug, coach.id);
 
+  // A coach who also played: their player page is a different presentation
+  // of the same person, not a canonical replacement for this one, so it is
+  // offered as a secondary link rather than imposed as a redirect.
+  const playingCareerPath = coach.playerId !== null && coach.playerSlug !== null
+    ? playerPath(coach.playerSlug, coach.playerId)
+    : null;
+
   return (
     <>
       <Breadcrumbs items={[
@@ -147,6 +158,10 @@ export default async function CoachPage({
         description: coachDescription(coach.displayName, career),
         dob: coach.dob,
         clubs: career.clubs.map((c) => ({ name: c.clubName, slug: c.clubSlug })),
+        // Two pages, one human: `sameAs` is what tells a consumer that this
+        // Person and the player page's Person are the same individual seen
+        // in two contexts, rather than two people who share a name.
+        sameAsPath: playingCareerPath,
       })} />
 
       <div className="page-header">
@@ -162,12 +177,29 @@ export default async function CoachPage({
           {formatSpan(career.clubs[0]?.firstSeason ?? null, career.clubs.at(-1)?.lastSeason ?? null)}
         </p>
         <p className="lede">{coachDescription(coach.displayName, career)}</p>
+        {/* The primary action on a COACH page compares coaches, with this
+            coach already chosen. The player page keeps its own "Compare with
+            another player" — each route offers the comparison that belongs
+            to the career it is presenting. */}
+        <p className="section-note">
+          <Link href={coachComparePath({ a: coach.id })}>Compare with another coach →</Link>
+          {playingCareerPath && (
+            <>
+              {' · '}
+              <Link href={playingCareerPath}>View playing career →</Link>
+            </>
+          )}
+        </p>
       </div>
 
       <div className="stat-strip">
         <div className="stat">
           <div className="value">{formatNumber(totals.games)}</div>
           <div className="label">Games</div>
+        </div>
+        <div className="stat">
+          <div className="value nowrap">{totals.wins}–{totals.losses}–{totals.draws}</div>
+          <div className="label">W–L–D</div>
         </div>
         <div className="stat">
           <div className="value">{formatPercentage(totals.winPct)}</div>

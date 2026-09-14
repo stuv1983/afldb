@@ -80,10 +80,10 @@ export type CoachCompareOptions = {
 };
 
 /**
- * One resolved coach plus where its canonical public profile lives: a
- * player-linked coach's page is the player page, a coach-only identity's
- * page is its own `/coaches/[slug]` (Stage 0 §0.1's routing constraint,
- * `coachProfilePath`'s existing contract).
+ * One resolved coach plus where its coach profile lives: always that
+ * coach's own `/coaches/[slug]-id` page (Stage 1E — a comparison OF COACHES
+ * links to coach pages, player-linked or not; `coachProfilePath`'s
+ * contract).
  */
 export type ResolvedCoach = {
   coach: CoachIdentity;
@@ -93,12 +93,7 @@ export type ResolvedCoach = {
 function resolveCoach(coach: CoachIdentity): ResolvedCoach {
   return {
     coach,
-    profilePath: coachProfilePath({
-      slug: coachSlug(coach.displayName),
-      coachId: coach.id,
-      playerId: coach.playerId,
-      playerSlug: coach.playerSlug,
-    }),
+    profilePath: coachProfilePath({ slug: coachSlug(coach.displayName), coachId: coach.id }),
   };
 }
 

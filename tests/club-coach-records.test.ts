@@ -51,11 +51,15 @@ describe('ClubCoachRecords rendering', () => {
     expect(html).toContain('56.4');
   });
 
-  it('links a coach who also played to their player profile', () => {
+  it('links a coach who also played to their COACH page, not their player page', () => {
+    // AFLDB-ISSUE-170 Stage 1E: a club's coaching table is a coaching
+    // context, so the name resolves to the coaching profile. Before Stage 1E
+    // it resolved to /players, because the coach route redirected there.
     const html = renderToStaticMarkup(
       ClubCoachRecords({ records: [row()], clubRecordName: 'Richmond', hasLineage: false }),
     );
-    expect(html).toContain('href="/players/damien-hardwick-10"');
+    expect(html).toContain('href="/coaches/damien-hardwick-1"');
+    expect(html).not.toContain('/players/');
   });
 
   it('links a coach-only person to the coach route, derived from their name', () => {

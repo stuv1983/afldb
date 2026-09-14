@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SortableTable } from '@/components/SortableTable';
 import { listCoaches } from '@/db/queries/coaches';
-import { coachPath, formatNumber, formatSpan, playerPath } from '@/lib/format';
+import { coachProfilePath, formatNumber, formatSpan } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { coachSlug } from '@/lib/slugs';
 
@@ -41,12 +41,10 @@ export default async function CoachesPage() {
               { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
             ]}
             items={coaches.map((c) => {
-              // A coach who also played resolves straight to their player
-              // profile: the coach-only route is for people who never played,
-              // and a linked coach never gets a second, duplicate profile.
-              const href = c.playerId !== null && c.playerSlug !== null
-                ? playerPath(c.playerSlug, c.playerId)
-                : coachPath(coachSlug(c.displayName), c.id);
+              // Every coach links to their COACH page, player-linked or not:
+              // a reader who picked a name out of the coaches index asked for
+              // the coaching record (AFLDB-ISSUE-170 Stage 1E).
+              const href = coachProfilePath({ slug: coachSlug(c.displayName), coachId: c.id });
               return {
                 id: c.id,
                 values: {

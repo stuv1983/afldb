@@ -5,7 +5,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { SortableTable } from '@/components/SortableTable';
 import { type CoachRecordRow, getCoachRecordsByGames, getCoachRecordsByWinPct } from '@/db/queries/coaches';
-import { coachPath, formatNumber, formatPercentage, formatSpan, playerPath } from '@/lib/format';
+import { coachProfilePath, formatNumber, formatPercentage, formatSpan } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
 import { coachSlug } from '@/lib/slugs';
 
@@ -23,10 +23,13 @@ export const metadata: Metadata = pageMetadata({
   path: '/records/coaches',
 });
 
+/**
+ * A coaching records board links every name to its coach page, player-linked
+ * or not (AFLDB-ISSUE-170 Stage 1E): the row is a coaching record, so the
+ * coaching profile is what the name promises.
+ */
 function coachCell(row: CoachRecordRow) {
-  const href = row.playerId !== null && row.playerSlug !== null
-    ? playerPath(row.playerSlug, row.playerId)
-    : coachPath(coachSlug(row.displayName), row.coachId);
+  const href = coachProfilePath({ slug: coachSlug(row.displayName), coachId: row.coachId });
   return <Link href={href}>{row.displayName}</Link>;
 }
 

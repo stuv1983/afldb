@@ -1,6 +1,8 @@
 ﻿# AFLDB-ISSUE-170 — Coach profile expansion and coach comparison
 
-**Status:** PLANNED — Stage 0 discovery COMPLETE, implementation not started
+**Status:** IN PROGRESS — Stage 0 discovery COMPLETE; Stages 1A–1D and 2A–2D implemented and
+committed; Stage 1E (route-contextual profiles, the acceptance correction) implemented, browser
+accepted, UNCOMMITTED. `CHANGELOG.md` entry owed when the feature lands.
 **Area:** Public coaches / Player coaching history / Comparison
 **Created:** 2026-09-14
 **Branch:** `feature/issue-170-coach-overhaul`
@@ -391,6 +393,61 @@ wrappers only where genuinely required.
 Existing player-to-coach canonical redirect behaviour remains unchanged unless implementation
 evidence demonstrates a separate routing defect.
 
+**Superseded by Stage 1E:** Stage 1 acceptance demonstrated exactly that routing defect.
+
+## Stage 1E — Route-contextual profiles (acceptance correction, 2026-09-14)
+
+Stage 1 acceptance found that `/coaches/[slug]-id` permanently redirected a player-linked coach
+to `/players/[slug]-id`, so selecting a coach through Coaches delivered a PLAYER profile: Mick
+Malthouse opened with playing statistics, "Compare with another player" as the primary action and
+his coaching record at the bottom of the page. Coach-context links (the coaches index, the coach
+records board, a club's coaching table, the Stage 2 comparison) pointed straight at `/players` for
+the same reason, so the defect did not need the redirect to reproduce.
+
+The correction: **route context decides presentation, identity does not.**
+
+- `/coaches/[slug]-id` renders the coach-oriented profile for EVERY coach, player-linked or not.
+  The permanent redirect to the player route is removed.
+- `/players/[slug]-id` remains the player-oriented profile and keeps its Coaching Career section.
+- Neither route is a redirect alias of the other. Each is canonical to itself, and the coach
+  page's `Person` block carries `sameAs` pointing at the player page so the two documents are
+  readable as one human rather than two.
+- The coach page's primary comparison action is **Compare with another coach**, linking to
+  `/coaches/compare?a=<coach id>` with the coach preselected. "Compare with another player" does
+  not appear on the coach route.
+- A player-linked coach page carries a secondary **View playing career** link.
+- `coachProfilePath` — the one helper every coaching surface links through — now always resolves
+  to the coach route. It previously resolved a player-linked coach to `/players` precisely because
+  the coach route redirected there.
+- The sitemap publishes every coach page, not only the coach-only identities. ~368 real pages were
+  previously unpublishable because they redirected.
+
+The only presentation change beyond routing is `W–L–D` added to the coach page's stat strip, so
+every headline figure this issue requires is visible without scrolling.
+
+Still deliberately unchanged: `searchCoaches` remains scoped to `player_id IS NULL`, so the site
+search box returns a person who both played and coached once, as a player. Revisit only with
+evidence that a reader expects both.
+
+### Stage 1E acceptance
+
+- `tests/coach-profile-route.test.ts` (new): the route contract — no redirect for a player-linked
+  coach, coach-only unchanged, coaching data primary, compare-with-coach preselected, playing-career
+  link, self-canonical metadata, `sameAs`, one-hop stale-slug redirect, no loop.
+- `tests/format.test.ts`, `tests/club-coach-records.test.ts`,
+  `tests/integration/coach-comparison-route.test.ts`: the three suites that encoded the old
+  link-to-player rule, updated to the new one.
+- `tests/e2e/journeys.spec.ts`: the two-route browser journey through Mick Malthouse.
+- Browser acceptance on the running DEV build, 2026-09-14: `/coaches` links Malthouse to
+  `/coaches/mick-malthouse-1` (all 386 rows link to coach pages); that URL renders 200 with no
+  redirect, leads with 718 games / 406–305–7 / 57.0% / 52 finals / 8 GFs / 3 premierships, the
+  club, biggest win/loss, venue and history-against-club sections, `Compare with another coach →`
+  = `/coaches/compare?a=1` (verified preselected) and `View playing career →` =
+  `/players/mick-malthouse-9635`; `/players/mick-malthouse-9635` renders 200, player-centric, with
+  `Compare with another player →` and Coaching Career as its last section; a stale coach slug
+  redirects once to the coach route; `/records/coaches` (74 links) and `/clubs/collingwood` (20)
+  resolve every coach name to a coach page.
+
 ## Stage 1 acceptance
 
 Stage 1 is complete when focused tests prove:
@@ -405,6 +462,8 @@ Stage 1 is complete when focused tests prove:
 - zero-game coaches render safely;
 - coach-only profile receives the richer UI;
 - linked player/coach receives the same richer data;
+- a player-linked coach reaches a coach-oriented profile through `/coaches`, not a player one
+  (Stage 1E);
 - historical missing coach assignments do not break rendering;
 - responsive rendering is acceptable on public breakpoints.
 

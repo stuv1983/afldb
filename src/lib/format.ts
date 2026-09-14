@@ -213,18 +213,24 @@ export function coachPath(slug: string, id: number): string {
 }
 
 /**
- * Where a coach's name should link. A coach who also played resolves to
- * their PLAYER profile: /coaches/[slug]-id permanently redirects a linked
- * coach there, so linking one to the coach route ships a guaranteed
- * redirect. A coach-only person -- 18 of AFLDB's 386 coaches never played
- * -- has no player page at all and must never be given a /players href.
+ * Where a coach's name should link FROM A COACHING CONTEXT: always that
+ * coach's own `/coaches/[slug]-id` page.
+ *
+ * AFLDB-ISSUE-170 Stage 1E: the two routes are route-contextual
+ * presentations of the same person, not duplicates. A reader who reached a
+ * name through the coaches index, a coach records board, a club's coaching
+ * history or a coach comparison asked for the COACHING record, so they are
+ * given the coach page — whether or not that person also played. The player
+ * page stays the player-centric presentation and keeps its own coaching
+ * section; it is reached through player surfaces, and from the coach page's
+ * own "View playing career" link.
+ *
+ * Before Stage 1E a player-linked coach was sent to `/players` here because
+ * `/coaches/[slug]-id` permanently redirected them there; that redirect is
+ * gone, so this is no longer a redirect-avoiding shortcut.
  */
-export function coachProfilePath(coach: {
-  slug: string; coachId: number; playerId: number | null; playerSlug: string | null;
-}): string {
-  return coach.playerId !== null && coach.playerSlug !== null
-    ? playerPath(coach.playerSlug, coach.playerId)
-    : coachPath(coach.slug, coach.coachId);
+export function coachProfilePath(coach: { slug: string; coachId: number }): string {
+  return coachPath(coach.slug, coach.coachId);
 }
 
 export function awardSeasonPath(slug: string, season: number): string {

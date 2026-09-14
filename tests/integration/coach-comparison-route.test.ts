@@ -19,6 +19,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { generateMetadata } from '@/app/coaches/compare/page';
 import { resolveCoachCompareMetadata, resolveCoachCompareState } from '@/app/coaches/compare/state';
 import { sql } from '@/db/client';
+import { coachSlug } from '@/lib/slugs';
 
 afterAll(async () => {
   await sql.end();
@@ -135,13 +136,16 @@ describe('Stage 2A route state: valid pair', () => {
     expect(state.kind).toBe('selected');
     if (state.kind !== 'selected') return;
 
-    // Coach-only -> the standalone coach page.
+    // Both sides link to their own coach page. AFLDB-ISSUE-170 Stage 1E: a
+    // comparison OF COACHES links to coaching profiles, so a player-linked
+    // coach is no longer sent to /players (which used to be the only
+    // non-redirecting destination for them).
     expect(state.coachA.coach.playerId).toBeNull();
-    expect(state.coachA.profilePath).toMatch(/^\/coaches\//);
+    expect(state.coachA.profilePath).toBe(`/coaches/${coachSlug(state.coachA.coach.displayName)}-${state.coachA.coach.id}`);
 
-    // Player-linked -> the canonical player page, never a duplicate coach profile.
     expect(state.coachB.coach.playerId).not.toBeNull();
-    expect(state.coachB.profilePath).toMatch(/^\/players\//);
+    expect(state.coachB.profilePath).toBe(`/coaches/${coachSlug(state.coachB.coach.displayName)}-${state.coachB.coach.id}`);
+    expect(state.coachB.profilePath).not.toContain('/players/');
   });
 
   it('orders the SEO canonical path by id, independent of requested order', async () => {

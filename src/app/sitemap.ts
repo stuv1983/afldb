@@ -68,11 +68,15 @@ export default async function sitemap({
       sql<{ slug: string }[]>`SELECT slug FROM clubs ORDER BY slug`,
       sql<{ year: number }[]>`SELECT year FROM seasons ORDER BY year`,
       sql<{ slug: string }[]>`SELECT slug FROM venues ORDER BY slug`,
-      // Coach-only people only: a coach who also played is reached through
-      // their player page, which /coaches/[slug] redirects to rather than
-      // duplicating -- see AFLDB-ISSUE-118 §W.4.
+      // EVERY coach, player-linked or not (AFLDB-ISSUE-170 Stage 1E).
+      // /coaches/[slug] no longer redirects a player-linked coach to their
+      // player page: the coach page is a real, self-canonical document
+      // presenting the coaching career, and the player page presents the
+      // playing career. Both deserve to be crawled; publishing only one of
+      // them would leave ~368 real pages undiscoverable. (Supersedes the
+      // coach-only scope AFLDB-ISSUE-118 §W.4 set.)
       sql<{ id: number; displayName: string }[]>`
-        SELECT id, display_name AS "displayName" FROM coaches WHERE player_id IS NULL
+        SELECT id, display_name AS "displayName" FROM coaches
       `,
     ]);
 

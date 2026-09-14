@@ -452,8 +452,10 @@ export type CoachIdentity = {
 
 /**
  * A coach's stable public identity, for the `/coaches/[slug]-id` route
- * (AFLDB-ISSUE-118 §W.4): just enough to render a coach-only profile or
- * redirect a linked coach to their player page, never the coaching
+ * (AFLDB-ISSUE-118 §W.4): just enough to render the coach profile and, for
+ * a coach who also played, to link out to their playing career
+ * (AFLDB-ISSUE-170 Stage 1E -- `playerId`/`playerSlug` used to drive a
+ * permanent redirect to the player page, which is gone). Never the coaching
  * aggregation itself -- that stays {@link getCoachCareer}'s job. An unknown
  * id returns null, never a fabricated identity.
  */
@@ -665,10 +667,10 @@ export type CoachIndexRow = {
 
 /**
  * Every coach, for the `/coaches` discovery index (AFLDB-ISSUE-118 §W.4).
- * Includes coaches who also played -- their row still needs to be findable
- * from the index, it just resolves to their player profile rather than a
- * coach-only one, same rule the linked-coach redirect on the profile route
- * applies.
+ * Includes coaches who also played: since AFLDB-ISSUE-170 Stage 1E every row
+ * here resolves to that coach's own `/coaches/[slug]-id` page, player-linked
+ * or not. `playerId`/`playerSlug` are retained because callers still need to
+ * know that a playing career exists, not to redirect to it.
  */
 export async function listCoaches(): Promise<CoachIndexRow[]> {
   return sql<CoachIndexRow[]>`

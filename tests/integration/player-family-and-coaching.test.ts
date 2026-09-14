@@ -702,7 +702,10 @@ describe('resolveCoachOpponentSelection', () => {
  * uses -- discovered dynamically, never a hardcoded id.
  */
 describe('getCoach', () => {
-  it('Leigh Matthews: a linked coach carries the player id and slug a redirect needs', async () => {
+  // AFLDB-ISSUE-170 Stage 1E: these two fields no longer drive a redirect to
+  // the player page — they are what the coach page's "View playing career"
+  // link is built from — but the route still needs both of them present.
+  it('Leigh Matthews: a linked coach carries the player id and slug the playing-career link needs', async () => {
     const [matthews] = await sql<{ id: number; playerId: number | null }[]>`
       SELECT id, player_id AS "playerId" FROM coaches WHERE name_key = 'Matthews, Leigh'
     `;

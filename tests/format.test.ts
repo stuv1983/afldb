@@ -313,21 +313,25 @@ describe('shouldShowUnmatched', () => {
 });
 
 describe('coachProfilePath', () => {
-  it('sends a linked coach to their player page, not to a guaranteed redirect', () => {
-    // /coaches/[slug]-id permanently redirects a linked coach to /players.
-    expect(coachProfilePath({
-      slug: 'damien-hardwick', coachId: 17, playerId: 900, playerSlug: 'damien-hardwick',
-    })).toBe('/players/damien-hardwick-900');
+  // AFLDB-ISSUE-170 Stage 1E reversed this helper's old rule. It used to send
+  // a player-linked coach to /players because /coaches/[slug]-id permanently
+  // redirected them there; that redirect is gone, and a name picked out of a
+  // COACHING surface must now reach the coaching profile.
+  it('sends a player-linked coach to their own coach page, not to /players', () => {
+    const href = coachProfilePath({ slug: 'damien-hardwick', coachId: 17 });
+    expect(href).toBe('/coaches/damien-hardwick-17');
+    expect(href).not.toContain('/players');
   });
 
   it('sends a coach-only person to the coach route, never to /players', () => {
-    const href = coachProfilePath({ slug: 'cliff-rankin', coachId: 152, playerId: null, playerSlug: null });
+    const href = coachProfilePath({ slug: 'cliff-rankin', coachId: 152 });
     expect(href).toBe('/coaches/cliff-rankin-152');
     expect(href).not.toContain('/players');
   });
 
-  it('falls back to the coach route when the link has no slug to render', () => {
-    expect(coachProfilePath({ slug: 'neil-craig', coachId: 5, playerId: 42, playerSlug: null }))
-      .toBe('/coaches/neil-craig-5');
+  it('is the coach id that identifies the page, not the player id', () => {
+    // The two identifier spaces are different tables; a coach page keyed by a
+    // player id would silently address the wrong coach.
+    expect(coachProfilePath({ slug: 'mick-malthouse', coachId: 3 })).toBe('/coaches/mick-malthouse-3');
   });
 });

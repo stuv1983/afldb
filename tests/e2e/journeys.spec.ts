@@ -740,3 +740,51 @@ test('the comparison controls are labelled and keyboard-operable', async ({ page
   expect(focusStyle).not.toBe('');
   expect(focusStyle).not.toBe('none:0px:none');
 });
+
+/**
+ * AFLDB-ISSUE-170 Stage 1E — route context decides presentation.
+ *
+ * Mick Malthouse both played and coached, which is exactly the case the
+ * acceptance defect was found on: entering through Coaches used to deliver
+ * his PLAYER profile, because /coaches/[slug] permanently redirected a
+ * player-linked coach to /players. The two routes now present two different
+ * careers for one person, and this walks both of them in one pass.
+ */
+test('coaches → a coach who also played → coach profile, then his playing career', async ({ page }) => {
+  await page.goto('/coaches');
+  await expect(page.getByRole('heading', { name: 'Coaches', level: 1 })).toBeVisible();
+
+  const malthouse = page.getByRole('link', { name: 'Mick Malthouse', exact: true });
+  await expect(malthouse).toBeVisible();
+  // The index itself must point at the coach page: a /players href here
+  // would reinstate the defect without needing a redirect to do it.
+  await expect(malthouse).toHaveAttribute('href', /^\/coaches\/mick-malthouse-\d+$/);
+  await malthouse.click();
+
+  // No redirect: the URL that was linked is the URL that renders.
+  await expect(page).toHaveURL(/\/coaches\/mick-malthouse-\d+$/);
+  await expect(page.getByRole('heading', { name: 'Mick Malthouse', level: 1 })).toBeVisible();
+
+  // Coaching is the primary content, visible without scrolling past a
+  // playing career to reach it.
+  await expect(page.getByText('W–L–D', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Coaching record' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'History against club' })).toBeVisible();
+
+  // The primary compare action belongs to the career being presented.
+  const compareCoach = page.getByRole('link', { name: /Compare with another coach/ });
+  await expect(compareCoach).toBeVisible();
+  await expect(compareCoach).toHaveAttribute('href', /^\/coaches\/compare\?a=\d+$/);
+  await expect(page.getByRole('link', { name: /Compare with another player/ })).toHaveCount(0);
+
+  // The other presentation of the same person is one link away, not a redirect.
+  await page.getByRole('link', { name: /View playing career/ }).click();
+  await expect(page).toHaveURL(/\/players\/mick-malthouse-\d+$/);
+  await expect(page.getByRole('heading', { name: 'Mick Malthouse', level: 1 })).toBeVisible();
+
+  // The player route stays player-centric, with its own primary compare action.
+  const comparePlayer = page.getByRole('link', { name: /Compare with another player/ });
+  await expect(comparePlayer).toBeVisible();
+  await expect(comparePlayer).toHaveAttribute('href', /^\/players\/compare\?a=\d+$/);
+  await expect(page.getByRole('link', { name: /Compare with another coach/ })).toHaveCount(0);
+});

@@ -7,8 +7,8 @@ import type { ComparisonOrganization } from '@/db/queries/club-comparison';
  * 1D): a plain GET form, following {@link ClubComparisonControls}'s own
  * convention — no hidden client state, so the selection is exactly what
  * the URL says, works with no JavaScript, and is bookmarkable/shareable
- * by construction. `/coaches/[slug]` has no ISR cost to protect (18
- * coach-only identities), unlike `/players/[slug]` — see
+ * by construction. `/coaches/[slug]` has no ISR cost to protect (a few
+ * hundred coaches, force-dynamic), unlike `/players/[slug]` — see
  * `CoachOpponentHistoryClient` for the player-linked surface's different,
  * deliberately scoped, client-side equivalent.
  */
