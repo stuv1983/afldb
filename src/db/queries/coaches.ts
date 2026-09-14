@@ -38,14 +38,89 @@ export type CoachingClubStint = {
   winPct: number | null;
 };
 
+/**
+ * One decided (non-drawn) match a coach was assigned to, from the
+ * coach's own perspective (AFLDB-ISSUE-170 Stage 1A). `margin` is signed:
+ * positive for a win, negative for a loss, by exactly the formula in the
+ * approved runbook -- home_score - away_score when the coached club is
+ * home, away_score - home_score when it is away. Never built for a draw.
+ */
+export type CoachCareerMatch = {
+  matchId: number;
+  season: number;
+  matchDate: Date;
+  roundType: string;
+  isFinalsSeries: boolean;
+  coachedClubId: number;
+  coachedClubName: string;
+  coachedClubSlug: string;
+  opponentClubId: number;
+  opponentClubName: string;
+  opponentClubSlug: string;
+  margin: number;
+  venueId: number | null;
+  venueName: string | null;
+  venueSlug: string | null;
+};
+
+type CoachCareerMatchRaw = Omit<CoachCareerMatch, 'margin'> & {
+  homeClubId: number;
+  homeScore: number;
+  awayScore: number;
+};
+
 export type CoachCareer = {
   coachId: number;
   clubs: CoachingClubStint[];
   totals: Omit<CoachingClubStint, 'clubId' | 'clubName' | 'clubSlug' | 'firstSeason' | 'lastSeason'>;
+  /** The coach's biggest win/loss across their whole career, or null with no qualifying (decided) match. */
+  biggestWin: CoachCareerMatch | null;
+  biggestLoss: CoachCareerMatch | null;
 };
 
 function winPct(wins: number, draws: number, games: number): number | null {
   return games > 0 ? ((wins + draws * 0.5) / games) * 100 : null;
+}
+
+/**
+ * Coach-perspective margin for one decided match (AFLDB-ISSUE-170 Stage
+ * 1A). Kept as a standalone pure function, rather than a SQL `CASE WHEN`,
+ * so the home/away formula is unit-testable without a database.
+ */
+export function coachPerspectiveMargin(args: {
+  coachedClubId: number;
+  homeClubId: number;
+  homeScore: number;
+  awayScore: number;
+}): number {
+  return args.coachedClubId === args.homeClubId
+    ? args.homeScore - args.awayScore
+    : args.awayScore - args.homeScore;
+}
+
+/**
+ * Deterministic tie-break among a coach's biggest wins/losses
+ * (AFLDB-ISSUE-170 Stage 1A): largest absolute margin first, then
+ * earliest match date, then lowest match id. Never picks a zero-margin
+ * (drawn) match for either direction. A pure function, unit-tested
+ * directly with fixtures rather than relying on a real tie existing in
+ * historical data.
+ */
+export function selectCareerRecordMatch(
+  matches: CoachCareerMatch[],
+  direction: 'win' | 'loss',
+): CoachCareerMatch | null {
+  const candidates = matches.filter((m) => (direction === 'win' ? m.margin > 0 : m.margin < 0));
+  return candidates.reduce<CoachCareerMatch | null>((best, m) => {
+    if (!best) return m;
+    const mAbs = Math.abs(m.margin);
+    const bestAbs = Math.abs(best.margin);
+    if (mAbs !== bestAbs) return mAbs > bestAbs ? m : best;
+    const mTime = m.matchDate.getTime();
+    const bestTime = best.matchDate.getTime();
+    if (mTime !== bestTime) return mTime < bestTime ? m : best;
+    return m.matchId < best.matchId ? m : best;
+  }, null);
 }
 
 /**
@@ -99,10 +174,36 @@ export async function getCoachCareer(coachId: number): Promise<CoachCareer | nul
     { games: 0, wins: 0, draws: 0, losses: 0, finals: 0, grandFinals: 0, premierships: 0 },
   );
 
+  // Every decided (non-drawn) match this coach was assigned to, raw
+  // enough to compute the coach-perspective margin in JS
+  // (coachPerspectiveMargin) rather than in SQL. A coach with zero
+  // match_coaches rows, or with only draws, safely yields [] here.
+  const decidedRaw = await sql<CoachCareerMatchRaw[]>`
+    SELECT m.id AS "matchId", m.season, m.match_date AS "matchDate",
+           m.round_type::text AS "roundType", m.is_finals_series AS "isFinalsSeries",
+           mc.club_id AS "coachedClubId", cc.name AS "coachedClubName", cc.slug AS "coachedClubSlug",
+           oc.id AS "opponentClubId", oc.name AS "opponentClubName", oc.slug AS "opponentClubSlug",
+           m.home_club_id AS "homeClubId", m.home_score AS "homeScore", m.away_score AS "awayScore",
+           v.id AS "venueId", v.canonical_name AS "venueName", v.slug AS "venueSlug"
+      FROM match_coaches mc
+      JOIN matches m ON m.id = mc.match_id
+      JOIN clubs cc ON cc.id = mc.club_id
+      JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE mc.coach_id = ${coach.id}
+       AND m.winner_club_id IS NOT NULL
+  `;
+  const decided: CoachCareerMatch[] = decidedRaw.map(({ homeClubId, homeScore, awayScore, ...rest }) => ({
+    ...rest,
+    margin: coachPerspectiveMargin({ coachedClubId: rest.coachedClubId, homeClubId, homeScore, awayScore }),
+  }));
+
   return {
     coachId: coach.id,
     clubs,
     totals: { ...totals, winPct: winPct(totals.wins, totals.draws, totals.games) },
+    biggestWin: selectCareerRecordMatch(decided, 'win'),
+    biggestLoss: selectCareerRecordMatch(decided, 'loss'),
   };
 }
 

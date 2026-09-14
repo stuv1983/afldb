@@ -39,6 +39,8 @@ function career(overrides: Partial<CoachCareer> = {}): CoachCareer {
       premierships: 4,
       winPct: 63.4,
     },
+    biggestWin: null,
+    biggestLoss: null,
     ...overrides,
   };
 }

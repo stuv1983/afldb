@@ -182,6 +182,86 @@ describe('getCoachCareer', () => {
   });
 });
 
+/**
+ * AFLDB-ISSUE-170 Stage 1A: biggest win/loss, added to the same
+ * {@link getCoachCareer} boundary. selectCareerRecordMatch's tie rule and
+ * coachPerspectiveMargin's home/away formula are unit-tested directly
+ * (tests/coaches.test.ts) with fixtures; these tests only prove the real
+ * query wires that logic to canonical data correctly, cross-checked
+ * against a direct-SQL truth query rather than a hardcoded margin.
+ */
+describe('getCoachCareer — biggest win/loss', () => {
+  it('Leigh Matthews: biggest win/loss and totals match a direct canonical cross-check', async () => {
+    const [matthews] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
+
+    const career = await getCoachCareer(matthews.id);
+    expect(career).not.toBeNull();
+    expect(career!.biggestWin).not.toBeNull();
+    expect(career!.biggestLoss).not.toBeNull();
+
+    // Existing totals are untouched by this stage: still equal direct truth.
+    const truth = await coachTruth(matthews.id);
+    expect(career!.totals).toMatchObject(sumTruth(truth));
+
+    // Independent direct-SQL selection of the biggest win, scoped to WIN
+    // assignments only (m.winner_club_id = mc.club_id) and applying the
+    // same deterministic tie rule as selectCareerRecordMatch -- greatest
+    // margin, then earliest match_date, then lowest match id -- entirely
+    // from scratch, not by reusing the production margin/tie-break logic.
+    //
+    // Comparing signed margin (not abs()) and scoping to one direction at
+    // a time both matter here: an abs()/direction-agnostic comparison
+    // would let a bigger WIN "beat" the biggest LOSS (or vice versa),
+    // which is not a real counter-example -- wins and losses are never
+    // compared against each other.
+    const [expectedWin] = await sql<{ matchId: number; margin: number }[]>`
+      SELECT m.id AS "matchId",
+             (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                   ELSE m.away_score - m.home_score END)::int AS margin
+        FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+       WHERE mc.coach_id = ${matthews.id} AND m.winner_club_id = mc.club_id
+       ORDER BY (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                      ELSE m.away_score - m.home_score END) DESC,
+                m.match_date ASC, m.id ASC
+       LIMIT 1
+    `;
+    expect(expectedWin, `no win found for coach ${matthews.id}`).toBeDefined();
+    expect(career!.biggestWin).toMatchObject({ matchId: expectedWin.matchId, margin: expectedWin.margin });
+
+    // Mirrored for the biggest loss: scoped to LOSS assignments only, most
+    // negative margin first (largest loss magnitude), same tie-break tuple.
+    const [expectedLoss] = await sql<{ matchId: number; margin: number }[]>`
+      SELECT m.id AS "matchId",
+             (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                   ELSE m.away_score - m.home_score END)::int AS margin
+        FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+       WHERE mc.coach_id = ${matthews.id} AND m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+       ORDER BY (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                      ELSE m.away_score - m.home_score END) ASC,
+                m.match_date ASC, m.id ASC
+       LIMIT 1
+    `;
+    expect(expectedLoss, `no loss found for coach ${matthews.id}`).toBeDefined();
+    expect(career!.biggestLoss).toMatchObject({ matchId: expectedLoss.matchId, margin: expectedLoss.margin });
+  });
+
+  it('Jim Adamson (coach id 315): zero canonical coaching assignments render safely, never a fabricated record', async () => {
+    const adamson = await getCoach(315);
+    expect(adamson, 'Jim Adamson (id 315) — see AFLDB-ISSUE-170.md §0.2; discovery evidence may be stale').toBeDefined();
+
+    const career = await getCoachCareer(315);
+    expect(career).not.toBeNull();
+    expect(career!.totals).toMatchObject({ games: 0, wins: 0, draws: 0, losses: 0 });
+    expect(career!.totals.winPct).toBeNull();
+    expect(career!.clubs).toEqual([]);
+    expect(career!.biggestWin).toBeNull();
+    expect(career!.biggestLoss).toBeNull();
+  });
+});
+
 describe('getPlayerCoachingCareer', () => {
   it('a player with no linked coaching row returns null', async () => {
     const [someone] = await sql<{ id: number }[]>`
