@@ -1,9 +1,12 @@
 # AFLDB-ISSUE-168 — Admin player-link suggestion URLs omit player ID and 404
 
-**Status:** Implemented and validated 2026-09-14; committed and pushed at `c7d07fb` on
-`sonnet/issue-168-player-link-url`, unmerged and undeployed. PROD unaffected either way — it
-already carries this defect and stays unfixed until this branch is merged and deployed through the
-normal workflow.
+**Status:** **RESOLVED on DEV — 2026-09-14.** Merged to `main` (`9e97c90`) and deployed to DEV at
+SHA `9e97c9091f2e5dd662f7166408de8d70b8a495f8`. Manual DEV acceptance passed: `/admin/player-links`
+rendered normally, a suggested AFLDB player link was clicked, it resolved successfully to the real
+player page via the canonical slug-plus-id route, and the prior 404 did not reproduce. Read-only
+acceptance — no player-link mutation was submitted. **PROD still carries the pre-fix code** and
+will keep 404ing this link until a future normal production deployment; PROD is not fixed by this
+resolution.
 
 **Branch:** `sonnet/issue-168-player-link-url`
 **Worktree:** `D:\dev\afldb-issue-168`
@@ -72,14 +75,28 @@ re-run green.
 - `tsc --noEmit` / `npm run build` not run — a single-expression href change inside an
   already-typechecked call; the focused test/type boundary doesn't need it.
 
+## DEV acceptance (2026-09-14)
+
+Manual, read-only acceptance on DEV at `main` `9e97c90`:
+
+- `/admin/player-links` rendered normally;
+- a suggested AFLDB player link was clicked;
+- it resolved successfully to the real player page;
+- the canonical slug-plus-id player route worked;
+- the prior 404 defect did not reproduce.
+
+No player-link mutation was submitted as part of this acceptance.
+
 ## PROD status
 
-Unaffected by this branch either way. `afldb_prod` already serves the pre-fix code (that's where
-the defect was found) and keeps 404ing this one admin link until this branch is reviewed,
-committed, merged and deployed per the standard workflow. No production system was touched to
-investigate or fix this issue.
+**Still unfixed.** `afldb_prod` continues to serve the pre-fix code that produced the original
+404 and will keep doing so until a future normal production deployment carries this fix through
+the standard workflow. No production system was touched to investigate, fix, or validate this
+issue.
 
-## Next action
+## Resolution
 
-Operator: `merge:ready -- --issue 168` is READY; merge, deploy to DEV, confirm one suggestion link
-resolves to a real player page on DEV, then mark Resolved (issues.md, IssuesIndex.md, this file).
+Resolved on DEV, 2026-09-14. Root cause, fix and regression test as above; DEV deployment plus the
+manual rendered acceptance above are the closing evidence. No follow-up work is tracked under this
+issue — the only remaining step is the ordinary future production deployment that carries `main`
+(and therefore this fix) to PROD, which is not itself an ISSUE-168 obligation.

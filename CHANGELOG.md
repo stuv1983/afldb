@@ -90,8 +90,8 @@ commit.
   click, and Next's prefetch logged a 404 per suggestion. The link was missing the player id its
   route requires; it now uses the same canonical `/players/<slug>-<id>` path every other
   player-link on the site already used. Admin-only; no public page, matching logic or routing
-  changed. **Implemented and validated; not yet merged or deployed** — production keeps the
-  pre-existing 404 until this ships through the normal workflow.
+  changed. **Merged and deployed to development; accepted there 2026-09-14.** Production keeps the
+  pre-existing 404 until this ships through a future normal production deployment.
 
 ### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
 
