@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### The Admin Centre batch, the awards and special-record lifecycles and the player-link recalibration are live in production (AFLDB-ISSUE-156) - 14 September 2026
+
+- Production was 50 commits behind and is now deployed at `a5c4a04`, with migrations `099`, `100`,
+  `101` and `102` applied in that order before the code. `afldb_prod` carries 102 of 102 migrations
+  with nothing pending. What actually reached readers and administrators: the awards / Hall of Fame
+  / honour-team lifecycle (`AFLDB-ISSUE-165`), the curated special-record lifecycle
+  (`AFLDB-ISSUE-167`), the real HTTP redirect on unauthorised admin requests
+  (`AFLDB-ISSUE-166`), the family and father-son search semantics (`AFLDB-ISSUE-153`), the
+  player-link confidence recalibration (`AFLDB-ISSUE-164`) and the comparison-metadata fix on soft
+  navigation (`AFLDB-ISSUE-144`). The Admin Centre batch's own migrations (`096`–`098`) had already
+  reached production on 12 September; this deployment brought production the code that uses them.
+- **Nothing in the football record changed.** Whole-table fingerprints taken before the migrations
+  and again after the restart are byte-identical for first-kick goals, after-the-siren kicks, award
+  winners, Hall of Fame, honour-team members and both normalised name columns. The new lifecycle
+  columns arrived with every existing row `active` and not one row suppressed.
+- Migration `099` replaces the name-normalisation function so Unicode separators such as
+  `NO-BREAK SPACE` are treated as spaces. On production's current names it changed **zero rows** —
+  measured before it ran, not assumed — so its effect is the corrected function and four rebuilt
+  trigram indexes, which is what the player-link matcher needed.
+- **Accepted on production the same day** by rendered browser checks as real Super Admin, Admin and
+  Contributor accounts, without changing a single record: every surface in the release renders, the
+  special-record and awards counts on screen match the database exactly, an Admin can read every
+  record but the controls that change one are absent from the page rather than merely hidden, and a
+  Contributor reaches none of it. Every refused request is a real redirect, not a page that loads and
+  then bounces.
+- Operational notes: no privilege reconciliation was required or performed (migrations `096`–`098`
+  carry their own grants; `101` and `102` contain none by design), and `afldb_auth` still holds no
+  grant of any kind on the special-record tables. No replay adapter was run — replay belongs to the
+  rebuilt-database promotion procedure, not to an in-place deployment, and production held no
+  human-override rows to replay. A proven production backup was taken first.
+
 ### Curated special records gain a correction, suppression and replacement lifecycle (AFLDB-ISSUE-167, ISSUE-156 P4) - 14 September 2026
 
 - The two curated special-record families — first-kick goals (`/records/first-kick-goal`) and kicks

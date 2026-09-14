@@ -1275,7 +1275,7 @@ created, reopened, resolved, or materially reclassified.
      the `AFLDB-ISSUE-156` umbrella, not this issue. Full evidence: the `AFLDB-ISSUE-165` entry
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
-| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** PROD is untouched and no PROD validation is claimed. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the Admin Centre batch (160–163) is DEV-accepted and ready for the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+| `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-167` (special records administration and durable
      suppression; `AFLDB-ISSUE-156` P4, the transferred `AFLDB-ISSUE-155` Phase E) is RESOLVED on
      DEV acceptance. All nine stages complete, committed and pushed on
@@ -23280,7 +23280,7 @@ runbook started under `issues/open/` (e.g. `AFLDB-ISSUE-152`, `-153`, `-137`).
 
 ## AFLDB-ISSUE-156 — Admin Centre completion (umbrella)
 
-**Status:** Open — P1, P2 and P3 resolved 2026-09-11; **P3b, P3c, P3d and P3e (`AFLDB-ISSUE-160`–`163`) resolved 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434`, so the batch is ready for the next release/promotion stage (a separate operator decision; PROD untouched). **P5 (`AFLDB-ISSUE-165`) resolved 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (Stage 8 role matrix, lifecycle fixture, responsive and accessibility acceptance all PASS); see the `AFLDB-ISSUE-165` entry, *Resolution (2026-09-13)*. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. P4, P6–P12 unallocated. See *P3b–P3e complete (2026-09-12)* below for the carried promotion checklist and follow-ups. **Correction (2026-09-12):** every "S-1" / "paused ISSUE-151 PROD promotion" reference below (§11.1 and elsewhere) describes a promotion that has since **completed** — stamp `20260907-234124`, 2026-09-08 01:11:24.440219 AEST, `auth_audit_log` id 196, under `AFLDB-ISSUE-125` — before this umbrella's children existed. There is no paused promotion for this batch's own future release to sequence against; do not follow any instruction below to decide S-1 against it. See the `AFLDB-ISSUE-151` entry for the authoritative record.
+**Status:** Open — P1, P2 and P3 resolved 2026-09-11; **P3b, P3c, P3d and P3e (`AFLDB-ISSUE-160`–`163`) resolved 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (*as recorded then: ready for the next release/promotion stage, a separate operator decision, PROD untouched — that stage has since been executed, see below*). **P5 (`AFLDB-ISSUE-165`) resolved 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (Stage 8 role matrix, lifecycle fixture, responsive and accessibility acceptance all PASS); see the `AFLDB-ISSUE-165` entry, *Resolution (2026-09-13)*. **Correction (2026-09-12): Production is not untouched** — current `afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. **P4 (`AFLDB-ISSUE-167`) resolved 2026-09-14** on DEV acceptance — special records administration and durable suppression; see that entry's *Resolution (2026-09-14)*. **PRODUCTION PROMOTION EXECUTED 2026-09-14** — `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits), migrations `099` → `100` → `101` → `102` applied before the code, 102/102 applied with 0 pending, `BUILD_ID F18g9rGqBr-3cvaECe2Qz` live, health `ok`/`ok`, all seven whole-table fingerprints unchanged, no replay adapter run and none required, no privilege step required or performed. The carried promotion checklist is **discharged**; see *Production promotion executed (2026-09-14)* below. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). P6–P12 unallocated. See *P3b–P3e complete (2026-09-12)* below for the carried promotion checklist and follow-ups. **Correction (2026-09-12):** every "S-1" / "paused ISSUE-151 PROD promotion" reference below (§11.1 and elsewhere) describes a promotion that has since **completed** — stamp `20260907-234124`, 2026-09-08 01:11:24.440219 AEST, `auth_audit_log` id 196, under `AFLDB-ISSUE-125` — before this umbrella's children existed. There is no paused promotion for this batch's own future release to sequence against; do not follow any instruction below to decide S-1 against it. See the `AFLDB-ISSUE-151` entry for the authoritative record.
 **Severity:** Medium
 **Area:** Admin / Authentication / Data management / Acquisition / Operations
 **Found:** 2026-09-11
@@ -23467,15 +23467,141 @@ period column; the replay validates a date's shape rather than the calendar); IS
 items 1–4 (venue-slug replay limit, the register-advance tail risk, the batch form as a scrolling
 table under 768px, `listVenues()` cost); ISSUE-161 D-8 external-source reconciliation.
 
+### Production promotion executed (2026-09-14) — the carried obligation is discharged
+
+The promotion checklist carried above is **complete**. Production was deployed in place — a code
+and migration deployment onto the live `afldb_prod`, **not** a rebuilt-database candidate
+promotion. Operator-authorised, executed 2026-09-14 15:24–15:35 AEST.
+
+**Scope actually shipped.** PROD was at `0955db3` (2026-09-12) and is now at
+`a5c4a043aedbf4cee3dc18cc652496699d15cbb1` — **50 commits, 197 files**. `0955db3` was proven an
+ancestor of `origin/main` with zero commits present only on PROD. Six issues ship runtime code:
+**165** (P5 awards lifecycle, migration 101), **167** (P4 special records, migration 102), **166**
+(admin HTTP denial), **153** (NL family/father-son, migration 100), **164** (player-link
+confidence, migration 099) and **144** (comparison metadata). Thirteen further issues
+(117, 137, 138, 139, 140, 147, 148, 149, 150, 151, 152, 155, 156) are tracking/evidence only.
+`deploy/` unchanged; `package-lock.json` unchanged (`package.json` adds two npm scripts only), so
+`npm ci` was deliberately **skipped** — no dependency change, and the tooling was verified present.
+
+**Two contract findings, both resolved before any write:**
+
+1. **`docs/production-promotion.md` does not govern this release.** It is the *rebuilt-database*
+   promotion contract (restore into a candidate, reinstate production-owned state, rename). Its
+   §7/§8 replay — including ISSUE-167's two special-record adapters — exists to re-apply human
+   overrides onto canonical rows a rebuild has just re-created. **No replay adapter was run**, and
+   none should have been: nothing was rebuilt, and `data_overrides` held **0 rows** on PROD before
+   the deployment, so there was nothing to replay even in principle. Recorded under decision
+   *Divergence A*, operator-accepted.
+2. **`npm run db:privileges` has no `prod` target** (`tools/db/privileges.ts:40-43` defines only
+   `dev`, `test`, `code-test`), so the carried "096 → 097 → 098 → `db:privileges` → code" step has
+   no PROD form. It is also unnecessary: 096/097/098 call `grant_app_read()`/`grant_import_write()`
+   inside the migration, and 101/102 contain no `GRANT` **by design** (`AFLDB-ISSUE-165.md`
+   §8 item 5; `AFLDB-ISSUE-167.md` §13 / D-5). Grants were verified read-only instead.
+
+**Ordered sequence executed.** Backup → `git pull --ff-only` → deploy preflight → `db:status` →
+`db:migrate` → post-migration proof + preflight re-run → `npm run build` → restart → health →
+smoke. Migration before code was preserved throughout; the service kept serving the old standalone
+bundle until the restart.
+
+| Gate | Evidence |
+|---|---|
+| Backup | `afldb_prod-20260914-152441.dump`, 23,903,094 bytes, `pg_restore --list` 1,452 objects, no `.partial`, target asserted `afldb_prod` |
+| Migrations | `099` → `100` → `101` → `102`, exit 0, 248 ms total; **102/102 applied, 0 pending**, no checksum drift |
+| Preflight (after) | reduced to the single accepted dirty-worktree FAIL; **`PASS migration parity (102/102)`**; zero pending / checksum / unknown-applied findings |
+| Build | exit 0, 4 m 51 s, 1,534 static pages; `BUILD_ID` `KZwy7Pc3v-XepU9NodVPH` → **`F18g9rGqBr-3cvaECe2Qz`**, `.next` and `.next/standalone` identical |
+| Restart | `MainPID` 1130266 → **1209640**, `ExecMainStartTimestamp` 2026-09-14 15:35:08 AEST, 2 workers, clean startup, ready in 1 s |
+| Health | local `ok`/`ok`; public `https://beta.afldb.com/api/health` **200** `ok`/`ok`; 0 error lines in the journal |
+| Integrity | all **7** whole-table fingerprints **UNCHANGED** before vs after; 5 lifecycle tables all-`active`, **0 void**; 0 duplicate stable identities; `data_overrides` 0, `data_edits` 1; 0 open import batches |
+| D-5 | `afldb_auth` grants on `player_achievements` / `after_siren_kicks`: **0 table-level, 0 column-level** |
+
+**Migration 099 measured before it ran, not assumed.** Its `UPDATE`s are guarded by
+`IS DISTINCT FROM` against the *new* function that the same migration installs, so the naive
+predicate measures the wrong thing. Inlining the new definition as a read-only expression gave
+**0 rows changed** in both `players` and `player_name_aliases` (no row in either table carries any
+of the 18 Unicode whitespace code points; `draft_persons`, which does, is not touched by 099).
+Confirmed after the fact: both name fingerprints byte-identical, and
+`afldb_normalise_name(U&'Aaron\00A0Cadman')` now returns `aaron cadman`. No unique index or
+constraint exists on `search_name`/`search_alias`, and duplicate groups were 459 before and after.
+
+**Deliberate residual state / follow-ups (none blocking):**
+
+- `prepare-standalone.mjs` logs *"AFLDB_ENV is not production; building with development headers"*
+  on every deploy. **Cosmetic and misleading** — that script is a plain Node process that does not
+  load `.env`, while Next does. `isProductionBuild` there is used only for the log line; the real
+  decision is `next.config.ts:14`. Verified: both routes manifests carry
+  `Strict-Transport-Security`, the CSP has no `unsafe-eval`, and Caddy's own HSTS line is commented
+  out (`Caddyfile:183`), so the header comes from the app. Worth fixing the log line; no security
+  impact, and the previous production build had the same headers.
+- `tools/maintenance/backup.sh` is recorded `100644` (as is every shell script in the tree), so a
+  direct invocation exits 126; it must be run as `bash tools/maintenance/backup.sh`. No file mode
+  was changed.
+- The `--mode deploy` preflight can **never** pass ahead of a migration-carrying deployment:
+  `compareAppliedMigrations()` (`tools/db/migration-safety.ts:159`) raises `pending-migration` as an
+  unconditional error for every migration about to be applied. The meaningful gate is the re-run
+  *after* migrating, which is what was required and passed here.
+- 16 untracked `docs/rebuild-manifests/afltables_fitzroy_core/settle-*.json` remain in the PROD
+  worktree, operator-approved and byte-compared unchanged before and after. Five carry a doubled
+  year in the filename (`settle-2026-2026-…`), cosmetic and pre-existing.
+- `season_list_members`, `fixtures` and `club_leadership` are **0 rows** on PROD. Expected: they are
+  administrator-authored registries with no importer.
+**ISSUE-156 is NOT closed by this.** P6–P12 remain unallocated placeholders. This discharges only
+the carried production-promotion obligation for the already-resolved children 160–163, 165 and 167.
+
+### Authenticated rendered PROD acceptance — PASS (2026-09-14)
+
+Rendered browser acceptance against the deployed production application, as **real Super Admin,
+Admin and Contributor accounts** entered interactively by the operator. **No production data was
+mutated**: no correction, suppression, reinstatement, replacement or create was submitted, and
+`void_rows = 0` and `data_overrides = 0` were re-measured afterwards to prove it.
+
+| Issue | Result | Evidence |
+|---|---|---|
+| **167** special records | **PASS** | `/admin/records` hub: first-kick **Active 334 / Voided 0**, after-siren **Active 126 / Voided 0**. Both list surfaces and both detail surfaces render; **no 500** from rendering the mutation surfaces; **no stale read-only notice** for Super Admin (the Stage 8 defect stays fixed); public `/records/first-kick-goal` shows 334, `/records/after-the-siren` renders; no void leakage |
+| **165** awards & honours | **PASS** | Admin hub shows **3,712 / 343 / 113**, exactly the canonical counts (the Stage 8 `.admin-cards` fix holds — cards render); winners/HOF/honour-team lists and a winner detail render with Correct/Lifecycle/Replace; public `/awards` reports **"47 awards and 3,712 recorded honours"**, so lifecycle filtering hides no active historical data |
+| **166** denial correctness | **PASS** | Every denied route returns a genuine transport-layer redirect (`status 0`, `type opaqueredirect`; `307` + `location` server-side). **No HTTP-200 shell, no meta-refresh in any body**, no protected content rendered before redirect — verified unauthenticated, as Admin (5 create routes) and as Contributor (11 surfaces) |
+| **160–163** Admin Centre batch | **PASS** | Draft administration paginates real data (137 pages); Season lists shows the correct empty state (**2027 first authoritative season, 0/18 clubs, 0 listed**); Fixtures shows 2026/2027 seasons with 0 fixtures and a diagnostics count; club leadership renders as the **Leadership / Appoint** panel inside `/admin/season-lists/[season]/[club]` — it has no standalone route by design |
+| **164** player links | **PASS** | Queue renders the recalibrated presentation: confidence bands (VERY HIGH/HIGH/MEDIUM/LOW), numeric scores, explicit evidence chips (`✓ EXACT NAME`, `✓ CLUB + SEASON`, `✓ PLAYING ERA`), `STALE (V1)`, `BULK-READY`, and the honest `Nothing confident enough to propose — closest was … review manually`. 5,394 unresolved across 108 pages |
+| **153** NL family grain | **PASS** | `biggest football families` answers **"Ablett — 906 combined career games"** with members and the unmatched-relative caveat, matching `/records/family` exactly; `which family has the most AFL players`, `families with three AFL players`, `who is Brent Harvey's son`, `who are Dustin Martin's brothers`, `who is Cooper Harvey's father` all answer. `/records/family` (50 rows) and `/records/father-son` (127 selections, Fletcher 664) render |
+| **144** comparison metadata | **PASS** | Soft navigation updates `document.title`, `meta[description]`, `og:title` and `canonical` together — generic → **"Carlton vs Collingwood — Club Comparison"** → **"Carlton vs Essendon"** on a second soft nav, so the metadata does not go stale |
+
+**Role matrix.** Super Admin sees Correct / Suppress / Replace on both record families and on award
+winners. **Admin** reads every surface but the mutation sections are **absent from the DOM**
+(`mutationMarkupPresentInDom: false`, 0 elements hidden by CSS) — server-omitted, not hidden — and
+all five create routes are denied. **Contributor** is denied all eleven admin surfaces, reaches only
+`/admin/upload`, and the sidebar leaks no forbidden nav entry.
+
+**Console / runtime.** 44 console errors across the whole run, every one accounted for: **31** are
+Cloudflare's edge-injected `beacon.min.js` blocked by our own CSP (one per page load), and **13** are
+404s — 10 from deliberately malformed probe URLs of my own, 3 from the player-links defect below.
+**Zero React, hydration, runtime or 5xx errors.** Server-side: **0 error lines** in the journal
+across the entire acceptance run; `MainPID` 1209640 unchanged, 2 workers, health `ok`/`ok` local and
+public, migrations 102/102, 0 open import batches.
+
+**Two non-blocking defects found, neither from this release, neither allocated an ID:**
+
+1. `src/app/admin/player-links/page.tsx:639` builds a candidate link as `/players/${match.playerSlug}`,
+   omitting the `-${id}` suffix the route requires. The canonical helper is `playerPath(slug, id)` →
+   `/players/<slug>-<id>`, and **every other call site appends the id**; this is the sole exception.
+   The link 404s if clicked and Next's prefetch logs a 404 per suggestion. Admin-only, no data or
+   public impact. Introduced by `88c2681` (`AFLDB-ISSUE-075`), long before this release.
+2. Cloudflare Web Analytics never runs: the edge injects `beacon.min.js`, our CSP `script-src 'self'
+   'unsafe-inline'` blocks it, and it logs a console error on every page load. The CSP is behaving
+   correctly; the analytics simply does not work. Pre-existing and unrelated to this release.
+
 ### Next action
 
-P1–P3 and P3b–P3e are complete. The Admin Centre batch (160–163) is DEV-accepted and ready for
-the next release/promotion stage, which is a separate operator decision under the checklist above
-(PROD untouched so far). **Correction (2026-09-12): Production is not untouched** — current
-`afldb_prod` carries migrations 092–098, applied 2026-09-12, and the production host checkout was
-observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not
-reconstructed as part of the `AFLDB-ISSUE-137` investigation. P4–P12 remain unallocated placeholders; the next phase receives an ID at
-its start.
+P1–P3, P3b–P3e, P4 and P5 are complete **and now live in production at `a5c4a04`** (see
+*Production promotion executed (2026-09-14)* above); the carried promotion checklist is discharged.
+**Authenticated rendered acceptance PASSED 2026-09-14** across Super Admin / Admin /
+Contributor, with no production mutation — see *Authenticated rendered PROD acceptance* above.
+Nothing from the promotion remains outstanding. P6–P12 remain
+unallocated placeholders; the next phase receives an ID at its start, and P6 is **not** allocated
+here.
+
+*Next action as it stood 2026-09-12 (superseded by the promotion above):* P1–P3 and P3b–P3e are
+complete; the Admin Centre batch is DEV-accepted and ready for the next release/promotion stage,
+which is a separate operator decision under the checklist above. Production carried migrations
+092–098 and the host checkout was observed at `0955db3`.
 
 *Next action as it stood 2026-09-11 (superseded):* P1, P2 and P3 are complete and merged (`3bbcab0`, `92a898f`, `af6379e`). The umbrella's next
 phase is P3b, `AFLDB-ISSUE-160`: D-1..D-9 are decided (2026-09-11), so a fresh Opus 5 /
