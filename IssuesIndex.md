@@ -6,6 +6,15 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
+**Current update:** 2026-09-14 (`AFLDB-ISSUE-171` **RESOLVED.** The AFL home-page Record of the
+week now has a typed 22-option catalogue across player career/match/season, coaches, venues and
+curated special records. Five legacy values remain stable; invalid settings fall back before
+dispatch; only the chosen provider runs; admin options are grouped; and Father–Son Selections is
+distinct from Most Games by Family. Focused unit (53/53), typecheck, `afldb_test`-backed
+integration (4/4) and production-build gates all PASS. Open issue count 2 -> 1. Removed from this
+index and the Open Issues table. See the `AFLDB-ISSUE-171` entry in `issues.md` (Status — RESOLVED
+2026-09-14) and `AFLDB-ISSUE-171.md`.)
+
 **Last updated:** 2026-09-14 (`AFLDB-ISSUE-156` **PRODUCTION PROMOTION EXECUTED — the carried
 promotion checklist is DISCHARGED; the umbrella stays OPEN on P6–P12.**) Production was deployed
 in place — a code and migration deployment onto the live `afldb_prod`, **not** a rebuilt-database

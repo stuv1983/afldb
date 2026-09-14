@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import type { SqlFragment } from '@/db/queries/filters';
 
 /**
  * Coaches for a picker, e.g. the grid solver's Coaching category.
@@ -572,6 +573,62 @@ export async function getCoachRecordsByWinPct(minGames = 50, limit = 50): Promis
       FROM totals
      WHERE games >= ${minGames}
      ORDER BY ((wins + draws * 0.5) * 100.0 / games) DESC, "displayName"
+     LIMIT ${limit}
+  `;
+}
+
+export type CoachCountRecordMetric = 'wins' | 'finals' | 'grandFinals' | 'premierships';
+
+function coachCountRecordValue(metric: CoachCountRecordMetric): SqlFragment {
+  switch (metric) {
+    case 'wins': return sql`t.wins`;
+    case 'finals': return sql`t.finals`;
+    case 'grandFinals': return sql`t."grandFinals"`;
+    case 'premierships': return sql`t.premierships`;
+  }
+}
+
+/**
+ * A bounded coach leaderboard for the additional home-page count records.
+ * The aggregate is the same canonical per-match assignment read model used
+ * by the public coach records page; only the ranked count is selected here.
+ */
+export async function getCoachRecordsByMetric(
+  metric: CoachCountRecordMetric,
+  limit = 5,
+): Promise<CoachRecordRow[]> {
+  const value = coachCountRecordValue(metric);
+  return sql<CoachRecordRow[]>`
+    WITH totals AS (
+      SELECT c.id AS "coachId", c.display_name AS "displayName",
+             (c.player_id IS NULL) AS "coachOnly",
+             c.player_id AS "playerId", p.slug AS "playerSlug",
+             min(m.season)::int AS "firstSeason", max(m.season)::int AS "lastSeason",
+             count(mc.match_id)::int AS games,
+             count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+             count(*) FILTER (WHERE m.id IS NOT NULL AND m.winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (
+               WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+             )::int AS losses,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+             count(*) FILTER (
+               WHERE m.round_type = 'grand_final' AND m.winner_club_id = mc.club_id
+             )::int AS premierships
+        FROM coaches c
+        LEFT JOIN players p ON p.id = c.player_id
+        LEFT JOIN match_coaches mc ON mc.coach_id = c.id
+        LEFT JOIN matches m ON m.id = mc.match_id
+       GROUP BY c.id, c.display_name, c.player_id, p.slug
+    )
+    SELECT dense_rank() OVER (ORDER BY ${value} DESC)::int AS rank,
+           t."coachId", t."displayName", t."coachOnly", t."playerId", t."playerSlug",
+           t."firstSeason", t."lastSeason", t.games, t.wins, t.draws, t.losses,
+           t.finals, t."grandFinals", t.premierships,
+           round(((t.wins + t.draws * 0.5) * 100.0 / NULLIF(t.games, 0))::numeric, 2) AS "winPct"
+      FROM totals t
+     WHERE ${value} > 0
+     ORDER BY ${value} DESC, t."displayName", t."coachId"
      LIMIT ${limit}
   `;
 }

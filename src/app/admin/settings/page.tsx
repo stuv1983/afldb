@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 
 import { SettingsForm } from '@/app/admin/settings/SettingsForm';
 import { TestEmailForm } from '@/app/admin/settings/TestEmailForm';
-import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { getSiteSettingsForAdmin } from '@/db/queries/site-settings';
 import { requireCapability } from '@/lib/auth/session';
 import { emailConfigured } from '@/lib/email/send';
-import { HOME_RECORD_CATEGORIES } from '@/lib/site-settings';
+import { homeRecordOptionGroups } from '@/lib/home-records';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +27,7 @@ export default async function SettingsPage() {
   const settings = await getSiteSettingsForAdmin();
   const smtpConfigured = emailConfigured();
 
-  // Titles come from the record catalogue rather than being restated here,
-  // so a reworded category reaches this form too.
-  const recordOptions = HOME_RECORD_CATEGORIES.map((slug) => ({
-    value: slug,
-    label: RECORD_CATEGORIES[slug].title,
-  }));
+  const recordGroups = homeRecordOptionGroups();
 
   return (
     <>
@@ -48,7 +42,7 @@ export default async function SettingsPage() {
 
       <SettingsForm
         settings={settings}
-        recordOptions={recordOptions}
+        recordGroups={recordGroups}
         smtpConfigured={smtpConfigured}
       />
 

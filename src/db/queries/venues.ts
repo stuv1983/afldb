@@ -54,6 +54,48 @@ export async function listVenues(filters: VenueFilters = {}): Promise<VenueSumma
   `;
 }
 
+export type VenueRecordMetric = 'matches' | 'finals' | 'grandFinals' | 'highestAttendance';
+
+export type VenueRecordLeaderRow = {
+  rank: number;
+  venueId: number;
+  venueSlug: string;
+  venueName: string;
+  value: number;
+};
+
+function venueRecordValue(metric: VenueRecordMetric) {
+  switch (metric) {
+    case 'matches': return sql`count(m.id)`;
+    case 'finals': return sql`count(*) FILTER (WHERE m.is_finals_series)`;
+    case 'grandFinals': return sql`count(*) FILTER (WHERE m.round_type = 'grand_final')`;
+    case 'highestAttendance': return sql`max(m.attendance)`;
+  }
+}
+
+/** One bounded venue leaderboard; NULL attendance remains unrecorded. */
+export async function getVenueRecordLeaders(
+  metric: VenueRecordMetric,
+  limit = 5,
+): Promise<VenueRecordLeaderRow[]> {
+  const value = venueRecordValue(metric);
+  return sql<VenueRecordLeaderRow[]>`
+    WITH totals AS (
+      SELECT v.id AS "venueId", v.slug AS "venueSlug",
+             v.canonical_name AS "venueName", (${value})::int AS value
+        FROM venues v
+        LEFT JOIN matches m ON m.venue_id = v.id
+       GROUP BY v.id, v.slug, v.canonical_name
+    )
+    SELECT dense_rank() OVER (ORDER BY t.value DESC)::int AS rank,
+           t."venueId", t."venueSlug", t."venueName", t.value
+      FROM totals t
+     WHERE t.value IS NOT NULL AND t.value > 0
+     ORDER BY t.value DESC, t."venueName", t."venueId"
+     LIMIT ${limit}
+  `;
+}
+
 export async function getVenueStates(): Promise<string[]> {
   const rows = await sql<{ state: string }[]>`
     SELECT DISTINCT state FROM venues WHERE state IS NOT NULL ORDER BY state

@@ -6,6 +6,7 @@ import { AdminSection } from '@/app/admin/AdminSection';
 import { EarlyAccessSettings } from '@/app/admin/settings/EarlyAccessSettings';
 import { SearchPlaceholderSettings } from '@/app/admin/settings/SearchPlaceholderSettings';
 import { saveSiteSettings, type SettingsState } from '@/app/admin/settings/actions';
+import type { HomeRecordOptionGroup } from '@/lib/home-records';
 import {
   AFLW_LEADER_CATEGORIES,
   GRID_AUDIENCES,
@@ -28,12 +29,12 @@ import {
  */
 export function SettingsForm({
   settings,
-  recordOptions,
+  recordGroups,
   smtpConfigured,
 }: {
   settings: SiteSettings;
-  /** Career record categories, labelled server-side from RECORD_CATEGORIES. */
-  recordOptions: { value: string; label: string }[];
+  /** Curated record choices, grouped server-side from the typed catalogue. */
+  recordGroups: HomeRecordOptionGroup[];
   /** Whether AFLDB_SMTP_* is set, so the form can say why sending is off. */
   smtpConfigured: boolean;
 }) {
@@ -183,8 +184,12 @@ export function SettingsForm({
           <div>
             <label htmlFor="homeRecord">Record of the week (AFL)</label>
             <select id="homeRecord" name="homeRecord" defaultValue={settings.homeRecord}>
-              {recordOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+              {recordGroups.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.options.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

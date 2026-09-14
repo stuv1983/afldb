@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### AFL home-page “Record of the week” expands into a typed multi-domain catalogue (AFLDB-ISSUE-171) - 14 September 2026
+
+- The Super Admin site-setting now offers 22 grouped AFL records across player career, match and
+  season performances, coaching, venues, after-the-siren kicks and first-kick goals. The five
+  existing stored values keep their identifiers and meaning; stale or malformed values fall back
+  safely, and the home page executes only the selected bounded provider.
+- The public panel now renders domain-specific player, match, coach and venue links, visible units,
+  coverage notes, optional destinations and an empty state. AFLW settings and behaviour are unchanged.
+- The selection-specific public card/page is now named **Father–Son Selections**, remaining distinct
+  from the sibling-family board **Most Games by Family**.
+
 ### Coach profiles gained a full historical record and a two-coach comparison surface (AFLDB-ISSUE-170) - 14 September 2026
 
 - `/coaches/[slug]` now renders a coach-oriented profile for every coach, including a person who

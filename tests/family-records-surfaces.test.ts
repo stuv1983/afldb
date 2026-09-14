@@ -40,6 +40,10 @@ vi.mock('@/db/queries/family-records', async () => {
   };
 });
 
+vi.mock('@/db/queries/site-settings', () => ({
+  getSiteSettings: vi.fn(async () => ({ pageIntros: { records: '' } })),
+}));
+
 // --- Q4: the family board counts siblings, and says so in SQL ---------
 
 describe('family record queries state the sibling relationship (ISSUE-153 Q4)', () => {
@@ -95,12 +99,23 @@ describe('family record queries state the sibling relationship (ISSUE-153 Q4)', 
 // --- Q3: the father-son page describes the selection rule -------------
 
 describe('/records/father-son prose describes the selection record (ISSUE-153 Q3)', () => {
+  it('keeps the selection card distinct from the sibling-family record', async () => {
+    const page = (await import('@/app/records/page')).default;
+    const html = renderToStaticMarkup(await page());
+
+    expect(html).toContain('Father–Son Selections');
+    expect(html).toContain('Most Games by Family');
+    expect(html).not.toContain('Father–Son Records');
+  });
+
   it('names the AFL father-son rule selection, not a bare parent-child relationship', async () => {
     const page = (await import('@/app/records/father-son/page')).default;
     const html = renderToStaticMarkup(await page());
     const text = html.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/g, (e) => (e === '&ndash;' ? '–' : ' '));
 
     // What the record IS.
+    expect(text).toMatch(/Father–Son Selections/);
+    expect(text).not.toMatch(/Father–Son Records/);
     expect(text).toMatch(/selection[s]? made under the AFL father–son rule/i);
     expect(text).toMatch(/drafted under the rule/i);
     // What it is NOT — the reading ISSUE-152 F1 recorded as the page's defect.
