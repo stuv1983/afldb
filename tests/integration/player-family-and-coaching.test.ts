@@ -14,7 +14,13 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
-import { getCoach, getCoachCareer, getPlayerCoachingCareer, listCoaches } from '@/db/queries/coaches';
+import {
+  getCoach,
+  getCoachCareer,
+  getCoachRecordAgainstOrganization,
+  getPlayerCoachingCareer,
+  listCoaches,
+} from '@/db/queries/coaches';
 import { searchCoaches } from '@/db/queries/search';
 import { getPlayerFamily } from '@/db/queries/players';
 
@@ -365,6 +371,247 @@ describe('getPlayerCoachingCareer', () => {
     `;
     expect(someone).toBeDefined();
     expect(await getPlayerCoachingCareer(someone.id)).toBeNull();
+  });
+});
+
+/**
+ * AFLDB-ISSUE-170 Stage 1C: a coach's record against one opponent
+ * club-organisation. Every fixture below is discovered dynamically from
+ * canonical data (never a hardcoded coach/organisation id), and every
+ * cross-check query is built from scratch rather than by re-running
+ * getCoachRecordAgainstOrganization's own SQL or importing its helpers.
+ */
+describe('getCoachRecordAgainstOrganization', () => {
+  it("Leigh Matthews: Games/W/D/L, Win%, Finals and Grand Finals against his most-faced opponent organisation match a direct canonical cross-check", async () => {
+    const [matthews] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
+
+    const [topOrg] = await sql<{ organizationId: number; games: number }[]>`
+      SELECT oc.organization_id AS "organizationId", count(*)::int AS games
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id}
+       GROUP BY oc.organization_id
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(topOrg, 'no opponent organisation found for Leigh Matthews').toBeDefined();
+
+    const record = await getCoachRecordAgainstOrganization(matthews.id, topOrg.organizationId);
+    expect(record).not.toBeNull();
+    expect(record!.coachId).toBe(matthews.id);
+    expect(record!.organization.id).toBe(topOrg.organizationId);
+    expect(record!.totals.games).toBe(topOrg.games);
+
+    const [truth] = await sql<{
+      wins: number; draws: number; losses: number; finals: number; grandFinals: number;
+    }[]>`
+      SELECT count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+             count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id)::int AS losses,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals"
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id} AND oc.organization_id = ${topOrg.organizationId}
+    `;
+    expect(record!.totals).toMatchObject(truth);
+    const expectedWinPct = ((truth.wins + truth.draws * 0.5) / topOrg.games) * 100;
+    expect(record!.totals.winPct).toBeCloseTo(expectedWinPct, 9);
+  });
+
+  it('Leigh Matthews: biggest win/loss against that organisation match a direct canonical cross-check', async () => {
+    const [matthews] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews).toBeDefined();
+
+    const [topOrg] = await sql<{ organizationId: number }[]>`
+      SELECT oc.organization_id AS "organizationId"
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id} AND m.winner_club_id IS NOT NULL
+       GROUP BY oc.organization_id
+      HAVING count(*) FILTER (WHERE m.winner_club_id = mc.club_id) > 0
+         AND count(*) FILTER (WHERE m.winner_club_id <> mc.club_id) > 0
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(topOrg, 'no opponent organisation with both a win and a loss found for Leigh Matthews').toBeDefined();
+
+    const record = await getCoachRecordAgainstOrganization(matthews.id, topOrg.organizationId);
+    expect(record!.biggestWin).not.toBeNull();
+    expect(record!.biggestLoss).not.toBeNull();
+
+    const [expectedWin] = await sql<{ matchId: number; margin: number }[]>`
+      SELECT m.id AS "matchId",
+             (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                   ELSE m.away_score - m.home_score END)::int AS margin
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id} AND m.winner_club_id = mc.club_id
+         AND oc.organization_id = ${topOrg.organizationId}
+       ORDER BY (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                      ELSE m.away_score - m.home_score END) DESC,
+                m.match_date ASC, m.id ASC
+       LIMIT 1
+    `;
+    expect(record!.biggestWin).toMatchObject({ matchId: expectedWin.matchId, margin: expectedWin.margin });
+
+    const [expectedLoss] = await sql<{ matchId: number; margin: number }[]>`
+      SELECT m.id AS "matchId",
+             (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                   ELSE m.away_score - m.home_score END)::int AS margin
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id} AND m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id
+         AND oc.organization_id = ${topOrg.organizationId}
+       ORDER BY (CASE WHEN mc.club_id = m.home_club_id THEN m.home_score - m.away_score
+                      ELSE m.away_score - m.home_score END) ASC,
+                m.match_date ASC, m.id ASC
+       LIMIT 1
+    `;
+    expect(record!.biggestLoss).toMatchObject({ matchId: expectedLoss.matchId, margin: expectedLoss.margin });
+  });
+
+  it('Leigh Matthews: venue breakdown against that organisation matches a direct canonical cross-check and stays deterministically ordered', async () => {
+    const [matthews] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews).toBeDefined();
+
+    const [topOrg] = await sql<{ organizationId: number }[]>`
+      SELECT oc.organization_id AS "organizationId", count(DISTINCT m.venue_id)::int AS venues
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id}
+       GROUP BY oc.organization_id
+      HAVING count(DISTINCT m.venue_id) > 1
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(topOrg, 'no opponent organisation with more than one venue found for Leigh Matthews').toBeDefined();
+
+    const record = await getCoachRecordAgainstOrganization(matthews.id, topOrg.organizationId);
+    expect(record!.venues.length).toBeGreaterThan(1);
+
+    const topVenue = record!.venues[0];
+    const [venueTruth] = await sql<{
+      games: number; wins: number; draws: number; losses: number;
+      finals: number; grandFinals: number; firstMatchDate: Date; lastMatchDate: Date;
+    }[]>`
+      SELECT count(*)::int AS games,
+             count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+             count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id)::int AS losses,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals",
+             min(m.match_date) AS "firstMatchDate",
+             max(m.match_date) AS "lastMatchDate"
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${matthews.id} AND oc.organization_id = ${topOrg.organizationId}
+         AND m.venue_id = ${topVenue.venueId}
+    `;
+    expect(topVenue).toMatchObject({
+      games: venueTruth.games, wins: venueTruth.wins, draws: venueTruth.draws, losses: venueTruth.losses,
+      finals: venueTruth.finals, grandFinals: venueTruth.grandFinals,
+    });
+    expect(topVenue.firstMatchDate.toISOString()).toBe(venueTruth.firstMatchDate.toISOString());
+    expect(topVenue.lastMatchDate.toISOString()).toBe(venueTruth.lastMatchDate.toISOString());
+
+    for (let i = 1; i < record!.venues.length; i++) {
+      const prev = record!.venues[i - 1];
+      const cur = record!.venues[i];
+      if (prev.games !== cur.games) {
+        expect(prev.games).toBeGreaterThan(cur.games);
+      } else if (prev.venueName !== cur.venueName) {
+        expect(prev.venueName < cur.venueName).toBe(true);
+      } else {
+        expect(prev.venueId).toBeLessThan(cur.venueId);
+      }
+    }
+  });
+
+  it("organisation lineage: a coach's record against an organisation combines every historical identity it has traded under, not just one", async () => {
+    const [pair] = await sql<{ coachId: number; organizationId: number; identities: number; total: number }[]>`
+      SELECT mc.coach_id AS "coachId", oc.organization_id AS "organizationId",
+             count(DISTINCT oc.id)::int AS identities, count(*)::int AS total
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       GROUP BY mc.coach_id, oc.organization_id
+      HAVING count(DISTINCT oc.id) >= 2
+       ORDER BY count(DISTINCT oc.id) DESC, count(*) DESC
+       LIMIT 1
+    `;
+    expect(pair, 'no coach/organisation pair spans multiple historical identities in this database').toBeDefined();
+
+    const record = await getCoachRecordAgainstOrganization(pair.coachId, pair.organizationId);
+    expect(record).not.toBeNull();
+    expect(record!.totals.games).toBe(pair.total);
+
+    // The single historical identity this coach faced most, within the same
+    // organisation, must undercount relative to the full lineage total --
+    // the assertion that fails if the implementation scoped by one
+    // clubs.id instead of clubs.organization_id.
+    const [biggestSlice] = await sql<{ games: number }[]>`
+      SELECT count(*)::int AS games
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+       WHERE mc.coach_id = ${pair.coachId} AND oc.organization_id = ${pair.organizationId}
+       GROUP BY oc.id
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(biggestSlice, 'no per-identity slice found').toBeDefined();
+    expect(biggestSlice.games).toBeLessThan(record!.totals.games);
+  });
+
+  it('a recognised coach/organisation pair with zero canonical meetings returns a deliberate zero-record, not null', async () => {
+    const [pair] = await sql<{ coachId: number; organizationId: number }[]>`
+      SELECT c.id AS "coachId", o.id AS "organizationId"
+        FROM coaches c
+        CROSS JOIN club_organizations o
+       WHERE NOT EXISTS (
+               SELECT 1
+                 FROM match_coaches mc
+                 JOIN matches m ON m.id = mc.match_id
+                 JOIN clubs oc
+                   ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+                WHERE mc.coach_id = c.id AND oc.organization_id = o.id
+             )
+       LIMIT 1
+    `;
+    expect(pair, 'no zero-meeting coach/organisation pair found').toBeDefined();
+
+    const record = await getCoachRecordAgainstOrganization(pair.coachId, pair.organizationId);
+    expect(record).not.toBeNull();
+    expect(record!.totals).toMatchObject({ games: 0, wins: 0, draws: 0, losses: 0, finals: 0, grandFinals: 0 });
+    expect(record!.totals.winPct).toBeNull();
+    expect(record!.biggestWin).toBeNull();
+    expect(record!.biggestLoss).toBeNull();
+    expect(record!.venues).toEqual([]);
+  });
+
+  it('an unrecognised coach id or organisation id returns null', async () => {
+    const [anyOrg] = await sql<{ id: number }[]>`SELECT id FROM club_organizations LIMIT 1`;
+    expect(anyOrg).toBeDefined();
+    expect(await getCoachRecordAgainstOrganization(-1, anyOrg.id)).toBeNull();
+
+    const [anyCoach] = await sql<{ id: number }[]>`SELECT id FROM coaches LIMIT 1`;
+    expect(anyCoach).toBeDefined();
+    expect(await getCoachRecordAgainstOrganization(anyCoach.id, -1)).toBeNull();
   });
 });
 

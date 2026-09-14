@@ -285,6 +285,162 @@ export async function getPlayerCoachingCareer(playerId: number): Promise<CoachCa
   return getCoachCareer(coach.id);
 }
 
+/** Opponent organisation identity, kept minimal -- just enough for a Stage 1D link/label. */
+export type CoachOpponentOrganization = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+export type CoachOrganizationTotals = {
+  games: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  finals: number;
+  grandFinals: number;
+  winPct: number | null;
+};
+
+export type CoachOrganizationRecord = {
+  coachId: number;
+  organization: CoachOpponentOrganization;
+  totals: CoachOrganizationTotals;
+  biggestWin: CoachCareerMatch | null;
+  biggestLoss: CoachCareerMatch | null;
+  venues: CoachVenueRecord[];
+};
+
+/**
+ * Every decided (non-drawn) match a coach was assigned to against ANY
+ * historical identity inside one opponent organisation (AFLDB-ISSUE-170
+ * Stage 1C, Stage 0 §0.5) -- the same shape/margin logic as
+ * {@link getCoachCareer}'s `decided` query, kept as its own query rather
+ * than a shared parameterised one so Stage 1A/1B's existing query is never
+ * touched by this addition.
+ */
+async function getDecidedMatchesAgainstOrganization(
+  coachId: number,
+  organizationId: number,
+): Promise<CoachCareerMatch[]> {
+  const rows = await sql<CoachCareerMatchRaw[]>`
+    SELECT m.id AS "matchId", m.season, m.match_date AS "matchDate",
+           m.round_type::text AS "roundType", m.is_finals_series AS "isFinalsSeries",
+           mc.club_id AS "coachedClubId", cc.name AS "coachedClubName", cc.slug AS "coachedClubSlug",
+           oc.id AS "opponentClubId", oc.name AS "opponentClubName", oc.slug AS "opponentClubSlug",
+           m.home_club_id AS "homeClubId", m.home_score AS "homeScore", m.away_score AS "awayScore",
+           v.id AS "venueId", v.canonical_name AS "venueName", v.slug AS "venueSlug"
+      FROM match_coaches mc
+      JOIN matches m ON m.id = mc.match_id
+      JOIN clubs cc ON cc.id = mc.club_id
+      JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+      LEFT JOIN venues v ON v.id = m.venue_id
+     WHERE mc.coach_id = ${coachId}
+       AND m.winner_club_id IS NOT NULL
+       AND oc.organization_id = ${organizationId}
+  `;
+  return rows.map(({ homeClubId, homeScore, awayScore, ...rest }) => ({
+    ...rest,
+    margin: coachPerspectiveMargin({ coachedClubId: rest.coachedClubId, homeClubId, homeScore, awayScore }),
+  }));
+}
+
+/**
+ * One coach's record against a single opponent club-organisation
+ * (AFLDB-ISSUE-170 Stage 1C): Games/W/D/L/Win%/Finals/Grand Finals,
+ * biggest win/loss (Stage 1A's contract type and
+ * {@link selectCareerRecordMatch} tie-break, reused verbatim) and venue
+ * history (Stage 1B's {@link CoachVenueRecord} shape and aggregation
+ * approach, reused verbatim).
+ *
+ * The opponent is scoped by `clubs.organization_id`, never one historical
+ * club identity (Stage 0 §0.5): a coach's meetings against Footscray and
+ * against Western Bulldogs are the same organisation's record, exactly the
+ * lineage convention {@link getClubLineage} and the club-comparison
+ * queries already use.
+ *
+ * Returns null only for an unrecognised coach id or organisation id. A
+ * recognised coach who has never coached against a recognised organisation
+ * -- or an organisation with zero canonical meetings -- returns a real
+ * record with zero totals and empty lists, the same deliberate no-record
+ * convention {@link getCoachCareer} uses for a zero-game coach.
+ */
+export async function getCoachRecordAgainstOrganization(
+  coachId: number,
+  organizationId: number,
+): Promise<CoachOrganizationRecord | null> {
+  const [coach] = await sql<{ id: number }[]>`
+    SELECT id FROM coaches WHERE id = ${coachId}
+  `;
+  if (!coach) return null;
+
+  const [organization] = await sql<CoachOpponentOrganization[]>`
+    SELECT id, name, slug FROM club_organizations WHERE id = ${organizationId}
+  `;
+  if (!organization) return null;
+
+  // Games/W/D/L/finals/Grand Finals against the organisation, all
+  // assignments (not just decided ones) -- an aggregate with no GROUP BY
+  // always returns exactly one row, zeros included, so no fallback default
+  // is needed for a zero-meeting pair.
+  const [totalsRow] = await sql<Omit<CoachOrganizationTotals, 'winPct'>[]>`
+    SELECT count(*)::int AS games,
+           count(*) FILTER (WHERE m.winner_club_id = mc.club_id)::int AS wins,
+           count(*) FILTER (WHERE m.winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (WHERE m.winner_club_id IS NOT NULL AND m.winner_club_id <> mc.club_id)::int AS losses,
+           count(*) FILTER (WHERE m.is_finals_series)::int AS finals,
+           count(*) FILTER (WHERE m.round_type = 'grand_final')::int AS "grandFinals"
+      FROM match_coaches mc
+      JOIN matches m ON m.id = mc.match_id
+      JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+     WHERE mc.coach_id = ${coach.id}
+       AND oc.organization_id = ${organization.id}
+  `;
+
+  const decided = await getDecidedMatchesAgainstOrganization(coach.id, organization.id);
+
+  // Venue breakdown for matches against the organisation only, one venue
+  // per row via array_agg (same approach as getCoachCareer's Stage 1B
+  // venue query) rather than a per-venue round trip.
+  const venueRows = await sql<Omit<CoachVenueRecord, 'winPct'>[]>`
+    WITH assignments AS (
+      SELECT mc.club_id AS coached_club_id, m.id AS match_id, m.match_date,
+             m.is_finals_series, m.round_type, m.winner_club_id,
+             v.id AS venue_id, v.canonical_name AS venue_name, v.slug AS venue_slug
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+        JOIN venues v ON v.id = m.venue_id
+       WHERE mc.coach_id = ${coach.id}
+         AND oc.organization_id = ${organization.id}
+    )
+    SELECT venue_id AS "venueId", venue_name AS "venueName", venue_slug AS "venueSlug",
+           count(*)::int AS games,
+           count(*) FILTER (WHERE winner_club_id = coached_club_id)::int AS wins,
+           count(*) FILTER (WHERE winner_club_id IS NULL)::int AS draws,
+           count(*) FILTER (WHERE winner_club_id IS NOT NULL AND winner_club_id <> coached_club_id)::int AS losses,
+           count(*) FILTER (WHERE is_finals_series)::int AS finals,
+           count(*) FILTER (WHERE round_type = 'grand_final')::int AS "grandFinals",
+           (array_agg(match_id ORDER BY match_date ASC, match_id ASC))[1] AS "firstMatchId",
+           (array_agg(match_date ORDER BY match_date ASC, match_id ASC))[1] AS "firstMatchDate",
+           (array_agg(match_id ORDER BY match_date DESC, match_id DESC))[1] AS "lastMatchId",
+           (array_agg(match_date ORDER BY match_date DESC, match_id DESC))[1] AS "lastMatchDate"
+      FROM assignments
+     GROUP BY venue_id, venue_name, venue_slug
+     ORDER BY count(*) DESC, venue_name ASC, venue_id ASC
+  `;
+  const venues = venueRows.map((r) => ({ ...r, winPct: winPct(r.wins, r.draws, r.games) }));
+
+  return {
+    coachId: coach.id,
+    organization,
+    totals: { ...totalsRow, winPct: winPct(totalsRow.wins, totalsRow.draws, totalsRow.games) },
+    biggestWin: selectCareerRecordMatch(decided, 'win'),
+    biggestLoss: selectCareerRecordMatch(decided, 'loss'),
+    venues,
+  };
+}
+
 export type CoachIdentity = {
   id: number;
   displayName: string;
