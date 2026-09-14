@@ -13,6 +13,7 @@ import { ReorderableSections } from '@/components/ReorderableSections';
 import { SortableTable } from '@/components/SortableTable';
 import { getPlayerAfterSirenEvents } from '@/db/queries/after-siren';
 import { getPlayerHonours } from '@/db/queries/awards';
+import { getComparisonOrganizations } from '@/db/queries/club-comparison';
 import { getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
 import {
@@ -176,6 +177,17 @@ export default async function PlayerPage({
       getPlayerCoachingCareer(player.id),
       getPlayerAfterSirenEvents(player.id),
     ]);
+
+  // The Stage 1C opponent-history selector's option list (AFLDB-ISSUE-170
+  // Stage 1D), fetched only for a coach with a real canonical coaching
+  // record -- a sequential await after the main fan-out rather than a
+  // member of it, since which coach (if any) is only known once
+  // coachingCareer itself has resolved. Cheap and canonical
+  // (getComparisonOrganizations already backs /clubs/compare), so no
+  // second organisation source is introduced.
+  const coachOrganizations = coachingCareer && coachingCareer.totals.games > 0
+    ? await getComparisonOrganizations()
+    : [];
 
   const risingStarNominations = honours.nominations;
   const risingStarWin = risingStarNominations.find((n) => n.isWinner);
@@ -724,7 +736,7 @@ export default async function PlayerPage({
     sections.push({
       id: 'coaching-career',
       label: 'Coaching Career',
-      node: <PlayerCoachingCareer career={coachingCareer} />,
+      node: <PlayerCoachingCareer career={coachingCareer} organizations={coachOrganizations} />,
     });
   }
 

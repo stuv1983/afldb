@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { CoachCareerBody, CoachOpponentRecordBody } from '@/components/CoachCareerRecord';
+import { CoachOpponentSelector } from '@/components/CoachOpponentSelector';
 import { JsonLd } from '@/components/JsonLd';
-import { SortableTable } from '@/components/SortableTable';
+import { getComparisonOrganizations, type ComparisonOrganization } from '@/db/queries/club-comparison';
 import type { CoachCareer } from '@/db/queries/coaches';
-import { getCoach, getCoachCareer, listCoaches } from '@/db/queries/coaches';
+import { getCoach, getCoachCareer } from '@/db/queries/coaches';
 import {
   clubPath,
   coachPath,
@@ -16,21 +18,28 @@ import {
   parseEntitySlug,
   playerPath,
 } from '@/lib/format';
+import { resolveCoachOpponentSelection, type CoachOpponentSelection } from '@/lib/coach-opponent-history';
+import { firstValue } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { coachSlug } from '@/lib/slugs';
 import { coachSchema } from '@/lib/structured-data';
 
-// Coaching careers are historical and change only when an import runs, same
-// as the player profile this route mirrors.
-export const revalidate = 3600;
+/**
+ * Stage 1D (AFLDB-ISSUE-170) adds a shareable `?opponent=` selection,
+ * which needs `searchParams` — trading this route's previous ISR
+ * (`revalidate = 3600` + `generateStaticParams`) for full server
+ * rendering, the same trade-off `/clubs/compare` already makes. This
+ * route is a small, low-traffic set (18 coach-only identities per Stage 0
+ * §0.2), so the trade costs nothing meaningful.
+ *
+ * `/players/[slug]` cannot make the same trade — it is static ISR for
+ * ~13,000 players — so the player-linked coaching surface resolves the
+ * identical selection client-side instead. See
+ * `CoachOpponentHistoryClient` for the full reasoning.
+ */
+export const dynamic = 'force-dynamic';
 
-/** Coach-only people are a small set (a few hundred at most): prerender them all. */
-export async function generateStaticParams() {
-  const coaches = await listCoaches();
-  return coaches
-    .filter((c) => c.playerId === null)
-    .map((c) => ({ slug: `${coachSlug(c.displayName)}-${c.id}` }));
-}
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function coachDescription(name: string, career: CoachCareer): string {
   if (career.totals.games === 0) {
@@ -49,8 +58,10 @@ function coachDescription(name: string, career: CoachCareer): string {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: SearchParams;
 }): Promise<Metadata> {
   const { slug } = await params;
   const parsed = parseEntitySlug(slug);
@@ -62,18 +73,26 @@ export async function generateMetadata({
   const career = await getCoachCareer(coach.id);
   if (!career) return notFoundMetadata('Coach');
 
+  // An opponent selection is a filtered view of the same canonical page
+  // (the `/clubs/compare` convention for a non-landing query state), so
+  // it is never offered to an index in place of the canonical record.
+  const opponent = firstValue((await searchParams).opponent);
+
   return pageMetadata({
     title: `${coach.displayName} — VFL/AFL Coaching Record`,
     description: coachDescription(coach.displayName, career),
     path: coachPath(coachSlug(coach.displayName), coach.id),
     ogType: 'profile',
+    noindex: Boolean(opponent),
   });
 }
 
 export default async function CoachPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: SearchParams;
 }) {
   const { slug } = await params;
   const parsed = parseEntitySlug(slug);
@@ -97,6 +116,20 @@ export default async function CoachPage({
 
   const career = await getCoachCareer(coach.id);
   if (!career) notFound();
+
+  const opponent = firstValue((await searchParams).opponent);
+
+  // The opponent selector/record only makes sense once there is a real
+  // canonical coaching record to scope (Stage 1A's zero-game convention);
+  // for a zero-game coach neither query is worth running.
+  let organizations: ComparisonOrganization[] = [];
+  let selection: CoachOpponentSelection = { kind: 'none' };
+  if (career.totals.games > 0) {
+    [organizations, selection] = await Promise.all([
+      getComparisonOrganizations(),
+      resolveCoachOpponentSelection(coach.id, opponent),
+    ]);
+  }
 
   const { totals } = career;
   const path = coachPath(canonicalSlug, coach.id);
@@ -156,75 +189,22 @@ export default async function CoachPage({
 
       <section className="section">
         <h2>Coaching record</h2>
-        <div className="table-wrap">
-          <table>
-            <tbody>
-              <tr>
-                <th scope="row">Games</th>
-                <td className="num">{formatNumber(totals.games)}</td>
-                <th scope="row">Win %</th>
-                <td className="num">{formatPercentage(totals.winPct)}</td>
-              </tr>
-              <tr>
-                <th scope="row">Record</th>
-                <td className="num nowrap">{totals.wins}W – {totals.losses}L – {totals.draws}D</td>
-                <th scope="row">Finals</th>
-                <td className="num">{formatNumber(totals.finals)}</td>
-              </tr>
-              <tr>
-                <th scope="row">Grand Finals</th>
-                <td className="num">{formatNumber(totals.grandFinals)}</td>
-                <th scope="row">Premierships</th>
-                <td className="num">{formatNumber(totals.premierships)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {career.clubs.length > 0 && (
-          <div className="table-wrap">
-            <SortableTable
-              defaultSort="firstSeason"
-              defaultDir="asc"
-              columns={[
-                { key: 'club', label: 'Club', sortType: 'text' },
-                { key: 'firstSeason', label: 'Seasons', sortType: 'number', className: 'num nowrap' },
-                { key: 'games', label: 'Games', sortType: 'number', className: 'num' },
-                { key: 'wld', label: 'W–L–D', sortType: 'number', className: 'num nowrap' },
-                { key: 'winPct', label: 'Win %', sortType: 'number', className: 'num' },
-                { key: 'finals', label: 'Finals', sortType: 'number', className: 'num' },
-                { key: 'grandFinals', label: 'GF', sortType: 'number', className: 'num' },
-                { key: 'premierships', label: 'Prem', sortType: 'number', className: 'num' },
-              ]}
-              items={career.clubs.map((c) => ({
-                id: String(c.clubId),
-                values: {
-                  club: c.clubName,
-                  firstSeason: c.firstSeason,
-                  games: c.games,
-                  wld: c.wins,
-                  winPct: c.winPct ?? -1,
-                  finals: c.finals,
-                  grandFinals: c.grandFinals,
-                  premierships: c.premierships,
-                },
-                element: (
-                  <tr key={c.clubId}>
-                    <td><Link href={clubPath(c.clubSlug)}>{c.clubName}</Link></td>
-                    <td className="num nowrap">{formatSpan(c.firstSeason, c.lastSeason)}</td>
-                    <td className="num">{formatNumber(c.games)}</td>
-                    <td className="num nowrap">{c.wins}–{c.losses}–{c.draws}</td>
-                    <td className="num">{formatPercentage(c.winPct)}</td>
-                    <td className="num">{formatNumber(c.finals)}</td>
-                    <td className="num">{formatNumber(c.grandFinals)}</td>
-                    <td className="num">{formatNumber(c.premierships)}</td>
-                  </tr>
-                ),
-              }))}
-            />
-          </div>
-        )}
+        <CoachCareerBody career={career} linkClubs />
       </section>
+
+      {career.totals.games > 0 && (
+        <section className="section">
+          <h2>History against club</h2>
+          <CoachOpponentSelector organizations={organizations} selected={opponent} basePath={path} />
+
+          {selection.kind === 'invalid' && (
+            <p className="muted">{selection.requested} is not a club on record.</p>
+          )}
+          {selection.kind === 'resolved' && (
+            <CoachOpponentRecordBody record={selection.record} showCoachedClub={career.clubs.length > 1} />
+          )}
+        </section>
+      )}
     </>
   );
 }

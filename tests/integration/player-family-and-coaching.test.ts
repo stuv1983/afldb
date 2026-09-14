@@ -23,6 +23,7 @@ import {
 } from '@/db/queries/coaches';
 import { searchCoaches } from '@/db/queries/search';
 import { getPlayerFamily } from '@/db/queries/players';
+import { resolveCoachOpponentSelection } from '@/lib/coach-opponent-history';
 
 afterAll(async () => {
   await sql.end();
@@ -612,6 +613,85 @@ describe('getCoachRecordAgainstOrganization', () => {
     const [anyCoach] = await sql<{ id: number }[]>`SELECT id FROM coaches LIMIT 1`;
     expect(anyCoach).toBeDefined();
     expect(await getCoachRecordAgainstOrganization(anyCoach.id, -1)).toBeNull();
+  });
+});
+
+/**
+ * The Stage 1C opponent-selection resolver shared by the standalone coach
+ * page's server-rendered selector and the player-linked coaching
+ * surface's `/api/coaches/[id]/opponent-record` route handler
+ * (AFLDB-ISSUE-170 Stage 1D). It is a thin slug-resolve-then-delegate
+ * wrapper over {@link getOrganizationBySlug} and
+ * {@link getCoachRecordAgainstOrganization} above, so these checks only
+ * prove the wrapping — not the aggregation, already proven in full above.
+ */
+describe('resolveCoachOpponentSelection', () => {
+  it('no requested slug resolves to "none", never running a query', async () => {
+    const [anyCoach] = await sql<{ id: number }[]>`SELECT id FROM coaches LIMIT 1`;
+    expect(anyCoach).toBeDefined();
+    expect(await resolveCoachOpponentSelection(anyCoach.id, undefined)).toEqual({ kind: 'none' });
+  });
+
+  it("a valid opponent slug resolves the same record getCoachRecordAgainstOrganization returns directly", async () => {
+    const [matthews] = await sql<{ id: number }[]>`
+      SELECT id FROM coaches WHERE name_key = 'Matthews, Leigh'
+    `;
+    expect(matthews, 'the coaches stage has not loaded this database').toBeDefined();
+
+    const [topOrg] = await sql<{ organizationId: number; slug: string }[]>`
+      SELECT o.id AS "organizationId", o.slug
+        FROM match_coaches mc
+        JOIN matches m ON m.id = mc.match_id
+        JOIN clubs oc ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+        JOIN club_organizations o ON o.id = oc.organization_id
+       WHERE mc.coach_id = ${matthews.id}
+       GROUP BY o.id, o.slug
+       ORDER BY count(*) DESC
+       LIMIT 1
+    `;
+    expect(topOrg, 'no opponent organisation found for Leigh Matthews').toBeDefined();
+
+    const direct = await getCoachRecordAgainstOrganization(matthews.id, topOrg.organizationId);
+    const selection = await resolveCoachOpponentSelection(matthews.id, topOrg.slug);
+
+    expect(selection.kind).toBe('resolved');
+    if (selection.kind !== 'resolved') throw new Error('unreachable');
+    expect(selection.organization.id).toBe(topOrg.organizationId);
+    expect(selection.record).toEqual(direct);
+  });
+
+  it('an unrecognised opponent slug is "invalid" with the requested value, never a thrown error', async () => {
+    const [anyCoach] = await sql<{ id: number }[]>`SELECT id FROM coaches LIMIT 1`;
+    expect(anyCoach).toBeDefined();
+    expect(await resolveCoachOpponentSelection(anyCoach.id, 'not-a-real-club-organisation-xyz')).toEqual({
+      kind: 'invalid',
+      requested: 'not-a-real-club-organisation-xyz',
+    });
+  });
+
+  it('a real, zero-meeting organisation still resolves — a coverage gap is never reported as an invalid selection', async () => {
+    const [pair] = await sql<{ coachId: number; organizationId: number; slug: string }[]>`
+      SELECT c.id AS "coachId", o.id AS "organizationId", o.slug
+        FROM coaches c
+        CROSS JOIN club_organizations o
+       WHERE NOT EXISTS (
+               SELECT 1
+                 FROM match_coaches mc
+                 JOIN matches m ON m.id = mc.match_id
+                 JOIN clubs oc
+                   ON oc.id = (CASE WHEN mc.club_id = m.home_club_id THEN m.away_club_id ELSE m.home_club_id END)
+                WHERE mc.coach_id = c.id AND oc.organization_id = o.id
+             )
+       LIMIT 1
+    `;
+    expect(pair, 'no zero-meeting coach/organisation pair found').toBeDefined();
+
+    const selection = await resolveCoachOpponentSelection(pair.coachId, pair.slug);
+    expect(selection.kind).toBe('resolved');
+    if (selection.kind !== 'resolved') throw new Error('unreachable');
+    expect(selection.record.totals.games).toBe(0);
+    expect(selection.record.biggestWin).toBeNull();
+    expect(selection.record.venues).toEqual([]);
   });
 });
 
