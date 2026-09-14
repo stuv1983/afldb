@@ -38,8 +38,23 @@
  * `tools/db/promotion-inventory.ts`'s lineage identities, by the replay
  * adapters and by the admin writer, so every one of them must be able to import
  * it.
+ *
+ * AND NO NODE BUILTIN EITHER, which Stage 7's production build is what proved
+ * (AFLDB-ISSUE-167 §26). This module reached a CLIENT bundle the moment Stage 6
+ * shipped `SpecialRecordCreatePanel.tsx`: that panel imports
+ * `src/app/admin/records/labels.ts`, which imports `specialRecordEntityKey`
+ * from here, and webpack cannot resolve `node:crypto` for the browser —
+ * `Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not
+ * handled by plugins`, and the build fails. The minted uuid therefore comes
+ * from WEB CRYPTO (`crypto.randomUUID()`), which is a global in Node (stable
+ * since 19), in the Edge runtime and in the browser alike, and is the same
+ * cryptographically random v4 uuid `node:crypto`'s export returns. The other
+ * five minting sites (`admin-awards`, `admin-club-leadership`, `admin-coaches`,
+ * `admin-draft`, `admin-fixtures`) keep their `node:crypto` import because
+ * every one of them lives in a `server-only` module that no client bundle can
+ * reach. This one cannot, so purity here has to mean runtime-neutral, not
+ * merely database-free.
  */
-import { randomUUID } from 'node:crypto';
 
 /**
  * The provenance source key a row an administrator created carries. Restated
@@ -154,5 +169,5 @@ export function mintManualSourceRecordId(family: SpecialRecordFamily): string {
       + `${SPECIAL_RECORD_FAMILIES.join(' and ')} only (D-1, 2026-09-13).`,
     );
   }
-  return `${family}:${randomUUID()}`;
+  return `${family}:${crypto.randomUUID()}`;
 }

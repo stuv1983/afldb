@@ -1480,6 +1480,35 @@ describe('lineage-safe reinstatement', () => {
     expect(checklist).toContain('club_leadership');
   });
 
+  it('AFLDB-ISSUE-167 §11: both special-record families are rebuilt data, and the '
+    + 'checklist names BOTH replay adapters', () => {
+    // Same shape once more, and §11.4 withdrew the planning premise that said
+    // otherwise: player_achievements (053:152) and after_siren_kicks (089) were
+    // each registered in afldb_meta.import_writable_tables on the day they were
+    // created, so both are rebuilt data and must have NO PROMOTION_CONTRACT
+    // entry. A doubly-classified table is {kind:'both'}, which refuses.
+    for (const name of ['player_achievements', 'after_siren_kicks']) {
+      expect(contractByName(name), name).toBeUndefined();
+    }
+    expect(() => assertContractCoherent()).not.toThrow();
+
+    // Migration 102 widened data_overrides.entity_type with both, so the replay
+    // step has TWO MORE entity types -- and, uniquely so far, two adapters
+    // (D-3): after_siren_kicks replays in Python with the rest, and
+    // player_achievements replays through the TypeScript adapter, because its
+    // importer is TypeScript. An operator who runs only the Python loop
+    // republishes every voided first-kick goal and loses every manual one, so
+    // the checklist has to name the second adapter by file, not just the entity.
+    const checklist = ACCEPTANCE_CHECKLIST.join('\n');
+    expect(checklist).toContain('player_achievements');
+    expect(checklist).toContain('after_siren_kicks');
+    expect(checklist).toContain('tools/records/special-records-replay.ts');
+    // And the ordering that makes their data_edits rows resolvable at all.
+    expect(checklist).toContain('first_kick_goal_key');
+    expect(checklist).toContain('after_siren_key');
+    expect(checklist).toMatch(/BEFORE the data_edits row_id remap/);
+  });
+
   it('remaps Gridley preservation by source key when source and candidate ids differ', () => {
     const remap = resolveLineageRemap({
       entity: 'sources', rule: 'source_key', referencedIds: [41],

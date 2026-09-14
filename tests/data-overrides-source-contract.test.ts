@@ -1470,4 +1470,29 @@ describe('AFLDB-ISSUE-167 source contract — two adapters, one authority', () =
     expect(update.length, 'the reload UPDATE slice is empty').toBeGreaterThan(200);
     expect(update).not.toMatch(/\bstatus\s*=|\bstatus_reason\s*=|\bupdated_at\s*=/);
   });
+
+  test('AFLDB-ISSUE-167 Stage 7: the promotion runbook names BOTH adapters', () => {
+    // The AFLDB-ISSUE-162 / -163 rule, applied to a family that needs it twice
+    // over. A promotion rebuilds both tables from source, so every durable
+    // decision about them arrives only from the data_overrides replay -- and
+    // half of that replay is not in the Python loop the runbook prints.
+    const promotion = readSource('docs/production-promotion.md');
+    // The Python half joins the loop, before 'fixtures' so the AFLDB-ISSUE-162
+    // assertion above still anchors on the tuple's closing parenthesis.
+    expect(promotion).toMatch(/for table in \([^)]*'after_siren_kicks'/);
+    // The TypeScript half CANNOT join it, so the runbook has to print it
+    // separately, naming the adapter, the entity and the role's DSN.
+    expect(promotion).toContain('tools/records/special-records-replay');
+    expect(promotion).toContain("replaySpecialRecordOverrides(tx, 'player_achievements')");
+    expect(promotion).toContain('AFLDB_IMPORT_DATABASE_URL');
+    // And it must not hand the operator the `-e` form: tsx evaluates it as
+    // CommonJS, where the adapter's named exports arrive under `.default` and
+    // the copied command silently reads `undefined` instead of the function.
+    expect(promotion).not.toMatch(/tsx -e[^\n]*special-records-replay/);
+    // Ordering is binding for the same reason it is for fixtures and
+    // club_leadership: a manual record does not exist in the candidate until
+    // the replay re-creates it, and the data_edits remap resolves through the
+    // two identities.
+    expect(promotion).toMatch(/before\*\* the `data_edits\.row_id` remap/);
+  });
 });

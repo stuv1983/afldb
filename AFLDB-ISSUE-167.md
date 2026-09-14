@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-167 — Special records administration and durable suppression
 
-**Status:** **Stages 0–5 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14); **Stage 6 COMPLETE — PASS 2026-09-14, UNCOMMITTED** (§25); Stage 7 is next. No stop condition open
+**Status:** **Stages 0–6 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14); **Stage 7 COMPLETE — PASS 2026-09-14, UNCOMMITTED** (§26); Stage 8 is next. No stop condition open
 **Severity:** Medium-high
 **Area:** Admin / Data management / Acquisition / Public read models
 **Created:** 2026-09-13
@@ -11,7 +11,7 @@
 
 This document began as a planning deliverable: no application code, migration, privilege,
 test or deployment change was made while producing Stages 0–1, and every stage below
-re-verifies current repository evidence before it writes anything. **Stages 2–5 have since
+re-verifies current repository evidence before it writes anything. **Stages 2–6 have since
 changed the repository, and that work is now committed and pushed.**
 
 ### Repository state — operator-proven 2026-09-14
@@ -23,14 +23,16 @@ Stage 3                 2a54444
 Stage 4                 5de87dd
 Stage 5                 e8b44f6
 tracking reconcile      c5a0df7
-HEAD = @{u}             c5a0df7a64663bfe8dbfbeb56d65e0a5879defc0
-worktree                Stage 6 changes present, UNCOMMITTED (§25.11)
+Stage 6                 077bf2a
+HEAD = @{u}             077bf2af95e1bd116f7aa1ade00015fe3457c6ae
+worktree                Stage 7 changes present, UNCOMMITTED (§26.6)
 ```
 
-Branch `opus/issue-167-special-records-admin` is **committed and pushed** through the Stage
-0–5 tracking reconcile and is level with its upstream. **Stage 6's own change is in the
-worktree and is not committed** — §25.11 lists every file. **Nothing is merged to `main`, and DEV and PROD are still
-not migrated or deployed** — §13 places that at Stage 8. Each stage-boundary paragraph
+Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 6 and
+is level with its upstream. **Stage 7's own change is in the worktree and is not committed**
+— §26.6 lists every file. **Nothing is merged to `main`, and DEV and PROD are still
+not migrated or deployed** — §13 places that at Stage 8, and `origin/main` still carries no
+migration past 101, which is what proves neither host can have seen 102. Each stage-boundary paragraph
 below ("nothing staged, committed, pushed…") records the state at the close of that
 stage's own session and is superseded on the commit/push half only by this block.
 
@@ -1461,7 +1463,7 @@ Every stage writes a failing test before the fix.
 | **4** | Both replay adapters + importer refusals (**the Phase E stop condition**) | Gates G-5, G-9. Reload-survival, rebuild-survival, atomicity and adapter-parity tests green. **STOP** if a suppressed fact can be resurrected by any path, or if the TS adapter cannot run on the importer's own `tx` |
 | **5** | Public read-model `status = 'active'` filters, fragment by fragment | ✅ **COMPLETE — PASS 2026-09-14** (§24). Eight query modules, 31 fragments, filtered and tested; §7's inventory re-derived from current source and **corrected in four places** (§24.2). Every public read path is filtered directly or by a proven helper, and a per-fragment source gate fails on any new unclassified reference. Admin still sees void rows; D-2 intact. 10 pre-existing failures proven pre-existing by in-place differential (§24.9). **No stop condition open** |
 | **6** | Mutations: correct / suppress / reinstate / replace / create, atomic audit, CAS, revalidation out of the pending path | ✅ **COMPLETE — PASS 2026-09-14** (§25). `data.specialRecords.edit` declared and enforced at ten Server Actions and the revalidate route; atomicity, CAS zero-write, replay-compatibility and both match-admin refusals green on `afldb_test` as `afldb_import`. Two design contradictions found against current source and resolved by NARROWING (§25.3 F-1 match derivation, §25.4 F-2 manual club link) — no authority, audit, CAS or replay contract weakened. **No stop condition open** |
-| **7** | `promotion-inventory.ts` entries + `db:promotion-check` + `npm run build` | Gate G-6. **STOP before merge** on any new refusal class (umbrella R-3) |
+| **7** | `promotion-inventory.ts` entries + `db:promotion-check` + `npm run build` | ✅ **COMPLETE — PASS 2026-09-14** (§26). **G-6 PASS** — 8 gates, none failed, before and after the edit; **no new refusal class**, so umbrella R-3's STOP is not invoked. §11's items 1–3 were already discharged at Stage 2; what Stage 7 found missing was the replay STEP — neither operator surface named a special-record entity type, so a promotion would have republished every voided record, lost every manual one and then stopped at the `data_edits` remap. Both surfaces now name both families AND both adapters (§26.3). The build gate caught a **real defect Stage 6 could not see**: `identity.ts` imported `node:crypto` and a Client Component reaches it, so `npm run build` failed outright; fixed by minting from Web Crypto, with no semantic change (§26.5). Build exit 0, 1534/1534 static pages. **No stop condition open** |
 | **8** | Operator commits; DEV deploy (migration → code — **no `db:privileges` dependency, per D-5**; a routine reconcile is harmless but applies nothing for P4); browser acceptance | Acceptance matrix §18 |
 
 Stages 4 and 5 are the two that can invalidate the design. Neither may be skipped or
@@ -3027,3 +3029,217 @@ are unchanged, and `AFLDB-ISSUE-167` **remains open** with the promotion and dep
 still to come. Stage 7's promotion work is the next action.
 
 **ISSUE-167 is NOT resolved.**
+
+---
+
+## 26. Stage 7 execution evidence — **PASS (2026-09-14)**
+
+Stage 7 is the promotion/build gate: reconcile the promotion inventory, pass **G-6**, pass the
+production build, and change nothing else. It found one real defect — in the **build** half, not
+the promotion half — and that is exactly the gate doing its job.
+
+### 26.1 Checkpoint, before anything was edited
+
+```
+branch            opus/issue-167-special-records-admin
+HEAD              077bf2af95e1bd116f7aa1ade00015fe3457c6ae
+@{u}              077bf2af95e1bd116f7aa1ade00015fe3457c6ae   (origin/, level)
+git status        clean
+git diff --check  clean
+origin/main       bb2e0af — HEAD is NOT an ancestor of it, and main's migrations stop at 101
+afldb_test        102 applied, 0 pending, no checksum drift
+```
+
+`npm run db:status -- --target test` lists `102_special_records_lifecycle.sql` as applied with
+**0 pending**. That also proves the file is **checksum-clean**: the drift check in
+`tools/db/migrate.ts:260-271` runs BEFORE the `--status` branch returns, so an edited applied
+migration would have exited 1 instead of printing the list.
+
+**Stage 6 committed exactly the intended surface.** `git show --stat 077bf2a` is 31 files: the
+15 new and 12 modified files §25.11 lists, plus the four tracking documents
+(`AFLDB-ISSUE-156.md`, `AFLDB-ISSUE-167.md`, `IssuesIndex.md`, `issues.md`) — `CHANGELOG.md`
+being one of the 12. Nothing else rode along.
+
+**DEV and PROD are untouched, and that is provable without connecting to either.** `origin/main`
+carries no migration past `101_awards_honours_lifecycle.sql`, and a DEV deploy pulls from
+`origin`, so migration 102 cannot have reached either host. Every database command in this stage
+named `afldb_test` on `127.0.0.1`, refused otherwise by an explicit precondition, and no
+deployment, `systemctl`, `ssh` or `db:migrate` command was run at all.
+
+### 26.2 The promotion inventory — what Stage 2 had already done, and the one thing it had not
+
+Re-read against the §11 obligations and the Stage 2 classification, **items 1–3 were already
+complete and correct** (§21.9), and item 4 was withdrawn at Stage 2 as a false premise:
+
+| §11 obligation | State at Stage 7 |
+|---|---|
+| 1. Entity registry for both families | **Done at Stage 2** — `first_kick_goal_key` and `after_siren_key` in `LINEAGE_IDENTITY_SQL`, resolving `'<sources.key>\|<source_record_id>'` by source KEY, so they denote the same row on both databases |
+| 2. `data_edits` lineage targets for both | **Done at Stage 2** — both in `data_edits.lineageRefs[0].targets`, in the same change that admitted them to the CHECK |
+| 3. `player_link_resolutions.target_id` for `player_achievements` | **Done at Stage 2** — corrected from `identity: 'none'` without reopening ISSUE-139 D1 |
+| 4. `after_siren_kicks` classification | **Withdrawn at Stage 2** — migration 089's `grant_import_write` registered it, so it is rebuilt data. Re-measured here: `[PASS] Table classification (fail-closed)` |
+
+**What was missing is the replay STEP, not the classification.** `data_overrides` is durable
+authority only if the promotion actually replays it, and the two operator surfaces that say what
+to replay — `ACCEPTANCE_CHECKLIST` in `tools/db/promotion-inventory.ts` and §8 step 1 of
+`docs/production-promotion.md` — named neither special-record entity type. Left alone, an
+operator following the runbook would have:
+
+- **republished every voided record** — Stage 5's suppression lives in `status`, the candidate is
+  rebuilt from source, and only the replay re-asserts it;
+- **lost every administrator-created record** — a manual row exists nowhere but in
+  `data_overrides` until its replay re-creates it;
+- then **STOPPED the promotion at the `data_edits` remap**, because those manual rows' audit rows
+  resolve through `first_kick_goal_key` / `after_siren_key`, and a row that does not exist cannot
+  be resolved.
+
+That is the AFLDB-ISSUE-162 / -163 obligation arriving for a third and a fourth entity type, and
+it is discharged the same way — **with one addition neither of those had to make.**
+
+### 26.3 One authority, two adapters — and only one of them is in the Python loop
+
+The runbook's replay step is a Python loop over `replay_admin_overrides`. `after_siren_kicks`
+joins it, placed before `'fixtures'` so the existing AFLDB-ISSUE-162 assertion still anchors on
+the tuple's closing parenthesis. **`player_achievements` cannot join it**: D-3 put its adapter in
+TypeScript (`tools/records/special-records-replay.ts`) because its importer is TypeScript, so the
+runbook now prints a second, explicitly separate invocation for it, run as the import role
+against `AFLDB_IMPORT_DATABASE_URL`. `data_overrides` remains the **sole** durable authority;
+this is the same two-adapters-one-authority shape §8.2.1 approved, surfaced where the operator
+acts on it.
+
+**The runbook deliberately says "write it to a FILE".** Measured here:
+
+```
+npx tsx -e "import('./tools/records/special-records-replay')
+              .then((m) => console.log(typeof m.replaySpecialRecordOverrides,
+                                       typeof (m.default || {}).replaySpecialRecordOverrides))"
+-> undefined function
+```
+
+`tsx -e` evaluates as CommonJS, where the adapter's named exports arrive under `.default`. A
+one-liner in a runbook would therefore read `undefined`, throw *is not a function*, and look like
+a broken adapter rather than a broken command. The file form is the one
+`tools/records/import-first-kick-goal.ts` itself uses.
+
+**Not executed here, and deliberately so.** Running the printed snippet needs a write-capable
+connection; this session's mandate is a read-only gate, and the environment refused the attempt
+when it was made. The snippet's *import shape* is proven (above, and by the importer that uses
+it) and its arguments are pinned by `tests/data-overrides-source-contract.test.ts`, but its
+**execution** belongs to Stage 8's DEV window, where a replay has real overrides to act on. That
+is stated rather than implied, so nobody reads §26 as evidence the command has been run.
+
+### 26.4 Gate G-6 — the real promotion check, twice
+
+```
+npm run db:promotion:check -- --phase source --database afldb_test
+
+[PASS] Database identity
+[PASS] Table classification (fail-closed)
+[PASS] No leftover promotion_staging schema (AFLDB-ISSUE-151)
+[PASS] Migration parity with this checkout
+       102 migration file(s) in this checkout, 102 applied, latest 102_special_records_lifecycle.sql
+[INFO] Test-fixture identities
+[INFO] Production super admin
+[INFO] Production-owned / operational state inventory
+[INFO] Privileges reconciled
+
+PROMOTION CHECK (prod/source): PASS — 8 gate(s) evaluated, none failed.
+```
+
+Run **before** the Stage 7 edit and **after** it, with identical output: 8 gates, 4 PASS + 4
+INFO, none failed. **ISSUE-167 adds no new refusal class.** The ISSUE-139 / ISSUE-143 pre-cutover
+refusals (UNKNOWN 079 + PENDING 091) are a **different phase against `afldb_prod`** and were not
+re-run here: this stage is not authorised to touch production, and those refusals stand as
+recorded, pre-existing, and unrelated to P4. `--phase source` is the phase P4's work can affect,
+and it passes.
+
+### 26.5 The build defect — a `node:crypto` import that reached a client bundle
+
+`npm run build` **FAILED** on the first run, and nothing before it could have caught it:
+
+```
+Failed to compile.
+node:crypto
+Module build failed: UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins
+Import trace for requested module:
+  node:crypto
+  ./src/lib/special-records/identity.ts
+  ./src/app/admin/records/labels.ts
+  ./src/app/admin/records/SpecialRecordCreatePanel.tsx
+```
+
+Stage 2 wrote `mintManualSourceRecordId()` into the **pure** grammar module, which was correct
+until Stage 6 shipped a **Client** Component that reaches it through `labels.ts`. `tsc`, ESLint
+and every vitest suite run in Node, where `node:crypto` resolves perfectly — this is the
+AFLDB-ISSUE-162 lesson restated: **only `npm run build` sees a client bundle.**
+
+**The fix is the smallest true one.** `identity.ts` now mints from **Web Crypto**
+(`crypto.randomUUID()`), a global in Node (stable since 19), in the Edge runtime and in the
+browser alike, returning the same cryptographically random v4 uuid. The module is now free of
+imports altogether, which is what its own "DELIBERATELY PURE" contract always meant. The other
+five minting sites (`admin-awards`, `admin-club-leadership`, `admin-coaches`, `admin-draft`,
+`admin-fixtures`) keep `node:crypto` and are deliberately left alone: every one of them is
+`server-only` and no client bundle can reach it.
+
+No identity, grammar, refusal or replay semantic changed — the minted id is still
+`'<family>:<uuid>'`, the Stage 6 writer mints through the same call, and the parity corpus that
+pins both adapters is green.
+
+```
+npm run build   ->   exit 0
+  ✓ Compiled successfully in 11.9s
+  ✓ Generating static pages using 19 workers (1534/1534) in 57s
+  prepare-standalone: standalone bundle ready
+  all seven /admin/records routes present and ƒ (dynamic), as designed
+```
+
+**Warnings, classified.** Two, neither new nor ISSUE-167's:
+
+| Warning | Classification |
+|---|---|
+| `The "middleware" file convention is deprecated. Please use "proxy" instead.` | **Known, pre-existing** Next 16.3.1 framework deprecation; the operator brief names it explicitly as not a Stage 7 defect |
+| `A Node.js API is used (process.cwd …) which is not supported in the Edge Runtime` | **Not ISSUE-167's.** Every frame of its import trace is inside `next/dist/esm/server/…`; no repository file appears in it, and P4 touched no middleware. It was present in the FAILED build too, before the only source fix this stage made |
+
+### 26.6 Files changed, and validation
+
+**Modified (6), plus the four tracking documents:**
+
+```
+tools/db/promotion-inventory.ts               ACCEPTANCE_CHECKLIST: both entity types, both adapters
+docs/production-promotion.md                  §8 step 1: after_siren_kicks in the loop, the TS half beside it
+src/lib/special-records/identity.ts           the build fix — Web Crypto, no `node:` import at all
+tests/db-promotion-check.test.ts              new: both families rebuilt + the checklist names both adapters
+tests/data-overrides-source-contract.test.ts  new: the runbook names both adapters, and not the `-e` form
+tests/special-records-identity.test.ts        new: identity.ts imports NOTHING, and still mints a v4 uuid
+```
+
+**Validation:**
+
+| Check | Result |
+|---|---|
+| `npm run db:promotion:check -- --phase source --database afldb_test` | **PASS — 8 gates, none failed** (before and after the edit) |
+| `npm run build` | **exit 0**, 1534/1534 static pages, standalone bundle ready |
+| `tests/db-promotion-check.test.ts`, `tests/data-overrides-source-contract.test.ts` | **160 passed** |
+| `tests/special-records-identity.test.ts` | **15 passed** |
+| Those three plus `tests/auth.test.ts` and `tests/special-records-admin.test.ts`, final run | **372 passed, 0 failed** |
+| `tests/special-records-replay-parity.test.ts` (both adapters, one corpus) | **19 passed** on `afldb_test` |
+| `tests/integration/admin-special-records.test.ts`, `tests/integration/special-records-lifecycle.test.ts` | **48 passed, 1 skipped**, as `afldb_import` |
+| `npx tsc --noEmit` | clean |
+| ESLint, every changed file | clean |
+| `git diff --check` | clean |
+
+The Stage 6 mutation suite is the one that matters for the mint change: it creates manual records
+through the real writer, so `crypto.randomUUID()` is exercised on its production path and not
+only in a unit test.
+
+### 26.7 Stage boundary
+
+Stage 7 is green and **stops here**. Nothing staged, committed, pushed or merged; no DEV or PROD
+migration; no deployment; no browser acceptance; **Stage 8 not begun**.
+
+`CHANGELOG.md` is **deliberately not touched again**. Stage 6's `Unreleased` entry already
+describes the retained behaviour; Stage 7 changed nothing a reader of the changelog can observe —
+a corrected promotion runbook, a uuid minted from a different global that returns the identical
+value, and three test files. An entry for it would be an investigation note, which §5 forbids.
+
+**ISSUE-167 is NOT resolved.** Stage 8 — operator commit, DEV migration then code (no
+`db:privileges` dependency, per D-5), then browser acceptance against §18 — is the next action.

@@ -121,6 +121,22 @@ describe('minted manual identity', () => {
   it('refuses a family it does not know', () => {
     expect(() => mintManualSourceRecordId('hall_of_fame' as never)).toThrow();
   });
+
+  it('mints from WEB crypto, so the grammar stays bundlable for a client', () => {
+    // AFLDB-ISSUE-167 §26 (Stage 7). This module is imported by
+    // src/app/admin/records/labels.ts, which a CLIENT Component imports, so a
+    // `node:` builtin anywhere in it fails the production build outright:
+    // "UnhandledSchemeError: Reading from "node:crypto" is not handled by
+    // plugins". Nothing but `npm run build` catches it — tsc, ESLint and every
+    // vitest suite run in Node, where the import resolves perfectly.
+    const source = readSource('src/lib/special-records/identity.ts');
+    const imports = source.split('\n').filter((line) => /^\s*import\b/.test(line));
+    expect(imports, 'identity.ts must import nothing at all').toEqual([]);
+    expect(source).toContain('crypto.randomUUID()');
+    // And the id is still a v4 uuid behind its family prefix.
+    expect(mintManualSourceRecordId('after_siren').slice('after_siren:'.length))
+      .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
 });
 
 describe('the module agrees with the rest of the repository', () => {

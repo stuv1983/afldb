@@ -659,7 +659,8 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    load_env()
    with connect_pg() as pg:
        for table in ('players', 'matches', 'draft_picks', 'season_list_members',
-                     'club_leadership', 'coaches', 'match_coaches', 'fixtures'):
+                     'club_leadership', 'coaches', 'match_coaches',
+                     'after_siren_kicks', 'fixtures'):
            replay_admin_overrides(pg, table)
        pg.commit()
    PY
@@ -686,6 +687,50 @@ generator, with the hyphenated `afldb_*_pre_rebuild_20260906-112500` shape pinne
    corrected after the fact must never erase valid leadership history. An unresolvable club
    slug, an identity that resolves to zero or to more than one player, an invalid role or
    status, an impossible interval or an active row carrying an end date all stop the replay.
+
+   **The two special-record families need TWO adapters, and both must run**
+   (`AFLDB-ISSUE-167`, migration 102, decision D-3). `after_siren_kicks` is in the Python loop
+   above. `player_achievements` (the first-kick-goal records) is **not**, and cannot be: its
+   importer is `tools/records/import-first-kick-goal.ts`, so its adapter is TypeScript.
+   `data_overrides` is still the **sole** durable authority — two adapters over one authority
+   is not two authorities, and `tests/special-records-replay-parity.test.ts` drives both from
+   one language-neutral corpus so the semantics cannot drift. Run it as the import role, in the
+   same window as the loop above:
+
+   ```bash
+   cd ~/projects/afldb && cat > replay-first-kick-goal.ts <<'TS'
+   import postgres from 'postgres';
+
+   import { replaySpecialRecordOverrides } from './tools/records/special-records-replay';
+
+   const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;
+   if (!dsn) throw new Error('AFLDB_IMPORT_DATABASE_URL is not set.');
+   const sql = postgres(dsn, { max: 1, onnotice: () => {} });
+   sql.begin((tx) => replaySpecialRecordOverrides(tx, 'player_achievements'))
+     .then(async (counts) => { console.log(counts); await sql.end(); })
+     .catch(async (error) => { console.error(error); await sql.end(); process.exit(1); });
+   TS
+   npx tsx replay-first-kick-goal.ts && rm replay-first-kick-goal.ts
+   ```
+
+   Write it to a **file**: `npx tsx -e` evaluates as CommonJS, where the adapter's named
+   exports arrive under `.default` and a copied one-liner silently reads `undefined`.
+
+   Neither special-record branch depends on another: an override payload for one of these rows
+   carries the raw name fields only — every link (`player_id`, `club_id`, `match_id`) and every
+   derived column is reconstructed by the importer and is deliberately not correctable
+   (`AFLDB-ISSUE-167` §3.4), so a special record names nothing by identity and both branches may
+   run anywhere in the order. Both must run **before** the `data_edits.row_id` remap, which
+   resolves their audit rows through `first_kick_goal_key` and `after_siren_key`: a record an
+   administrator CREATED does not exist in the candidate until its replay re-creates it. A
+   **voided** row is re-created and re-voided, never dropped — the same rule as a cancelled
+   fixture or an ended appointment, and for the same reason: the row is never deleted precisely
+   so its `data_edits` rows stay resolvable. Skip either replay and the promoted site publishes
+   suppressed records again — `/records/first-kick-goal`, `/records/after-the-siren`, the player
+   pages, NL answers and the Grid Solver all read the canonical rows and filter on
+   `status = 'active'` (`AFLDB-ISSUE-167` §7), so a lost void is a visible regression, not a
+   silent one.
+
    For `matches`, and for a
    source-owned player or selection, an override patches fields of a row the rebuild
    already produced. For a manual one it carries an **entire row**: an administrator can
