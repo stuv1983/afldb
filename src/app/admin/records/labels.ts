@@ -124,11 +124,28 @@ export const DERIVED_NOTICE =
   + 'its candidate count come from the link decision, and the match is resolved from the '
   + 'season, round and clubs. They are shown because they are what the record resolved to.';
 
-/** Stage 3 is a reading surface, and says so rather than implying more. */
+/**
+ * What the hub promises, told per role rather than per stage.
+ *
+ * Stage 3 shipped one unconditional sentence, because at Stage 3 the surface
+ * really was read-only for everyone. Stage 6 gave Super Admin the mutation
+ * surface and did not revisit this copy, so DEV showed a Super Admin "nothing
+ * here changes a record" directly above controls that change records
+ * (AFLDB-ISSUE-167 §27). An administrator acts on what the page tells them, so
+ * the sentence is now chosen by the same `data.specialRecords.edit` check that
+ * decides whether the controls render at all.
+ */
 export const READ_ONLY_NOTICE =
   'This surface is read-only: it shows what each record asserts, where it came from, whether '
   + 'it stands, and every manual edit ever recorded against it. Nothing here changes a record, '
   + 'and nothing here deletes one.';
+
+/** The same promise for a role that CAN act: correctable, never deletable. */
+export const EDITABLE_NOTICE =
+  'This surface shows what each record asserts, where it came from, whether it stands, and '
+  + 'every manual edit ever recorded against it. A record can be corrected, suppressed, '
+  + 'reinstated or replaced here, and nothing here deletes one: a suppressed record is kept, '
+  + 'with its reason and its audit trail.';
 
 /**
  * The row's durable identity, or null when one cannot be formed.

@@ -102,3 +102,35 @@ export function parseChangedFields(
   }
   return [...seen];
 }
+
+/**
+ * Exactly AFLDB-ISSUE-167 §3.4's amendable list for `player_achievements`.
+ *
+ * The derived and identity-bearing fields are absent here AND refused again
+ * inside the mutation transaction, because this list is a convenience for the
+ * form and the transaction is the boundary.
+ *
+ * THESE TWO LISTS LIVE HERE, NOT IN `actions.ts`, AND THAT IS LOAD-BEARING.
+ * A `'use server'` module may export only async functions; Next.js checks it
+ * when the Server Action is first invoked, not when the bundle is built, so an
+ * exported array there builds cleanly and then fails every mutation at runtime
+ * with *A "use server" file can only export async functions, found object*
+ * (met on DEV at Stage 8, §27). The sibling admin surfaces keep their
+ * equivalent lists module-private for the same reason; ISSUE-167 exports these
+ * because `tests/special-records-admin.test.ts` asserts the Stage 6 invariant
+ * that the correctable set equals the replay adapter's own column list, and a
+ * contract that important is worth a module of its own rather than deleting.
+ */
+export const FIRST_KICK_CORRECTABLE_FIELDS = [
+  'playerNameRaw', 'playerNameClean', 'clubNameRaw', 'season', 'roundRaw', 'seasonFootnoteRaw',
+  'sourceAnnotation', 'notes', 'consecutiveGoalKicks', 'noFurtherCareerGoals',
+  'noFurtherCareerKicks', 'kicklessMatchesBeforeFirstKick',
+] as const;
+
+/** Exactly AFLDB-ISSUE-167 §3.4's amendable list for `after_siren_kicks`. */
+export const AFTER_SIREN_CORRECTABLE_FIELDS = [
+  'playerNameRaw', 'playerNameClean', 'clubNameRaw', 'opponentNameRaw', 'competition',
+  'premiershipSeason', 'season', 'roundRaw', 'kickScored', 'kickEffect', 'kickerResult',
+  'siren', 'kickerScoreRaw', 'opponentScoreRaw', 'kickerPoints', 'opponentPoints',
+  'supergoalScoring', 'cited', 'shotDetail', 'sourceAnnotation', 'notes',
+] as const;

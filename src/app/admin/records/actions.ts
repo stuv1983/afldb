@@ -26,6 +26,7 @@ import {
 
 import type { SpecialRecordsActionState } from './submit-helper';
 import {
+  AFTER_SIREN_CORRECTABLE_FIELDS, FIRST_KICK_CORRECTABLE_FIELDS,
   optionalText, parseChangedFields, parseCheckbox, parseEnum, parseNullableInt,
   parsePositiveInt, parseRequiredInt, requiredText,
 } from './validation';
@@ -147,19 +148,6 @@ function editBase(formData: FormData): { rowId: number; expectedUpdatedAt: strin
 // =========================================================================
 // player_achievements -- the first-kick goal
 // =========================================================================
-
-/**
- * Exactly AFLDB-ISSUE-167 §3.4's amendable list for `player_achievements`.
- *
- * The derived and identity-bearing fields are absent here AND refused again
- * inside the mutation transaction, because this list is a convenience for the
- * form and the transaction is the boundary.
- */
-export const FIRST_KICK_CORRECTABLE_FIELDS = [
-  'playerNameRaw', 'playerNameClean', 'clubNameRaw', 'season', 'roundRaw', 'seasonFootnoteRaw',
-  'sourceAnnotation', 'notes', 'consecutiveGoalKicks', 'noFurtherCareerGoals',
-  'noFurtherCareerKicks', 'kicklessMatchesBeforeFirstKick',
-] as const;
 
 function firstKickCorrection(
   formData: FormData, changed: string[],
@@ -388,14 +376,6 @@ export async function replaceFirstKickGoalAction(
 // =========================================================================
 // after_siren_kicks -- the kick after the siren
 // =========================================================================
-
-/** Exactly AFLDB-ISSUE-167 §3.4's amendable list for `after_siren_kicks`. */
-export const AFTER_SIREN_CORRECTABLE_FIELDS = [
-  'playerNameRaw', 'playerNameClean', 'clubNameRaw', 'opponentNameRaw', 'competition',
-  'premiershipSeason', 'season', 'roundRaw', 'kickScored', 'kickEffect', 'kickerResult',
-  'siren', 'kickerScoreRaw', 'opponentScoreRaw', 'kickerPoints', 'opponentPoints',
-  'supergoalScoring', 'cited', 'shotDetail', 'sourceAnnotation', 'notes',
-] as const;
 
 function afterSirenCorrection(
   formData: FormData, changed: string[],

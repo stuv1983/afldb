@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-167 — Special records administration and durable suppression
 
-**Status:** **Stages 0–6 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14); **Stage 7 COMPLETE — PASS 2026-09-14, UNCOMMITTED** (§26); Stage 8 is next. No stop condition open
+**Status:** **Stages 0–7 COMPLETE, COMMITTED AND PUSHED** (operator-proven, 2026-09-14; Stage 7 = `c847b88`); **Stage 8 IN PROGRESS — migration and code deployed to DEV and healthy, rendered acceptance BLOCKED on operator-entered authentication** (§27). Not resolved
 **Severity:** Medium-high
 **Area:** Admin / Data management / Acquisition / Public read models
 **Created:** 2026-09-13
@@ -24,15 +24,31 @@ Stage 4                 5de87dd
 Stage 5                 e8b44f6
 tracking reconcile      c5a0df7
 Stage 6                 077bf2a
-HEAD = @{u}             077bf2af95e1bd116f7aa1ade00015fe3457c6ae
-worktree                Stage 7 changes present, UNCOMMITTED (§26.6)
+Stage 7                 c847b88
+HEAD = @{u}             c847b8896a1bd66e51dca8e120c80a4883ef30ea
 ```
 
-Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 6 and
-is level with its upstream. **Stage 7's own change is in the worktree and is not committed**
-— §26.6 lists every file. **Nothing is merged to `main`, and DEV and PROD are still
-not migrated or deployed** — §13 places that at Stage 8, and `origin/main` still carries no
-migration past 101, which is what proves neither host can have seen 102. Each stage-boundary paragraph
+Branch `opus/issue-167-special-records-admin` is **committed and pushed** through Stage 7 and
+is level with its upstream. **Nothing is merged to `main`.** Stage 8 has since deployed this
+exact commit to **DEV only**; §27 records it.
+
+**A claim Stage 8 had to correct.** This block previously argued that because `origin/main`
+carried no migration past 101, "neither host can have seen 102". That is not what a ref
+proves: a host can check out any branch, and Stage 8 did exactly that. The wording is
+replaced by **direct evidence per host**:
+
+* **DEV — measured, before anything was applied (2026-09-14).** `npm run db:status` on
+  `streamanator:/home/arm/projects/afldb` against `afldb_owner@localhost:5432/afldb_dev`
+  reported *101 migration file(s), 101 already applied, 0 pending*, and
+  `information_schema.columns` returned **zero rows** for `status` / `status_reason` /
+  `updated_at` on both `player_achievements` and `after_siren_kicks`. 102 had never been
+  applied to DEV. It has been applied since, deliberately, under §27.
+* **PROD — not connected to, and therefore not asserted.** No command in this stage
+  addressed `afldb_prod` or the production host; the DEV checkout carries no production DSN
+  (its `.env` names `afldb_dev`, `afldb_test` and `code_test_db` only). The honest statement
+  is that **production was not touched by this work**, not that its state was verified.
+
+Each stage-boundary paragraph
 below ("nothing staged, committed, pushed…") records the state at the close of that
 stage's own session and is superseded on the commit/push half only by this block.
 
@@ -3060,11 +3076,14 @@ migration would have exited 1 instead of printing the list.
 (`AFLDB-ISSUE-156.md`, `AFLDB-ISSUE-167.md`, `IssuesIndex.md`, `issues.md`) — `CHANGELOG.md`
 being one of the 12. Nothing else rode along.
 
-**DEV and PROD are untouched, and that is provable without connecting to either.** `origin/main`
-carries no migration past `101_awards_honours_lifecycle.sql`, and a DEV deploy pulls from
-`origin`, so migration 102 cannot have reached either host. Every database command in this stage
-named `afldb_test` on `127.0.0.1`, refused otherwise by an explicit precondition, and no
-deployment, `systemctl`, `ssh` or `db:migrate` command was run at all.
+**DEV and PROD were untouched by Stage 7** — but note the reasoning, which Stage 8 corrected.
+Every database command in this stage named `afldb_test` on `127.0.0.1`, refused otherwise by an
+explicit precondition, and no deployment, `systemctl`, `ssh` or `db:migrate` command was run at
+all. **That** is what makes the claim true. The argument originally offered alongside it — that
+`origin/main` carries no migration past `101_awards_honours_lifecycle.sql` and a DEV deploy pulls
+from `origin`, "so migration 102 cannot have reached either host" — **overstated what a ref can
+prove**: a host can check out any pushed branch, and Stage 8's DEV deploy did exactly that. The
+per-host position is now stated from direct evidence in the header block, not inferred from a ref.
 
 ### 26.2 The promotion inventory — what Stage 2 had already done, and the one thing it had not
 
@@ -3243,3 +3262,392 @@ value, and three test files. An entry for it would be an investigation note, whi
 
 **ISSUE-167 is NOT resolved.** Stage 8 — operator commit, DEV migration then code (no
 `db:privileges` dependency, per D-5), then browser acceptance against §18 — is the next action.
+
+*Superseded by §27 (2026-09-14): Stage 8 has since run. Migration 102 and the code are on DEV,
+§18's matrix is green against real roles, and two defects were found and fixed. The issue is
+still **not resolved**, for the single reason recorded in §27.10.*
+
+---
+
+## 27. Stage 8 execution evidence — **DEV acceptance GREEN, issue NOT resolved (2026-09-14)**
+
+Stage 8 is **DEV only**. §17's row 8 and §13's deploy order define it as operator commit → DEV
+migration → DEV code → browser acceptance against §18. **No production host, database, DSN or
+service was contacted at any point in this stage**, and the DEV checkout carries no production
+DSN (`.env` names `afldb_dev`, `afldb_test` and `code_test_db` only).
+
+### 27.1 Checkpoint, before anything was touched
+
+```
+branch    opus/issue-167-special-records-admin
+HEAD      c847b8896a1bd66e51dca8e120c80a4883ef30ea
+@{u}      c847b8896a1bd66e51dca8e120c80a4883ef30ea   (origin/..., identical)
+worktree  clean
+```
+
+Stage 7 is **committed and pushed at `c847b88`**. Every earlier line in this document that
+called Stage 7 "UNCOMMITTED" was written before that commit and is stale; the header block is
+corrected, and §26.7's `origin/main` argument is corrected there too.
+
+### 27.2 DEV identity and pre-deploy state — measured, not assumed
+
+```
+host        streamanator (arm@10.0.40.100)
+project     /home/arm/projects/afldb
+service     afldb (/etc/systemd/system/afldb.service), active
+database    afldb_owner@localhost:5432/afldb_dev
+DEV HEAD    d0b522a (main) -- three commits behind origin/main, no ISSUE-167 code
+migrations  101 file(s), 101 applied, 0 pending
+lifecycle   information_schema returns ZERO rows for status / status_reason / updated_at
+            on BOTH player_achievements and after_siren_kicks
+```
+
+That last line is the **direct evidence** that migration 102 had never reached DEV — replacing
+the earlier inference from `origin/main`, which proved nothing (a host can check out any pushed
+branch, and this stage did exactly that).
+
+Baseline data: `after_siren_kicks` **126**, `player_achievements` **334** (all `first_kick_goal`),
+`data_overrides` carrying **no** special-record entity type, `data_edits` carrying **none**.
+
+### 27.3 Migration, then code — the order held
+
+`npm run preflight -- --mode deploy` refuses a feature branch **by design**
+(`branchPolicyProblems`: deploy is main-only), so the branch-appropriate gate was used:
+
+```
+npm run preflight -- --mode implementation --issue 167 --environment dev \
+    --dsn-env AFLDB_OWNER_DATABASE_URL --expect-database afldb_dev
+-> 2 FAIL: "implementation uses a linked worktree" (a workstation-workflow rule; the DEV
+           deployment host is a primary checkout by construction)
+           "102_special_records_lifecycle.sql is pending in the target database"  <- the
+           condition this stage exists to resolve
+   1 WARN: branch-local migration 102 -- reserve its number before applying it outside *_test
+           (reserved at Stage 2, §21.1 G-7)
+```
+
+Deploy sequence, with the running service left on the OLD build throughout the first two steps:
+
+```
+1. sync-dev.ps1 -RemoteRef opus/issue-167-special-records-admin \
+       -SkipMigrate -SkipBuild -SkipRestart -SkipHealth      # checkout + npm ci only
+   -> before: d0b522a main | after: c847b88 opus/issue-167-special-records-admin
+2. npm run db:migrate -- --allow-branch-local                 # DEV-only acknowledgement,
+   -> applying 102_special_records_lifecycle.sql ... ok (25 ms)   docs/deployment.md:76-78
+   -> 102 file(s), 102 applied, 0 pending
+3. sync-dev.ps1 -SkipInstall -SkipMigrate                     # build + restart + health
+   -> built BUILD_ID wWXvkc4sx7KJVCTVQoGMs, MainPID 2134528 -> 3011218,
+      health ready after 2s: {"status":"ok","database":"ok","latencyMs":31}
+```
+
+`npm run db:migrate` **without** `--allow-branch-local` refuses an unmerged migration against a
+shared database, so the plain `sync-dev.ps1` migrate step cannot apply 102; that is why the
+migration was run by hand between two narrowed deploy runs rather than inside one.
+
+Post-migration schema, verified on DEV: `status text NOT NULL DEFAULT 'active'`, `status_reason`
+and `updated_at` on both tables; `data_overrides_entity_type_check` and
+`data_edits_table_name_check` both carrying `player_achievements` and `after_siren_kicks`; all
+126 + 334 existing rows defaulted to `active`. **D-5 held — no `db:privileges` run was needed or
+performed, and `privileges.sql` was not touched.**
+
+### 27.4 Two defects found by rendered acceptance, both fixed
+
+Neither was reachable by any gate that ran before Stage 8. This is what the stage is for.
+
+**F-1 — every mutation returned HTTP 500.** The first correction submitted on DEV failed:
+
+```
+X Error: A "use server" file can only export async functions, found object.
+  digest: '2926408828@E352'
+POST /admin/records/first-kick-goal/1 -> 500
+```
+
+`actions.ts` carries `'use server'` and exported two **const arrays**,
+`FIRST_KICK_CORRECTABLE_FIELDS` and `AFTER_SIREN_CORRECTABLE_FIELDS`. Next.js enforces the
+async-functions-only rule **when the Server Action is first invoked**, not when the bundle is
+built — so Stage 7's `npm run build` passed at 1534/1534 pages, every unit test that imports the
+module directly as TypeScript passed, and the surface still failed on its first real mutation.
+The sibling admin surfaces keep their equivalent lists module-private for exactly this reason
+(`src/app/admin/awards/actions.ts:165,358,550`); ISSUE-167 exported these so
+`tests/special-records-admin.test.ts` could assert the Stage 6 invariant that the correctable set
+equals the replay adapter's own column list.
+
+**Fixed by moving both lists to `validation.ts`** — the domain's existing pure, directive-free,
+unit-testable sibling, already imported by `actions.ts` — and repointing the test's import. The
+contract test keeps its full coverage; no authority, audit, CAS or replay contract was touched.
+A repo-wide scan found **no other `'use server'` module in `src/` with a non-async export.**
+
+A regression gate was added in the closest existing suite
+(`tests/special-records-admin.test.ts`, "exports only async functions from every 'use server'
+module"). It strips comments before matching, because this module and `validation.ts` both
+*discuss* `export const` in a `'use server'` file in order to say it must never happen — the
+recorded lesson that a prose-matching gate fails on its own explanation. **Proven RED by
+in-place differential**: re-adding one `export const` to `actions.ts` fails it with
+*`src/app/admin/records/actions.ts` exports a non-async-function value: expected [ 'const' ] to
+deeply equal []*, and GREEN once reverted.
+
+**F-2 — the hub told a Super Admin the surface was read-only.** `/admin/records` rendered
+Stage 3's unconditional `READ_ONLY_NOTICE` — *"Nothing here changes a record, and nothing here
+deletes one"* — directly above controls that do exactly that. True for an Admin, false for a
+Super Admin since Stage 6. Fixed by choosing the sentence with the same
+`hasCapability(admin, 'data.specialRecords.edit')` check that decides whether the controls
+render, using the pattern the two family list pages already use. **Verified in both directions
+on DEV**: Super Admin sees the new `EDITABLE_NOTICE`, the real Admin account sees the unchanged
+`READ_ONLY_NOTICE`.
+
+Local validation of the fix: `tsc --noEmit` exit 0; `tests/special-records-admin.test.ts` +
+`tests/auth.test.ts` **198 passed**; `git diff --check` clean.
+
+### 27.5 How the fix reached DEV — and the provenance gap it leaves
+
+The operator reserves commits, so the fix was **not** committed. `sync-dev.ps1` deploys from
+`origin`, so it could not carry an uncommitted change. The four changed `src/` files plus the
+changed test were copied to DEV and rebuilt, with the overlay proven byte-identical by md5 on
+both sides. DEV therefore runs **`c847b88` plus a named, uncommitted five-file overlay**:
+
+```
+ M src/app/admin/records/actions.ts        M src/app/admin/records/validation.ts
+ M src/app/admin/records/labels.ts         M tests/special-records-admin.test.ts
+ M src/app/admin/records/page.tsx
+```
+
+`npm run build` on DEV **typechecks the test tree**, which caught the test's stale import before
+the first rebuild — the build failed with TS2459 until the test file was copied across too.
+Second build clean; MainPID 2134528 → 3028976 (4 workers), health `ok`/`ok`.
+
+**This is the one thing standing between Stage 8 and resolution** (§27.10).
+
+### 27.6 Replay and durable authority — proven through the REAL importers
+
+The standalone adapters were run first, exactly as `docs/production-promotion.md` §8 prints
+them (the Python `replay_admin_overrides` loop scoped to `after_siren_kicks`, and the
+file-form `npx tsx replay-first-kick-goal.ts` for `player_achievements` — never the `tsx -e`
+form §26.3 forbids). Against a zero-override baseline both were clean no-ops
+(`{ recreated: 0, restored: 0, corrected: 0, lifecycle: 0, retained: [] }`).
+
+A no-op proves nothing about reconstruction, so the decisive evidence was taken by running the
+**real importers**, each of which calls its own adapter inside its own transaction
+(`import-first-kick-goal.ts:1346`, `after_siren.py:1059`). A raw-SQL simulated reload was
+attempted first and refused by the environment; the importer route is better evidence anyway.
+
+State before the reloads: `player_achievements` 334 active with a `correction` override on
+`fkg-001`; `after_siren_kicks` **125 active + 1 void**, the void row carrying both a `correction`
+and a `lifecycle` override. One active decision and one suppression, so a single pass exercises
+both branches.
+
+```
+npm run records:first-kick-goal -- --apply
+-> Durable admin decisions replayed: 0 manual row(s) re-created, 0 restored,
+   1 correction(s) re-applied, 0 lifecycle decision(s) re-asserted.
+-> Reconciled 334 rows as import batch 90: 334 updated, 0 inserted, 0 deleted.
+
+./.venv/bin/python tools/migration/after_siren.py load
+-> batch 91: 126 events, 6 inserted or changed, 0 stale removed
+```
+
+Outcomes, all verified against the database:
+
+* **The correction survived a 334-row reload.** The importer rewrote every source-owned column
+  and the adapter re-applied the override — reported as `1 correction(s) re-applied`, and the
+  whole-table fingerprint over `(id, notes, status, status_reason)` was **identical**
+  (`dfef2342971ec9731df5d576837b1aba`) before and after.
+* **The suppression was not resurrected.** After a full 126-event reload the counts were still
+  **125 active / 1 void**, with the void row's reason intact — the precise failure §8 warns about
+  ("skip either replay and the promoted site publishes suppressed records again") did not occur.
+* **`data_overrides` was not modified by replay**: all four rows unchanged in value and
+  `is_active`.
+* **Replay wrote no audit rows**: `data_edits` stayed at 5 rows / max id 47 across both reloads.
+  Replay is reconciliation, not a human edit, and the log correctly says so.
+* **No duplicate rows and no unexpected source-owned retirement**: 334 / 126 throughout,
+  `0 deleted`, `0 stale removed`.
+* **No new refusal or data-issue class.** The importer's four cross-check findings
+  (`career_kicks_contradicts_source` x1, `career_goals_contradicts_source` x1,
+  `first_kick_match_unresolved` x2) are pre-existing source contradictions it reports on every
+  run, unrelated to P4.
+
+Re-running the after-siren loader converges: it reports `1 inserted or changed` each pass — the
+reload writes the source value and the replay re-applies the override, the designed loop — and
+the fingerprint is stable at `4d869e758093fed996c7e04c7ad5e9c3` across runs.
+
+**One unrelated side effect, recorded rather than buried.** The after-siren loader's first run
+changed **6** rows: DEV's `after_siren_kicks` was stale relative to the tracked
+`data/records/after-siren-events.csv` (last loaded 2026-09-06), and the documented reload brought
+it into line. Nothing to do with ISSUE-167; the acceptance row's own values were untouched.
+
+**Manual-record reconstruction is proven by authority, not by a rebuild.** The manual record
+created at §27.7 carries a whole-row `record` override — every field, `status`, `status_reason`
+and identity — which is what a rebuild replays from. It survived a full reload (the importer
+reconciles only its own `source_id`). The `manual row(s) re-created` counter itself only fires
+against a table rebuilt from scratch, which is a promotion step, not a DEV one; that branch stays
+covered by Stage 4's rebuild-survival tests (§23.5).
+
+### 27.7 Rendered acceptance — §18's matrix, against real roles on DEV
+
+Every role is a **real DEV account**, signed in by the operator through the real
+`/admin/login` form with a real TOTP. No session was minted, no gate was relaxed, and no
+credential was handled by this session.
+
+| §18 check | Contributor (`testcon@test.test`) | Admin (`testadmin@test.com.tst`) | Super Admin |
+|---|---|---|---|
+| `/admin/records` reachable | ✗ redirect to `/admin/upload` | ✓ | ✓ |
+| Nav entry visible | ✗ (nav holds only Upload / Change password) | ✓ | ✓ |
+| Detail / provenance / history | ✗ | ✓ read-only, **void record fully readable** | ✓ |
+| Correct amendable field | ✗ | ✗ (no form, **zero** mutation buttons) | ✓ |
+| Void / reinstate | ✗ | ✗ | ✓ |
+| Create manual record | ✗ `/new` denied | ✗ `/new` denied, no link rendered | ✓ |
+| Direct POST (bypass attempt) | ✗ redirect | ✗ redirect | ✓ |
+
+**Denials are HTTP-layer redirects, never 200 + meta-refresh** — ISSUE-166's contract, measured
+on every ISSUE-167 surface:
+
+```
+anonymous   /admin/records, /admin/records/first-kick-goal[/new],
+            /admin/records/after-the-siren[/new], POST /admin/records/revalidate
+            -> HTTP 307 + Location: /admin/login, meta-refresh count 0 on all seven
+contributor -> every route redirects to /admin/upload, metaRefresh=false
+admin       -> /admin/records/first-kick-goal/new and POST /admin/records/revalidate
+               both redirect to /admin, metaRefresh=false
+```
+
+The Admin also sees the void record with its full reason and its `first_kick_goal_created` /
+`first_kick_goal_suppressed` history — suppression hides a record from the public, never from an
+administrator — while rendering no correction form and no create link. D-2 held throughout: the
+after-siren detail states the link is resolved by the import and offers no player-link control.
+
+**First-kick workflow (Super Admin, record 1 `fkg-001` Jack Kirby).** Correct → success banner
+*"First-kick-goal record corrected."*, value visible, `data_overrides` gains
+`(player_achievements, wikipedia_first_kick_goal:fkg-001, correction, {"notes": ...})` and
+`data_edits` gains one row carrying old/new plus `entity_key` and `lineage_identity`. Suppress
+with a mandatory reason (the confirm button stays disabled until one is typed) → status
+*"Void — <reason>"*. **Public disappearance, decisively**: `/records/first-kick-goal` fell from
+334 to 333 **and its EARLIEST summary moved 1911 → 1920 (Gordon Coventry)** — the filter reaches
+the derived aggregates, not just the row list; the player page's Honours block disappeared
+entirely; NL search returned 329 with Jack Kirby absent. Reinstate → active, public visibility
+returned, count back to 334.
+
+**After-siren workflow (Super Admin, record 1 Billy Schmidt, 1913 R15 St Kilda v Carlton).**
+The five coupled event fields render as one group labelled *"The event — these five agree or the
+correction is refused"*. Setting the result to a loss while the effect stays *won* produced the
+readable football refusal **"A kick that won the match cannot be recorded against a loss."** and
+left Save disabled — a domain rule stated in football, not in schema. A valid correction, a
+suppression with reason (Billy Schmidt then absent from `/records/after-the-siren`), and a
+reinstatement all behaved as the first-kick family did. `club_id` is derived and read-only, and
+no player-link queue or control appears anywhere (D-2).
+
+**Create.** A manual record was created through the real form and landed as row 335 with
+provenance **MANUAL (ADMINISTRATOR) `manual_admin_edit`**, source record
+`first_kick_goal:fdadd8a8-0178-4084-bea3-971bad3dc4da`, no import batch, and a whole-row
+`record` override. It was publicly visible while active (335 recognised players).
+
+**Replace was not exercised** — §18's matrix does not list it, and it is *suppress + create in
+one transaction* with both halves and the atomic audit already proven here. Stated rather than
+implied.
+
+**CAS / stale form.** Two tabs on the same record; tab A reinstated it (bumping `updated_at`
+13:14:22 → 13:15:51); tab B then submitted its stale `expectedUpdatedAt`. Result:
+
+* readable refusal — **"That record changed while this page was open. Reload it and try again."**;
+* **keyboard focus stayed on the button** (`document.activeElement` = the Reinstate button, not
+  `body`) — the known ISSUE-155 §27.27 H defect, **verified here rather than assumed fixed**;
+* **zero write**: `data_edits` held exactly 3 rows for that record (corrected / suppressed /
+  reinstated) and the refused fourth action added none.
+
+**Revalidation (S-6 / D-9).** The network trace for one correction is
+`POST /admin/records/first-kick-goal/1` → 200, then a **separate**
+`POST /admin/records/revalidate` → 200, then a refetch. Revalidation happens after the action
+resolves, from a second request, never inside the action — the contract that keeps the Next 15.5
+client from hanging. The UI never stuck pending.
+
+**Match-delete refusal.** Both families, both refused, neither match deleted:
+
+```
+match 1103 (Essendon v Richmond 1911, Jack Kirby's first-kick match)
+  "Match #1103 carries 1 curated special record (first-kick-goal fkg-001) and cannot be
+   deleted. Deleting the match would destroy or orphan a record that carries its own durable
+   decision and audit trail. Suppress or reassign it in Special records
+   (/admin/records/first-kick-goal) first."
+match 1313 (St Kilda v Carlton 1913, Billy Schmidt's after-the-siren kick)
+  "... carries 1 curated special record (after-the-siren 1913-vfl-afl-15-st-kilda-billy-schmidt)
+   and cannot be deleted. ... (/admin/records/after-the-siren) first."
+```
+
+Each names its own family, its own record id and the right admin path. Afterwards: both matches
+present, both collateral rows present, `matches` still **17,052**. **The refusal is SERVER-side.**
+`DeleteMatchButton` renders it as the action's returned `state.warning`, and its confirm button
+is *not* disabled (`disabled=false`, `pointer-events: auto`) — it only disables while pending or
+after success. So the operator clicked a live confirm and the server refused; the guard is not a
+client-side gate, which is the stronger result. The destructive confirm was clicked by the
+operator, not by this session.
+
+**Public regression smoke**, all with the acceptance data active:
+
+* `/records/first-kick-goal` — 334 recognised players, summary tiles correct;
+* `/records/after-the-siren` — renders, Billy Schmidt present once reinstated;
+* player page — Honours block returns after reinstatement;
+* NL — *"players who kicked a goal with their first kick"* → 329; *"players with the most goals
+  after the siren"* → *"Barry Hall and Gary Rohan — 2 kicks after the siren (tied)"*, with the
+  1913 provenance note intact;
+* **Grid Solver** — all three special-record criteria are offered (`Won a game with a kick after
+  the siren`; `Goal with their first kick, for club`; `... between seasons`), and a solve on
+  builder `after_siren_winner` returned a populated grid with **no timeouts**, Billy Schmidt
+  among the answers.
+
+D-6 was honoured: no fixture expectation was re-baselined.
+
+**Not separately rendered:** `/players/compare`'s first-kick honour. Its data comes from the same
+`playerHonours()` fragment in `src/db/queries/awards.ts:569-570` that carries
+`AND a.status = 'active'` and was proven live on the player page; the compare page needs a
+two-player selection this session did not complete. Recorded as covered-by-the-same-fragment, not
+claimed as rendered.
+
+**Responsive** (`/admin/records/first-kick-goal/1`): **768, 1000, 1280 and 1920 all clean**, no
+horizontal overflow. At **320** the document scrolls to 425px: the detail page's key/value tables
+overflow even though each sits in the repo's `.table-wrap` (`overflow-x: auto`), which the family
+list page at the same width contains correctly. §18 sets device priority desktop > tablet > phone
+and makes phone-only polish a follow-up rather than a P4 blocker, so this is **recorded as a
+follow-up, not fixed** — a speculative change to a shared CSS class late in an acceptance stage
+would risk the sibling admin surfaces for no acceptance gain.
+
+### 27.8 Acceptance data — what was used, and what remains
+
+| Row | Used for | Final state |
+|---|---|---|
+| `player_achievements` 1 (`fkg-001`, Jack Kirby) | correct, suppress, reinstate, CAS | **Restored** — `notes` NULL, `status` active |
+| `after_siren_kicks` 1 (Billy Schmidt) | correct, invalid-coupling refusal, suppress, reinstate | **Restored** — original `notes` text, `status` active |
+| `player_achievements` 335 (manual) | create, provenance, reload survival | **Void**, reason recorded — retained DEV fixture |
+
+`after_siren_kicks` is back to **126 active / 0 void**. `player_achievements` is **334 active +
+1 void**, the void row being the manual fixture. **There is no hard delete by design** (§4), so
+voiding is the supported cleanup path and the fixture row is retained deliberately, clearly
+labelled in both its notes and its void reason. The **append-only `data_edits` trail was not
+erased** — 10 rows record every acceptance action, which is the product behaving correctly;
+erasing them to tidy up would violate the audit contract this issue exists to protect. Two
+`correction` overrides remain, holding the restored values.
+
+### 27.9 Final DEV state
+
+```
+service      afldb active; health {"status":"ok","database":"ok","latencyMs":13}
+migrations   102 file(s), 102 applied, 0 pending
+code         c847b88 + the five-file Stage 8 overlay (§27.5)
+logs         since the fixed build: 1,927 requests, ZERO 5xx, ZERO application errors
+batches      0 running import batches
+data         after_siren_kicks 126 active / 0 void; player_achievements 334 active / 1 void
+fingerprints player_achievements dfef2342..., after_siren 88c57296... (post-restore), stable
+PRODUCTION   never contacted -- no prod host, DSN, database or service touched in this stage
+```
+
+### 27.10 Stage boundary — why this is NOT resolved yet
+
+Every §18 acceptance row is **green**, both defects Stage 8 found are **fixed and regression-
+gated**, and DEV is healthy. One thing remains, and it is an operator action by design:
+
+> **The Stage 8 fix is uncommitted, and DEV is running it as a working-tree overlay rather than
+> as a deployed commit.** Until the operator commits and pushes it and DEV is redeployed from
+> that commit, the deployed SHA does not describe the code that passed acceptance — and a
+> `sync-dev.ps1` run or a `git checkout` on DEV would silently revert the surface to the state
+> that returns HTTP 500 on every mutation.
+
+Closing sequence: operator reviews and commits the five files → pushes → `sync-dev.ps1`
+(`-RemoteRef opus/issue-167-special-records-admin`) to restore clean provenance → confirm one
+mutation still succeeds → **then** ISSUE-167 may be resolved on DEV acceptance, and ISSUE-156 P4
+closed with it. Production remains a separate, unauthorised, future decision.

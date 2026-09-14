@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import {
-  FAMILY_BLURBS, FAMILY_LABELS, FAMILY_PUBLIC_PATHS, READ_ONLY_NOTICE, RECORD_FAMILY_SLUGS,
+  EDITABLE_NOTICE, FAMILY_BLURBS, FAMILY_LABELS, FAMILY_PUBLIC_PATHS, READ_ONLY_NOTICE,
+  RECORD_FAMILY_SLUGS,
   familyListPath, listHref, type RecordFamilySlug,
 } from '@/app/admin/records/labels';
 import { specialRecordLifecycleCounts } from '@/db/queries/admin-special-records';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { formatNumber } from '@/lib/format';
 
@@ -41,7 +43,9 @@ const FAMILY_TABLES: Record<RecordFamilySlug, SpecialRecordTable> = {
  * entirely rather than deferring it.
  */
 export default async function SpecialRecordsAdminPage() {
-  await requireCapability('data.specialRecords.read');
+  const admin = await requireCapability('data.specialRecords.read');
+  // Furniture only: every action asserts `data.specialRecords.edit` for itself.
+  const canEdit = hasCapability(admin, 'data.specialRecords.edit');
   const counts = await specialRecordLifecycleCounts();
 
   return (
@@ -53,7 +57,7 @@ export default async function SpecialRecordsAdminPage() {
           first-kick goals and kicks after the siren — with their provenance, their lifecycle
           state and every manual edit recorded against them.
         </p>
-        <p className="muted">{READ_ONLY_NOTICE}</p>
+        <p className="muted">{canEdit ? EDITABLE_NOTICE : READ_ONLY_NOTICE}</p>
       </div>
 
       <section className="section">

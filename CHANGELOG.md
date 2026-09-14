@@ -44,9 +44,14 @@ commit.
   the record and where to go instead. Previously a match deletion silently destroyed a first-kick
   record as collateral, and an after-the-siren record turned the same deletion into an unreadable
   database error.
-- Migration `102_special_records_lifecycle.sql` is applied to the **test database only**. This work
-  is not deployed: DEV and production are unchanged, and `AFLDB-ISSUE-167` remains open — the
-  promotion-inventory and deployment stages are still to come.
+- Migration `102_special_records_lifecycle.sql` is applied to the **test and development
+  databases**. This work is **on DEV only and production is unchanged**; `AFLDB-ISSUE-167` remains
+  open pending the operator commit of the acceptance fixes below.
+- Two faults were found by running the surface for real on DEV, and both are fixed. Every save,
+  suppression and reinstatement returned a server error, because of a module rule the production
+  build and the unit tests cannot see — only invoking the action does. And the Special records
+  landing page told a Super Admin the surface was read-only while showing them the controls that
+  change records; it now says what each administrator can actually do.
 
 ### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
 

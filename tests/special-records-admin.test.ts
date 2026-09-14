@@ -34,7 +34,7 @@ import {
 } from '@/db/queries/admin-special-records';
 import {
   AFTER_SIREN_CORRECTABLE_FIELDS, FIRST_KICK_CORRECTABLE_FIELDS,
-} from '@/app/admin/records/actions';
+} from '@/app/admin/records/validation';
 import { isAllowedRevalidatePath } from '@/app/admin/records/revalidate-paths';
 import { validateAfterSirenEvent } from '@/lib/special-records/after-siren-rules';
 import { DATA_EDIT_TABLE_NAMES } from '@/db/queries/audit-log';
@@ -143,6 +143,30 @@ describe('the records route surface', () => {
     const guards = [...actions.matchAll(/await requireCapability\('([^']+)'\)/g)].map((m) => m[1]);
     expect(guards.length).toBeGreaterThanOrEqual(10);
     expect([...new Set(guards)]).toEqual(['data.specialRecords.edit']);
+  });
+
+  it('exports only async functions from every "use server" module (Stage 8 DEV defect)', () => {
+    // Next.js enforces this when the Server Action is FIRST INVOKED, not when
+    // the bundle is built: an exported array builds cleanly, passes every unit
+    // test that imports the module directly as TypeScript, and then fails every
+    // mutation at runtime with `A "use server" file can only export async
+    // functions, found object`. That is exactly what DEV met at Stage 8 --
+    // `export const FIRST_KICK_CORRECTABLE_FIELDS` / `AFTER_SIREN_CORRECTABLE_
+    // FIELDS` in actions.ts turned the first correction into an HTTP 500. The
+    // lists now live in validation.ts, which carries no directive.
+    //
+    // Comments are stripped first: this module and validation.ts both DISCUSS
+    // `export const` in a `'use server'` file in order to say it must not
+    // happen, and a prose-matching gate would fail on the explanation.
+    const serverModules = RECORDS_FILES
+      .filter((file) => /^\s*'use server';/m.test(readSource(file)));
+    expect(serverModules.length).toBeGreaterThan(0);
+
+    for (const file of serverModules) {
+      const offenders = [...withoutComments(readSource(file))
+        .matchAll(/^export\s+(?!async\s+function\b|type\b)(\w+)/gm)].map((m) => m[1]);
+      expect(offenders, `${repoPath(file)} exports a non-async-function value`).toEqual([]);
+    }
   });
 
   it('keeps the derived and identity fields off every control (§3.4.1, §19.1)', () => {
