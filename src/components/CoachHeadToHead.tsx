@@ -2,9 +2,11 @@ import Link from 'next/link';
 
 import { SortableTable } from '@/components/SortableTable';
 import type { ResolvedCoach } from '@/app/coaches/compare/state';
-import type { CoachCareerMatch, CoachHeadToHead, CoachHeadToHeadVenueRecord } from '@/db/queries/coaches';
+import type {
+  CoachCareerMatch, CoachHeadToHead, CoachHeadToHeadVenueRecord, CoachOverlap,
+} from '@/db/queries/coaches';
 import {
-  NOT_RECORDED, clubPath, formatDate, formatNumber, formatPercentage, matchPath, venuePath,
+  NOT_RECORDED, clubPath, formatDate, formatNumber, formatPercentage, formatSpan, matchPath, venuePath,
 } from '@/lib/format';
 
 /**
@@ -12,7 +14,11 @@ import {
  * between two selected coaches where they actually coached opposing clubs
  * against each other, kept clearly separate from Stage 2B's career
  * comparison ({@link CoachComparisonCareer}), which is independent of
- * whether the two coaches ever met.
+ * whether the two coaches ever met. Also renders Stage 2D's comparison
+ * context ({@link CoachComparisonContextTable}): overlapping coaching
+ * seasons and the pair's first/most recent direct meeting, shown once near
+ * the top of this section rather than duplicated into Stage 2B or repeated
+ * per sub-table below.
  *
  * A plain prop-to-JSX renderer, no data fetching -- {@link getCoachHeadToHead}
  * decides everything about which matches count and how A/B are oriented;
@@ -138,12 +144,85 @@ function CoachHeadToHeadVenueTable({ venues }: { venues: CoachHeadToHeadVenueRec
 }
 
 /**
- * The full Stage 2C section: totals, biggest direct win for each coach, and
- * direct-meeting venue history. `headToHead === null` is the unexpected
- * failed-load case (mirrors {@link CoachComparisonCareer}'s `careerA`/
- * `careerB` null handling); a real, distinct pair that never met is NOT
- * that case -- it is `totals.meetings === 0`, and gets its own deliberate
- * "never met" message rather than a fabricated table of zeros.
+ * Stage 2D: overlapping coaching seasons and the pair's first/most recent
+ * direct meeting -- concise context that sits ABOVE the detailed Stage 2C
+ * tables below, and is shown regardless of whether the pair ever met
+ * (overlap is about career timing, not direct opposition; the two can
+ * genuinely disagree, e.g. two contemporaries in different competitions).
+ * `firstMeeting`/`lastMeeting` are null exactly when there is nothing to
+ * show for them -- rendered as an explicit "no meeting" cell, never a
+ * blank or fabricated date, the same convention
+ * {@link CoachHeadToHeadBiggestWinsTable} already uses for a missing win.
+ */
+function CoachComparisonContextTable({
+  coachA,
+  coachB,
+  overlap,
+  firstMeeting,
+  lastMeeting,
+}: {
+  coachA: ResolvedCoach;
+  coachB: ResolvedCoach;
+  overlap: CoachOverlap;
+  firstMeeting: CoachCareerMatch | null;
+  lastMeeting: CoachCareerMatch | null;
+}) {
+  const meetingRows: { label: string; match: CoachCareerMatch | null }[] = [
+    { label: 'First direct meeting', match: firstMeeting },
+    { label: 'Most recent direct meeting', match: lastMeeting },
+  ];
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">Overlapping coaching seasons</th>
+            <td colSpan={4}>
+              {overlap.seasons > 0
+                ? `${formatSpan(overlap.firstSeason, overlap.lastSeason)} (${formatNumber(overlap.seasons)} season${overlap.seasons === 1 ? '' : 's'})`
+                : `${coachA.coach.displayName} and ${coachB.coach.displayName} were never coaching in the same season.`}
+            </td>
+          </tr>
+          {meetingRows.map(({ label, match }) => (
+            <tr key={label}>
+              <th scope="row">{label}</th>
+              {match ? (
+                <>
+                  <td>
+                    <Link href={clubPath(match.coachedClubSlug)}>{match.coachedClubName}</Link>
+                    {' v '}
+                    <Link href={clubPath(match.opponentClubSlug)}>{match.opponentClubName}</Link>
+                  </td>
+                  <td className="num"><Link href={matchPath(match.matchId)}>{match.season}</Link></td>
+                  <td className="nowrap">{formatDate(match.matchDate)}</td>
+                  <td>
+                    {match.venueSlug
+                      ? <Link href={venuePath(match.venueSlug)}>{match.venueName}</Link>
+                      : (match.venueName ?? NOT_RECORDED)}
+                  </td>
+                </>
+              ) : (
+                <td className="muted" colSpan={4}>No canonical direct meeting on record.</td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The full Stage 2C/2D section: Stage 2D's comparison context (overlap,
+ * first/most recent meeting), then totals, biggest direct win for each
+ * coach, and direct-meeting venue history. `headToHead === null` is the
+ * unexpected failed-load case (mirrors {@link CoachComparisonCareer}'s
+ * `careerA`/`careerB` null handling); a real, distinct pair that never met
+ * is NOT that case -- it is `totals.meetings === 0`, and gets its own
+ * deliberate "never met" message (with the context table still shown --
+ * overlap is a career-timing fact, independent of ever meeting) rather
+ * than a fabricated table of zeros.
  */
 export function CoachHeadToHeadSection({
   coachA,
@@ -166,12 +245,21 @@ export function CoachHeadToHeadSection({
     );
   }
 
-  const { totals } = headToHead;
+  const {
+    totals, overlap, firstMeeting, lastMeeting,
+  } = headToHead;
 
   if (totals.meetings === 0) {
     return (
       <section className="section">
         <h2>Head-to-head</h2>
+        <CoachComparisonContextTable
+          coachA={coachA}
+          coachB={coachB}
+          overlap={overlap}
+          firstMeeting={firstMeeting}
+          lastMeeting={lastMeeting}
+        />
         <p className="muted">
           No canonical match has {coachA.coach.displayName} and {coachB.coach.displayName} coaching
           opposing clubs against each other.
@@ -183,6 +271,13 @@ export function CoachHeadToHeadSection({
   return (
     <section className="section">
       <h2>Head-to-head</h2>
+      <CoachComparisonContextTable
+        coachA={coachA}
+        coachB={coachB}
+        overlap={overlap}
+        firstMeeting={firstMeeting}
+        lastMeeting={lastMeeting}
+      />
       <div className="table-wrap">
         <table>
           <tbody>

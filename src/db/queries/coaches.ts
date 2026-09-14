@@ -720,6 +720,19 @@ export type CoachHeadToHeadVenueRecord = {
   lastMeetingDate: Date;
 };
 
+/**
+ * Seasons in which two coaches were both canonically active
+ * (AFLDB-ISSUE-170 Stage 2D), independent of whether they ever directly
+ * opposed each other -- {@link CoachHeadToHead.totals} answers a different
+ * question. `seasons === 0` is the deliberate no-overlap state; `firstSeason`
+ * and `lastSeason` are null only then, never a fabricated span.
+ */
+export type CoachOverlap = {
+  firstSeason: number | null;
+  lastSeason: number | null;
+  seasons: number;
+};
+
 export type CoachHeadToHead = {
   coachAId: number;
   coachBId: number;
@@ -733,9 +746,28 @@ export type CoachHeadToHead = {
    * uses for a single coach's venue history.
    */
   venues: CoachHeadToHeadVenueRecord[];
+  /**
+   * Seasons in which both coaches held at least one canonical coaching
+   * assignment (AFLDB-ISSUE-170 Stage 2D). Derived from each coach's actual
+   * season presence in `match_coaches`/`matches`, never by intersecting
+   * career first/last-season endpoints -- a coach with a mid-career gap
+   * must not be credited with an overlapping season they were not actually
+   * active in.
+   */
+  overlap: CoachOverlap;
+  /**
+   * The earliest/most recent direct meeting between the two coaches
+   * (AFLDB-ISSUE-170 Stage 2D), oriented to coach A's perspective -- the
+   * same fixed orientation {@link biggestWinA} already uses. Unlike
+   * {@link biggestWinA}/{@link biggestWinB}, a drawn meeting counts here (a
+   * draw is still a meeting). `null` only for a real, distinct pair with
+   * zero direct meetings (`totals.meetings === 0`), never a fabricated date.
+   */
+  firstMeeting: CoachCareerMatch | null;
+  lastMeeting: CoachCareerMatch | null;
 };
 
-type CoachHeadToHeadDecidedRaw = {
+type CoachHeadToHeadMeetingRaw = {
   matchId: number;
   season: number;
   matchDate: Date;
@@ -785,7 +817,7 @@ function coachHeadToHeadScope(coachAId: number, coachBId: number) {
 }
 
 /** One direct meeting, oriented to one side's perspective, in {@link CoachCareerMatch} shape. */
-function toDirectMeetingMatch(row: CoachHeadToHeadDecidedRaw, perspective: 'a' | 'b'): CoachCareerMatch {
+function toDirectMeetingMatch(row: CoachHeadToHeadMeetingRaw, perspective: 'a' | 'b'): CoachCareerMatch {
   const coachedClubId = perspective === 'a' ? row.aClubId : row.bClubId;
   const coachedClubName = perspective === 'a' ? row.aClubName : row.bClubName;
   const coachedClubSlug = perspective === 'a' ? row.aClubSlug : row.bClubSlug;
@@ -814,12 +846,38 @@ function toDirectMeetingMatch(row: CoachHeadToHeadDecidedRaw, perspective: 'a' |
 }
 
 /**
+ * The earliest/most recent meeting in a direct-meeting population
+ * (AFLDB-ISSUE-170 Stage 2D): earliest-or-latest match date first, then
+ * lowest-or-highest match id as the deterministic tie-break -- the same
+ * two-key shape {@link selectCareerRecordMatch} uses for margin, just
+ * ordered by date instead. Unlike {@link selectCareerRecordMatch}, a drawn
+ * meeting is a valid candidate here (a draw is still a meeting).
+ */
+export function selectDirectMeeting(
+  matches: CoachCareerMatch[],
+  which: 'first' | 'last',
+): CoachCareerMatch | null {
+  return matches.reduce<CoachCareerMatch | null>((best, m) => {
+    if (!best) return m;
+    const mTime = m.matchDate.getTime();
+    const bestTime = best.matchDate.getTime();
+    if (mTime !== bestTime) {
+      return (which === 'first' ? mTime < bestTime : mTime > bestTime) ? m : best;
+    }
+    return (which === 'first' ? m.matchId < best.matchId : m.matchId > best.matchId) ? m : best;
+  }, null);
+}
+
+/**
  * Two coaches' direct record against EACH OTHER (AFLDB-ISSUE-170 Stage 2C):
  * meetings, wins/draws/win% oriented to the requested A/B order, finals and
  * Grand Final meeting counts, each side's biggest direct win (reusing
  * {@link selectCareerRecordMatch}'s tie rule verbatim -- greatest margin,
  * then earliest date, then lowest match id), and venue history scoped to
- * these two coaches' meetings only.
+ * these two coaches' meetings only. Also carries Stage 2D's comparison
+ * context: {@link CoachOverlap} and the pair's first/most recent direct
+ * meeting -- kept on this same result rather than a second query family,
+ * since the direct-meeting population is already assembled here.
  *
  * Orientation is never canonicalised: `coachAId`/`coachBId` are passed
  * straight into {@link coachHeadToHeadScope} in the order given, so calling
@@ -829,10 +887,10 @@ function toDirectMeetingMatch(row: CoachHeadToHeadDecidedRaw, perspective: 'a' |
  *
  * A recognised, distinct pair that never met returns a real object with
  * `totals.meetings = 0` (an aggregate with no GROUP BY always returns
- * exactly one row, zeros included) and `venues: []` -- never null. Null is
- * reserved for an unrecognised coach id on either side, the same
- * zero-vs-null convention {@link getCoachRecordAgainstOrganization} already
- * uses.
+ * exactly one row, zeros included), `venues: []` and `firstMeeting`/
+ * `lastMeeting` both null -- never null itself. Null is reserved for an
+ * unrecognised coach id on either side, the same zero-vs-null convention
+ * {@link getCoachRecordAgainstOrganization} already uses.
  */
 export async function getCoachHeadToHead(coachAId: number, coachBId: number): Promise<CoachHeadToHead | null> {
   const [coachA] = await sql<{ id: number }[]>`SELECT id FROM coaches WHERE id = ${coachAId}`;
@@ -840,7 +898,7 @@ export async function getCoachHeadToHead(coachAId: number, coachBId: number): Pr
   const [coachB] = await sql<{ id: number }[]>`SELECT id FROM coaches WHERE id = ${coachBId}`;
   if (!coachB) return null;
 
-  const [[totalsRow], decidedRaw, venueRows] = await Promise.all([
+  const [[totalsRow], meetingsRaw, venueRows, [overlap]] = await Promise.all([
     sql<Omit<CoachHeadToHeadTotals, 'aWinPct' | 'bWinPct'>[]>`
       WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
       SELECT count(*)::int AS meetings,
@@ -851,7 +909,13 @@ export async function getCoachHeadToHead(coachAId: number, coachBId: number): Pr
              count(*) FILTER (WHERE round_type = 'grand_final')::int AS "grandFinals"
         FROM meetings
     `,
-    sql<CoachHeadToHeadDecidedRaw[]>`
+    // Every direct meeting, decided or drawn (AFLDB-ISSUE-170 Stage 2D):
+    // {@link selectCareerRecordMatch}'s own margin-sign filter already
+    // excludes a drawn (margin = 0) meeting from biggestWinA/B, so widening
+    // this from "decided only" to "every meeting" changes nothing about
+    // those two results and lets firstMeeting/lastMeeting share the same
+    // query rather than a second round trip.
+    sql<CoachHeadToHeadMeetingRaw[]>`
       WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
       SELECT mt.match_id AS "matchId", mt.season, mt.match_date AS "matchDate",
              mt.round_type AS "roundType", mt.is_finals_series AS "isFinalsSeries",
@@ -863,7 +927,6 @@ export async function getCoachHeadToHead(coachAId: number, coachBId: number): Pr
         JOIN clubs ac ON ac.id = mt.a_club_id
         JOIN clubs bc ON bc.id = mt.b_club_id
         LEFT JOIN venues v ON v.id = mt.venue_id
-       WHERE mt.winner_club_id IS NOT NULL
     `,
     sql<Omit<CoachHeadToHeadVenueRecord, 'aWinPct' | 'bWinPct'>[]>`
       WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
@@ -881,10 +944,32 @@ export async function getCoachHeadToHead(coachAId: number, coachBId: number): Pr
        GROUP BY v.id, v.canonical_name, v.slug
        ORDER BY count(*) DESC, v.canonical_name ASC, v.id ASC
     `,
+    // A small, dedicated query (AFLDB-ISSUE-170 Stage 2D) rather than an
+    // extension of coachHeadToHeadScope: overlap is about each coach's own
+    // season presence, not about the two of them ever meeting, so it is a
+    // genuinely different population. Built from `DISTINCT season` per
+    // coach, then intersected -- never `least(maxA, maxB) >= greatest(minA,
+    // minB)`, which would credit a mid-career gap year as "overlapping". An
+    // aggregate with no GROUP BY over a zero-row join still returns exactly
+    // one row (min/max NULL, count 0), so a non-overlapping pair gets the
+    // deliberate no-overlap state, never a missing row.
+    sql<CoachOverlap[]>`
+      WITH seasons_a AS (
+        SELECT DISTINCT m.season
+          FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+         WHERE mc.coach_id = ${coachA.id}
+      ), seasons_b AS (
+        SELECT DISTINCT m.season
+          FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+         WHERE mc.coach_id = ${coachB.id}
+      )
+      SELECT min(a.season)::int AS "firstSeason", max(a.season)::int AS "lastSeason", count(*)::int AS seasons
+        FROM seasons_a a JOIN seasons_b b ON a.season = b.season
+    `,
   ]);
 
-  const matchesFromA = decidedRaw.map((r) => toDirectMeetingMatch(r, 'a'));
-  const matchesFromB = decidedRaw.map((r) => toDirectMeetingMatch(r, 'b'));
+  const matchesFromA = meetingsRaw.map((r) => toDirectMeetingMatch(r, 'a'));
+  const matchesFromB = meetingsRaw.map((r) => toDirectMeetingMatch(r, 'b'));
 
   return {
     coachAId: coachA.id,
@@ -901,5 +986,8 @@ export async function getCoachHeadToHead(coachAId: number, coachBId: number): Pr
       aWinPct: winPct(v.aWins, v.draws, v.meetings),
       bWinPct: winPct(v.bWins, v.draws, v.meetings),
     })),
+    overlap,
+    firstMeeting: selectDirectMeeting(matchesFromA, 'first'),
+    lastMeeting: selectDirectMeeting(matchesFromA, 'last'),
   };
 }

@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { CoachHeadToHeadSection } from '@/components/CoachHeadToHead';
 import type { ResolvedCoach } from '@/app/coaches/compare/state';
-import type { CoachCareerMatch, CoachHeadToHead, CoachHeadToHeadVenueRecord } from '@/db/queries/coaches';
+import type {
+  CoachCareerMatch, CoachHeadToHead, CoachHeadToHeadVenueRecord, CoachOverlap,
+} from '@/db/queries/coaches';
 
 /**
  * AFLDB-ISSUE-170 Stage 2C — the direct coach-v-coach head-to-head section.
@@ -42,6 +44,10 @@ function venue(overrides: Partial<CoachHeadToHeadVenueRecord> = {}): CoachHeadTo
   };
 }
 
+function overlap(overrides: Partial<CoachOverlap> = {}): CoachOverlap {
+  return { firstSeason: 1990, lastSeason: 1999, seasons: 8, ...overrides };
+}
+
 function headToHead(overrides: Partial<CoachHeadToHead> = {}): CoachHeadToHead {
   return {
     coachAId: 1,
@@ -55,6 +61,17 @@ function headToHead(overrides: Partial<CoachHeadToHead> = {}): CoachHeadToHead {
       opponentClubId: 1, opponentClubName: 'Collingwood', opponentClubSlug: 'collingwood',
     }),
     venues: [venue()],
+    overlap: overlap(),
+    firstMeeting: match({
+      matchId: 500, season: 1990, matchDate: new Date('1990-04-01'),
+      coachedClubName: 'Collingwood', coachedClubSlug: 'collingwood',
+      opponentClubName: 'Essendon', opponentClubSlug: 'essendon',
+    }),
+    lastMeeting: match({
+      matchId: 560, season: 1999, matchDate: new Date('1999-08-20'),
+      coachedClubName: 'Collingwood', coachedClubSlug: 'collingwood',
+      opponentClubName: 'Essendon', opponentClubSlug: 'essendon',
+    }),
     ...overrides,
   };
 }
@@ -124,6 +141,8 @@ describe('CoachHeadToHeadSection', () => {
           coachAId: 1, coachBId: 2,
           totals: { meetings: 0, aWins: 0, bWins: 0, draws: 0, aWinPct: null, bWinPct: null, finals: 0, grandFinals: 0 },
           biggestWinA: null, biggestWinB: null, venues: [],
+          overlap: overlap({ seasons: 8 }),
+          firstMeeting: null, lastMeeting: null,
         },
       }),
     );
@@ -132,6 +151,11 @@ describe('CoachHeadToHeadSection', () => {
     expect(html).toContain('Chris Scott');
     expect(html).not.toContain('Meetings');
     expect(html).not.toContain('Venue history');
+    // Overlap is a career-timing fact independent of ever meeting, so the
+    // context table (Stage 2D) still renders here, safely: a genuine
+    // 8-season overlap alongside an explicit "no meeting" cell for both.
+    expect(html).toContain('8 seasons');
+    expect(html).toContain('No canonical direct meeting on record.');
   });
 
   it('fails safely with an explicit message when head-to-head data fails to resolve, never throwing', () => {
@@ -176,5 +200,58 @@ describe('CoachHeadToHeadSection', () => {
     // Each coach's own biggest win stays theirs regardless of A/B position.
     expect(forward).toContain('+50');
     expect(swapped).toContain('+50');
+  });
+
+  it('renders overlapping coaching seasons as a span with a season count (AFLDB-ISSUE-170 Stage 2D)', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({
+        coachA, coachB,
+        headToHead: headToHead({ overlap: overlap({ firstSeason: 1990, lastSeason: 1999, seasons: 8 }) }),
+      }),
+    );
+    expect(html).toContain('Overlapping coaching seasons');
+    expect(html).toContain('1990–1999');
+    expect(html).toContain('8 seasons');
+  });
+
+  it('renders a deliberate no-overlap sentence rather than a fabricated span when seasons is 0', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({
+        coachA, coachB,
+        headToHead: headToHead({ overlap: { firstSeason: null, lastSeason: null, seasons: 0 } }),
+      }),
+    );
+    expect(html).toContain('were never coaching in the same season');
+    expect(html).not.toContain('null');
+    expect(html).not.toContain('undefined');
+  });
+
+  it("renders each coach's first and most recent direct meeting with season, date and venue", () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({ coachA, coachB, headToHead: headToHead() }),
+    );
+    expect(html).toContain('First direct meeting');
+    expect(html).toContain('Most recent direct meeting');
+    // firstMeeting fixture: 1990, MCG; lastMeeting fixture: 1999, MCG.
+    expect(html).toContain('1990');
+    expect(html).toContain('1999');
+    expect(html).toContain('MCG');
+    expect(html).toContain('Collingwood');
+    expect(html).toContain('Essendon');
+  });
+
+  it('gives a zero-meeting pair an explicit "no meeting" cell for both first and most recent meeting, never a fabricated date', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({
+        coachA, coachB,
+        headToHead: headToHead({
+          totals: { meetings: 0, aWins: 0, bWins: 0, draws: 0, aWinPct: null, bWinPct: null, finals: 0, grandFinals: 0 },
+          biggestWinA: null, biggestWinB: null, venues: [],
+          firstMeeting: null, lastMeeting: null,
+        }),
+      }),
+    );
+    const noMeetingCells = html.match(/No canonical direct meeting on record\./g) ?? [];
+    expect(noMeetingCells.length).toBe(2);
   });
 });

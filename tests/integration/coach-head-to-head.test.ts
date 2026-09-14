@@ -77,6 +77,68 @@ async function unusedCoachId(): Promise<number> {
   return row.id;
 }
 
+/** Two coaches whose careers never overlap in a single season (disjoint season ranges). */
+async function noOverlapPair(): Promise<[number, number] | null> {
+  const [row] = await sql<{ a: number; b: number }[]>`
+    WITH spans AS (
+      SELECT mc.coach_id, min(m.season) AS min_s, max(m.season) AS max_s
+        FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+       GROUP BY mc.coach_id
+    )
+    SELECT a.coach_id AS a, b.coach_id AS b
+      FROM spans a
+      JOIN spans b ON a.coach_id <> b.coach_id
+     WHERE a.max_s < b.min_s
+     LIMIT 1
+  `;
+  return row ? [row.a, row.b] : null;
+}
+
+/**
+ * A coach with a genuine mid-career gap (at least one season strictly
+ * between their first and last coached season with NO canonical
+ * assignment), paired with another coach whose own span fully covers that
+ * gap -- so naively intersecting `[GREATEST(minA,minB), LEAST(maxA,maxB)]`
+ * would credit the gap season as "overlapping" even though the gap coach
+ * was not actually active then. Used to prove the production overlap
+ * query is built from real season presence, never a min/max range
+ * (AFLDB-ISSUE-170 Stage 2D).
+ */
+async function gapOverlapPair(): Promise<{ a: number; b: number; naiveRange: number; actualOverlap: number } | null> {
+  const [row] = await sql<{ a: number; b: number; naiveRange: number; actualOverlap: number }[]>`
+    WITH coach_seasons AS (
+      SELECT DISTINCT mc.coach_id, m.season
+        FROM match_coaches mc JOIN matches m ON m.id = mc.match_id
+    ), spans AS (
+      SELECT coach_id, min(season) AS min_s, max(season) AS max_s, count(*) AS n
+        FROM coach_seasons GROUP BY coach_id
+    ), gap_coaches AS (
+      SELECT coach_id, min_s, max_s FROM spans WHERE n < (max_s - min_s + 1)
+    ), candidates AS (
+      SELECT g.coach_id AS gap_id, s.coach_id AS other_id,
+             GREATEST(g.min_s, s.min_s) AS lo, LEAST(g.max_s, s.max_s) AS hi
+        FROM gap_coaches g
+        JOIN spans s ON s.coach_id <> g.coach_id
+       WHERE GREATEST(g.min_s, s.min_s) <= LEAST(g.max_s, s.max_s)
+    ), actual AS (
+      SELECT c.gap_id, c.other_id, count(*)::int AS actual_overlap
+        FROM candidates c
+        JOIN coach_seasons sa ON sa.coach_id = c.gap_id AND sa.season BETWEEN c.lo AND c.hi
+        JOIN coach_seasons sb ON sb.coach_id = c.other_id AND sb.season = sa.season
+       GROUP BY c.gap_id, c.other_id
+    )
+    SELECT c.gap_id AS a, c.other_id AS b,
+           (c.hi - c.lo + 1)::int AS "naiveRange",
+           coalesce(a2.actual_overlap, 0) AS "actualOverlap"
+      FROM candidates c
+      LEFT JOIN actual a2 ON a2.gap_id = c.gap_id AND a2.other_id = c.other_id
+     WHERE (c.hi - c.lo + 1) > coalesce(a2.actual_overlap, 0)
+     ORDER BY (c.hi - c.lo + 1) - coalesce(a2.actual_overlap, 0) DESC
+     LIMIT 1
+  `;
+  return row ?? null;
+}
+
 describe('getCoachHeadToHead — totals, biggest wins and venues, cross-checked against a direct-SQL oracle', () => {
   it('meetings, wins, draws, win %, finals and Grand Final counts match independent SQL', async () => {
     const [idA, idB] = await mostFrequentMatchup();
@@ -230,6 +292,122 @@ describe('getCoachHeadToHead — orientation', () => {
       expect(v.bWins).toBe(f.aWins);
       expect(v.meetings).toBe(f.meetings);
     }
+  });
+
+  it("swapping A/B preserves the direct-meeting population/dates and overlap, while orientation-specific context (Stage 2D) stays correct", async () => {
+    const [idA, idB] = await mostFrequentMatchup();
+    const forward = await getCoachHeadToHead(idA, idB);
+    const reversed = await getCoachHeadToHead(idB, idA);
+    expect(forward).not.toBeNull();
+    expect(reversed).not.toBeNull();
+
+    // Overlap is symmetric -- the same two season sets, intersected --
+    // so it must be identical regardless of requested order.
+    expect(reversed!.overlap).toEqual(forward!.overlap);
+
+    // Same underlying matches (same ids/dates), but coached/opponent club
+    // is oriented to whichever coach is now "A".
+    expect(reversed!.firstMeeting?.matchId).toBe(forward!.firstMeeting?.matchId);
+    expect(reversed!.firstMeeting?.matchDate.getTime()).toBe(forward!.firstMeeting?.matchDate.getTime());
+    expect(reversed!.firstMeeting?.coachedClubId).toBe(forward!.firstMeeting?.opponentClubId);
+    expect(reversed!.firstMeeting?.opponentClubId).toBe(forward!.firstMeeting?.coachedClubId);
+
+    expect(reversed!.lastMeeting?.matchId).toBe(forward!.lastMeeting?.matchId);
+    expect(reversed!.lastMeeting?.matchDate.getTime()).toBe(forward!.lastMeeting?.matchDate.getTime());
+    expect(reversed!.lastMeeting?.coachedClubId).toBe(forward!.lastMeeting?.opponentClubId);
+    expect(reversed!.lastMeeting?.opponentClubId).toBe(forward!.lastMeeting?.coachedClubId);
+  });
+});
+
+describe('getCoachHeadToHead — overlapping coaching seasons (Stage 2D)', () => {
+  it('overlapping-season count, first overlapping season and last overlapping season match an independent SQL intersection of actual season presence', async () => {
+    const [idA, idB] = await mostFrequentMatchup();
+
+    const [truth] = await sql<{ firstSeason: number | null; lastSeason: number | null; seasons: number }[]>`
+      WITH szn_a AS (
+        SELECT DISTINCT m.season FROM match_coaches mc JOIN matches m ON m.id = mc.match_id WHERE mc.coach_id = ${idA}
+      ), szn_b AS (
+        SELECT DISTINCT m.season FROM match_coaches mc JOIN matches m ON m.id = mc.match_id WHERE mc.coach_id = ${idB}
+      )
+      SELECT min(a.season)::int AS "firstSeason", max(a.season)::int AS "lastSeason", count(*)::int AS seasons
+        FROM szn_a a JOIN szn_b b ON a.season = b.season
+    `;
+
+    const h2h = await getCoachHeadToHead(idA, idB);
+    expect(h2h).not.toBeNull();
+    expect(h2h!.overlap).toEqual(truth);
+    expect(h2h!.overlap.seasons).toBeGreaterThan(0);
+  });
+
+  it('a pair with disjoint career spans returns the deliberate no-overlap state, not a fabricated span', async () => {
+    const pair = await noOverlapPair();
+    if (pair === null) return; // no disjoint-span pair found; not this test's concern
+    const [idA, idB] = pair;
+
+    const h2h = await getCoachHeadToHead(idA, idB);
+    expect(h2h).not.toBeNull();
+    expect(h2h!.overlap).toEqual({ firstSeason: null, lastSeason: null, seasons: 0 });
+  });
+
+  it("a coach's real mid-career gap is excluded from overlap, proving the query uses actual season presence rather than intersecting min/max ranges", async () => {
+    const gapPair = await gapOverlapPair();
+    if (gapPair === null) return; // no such gap pair found on this database; not this test's concern
+    const { a, b, naiveRange, actualOverlap } = gapPair;
+
+    const h2h = await getCoachHeadToHead(a, b);
+    expect(h2h).not.toBeNull();
+    expect(h2h!.overlap.seasons).toBe(actualOverlap);
+    // The proof: the naive min/max-range count is strictly larger than what
+    // real season presence supports, and the production result must match
+    // the smaller, correct figure -- never the naive one.
+    expect(h2h!.overlap.seasons).toBeLessThan(naiveRange);
+  });
+});
+
+describe('getCoachHeadToHead — first and most recent direct meeting (Stage 2D)', () => {
+  it('firstMeeting and lastMeeting match an independent earliest/latest match-date selection over the FULL meeting population (draws included)', async () => {
+    const [idA, idB] = await mostFrequentMatchup();
+    const h2h = await getCoachHeadToHead(idA, idB);
+    expect(h2h).not.toBeNull();
+
+    const [expectedFirst] = await sql<{ matchId: number; matchDate: Date }[]>`
+      SELECT m.id AS "matchId", m.match_date AS "matchDate"
+        FROM match_coaches mcA
+        JOIN match_coaches mcB ON mcB.match_id = mcA.match_id AND mcB.club_id <> mcA.club_id
+        JOIN matches m ON m.id = mcA.match_id
+       WHERE mcA.coach_id = ${idA} AND mcB.coach_id = ${idB}
+       ORDER BY m.match_date ASC, m.id ASC
+       LIMIT 1
+    `;
+    const [expectedLast] = await sql<{ matchId: number; matchDate: Date }[]>`
+      SELECT m.id AS "matchId", m.match_date AS "matchDate"
+        FROM match_coaches mcA
+        JOIN match_coaches mcB ON mcB.match_id = mcA.match_id AND mcB.club_id <> mcA.club_id
+        JOIN matches m ON m.id = mcA.match_id
+       WHERE mcA.coach_id = ${idA} AND mcB.coach_id = ${idB}
+       ORDER BY m.match_date DESC, m.id DESC
+       LIMIT 1
+    `;
+
+    expect(h2h!.firstMeeting).not.toBeNull();
+    expect(h2h!.firstMeeting!.matchId).toBe(expectedFirst.matchId);
+    expect(h2h!.firstMeeting!.matchDate.toISOString()).toBe(expectedFirst.matchDate.toISOString());
+
+    expect(h2h!.lastMeeting).not.toBeNull();
+    expect(h2h!.lastMeeting!.matchId).toBe(expectedLast.matchId);
+    expect(h2h!.lastMeeting!.matchDate.toISOString()).toBe(expectedLast.matchDate.toISOString());
+  });
+
+  it('a real, distinct pair who never met gets null firstMeeting and lastMeeting, never a fabricated date', async () => {
+    const pair = await neverMetPair();
+    if (pair === null) return; // no non-meeting pair found among the sampled candidates; not this test's concern
+    const [idA, idB] = pair;
+
+    const h2h = await getCoachHeadToHead(idA, idB);
+    expect(h2h).not.toBeNull();
+    expect(h2h!.totals.meetings).toBe(0);
+    expect(h2h!.firstMeeting).toBeNull();
+    expect(h2h!.lastMeeting).toBeNull();
   });
 });
 

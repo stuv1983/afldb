@@ -19,8 +19,8 @@ import type { CoachCompareRouteState } from '@/app/coaches/compare/state';
  * public link (player page for a player-linked coach, coach page for a
  * coach-only identity), then their side-by-side career comparison
  * ({@link CoachComparisonCareer}, Stage 2B), then their direct
- * coach-v-coach head-to-head ({@link CoachHeadToHeadSection}, Stage 2C).
- * Stage 2D contextual extras remain a later stage.
+ * coach-v-coach head-to-head plus Stage 2D's comparison context
+ * ({@link CoachHeadToHeadSection}, Stage 2C/2D).
  */
 export function CoachComparisonView({ state }: { state: CoachCompareRouteState }) {
   return (

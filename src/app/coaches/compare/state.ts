@@ -34,8 +34,10 @@ import 'server-only';
  * Stage 2C adds the pair's direct coach-v-coach head-to-head
  * (`getCoachHeadToHead`), oriented to the REQUESTED A/B order -- never the
  * canonical/ordered pair. All three reads (careerA, careerB, headToHead)
- * are independent, so they are loaded concurrently. Stage 2D contextual
- * extras remain a later stage.
+ * are independent, so they are loaded concurrently. Stage 2D's comparison
+ * context (overlapping coaching seasons, first/most recent direct meeting)
+ * travels on that same `headToHead` result rather than a fourth read --
+ * see `CoachHeadToHead.overlap`/`firstMeeting`/`lastMeeting`.
  */
 import {
   getCoach, getCoachCareer, getCoachHeadToHead, getCoachOptions,
