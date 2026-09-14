@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { CoachComparisonCareer } from '@/components/CoachComparisonCareer';
 import { CoachComparisonControls } from '@/components/CoachComparisonControls';
 import type { CoachCompareRouteState } from '@/app/coaches/compare/state';
 
@@ -13,11 +14,11 @@ import type { CoachCompareRouteState } from '@/app/coaches/compare/state';
  * the four states -- unselected, invalid, same coach and selected -- has a
  * usable page.
  *
- * Stage 2A deliberately renders only the comparison shell: the selected
- * state shows each coach's identity and their canonical public link
- * (player page for a player-linked coach, coach page for a coach-only
- * identity), never career, venue, opponent or head-to-head data -- that is
- * Stage 2B/2C/2D.
+ * The selected state shows each coach's identity and their canonical
+ * public link (player page for a player-linked coach, coach page for a
+ * coach-only identity), then their side-by-side career comparison
+ * ({@link CoachComparisonCareer}, Stage 2B). Opponent and direct
+ * head-to-head data remain Stage 2C/2D.
  */
 export function CoachComparisonView({ state }: { state: CoachCompareRouteState }) {
   return (
@@ -73,24 +74,33 @@ export function CoachComparisonView({ state }: { state: CoachCompareRouteState }
       )}
 
       {state.kind === 'selected' && (
-        <div className="section">
-          <div className="stat-strip">
-            {[state.coachA, state.coachB].map(({ coach, profilePath }) => (
-              <div className="stat" key={coach.id}>
-                <div className="value">
-                  <Link href={profilePath}>{coach.displayName}</Link>
+        <>
+          <div className="section">
+            <div className="stat-strip">
+              {[state.coachA, state.coachB].map(({ coach, profilePath }) => (
+                <div className="stat" key={coach.id}>
+                  <div className="value">
+                    <Link href={profilePath}>{coach.displayName}</Link>
+                  </div>
+                  <div className="label">
+                    {coach.playerId !== null ? 'Player-linked coach' : 'Coach-only profile'}
+                  </div>
                 </div>
-                <div className="label">
-                  {coach.playerId !== null ? 'Player-linked coach' : 'Coach-only profile'}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
+
+          <CoachComparisonCareer
+            coachA={state.coachA}
+            coachB={state.coachB}
+            careerA={state.careerA}
+            careerB={state.careerB}
+          />
+
           <p className="muted">
-            Career, venue and head-to-head comparison for these two coaches is coming in a
-            later stage.
+            Direct head-to-head record for these two coaches is coming in a later stage.
           </p>
-        </div>
+        </>
       )}
     </>
   );

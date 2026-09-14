@@ -25,9 +25,17 @@ import 'server-only';
  *
  * Stage 2A renders only the comparison shell: the resolved pair carries
  * each coach's canonical identity and public profile link, never career,
- * venue, opponent or head-to-head data -- that is Stage 2B/2C/2D.
+ * venue, opponent or head-to-head data.
+ *
+ * Stage 2B adds each coach's full `CoachCareer` (Stage 1A/1B's existing
+ * read model -- `getCoachCareer`, never a second, comparison-specific
+ * aggregation) to a resolved pair, loaded concurrently since the two
+ * reads are independent. Opponent and direct head-to-head data remain
+ * Stage 2C/2D.
  */
-import { getCoach, getCoachOptions, type CoachIdentity } from '@/db/queries/coaches';
+import {
+  getCoach, getCoachCareer, getCoachOptions, type CoachCareer, type CoachIdentity,
+} from '@/db/queries/coaches';
 import {
   COACH_COMPARE_PATH,
   canonicalCoachComparePath,
@@ -107,6 +115,14 @@ export type CoachCompareRouteState =
       /** Presentation order is the REQUESTED order, not the canonical one. */
       coachA: ResolvedCoach;
       coachB: ResolvedCoach;
+      /**
+       * Each coach's full career (Stage 2B), loaded concurrently from
+       * {@link getCoachCareer}. `null` only in the unexpected case where
+       * an already-resolved, valid coach id's career fails to load -- the
+       * view must fail safely rather than throw.
+       */
+      careerA: CoachCareer | null;
+      careerB: CoachCareer | null;
       /** The same view with the two coaches reversed. */
       swapPath: string;
     });
@@ -195,11 +211,21 @@ export async function resolveCoachCompareState(
     };
   }
 
+  // Stage 2B: both careers are independent reads, so load them
+  // concurrently rather than sequentially -- the same reasoning the pair
+  // lookup above already applies to coachA/coachB.
+  const [careerA, careerB] = await Promise.all([
+    getCoachCareer(coachA.id),
+    getCoachCareer(coachB.id),
+  ]);
+
   return {
     ...base,
     kind: 'selected',
     coachA: resolveCoach(coachA),
     coachB: resolveCoach(coachB),
+    careerA,
+    careerB,
     swapPath: swapCoachComparePath(params),
     canonicalPath: canonicalCoachComparePath(coachA.id, coachB.id),
     noindex: false,

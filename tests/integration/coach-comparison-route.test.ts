@@ -30,6 +30,27 @@ async function distinctCoachIds(): Promise<[number, number]> {
   return [rows[0].id, rows[1].id];
 }
 
+/** A coach with at least one canonical `match_coaches` assignment (Stage 2B needs a non-empty career to compare). */
+async function coachWithGamesId(): Promise<number> {
+  const [row] = await sql<{ id: number }[]>`
+    SELECT c.id FROM coaches c
+     WHERE EXISTS (SELECT 1 FROM match_coaches mc WHERE mc.coach_id = c.id)
+     ORDER BY c.id LIMIT 1
+  `;
+  expect(row, 'afldb_test needs at least one coach with match_coaches rows').toBeDefined();
+  return row.id;
+}
+
+/** A coach with zero canonical `match_coaches` rows (Stage 0 §0.2's Jim Adamson case). */
+async function zeroGameCoachId(): Promise<number | null> {
+  const [row] = await sql<{ id: number }[]>`
+    SELECT c.id FROM coaches c
+     WHERE NOT EXISTS (SELECT 1 FROM match_coaches mc WHERE mc.coach_id = c.id)
+     ORDER BY c.id LIMIT 1
+  `;
+  return row?.id ?? null;
+}
+
 async function coachOnlyId(): Promise<number> {
   const [row] = await sql<{ id: number }[]>`
     SELECT id FROM coaches WHERE player_id IS NULL ORDER BY id LIMIT 1
@@ -251,5 +272,85 @@ describe('Stage 2A: page generateMetadata delegates to the state resolver', () =
   it('resolves the landing page without throwing', async () => {
     const meta = await generateMetadata({ searchParams: Promise.resolve({}) });
     expect(meta.title).toBeTruthy();
+  });
+});
+
+describe('Stage 2B route state: career comparison', () => {
+  it('loads both coaches\' CoachCareer records for a resolved pair, using getCoachCareer', async () => {
+    const [idA, idB] = await distinctCoachIds();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idB) });
+
+    expect(state.kind).toBe('selected');
+    if (state.kind !== 'selected') return;
+
+    expect(state.careerA).not.toBeNull();
+    expect(state.careerB).not.toBeNull();
+    expect(state.careerA?.coachId).toBe(idA);
+    expect(state.careerB?.coachId).toBe(idB);
+  });
+
+  it('resolves internally consistent career totals: games = wins + draws + losses', async () => {
+    const [idA, idB] = await distinctCoachIds();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idB) });
+    if (state.kind !== 'selected') return;
+
+    const totalsA = state.careerA?.totals;
+    const totalsB = state.careerB?.totals;
+    expect(totalsA?.games).toBe((totalsA?.wins ?? 0) + (totalsA?.draws ?? 0) + (totalsA?.losses ?? 0));
+    expect(totalsB?.games).toBe((totalsB?.wins ?? 0) + (totalsB?.draws ?? 0) + (totalsB?.losses ?? 0));
+  });
+
+  it('resolves a real zero-game career safely when paired with a coach who has games (Stage 0 §0.2)', async () => {
+    const zeroId = await zeroGameCoachId();
+    if (zeroId === null) return; // no zero-game coach currently on this database; not this test's concern
+    const gamesId = await coachWithGamesId();
+
+    const state = await resolveCoachCompareState({ a: String(zeroId), b: String(gamesId) });
+    expect(state.kind).toBe('selected');
+    if (state.kind !== 'selected') return;
+
+    expect(state.careerA).not.toBeNull();
+    expect(state.careerA?.totals.games).toBe(0);
+    expect(state.careerA?.totals.winPct).toBeNull();
+    expect(state.careerA?.biggestWin).toBeNull();
+    expect(state.careerA?.biggestLoss).toBeNull();
+    expect(state.careerA?.venues).toEqual([]);
+    // The paired coach's real career still resolves alongside it.
+    expect(state.careerB?.totals.games).toBeGreaterThan(0);
+  });
+
+  it('resolves both careers for a coach-only + player-linked pair', async () => {
+    const idA = await coachOnlyId();
+    const idB = await playerLinkedId();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idB) });
+
+    expect(state.kind).toBe('selected');
+    if (state.kind !== 'selected') return;
+
+    expect(state.careerA?.coachId).toBe(idA);
+    expect(state.careerB?.coachId).toBe(idB);
+  });
+
+  it('does not attempt career comparison for the unselected state', async () => {
+    const state = await resolveCoachCompareState({});
+    expect('careerA' in state).toBe(false);
+    expect('careerB' in state).toBe(false);
+  });
+
+  it('does not attempt career comparison for the same-coach state', async () => {
+    const [idA] = await distinctCoachIds();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idA) });
+    expect(state.kind).toBe('same-coach');
+    expect('careerA' in state).toBe(false);
+    expect('careerB' in state).toBe(false);
+  });
+
+  it('does not attempt career comparison for the invalid/stale state', async () => {
+    const [idA] = await distinctCoachIds();
+    const staleId = await unusedCoachId();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(staleId) });
+    expect(state.kind).toBe('invalid');
+    expect('careerA' in state).toBe(false);
+    expect('careerB' in state).toBe(false);
   });
 });
