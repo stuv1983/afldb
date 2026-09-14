@@ -7,7 +7,16 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 2 tracked here — `-156`, `-169`.
+**Open issues:** 1 tracked here — `-156`.
+
+<!-- 2026-09-14 (AFLDB-ISSUE-169 RESOLVED — operator disabled Cloudflare Web Analytics / RUM
+     injection at the edge for the `afldb.com` zone (was "Enable, excluding visitor data in the
+     EU," changed to "Disable"), matching the investigation's recommendation. Post-change fresh
+     browser validation against `beta.afldb.com` showed zero requests matching `cloudflareinsights`,
+     `beacon.min.js` or `static.cloudflareinsights.com`. No application, CSP, or deployment
+     configuration changed — Cloudflare-edge-only fix. Open issue count 2 -> 1. Removed from this
+     table and from `IssuesIndex.md`. See the AFLDB-ISSUE-169 entry above, section
+     *Resolution (2026-09-14)*, and `AFLDB-ISSUE-169.md`. -->
 
 <!-- 2026-09-13 (AFLDB-ISSUE-165 RESOLVED — Stage 8 rendered acceptance restarted from 8.1 after the
      §20.3 CSS fix was committed, pushed and redeployed to DEV, and is now fully PASS: Contributor /
@@ -1276,7 +1285,22 @@ created, reopened, resolved, or materially reclassified.
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+<!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-169` is **Resolved** and is NO LONGER an open issue. The
+     operator disabled Cloudflare Web Analytics / RUM injection at the edge for the `afldb.com`
+     zone (was "Enable, excluding visitor data in the EU," changed to "Disable"), matching the
+     investigation's recommended disposition. Post-change fresh browser validation against
+     `beta.afldb.com` showed zero requests matching `cloudflareinsights`, `beacon.min.js` or
+     `static.cloudflareinsights.com`. No application, CSP, or deployment configuration changed —
+     Cloudflare-edge-only fix. Authoritative record: the `AFLDB-ISSUE-169` entry above, *Resolution
+     (2026-09-14)*, and `AFLDB-ISSUE-169.md`. The pre-resolution row below is lineage only and its
+     "OPEN" text is SUPERSEDED.
 | `AFLDB-ISSUE-169` | Low | Security headers / CSP / Cloudflare edge configuration / Privacy posture | **OPEN — INVESTIGATED 2026-09-14; DISPOSITION RECOMMENDED; NO CODE CHANGE MADE.** Cloudflare's edge-injected Web Analytics beacon (`https://static.cloudflareinsights.com/beacon.min.js`) is refused by `script-src 'self' 'unsafe-inline'` on every page load of `beta.afldb.com` — 31 of the 44 console errors in the 2026-09-14 `AFLDB-ISSUE-156` P4 PROD acceptance, and re-observed in four earlier runs since `AFLDB-ISSUE-126`. **The CSP is not defective:** `src/app/privacy/page.tsx:24-31` publishes to users that there is no third-party analytics, that nothing they do is sent to another company, and that the CSP enforces this in the browser rather than promising it — allow-listing the beacon would falsify all three. Nothing leaks today: the script never executes, so no visitor data reaches Cloudflare. **Recommended disposition: disable Web Analytics / RUM injection for the `afldb.com` zone at the Cloudflare dashboard — no repository change.** Were it ever allow-listed, the change is `script-src` only, one exact path (`connect-src 'self'` already covers the same-origin `/cdn-cgi/rum` POST under edge-injected setup) and must be made in **both** `next.config.ts:42-58` and `deploy/Caddyfile.production:71`, because Caddy's `header` directive replaces the upstream field and silently wins on PROD. **Next action: operator decision in the Cloudflare dashboard** — confirm which hostnames injection is enabled for, then disable, or take the alternative path starting with the `/privacy` rewrite. No DEV acceptance is possible (no Cloudflare edge in front of `:8090`, so the beacon is never injected there). Full record: `AFLDB-ISSUE-169.md`. |
+-->
+<!-- Open issues continue. The header is repeated because the retired ISSUE-169 row above
+     interrupts the table. -->
+
+| Issue | Severity | Area | Current state |
+|---|---|---|---|
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-168` is **Resolved on DEV**. Merged to `main` (`9e97c90`)
      and deployed to DEV (`9e97c9091f2e5dd662f7166408de8d70b8a495f8`); manual read-only DEV
      acceptance confirmed the suggested-player link resolves via the canonical slug-plus-id route
@@ -28604,12 +28628,12 @@ above and in `AFLDB-ISSUE-168.md`.
 
 ## AFLDB-ISSUE-169 — Cloudflare Web Analytics blocked by site CSP
 
-- **Status:** **OPEN — INVESTIGATED 2026-09-14; DISPOSITION RECOMMENDED; NO CODE CHANGE MADE.**
-  The investigation is complete. The conclusion is that **AFLDB's CSP is not defective** — it is
-  enforcing, exactly as written, a commitment the site publishes to its users on `/privacy` — so
-  the correct fix is **at the Cloudflare edge, not in this repository**. Stays OPEN pending an
-  operator decision in the Cloudflare dashboard; there is no implementation to accept and no DEV
-  acceptance is possible.
+- **Status:** **RESOLVED 2026-09-14.** Investigated 2026-09-14; the conclusion was that **AFLDB's
+  CSP was not defective** — it was enforcing, exactly as written, a commitment the site publishes
+  to its users on `/privacy` — so the correct fix was **at the Cloudflare edge, not in this
+  repository**. The operator has since applied that fix: Cloudflare Web Analytics / RUM changed
+  from "Enable, excluding visitor data in the EU" to "Disable." See *Resolution (2026-09-14)* below.
+  No repository code, CSP, or deployment configuration was changed.
 - **Severity:** Low
 - **Area:** Security headers / CSP (`next.config.ts`, `deploy/Caddyfile.production`) / Cloudflare
   edge configuration / Privacy posture
@@ -28671,8 +28695,10 @@ frame-ancestors 'none'; base-uri 'self'; object-src 'none'
 Nothing in the repository references Cloudflare Web Analytics — no `<Script>` tag, no component,
 no flag, no documentation. `issues/closed/AFLDB-ISSUE-137.md:685` records the live path as
 **Cloudflare → Caddy → Node**, so the zone is proxied and the beacon is inserted by Cloudflare's
-automatic setup at the edge. It was enabled at some point in the Cloudflare dashboard — it is not
-on by default — but no record of that decision exists here.
+automatic setup at the edge. It was enabled at some point in the Cloudflare dashboard, but no
+record of that decision existed here. (An earlier version of this entry additionally asserted "it
+is not on by default" with no cited authoritative basis; that claim is withdrawn — see *Resolution
+(2026-09-14)* for the operator's actual dashboard reading.)
 
 **Which directives would actually be required: `script-src` only.** Cloudflare's documentation
 distinguishes automatic from manual setup. Under automatic (edge-injected) setup — AFLDB's case —
@@ -28752,19 +28778,40 @@ would ship unnoticed. A focused policy-shape test plus a string-equality check b
 definitions would close both cheaply — a reasonable follow-up, deliberately not done under an
 issue that changes no policy and so has no behaviour to regression-test.
 
-### Status
+### Status (as investigated, pre-resolution)
 
 Repository: no change, tracking only (`AFLDB-ISSUE-169.md`, this entry, `IssuesIndex.md`).
 DEV: unaffected and untestable for this behaviour. PROD: unchanged — beacon still injected, still
 blocked, still one console error per page load, still no visitor data reaching Cloudflare; no
-production system was touched.
+production system was touched. See *Resolution (2026-09-14)* below for the operator action taken
+since.
+
+### Resolution (2026-09-14)
+
+**Root cause:** Cloudflare Web Analytics / RUM was enabled at the edge for the `afldb.com` zone and
+automatically injecting its beacon into every response, on a site whose published `/privacy`
+commitment and intentional CSP prohibit third-party analytics. The CSP was correctly blocking the
+injected script; it was never the defect.
+
+**Operator evidence, Cloudflare Dashboard → Web Analytics → Manage site:** configured hostname
+`afldb.com`; RUM was enabled, mode "Enable, excluding visitor data in the EU," with Cloudflare
+stating the JS snippet would be automatically injected outside the EU (this settles the one fact
+the original investigation could not establish from the repository alone). Advanced Options exposed
+no configurable Web Analytics Rules on the current plan. The operator changed the setting to
+"Disable"; Cloudflare confirmed the JS snippet would not be injected, and the setting was saved.
+
+**Fix:** Cloudflare Web Analytics / RUM changed from "Enable, excluding visitor data in the EU" to
+"Disable," at the Cloudflare edge only — matching the original recommendation exactly.
+
+**Validation:** fresh-browser-session reload of `beta.afldb.com` showed zero Network requests
+matching `cloudflareinsights`, `beacon.min.js`, or `static.cloudflareinsights.com`.
+
+No application, CSP, or deployment configuration was changed — no file under `src/`, `deploy/`, or
+`next.config.ts` was touched, at investigation or at closure. Full record: `AFLDB-ISSUE-169.md`
+*Resolution (2026-09-14)*.
 
 ### Next action
 
-**Operator decision in the Cloudflare dashboard**, which this repository cannot make or observe:
-confirm which hostnames Web Analytics / RUM injection is enabled for (`beta.afldb.com`,
-`afldb.com`, or both — the one fact the investigation could not establish, and the one that
-determines whether anything is being lost today), then either disable it per the recommendation or
-consciously take the alternative path starting with the `/privacy` rewrite. Close on that decision.
-If the decision is "disable", the closing evidence is a clean browser console on the next PROD
-acceptance run — a check that already happens every time.
+None. Follow-up (not blocking, not part of this issue): `AFLDB-ISSUE-169.md` §9's two
+recorded-not-acted-on observations (no test covers any security header; the Next/Caddy CSP strings
+are hand-synchronised with no drift detection) remain open for a future issue if picked up.

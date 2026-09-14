@@ -1,11 +1,13 @@
 # AFLDB-ISSUE-169 — Cloudflare Web Analytics blocked by site CSP
 
-**Status:** **OPEN — INVESTIGATED, DISPOSITION RECOMMENDED, NO CODE CHANGE MADE (2026-09-14).**
-The investigation is complete and the conclusion is that **AFLDB's CSP is not defective**: it is
-enforcing, exactly as written, a commitment the site publishes to its users on `/privacy`. The
-correct fix is therefore **at the Cloudflare edge, not in this repository**, and the decision is
-an operator/product one. This issue stays OPEN pending that operator decision; there is no
-implementation to DEV-accept and no DEV acceptance is possible (see *Why DEV cannot validate this*).
+**Status:** **RESOLVED 2026-09-14.**
+The investigation (§1–§9 below) concluded that **AFLDB's CSP was not defective**: it was enforcing,
+exactly as written, a commitment the site publishes to its users on `/privacy`. The correct fix was
+therefore **at the Cloudflare edge, not in this repository**, and the decision was an
+operator/product one (§6, §11). The operator has since taken that decision: Cloudflare Web
+Analytics / RUM was disabled at the edge. See *Resolution (2026-09-14)* at the end of this file for
+the actual root cause, fix and validation. No repository code, CSP, or deployment configuration was
+changed at any point in this issue's lifecycle.
 
 **Branch:** `opus/issue-169-cloudflare-analytics-csp`
 **Worktree:** `D:\dev\afldb-issue-169`
@@ -110,10 +112,13 @@ curl -sSI http://<dev-host>:8090/ | grep -i '^content-security-policy'
   **Cloudflare → Caddy → Node**, so the zone is proxied. Cloudflare Web Analytics' *automatic
   setup* rewrites HTML at the edge to insert the beacon; that is the only mechanism consistent
   with a script AFLDB never authored appearing on every page.
-- **Enabled deliberately at some point, by someone, in the Cloudflare dashboard** — it is not on by
-  default — but **no record of that decision exists in this repository**, and no AFLDB
-  documentation mentions Cloudflare at all. Cloudflare-side configuration is state this repository
-  cannot see; the dashboard is the only authority for which hostnames it is enabled on.
+- **Enabled at some point in the Cloudflare dashboard**, but **no record of that decision exists in
+  this repository**, and no AFLDB documentation mentions Cloudflare at all. Cloudflare-side
+  configuration is state this repository cannot see; the dashboard is the only authority for which
+  hostnames it is enabled on. (An earlier version of this section additionally asserted "it is not
+  on by default" — that claim had no cited authoritative basis and is withdrawn; see *Resolution
+  (2026-09-14)*, which records the operator's dashboard reading of the actual enabled setting
+  instead.)
 
 **Unknown, and it matters (see §6):** whether the beacon is also being injected into the apex
 `afldb.com` coming-soon page. The 2026-09-14 acceptance covered `beta.afldb.com` only. The apex
@@ -298,7 +303,7 @@ behaviour to regression-test.
 
 ---
 
-## 10. Status
+## 10. Status (as investigated, pre-resolution)
 
 | Environment | State |
 |---|---|
@@ -306,7 +311,10 @@ behaviour to regression-test.
 | DEV | Unaffected and untestable for this behaviour (§8). No Cloudflare edge. |
 | PROD (`beta.afldb.com`) | Unchanged. Beacon still injected, still blocked, still one console error per page load. **No visitor data reaches Cloudflare Web Analytics.** No deployment performed under this issue. |
 
-## 11. Next action
+This table reflects state at the time of investigation (§1–§9). See *Resolution (2026-09-14)* below
+for the operator action taken since and the final state.
+
+## 11. Next action (superseded — see Resolution)
 
 **Operator decision at the Cloudflare dashboard**, which this repository cannot make or observe:
 
@@ -319,3 +327,43 @@ behaviour to regression-test.
 Close this issue once that decision is taken and recorded here. If the decision is "disable", the
 closure evidence is a clean browser console on the next PROD acceptance run — a check that already
 happens every time, at no extra cost.
+
+---
+
+## Resolution (2026-09-14)
+
+**Root cause** (unchanged from §5.3/§6 above): Cloudflare Web Analytics / RUM was enabled at the
+edge for the `afldb.com` zone and was automatically injecting its beacon (`beacon.min.js`) into
+every response on a site whose published `/privacy` commitment and intentional CSP prohibit
+third-party analytics. The CSP was correctly blocking the injected script; the CSP was never the
+defect.
+
+**Operator evidence, Cloudflare Dashboard → Web Analytics → Manage site:**
+
+1. Before the change:
+   - Configured hostname: `afldb.com`.
+   - Real User Measurements (RUM) was **enabled**.
+   - Selected mode: **"Enable, excluding visitor data in the EU."** This answers the one fact §3/§11
+     could not establish from the repository alone — the beacon was live for this hostname, with
+     Cloudflare stating the JS snippet would be automatically injected outside the EU.
+   - Advanced Options exposed no configurable Web Analytics Rules on the current plan.
+2. The operator changed the setting to **"Disable."** Cloudflare confirmed: "The JS Snippet will not
+   be injected and has been disabled." The setting was saved.
+
+**Fix:** Cloudflare Web Analytics / RUM changed from "Enable, excluding visitor data in the EU" to
+"Disable," at the Cloudflare edge only. This matches the §6 recommendation exactly.
+
+**Validation:** Post-change browser validation against `beta.afldb.com` in a fresh browser session
+showed **zero** Network requests matching `cloudflareinsights`, `beacon.min.js`, or
+`static.cloudflareinsights.com`.
+
+**No application, CSP, or deployment configuration was changed.** No file under `src/`, `deploy/`,
+or `next.config.ts` was touched at any point in this issue's lifecycle, in the original
+investigation or in this closure. `script-src 'self' 'unsafe-inline'` is exactly as it was; the
+`/privacy` page's claim that there is no third-party analytics is now true both by construction (the
+CSP) and in actual Cloudflare-edge configuration.
+
+**Follow-up (not blocking, not part of this issue):** §9's two recorded-not-acted-on observations
+(no test covers any security header; the Next/Caddy CSP strings are hand-synchronised with no drift
+detection) remain open observations for a future issue if someone chooses to pick them up. Neither
+is a regression caused by or related to this resolution.
