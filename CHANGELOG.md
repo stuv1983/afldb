@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Cloudflare Web Analytics injection disabled at the edge, preserving the no-third-party-analytics privacy commitment (AFLDB-ISSUE-169) - 14 September 2026
+
+- Cloudflare Web Analytics / RUM was found enabled at the edge for the `afldb.com` zone, silently
+  injecting a third-party analytics beacon into every page load. AFLDB's CSP was correctly blocking
+  it, so no visitor data ever reached Cloudflare — but the edge configuration contradicted the
+  site's published `/privacy` commitment that there is no third-party analytics. Web Analytics / RUM
+  was changed from "Enable, excluding visitor data in the EU" to "Disable," so the edge no longer
+  attempts to inject it at all.
+- This is a Cloudflare dashboard change only. No application code, CSP or deployment configuration
+  changed.
+
 ### The Admin Centre batch, the awards and special-record lifecycles and the player-link recalibration are live in production (AFLDB-ISSUE-156) - 14 September 2026
 
 - Production was 50 commits behind and is now deployed at `a5c4a04`, with migrations `099`, `100`,
