@@ -1,8 +1,9 @@
 ﻿# AFLDB-ISSUE-170 — Coach profile expansion and coach comparison
 
-**Status:** IN PROGRESS — Stage 0 discovery COMPLETE; Stages 1A–1D and 2A–2D implemented and
-committed; Stage 1E (route-contextual profiles, the acceptance correction) implemented, browser
-accepted, UNCOMMITTED. `CHANGELOG.md` entry owed when the feature lands.
+**Status:** RESOLVED 2026-09-14 — Stage 0 discovery COMPLETE; Stages 1A–1E and 2A–2D implemented,
+committed (`798e28b`, `2d6c9d1`, `2c0b8c6`, `36835b1`, `560dddb`, `51eb138`) and browser-accepted.
+See the `AFLDB-ISSUE-170` entry in `issues.md` for the authoritative resolution record and
+validation evidence. `CHANGELOG.md` entry added under Unreleased.
 **Area:** Public coaches / Player coaching history / Comparison
 **Created:** 2026-09-14
 **Branch:** `feature/issue-170-coach-overhaul`

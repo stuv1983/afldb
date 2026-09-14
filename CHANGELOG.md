@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### Coach profiles gained a full historical record and a two-coach comparison surface (AFLDB-ISSUE-170) - 14 September 2026
+
+- `/coaches/[slug]` now renders a coach-oriented profile for every coach, including a person who
+  also played — career totals (with W–L–D added to the stat strip), club history, biggest win and
+  biggest loss, venue history, and record against a selected opponent club scoped by club
+  organisation lineage. The permanent redirect that previously sent a player-linked coach's coach
+  URL to their player page was removed, so `/coaches/[slug]` and `/players/[slug]` are now each
+  self-canonical (linked via `sameAs`) rather than one being an alias of the other; the pages
+  cross-link with "View coaching career →" and "View playing career →". `coachProfilePath` now
+  always resolves to the coach route, so roughly 368 previously-redirecting coach pages are
+  sitemap-published for the first time.
+- Added `/coaches/compare` for two-coach comparison: side-by-side career totals, direct
+  head-to-head derived only from matches where both coaches were assigned to opposing clubs,
+  finals/Grand Final meeting context, venue records, career-overlap seasons, and first/latest
+  direct meetings. Fixed a mobile layout overflow on the comparison page (reduced from roughly
+  782–785px to 375px of page width against a 390px viewport).
+- All figures are derived from canonical `coaches` / `match_coaches` / `matches` / `clubs` /
+  `venues` data; no new tables or stored coach summaries were introduced.
+
 ### Cloudflare Web Analytics injection disabled at the edge, preserving the no-third-party-analytics privacy commitment (AFLDB-ISSUE-169) - 14 September 2026
 
 - Cloudflare Web Analytics / RUM was found enabled at the edge for the `afldb.com` zone, silently
