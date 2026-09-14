@@ -15,6 +15,39 @@ commit.
 
 ## [Unreleased]
 
+### Curated special records gain a correction, suppression and replacement lifecycle (AFLDB-ISSUE-167, ISSUE-156 P4) - 14 September 2026
+
+- The two curated special-record families — first-kick goals (`/records/first-kick-goal`) and kicks
+  after the siren (`/records/after-the-siren`) — could be loaded from their tracked sources and read,
+  and nothing else. A wrong row could only be repaired by editing the source manifest and reloading.
+  A Super Admin can now **create, correct, suppress, reinstate and replace** one from
+  **Admin Centre → Data → Special records**.
+- **Suppressing is not deleting.** A suppressed record needs a written reason, leaves every public
+  surface, and is kept — so the decision, its reason and its audit history survive, and a rebuild
+  re-asserts it rather than losing it. Reinstating restores the record without erasing the earlier
+  suppression. A wrong *identity* — the wrong person, the wrong match, a source record id belonging
+  to something else — is repaired by Replace, which suppresses the old record and records the
+  correct one as a single change, never by editing the identity in place.
+- Gated by a new permission, `data.specialRecords.edit`, enforced on the server for every action
+  rather than by hiding buttons. Admins keep read access to every record, its provenance and its
+  full history and see no way to change one; a Contributor reaches none of it.
+- **Every change is durable and audited together.** The record, the operator's decision and the
+  audit entry are written in one transaction — if any part fails, none of it happens — and the
+  decision is stored so the next import, and a full database rebuild, re-apply it instead of
+  quietly reverting it.
+- **Two people cannot overwrite each other.** A form opened before the record changed is refused
+  with a plain message and writes nothing at all, rather than silently applying stale values over
+  someone else's work or an importer's.
+- Affected public pages are refreshed after a change is saved, through a fixed list of allowed
+  pages, and the browser is never left waiting on the save.
+- **Deleting a match that carries a curated special record is now refused** with a message naming
+  the record and where to go instead. Previously a match deletion silently destroyed a first-kick
+  record as collateral, and an after-the-siren record turned the same deletion into an unreadable
+  database error.
+- Migration `102_special_records_lifecycle.sql` is applied to the **test database only**. This work
+  is not deployed: DEV and production are unchanged, and `AFLDB-ISSUE-167` remains open — the
+  promotion-inventory and deployment stages are still to come.
+
 ### Admin pages now refuse an unauthorised request with a real HTTP redirect (AFLDB-ISSUE-166) - 13 September 2026
 
 - Refusing to show someone an admin page they may not see is supposed to be an HTTP redirect. For

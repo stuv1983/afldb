@@ -6,8 +6,12 @@ import { RecordHistory } from '@/app/admin/awards/RecordHistory';
 import {
   FAMILY_PUBLIC_PATHS, RECORDS_ROOT, durableIdentityOf, familyListPath,
 } from '@/app/admin/records/labels';
+import { AfterSirenCorrectionPanel } from '@/app/admin/records/AfterSirenCorrectionPanel';
 import { RecordsCrumb, SpecialRecordFacts } from '@/app/admin/records/SpecialRecordFacts';
+import { SpecialRecordLifecyclePanel } from '@/app/admin/records/SpecialRecordLifecyclePanel';
+import { SpecialRecordReplacePanel } from '@/app/admin/records/SpecialRecordReplacePanel';
 import { provenanceOf, readAfterSirenKick } from '@/db/queries/admin-special-records';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { clubPath, matchPath, seasonPath } from '@/lib/format';
 
@@ -30,10 +34,11 @@ const EFFECT_SENTENCES: Record<string, string> = {
  * FIVE FIELDS THAT CANNOT MOVE INDEPENDENTLY, shown together for that reason:
  * `kick_scored`, `kick_effect`, `kicker_result`, `siren` and the margin
  * arithmetic over `kicker_points` / `opponent_points` are coupled by migration
- * 089's `_effect_ck`, `_regulation_ck` and `_points_ck`. Stage 3 only displays
- * them; when Stage 6 makes them correctable the form must validate the
- * relationships in the action and return a readable error rather than surface
- * a raw constraint violation (§10.3).
+ * 089's `_effect_ck`, `_regulation_ck` and `_points_ck`. Stage 6's correction
+ * panel edits them as one group and validates the whole combination -- in the
+ * panel, again in the action, and finally in the CHECK constraints themselves
+ * -- from one pure rule module, so a refused combination reads as a sentence
+ * about football rather than a constraint name (§10.3).
  *
  * `cited` IS NOT LIFECYCLE (gate G-3). It says the SOURCE carried no reference
  * for a kick that happened, which is an evidence gap kept rather than dropped.
@@ -47,7 +52,7 @@ const EFFECT_SENTENCES: Record<string, string> = {
 export default async function AfterTheSirenDetailPage(
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireCapability('data.specialRecords.read');
+  const admin = await requireCapability('data.specialRecords.read');
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
@@ -57,6 +62,12 @@ export default async function AfterTheSirenDetailPage(
 
   const entityKey = durableIdentityOf(row.sourceKey, row.sourceRecordId);
   const margin = row.kickerPoints - row.opponentPoints;
+  // Furniture, not a gate -- the boundary is requireCapability() inside every
+  // action in `src/app/admin/records/actions.ts`, which a direct POST reaches.
+  const canEdit = hasCapability(admin, 'data.specialRecords.edit');
+  const summary = `${row.playerDisplayName ?? row.playerNameRaw} -- after the siren, `
+    + `${row.season} ${row.roundRaw} v ${row.opponentNameRaw} `
+    + `(${row.sourceRecordId ?? `#${row.id}`})`;
 
   return (
     <>
@@ -210,6 +221,32 @@ export default async function AfterTheSirenDetailPage(
           the model working rather than a gap.
         </p>
       </section>
+
+      {canEdit ? (
+        <>
+          <AfterSirenCorrectionPanel row={row} />
+          <SpecialRecordLifecyclePanel
+            family="after-the-siren"
+            rowId={row.id}
+            expectedUpdatedAt={row.updatedAt}
+            status={row.status}
+            statusReason={row.statusReason}
+          />
+          {row.status === 'active' && (
+            <SpecialRecordReplacePanel
+              family="after-the-siren"
+              rowId={row.id}
+              expectedUpdatedAt={row.updatedAt}
+              currentSummary={summary}
+            />
+          )}
+        </>
+      ) : (
+        <p className="muted">
+          Correcting, suppressing, reinstating, replacing and creating a special record are Super
+          Admin actions.
+        </p>
+      )}
 
       <RecordHistory table="after_siren_kicks" rowId={row.id} />
     </>

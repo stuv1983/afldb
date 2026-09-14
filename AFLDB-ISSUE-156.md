@@ -353,7 +353,7 @@ contract remaps.
 | P3c | **AFLDB-ISSUE-161** | Season list administration — authoritative club playing lists per season | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3b | medium (player–club–season model; one migration) | §P3c below — Stage 1 AND Stage 2 complete 2026-09-11 (D-3 evidence gate passed, migration 096, replay/promotion classification proven). **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 096 applied on DEV) |
 | P3d | **AFLDB-ISSUE-162** | Fixture / season schedule administration — a future season's schedule inside AFLDB | new (no ISSUE-155 phase) — inserted 2026-09-11, stacked on P3c | medium-high (new canonical table beside `matches`; one migration; promotion lineage) | §P3d below — Stage 1 (`cb98c67`) and Stage 2 (`6a9fbc4`) validated; the DEV-rollout client/server boundary fix and cleared-date fix committed. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 097 applied on DEV, production build PASS); the all-refs 097 collision check is a closeout operator command |
 | P3e | **AFLDB-ISSUE-163** | Club leadership administration and current-captain display | new (no ISSUE-155 phase) — inserted 2026-09-12, stacked on P3d; the batch's first item with public output | medium (club–season–player model; one migration; public club page) | §P3e below — D-1…D-18 signed off with four clarifications; both stages validated (`ea9f3dd`), audit found no deviation. **RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance (`main` `3272434`, 098 applied on DEV); §34.4 items 1–3 carried as follow-ups |
-| P4 | **AFLDB-ISSUE-167** | Special records — first-kick / after-siren (family deferred pending decision D-1) | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe — see §P4 handoff contract below. **Allocated and planned 2026-09-13; Stages 0–5 complete, committed and pushed on `opus/issue-167-special-records-admin` (Stage 5 = `e8b44f6`) as at 2026-09-14; not merged, undeployed; Stage 6 next** |
+| P4 | **AFLDB-ISSUE-167** | Special records — first-kick / after-siren (family deferred pending decision D-1) | Phase E (§23, §12) | medium-high | suppress operation proven reload-safe — see §P4 handoff contract below. **Allocated and planned 2026-09-13; Stages 0–6 complete as at 2026-09-14 — Stages 0–5 committed and pushed on `opus/issue-167-special-records-admin` (tracking reconcile `c5a0df7`), Stage 6 (the Super Admin mutation surface) green but UNCOMMITTED; not merged, undeployed; Stage 7 next** |
 | P5 | **AFLDB-ISSUE-165** | Awards and honours correction lifecycle | §5, §12 tail | medium | never a second Brownlow authority — see §P5 handoff contract below. **Stages 1–7 complete 2026-09-13; uncommitted, undeployed; Stage 8 DEV rollout blocked on the operator commit/push** |
 | P6 | placeholder | Site content and versioning | Phase F (§23, §11) | medium | reuse root-layout revalidation |
 | P7 | placeholder | Safe refresh and operational controls | Phase G (§23, §13) | high | allowlist + single-flight + settle-timer interaction proven |
@@ -934,10 +934,14 @@ administration and durable suppression — in a planning-only session on
 `opus/issue-167-special-records-admin`. See the §P4 handoff contract at the end of this document.
 P6, P7, P9–P12 remain unallocated placeholders.
 
-**Updated 2026-09-14.** ISSUE-167 Stages 0–5 are complete and **committed and pushed** on that
-branch (Stage 5 = `e8b44f6`, `HEAD = @{u}`, clean worktree). **Not merged to `main`; DEV and PROD
-are not migrated or deployed.** Stage 6 (mutations, atomic audit, CAS, revalidation) is the next
-action; no stop condition is open.
+**Updated 2026-09-14.** ISSUE-167 Stages 0–6 are complete. Stages 0–5 are **committed and
+pushed** on that branch (tracking reconcile `c5a0df7`, `HEAD = @{u}`); **Stage 6 — the Super Admin
+mutation surface, its atomic audit, compare-and-swap, bounded revalidation and the closed
+match-delete destruction path — is green but UNCOMMITTED.** **Not merged to `main`; DEV and PROD
+are not migrated or deployed.** Stage 7 (promotion inventory, `db:promotion-check`, `npm run
+build`) is the next action; no stop condition is open. `data.specialRecords.edit` is now declared
+and enforced, so **D-4's capability pair is complete** and the umbrella's capability table is
+current.
 
 ---
 
@@ -1070,10 +1074,11 @@ in `src/db/queries/awards.ts` left unfiltered by the new status predicate.
 **Allocated 2026-09-13** on `opus/issue-167-special-records-admin`; **Stage 0 allocation proof PASS**
 the same day (HEAD = `main` = `origin/main` = `bb2e0af`, nothing ahead or behind; one ISSUE-167
 worktree; no 167 branch or commit anywhere in history; `git diff --check` clean). That session was
-planning only. **Status 2026-09-14: Stages 0–5 are complete, committed and pushed** on
-`opus/issue-167-special-records-admin` (planning `9faba6f`, Stage 2 `8d9ac74`, Stage 3 `2a54444`,
-Stage 4 `5de87dd`, Stage 5 `e8b44f6`; `HEAD = @{u}`; worktree clean); **not merged to `main`, and
-neither DEV nor PROD is migrated or deployed**; Stage 6 is the next action. **Six operator decisions
+planning only. **Status 2026-09-14: Stages 0–6 are complete.** Stages 0–5 are **committed and
+pushed** on `opus/issue-167-special-records-admin` (planning `9faba6f`, Stage 2 `8d9ac74`, Stage 3
+`2a54444`, Stage 4 `5de87dd`, Stage 5 `e8b44f6`, tracking reconcile `c5a0df7`; `HEAD = @{u}`), and
+**Stage 6 is green but UNCOMMITTED**; **not merged to `main`, and neither DEV nor PROD is migrated
+or deployed**; Stage 7 is the next action. **Six operator decisions
 are recorded — D-1…D-5 (2026-09-13) and D-6 (2026-09-14, do not re-baseline the drifted Grid Solver
 / NL after-siren fixtures); no stop condition is open.** The authoritative contract is
 `AFLDB-ISSUE-167.md`; this is the umbrella's summary. Inherited scope is the transferred

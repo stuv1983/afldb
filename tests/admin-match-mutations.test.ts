@@ -213,4 +213,50 @@ describe('admin match mutation source contracts', () => {
     expect(dataEdits.indexOf('recomputeSeasonMetadata(tx, match.season)'))
       .toBeLessThan(dataEdits.indexOf('recomputePlayerDerivedStats(tx, affectedIds, match.season)'));
   });
+
+  // AFLDB-ISSUE-167 §8.3, the THIRD destruction path — the one outside both
+  // importers, which no reload-survival mechanism covered.
+  //
+  // Until Stage 6, deleting a match ran `DELETE FROM player_achievements WHERE
+  // match_id = $1` and silently destroyed a curated first-kick-goal record: a
+  // Phase E fact with its own durable `data_overrides` decision and its own
+  // audit trail, gone as collateral, with the override left naming nothing.
+  // `after_siren_kicks.match_id` was not deleted there at all — migration 089
+  // declares it `REFERENCES matches(id)` with no ON DELETE clause, so the
+  // default NO ACTION turned the same delete into a raw foreign-key violation,
+  // which is not control flow a Data Editor user can act on.
+  it('refuses to delete a match carrying a curated special record (AFLDB-ISSUE-167)', () => {
+    // Read as CODE, not prose: the refusal's own comment quotes the statement
+    // it replaced, and a comment must never be what satisfies or defeats this.
+    const code = matchAdmin
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ 	]*\/\/.*$/gm, '');
+    // Neither table may be deleted from here, ever again.
+    expect(code).not.toMatch(/DELETE\s+FROM\s+player_achievements/i);
+    expect(code).not.toMatch(/DELETE\s+FROM\s+after_siren_kicks/i);
+
+    // Both families are inspected, and both by match_id.
+    expect(matchAdmin).toContain('player_achievements WHERE match_id');
+    expect(matchAdmin).toContain('after_siren_kicks WHERE match_id');
+
+    // The refusal is actionable in the shape §8.3 asks for: it says the match
+    // cannot be deleted, names the records, and says where to go instead.
+    expect(matchAdmin).toContain('cannot be deleted');
+    expect(matchAdmin).toContain('Suppress or reassign');
+    expect(matchAdmin).toContain('/admin/records/');
+  });
+
+  it('makes that refusal before anything destructive runs', () => {
+    // The same discipline the Brownlow refusal already follows: refuse first,
+    // rather than raise a foreign-key violation part-way through a delete.
+    const collateral = matchAdmin.indexOf('const collateral = await tx');
+    const firstDestruction = matchAdmin.search(
+      /clearPlayerClubMatchReferences\(tx|DELETE\s+FROM\s+player_match_stats/i,
+    );
+    expect(collateral).toBeGreaterThan(-1);
+    expect(firstDestruction).toBeGreaterThan(-1);
+    expect(collateral).toBeLessThan(firstDestruction);
+    // And it stays beside the Brownlow refusal it is modelled on.
+    expect(matchAdmin).toContain('carries a Brownlow vote entry');
+  });
 });

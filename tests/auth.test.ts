@@ -378,20 +378,73 @@ describe('capability policy', () => {
     // already gives an Admin the full data_edits trail. Reading a special
     // record's provenance, lifecycle state and void reason widens no boundary
     // that exists today.
-    //
-    // The .edit half of D-4 is NOT declared yet. It is a Super-Admin-only
-    // mutation capability and Stage 3 ships no mutation, so declaring it here
-    // would break the ISSUE-158 contract above ("enforces every declared
-    // capability at a real page, route or action boundary"). It is introduced
-    // in Stage 6, in the same change as its first guarded write. The final
-    // role matrix D-4 approved is unchanged: Contributor neither, Admin
-    // .read only, Super Admin both.
     expect(hasCapability(viewer('contributor'), 'data.specialRecords.read')).toBe(false);
     expect(hasCapability(viewer('contributor', true), 'data.specialRecords.read')).toBe(false);
     expect(hasCapability(viewer('admin'), 'data.specialRecords.read')).toBe(true);
     expect(hasCapability(viewer('super_admin'), 'data.specialRecords.read')).toBe(true);
-    // Until Stage 6 declares it, no .edit capability exists to be held by anyone.
-    expect(DECLARED_CAPABILITIES).not.toContain('data.specialRecords.edit');
+  });
+
+  it('keeps every special-record WRITE to a super admin (AFLDB-ISSUE-167 D-4, Stage 6)', () => {
+    // D-4's second half, declared at Stage 6 beside its first guarded mutation
+    // (§9.1). Create, correct, suppress, reinstate and replace are ALL writes
+    // under this one capability -- there is deliberately no separate
+    // `.suppress`, because both halves would be SUPER_ADMIN_ONLY and splitting
+    // them would separate nothing.
+    //
+    // The final role matrix D-4 approved, entire:
+    //     Contributor  read no   edit no
+    //     Admin        read yes  edit no
+    //     Super Admin  read yes  edit yes
+    expect(DECLARED_CAPABILITIES).toContain('data.specialRecords.edit');
+    expect(hasCapability(viewer('contributor'), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('contributor', true), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('admin'), 'data.specialRecords.edit')).toBe(false);
+    // can_manage_admins delegates people.admins.manage and nothing else: an
+    // Admin carrying it is still an Admin here.
+    expect(hasCapability(viewer('admin', true), 'data.specialRecords.edit')).toBe(false);
+    expect(hasCapability(viewer('super_admin'), 'data.specialRecords.edit')).toBe(true);
+  });
+
+  it('guards every special-record Server Action and the revalidate route with .edit', () => {
+    // Nav and button hiding are furniture. The boundary is the server-side
+    // call, and a direct POST by an Admin or a Contributor reaches this line
+    // either way -- so the assertion is about the ACTION source, not the page.
+    const actions = boundary('src/app/admin/records/actions.ts');
+    expect(actions, 'the Stage 6 special-record Server Actions module').toBeDefined();
+    const enforced = enforcedCapabilities(actions!.source);
+    expect(enforced.length).toBeGreaterThanOrEqual(10);
+    expect([...new Set(enforced)]).toEqual(['data.specialRecords.edit']);
+
+    // Every exported action, not merely the first one found.
+    const exported = topLevelAsyncFunctions(actions!.source).filter((fn) => fn.exported);
+    expect(exported.length).toBeGreaterThanOrEqual(10);
+    for (const fn of exported) {
+      expect(firstGuard(fn, new Map(topLevelAsyncFunctions(actions!.source).map((f) => [f.name, f]))),
+        `${fn.name} must assert the capability before it awaits anything else`)
+        .toBe('requireCapability');
+    }
+
+    // The bounded revalidation route finishes a mutation, so only a viewer who
+    // could have made one may reach it (the ISSUE-165 §5.6 precedent).
+    const route = boundary('src/app/admin/records/revalidate/route.ts');
+    expect(route, 'the Stage 6 bounded revalidation route').toBeDefined();
+    expect(enforcedCapabilities(route!.source)).toEqual(['data.specialRecords.edit']);
+  });
+
+  it('never calls revalidatePath() inside a special-record Server Action (R-7)', () => {
+    // revalidatePath() inside a Server Action hangs the Next 15.5 client
+    // (AFLDB-ISSUE-156 §7 R-7). The action returns the paths; the browser posts
+    // them to the allowlisted route AFTER the action has resolved.
+    const actions = boundary('src/app/admin/records/actions.ts');
+    expect(actions).toBeDefined();
+    // A CALL, not a mention: the module's own header explains the rule in
+    // prose, and prose must not be what this test is reading.
+    expect(actions!.source).not.toMatch(/\brevalidatePath\s*\(/);
+    expect(actions!.source).not.toContain('next/cache');
+
+    // The one place the call is allowed: the capability-gated allowlisted route.
+    const route = boundary('src/app/admin/records/revalidate/route.ts');
+    expect(route!.source).toContain('applyRevalidateRequest');
   });
 
   it('opens the audit trail to any admin and never to a contributor (AFLDB-ISSUE-157)', () => {
@@ -1188,9 +1241,12 @@ const EQUIVALENT_ROLE_GUARD: Record<Capability, 'requireUploader' | 'requireAdmi
   'data.awards.read': 'requireAdmin',
   'data.awards.edit': 'requireSuperAdmin',
   // AFLDB-ISSUE-167 D-4. Reading a curated special record widens nothing: the
-  // facts are already public pages. The .edit half arrives in Stage 6 with the
-  // first guarded mutation and will read 'requireSuperAdmin'.
+  // facts are already public pages. Correcting, suppressing, reinstating,
+  // replacing or creating one becomes a public fact immediately with no draft
+  // stage, so the edit half is a super admin's -- the same reasoning as
+  // data.awards.edit / data.coaches.edit / data.draft.edit.
   'data.specialRecords.read': 'requireAdmin',
+  'data.specialRecords.edit': 'requireSuperAdmin',
   'acquisition.legacyIntake': 'requireUploader',
   'acquisition.currentSeason': 'requireSuperAdmin',
   'people.betaAccess': 'requireAdmin',

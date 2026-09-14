@@ -28,9 +28,15 @@ vi.mock('@/db/client', () => ({
 }));
 
 import {
-  DEFAULT_ADMIN_STATUS_FILTER, SPECIAL_RECORD_STATUSES, isSpecialRecordLinkFilter,
-  isSpecialRecordProvenance, isSpecialRecordStatusFilter, provenanceOf,
+  AFTER_SIREN_CORRECTABLE, DEFAULT_ADMIN_STATUS_FILTER, FIRST_KICK_CORRECTABLE,
+  SPECIAL_RECORD_STATUSES, isSpecialRecordLinkFilter, isSpecialRecordProvenance,
+  isSpecialRecordStatusFilter, provenanceOf, uncorrectableFieldRefusal,
 } from '@/db/queries/admin-special-records';
+import {
+  AFTER_SIREN_CORRECTABLE_FIELDS, FIRST_KICK_CORRECTABLE_FIELDS,
+} from '@/app/admin/records/actions';
+import { isAllowedRevalidatePath } from '@/app/admin/records/revalidate-paths';
+import { validateAfterSirenEvent } from '@/lib/special-records/after-siren-rules';
 import { DATA_EDIT_TABLE_NAMES } from '@/db/queries/audit-log';
 import { LINK_TARGET_TABLES } from '@/db/queries/player-links';
 import { DATA_EDIT_TABLE_LABELS } from '@/lib/audit-view';
@@ -68,8 +74,14 @@ const RECORDS_PAGES = RECORDS_FILES.filter((f) => basename(f) === 'page.tsx');
 const QUERY_MODULE = readSource(join(REPO, 'src', 'db', 'queries', 'admin-special-records.ts'));
 const QUERY_CODE = withoutComments(QUERY_MODULE);
 
-/** The five routes Stage 3 ships, and no sixth. */
-const STAGE_3_ROUTES = [
+/**
+ * The five READ routes (Stage 3) and the two creation routes Stage 6 adds.
+ *
+ * The `/new` pair is a CREATION surface and could not ship before the mutation
+ * it implies: shipping the shell early would have been an edit seam with
+ * nothing behind it, which is why Stage 3 asserted its absence.
+ */
+const READ_ROUTES = [
   'src/app/admin/records/page.tsx',
   'src/app/admin/records/first-kick-goal/page.tsx',
   'src/app/admin/records/first-kick-goal/[id]/page.tsx',
@@ -77,23 +89,32 @@ const STAGE_3_ROUTES = [
   'src/app/admin/records/after-the-siren/[id]/page.tsx',
 ];
 
-describe('the Stage 3 route surface', () => {
-  it('ships exactly the five read-only routes, and no /new', () => {
-    expect(RECORDS_PAGES.map(repoPath).sort()).toEqual([...STAGE_3_ROUTES].sort());
-    // /admin/records/<family>/new is a CREATION route. It belongs to Stage 6
-    // with the mutation it implies, and shipping the shell early would be an
-    // edit seam with nothing behind it.
-    expect(RECORDS_FILES.map(repoPath).filter((p) => p.includes('/new/'))).toEqual([]);
+/** Guarded by `.edit`, not `.read`: every path they reach is a mutation. */
+const CREATE_ROUTES = [
+  'src/app/admin/records/first-kick-goal/new/page.tsx',
+  'src/app/admin/records/after-the-siren/new/page.tsx',
+];
+
+describe('the records route surface', () => {
+  it('ships exactly the five read routes and the two creation routes', () => {
+    expect(RECORDS_PAGES.map(repoPath).sort())
+      .toEqual([...READ_ROUTES, ...CREATE_ROUTES].sort());
   });
 
-  it('enforces data.specialRecords.read server-side on every one of them', () => {
+  it('enforces a special-records capability server-side on every one of them', () => {
     // Not "the nav hides it": nav-model.ts says of itself that a link omitted
     // there is not a link that is protected. Each route awaits the guard, and
     // the guard redirects — so a Contributor is denied at the HTTP layer.
-    for (const page of RECORDS_PAGES) {
-      const source = readSource(page);
-      expect(source, `${repoPath(page)} does not await requireCapability`)
+    for (const page of READ_ROUTES) {
+      expect(readSource(join(REPO, page)), `${page} does not await requireCapability`)
         .toContain("await requireCapability('data.specialRecords.read')");
+    }
+    // The creation pages take the NARROWER capability, following
+    // /admin/awards/winners/new: an Admin who could not complete the form is
+    // turned away at the door rather than shown one that will refuse them.
+    for (const page of CREATE_ROUTES) {
+      expect(readSource(join(REPO, page)), `${page} does not await requireCapability`)
+        .toContain("await requireCapability('data.specialRecords.edit')");
     }
   });
 
@@ -109,35 +130,51 @@ describe('the Stage 3 route surface', () => {
     }
   });
 
-  it('opens no edit seam: no Server Action, no form post, no mutation import', () => {
-    // Stage 3 is read-only by contract. A 'use server' module here would also
-    // be a new admin boundary, and an unguarded one would fail the ISSUE-158
-    // contract — but the point is earlier than that: there is nothing to write
-    // yet, and a placeholder endpoint is how a half-built write path ships.
-    for (const file of RECORDS_FILES) {
-      const source = readSource(file);
-      const path = repoPath(file);
-      expect(/^\s*'use server';/m.test(source), `${path} declares a Server Action`).toBe(false);
-      expect(/<form[^>]*method=["']POST["']/i.test(source), `${path} posts a form`).toBe(false);
-      expect(/method=\{?["']post/i.test(source), `${path} posts a form`).toBe(false);
-      expect(/\buseActionState\b|\bformAction\b/.test(source), `${path} wires a form action`).toBe(false);
-    }
+  it('has exactly ONE Server Action module, and it guards the edit capability', () => {
+    // A second 'use server' module in this domain would be a second write
+    // boundary to keep guarded, and the ISSUE-158 contract is enforced per
+    // module. One module, one guard, asserted from both directions.
+    const actionModules = RECORDS_FILES
+      .filter((file) => /^\s*'use server';/m.test(readSource(file)))
+      .map(repoPath);
+    expect(actionModules).toEqual(['src/app/admin/records/actions.ts']);
+
+    const actions = readSource(join(REPO, 'src/app/admin/records/actions.ts'));
+    const guards = [...actions.matchAll(/await requireCapability\('([^']+)'\)/g)].map((m) => m[1]);
+    expect(guards.length).toBeGreaterThanOrEqual(10);
+    expect([...new Set(guards)]).toEqual(['data.specialRecords.edit']);
   });
 
   it('keeps the derived and identity fields off every control (§3.4.1, §19.1)', () => {
     // link_status_value, candidate_count, player_achievements.match_id and
     // after_siren_kicks.club_id are DERIVED; source_id / source_record_id are
-    // IDENTITY. All six are displayed and none is offered as a field. With no
-    // form anywhere in the domain (above) the only way one could become
-    // editable is an <input>/<select>/<textarea>, so no page may carry a
-    // writable control at all in this stage.
-    for (const file of RECORDS_PAGES) {
-      const source = readSource(file);
+    // IDENTITY. Stage 6 gives this domain real controls, so the rule can no
+    // longer be "no controls at all" — it becomes "no control NAMED after one
+    // of them". A `matchId` / `playerId` input on a CREATION field set is the
+    // one admitted case and is admitted only there: a manual row's link travels
+    // durably as a natural identity inside its record payload, while a
+    // CORRECTION has no carrier for one, so no correction panel may offer it.
+    const FORBIDDEN = [
+      'linkStatus', 'link_status_value', 'candidateCount', 'candidate_count',
+      'clubId', 'club_id', 'opponentClubId', 'opponent_club_id',
+      'sourceId', 'source_id', 'sourceRecordId', 'source_record_id',
+      'achievementType', 'achievement_type',
+    ];
+    const CREATION_ONLY = ['matchId', 'playerId'];
+    for (const file of RECORDS_FILES) {
       const path = repoPath(file);
-      // A GET filter form is the one legitimate input: it narrows a list and
-      // writes nothing. Detail pages have no controls whatsoever.
-      if (path.includes('[id]')) {
-        expect(/<(input|select|textarea|button)\b/i.test(source), `${path} carries a control`).toBe(false);
+      const source = readSource(file);
+      const controls = [
+        ...source.matchAll(/<(?:input|select|textarea)\b[^>]*\bname=\{?[`'"]([^`'"}]+)/gi),
+        ...source.matchAll(/draft\.set\(\s*'([^']+)'/g),
+      ].map((m) => m[1].replace(/^\$\{prefix\}/, ''));
+      for (const control of controls) {
+        expect(FORBIDDEN.includes(control), `${path} offers a derived/identity control: ${control}`)
+          .toBe(false);
+        if (CREATION_ONLY.includes(control)) {
+          expect(/Fields\.tsx$/.test(path), `${path} offers ${control} outside a creation field set`)
+            .toBe(true);
+        }
       }
     }
   });
@@ -162,8 +199,18 @@ describe('D-2 — after-siren link state is read-only (2026-09-13)', () => {
     for (const source of sources) {
       expect(/player_link_resolutions/.test(source)).toBe(false);
       expect(/\b(resolvePlayerLink|recordLinkResolution|linkPlayer)\b/.test(source)).toBe(false);
-      expect(/\bUPDATE\s+(player_achievements|after_siren_kicks)\b/i.test(source)).toBe(false);
     }
+    // Stage 6 DOES update both tables — that is the whole stage — so the rule
+    // becomes precise rather than absent: no statement anywhere in this domain
+    // may ASSIGN a link column. The correctable specs are the assignment
+    // vocabulary and neither names one; the only places player_id,
+    // link_status_value or match_id are written are the two manual-creation
+    // INSERTs, whose values the Stage 4 replay reconstructs from the record
+    // payload's natural identities.
+    const assignments = [...QUERY_CODE.matchAll(
+      /(?:SET|,)\s+(player_id|link_status_value|club_id|opponent_club_id|match_id)\s*=/gi,
+    )].map((m) => m[1]);
+    expect(assignments, 'a link column is assigned by an UPDATE in this domain').toEqual([]);
   });
 
   it('still surfaces the gap rather than hiding it', () => {
@@ -211,7 +258,17 @@ describe('the admin read contract', () => {
   it('carries no public status filter into the admin queries', () => {
     // Stage 5 filters the PUBLIC read models. An admin query that had already
     // acquired `status = 'active'` would hide exactly what it exists to show.
-    expect(/status\s*=\s*'active'/.test(QUERY_CODE)).toBe(false);
+    //
+    // Stage 6 makes the literal appear legitimately in one shape and one only:
+    // `SET status = 'active'`, the reinstatement's own assignment. That is a
+    // WRITE of the lifecycle, not a filter on it, so the rule is stated as
+    // "every occurrence is an assignment" rather than "no occurrence" — which
+    // keeps the assertion about the thing it was always about.
+    const occurrences = [...QUERY_CODE.matchAll(/(.{0,8})status\s*=\s*'active'/g)];
+    const filters = occurrences.filter((m) => !/\bSET\s+$/.test(m[1]));
+    expect(filters.map((m) => m[0]), 'an admin query filters on status').toEqual([]);
+    // And the assignment really is there, so the rule cannot pass vacuously.
+    expect(occurrences.length).toBeGreaterThan(0);
   });
 
   it('accepts only the filter vocabularies it declares', () => {
@@ -300,5 +357,186 @@ describe('the audit viewer carries its own table-name allowlist (§12)', () => {
     expect(check, 'migration 102 no longer widens data_edits_table_name_check').not.toBeNull();
     const literals = [...check![1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort();
     expect([...DATA_EDIT_TABLE_NAMES].sort()).toEqual(literals);
+  });
+});
+
+// =========================================================================
+// Stage 6 — the write side, as a source contract
+// =========================================================================
+
+const REPLAY_ADAPTER = readSource(join(REPO, 'tools', 'records', 'special-records-replay.ts'));
+const MIGRATION_089 = readSource(join(REPO, 'src', 'db', 'migrations', '089_after_siren_kicks.sql'));
+const MATCH_ADMIN = readSource(join(REPO, 'src', 'db', 'queries', 'match-admin.ts'));
+const ACTIONS = readSource(join(REPO, 'src', 'app', 'admin', 'records', 'actions.ts'));
+
+/**
+ * The column names the Stage 4 replay adapter carries for one table, read out
+ * of its own `COLUMNS` literal rather than restated here — a restatement would
+ * be free to drift from the thing it claims to mirror.
+ */
+function replayColumnsFor(table: string): string[] {
+  const start = REPLAY_ADAPTER.indexOf(`  ${table}: [`);
+  expect(start, `the replay adapter declares no COLUMNS for ${table}`).toBeGreaterThan(-1);
+  const end = REPLAY_ADAPTER.indexOf('\n  ],', start);
+  const block = REPLAY_ADAPTER.slice(start, end);
+  return [...block.matchAll(/\{\s*column:\s*'([^']+)'/g)].map((m) => m[1]);
+}
+
+describe('Stage 6 — what a correction may touch (§3.4, and the replay that must carry it)', () => {
+  it.each([
+    ['player_achievements', FIRST_KICK_CORRECTABLE],
+    ['after_siren_kicks', AFTER_SIREN_CORRECTABLE],
+  ] as const)(
+    '%s: the correctable columns are EXACTLY the ones the Stage 4 replay carries',
+    (table, correctable) => {
+      // This is the load-bearing assertion of the whole stage. A mutation that
+      // wrote a column the replay does not carry would create state a
+      // destructive rebuild silently reverts — the one failure the durable
+      // decision design exists to prevent — and a replay column the admin
+      // surface cannot reach would be an amendable field with no way to amend
+      // it. Both directions, so neither list can drift alone.
+      const columns = Object.values(correctable).map((spec) => spec.column).sort();
+      expect(columns).toEqual([...replayColumnsFor(table)].sort());
+    },
+  );
+
+  it('names no derived, link or identity column in either correctable spec', () => {
+    // §3.4.1 proved all three of the apparently-manual fields genuinely
+    // derived; D-2 keeps after-siren linkage out entirely; identity is repaired
+    // by suppression plus replacement, never by a rekey (P10's).
+    const forbidden = [
+      'link_status_value', 'candidate_count', 'player_id', 'club_id', 'opponent_club_id',
+      'match_id', 'source_id', 'source_record_id', 'import_batch_id', 'imported_at',
+      'achievement_type', 'status', 'status_reason', 'updated_at', 'id',
+    ];
+    for (const spec of [FIRST_KICK_CORRECTABLE, AFTER_SIREN_CORRECTABLE]) {
+      for (const { column } of Object.values(spec)) {
+        expect(forbidden.includes(column), `${column} is not correctable`).toBe(false);
+      }
+    }
+  });
+
+  it("names each forbidden field in the refusal, so a crafted payload gets a sentence", () => {
+    const sentence = uncorrectableFieldRefusal(['matchId', 'sourceRecordId'], 'record');
+    expect(sentence).toContain('matchId');
+    expect(sentence).toContain('sourceRecordId');
+    expect(sentence).toMatch(/suppression plus a manual replacement/);
+  });
+
+  it('exposes the same correctable vocabulary to the actions, and no more', () => {
+    // The action's allowlist is what the FORM may post; the query module's spec
+    // is what the TRANSACTION will write. A field in the first and not the
+    // second would be silently dropped; the reverse would be unreachable.
+    expect([...FIRST_KICK_CORRECTABLE_FIELDS].sort())
+      .toEqual(Object.keys(FIRST_KICK_CORRECTABLE).sort());
+    expect([...AFTER_SIREN_CORRECTABLE_FIELDS].sort())
+      .toEqual(Object.keys(AFTER_SIREN_CORRECTABLE).sort());
+  });
+});
+
+describe('Stage 6 — the after-siren coupled rules mirror migration 089 (§10.3)', () => {
+  it('still faces the four CHECK constraints it claims to mirror', () => {
+    // If 089's constraint text moves, the pure rule module must move with it.
+    // The four names are the contract; the rules below are transcribed from
+    // their bodies.
+    for (const name of [
+      'after_siren_kicks_effect_ck', 'after_siren_kicks_regulation_ck',
+      'after_siren_kicks_match_ck', 'after_siren_kicks_points_ck',
+    ]) {
+      expect(MIGRATION_089, `${name} is gone from migration 089`).toContain(name);
+    }
+    expect(MIGRATION_089).toContain("WHEN 'goal' THEN 6 ELSE 1 END");
+    expect(MIGRATION_089).toContain("siren <> 'end_of_regulation' OR kick_effect = 'none'");
+    expect(MIGRATION_089).toContain('premiership_season OR match_id IS NULL');
+  });
+
+  const legal = {
+    kickScored: 'goal', kickEffect: 'won', kickerResult: 'win', siren: 'final',
+    kickerPoints: 82, opponentPoints: 76, premiershipSeason: true, hasMatch: true,
+  } as const;
+
+  it('admits a legal after-siren winner', () => {
+    expect(validateAfterSirenEvent({ ...legal })).toBeNull();
+  });
+
+  it.each([
+    ['a win by more than a goal', { kickerPoints: 90 }, /1 to 6 points/],
+    ['a kick that scored nothing winning the match', { kickScored: 'none' }, /must have scored/],
+    ['a win recorded against a loss', { kickerResult: 'loss' }, /cannot be recorded against a loss/],
+    ['a decisive kick after the end-of-regulation siren', { siren: 'end_of_regulation' }, /extra time/],
+    ['a draw with unequal scores', { kickEffect: 'drew', kickerResult: 'draw' }, /level/],
+    ['a match link on a non-premiership row', { premiershipSeason: false }, /premiership-season/],
+    ['a negative score', { kickerPoints: -1 }, /cannot be negative/],
+  ] as const)('refuses %s, in words', (_case, overrides, expected) => {
+    const problem = validateAfterSirenEvent({ ...legal, ...(overrides as object) });
+    expect(problem, 'the combination was admitted').not.toBeNull();
+    expect(problem!).toMatch(expected);
+    // A readable sentence, never a constraint name.
+    expect(problem!).not.toMatch(/_ck\b/);
+  });
+
+  it('refuses "changed nothing" beside a win only when the siren was final', () => {
+    expect(validateAfterSirenEvent({
+      ...legal, kickEffect: 'none', kickScored: 'behind',
+    })).toMatch(/either won the match or followed/);
+    // The third branch's escape hatch: end_of_regulation admits it.
+    expect(validateAfterSirenEvent({
+      ...legal, kickEffect: 'none', kickScored: 'behind', siren: 'end_of_regulation',
+    })).toBeNull();
+  });
+});
+
+describe('Stage 6 — bounded revalidation (R-7, the ISSUE-156 contract)', () => {
+  it('admits exactly the shapes the server computes', () => {
+    for (const path of [
+      '/records/first-kick-goal', '/records/after-the-siren',
+      '/admin/records/first-kick-goal', '/admin/records/after-the-siren/42',
+      '/players/tony-lockett-1234', '/clubs/carlton', '/matches/9876',
+    ]) {
+      expect(isAllowedRevalidatePath(path), `${path} should be allowed`).toBe(true);
+    }
+  });
+
+  it('refuses traversal, other origins, query strings and anything else', () => {
+    for (const path of [
+      '/', '/awards', '/admin', '/admin/records', '/admin/records/family',
+      '/records/first-kick-goal?x=1', '//evil.example/records/first-kick-goal',
+      'https://evil.example/players/x-1', '/players/../../etc/passwd',
+      '/matches/9876/edit', '/players/Tony-1234', '/clubs/carlton/',
+    ]) {
+      expect(isAllowedRevalidatePath(path), `${path} should be refused`).toBe(false);
+    }
+  });
+
+  it('is reached only through the capability-gated route, never from the action', () => {
+    const route = readSource(join(REPO, 'src/app/admin/records/revalidate/route.ts'));
+    expect(route).toContain("await requireCapability('data.specialRecords.edit')");
+    expect(ACTIONS).not.toMatch(/\brevalidatePath\s*\(/);
+    expect(ACTIONS).not.toContain('next/cache');
+    // The client posts them; the action only names them.
+    expect(withoutComments(ACTIONS)).toContain('revalidatePaths');
+  });
+});
+
+describe('Stage 6 — the third destruction path is closed (§8.3)', () => {
+  it('no longer deletes a first-kick achievement as match-delete collateral', () => {
+    const code = withoutComments(MATCH_ADMIN);
+    expect(/DELETE\s+FROM\s+player_achievements/i.test(code),
+      'match deletion still destroys a curated first-kick record').toBe(false);
+    expect(/DELETE\s+FROM\s+after_siren_kicks/i.test(code)).toBe(false);
+  });
+
+  it('refuses the delete for BOTH families, before anything destructive runs', () => {
+    const code = withoutComments(MATCH_ADMIN);
+    const refusalAt = code.indexOf('cannot be deleted');
+    const firstDeleteAt = code.search(/DELETE\s+FROM\s+player_match_stats/i);
+    expect(refusalAt).toBeGreaterThan(-1);
+    expect(firstDeleteAt).toBeGreaterThan(-1);
+    expect(refusalAt, 'the refusal must precede every destructive statement')
+      .toBeLessThan(firstDeleteAt);
+    expect(code).toContain('player_achievements WHERE match_id');
+    expect(code).toContain('after_siren_kicks WHERE match_id');
+    // Actionable, in the shape §8.3 asks for: it names where to go next.
+    expect(MATCH_ADMIN).toContain('/admin/records/');
   });
 });

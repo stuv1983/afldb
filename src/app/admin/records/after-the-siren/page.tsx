@@ -11,6 +11,7 @@ import {
   isSpecialRecordLinkFilter, isSpecialRecordProvenance, isSpecialRecordStatusFilter,
   listAfterSirenKicks, listAfterSirenSeasonsForAdmin, provenanceOf,
 } from '@/db/queries/admin-special-records';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, playerPath } from '@/lib/format';
 import { firstValue } from '@/lib/params';
@@ -46,7 +47,10 @@ const EFFECT_LABELS: Record<string, string> = {
 export default async function AfterTheSirenAdminPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
-  await requireCapability('data.specialRecords.read');
+  const admin = await requireCapability('data.specialRecords.read');
+  // Furniture only: the creator page and every action behind it assert
+  // `data.specialRecords.edit` server-side for themselves.
+  const canEdit = hasCapability(admin, 'data.specialRecords.edit');
   const params = await searchParams;
 
   const q = (firstValue(params.q) ?? '').trim();
@@ -82,6 +86,12 @@ export default async function AfterTheSirenAdminPage(
         <p className="subtitle">{FAMILY_BLURBS['after-the-siren']}</p>
         <p className="muted">
           <Link href={FAMILY_PUBLIC_PATHS['after-the-siren']}>See the public page</Link>
+          {canEdit && (
+            <>
+              {' · '}
+              <Link href={`${familyListPath('after-the-siren')}/new`}>Record a manual entry</Link>
+            </>
+          )}
         </p>
       </div>
 

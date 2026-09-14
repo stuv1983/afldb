@@ -384,6 +384,55 @@ export async function deleteMatch(input: {
         };
       }
 
+      // AFLDB-ISSUE-167 §8.3, the THIRD destruction path. Until Stage 6 this
+      // function ran `DELETE FROM player_achievements WHERE match_id = $1` and
+      // silently destroyed a curated first-kick-goal record -- a Phase E fact
+      // with its own durable `data_overrides` decision and its own audit trail
+      // -- as collateral of a match deletion. It is outside both importers, so
+      // no reload-survival mechanism covered it: the row was simply gone, and
+      // its override left naming nothing.
+      //
+      // `after_siren_kicks.match_id` was never deleted here at all. Migration
+      // 089 declares it `integer REFERENCES matches(id)` with no ON DELETE
+      // clause, so the default NO ACTION made the match delete raise a raw
+      // foreign-key violation -- not control flow a Data Editor user can act
+      // on, and exactly the opaque failure the Brownlow refusal above exists to
+      // avoid. Both families are therefore refused explicitly, before anything
+      // destructive runs, in the same shape.
+      //
+      // A SUPPRESSED record still refuses. Suppression says the record should
+      // never have existed; it does not say the row may be destroyed, and the
+      // row is precisely what keeps its `data_edits` history resolvable through
+      // the next promotion's lineage remap.
+      const collateral = await tx<{
+        family: string; recordId: string | null; rowId: number; status: string;
+      }[]>`
+        SELECT 'first-kick-goal' AS family, source_record_id AS "recordId",
+               id::int AS "rowId", status
+          FROM player_achievements WHERE match_id = ${input.matchId}
+        UNION ALL
+        SELECT 'after-the-siren', source_record_id, id::int, status
+          FROM after_siren_kicks WHERE match_id = ${input.matchId}
+         ORDER BY 1, 3
+      `;
+      if (collateral.length > 0) {
+        const named = collateral
+          .map((r) => `${r.family} ${r.recordId ?? `#${r.rowId}`}`
+            + (r.status === 'void' ? ' (already suppressed)' : ''))
+          .join(', ');
+        const families = [...new Set(collateral.map((r) => r.family))];
+        return {
+          ok: false as const,
+          error:
+            `Match #${input.matchId} carries ${collateral.length} curated special `
+            + `record${collateral.length === 1 ? '' : 's'} (${named}) and cannot be deleted. `
+            + 'Deleting the match would destroy or orphan a record that carries its own '
+            + 'durable decision and audit trail. Suppress or reassign '
+            + `${collateral.length === 1 ? 'it' : 'them'} in Special records (`
+            + `${families.map((f) => `/admin/records/${f}`).join(', ')}) first.`,
+        };
+      }
+
       // 2. Identify all affected players in this match
       const playerRows = await tx<{ playerId: number }[]>`
         SELECT DISTINCT player_id AS "playerId"
@@ -397,8 +446,9 @@ export async function deleteMatch(input: {
       // the same transaction rebuilds them from what remains below.
       await clearPlayerClubMatchReferences(tx, affectedIds);
 
-      // 3. Delete dependent rows
-      await tx`DELETE FROM player_achievements WHERE match_id = ${input.matchId}`;
+      // 3. Delete dependent rows. `player_achievements` is deliberately ABSENT
+      // from this list since AFLDB-ISSUE-167 Stage 6: a match carrying one is
+      // refused above rather than having its curated record destroyed here.
       await tx`DELETE FROM player_match_stats WHERE match_id = ${input.matchId}`;
       await tx`DELETE FROM match_period_scores WHERE match_id = ${input.matchId}`;
       await tx`DELETE FROM matches WHERE id = ${input.matchId}`;

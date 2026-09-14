@@ -50,6 +50,7 @@ export type Capability =
   | 'data.awards.read'
   | 'data.awards.edit'
   | 'data.specialRecords.read'
+  | 'data.specialRecords.edit'
   | 'acquisition.legacyIntake'
   | 'acquisition.currentSeason'
   | 'people.betaAccess'
@@ -143,14 +144,20 @@ const CAPABILITY_ROLES: Record<Capability, readonly CapabilityRole[]> = {
   // avoids colliding with src/db/queries/records.ts, which in this codebase
   // means computed leaderboards and nothing stored.
   //
-  // D-4 also approved `data.specialRecords.edit` (SUPER_ADMIN_ONLY, covering
-  // create / correct / void / suppress / reinstate / replace -- there is no
-  // separate `.suppress`). It is deliberately NOT declared yet: Stage 3 is
-  // read-only, and tests/auth.test.ts fails a capability that is declared but
-  // enforced at no boundary (AFLDB-ISSUE-158). It is declared in Stage 6, in
-  // the same change as the first mutation that guards on it, which is also
-  // when EQUIVALENT_ROLE_GUARD gains its 'requireSuperAdmin' entry.
+  // D-4's edit half, declared at Stage 6 in the same change as the first
+  // mutation that guards on it (§9.1) -- not earlier, because
+  // tests/auth.test.ts fails a capability that is declared but enforced at no
+  // boundary (AFLDB-ISSUE-158), and Stage 3 shipped no write. It covers
+  // create / correct / suppress / reinstate / replace together: there is
+  // deliberately no separate `.suppress`, because both halves would be
+  // SUPER_ADMIN_ONLY and splitting them would separate nothing (the
+  // AFLDB-ISSUE-160 D-6 reasoning). Correcting, suppressing, reinstating,
+  // replacing or creating a curated special record becomes a public fact
+  // immediately with no draft stage, so only a Super Admin may write -- the
+  // same reasoning as data.awards.edit / data.coaches.edit / data.draft.edit /
+  // data.seasonLists.edit / data.fixtures.edit.
   'data.specialRecords.read': ADMIN_AND_UP,
+  'data.specialRecords.edit': SUPER_ADMIN_ONLY,
   // requireUploader-gated (src/app/admin/upload/page.tsx): a contributor's
   // one reachable route, so it stays open to every staff role.
   'acquisition.legacyIntake': ALL_STAFF,

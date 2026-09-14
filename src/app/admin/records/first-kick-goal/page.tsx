@@ -11,6 +11,7 @@ import {
   isSpecialRecordLinkFilter, isSpecialRecordProvenance, isSpecialRecordStatusFilter,
   listFirstKickGoalSeasonsForAdmin, listFirstKickGoals, provenanceOf,
 } from '@/db/queries/admin-special-records';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, playerPath } from '@/lib/format';
 import { firstValue } from '@/lib/params';
@@ -40,7 +41,10 @@ const PAGE_SIZE = 50;
 export default async function FirstKickGoalAdminPage(
   { searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
-  await requireCapability('data.specialRecords.read');
+  const admin = await requireCapability('data.specialRecords.read');
+  // Furniture only: the creator page and every action behind it assert
+  // `data.specialRecords.edit` server-side for themselves.
+  const canEdit = hasCapability(admin, 'data.specialRecords.edit');
   const params = await searchParams;
 
   const q = (firstValue(params.q) ?? '').trim();
@@ -72,6 +76,12 @@ export default async function FirstKickGoalAdminPage(
         <p className="subtitle">{FAMILY_BLURBS['first-kick-goal']}</p>
         <p className="muted">
           <Link href={FAMILY_PUBLIC_PATHS['first-kick-goal']}>See the public page</Link>
+          {canEdit && (
+            <>
+              {' · '}
+              <Link href={`${familyListPath('first-kick-goal')}/new`}>Record a manual entry</Link>
+            </>
+          )}
         </p>
       </div>
 

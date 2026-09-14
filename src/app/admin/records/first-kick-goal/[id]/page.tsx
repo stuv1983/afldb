@@ -6,8 +6,12 @@ import { RecordHistory } from '@/app/admin/awards/RecordHistory';
 import {
   FAMILY_PUBLIC_PATHS, RECORDS_ROOT, durableIdentityOf, familyListPath,
 } from '@/app/admin/records/labels';
+import { FirstKickCorrectionPanel } from '@/app/admin/records/FirstKickCorrectionPanel';
 import { RecordsCrumb, SpecialRecordFacts } from '@/app/admin/records/SpecialRecordFacts';
+import { SpecialRecordLifecyclePanel } from '@/app/admin/records/SpecialRecordLifecyclePanel';
+import { SpecialRecordReplacePanel } from '@/app/admin/records/SpecialRecordReplacePanel';
 import { provenanceOf, readFirstKickGoal } from '@/db/queries/admin-special-records';
+import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { clubPath, matchPath, seasonPath } from '@/lib/format';
 
@@ -36,7 +40,7 @@ export const dynamic = 'force-dynamic';
 export default async function FirstKickGoalDetailPage(
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireCapability('data.specialRecords.read');
+  const admin = await requireCapability('data.specialRecords.read');
   const { id: idParam } = await params;
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
@@ -45,6 +49,13 @@ export default async function FirstKickGoalDetailPage(
   if (!row) notFound();
 
   const entityKey = durableIdentityOf(row.sourceKey, row.sourceRecordId);
+  // Furniture, not a gate. An Admin sees the record, its provenance and its
+  // whole history and no mutation control; the boundary that actually refuses
+  // them is `requireCapability('data.specialRecords.edit')` inside every action
+  // in `src/app/admin/records/actions.ts`, which a direct POST reaches too.
+  const canEdit = hasCapability(admin, 'data.specialRecords.edit');
+  const summary = `${row.playerDisplayName ?? row.playerNameRaw} — first-kick goal, `
+    + `${row.season} ${row.roundRaw} (${row.sourceRecordId ?? `#${row.id}`})`;
 
   return (
     <>
@@ -134,12 +145,38 @@ export default async function FirstKickGoalDetailPage(
           </table>
         </div>
         <p className="muted" style={{ fontSize: '0.85rem' }}>
-          The resolved match is derived from the season, the round and the clubs, with the
-          kickless-match count as its input — it is not a field of this record. The source
-          annotation is the marker the source itself carried, kept beside the value decoded from
-          it so the evidence and the decision stay separately visible.
+          The resolved match is derived by the import from the source&apos;s own season and round —
+          it is not a field of this record, and correcting the season or the round here does not
+          move it. The source annotation is the marker the source itself carried, kept beside the
+          value decoded from it so the evidence and the decision stay separately visible.
         </p>
       </section>
+
+      {canEdit ? (
+        <>
+          <FirstKickCorrectionPanel row={row} />
+          <SpecialRecordLifecyclePanel
+            family="first-kick-goal"
+            rowId={row.id}
+            expectedUpdatedAt={row.updatedAt}
+            status={row.status}
+            statusReason={row.statusReason}
+          />
+          {row.status === 'active' && (
+            <SpecialRecordReplacePanel
+              family="first-kick-goal"
+              rowId={row.id}
+              expectedUpdatedAt={row.updatedAt}
+              currentSummary={summary}
+            />
+          )}
+        </>
+      ) : (
+        <p className="muted">
+          Correcting, suppressing, reinstating, replacing and creating a special record are Super
+          Admin actions.
+        </p>
+      )}
 
       <RecordHistory table="player_achievements" rowId={row.id} />
     </>
