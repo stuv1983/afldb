@@ -1,8 +1,9 @@
 # AFLDB-ISSUE-168 — Admin player-link suggestion URLs omit player ID and 404
 
-**Status:** Implemented and validated 2026-09-14; UNCOMMITTED, UNDEPLOYED. PROD unaffected
-either way — it already carries this defect and stays unfixed until this branch is committed,
-merged and deployed through the normal workflow.
+**Status:** Implemented and validated 2026-09-14; committed and pushed at `c7d07fb` on
+`sonnet/issue-168-player-link-url`, unmerged and undeployed. PROD unaffected either way — it
+already carries this defect and stays unfixed until this branch is merged and deployed through the
+normal workflow.
 
 **Branch:** `sonnet/issue-168-player-link-url`
 **Worktree:** `D:\dev\afldb-issue-168`
@@ -80,6 +81,5 @@ investigate or fix this issue.
 
 ## Next action
 
-Operator: review the diff, commit, `npm run merge:ready -- --issue 168`, merge, deploy to DEV,
-confirm one suggestion link resolves to a real player page on DEV, then mark Resolved (issues.md,
-IssuesIndex.md, this file).
+Operator: `merge:ready -- --issue 168` is READY; merge, deploy to DEV, confirm one suggestion link
+resolves to a real player page on DEV, then mark Resolved (issues.md, IssuesIndex.md, this file).
