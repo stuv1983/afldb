@@ -57,11 +57,3 @@ export function canonicalCoachComparePath(
   const [lower, higher] = canonicalPairOrder(idA, idB);
   return coachComparePath({ a: lower, b: higher });
 }
-
-/**
- * The same view with the two coaches the other way round. A presentation
- * reversal only -- it must not change which pair is being described.
- */
-export function swapCoachComparePath(params: CoachCompareUrlParams): string {
-  return coachComparePath({ a: params.b, b: params.a });
-}

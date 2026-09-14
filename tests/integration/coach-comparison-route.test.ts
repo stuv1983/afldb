@@ -125,7 +125,6 @@ describe('Stage 2A route state: valid pair', () => {
     expect(state.coachB.coach.id).toBe(idB);
     expect(state.notices).toEqual([]);
     expect(state.noindex).toBe(false);
-    expect(state.swapPath).toBe(`/coaches/compare?a=${idB}&b=${idA}`);
   });
 
   it('accepts a coach-only identity paired with a player-linked identity', async () => {

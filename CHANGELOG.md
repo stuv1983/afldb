@@ -15,6 +15,30 @@ commit.
 
 ## [Unreleased]
 
+### Public site UI/UX cleanup: navigation, redundant search controls, Coaches interaction, expandable tables, comparison ordering (AFLDB-ISSUE-172) - 15 September 2026
+
+- Removed **Match Search** and **Brownlow** from the main navigation. Both routes are unchanged and
+  fully functional, and both keep their existing home-page "Browse the record" tile. Brownlow is now
+  discoverable from `/awards`, which gained its own Brownlow Medal card.
+- Removed the "Advanced search" filter panel from `/clubs` entirely (state, succession and
+  season-range filtering, and their empty-state wording); the page is a plain, unfiltered club
+  browse/list. `TableFilters` and every other page that uses it are unchanged.
+- Removed the static "Example searches" section from `/players`. The real search/filter
+  functionality is unchanged.
+- `/coaches/[slug]`'s "Choose an opponent" selector no longer performs a full page reload and no
+  longer throws the reader back to the top of the page on every opponent change — it now updates via
+  client-side navigation (`router.push(..., { scroll: false })`), the same approach already used on
+  the player-linked coaching surface. Query and statistical semantics are unchanged; the previous
+  no-JavaScript form submission is a deliberate, accepted trade-off.
+- Removed the "Swap the order of the two clubs/coaches" controls from `/clubs/compare` and
+  `/coaches/compare`. Investigation confirmed they only reversed presentation order (which side each
+  club/coach's data renders on) and never changed the underlying head-to-head data or query.
+- Added a reusable "Expand table" capability: any table wrapped in the new `ExpandableTableFrame`
+  can grow to fill the viewport (with Escape-to-close, a focus trap, body-scroll locking, and focus
+  restored to the trigger on close) without losing its sort, filter or pagination state. Wired into
+  the Coaches list for this issue; other tables adopt it opportunistically, ahead of the Coaches
+  page's separate design review.
+
 ### AFL home-page “Record of the week” expands into a typed multi-domain catalogue (AFLDB-ISSUE-171) - 14 September 2026
 
 - The Super Admin site-setting now offers 22 grouped AFL records across player career, match and

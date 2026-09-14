@@ -47,7 +47,6 @@ import {
   COACH_COMPARE_PATH,
   canonicalCoachComparePath,
   coachComparePath,
-  swapCoachComparePath,
 } from '@/lib/coach-comparison-url';
 import { coachProfilePath } from '@/lib/format';
 import { firstValue, parseIntInRange } from '@/lib/params';
@@ -134,8 +133,6 @@ export type CoachCompareRouteState =
        * never `null` (see {@link getCoachHeadToHead}).
        */
       headToHead: CoachHeadToHead | null;
-      /** The same view with the two coaches reversed. */
-      swapPath: string;
     });
 
 function parseParams(raw: RawSearchParams): {
@@ -241,7 +238,6 @@ export async function resolveCoachCompareState(
     careerA,
     careerB,
     headToHead,
-    swapPath: swapCoachComparePath(params),
     canonicalPath: canonicalCoachComparePath(coachA.id, coachB.id),
     noindex: false,
   };

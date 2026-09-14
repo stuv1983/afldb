@@ -39,10 +39,15 @@ const data = vi.hoisted(() => ({
 
 // notFound()/permanentRedirect() are `never`-returning throws in Next; the
 // throw is what stops the rest of the page from rendering, so it is
-// reproduced here rather than stubbed out.
+// reproduced here rather than stubbed out. useRouter/useSearchParams are
+// stubbed because CoachOpponentSelector (rendered whenever a fixture's
+// coaching totals are non-zero) is a client component that reads them
+// (AFLDB-ISSUE-172) — they throw outside an actual mounted App Router.
 vi.mock('next/navigation', () => ({
   notFound: () => { nav.notFound += 1; throw new Error('NEXT_NOT_FOUND'); },
   permanentRedirect: (url: string) => { nav.redirects.push(url); throw new Error('NEXT_REDIRECT'); },
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/db/queries/coaches', () => ({

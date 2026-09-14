@@ -1,15 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { CollapsibleTable } from '@/components/CollapsibleTable';
-import { FilterErrors } from '@/components/FilterErrors';
-import { TableFilters } from '@/components/TableFilters';
-import { getClubStates, listClubs } from '@/db/queries/clubs';
+import { listClubs } from '@/db/queries/clubs';
 import { getSiteSettings } from '@/db/queries/site-settings';
 import { clubPath, formatSpan } from '@/lib/format';
 import { pageMetadata } from '@/lib/seo';
-import { clubFilterFields } from '@/search/list-filters';
-import { describeFilters, optionsFrom, parseFilterValues } from '@/search/table-filters';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,24 +16,9 @@ export const metadata: Metadata = pageMetadata({
   path: '/clubs',
 });
 
-export default async function ClubsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const params = await searchParams;
-  const states = await getClubStates();
+export default async function ClubsPage() {
   const settings = await getSiteSettings();
-  const fields = clubFilterFields(optionsFrom(states));
-  const values = parseFilterValues(fields, params);
-
-  const clubs = await listClubs({
-    q: values.text.q,
-    state: values.select.state,
-    succession: values.select.succession,
-    ranges: values,
-  });
-  const described = describeFilters(fields, values);
+  const clubs = await listClubs();
 
   return (
     <>
@@ -49,9 +29,6 @@ export default async function ClubsPage({
             {settings.pageIntros.clubs}
           </p>
         )}
-        {described.length > 0 && (
-          <p className="subtitle">{described.join(' · ')}</p>
-        )}
         {/* The comparison surface takes ORGANISATION slugs, so it is seeded
             from here without a club: choosing the pair is the first thing
             that page asks for. AFLDB-ISSUE-144. */}
@@ -60,19 +37,11 @@ export default async function ClubsPage({
         </p>
       </div>
 
-      <FilterErrors errors={values.errors} />
-
-      {/* One panel, not one per section: these filters narrow the current
-          clubs and the historical identities together, and splitting them
-          would let the two lists disagree about what is being asked. */}
-      <TableFilters action="/clubs" fields={fields} values={values} />
-
       <section className="section">
         <h2>Clubs</h2>
         {clubs.length === 0 ? (
           <div className="empty">
-            <h3>No clubs match those filters</h3>
-            <p>Try clearing the state or widening the season range.</p>
+            <h3>No clubs found</h3>
           </div>
         ) : (
           <div className="grid">

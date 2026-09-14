@@ -25,12 +25,17 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: '/venues', label: 'Venues' },
   { href: '/records', label: 'Records' },
   { href: '/coaches', label: 'Coaches' },
-  { href: '/brownlow', label: 'Brownlow' },
   { href: '/awards', label: 'Awards' },
   { href: '/draft', label: 'Draft' },
   // No separate "Player Search": Players IS the search — the index carries
   // the whole career filter set that Advanced Player Search used to.
-  { href: '/match-search', label: 'Match Search' },
+  //
+  // Brownlow and Match Search are deliberately NOT top-level items
+  // (AFLDB-ISSUE-172): Brownlow is discoverable from Awards, and Match
+  // Search overlaps the Players filter set. Both routes stay live and
+  // both keep their home "Browse the record" tile — see
+  // `BROWSE_ONLY_LABELS` below, which is what keeps that tile from
+  // disappearing along with the nav entry.
   { href: '/aflw', label: 'AFLW' },
 ];
 
@@ -68,9 +73,12 @@ export const AFLW_QUICK_TABS: NavItem[] = [
 ];
 
 /**
- * Blurbs for the home "Browse the record" grid, keyed by `PRIMARY_NAV`
- * href. An entry with no blurb is simply left off the grid but stays in
- * both navs; AFLW is a mode switch, not a "record" section, so it has none.
+ * Blurbs for the home "Browse the record" grid, and this map's own keys
+ * are what decide grid membership and order (see `BROWSE_SECTIONS`) — not
+ * `PRIMARY_NAV` membership. A route with no blurb here is simply left off
+ * the grid; a route absent from `PRIMARY_NAV` can still appear (its label
+ * comes from `BROWSE_ONLY_LABELS`). AFLW is a mode switch, not a "record"
+ * section, so it has none.
  */
 const BROWSE_META: Record<string, string> = {
   '/players': 'Every player since 1897, filtered by career statistics',
@@ -85,9 +93,24 @@ const BROWSE_META: Record<string, string> = {
   '/match-search': 'Find games by scoreline and margin',
 };
 
-export const BROWSE_SECTIONS: (NavItem & { meta: string })[] = PRIMARY_NAV
-  .filter((item) => item.href in BROWSE_META)
-  .map((item) => ({ ...item, meta: BROWSE_META[item.href] }));
+/**
+ * Labels for a browse tile whose route is no longer a `PRIMARY_NAV` entry
+ * (AFLDB-ISSUE-172). Deliberately the minimum needed — not a second copy
+ * of the nav model — so `BROWSE_SECTIONS` below stays sourced from
+ * `BROWSE_META` (membership and order) with `PRIMARY_NAV` only consulted
+ * first, this map second, for the label.
+ */
+const BROWSE_ONLY_LABELS: Record<string, string> = {
+  '/brownlow': 'Brownlow',
+  '/match-search': 'Match Search',
+};
+
+export const BROWSE_SECTIONS: (NavItem & { meta: string })[] = Object.entries(BROWSE_META)
+  .map(([href, meta]) => {
+    const label = PRIMARY_NAV.find((item) => item.href === href)?.label ?? BROWSE_ONLY_LABELS[href];
+    return label ? { href, label, meta } : null;
+  })
+  .filter((item): item is NavItem & { meta: string } => item !== null);
 
 export function inAflw(pathname: string): boolean {
   return pathname === '/aflw' || pathname.startsWith('/aflw/');

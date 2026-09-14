@@ -59,7 +59,6 @@ export function ClubComparisonView({ state }: { state: ClubComparisonRouteState 
       <ClubComparisonControls
         params={state.params}
         options={state.options}
-        swapPath={state.kind === 'comparison' ? state.swapPath : undefined}
       />
 
       {state.kind === 'unselected' && (

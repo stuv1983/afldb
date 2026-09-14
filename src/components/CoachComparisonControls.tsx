@@ -23,12 +23,9 @@ import type { CoachCompareEffectiveParams, CoachCompareOptions } from '@/app/coa
 export function CoachComparisonControls({
   params,
   options,
-  swapPath,
 }: {
   params: CoachCompareEffectiveParams;
   options: CoachCompareOptions;
-  /** Present only for a resolved pair; a swap of nothing is not a control. */
-  swapPath?: string;
 }) {
   const coachOptions = (
     <>
@@ -63,11 +60,6 @@ export function CoachComparisonControls({
         </p>
         <div className="filter-actions">
           <button className="btn" type="submit">Compare coaches</button>
-          {swapPath && (
-            <Link className="btn btn-secondary" href={swapPath} prefetch={false}>
-              Swap the order of the two coaches
-            </Link>
-          )}
           <Link className="btn btn-secondary" href={COACH_COMPARE_PATH} prefetch={false}>Reset</Link>
         </div>
       </fieldset>

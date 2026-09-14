@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
@@ -14,6 +14,17 @@ import type { ComparisonOrganization } from '@/db/queries/club-comparison';
 import type {
   CoachCareer, CoachCareerMatch, CoachingClubStint, CoachVenueRecord,
 } from '@/db/queries/coaches';
+
+// CoachOpponentSelector is a client component (AFLDB-ISSUE-172: converted
+// from a plain GET <form> to router.push, fixing the full-reload/
+// scroll-to-top defect) and reads next/navigation's useRouter/
+// useSearchParams, which throw outside an actual mounted Next.js App
+// Router. Stub both so the unit render below stays a plain, database-free
+// renderToStaticMarkup call.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 /**
  * The AFLDB-ISSUE-170 Stage 1D shared presentation: totals, club-by-club
@@ -280,8 +291,8 @@ describe('CoachOpponentRecordBody — the Stage 1C opponent-scoped presentation'
   });
 });
 
-describe('CoachOpponentSelector — the standalone coach page\'s server-rendered Stage 1C selector', () => {
-  it('renders every organisation as a plain GET option, grouped by current/former', () => {
+describe('CoachOpponentSelector — the standalone coach page\'s client-side Stage 1C selector (AFLDB-ISSUE-172)', () => {
+  it('renders every organisation as a select option, grouped by current/former', () => {
     const html = renderToStaticMarkup(
       CoachOpponentSelector({
         organizations: [org(), org({ id: 10, name: 'Fitzroy', slug: 'fitzroy', isActive: false })],
@@ -289,8 +300,7 @@ describe('CoachOpponentSelector — the standalone coach page\'s server-rendered
         basePath: '/coaches/some-coach-1',
       }),
     );
-    expect(html).toContain('method="get"');
-    expect(html).toContain('action="/coaches/some-coach-1"');
+    expect(html).toContain('<select');
     expect(html).toContain('Essendon');
     expect(html).toContain('Fitzroy');
     expect(html).toContain('Current clubs');

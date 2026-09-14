@@ -29,12 +29,9 @@ import type { ComparisonEffectiveParams, ComparisonOptions } from '@/app/clubs/c
 export function ClubComparisonControls({
   params,
   options,
-  swapPath,
 }: {
   params: ComparisonEffectiveParams;
   options: ComparisonOptions;
-  /** Present only for a resolved pair; a swap of nothing is not a control. */
-  swapPath?: string;
 }) {
   const current = options.organizations.filter((o) => o.isActive);
   const former = options.organizations.filter((o) => !o.isActive);
@@ -78,18 +75,13 @@ export function ClubComparisonControls({
           Kangaroos — are part of the same club here, so they are not separate choices.
         </p>
         <div className="filter-actions">
-          {/* prefetch={false} on both: Next's default hover/viewport prefetch of
-              a sibling link on this page populates the client router cache with
+          {/* prefetch={false}: Next's default hover/viewport prefetch of a
+              sibling link on this page populates the client router cache with
               THAT link's resolved <head> for this same dynamic segment, and a
               later navigation to a DIFFERENT link here (e.g. an era chip) can
               then pick up the wrong cached title/canonical instead of its own
               (metadata desync fixed by this change; see AFLDB-ISSUE-144). */}
           <button className="btn" type="submit">Compare clubs</button>
-          {swapPath && (
-            <Link className="btn btn-secondary" href={swapPath} prefetch={false}>
-              Swap the order of the two clubs
-            </Link>
-          )}
           <Link className="btn btn-secondary" href={CLUB_COMPARE_PATH} prefetch={false}>Reset</Link>
         </div>
       </fieldset>

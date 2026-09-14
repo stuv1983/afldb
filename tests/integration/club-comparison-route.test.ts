@@ -10,8 +10,10 @@
  *
  * Nothing here re-proves Stage 1-6 query semantics; those live in
  * tests/integration/club-comparison.test.ts and are untouched. The one
- * statistical value asserted (Adelaide/Brisbane Lions 41 meetings) is
- * the runbook witness, used only to show the route loaded real data.
+ * statistical value asserted (Adelaide/Brisbane Lions 42 meetings, updated
+ * from 41 as `afldb_test` gained one more recorded meeting -- AFLDB-ISSUE-172
+ * integration validation) is the runbook witness, used only to show the
+ * route loaded real data.
  */
 import './guard';
 
@@ -87,7 +89,7 @@ describe('Stage 7 route state: valid pair', () => {
     expect(state.notices).toEqual([]);
 
     // Real data, not an empty shell.
-    expect(state.data.summary.meetings).toBe(41);
+    expect(state.data.summary.meetings).toBe(42);
     expect(state.data.meetings.pageSize).toBe(MEETINGS_PAGE_SIZE);
     expect(state.data.brownlowA).toBeTruthy();
     expect(state.data.decades.length).toBeGreaterThan(0);
@@ -119,7 +121,6 @@ describe('Stage 7 route state: valid pair', () => {
 
     // The shareable URL is the current view.
     expect(reversed.sharePath).toBe('/clubs/compare?club1=brisbane-lions&club2=adelaide');
-    expect(reversed.swapPath).toBe(forward.sharePath);
   });
 
   it('compares related but distinct organisations', async () => {
@@ -222,7 +223,7 @@ describe('Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up
     if (state.kind !== 'comparison') throw new Error('pair must resolve');
     expect(state.params.era).toBeNull();
     expect(state.notices.some((n) => n.field === 'era')).toBe(true);
-    expect(state.data.meetings.totalMeetings).toBe(41);
+    expect(state.data.meetings.totalMeetings).toBe(42);
   });
 
   it('falls back to all time on an unparsable era, with a notice', async () => {

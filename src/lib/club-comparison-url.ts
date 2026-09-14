@@ -89,16 +89,6 @@ export function canonicalClubComparePath(
 }
 
 /**
- * The same view with the two clubs the other way round. The match
- * filter and page survive untouched: swapping is a presentation
- * reversal, and it must not move the reader or change the population
- * being described.
- */
-export function swapClubComparePath(params: ComparisonUrlParams): string {
-  return clubComparePath({ ...params, club1: params.club2, club2: params.club1 });
-}
-
-/**
  * The pagination component builds hrefs from a raw parameter record, so
  * hand it exactly the state this surface keeps, minus the page itself.
  * `era` (FR-2) is included: paging through an era-filtered match history
