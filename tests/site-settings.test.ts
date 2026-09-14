@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SITE_FOOTER } from '@/lib/site-content';
 import {
+  HOME_RECORD_CATALOGUE,
+  homeRecordOptionGroups,
+} from '@/lib/home-records';
+import {
   DEFAULT_AFL_PLACEHOLDERS,
   DEFAULT_AFLW_PLACEHOLDERS,
   DEFAULT_EARLY_ACCESS_INTRO,
@@ -100,9 +104,25 @@ describe('homeSectionRows', () => {
 });
 
 describe('single-value settings', () => {
-  it('rejects a record category the career leaderboard cannot answer', () => {
-    expect(parseHomeRecord('most-goals-in-a-game')).toBe(DEFAULT_HOME_RECORD);
-    expect(parseHomeRecord('most-games')).toBe('most-games');
+  it('accepts every legacy record value and representative expanded domains', () => {
+    for (const value of [
+      'most-goals', 'most-games', 'most-finals', 'most-premierships',
+      'most-brownlow-votes',
+    ]) {
+      expect(parseHomeRecord(value)).toBe(value);
+    }
+    expect(parseHomeRecord('most-goals-in-a-game')).toBe('most-goals-in-a-game');
+    expect(parseHomeRecord('coach-most-wins')).toBe('coach-most-wins');
+    expect(parseHomeRecord('venue-most-finals')).toBe('venue-most-finals');
+    expect(parseHomeRecord('after-siren-most-goals')).toBe('after-siren-most-goals');
+    expect(parseHomeRecord('first-kick-most-consecutive-goals'))
+      .toBe('first-kick-most-consecutive-goals');
+  });
+
+  it('falls back safely for stale and malformed record values', () => {
+    for (const value of ['most-marks', 'constructor', '', null, 42, {}]) {
+      expect(parseHomeRecord(value)).toBe(DEFAULT_HOME_RECORD);
+    }
   });
 
   it('falls back to super admins when the audience is unrecognised', () => {
@@ -117,6 +137,44 @@ describe('single-value settings', () => {
   it('accepts the AFLW leader categories and nothing else', () => {
     expect(parseAflwLeaders('tackles')).toBe('tackles');
     expect(parseAflwLeaders('metres_gained')).toBe('goals');
+  });
+});
+
+describe('home record catalogue', () => {
+  it('has unique stable values and a complete provider/render contract', () => {
+    const values = HOME_RECORD_CATALOGUE.map((entry) => entry.value);
+    expect(new Set(values).size).toBe(values.length);
+
+    for (const entry of HOME_RECORD_CATALOGUE) {
+      expect(entry.adminLabel).toBeTruthy();
+      expect(entry.publicTitle).toBeTruthy();
+      expect(entry.definition).toBeTruthy();
+      expect(entry.unit).toBeTruthy();
+      expect(entry.provider.kind).toBeTruthy();
+      expect(entry.renderKind).toBeTruthy();
+      const expectedRender = {
+        career: 'player-total',
+        match: 'player-match',
+        season: 'player-season',
+        coach: 'coach-total',
+        venue: 'venue-total',
+        'after-siren': 'special-player-total',
+        'first-kick': 'special-player-total',
+      } as const;
+      expect(entry.renderKind).toBe(expectedRender[entry.provider.kind]);
+    }
+  });
+
+  it('builds manageable admin groups with representative expanded options', () => {
+    const groups = homeRecordOptionGroups();
+    expect(groups.map((group) => group.label)).toEqual([
+      'Players — Career', 'Players — Match', 'Players — Season',
+      'Coaches', 'Venues', 'Special records',
+    ]);
+    expect(groups.find((group) => group.id === 'coaches')?.options)
+      .toContainEqual({ value: 'coach-most-wins', label: 'Most Wins Coached' });
+    expect(groups.find((group) => group.id === 'venues')?.options)
+      .toContainEqual({ value: 'venue-most-finals', label: 'Most Finals Hosted' });
   });
 });
 

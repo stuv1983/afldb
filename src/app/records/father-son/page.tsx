@@ -10,7 +10,7 @@ import { pageMetadata } from '@/lib/seo';
 
 export const revalidate = 86400;
 
-const TITLE = 'Father–Son Records';
+const TITLE = 'Father–Son Selections';
 const DEFINITION =
   'Selections made under the AFL father–son rule — the player drafted under the rule '
   + 'and his father — ranked by combined career VFL/AFL games.';

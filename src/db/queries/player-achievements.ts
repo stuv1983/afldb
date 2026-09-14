@@ -53,6 +53,14 @@ export type FirstKickGoalRow = {
   kicklessMatchesBeforeFirstKick: number;
 };
 
+export type FirstKickGoalRecordRow = {
+  playerId: number;
+  playerSlug: string;
+  playerName: string;
+  season: number;
+  consecutiveGoalKicks: number;
+};
+
 export type FirstKickGoalFeature = 'multi-kick' | 'only-career-goal';
 
 export type FirstKickGoalFilters = {
@@ -106,6 +114,26 @@ export async function getFirstKickGoalList(filters: FirstKickGoalFilters = {}): 
       END
      WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND ${where}
      ORDER BY a.season, a.id
+  `;
+}
+
+/**
+ * Bounded ranked presentation for the home page. This claims a linked
+ * player identity, so it uses the module's existing `LINKED` contract as
+ * well as the active lifecycle filter.
+ */
+export async function getFirstKickGoalRecordLeaders(
+  limit = 5,
+): Promise<FirstKickGoalRecordRow[]> {
+  return sql<FirstKickGoalRecordRow[]>`
+    SELECT a.player_id AS "playerId", p.slug AS "playerSlug",
+           p.display_name AS "playerName", a.season,
+           a.consecutive_goal_kicks AS "consecutiveGoalKicks"
+      FROM player_achievements a
+      JOIN players p ON p.id = a.player_id
+     WHERE a.${FIRST_KICK_GOAL} AND a.${ACTIVE} AND a.${LINKED}
+     ORDER BY a.consecutive_goal_kicks DESC, a.season, a.id
+     LIMIT ${limit}
   `;
 }
 

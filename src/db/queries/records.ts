@@ -2,6 +2,11 @@ import 'server-only';
 
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+export {
+  RECORD_CATEGORIES,
+  getRecordCategory,
+  type RecordCategory,
+} from '@/lib/home-records';
 import type { FilterValues } from '@/search/table-filters';
 
 /**
@@ -43,92 +48,6 @@ export const SEASON_RECORD_FILTER_COLUMNS: Record<string, string> = {
   season: 'r.season',
   games: 'r.games',
 };
-
-export type RecordCategory = {
-  slug: string;
-  title: string;
-  definition: string;
-  coverage?: string;
-  unit: string;
-};
-
-export const RECORD_CATEGORIES: Record<string, RecordCategory> = {
-  'most-games': {
-    slug: 'most-games',
-    title: 'Most Games',
-    definition: 'Total VFL/AFL matches played, including finals, across all clubs.',
-    unit: 'Games',
-  },
-  'most-goals': {
-    slug: 'most-goals',
-    title: 'Most Goals',
-    definition: 'Total career goals in VFL/AFL matches, including finals.',
-    coverage: 'Goals are recorded for every season from 1897, so this list is complete.',
-    unit: 'Goals',
-  },
-  'most-finals': {
-    slug: 'most-finals',
-    title: 'Most Finals',
-    definition: 'Matches played in an elimination, qualifying, semi, preliminary or grand final.',
-    unit: 'Finals',
-  },
-  'most-premierships': {
-    slug: 'most-premierships',
-    title: 'Most Premierships',
-    definition: 'Grand finals played in and won.',
-    unit: 'Premierships',
-  },
-  'most-brownlow-votes': {
-    slug: 'most-brownlow-votes',
-    title: 'Most Brownlow Votes',
-    definition: 'Career Brownlow Medal votes, summed from the official season counts.',
-    coverage:
-      'The Brownlow Medal was first awarded in 1924, so players who finished before then '
-      + 'have no votes. Totals come from the official season counts rather than from '
-      + 'per-game votes, which exist only for 1931–1934 and 1984–2025.',
-    unit: 'Votes',
-  },
-  'most-goals-in-a-game': {
-    slug: 'most-goals-in-a-game',
-    title: 'Most Goals in a Match',
-    definition: 'Highest goals scored by one player in a single VFL/AFL match.',
-    coverage: 'Goals are recorded for every season from 1897.',
-    unit: 'Goals',
-  },
-  'most-disposals-in-a-game': {
-    slug: 'most-disposals-in-a-game',
-    title: 'Most Disposals in a Match',
-    definition: 'Highest disposals recorded for one player in a single match.',
-    coverage:
-      'Disposals were not recorded before 1965. Matches before then are absent from this '
-      + 'list because the statistic was not collected, not because no disposals occurred.',
-    unit: 'Disposals',
-  },
-  'most-goals-in-a-season': {
-    slug: 'most-goals-in-a-season',
-    title: 'Most Goals in a Season',
-    definition: 'Highest goals by one player in a single season, including finals.',
-    coverage:
-      'A season total is the player\'s, not a club\'s: a player who transferred '
-      + 'mid-season is ranked on the whole season. The club column names the club '
-      + 'of most games that year.',
-    unit: 'Goals',
-  },
-};
-
-/**
- * The category for a slug, or null when there is none.
- *
- * `Object.hasOwn` rather than a truthiness check on the index: the slug is a
- * URL segment, and a plain index also finds inherited properties, so
- * /records/constructor would sail past a `if (!definition) notFound()` guard
- * and render a page built from Object's constructor. Same discipline the
- * search specs apply to their own catalogue lookups (isGridStatKey,
- * isPlayerSort).
- */
-export function getRecordCategory(slug: string): RecordCategory | null {
-  return Object.hasOwn(RECORD_CATEGORIES, slug) ? RECORD_CATEGORIES[slug] : null;
-}
 
 export type CareerRecordRow = {
   rank: number;

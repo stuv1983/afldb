@@ -19,6 +19,12 @@
  * Component form, so it stays free of server-only imports.
  */
 
+import {
+  DEFAULT_HOME_RECORD,
+  HOME_RECORD_VALUES,
+  parseHomeRecordValue,
+  type HomeRecordValue,
+} from '@/lib/home-records';
 import { DEFAULT_SITE_FOOTER, parseSiteFooter, type SiteFooter } from '@/lib/site-content';
 
 export const SETTING_KEYS = {
@@ -83,7 +89,7 @@ export const HOME_SECTIONS: {
   {
     id: 'record',
     label: 'Record of the week',
-    help: 'The top five of one career record, chosen below.',
+    help: 'The leading entries from one curated AFL record, chosen below.',
     panel: true,
   },
   {
@@ -164,31 +170,13 @@ export function homeSectionRows(visible: HomeSectionId[]): HomeSectionId[][] {
 
 // --- Record of the week ---
 
-/**
- * Career records the home panel can lead with.
- *
- * Deliberately only the five the career leaderboard query can answer
- * (`CAREER_COLUMNS` in db/queries/records.ts): the single-game and season
- * categories are ranked per performance rather than per player, so they do
- * not fit the five-name meter the panel draws.
- */
-export const HOME_RECORD_CATEGORIES = [
-  'most-goals',
-  'most-games',
-  'most-finals',
-  'most-premierships',
-  'most-brownlow-votes',
-] as const;
-
-export type HomeRecordCategory = typeof HOME_RECORD_CATEGORIES[number];
-
-export const DEFAULT_HOME_RECORD: HomeRecordCategory = 'most-goals';
+/** Stable setting values, derived from the typed multi-domain catalogue. */
+export const HOME_RECORD_CATEGORIES = HOME_RECORD_VALUES;
+export type HomeRecordCategory = HomeRecordValue;
+export { DEFAULT_HOME_RECORD };
 
 export function parseHomeRecord(value: unknown): HomeRecordCategory {
-  return typeof value === 'string'
-    && (HOME_RECORD_CATEGORIES as readonly string[]).includes(value)
-    ? value as HomeRecordCategory
-    : DEFAULT_HOME_RECORD;
+  return parseHomeRecordValue(value);
 }
 
 // --- AFLW leaders panel ---

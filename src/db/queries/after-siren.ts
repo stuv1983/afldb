@@ -72,6 +72,16 @@ export type AfterSirenRecordRow = {
   lastGoal: AfterSirenOccurrence | null;
 };
 
+export type AfterSirenRecordMetric = 'attempts' | 'goals' | 'goalsToWin';
+
+function afterSirenRecordValue(metric: AfterSirenRecordMetric) {
+  switch (metric) {
+    case 'attempts': return sql`t.attempts`;
+    case 'goals': return sql`t.goals`;
+    case 'goalsToWin': return sql`t.goals_to_win`;
+  }
+}
+
 /**
  * Per-player after-the-siren totals, for the Records "most attempts" /
  * "most goals" boards (AFLDB-ISSUE-139 UI handoff). first/latest for the
@@ -80,7 +90,12 @@ export type AfterSirenRecordRow = {
  * so a "most goals" first/latest can never be filled from a non-goal
  * attempt.
  */
-export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
+export async function getAfterSirenRecords(options: {
+  metric?: AfterSirenRecordMetric;
+  limit?: number;
+} = {}): Promise<AfterSirenRecordRow[]> {
+  const value = afterSirenRecordValue(options.metric ?? 'attempts');
+  const limit = options.limit === undefined ? sql`` : sql`LIMIT ${options.limit}`;
   return sql<AfterSirenRecordRow[]>`
     WITH totals AS (
       SELECT a.player_id, count(*)::int AS attempts,
@@ -166,7 +181,9 @@ export async function getAfterSirenRecords(): Promise<AfterSirenRecordRow[]> {
       LEFT JOIN last_attempt la ON la.player_id = t.player_id
       LEFT JOIN first_goal fg ON fg.player_id = t.player_id
       LEFT JOIN last_goal lg ON lg.player_id = t.player_id
-     ORDER BY t.attempts DESC, p.display_name
+     WHERE ${value} > 0
+     ORDER BY ${value} DESC, t.attempts DESC, p.display_name, t.player_id
+     ${limit}
   `;
 }
 

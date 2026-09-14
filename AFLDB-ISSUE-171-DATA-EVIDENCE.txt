@@ -1,0 +1,302 @@
+  database  | default_transaction_read_only 
+------------+-------------------------------
+ afldb_test | off
+(1 row)
+
+ metric |   display_name   | value 
+--------+------------------+-------
+ games  | Scott Pendlebury |   442
+ games  | Brent Harvey     |   432
+ games  | Michael Tuck     |   426
+ games  | Shaun Burgoyne   |   407
+ games  | Kevin Bartlett   |   403
+(5 rows)
+
+ metric |  display_name   | value 
+--------+-----------------+-------
+ goals  | Tony Lockett    |  1360
+ goals  | Gordon Coventry |  1299
+ goals  | Jason Dunstall  |  1254
+ goals  | Lance Franklin  |  1066
+ goals  | Doug Wade       |  1057
+(5 rows)
+
+ metric |    display_name     | value 
+--------+---------------------+-------
+ finals | Joel Selwood        |    40
+ finals | Michael Tuck        |    39
+ finals | Shaun Burgoyne      |    35
+ finals | Scott Pendlebury    |    33
+ finals | Patrick Dangerfield |    32
+(5 rows)
+
+    metric    |  display_name  | value 
+--------------+----------------+-------
+ premierships | Michael Tuck   |     7
+ premierships | Albert Collier |     6
+ premierships | Frank Adams    |     6
+ premierships | Harry Collier  |     6
+ premierships | Ron Barassi    |     6
+(5 rows)
+
+     metric     |    display_name     | value 
+----------------+---------------------+-------
+ brownlow_votes | Gary Ablett         |   262
+ brownlow_votes | Patrick Dangerfield |   259
+ brownlow_votes | Gary Dempsey        |   246
+ brownlow_votes | Sam Mitchell        |   227
+ brownlow_votes | Lachie Neale        |   225
+(5 rows)
+
+     metric     |   display_name   | value | season | match_id 
+----------------+------------------+-------+--------+----------
+ goals_in_match | Fred Fanning     |    18 |   1947 |     4630
+ goals_in_match | Gordon Coventry  |    17 |   1930 |     2717
+ goals_in_match | Jason Dunstall   |    17 |   1992 |    10340
+ goals_in_match | Gordon Coventry  |    16 |   1929 |     2611
+ goals_in_match | Peter Hudson     |    16 |   1969 |     7046
+ goals_in_match | Peter McKenna    |    16 |   1969 |     7128
+ goals_in_match | Tony Lockett     |    16 |   1995 |    10953
+ goals_in_match | Gordon Coventry  |    15 |   1933 |     3047
+ goals_in_match | Bob Pratt        |    15 |   1934 |     3115
+ goals_in_match | Kelvin Templeton |    15 |   1978 |     8319
+(10 rows)
+
+       metric       |  display_name  | value | season | match_id 
+--------------------+----------------+-------+--------+----------
+ disposals_in_match | Tom Mitchell   |    54 |   2018 |    15204
+ disposals_in_match | Harry Sheezel  |    54 |   2025 |    16817
+ disposals_in_match | Greg Williams  |    53 |   1989 |     9939
+ disposals_in_match | Gary Ablett    |    53 |   2012 |    14048
+ disposals_in_match | Barry Price    |    52 |   1971 |     7297
+ disposals_in_match | Scott Thompson |    51 |   2011 |    13929
+ disposals_in_match | Lachie Neale   |    51 |   2019 |    15604
+ disposals_in_match | John Greening  |    50 |   1971 |     7316
+ disposals_in_match | Tony Shaw      |    50 |   1991 |    10154
+ disposals_in_match | Tom Mitchell   |    50 |   2017 |    15068
+(10 rows)
+
+     metric      |  display_name  | value | season 
+-----------------+----------------+-------+--------
+ goals_in_season | Bob Pratt      |   150 |   1934
+ goals_in_season | Peter Hudson   |   150 |   1971
+ goals_in_season | Peter Hudson   |   146 |   1970
+ goals_in_season | Jason Dunstall |   145 |   1992
+ goals_in_season | Peter McKenna  |   143 |   1970
+ goals_in_season | Jason Dunstall |   138 |   1989
+ goals_in_season | Peter McKenna  |   134 |   1971
+ goals_in_season | Jason Dunstall |   132 |   1988
+ goals_in_season | Tony Lockett   |   132 |   1992
+ goals_in_season | Peter McKenna  |   130 |   1972
+(10 rows)
+
+ coaches | linked_to_player | coach_only_people 
+---------+------------------+-------------------
+     386 |              368 |                18
+(1 row)
+
+   display_name    | games | wins | draws | losses | finals | grand_finals | premierships | win_pct 
+-------------------+-------+------+-------+--------+--------+--------------+--------------+---------
+ Mick Malthouse    |   718 |  406 |     7 |    305 |     52 |            8 |            3 |   57.03
+ Jock McHale       |   713 |  466 |    10 |    237 |     58 |           16 |            7 |   66.06
+ Kevin Sheedy      |   678 |  389 |     6 |    283 |     43 |            7 |            4 |   57.82
+ Allan Jeans       |   576 |  357 |     2 |    217 |     41 |            9 |            4 |   62.15
+ Tom Hafey         |   522 |  336 |     4 |    182 |     42 |           10 |            4 |   64.75
+ David Parkin      |   518 |  306 |     2 |    210 |     36 |            6 |            4 |   59.27
+ Ron Barassi       |   515 |  276 |     4 |    235 |     33 |            9 |            4 |   53.98
+ Alastair Clarkson |   472 |  248 |     5 |    219 |     26 |            5 |            4 |   53.07
+ Leigh Matthews    |   461 |  267 |     8 |    186 |     27 |            5 |            4 |   58.79
+ Norm Smith        |   452 |  253 |     7 |    192 |     24 |            8 |            6 |   56.75
+ Dick Reynolds     |   415 |  275 |     6 |    134 |     37 |           12 |            4 |   66.99
+ Perce Bentley     |   414 |  253 |     5 |    156 |     19 |            5 |            3 |   61.71
+ John Kennedy      |   412 |  236 |     5 |    171 |     18 |            5 |            3 |   57.89
+ Ross Lyon         |   398 |  215 |     5 |    178 |     21 |            4 |            0 |   54.65
+ John Worsfold     |   388 |  194 |     3 |    191 |     19 |            2 |            1 |   50.39
+(15 rows)
+
+  display_name  | games | wins | draws | win_pct 
+----------------+-------+------+-------+---------
+ Jock McHale    |   713 |  466 |    10 |   66.06
+ Mick Malthouse |   718 |  406 |     7 |   57.03
+ Kevin Sheedy   |   678 |  389 |     6 |   57.82
+ Allan Jeans    |   576 |  357 |     2 |   62.15
+ Tom Hafey      |   522 |  336 |     4 |   64.75
+ David Parkin   |   518 |  306 |     2 |   59.27
+ Ron Barassi    |   515 |  276 |     4 |   53.98
+ Dick Reynolds  |   415 |  275 |     6 |   66.99
+ Leigh Matthews |   461 |  267 |     8 |   58.79
+ Chris Scott    |   383 |  260 |     3 |   68.28
+(10 rows)
+
+   display_name    | games | finals | grand_finals | premierships 
+-------------------+-------+--------+--------------+--------------
+ Jock McHale       |   713 |     58 |           16 |            7
+ Norm Smith        |   452 |     24 |            8 |            6
+ Frank Hughes      |   378 |     30 |           11 |            5
+ John Worrall      |   279 |     16 |            6 |            5
+ Dick Reynolds     |   415 |     37 |           12 |            4
+ Tom Hafey         |   522 |     42 |           10 |            4
+ Allan Jeans       |   576 |     41 |            9 |            4
+ Ron Barassi       |   515 |     33 |            9 |            4
+ Kevin Sheedy      |   678 |     43 |            7 |            4
+ David Parkin      |   518 |     36 |            6 |            4
+ Leigh Matthews    |   461 |     27 |            5 |            4
+ Alastair Clarkson |   472 |     26 |            5 |            4
+ Mick Malthouse    |   718 |     52 |            8 |            3
+ Perce Bentley     |   414 |     19 |            5 |            3
+ John Kennedy      |   412 |     18 |            5 |            3
+(15 rows)
+
+   display_name   | games | wins | draws | win_pct 
+------------------+-------+------+-------+---------
+ Cliff Rankin     |    57 |   45 |     0 |   78.95
+ Jack Bisset      |    80 |   63 |     0 |   78.75
+ George Angus     |    60 |   41 |     2 |   70.00
+ Brighton Diggins |    58 |   40 |     0 |   68.97
+ John Coleman     |   133 |   90 |     3 |   68.80
+ Neil Mann        |    72 |   49 |     1 |   68.75
+ Chris Scott      |   383 |  260 |     3 |   68.28
+ Dick Reynolds    |   415 |  275 |     6 |   66.99
+ Peter Pianto     |   104 |   69 |     1 |   66.83
+ Jock McHale      |   713 |  466 |    10 |   66.06
+ Craig McRae      |   123 |   79 |     4 |   65.85
+ John Nicholls    |    95 |   61 |     3 |   65.79
+ Frank Hughes     |   378 |  244 |     4 |   65.08
+ Tom Hafey        |   522 |  336 |     4 |   64.75
+ Bob Davis        |   116 |   72 |     5 |   64.22
+(15 rows)
+
+ venues | venues_with_slug 
+--------+------------------
+     52 |               52
+(1 row)
+
+ id |      canonical_name      |           slug           | matches | finals | grand_finals | matches_with_attendance | highest_attendance | avg_recorded_attendance 
+----+--------------------------+--------------------------+---------+--------+--------------+-------------------------+--------------------+-------------------------
+ 26 | Melbourne Cricket Ground | melbourne-cricket-ground |    3200 |    485 |          119 |                    3081 |             121696 |                   44030
+ 34 | Princes Park             | princes-park             |    1277 |     15 |            3 |                    1081 |              62986 |                   20696
+ 14 | Docklands                | docklands                |    1205 |      6 |            0 |                    1177 |              54444 |                   32313
+ 44 | Victoria Park            | victoria-park            |     880 |      2 |            0 |                     679 |              47000 |                   22232
+ 24 | Kardinia Park            | kardinia-park            |     740 |      1 |            0 |                     733 |              49107 |                   21113
+ 23 | Junction Oval            | junction-oval            |     734 |      6 |            3 |                     547 |              47000 |                   16906
+ 46 | Waverley Park            | waverley-park            |     732 |     70 |            1 |                     732 |              92935 |                   31795
+ 25 | Lake Oval                | lake-oval                |     704 |      4 |            1 |                     509 |              41000 |                   17419
+ 48 | Western Oval             | western-oval             |     665 |      0 |            0 |                     665 |              42354 |                   17345
+ 49 | Windy Hill               | windy-hill               |     629 |      1 |            0 |                     629 |              43487 |                   19275
+  9 | Brunswick St             | brunswick-st             |     612 |      4 |            0 |                     416 |              36000 |                   15906
+ 39 | Subiaco                  | subiaco                  |     545 |     20 |            0 |                     545 |              44142 |                   33639
+ 35 | Punt Rd                  | punt-rd                  |     544 |      0 |            0 |                     440 |              46000 |                   19093
+  3 | Arden St                 | arden-st                 |     529 |      0 |            0 |                     529 |              35000 |                   13138
+ 37 | Sydney Cricket Ground    | sydney-cricket-ground    |     486 |     12 |            0 |                     483 |              46323 |                   24027
+ 18 | Football Park            | football-park            |     458 |     20 |            0 |                     458 |              51140 |                   35137
+ 20 | Glenferrie Oval          | glenferrie-oval          |     443 |      0 |            0 |                     443 |              36000 |                   13094
+ 19 | Gabba                    | gabba                    |     432 |     25 |            1 |                     431 |              37478 |                   22713
+ 13 | Corio Oval               | corio-oval               |     371 |      1 |            0 |                     180 |              26025 |                   11820
+  1 | Adelaide Oval            | adelaide-oval            |     319 |     16 |            0 |                     318 |              54283 |                   38153
+(20 rows)
+
+ id |      canonical_name      |           slug           | finals | grand_finals | matches 
+----+--------------------------+--------------------------+--------+--------------+---------
+ 26 | Melbourne Cricket Ground | melbourne-cricket-ground |    485 |          119 |    3200
+ 46 | Waverley Park            | waverley-park            |     70 |            1 |     732
+ 19 | Gabba                    | gabba                    |     25 |            1 |     432
+ 39 | Subiaco                  | subiaco                  |     20 |            0 |     545
+ 18 | Football Park            | football-park            |     20 |            0 |     458
+  1 | Adelaide Oval            | adelaide-oval            |     16 |            0 |     319
+ 34 | Princes Park             | princes-park             |     15 |            3 |    1277
+ 37 | Sydney Cricket Ground    | sydney-cricket-ground    |     12 |            0 |     486
+ 38 | Stadium Australia        | stadium-australia        |     11 |            0 |      56
+ 33 | Perth Stadium            | perth-stadium            |     10 |            1 |     205
+ 23 | Junction Oval            | junction-oval            |      6 |            3 |     734
+ 14 | Docklands                | docklands                |      6 |            0 |    1205
+ 41 | Sydney Showground        | sydney-showground        |      5 |            0 |     119
+ 25 | Lake Oval                | lake-oval                |      4 |            1 |     704
+  9 | Brunswick St             | brunswick-st             |      4 |            0 |     612
+(15 rows)
+
+ match_id | season | match_date | venue_id |      canonical_name      |           slug           |    home     |      away       | attendance 
+----------+--------+------------+----------+--------------------------+--------------------------+-------------+-----------------+------------
+     7278 |   1970 | 1970-09-26 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Collingwood | Carlton         |     121696
+     7142 |   1969 | 1969-09-27 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Carlton     | Richmond        |     119165
+     7414 |   1971 | 1971-09-25 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Hawthorn    | St Kilda        |     118192
+     7691 |   1973 | 1973-09-29 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Richmond    | Carlton         |     116956
+     7018 |   1968 | 1968-09-28 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Essendon    | Carlton         |     116828
+     5661 |   1956 | 1956-09-15 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Melbourne   | Collingwood     |     115902
+     7829 |   1974 | 1974-09-28 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Richmond    | North Melbourne |     113839
+     8520 |   1979 | 1979-09-29 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Carlton     | Collingwood     |     113545
+     8658 |   1980 | 1980-09-27 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Richmond    | Collingwood     |     113461
+     8796 |   1981 | 1981-09-26 |       26 | Melbourne Cricket Ground | melbourne-cricket-ground | Carlton     | Collingwood     |     112964
+(10 rows)
+
+ total_active | linked | unlinked | earliest_season | latest_season | multi_kick | max_consecutive_goal_kicks | only_career_goal | no_further_career_kicks | resolved_match 
+--------------+--------+----------+-----------------+---------------+------------+----------------------------+------------------+-------------------------+----------------
+          334 |    330 |        4 |            1911 |          2026 |         44 |                          6 |               23 |                       4 |            328
+(1 row)
+
+    player_name    |       slug        | season | round_raw | consecutive_goal_kicks | no_further_career_goals | no_further_career_kicks | kickless_matches_before_first_kick | match_id 
+-------------------+-------------------+--------+-----------+------------------------+-------------------------+-------------------------+------------------------------------+----------
+ Clen Denning      | clen-denning      |   1935 | 4         |                      6 | f                       | f                       |                                  0 |     3233
+ Richard Lounder   | richard-lounder   |   1989 | 5         |                      4 | f                       | f                       |                                  0 |     9840
+ Daniel Metropolis | daniel-metropolis |   1992 | 3         |                      4 | f                       | f                       |                                  0 |    10317
+ Michael Tuck      | michael-tuck      |   1972 | 8         |                      3 | f                       | f                       |                                  0 |     7460
+ Ian Fairley       | ian-fairley       |   1983 | 7         |                      3 | f                       | f                       |                                  0 |     8973
+ Tim Hargreaves    | tim-hargreaves    |   1994 | 5         |                      3 | f                       | f                       |                                  0 |    10662
+ Damian Houlihan   | damian-houlihan   |   1994 | 7         |                      3 | f                       | f                       |                                  0 |    10672
+ Marcus Baldwin    | marcus-baldwin    |   2000 | 21        |                      3 | f                       | f                       |                                  0 |    11894
+ Ben Rutten        | ben-rutten        |   2003 | 16        |                      3 | f                       | f                       |                                  0 |    12408
+ Jason Tutt        | jason-tutt        |   2011 | 22        |                      3 | f                       | f                       |                                  0 |    13933
+ Samson Ryan       | samson-ryan       |   2023 | 2         |                      3 | f                       | f                       |                                  1 |    16202
+ Ian Chinn         | ian-chinn         |   1940 | 6         |                      2 | f                       | f                       |                                  0 |     3805
+ Bob Trainer       | bob-trainer       |   1950 | 13        |                      2 | f                       | f                       |                                  0 |     4949
+ Stuart Lennie     | stuart-lennie     |   1955 | 1         |                      2 | f                       | f                       |                                  0 |     5443
+ Edo Benetti       | edo-benetti       |   1961 | 8         |                      2 | f                       | f                       |                                  0 |     6155
+(15 rows)
+
+ active_events | linked_events | linked_players | earliest_season | latest_season | goals | behinds | misses | goals_to_win | goals_to_draw | cited_events 
+---------------+---------------+----------------+-----------------+---------------+-------+---------+--------+--------------+---------------+--------------
+           126 |           124 |            114 |            1913 |          2026 |    71 |      30 |     25 |           62 |             9 |          125
+(1 row)
+
+   display_name    |       slug        | attempts | goals | behinds | misses | goals_to_win | goals_to_draw 
+-------------------+-------------------+----------+-------+---------+--------+--------------+---------------
+ Barry Hall        | barry-hall        |        2 |     2 |       0 |      0 |            2 |             0
+ Gary Rohan        | gary-rohan        |        2 |     2 |       0 |      0 |            2 |             0
+ David Mundy       | david-mundy       |        2 |     1 |       1 |      0 |            1 |             0
+ Dylan Moore       | dylan-moore       |        2 |     1 |       0 |      1 |            0 |             1
+ Jack Riewoldt     | jack-riewoldt     |        2 |     1 |       0 |      1 |            1 |             0
+ Malcolm Blight    | malcolm-blight    |        2 |     1 |       0 |      1 |            1 |             0
+ Mitch McGovern    | mitch-mcgovern    |        2 |     1 |       0 |      1 |            0 |             1
+ Stephen Kernahan  | stephen-kernahan  |        2 |     1 |       0 |      1 |            1 |             0
+ Tom Hawkins       | tom-hawkins       |        2 |     1 |       1 |      0 |            1 |             0
+ Brad Johnson      | brad-johnson      |        2 |     0 |       2 |      0 |            0 |             0
+ Alan Ryan         | alan-ryan         |        1 |     1 |       0 |      0 |            0 |             1
+ Alan Stoneham     | alan-stoneham     |        1 |     1 |       0 |      0 |            1 |             0
+ Alastair Clarkson | alastair-clarkson |        1 |     1 |       0 |      0 |            1 |             0
+ Ashley McGrath    | ashley-mcgrath    |        1 |     1 |       0 |      0 |            1 |             0
+ Ashley Sampi      | ashley-sampi      |        1 |     1 |       0 |      0 |            0 |             1
+ Ben Dixon         | ben-dixon         |        1 |     1 |       0 |      0 |            1 |             0
+ Bill Brownless    | bill-brownless    |        1 |     1 |       0 |      0 |            1 |             0
+ Bill Nolan        | bill-nolan        |        1 |     1 |       0 |      0 |            1 |             0
+ Bill Ryan         | bill-ryan         |        1 |     1 |       0 |      0 |            1 |             0
+ Bill Wood         | bill-wood         |        1 |     1 |       0 |      0 |            1 |             0
+(20 rows)
+
+ matches | earliest_season | latest_season | finals | grand_finals | matches_with_attendance 
+---------+-----------------+---------------+--------+--------------+-------------------------
+   17051 |            1897 |          2026 |    722 |          130 |                   15400
+(1 row)
+
+  id   | season | match_date |      home       |      away       | home_score | away_score | margin |          venue           
+-------+--------+------------+-----------------+-----------------+------------+------------+--------+--------------------------
+  8481 |   1979 | 1979-07-28 | Fitzroy         | Melbourne       |        238 |         48 |    190 | Waverley Park
+ 13906 |   2011 | 2011-07-30 | Geelong         | Melbourne       |        233 |         47 |    186 | Kardinia Park
+  8403 |   1979 | 1979-04-28 | Collingwood     | St Kilda        |        207 |         29 |    178 | Victoria Park
+  1686 |   1919 | 1919-07-26 | South Melbourne | St Kilda        |        189 |         18 |    171 | Lake Oval
+ 16314 |   2023 | 2023-06-24 | Sydney          | West Coast      |        205 |         34 |    171 | Sydney Cricket Ground
+  2772 |   1931 | 1931-05-09 | Richmond        | North Melbourne |        199 |         31 |    168 | Punt Rd
+  6549 |   1964 | 1964-08-22 | Essendon        | South Melbourne |        184 |         19 |    165 | Windy Hill
+ 13922 |   2011 | 2011-08-13 | Hawthorn        | Port Adelaide   |        197 |         32 |    165 | Melbourne Cricket Ground
+ 10343 |   1992 | 1992-05-03 | Brisbane Bears  | Geelong         |         75 |        239 |    164 | Carrara
+  9605 |   1987 | 1987-07-26 | Sydney          | Essendon        |        236 |         73 |    163 | Sydney Cricket Ground
+(10 rows)
+

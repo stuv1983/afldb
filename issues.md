@@ -9,6 +9,16 @@ created, reopened, resolved, or materially reclassified.
 
 **Open issues:** 1 tracked here — `-156`.
 
+<!-- 2026-09-14 (AFLDB-ISSUE-171 RESOLVED — the AFL home-page Record of the week now offers a typed
+     22-option catalogue across player career/match/season, coaches, venues and curated special
+     records; the five legacy stored values are unchanged and an invalid value falls back safely
+     before dispatch; Father–Son Selections is distinct from Most Games by Family. Focused unit
+     (53/53), typecheck, `afldb_test`-backed integration (4/4) and production-build gates all PASS;
+     no implementation change was required during validation. See the `AFLDB-ISSUE-171` entry in
+     `issues.md` (Status — RESOLVED 2026-09-14, *Validation and resolution* section) and
+     `AFLDB-ISSUE-171.md`. Open issue count 2 -> 1. Removed from this table and from
+     `IssuesIndex.md`. -->
+
 <!-- 2026-09-14 (AFLDB-ISSUE-169 RESOLVED — operator disabled Cloudflare Web Analytics / RUM
      injection at the edge for the `afldb.com` zone (was "Enable, excluding visitor data in the
      EU," changed to "Disable"), matching the investigation's recommendation. Post-change fresh
@@ -28932,3 +28942,57 @@ None. The feature is complete, validated and committed on `feature/issue-170-coa
 and deploy follow the standard issue lifecycle (`merge:ready`, operator push/merge,
 `deploy/sync-dev.ps1`, DEV smoke) at the user's discretion; no code change remains outstanding under
 this issue.
+
+## AFLDB-ISSUE-171 — Expand “Record of the week” beyond career-player records
+
+- **Status:** Resolved
+- **Resolved:** 2026-09-14
+
+**Status — RESOLVED (2026-09-14).**  
+**Severity — Medium.**  
+**Area — Home page / Site settings / Record queries.**
+
+### Problem and evidence
+
+The persisted AFL home-record setting accepted only five career-player values because
+`src/app/page.tsx` called `getCareerRecord()` directly and rendered one fixed row shape. This is an
+application-contract limitation, not a data limitation. Bounded discovery and read-only
+`afldb_test` evidence are retained in `AFLDB-ISSUE-171-CODEX-CONTEXT.md`,
+`AFLDB-ISSUE-171-DATA-EVIDENCE.txt` and `ISSUE-171-DATA-EVIDENCE.sql`.
+
+### Local implementation
+
+- `src/lib/home-records.ts` is the typed 22-option catalogue and safe setting resolver.
+- `src/db/queries/home-records.ts` dispatches exactly one selected provider into existing player,
+  coach and curated-record read models plus bounded coach/venue/first-kick query adapters.
+- `src/components/HomeRecordPanel.tsx` renders the finite row union with correct player, match,
+  coach and venue destinations, visible units, optional `All →`, coverage and empty state.
+- `/admin/settings` groups choices into Players — Career/Match/Season, Coaches, Venues and Special
+  records without changing the `site.settings` boundary. AFLW is unchanged.
+- The public selection-specific label is now **Father–Son Selections**, distinct from **Most Games
+  by Family**.
+
+The exact catalogue, deferrals, compatibility choices and pending validation are recorded in
+`AFLDB-ISSUE-171.md`. No schema or stored-value migration is required.
+
+### Validation and resolution — 2026-09-14
+
+- **Focused unit gate — PASS:** `tests/site-settings.test.ts`, `tests/home-records.test.ts`,
+  `tests/family-records-surfaces.test.ts` and `tests/admin-settings-actions.test.ts`; 4 files and
+  53/53 tests passed.
+- **Typecheck — PASS:** `npm run typecheck` completed with no diagnostics.
+- **Focused integration gate — PASS:** `tests/integration/home-records.test.ts`; 4/4 tests passed
+  against `afldb_test` via `127.0.0.1:55432`. Coverage confirms career, match and season record
+  semantics; coach leaders from canonical match assignments; venue counts and NULL attendance;
+  and active-linked after-siren and first-kick curated rules.
+- **Production build gate — PASS:** with `DATABASE_URL` temporarily set to
+  `AFLDB_TEST_DATABASE_URL`, Next.js 16.3.1 completed TypeScript, 1,516/1,516 static pages, build
+  traces, final optimisation and `prepare-standalone`; exit code 0. The middleware-to-proxy
+  deprecation and Next-internal Edge Runtime `process.cwd` messages are existing non-blocking
+  warnings.
+
+Resolved locally. The root cause was the home panel's five-value, career-player-only query/render
+contract. The typed 22-option catalogue, selected-provider dispatch, bounded canonical queries,
+heterogeneous renderer and grouped admin selector implement the approved fix while preserving the
+five legacy values and safe fallback. The focused behavioural, database and production-build gates
+all pass; no implementation change was required during validation.

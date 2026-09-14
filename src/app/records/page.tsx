@@ -56,9 +56,9 @@ export default async function RecordsPage() {
         </Link>
 
         <Link href="/records/father-son" className="card">
-          <h3>Father–Son Records</h3>
+          <h3>Father–Son Selections</h3>
           <div className="meta">
-            Selections made under the AFL father&ndash;son rule, by combined career games.
+            Players selected under the AFL father&ndash;son rule, ranked by combined career games.
           </div>
         </Link>
 
