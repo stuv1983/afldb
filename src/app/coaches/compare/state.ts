@@ -29,12 +29,17 @@ import 'server-only';
  *
  * Stage 2B adds each coach's full `CoachCareer` (Stage 1A/1B's existing
  * read model -- `getCoachCareer`, never a second, comparison-specific
- * aggregation) to a resolved pair, loaded concurrently since the two
- * reads are independent. Opponent and direct head-to-head data remain
- * Stage 2C/2D.
+ * aggregation) to a resolved pair.
+ *
+ * Stage 2C adds the pair's direct coach-v-coach head-to-head
+ * (`getCoachHeadToHead`), oriented to the REQUESTED A/B order -- never the
+ * canonical/ordered pair. All three reads (careerA, careerB, headToHead)
+ * are independent, so they are loaded concurrently. Stage 2D contextual
+ * extras remain a later stage.
  */
 import {
-  getCoach, getCoachCareer, getCoachOptions, type CoachCareer, type CoachIdentity,
+  getCoach, getCoachCareer, getCoachHeadToHead, getCoachOptions,
+  type CoachCareer, type CoachHeadToHead, type CoachIdentity,
 } from '@/db/queries/coaches';
 import {
   COACH_COMPARE_PATH,
@@ -123,6 +128,15 @@ export type CoachCompareRouteState =
        */
       careerA: CoachCareer | null;
       careerB: CoachCareer | null;
+      /**
+       * Direct coach-v-coach head-to-head (Stage 2C), oriented to the
+       * REQUESTED A/B order -- `null` only in the unexpected case where an
+       * already-resolved, valid pair's head-to-head fails to load, the same
+       * fail-safe convention `careerA`/`careerB` already use. A real,
+       * distinct pair that never met returns a real zero-meeting object,
+       * never `null` (see {@link getCoachHeadToHead}).
+       */
+      headToHead: CoachHeadToHead | null;
       /** The same view with the two coaches reversed. */
       swapPath: string;
     });
@@ -211,12 +225,15 @@ export async function resolveCoachCompareState(
     };
   }
 
-  // Stage 2B: both careers are independent reads, so load them
-  // concurrently rather than sequentially -- the same reasoning the pair
-  // lookup above already applies to coachA/coachB.
-  const [careerA, careerB] = await Promise.all([
+  // Stage 2B/2C: careers and the direct head-to-head are three independent
+  // reads, so load them concurrently rather than sequentially -- the same
+  // reasoning the pair lookup above already applies to coachA/coachB.
+  // headToHead is requested in the REQUESTED order (coachA.id, coachB.id),
+  // never the canonical/ordered pair, so A/B orientation survives intact.
+  const [careerA, careerB, headToHead] = await Promise.all([
     getCoachCareer(coachA.id),
     getCoachCareer(coachB.id),
+    getCoachHeadToHead(coachA.id, coachB.id),
   ]);
 
   return {
@@ -226,6 +243,7 @@ export async function resolveCoachCompareState(
     coachB: resolveCoach(coachB),
     careerA,
     careerB,
+    headToHead,
     swapPath: swapCoachComparePath(params),
     canonicalPath: canonicalCoachComparePath(coachA.id, coachB.id),
     noindex: false,

@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { CoachComparisonCareer } from '@/components/CoachComparisonCareer';
 import { CoachComparisonControls } from '@/components/CoachComparisonControls';
+import { CoachHeadToHeadSection } from '@/components/CoachHeadToHead';
 import type { CoachCompareRouteState } from '@/app/coaches/compare/state';
 
 /**
@@ -17,8 +18,9 @@ import type { CoachCompareRouteState } from '@/app/coaches/compare/state';
  * The selected state shows each coach's identity and their canonical
  * public link (player page for a player-linked coach, coach page for a
  * coach-only identity), then their side-by-side career comparison
- * ({@link CoachComparisonCareer}, Stage 2B). Opponent and direct
- * head-to-head data remain Stage 2C/2D.
+ * ({@link CoachComparisonCareer}, Stage 2B), then their direct
+ * coach-v-coach head-to-head ({@link CoachHeadToHeadSection}, Stage 2C).
+ * Stage 2D contextual extras remain a later stage.
  */
 export function CoachComparisonView({ state }: { state: CoachCompareRouteState }) {
   return (
@@ -97,9 +99,11 @@ export function CoachComparisonView({ state }: { state: CoachCompareRouteState }
             careerB={state.careerB}
           />
 
-          <p className="muted">
-            Direct head-to-head record for these two coaches is coming in a later stage.
-          </p>
+          <CoachHeadToHeadSection
+            coachA={state.coachA}
+            coachB={state.coachB}
+            headToHead={state.headToHead}
+          />
         </>
       )}
     </>

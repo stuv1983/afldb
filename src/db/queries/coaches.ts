@@ -684,3 +684,222 @@ export async function listCoaches(): Promise<CoachIndexRow[]> {
      ORDER BY c.surname, c.given_name, c.display_name
   `;
 }
+
+// --- Stage 2C: direct coach-v-coach head-to-head ---
+
+export type CoachHeadToHeadTotals = {
+  meetings: number;
+  aWins: number;
+  bWins: number;
+  draws: number;
+  aWinPct: number | null;
+  bWinPct: number | null;
+  finals: number;
+  grandFinals: number;
+};
+
+/**
+ * One venue where two coaches met directly (AFLDB-ISSUE-170 Stage 2C). Kept
+ * as its own type rather than reusing {@link CoachVenueRecord}: that type's
+ * wins/losses are single-coach oriented and would misrepresent an A/B
+ * head-to-head, where "a win" and "a loss" both need a named side.
+ */
+export type CoachHeadToHeadVenueRecord = {
+  venueId: number;
+  venueName: string;
+  venueSlug: string;
+  meetings: number;
+  aWins: number;
+  bWins: number;
+  draws: number;
+  aWinPct: number | null;
+  bWinPct: number | null;
+  finals: number;
+  grandFinals: number;
+  firstMeetingDate: Date;
+  lastMeetingDate: Date;
+};
+
+export type CoachHeadToHead = {
+  coachAId: number;
+  coachBId: number;
+  totals: CoachHeadToHeadTotals;
+  /** This coach's biggest-margin direct win over the other, or null with no qualifying (decided) direct meeting. */
+  biggestWinA: CoachCareerMatch | null;
+  biggestWinB: CoachCareerMatch | null;
+  /**
+   * Every venue with at least one direct meeting, ordered `meetings DESC,
+   * venue name ASC, venue id ASC` -- the same tie-break {@link CoachVenueRecord}
+   * uses for a single coach's venue history.
+   */
+  venues: CoachHeadToHeadVenueRecord[];
+};
+
+type CoachHeadToHeadDecidedRaw = {
+  matchId: number;
+  season: number;
+  matchDate: Date;
+  roundType: string;
+  isFinalsSeries: boolean;
+  aClubId: number;
+  aClubName: string;
+  aClubSlug: string;
+  bClubId: number;
+  bClubName: string;
+  bClubSlug: string;
+  homeClubId: number;
+  homeScore: number;
+  awayScore: number;
+  venueId: number | null;
+  venueName: string | null;
+  venueSlug: string | null;
+};
+
+/**
+ * THE direct-meeting population fragment (AFLDB-ISSUE-170 Stage 2C, Stage 0
+ * §0.8): matches where `coachAId` and `coachBId` each have a `match_coaches`
+ * assignment, to two DIFFERENT clubs, in the SAME match. `match_coaches` has
+ * at most one row per (match, club) and Stage 0 §0.8 found zero matches with
+ * more than two coach assignments, so joining one coach's assignment to the
+ * other's on the same `match_id` with `club_id <>` is exactly "opposing
+ * clubs, same match" -- never a same-club pairing, and never inferred from
+ * career-span overlap. A match where only one (or neither) of these two
+ * coaches is assigned simply has no row in this join, and a match where
+ * they are somehow assigned to the SAME club (never observed, Stage 0 §0.8)
+ * is excluded by `club_id <>` regardless.
+ *
+ * Every query below builds its `meetings` CTE from this and nothing else,
+ * so totals, biggest wins and venue history can never disagree about which
+ * matches count as a direct meeting.
+ */
+function coachHeadToHeadScope(coachAId: number, coachBId: number) {
+  return sql`
+    SELECT mcA.match_id, m.season, m.match_date, m.round_type::text AS round_type,
+           m.is_finals_series, m.winner_club_id, m.home_club_id, m.home_score, m.away_score,
+           m.venue_id, mcA.club_id AS a_club_id, mcB.club_id AS b_club_id
+      FROM match_coaches mcA
+      JOIN match_coaches mcB ON mcB.match_id = mcA.match_id AND mcB.club_id <> mcA.club_id
+      JOIN matches m ON m.id = mcA.match_id
+     WHERE mcA.coach_id = ${coachAId} AND mcB.coach_id = ${coachBId}
+  `;
+}
+
+/** One direct meeting, oriented to one side's perspective, in {@link CoachCareerMatch} shape. */
+function toDirectMeetingMatch(row: CoachHeadToHeadDecidedRaw, perspective: 'a' | 'b'): CoachCareerMatch {
+  const coachedClubId = perspective === 'a' ? row.aClubId : row.bClubId;
+  const coachedClubName = perspective === 'a' ? row.aClubName : row.bClubName;
+  const coachedClubSlug = perspective === 'a' ? row.aClubSlug : row.bClubSlug;
+  const opponentClubId = perspective === 'a' ? row.bClubId : row.aClubId;
+  const opponentClubName = perspective === 'a' ? row.bClubName : row.aClubName;
+  const opponentClubSlug = perspective === 'a' ? row.bClubSlug : row.aClubSlug;
+  return {
+    matchId: row.matchId,
+    season: row.season,
+    matchDate: row.matchDate,
+    roundType: row.roundType,
+    isFinalsSeries: row.isFinalsSeries,
+    coachedClubId,
+    coachedClubName,
+    coachedClubSlug,
+    opponentClubId,
+    opponentClubName,
+    opponentClubSlug,
+    margin: coachPerspectiveMargin({
+      coachedClubId, homeClubId: row.homeClubId, homeScore: row.homeScore, awayScore: row.awayScore,
+    }),
+    venueId: row.venueId,
+    venueName: row.venueName,
+    venueSlug: row.venueSlug,
+  };
+}
+
+/**
+ * Two coaches' direct record against EACH OTHER (AFLDB-ISSUE-170 Stage 2C):
+ * meetings, wins/draws/win% oriented to the requested A/B order, finals and
+ * Grand Final meeting counts, each side's biggest direct win (reusing
+ * {@link selectCareerRecordMatch}'s tie rule verbatim -- greatest margin,
+ * then earliest date, then lowest match id), and venue history scoped to
+ * these two coaches' meetings only.
+ *
+ * Orientation is never canonicalised: `coachAId`/`coachBId` are passed
+ * straight into {@link coachHeadToHeadScope} in the order given, so calling
+ * this with the two ids swapped swaps every A/B value in the result -- it
+ * does not change which pair is being described, exactly the convention
+ * `swapCoachComparePath` already applies to the comparison URL.
+ *
+ * A recognised, distinct pair that never met returns a real object with
+ * `totals.meetings = 0` (an aggregate with no GROUP BY always returns
+ * exactly one row, zeros included) and `venues: []` -- never null. Null is
+ * reserved for an unrecognised coach id on either side, the same
+ * zero-vs-null convention {@link getCoachRecordAgainstOrganization} already
+ * uses.
+ */
+export async function getCoachHeadToHead(coachAId: number, coachBId: number): Promise<CoachHeadToHead | null> {
+  const [coachA] = await sql<{ id: number }[]>`SELECT id FROM coaches WHERE id = ${coachAId}`;
+  if (!coachA) return null;
+  const [coachB] = await sql<{ id: number }[]>`SELECT id FROM coaches WHERE id = ${coachBId}`;
+  if (!coachB) return null;
+
+  const [[totalsRow], decidedRaw, venueRows] = await Promise.all([
+    sql<Omit<CoachHeadToHeadTotals, 'aWinPct' | 'bWinPct'>[]>`
+      WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
+      SELECT count(*)::int AS meetings,
+             count(*) FILTER (WHERE winner_club_id = a_club_id)::int AS "aWins",
+             count(*) FILTER (WHERE winner_club_id = b_club_id)::int AS "bWins",
+             count(*) FILTER (WHERE winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (WHERE is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE round_type = 'grand_final')::int AS "grandFinals"
+        FROM meetings
+    `,
+    sql<CoachHeadToHeadDecidedRaw[]>`
+      WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
+      SELECT mt.match_id AS "matchId", mt.season, mt.match_date AS "matchDate",
+             mt.round_type AS "roundType", mt.is_finals_series AS "isFinalsSeries",
+             ac.id AS "aClubId", ac.name AS "aClubName", ac.slug AS "aClubSlug",
+             bc.id AS "bClubId", bc.name AS "bClubName", bc.slug AS "bClubSlug",
+             mt.home_club_id AS "homeClubId", mt.home_score AS "homeScore", mt.away_score AS "awayScore",
+             v.id AS "venueId", v.canonical_name AS "venueName", v.slug AS "venueSlug"
+        FROM meetings mt
+        JOIN clubs ac ON ac.id = mt.a_club_id
+        JOIN clubs bc ON bc.id = mt.b_club_id
+        LEFT JOIN venues v ON v.id = mt.venue_id
+       WHERE mt.winner_club_id IS NOT NULL
+    `,
+    sql<Omit<CoachHeadToHeadVenueRecord, 'aWinPct' | 'bWinPct'>[]>`
+      WITH meetings AS (${coachHeadToHeadScope(coachA.id, coachB.id)})
+      SELECT v.id AS "venueId", v.canonical_name AS "venueName", v.slug AS "venueSlug",
+             count(*)::int AS meetings,
+             count(*) FILTER (WHERE mt.winner_club_id = mt.a_club_id)::int AS "aWins",
+             count(*) FILTER (WHERE mt.winner_club_id = mt.b_club_id)::int AS "bWins",
+             count(*) FILTER (WHERE mt.winner_club_id IS NULL)::int AS draws,
+             count(*) FILTER (WHERE mt.is_finals_series)::int AS finals,
+             count(*) FILTER (WHERE mt.round_type = 'grand_final')::int AS "grandFinals",
+             min(mt.match_date) AS "firstMeetingDate",
+             max(mt.match_date) AS "lastMeetingDate"
+        FROM meetings mt
+        JOIN venues v ON v.id = mt.venue_id
+       GROUP BY v.id, v.canonical_name, v.slug
+       ORDER BY count(*) DESC, v.canonical_name ASC, v.id ASC
+    `,
+  ]);
+
+  const matchesFromA = decidedRaw.map((r) => toDirectMeetingMatch(r, 'a'));
+  const matchesFromB = decidedRaw.map((r) => toDirectMeetingMatch(r, 'b'));
+
+  return {
+    coachAId: coachA.id,
+    coachBId: coachB.id,
+    totals: {
+      ...totalsRow,
+      aWinPct: winPct(totalsRow.aWins, totalsRow.draws, totalsRow.meetings),
+      bWinPct: winPct(totalsRow.bWins, totalsRow.draws, totalsRow.meetings),
+    },
+    biggestWinA: selectCareerRecordMatch(matchesFromA, 'win'),
+    biggestWinB: selectCareerRecordMatch(matchesFromB, 'win'),
+    venues: venueRows.map((v) => ({
+      ...v,
+      aWinPct: winPct(v.aWins, v.draws, v.meetings),
+      bWinPct: winPct(v.bWins, v.draws, v.meetings),
+    })),
+  };
+}

@@ -354,3 +354,69 @@ describe('Stage 2B route state: career comparison', () => {
     expect('careerB' in state).toBe(false);
   });
 });
+
+describe('Stage 2C route state: direct head-to-head', () => {
+  it("loads the pair's head-to-head using getCoachHeadToHead, oriented to the requested A/B order", async () => {
+    const [idA, idB] = await distinctCoachIds();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idB) });
+
+    expect(state.kind).toBe('selected');
+    if (state.kind !== 'selected') return;
+
+    expect(state.headToHead).not.toBeNull();
+    expect(state.headToHead?.coachAId).toBe(idA);
+    expect(state.headToHead?.coachBId).toBe(idB);
+  });
+
+  it('a real, distinct pair returns a deliberate zero-meeting object rather than null when they never opposed each other', async () => {
+    const zeroId = await zeroGameCoachId();
+    if (zeroId === null) return; // no zero-game coach currently on this database; not this test's concern
+    const gamesId = await coachWithGamesId();
+
+    const state = await resolveCoachCompareState({ a: String(zeroId), b: String(gamesId) });
+    expect(state.kind).toBe('selected');
+    if (state.kind !== 'selected') return;
+
+    // A zero-game coach cannot have directly opposed anyone.
+    expect(state.headToHead).not.toBeNull();
+    expect(state.headToHead?.totals.meetings).toBe(0);
+    expect(state.headToHead?.totals.aWinPct).toBeNull();
+    expect(state.headToHead?.biggestWinA).toBeNull();
+    expect(state.headToHead?.biggestWinB).toBeNull();
+    expect(state.headToHead?.venues).toEqual([]);
+    // The paired coach's real career still resolves alongside it (Stage 2B unaffected).
+    expect(state.careerB?.totals.games).toBeGreaterThan(0);
+  });
+
+  it('swapping the requested pair order swaps the head-to-head orientation too', async () => {
+    const [idA, idB] = await distinctCoachIds();
+    const forward = await resolveCoachCompareState({ a: String(idA), b: String(idB) });
+    const reversed = await resolveCoachCompareState({ a: String(idB), b: String(idA) });
+    if (forward.kind !== 'selected' || reversed.kind !== 'selected') return;
+
+    expect(reversed.headToHead?.coachAId).toBe(idB);
+    expect(reversed.headToHead?.coachBId).toBe(idA);
+    expect(reversed.headToHead?.totals.meetings).toBe(forward.headToHead?.totals.meetings);
+    expect(reversed.headToHead?.totals.aWins).toBe(forward.headToHead?.totals.bWins);
+  });
+
+  it('does not attempt head-to-head for the unselected state', async () => {
+    const state = await resolveCoachCompareState({});
+    expect('headToHead' in state).toBe(false);
+  });
+
+  it('does not attempt head-to-head for the same-coach state', async () => {
+    const [idA] = await distinctCoachIds();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(idA) });
+    expect(state.kind).toBe('same-coach');
+    expect('headToHead' in state).toBe(false);
+  });
+
+  it('does not attempt head-to-head for the invalid/stale state', async () => {
+    const [idA] = await distinctCoachIds();
+    const staleId = await unusedCoachId();
+    const state = await resolveCoachCompareState({ a: String(idA), b: String(staleId) });
+    expect(state.kind).toBe('invalid');
+    expect('headToHead' in state).toBe(false);
+  });
+});
