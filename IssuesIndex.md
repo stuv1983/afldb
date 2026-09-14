@@ -20,9 +20,14 @@ user-supplied diff of `src/db/queries/coaches.ts` (comment-only). Validation: fo
 `ExpandableTableFrame` rerun 3/3, focused `afldb_test` integration 61/61 (two stale 41-meeting test
 expectations updated to 42 as data drift only), typecheck PASS, production-style build PASS
 (1516/1516 static pages), focused ISSUE-172 E2E 4/4. Broader pre-existing E2E/journeys drift is
-untouched, out of scope. Branch `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172` —
-**not yet merged, not yet deployed.** Open issue count 25 -> 24. Removed from this index and the
-Open Issues table. See the `AFLDB-ISSUE-172` entry in `issues.md`, *Resolution (2026-09-15)*.)
+untouched, out of scope. Branch `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172`,
+merged into `main` at `a4e8a34`. **Deployed to DEV and DEV-accepted 2026-09-15:** `streamanator`
+updated `57ce458` -> `a4e8a34`, 102/102 migrations already applied (0 pending), production build/
+typecheck PASS, static generation 1516/1516, standalone bundle prepared, `afldb.service`
+active/running, `/api/health` `status=ok`/`database=ok` (healthy after 3s / 2 probes). Manual DEV
+acceptance PASS across all eleven verified surfaces. **PROD untouched.** Open issue count 25 -> 24.
+Removed from this index and the Open Issues table. See the `AFLDB-ISSUE-172` entry in `issues.md`,
+*Resolution (2026-09-15)* and *DEV deployment and acceptance (2026-09-15)*.)
 
 **Last updated:** 2026-09-14 (`AFLDB-ISSUE-171` **RESOLVED.** The AFL home-page Record of the
 week now has a typed 22-option catalogue across player career/match/season, coaches, venues and

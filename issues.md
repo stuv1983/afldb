@@ -7,7 +7,24 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 2 tracked here — `-156`, `-172`.
+**Open issues:** 1 tracked here — `-156`.
+
+<!-- 2026-09-15 (AFLDB-ISSUE-172 RESOLVED — Bounded public UI/UX cleanup, seven sub-items: Match
+     Search and Brownlow removed from `PRIMARY_NAV` (both routes and their home-page browse tiles
+     unchanged, Brownlow now linked from `/awards`); `/clubs` advanced-search/filtering removed
+     entirely; Players' "Example searches" section removed; `/coaches/[slug]`'s opponent selector
+     converted from a full-reloading GET form to `router.push(..., { scroll: false })` (query/stat
+     semantics unchanged); Coaches page visual/layout redesign explicitly deferred to a separate
+     Claude Design pass; new reusable `ExpandableTableFrame` (CSS-only, no portal) wired into the
+     Coaches list only; the presentation-only club/coach comparison "swap order" controls removed.
+     Validation PASS: focused unit 88/88, `ExpandableTableFrame` rerun 3/3, focused `afldb_test`
+     integration 61/61, typecheck, production-style build (1516/1516 static pages), focused E2E
+     4/4. Merged to `main` at `a4e8a34` and **deployed to DEV and DEV-accepted 2026-09-15**:
+     `streamanator` updated `57ce458` -> `a4e8a34`, migrations 102/102 already applied (0 pending),
+     `afldb.service` active/running, `/api/health` `status=ok`/`database=ok`, manual DEV acceptance
+     PASS across all eleven verified surfaces. PROD untouched; no PROD deployment claimed. See the
+     `AFLDB-ISSUE-172` entry below, *Resolution (2026-09-15)* and *DEV deployment and acceptance
+     (2026-09-15)*. Removed from this table and from `IssuesIndex.md`; 2 -> 1. -->
 
 <!-- 2026-09-14 (AFLDB-ISSUE-171 RESOLVED — the AFL home-page Record of the week now offers a typed
      22-option catalogue across player career/match/season, coaches, venues and curated special
@@ -1295,7 +1312,6 @@ created, reopened, resolved, or materially reclassified.
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
-| `AFLDB-ISSUE-172` | Low/Medium | Public UI/UX — navigation, search, Coaches, tables, comparisons | **OPEN — IMPLEMENTED LOCALLY 2026-09-15, NOT YET VALIDATED, NOT MERGED.** Seven bounded sub-items on `sonnet/issue-172-ui-ux-cleanup`: (1) Match Search and Brownlow removed from `PRIMARY_NAV`, both routes and their home-page browse tiles unchanged, Brownlow now linked from `/awards`; (2) `/clubs` advanced-search/filtering removed entirely, unfiltered browse only; (3) Players "Example searches" section removed; (4) `/coaches/[slug]`'s opponent selector converted from a full-reloading GET form to `router.push(..., { scroll: false })`, mirroring the existing player-linked pattern, query semantics unchanged; (5) Coaches page visual/layout redesign explicitly deferred to a separate Claude Design pass; (6) new reusable `ExpandableTableFrame` (CSS-only, no remount, no portal) wired into the Coaches list only; (7) the presentation-only "Swap the order of the two clubs/coaches" controls removed from `/clubs/compare` and `/coaches/compare`, with the now-unused `swapClubComparePath`/`swapCoachComparePath` helpers deleted. Full detail: the `AFLDB-ISSUE-172` entry in `issues.md`. | **Operator:** run the focused validation commands recorded in the `AFLDB-ISSUE-172` entry's *Validation* section (focused vitest, focused `afldb_test` integration, focused Playwright e2e, typecheck), then review/commit/merge per the standard issue lifecycle. |
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-169` is **Resolved** and is NO LONGER an open issue. The
      operator disabled Cloudflare Web Analytics / RUM injection at the edge for the `afldb.com`
      zone (was "Enable, excluding visitor data in the EU," changed to "Disable"), matching the
@@ -29000,14 +29016,16 @@ all pass; no implementation change was required during validation.
 
 ## AFLDB-ISSUE-172 — Public site UI/UX cleanup: navigation, redundant search controls, Coaches interaction, expandable tables, comparison ordering
 
-- **Status:** Resolved 2026-09-15. Not yet merged, not yet deployed — operator commit/merge per the
-  standard lifecycle remains outstanding.
+- **Status:** **RESOLVED on DEV — 2026-09-15.** Merged to `main` (`a4e8a34`) and deployed to DEV;
+  `/api/health` returned `status=ok`/`database=ok` and manual DEV acceptance PASSED (see
+  *DEV deployment and acceptance (2026-09-15)* below). **PROD untouched.**
 - **Severity:** Low/Medium (UX/navigation clarity; no data or correctness defect)
 - **Area:** Public navigation / Clubs / Players / Coaches / shared table components / comparison
   surfaces
 - **Found:** 2026-09-14
 - **Implemented:** 2026-09-15
-- **Branch:** `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172`.
+- **Branch:** `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172`; merged into
+  `main` at `a4e8a34`.
 
 ### Objective
 
@@ -29200,8 +29218,23 @@ semantics changed.
 Broader/unrelated pre-existing E2E drift (stale Pendlebury id, player counts, Brownlow/merged-club
 fixtures, ambiguous Records selector, local auth-env warnings) was left untouched, as scoped.
 
-Not yet merged or deployed; PROD and `afldb_dev` untouched. Operator next action: review/stage/commit
-per the standard lifecycle below.
+### DEV deployment and acceptance (2026-09-15)
+
+Merged to `main` and deployed to DEV: `streamanator` updated from `57ce458` to `a4e8a34`.
+Migrations 102/102 already applied, 0 pending. Next.js production build PASS, TypeScript PASS,
+static generation 1516/1516, standalone bundle prepared successfully. `afldb.service`
+active/running; `/api/health` returned `status=ok`/`database=ok`; the service became healthy
+after 3 seconds / 2 probes.
+
+Manual DEV acceptance PASS across every verified surface: Match Search and Brownlow absent from
+primary navigation; Match Search and Brownlow home Browse tiles retained; the Brownlow card
+present under `/awards`; the `/clubs` Advanced Search/filter panel removed; the `/players` Example
+Searches section removed; the coach opponent/history-v-team navigation no longer jumps back to
+page top; Coaches Expand Table works and preserves state; Escape closes the expanded table with
+focus returned appropriately; the club comparison swap control removed; the coach comparison swap
+control removed.
+
+**PROD untouched** — no PROD deployment is claimed by this issue.
 
 ### Deferred
 
