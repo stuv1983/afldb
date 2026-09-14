@@ -42,7 +42,7 @@ export function ClubComparisonEraExplorer({
     <nav className="sort-nav" aria-label="Filter rivalry records and match history by era">
       <span className="sort-label">Era</span>
       {/* prefetch={false} on every chip: see the same note in
-          ClubComparisonControls.tsx (Swap/Reset) — sibling-link prefetch on
+          ClubComparisonControls.tsx (Reset) — sibling-link prefetch on
           this dynamic segment can leak a different chip's cached <head> into
           whichever one is actually clicked (AFLDB-ISSUE-144). */}
       <Link

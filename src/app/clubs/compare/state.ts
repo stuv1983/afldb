@@ -59,7 +59,6 @@ import {
   canonicalClubComparePath,
   clubComparePath,
   isMatchType,
-  swapClubComparePath,
 } from '@/lib/club-comparison-url';
 import { firstValue, parsePage, parseSlug } from '@/lib/params';
 
@@ -134,8 +133,6 @@ export type ClubComparisonRouteState =
       /** Presentation order is the REQUESTED order, not the canonical one. */
       organizationA: ComparisonOrganization;
       organizationB: ComparisonOrganization;
-      /** The same view with the two clubs reversed; Stage 8 links it. */
-      swapPath: string;
       data: ClubComparisonData;
     });
 
@@ -362,7 +359,6 @@ export async function resolveClubComparisonState(
     sharePath: clubComparePath(effectiveParams),
     organizationA,
     organizationB,
-    swapPath: swapClubComparePath(effectiveParams),
     canonicalPath: canonicalClubComparePath(organizationA.slug, organizationB.slug),
     noindex: false,
     data: {

@@ -23,7 +23,6 @@ import type {
 import {
   canonicalClubComparePath,
   clubComparePath,
-  swapClubComparePath,
 } from '@/lib/club-comparison-url';
 
 /**
@@ -300,7 +299,6 @@ function comparisonState(
     noindex: false,
     organizationA: ADELAIDE,
     organizationB,
-    swapPath: swapClubComparePath(effective),
     data: comparisonData(overrides.data),
   };
 }
@@ -497,15 +495,6 @@ describe('ties', () => {
 });
 
 describe('shareable controls', () => {
-  it('swaps the presentation order while preserving the filter and page', () => {
-    const html = render(comparisonState({ params: { matchType: 'finals', page: 3 } }));
-    expect(html).toContain(
-      'href="/clubs/compare?club1=brisbane-lions&amp;club2=adelaide'
-      + '&amp;matchType=finals&amp;page=3"',
-    );
-    expect(html).toContain('Swap the order of the two clubs');
-  });
-
   it('keeps the club and filter state on every pagination link', () => {
     const html = render(comparisonState({
       params: { matchType: 'finals', page: 2 },

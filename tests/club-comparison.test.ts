@@ -15,7 +15,6 @@ import {
   clubCompareBaseParams,
   clubComparePath,
   isMatchType,
-  swapClubComparePath,
 } from '@/lib/club-comparison-url';
 
 describe('AFLDB-ISSUE-144 Stage 7: shareable current-state URLs', () => {
@@ -47,27 +46,6 @@ describe('AFLDB-ISSUE-144 Stage 7: shareable current-state URLs', () => {
 
   it('is the bare surface when nothing is selected', () => {
     expect(clubComparePath({})).toBe(CLUB_COMPARE_PATH);
-  });
-});
-
-describe('AFLDB-ISSUE-144 Stage 7: swap', () => {
-  const state = {
-    club1: 'carlton', club2: 'collingwood', matchType: 'finals' as const, page: 3,
-  };
-
-  it('reverses the clubs and nothing else', () => {
-    expect(swapClubComparePath(state))
-      .toBe('/clubs/compare?club1=collingwood&club2=carlton&matchType=finals&page=3');
-  });
-
-  it('preserves the era (Club Rivalry Explorer follow-up, FR-2)', () => {
-    expect(swapClubComparePath({ ...state, era: 1990 }))
-      .toBe('/clubs/compare?club1=collingwood&club2=carlton&matchType=finals&era=1990&page=3');
-  });
-
-  it('is its own inverse', () => {
-    expect(swapClubComparePath({ ...state, club1: state.club2, club2: state.club1 }))
-      .toBe(clubComparePath(state));
   });
 });
 

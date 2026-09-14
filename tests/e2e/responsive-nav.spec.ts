@@ -46,7 +46,7 @@ test.describe('primary navigation is the same set on phone and desktop', () => {
   test('every masthead destination is reachable from the phone "More" sheet', async ({ page }) => {
     const wide = await mastheadLabels(page);
     expect(wide).toContain('clubs');
-    expect(wide.length).toBeGreaterThanOrEqual(10);
+    expect(wide.length).toBeGreaterThanOrEqual(9);
 
     await page.setViewportSize(PHONE);
     await page.goto('/');
@@ -80,9 +80,14 @@ test.describe('primary navigation is the same set on phone and desktop', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/players');
     const nav = page.getByRole('navigation', { name: 'Primary' });
-    for (const label of ['Players', 'Clubs', 'Seasons', 'Venues', 'Records', 'Match Search', 'AFLW']) {
+    for (const label of ['Players', 'Clubs', 'Seasons', 'Venues', 'Records', 'Coaches', 'Awards', 'Draft', 'AFLW']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
+    // Match Search and Brownlow are deliberately NOT top-level items
+    // (AFLDB-ISSUE-172): Match Search overlaps the Players filter set, and
+    // Brownlow is reachable from Awards instead. Both routes stay live.
+    await expect(nav.getByRole('link', { name: 'Match Search', exact: true })).toHaveCount(0);
+    await expect(nav.getByRole('link', { name: 'Brownlow', exact: true })).toHaveCount(0);
     // No bottom bar on the desktop layout.
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden();
   });
@@ -123,9 +128,11 @@ test.describe('the "More" sheet behaves as a dialog', () => {
     await expect(sheet).toBeHidden();
 
     // A link inside navigates and the sheet is gone on the next page.
+    // Awards, not Brownlow: Brownlow is no longer a top-level nav entry
+    // (AFLDB-ISSUE-172), so it is no longer in this sheet either.
     await more.click();
-    await sheet.getByRole('link', { name: 'Brownlow', exact: true }).click();
-    await expect(page).toHaveURL(/\/brownlow$/);
+    await sheet.getByRole('link', { name: 'Awards', exact: true }).click();
+    await expect(page).toHaveURL(/\/awards$/);
     await expect(page.getByRole('dialog', { name: 'All sections' })).toBeHidden();
   });
 

@@ -6,7 +6,25 @@
 > `issues.md` disagree, trust `issues.md` and immediately synchronize this file
 > and the Open Issues table at the top of `issues.md`.
 
-**Current update:** 2026-09-14 (`AFLDB-ISSUE-171` **RESOLVED.** The AFL home-page Record of the
+**Current update:** 2026-09-15 (`AFLDB-ISSUE-172` **RESOLVED.** Bounded public UI/UX cleanup —
+seven sub-items: Match Search and Brownlow removed from `PRIMARY_NAV` (both routes and their
+home-page browse tiles unchanged, Brownlow now linked from `/awards`); `/clubs` advanced-search/
+filtering removed entirely; Players' "Example searches" section removed; `/coaches/[slug]`'s
+opponent selector converted from a full-reloading GET form to `router.push(..., { scroll: false })`
+(query/stat semantics unchanged); Coaches page visual/layout redesign explicitly deferred to a
+separate Claude Design pass; new reusable `ExpandableTableFrame` (CSS-only, no portal) wired into
+the Coaches list only; the presentation-only club/coach comparison "swap order" controls removed
+along with the now-unused `swapClubComparePath`/`swapCoachComparePath` helpers. A final bounded
+review confirmed every changed file against the approved scope by direct inspection plus a
+user-supplied diff of `src/db/queries/coaches.ts` (comment-only). Validation: focused unit 88/88,
+`ExpandableTableFrame` rerun 3/3, focused `afldb_test` integration 61/61 (two stale 41-meeting test
+expectations updated to 42 as data drift only), typecheck PASS, production-style build PASS
+(1516/1516 static pages), focused ISSUE-172 E2E 4/4. Broader pre-existing E2E/journeys drift is
+untouched, out of scope. Branch `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172` —
+**not yet merged, not yet deployed.** Open issue count 25 -> 24. Removed from this index and the
+Open Issues table. See the `AFLDB-ISSUE-172` entry in `issues.md`, *Resolution (2026-09-15)*.)
+
+**Last updated:** 2026-09-14 (`AFLDB-ISSUE-171` **RESOLVED.** The AFL home-page Record of the
 week now has a typed 22-option catalogue across player career/match/season, coaches, venues and
 curated special records. Five legacy values remain stable; invalid settings fall back before
 dispatch; only the chosen provider runs; admin options are grouped; and Father–Son Selections is
@@ -57,6 +75,19 @@ sole call site of that shape. New regression test `tests/player-links-page.test.
 before the fix and green after; 192/192 focused tests pass. Committed and pushed at `c7d07fb` on
 `sonnet/issue-168-player-link-url`; unmerged, undeployed — PROD still carries the defect. Open
 issue count 1 -> 2. See the `AFLDB-ISSUE-168` entry below and `issues.md`.)
+
+**Current update:** 2026-09-15 (`AFLDB-ISSUE-172` **ALLOCATED AND IMPLEMENTED LOCALLY, NOT YET
+VALIDATED, NOT MERGED.** Bounded public UI/UX cleanup, seven sub-items: Match Search and Brownlow
+removed from the main nav (`PRIMARY_NAV`) while keeping both routes' home-page browse tiles and
+adding Brownlow to `/awards`; `/clubs`' advanced-search/filtering removed entirely; Players'
+"Example searches" section removed; the `/coaches/[slug]` opponent selector converted from a
+full-reloading GET form to `router.push(..., { scroll: false })` (no query/stat semantics change);
+Coaches page redesign explicitly deferred to a separate Claude Design pass; new reusable
+`ExpandableTableFrame` (CSS-only, no remount) wired into the Coaches list only; the presentation-only
+club/coach comparison "swap order" controls removed along with their now-unused URL helpers. Branch
+`sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172`. Open issue count 1 -> 2. See the
+`AFLDB-ISSUE-172` entry in `issues.md` for full detail and the exact focused-validation commands
+still to be run.)
 
 **Later same-day update:** 2026-09-14 (`AFLDB-ISSUE-168` **RESOLVED on DEV.** Merged to `main`
 (`9e97c90`) and deployed to DEV at SHA `9e97c9091f2e5dd662f7166408de8d70b8a495f8`. Manual, read-only

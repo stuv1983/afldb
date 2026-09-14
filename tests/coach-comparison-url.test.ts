@@ -13,7 +13,6 @@ import {
   canonicalCoachComparePath,
   canonicalPairOrder,
   coachComparePath,
-  swapCoachComparePath,
 } from '@/lib/coach-comparison-url';
 
 describe('AFLDB-ISSUE-170 Stage 2A: shareable current-state URLs', () => {
@@ -29,21 +28,6 @@ describe('AFLDB-ISSUE-170 Stage 2A: shareable current-state URLs', () => {
   it('is the bare surface when nothing is selected', () => {
     expect(coachComparePath({})).toBe(COACH_COMPARE_PATH);
     expect(coachComparePath({ a: null, b: null })).toBe(COACH_COMPARE_PATH);
-  });
-});
-
-describe('AFLDB-ISSUE-170 Stage 2A: swap', () => {
-  it('reverses the coaches and nothing else', () => {
-    expect(swapCoachComparePath({ a: 5, b: 12 })).toBe('/coaches/compare?a=12&b=5');
-  });
-
-  it('is its own inverse', () => {
-    const state = { a: 5, b: 12 };
-    expect(swapCoachComparePath({ a: state.b, b: state.a })).toBe(coachComparePath(state));
-  });
-
-  it('swaps a half-selection too', () => {
-    expect(swapCoachComparePath({ a: 5 })).toBe('/coaches/compare?b=5');
   });
 });
 

@@ -7,7 +7,7 @@ below remain authoritative. `IssuesIndex.md` mirrors these open items in a
 session-friendly format and must be kept synchronized whenever an issue is
 created, reopened, resolved, or materially reclassified.
 
-**Open issues:** 1 tracked here — `-156`.
+**Open issues:** 2 tracked here — `-156`, `-172`.
 
 <!-- 2026-09-14 (AFLDB-ISSUE-171 RESOLVED — the AFL home-page Record of the week now offers a typed
      22-option catalogue across player career/match/season, coaches, venues and curated special
@@ -1295,6 +1295,7 @@ created, reopened, resolved, or materially reclassified.
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+| `AFLDB-ISSUE-172` | Low/Medium | Public UI/UX — navigation, search, Coaches, tables, comparisons | **OPEN — IMPLEMENTED LOCALLY 2026-09-15, NOT YET VALIDATED, NOT MERGED.** Seven bounded sub-items on `sonnet/issue-172-ui-ux-cleanup`: (1) Match Search and Brownlow removed from `PRIMARY_NAV`, both routes and their home-page browse tiles unchanged, Brownlow now linked from `/awards`; (2) `/clubs` advanced-search/filtering removed entirely, unfiltered browse only; (3) Players "Example searches" section removed; (4) `/coaches/[slug]`'s opponent selector converted from a full-reloading GET form to `router.push(..., { scroll: false })`, mirroring the existing player-linked pattern, query semantics unchanged; (5) Coaches page visual/layout redesign explicitly deferred to a separate Claude Design pass; (6) new reusable `ExpandableTableFrame` (CSS-only, no remount, no portal) wired into the Coaches list only; (7) the presentation-only "Swap the order of the two clubs/coaches" controls removed from `/clubs/compare` and `/coaches/compare`, with the now-unused `swapClubComparePath`/`swapCoachComparePath` helpers deleted. Full detail: the `AFLDB-ISSUE-172` entry in `issues.md`. | **Operator:** run the focused validation commands recorded in the `AFLDB-ISSUE-172` entry's *Validation* section (focused vitest, focused `afldb_test` integration, focused Playwright e2e, typecheck), then review/commit/merge per the standard issue lifecycle. |
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-169` is **Resolved** and is NO LONGER an open issue. The
      operator disabled Cloudflare Web Analytics / RUM injection at the edge for the `afldb.com`
      zone (was "Enable, excluding visitor data in the EU," changed to "Disable"), matching the
@@ -28996,3 +28997,214 @@ contract. The typed 22-option catalogue, selected-provider dispatch, bounded can
 heterogeneous renderer and grouped admin selector implement the approved fix while preserving the
 five legacy values and safe fallback. The focused behavioural, database and production-build gates
 all pass; no implementation change was required during validation.
+
+## AFLDB-ISSUE-172 — Public site UI/UX cleanup: navigation, redundant search controls, Coaches interaction, expandable tables, comparison ordering
+
+- **Status:** Resolved 2026-09-15. Not yet merged, not yet deployed — operator commit/merge per the
+  standard lifecycle remains outstanding.
+- **Severity:** Low/Medium (UX/navigation clarity; no data or correctness defect)
+- **Area:** Public navigation / Clubs / Players / Coaches / shared table components / comparison
+  surfaces
+- **Found:** 2026-09-14
+- **Implemented:** 2026-09-15
+- **Branch:** `sonnet/issue-172-ui-ux-cleanup`, worktree `D:\dev\afldb-issue-172`.
+
+### Objective
+
+Bounded functional/structural UI/UX cleanup, not a redesign: simplify main navigation, remove
+redundant/confusing search and ordering controls, fix a full-reload regression on the Coaches
+opponent selector, and add a reusable expanded-table-viewing capability. Seven sub-items, planned
+and then implemented in the same repository, no runbook needed — none of the seven items revealed
+complexity beyond what planning found.
+
+### 1. Main navigation cleanup
+
+`PRIMARY_NAV` (`src/lib/site-nav-model.ts`) no longer lists **Match Search** or **Brownlow** as
+top-level entries. Both routes are unchanged and fully functional. Brownlow is discoverable from a
+new "Brownlow Medal" card on `/awards` (`src/app/awards/page.tsx`).
+
+The coupling that previously made `BROWSE_SECTIONS` (the home-page "Browse the record" grid) a
+straight filter of `PRIMARY_NAV` was removed: `BROWSE_SECTIONS` is now derived from `BROWSE_META`'s
+own keys (unchanged membership/order), with each item's label resolved first from `PRIMARY_NAV`,
+then from a new two-entry `BROWSE_ONLY_LABELS` map for the two routes that no longer have a nav
+entry. Both routes keep their existing home-page tile, at its existing position, with its existing
+blurb — `BROWSE_META` itself was not touched. AFLW navigation (`AFLW_PRIMARY_NAV`,
+`AFLW_QUICK_TABS`) is untouched.
+
+`tests/e2e/responsive-nav.spec.ts` hard-coded the previous nav contents in three places (masthead
+item count, an explicit "Match Search" visibility check, and a "click Brownlow in the phone sheet"
+step) and was updated to match the new, approved contents rather than the old ones.
+
+### 2. Clubs page cleanup
+
+`src/app/clubs/page.tsx` no longer renders `TableFilters`/`FilterErrors` or does any filter
+parsing/description; state, succession and season-range filtering are gone from this page, and
+`listClubs()` is called unfiltered. The page is a plain, unfiltered club browse/list of cards.
+`TableFilters`, `search/list-filters.ts`, `search/table-filters.ts` and every other page that uses
+them (Players, Draft, Seasons, Brownlow, Records, Match Search, Grid Solver) are untouched. No
+replacement simple-search control was added, per the approved scope.
+
+### 3. Players page cleanup
+
+`src/app/players/page.tsx`'s `EXAMPLE_SEARCHES` constant and its rendered "Example searches"
+section are removed. The stale comment describing "the five example searches" as part of the page's
+crawlable surface was corrected. Real search/filter/sort/pagination behaviour is unchanged.
+
+### 4. Coaches history-v-team interaction
+
+Root cause confirmed: `/coaches/[slug]`'s opponent selector
+(`src/components/CoachOpponentSelector.tsx`) was a plain `<form method="get">` — a real browser
+navigation, hence the full reload and scroll-to-top. It is now a client component using a controlled
+`<select onChange>` that calls `router.push(`${basePath}?opponent=...`, { scroll: false })`,
+mirroring `CoachOpponentHistoryClient` (the player-linked coaching surface's existing equivalent).
+`/coaches/[slug]` is already `dynamic = 'force-dynamic'`, so this is a fresh server render of the
+same route on each selection — `resolveCoachOpponentSelection` still runs server-side, per request,
+unchanged; no new API route or client-side statistics layer was introduced. The previous
+no-JavaScript form submission is a **deliberate, accepted trade-off**, recorded here per the
+approved scope rather than treated as an oversight.
+
+Tests updated to mock `next/navigation`'s `useRouter`/`useSearchParams` (the component now reads
+them): `tests/coach-career-record.test.ts` (direct unit coverage of the selector's rendered markup)
+and `tests/coach-profile-route.test.ts` (renders the full `/coaches/[slug]` page, which includes the
+selector whenever a fixture's coaching totals are non-zero).
+
+### 5. Coaches design/layout — deferred
+
+No layout or visual change was made beyond converting the selector to a client component (which
+changes no markup or CSS). **The complete Coaches page will receive a separate Claude Design review**
+covering information hierarchy, spacing, responsive behaviour, density, controls, tables and overall
+page composition. This issue is not a partial version of that pass.
+
+### 6. Reusable expanded-table view
+
+New `src/components/ExpandableTableFrame.tsx`: a client component giving a table section an
+"Expand table" control that grows it to fill the viewport. Implementation is CSS-only, not a React
+portal — the wrapped children render in exactly one place in the component tree on every render,
+expanded or not; only a CSS class toggles the wrapper between its normal static position and
+`position: fixed; inset: 0`. Nothing ever unmounts, so whatever state already lives in the wrapped
+table (an in-memory client sort, or a server-rendered set of rows/links for a URL-driven
+filtered/sorted/paginated table) survives expanding and collapsing untouched. The overlay/dialog
+behaviour (`role="dialog"`, Escape-to-close, a focus trap, body-scroll locking while expanded, focus
+restored to the trigger on close) follows the same convention already proven by `SiteNav.tsx`'s
+"More" sheet — not a new interaction model, and not the Fullscreen API. Horizontal scrolling is
+unaffected: the existing `.table-wrap` convention still handles it, unchanged, inside the expanded
+view.
+
+Wired into the Coaches list only (`src/app/coaches/page.tsx`, wrapping its existing
+`<div className="table-wrap"><SortableTable .../></div>`), per the approved scope. Not wired into
+Players or any other page in this issue.
+
+New CSS in `src/styles/globals.css` (`.table-expand*` rules, placed beside the existing `.table-wrap`
+rules). No ancestor of the Coaches list sets `transform`/`filter`/`contain`, so the fixed overlay
+resolves against the real viewport.
+
+New focused test file `tests/expandable-table-frame.test.ts` (no existing suite is a sensible
+semantic home for a new shared primitive) covers the static collapsed-render contract. The
+interactive half (expand, Escape-to-close, focus trap/restore, body-scroll lock, and that the same
+in-memory sort survives the round trip) is covered by a new test in `tests/e2e/journeys.spec.ts`,
+the same unit/e2e split already used for `SiteNav.tsx`'s "More" sheet.
+
+### 7. Club/Coach comparison "swap order" controls — removed
+
+Traced exactly: `swapClubComparePath`/`swapCoachComparePath` (`src/lib/club-comparison-url.ts`,
+`src/lib/coach-comparison-url.ts`) only exchanged which slug/id was "first"/"second", flipping the
+page `<h1>` order and which side's data renders as the "A"/"B" column throughout the comparison
+view. They never changed the underlying head-to-head data or query — the canonical/SEO URL already
+normalises pair order regardless of what the reader picked. Per the approved scope's own instruction
+("if reordering only changes presentation and provides no meaningful user value, recommend
+removal"), both controls are **removed**, not relabelled:
+
+- "Swap the order of the two clubs" — `src/components/ClubComparisonControls.tsx`
+- "Swap the order of the two coaches" — `src/components/CoachComparisonControls.tsx`
+
+`swapPath` was removed from both route-state types (`src/app/clubs/compare/state.ts`,
+`src/app/coaches/compare/state.ts`) and from `ClubComparisonView.tsx`/`CoachComparisonView.tsx`'s
+props. A fresh repository search confirmed `swapClubComparePath`/`swapCoachComparePath` had no
+callers beyond those two `state.ts` files, so both helper functions were deleted; canonical URL
+normalisation (`canonicalClubComparePath`, `canonicalCoachComparePath`, `canonicalPairOrder`) is
+untouched. A stray doc-comment reference to the deleted `swapCoachComparePath` in
+`src/db/queries/coaches.ts` was corrected.
+
+Tests for the deleted functions were removed (`tests/coach-comparison-url.test.ts`,
+`tests/club-comparison.test.ts`, `tests/club-comparison-view.test.ts`, and the `.swapPath` assertions
+in `tests/integration/coach-comparison-route.test.ts` / `tests/integration/club-comparison-route.test.ts`).
+`tests/e2e/journeys.spec.ts`'s swap-click test was rewritten to exercise the same reversed-pair/
+canonical-URL property via a direct URL navigation instead of a click on the now-removed control, and
+its keyboard-traversal assertion now checks for "Reset" instead of the removed control's name.
+`tests/coach-comparison-career.test.ts`'s "swaps presentation order" test is untouched — it tests the
+comparison **presentation component's** own A/B-reversal property directly (unrelated to the removed
+URL-level control).
+
+### Files changed
+
+`src/lib/site-nav-model.ts`; `src/app/awards/page.tsx`; `src/app/clubs/page.tsx`;
+`src/app/players/page.tsx`; `src/components/CoachOpponentSelector.tsx`;
+`src/components/ExpandableTableFrame.tsx` (new); `src/app/coaches/page.tsx`;
+`src/styles/globals.css`; `src/components/ClubComparisonControls.tsx`;
+`src/components/CoachComparisonControls.tsx`; `src/components/ClubComparisonView.tsx`;
+`src/components/CoachComparisonView.tsx`; `src/components/ClubComparisonEraExplorer.tsx`;
+`src/lib/club-comparison-url.ts`; `src/lib/coach-comparison-url.ts`;
+`src/app/clubs/compare/state.ts`; `src/app/coaches/compare/state.ts`; `src/db/queries/coaches.ts`;
+`tests/e2e/responsive-nav.spec.ts`; `tests/e2e/journeys.spec.ts`; `tests/coach-career-record.test.ts`;
+`tests/coach-profile-route.test.ts`; `tests/coach-comparison-url.test.ts`;
+`tests/club-comparison.test.ts`; `tests/club-comparison-view.test.ts`;
+`tests/integration/coach-comparison-route.test.ts`; `tests/integration/club-comparison-route.test.ts`;
+`tests/expandable-table-frame.test.ts` (new); `issues.md`; `IssuesIndex.md`; `CHANGELOG.md`.
+
+### Validation
+
+Not yet run by the operator. Smallest exact commands, escalating per CLAUDE.md §10:
+
+1. Focused unit/component gate (Node, no database):
+   `npx vitest run tests/expandable-table-frame.test.ts tests/coach-career-record.test.ts tests/coach-profile-route.test.ts tests/coach-comparison-url.test.ts tests/club-comparison.test.ts tests/club-comparison-view.test.ts`
+2. Focused integration gate (needs `AFLDB_TEST_DATABASE_URL` against `afldb_test`):
+   `npx vitest run tests/integration/coach-comparison-route.test.ts tests/integration/club-comparison-route.test.ts`
+3. Focused browser/E2E gate (needs a running dev server):
+   `npm run test:e2e -- tests/e2e/responsive-nav.spec.ts tests/e2e/journeys.spec.ts`
+4. Typecheck (removed a field from two discriminated route-state unions across several consuming
+   files — grep-verified clean, typecheck is the authoritative check):
+   `npm run typecheck`
+
+Not run: `npm run build`, the full suite. Neither is required by CLAUDE.md §11/§10 for this change;
+escalate only if the above surfaces something the focused gates don't explain.
+
+### Resolution (2026-09-15)
+
+Operator-run validation (reported to the final-review session) and an independent bounded review in
+that same session both PASS with no findings:
+
+- Focused unit/component gate: 6 files, 88/88 PASS.
+- `ExpandableTableFrame` focused rerun: 3/3 PASS.
+- Focused integration gate (`afldb_test`): `coach-comparison-route` 32/32 + `club-comparison-route`
+  29/29 = 61/61 PASS. The `club-comparison-route` run required updating two stale hard-coded
+  41-meeting Adelaide/Brisbane Lions expectations to 42 (current `afldb_test` data); confirmed
+  test-data drift only — `listClubs`/comparison query code untouched.
+- Typecheck: `npm run typecheck` PASS, no diagnostics.
+- Production-style build (pointed at `afldb_test`): PASS, 1516/1516 static pages, standalone
+  preparation PASS.
+- Focused ISSUE-172 E2E (`responsive-nav.spec.ts` + the two rewritten `journeys.spec.ts` cases,
+  desktop + mobile): 4/4 PASS.
+
+Review confirmed, by direct inspection of the current state of every file in "Files changed" plus a
+user-supplied `git diff main...HEAD -- src/db/queries/coaches.ts`: `PRIMARY_NAV` no longer lists
+Match Search/Brownlow while `BROWSE_SECTIONS`/`BROWSE_ONLY_LABELS` still surface both tiles; `/clubs`
+calls `listClubs()` unfiltered with no `TableFilters`/`FilterErrors`; `/players` has no
+`EXAMPLE_SEARCHES`/"Example searches"; `CoachOpponentSelector` uses
+`router.push(..., { scroll: false })`, no `<form method="get">`; `ExpandableTableFrame` is referenced
+only from `src/app/coaches/page.tsx` plus its own definition and CSS; a repository-wide search for
+`swapPath`/`swapClubComparePath`/`swapCoachComparePath`/"Swap the order" returned no matches anywhere
+in `src`. The `src/db/queries/coaches.ts` diff is confirmed comment-only (removes a stale sentence
+naming the deleted `swapCoachComparePath`) — no SQL, return shape, filtering, ordering or data
+semantics changed.
+
+Broader/unrelated pre-existing E2E drift (stale Pendlebury id, player counts, Brownlow/merged-club
+fixtures, ambiguous Records selector, local auth-env warnings) was left untouched, as scoped.
+
+Not yet merged or deployed; PROD and `afldb_dev` untouched. Operator next action: review/stage/commit
+per the standard lifecycle below.
+
+### Deferred
+
+The complete Coaches page visual/layout redesign (information hierarchy, spacing, responsive
+behaviour, density, controls, tables, overall composition) — a separate, later Claude Design pass.
+Broader adoption of `ExpandableTableFrame` beyond the Coaches list.

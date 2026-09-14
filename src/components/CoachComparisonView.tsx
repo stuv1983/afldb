@@ -40,7 +40,6 @@ export function CoachComparisonView({ state }: { state: CoachCompareRouteState }
       <CoachComparisonControls
         params={state.params}
         options={state.options}
-        swapPath={state.kind === 'selected' ? state.swapPath : undefined}
       />
 
       {state.kind === 'unselected' && (

@@ -941,8 +941,7 @@ export function selectDirectMeeting(
  * Orientation is never canonicalised: `coachAId`/`coachBId` are passed
  * straight into {@link coachHeadToHeadScope} in the order given, so calling
  * this with the two ids swapped swaps every A/B value in the result -- it
- * does not change which pair is being described, exactly the convention
- * `swapCoachComparePath` already applies to the comparison URL.
+ * does not change which pair is being described.
  *
  * A recognised, distinct pair that never met returns a real object with
  * `totals.meetings = 0` (an aggregate with no GROUP BY always returns

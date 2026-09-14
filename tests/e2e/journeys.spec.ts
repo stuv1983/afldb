@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 
 /**
  * Core user journeys, run against the production build.
@@ -270,9 +270,26 @@ async function reachPrimary(
   }
 }
 
-test('match search is reachable from the primary navigation', async ({ page, isMobile }) => {
+test('match search is no longer in primary navigation, but is reachable from the home browse grid (AFLDB-ISSUE-172)', async ({ page, isMobile }) => {
   await page.goto('/');
-  await reachPrimary(page, isMobile, 'Match Search');
+
+  if (isMobile) {
+    await page.getByRole('button', { name: 'More' }).click();
+    const sheet = page.getByRole('dialog', { name: 'All sections' });
+    await expect(sheet.getByRole('link', { name: 'Match Search', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  } else {
+    await expect(
+      page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Match Search', exact: true }),
+    ).toHaveCount(0);
+  }
+
+  // The route and its home-page "Browse the record" tile are unchanged.
+  const browseGrid = page.getByRole('navigation', { name: 'Browse' });
+  await browseGrid.scrollIntoViewIfNeeded();
+  const matchSearchTile = browseGrid.locator('a[href="/match-search"]');
+  await expect(matchSearchTile).toBeVisible();
+  await matchSearchTile.click();
   await expect(page).toHaveURL(/\/match-search/);
 });
 
@@ -500,7 +517,11 @@ test('a rivalry renders every section of the comparison', async ({ page }) => {
   await expect(history.getByRole('table').first()).toBeVisible();
 });
 
-test('reversing the pair reverses the presentation, not the canonical', async ({ page }) => {
+test('reversing the pair in the URL reverses the presentation, not the canonical', async ({ page }) => {
+  // AFLDB-ISSUE-172 removed the "Swap the order of the two clubs" control
+  // (presentation-only, no data-semantics value); this now covers the same
+  // reversed-pair/canonical-URL property via a direct navigation instead of
+  // a click on that control.
   await page.goto('/clubs/compare?club1=brisbane-lions&club2=adelaide');
   await expect(
     page.getByRole('heading', { name: 'Brisbane Lions v Adelaide', level: 1 }),
@@ -509,28 +530,17 @@ test('reversing the pair reverses the presentation, not the canonical', async ({
   const canonical = await page.locator('link[rel="canonical"]').first().getAttribute('href');
   expect(new URL(canonical!).search).toBe('?club1=adelaide&club2=brisbane-lions');
 
-  await page.getByRole('link', { name: 'Swap the order of the two clubs' }).click();
+  await page.goto('/clubs/compare?club1=adelaide&club2=brisbane-lions');
   await expect(
     page.getByRole('heading', { name: 'Adelaide v Brisbane Lions', level: 1 }),
   ).toBeVisible();
-  await expect(page).toHaveURL(/club1=adelaide&club2=brisbane-lions/);
 
-  // AFLDB-ISSUE-144 follow-up defect: Swap is a client-side <Link>
-  // navigation, and Next's default prefetching of sibling links on this
-  // page (Reset, the era chips) populated the router's client cache with
-  // OTHER pairs' resolved <head>, which could then be shown instead of the
-  // one this navigation actually landed on -- title and canonical are the
-  // proof that this soft transition, not just the URL and h1, resolved to
-  // THIS pair. Fixed by `prefetch={false}` on those links
-  // (ClubComparisonControls.tsx / ClubComparisonEraExplorer.tsx): with no
-  // prefetch there is nothing else in the cache to bleed in.
   await expect(page).toHaveTitle('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
-  const ogTitleAfterSwap = await page.locator('meta[property="og:title"]').first().getAttribute('content');
-  expect(ogTitleAfterSwap).toBe('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
-  const canonicalAfterSwap = await page.locator('link[rel="canonical"]').first().getAttribute('href');
-  // The pair is alphabetically ordered either way round, so the swap must
-  // not have regressed it to the bare, no-pair surface.
-  expect(new URL(canonicalAfterSwap!).search).toBe('?club1=adelaide&club2=brisbane-lions');
+  const ogTitleReversed = await page.locator('meta[property="og:title"]').first().getAttribute('content');
+  expect(ogTitleReversed).toBe('Adelaide vs Brisbane Lions — Club Comparison | AFLDB');
+  const canonicalReversed = await page.locator('link[rel="canonical"]').first().getAttribute('href');
+  // The pair is alphabetically ordered either way round.
+  expect(new URL(canonicalReversed!).search).toBe('?club1=adelaide&club2=brisbane-lions');
 });
 
 test('the match filter and the history page are shareable state', async ({ page }) => {
@@ -726,9 +736,9 @@ test('the comparison controls are labelled and keyboard-operable', async ({ page
       return (active.getAttribute('aria-label') ?? active.textContent ?? '').trim();
     }));
   }
-  // The swap control is a link with a sentence for a name, and the keyboard
-  // reaches it from the first selector without being trapped on the way.
-  expect(reached.join(' | ')).toContain('Swap the order of the two clubs');
+  // The keyboard reaches Reset from the first selector without being
+  // trapped on the way.
+  expect(reached.join(' | ')).toContain('Reset');
 
   // Focus is visible rather than suppressed.
   const focusStyle = await page.evaluate(() => {
@@ -787,4 +797,49 @@ test('coaches → a coach who also played → coach profile, then his playing ca
   await expect(comparePlayer).toBeVisible();
   await expect(comparePlayer).toHaveAttribute('href', /^\/players\/compare\?a=\d+$/);
   await expect(page.getByRole('link', { name: /Compare with another coach/ })).toHaveCount(0);
+});
+
+test('the Coaches table expands to fill the viewport, keeps its sort, and restores focus on close (AFLDB-ISSUE-172)', async ({ page }) => {
+  // Compares individual cell values rather than a row's serialized text:
+  // innerText() inserts layout-driven whitespace between <td>s that
+  // toHaveText()'s normalization does not reproduce, which is a mismatch
+  // between text-extraction methods, not a real behavioural difference —
+  // the thing actually under test is "does the same row/state survive
+  // expanding", not whitespace serialization.
+  async function rowCells(row: Locator) {
+    return (await row.locator('td').allTextContents()).map((cell) => cell.trim());
+  }
+
+  await page.goto('/coaches');
+  const table = page.locator('#coaches');
+  await expect(table.getByRole('heading', { name: 'Coaches' })).toBeVisible();
+
+  // Sort by name before expanding, so the same in-memory SortableTable
+  // state can be checked to have survived the toggle below.
+  await table.getByRole('button', { name: 'Name' }).click();
+  const cellsBefore = await rowCells(table.getByRole('row').nth(1));
+
+  const toggle = table.getByRole('button', { name: 'Expand table' });
+  await toggle.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Coaches' });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close expanded view' })).toBeVisible();
+
+  // Same table, same state: sort survived because nothing unmounted.
+  expect(await rowCells(dialog.getByRole('row').nth(1))).toEqual(cellsBefore);
+
+  // The page behind the expanded view cannot be scrolled.
+  const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
+  expect(bodyOverflow).toBe('hidden');
+
+  // Escape closes and returns focus to the trigger, which is the same
+  // control now labelled "Expand table" again.
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Coaches' })).toBeHidden();
+  await expect(table.getByRole('button', { name: 'Expand table' })).toBeFocused();
+  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
+
+  // The sort is still applied after collapsing back too.
+  expect(await rowCells(table.getByRole('row').nth(1))).toEqual(cellsBefore);
 });
