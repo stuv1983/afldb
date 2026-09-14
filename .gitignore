@@ -125,6 +125,7 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+.playwright-mcp/
 
 # Stress-test output. `npm run nl:stress -- --out ./nl-stress-out` is the
 # documented invocation and lands in the repo root; a full run is ~12 MB
