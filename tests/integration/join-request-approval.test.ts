@@ -74,6 +74,7 @@ const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
 const owner = postgres(testDbUrl, { max: 1, onnotice: () => {} });
 
 const MARKER = 'AFLDB-ISSUE-178';
+const MARKER_179 = 'AFLDB-ISSUE-179';
 const FIXTURE_ADMIN_EMAIL = 'issue-178-fixture-admin@example.test';
 
 const joinRequestIds = new Set<number>();
@@ -119,6 +120,48 @@ async function auditActionsFor(requestId: number): Promise<string[]> {
      ORDER BY id
   `;
   return rows.map((r) => r.action);
+}
+
+// Same trigger-based failure-injection technique as
+// tests/integration/admin-draft.test.ts (AFLDB-ISSUE-160 gate 8): a
+// hardcoded marker, not an interpolated value, so the condition is fixed
+// SQL text rather than something built from test input.
+const ROLLBACK_FORCE_FAIL_EMAIL = 'afldb-issue-179-rollback-force-fail@example.test';
+const ROLLBACK_TRIGGER_FN = 'issue179_test_force_join_denied_audit_failure';
+const ROLLBACK_TRIGGER = 'issue179_test_force_join_denied_audit_failure_trg';
+
+/**
+ * AFLDB-ISSUE-179: force a genuine database-side failure on exactly the
+ * access.join_denied audit INSERT for the ROLLBACK_FORCE_FAIL_EMAIL
+ * fixture, so the rollback test proves a real failure rather than a
+ * mocked rejection. Scoped by that marker value (not by table-wide
+ * effect), created and dropped around the one test that uses it so it
+ * cannot affect any other test running concurrently against the shared
+ * afldb_test database. Cleanup runs in `finally`, including on a failing
+ * assertion or a timeout thrown out of `fn`.
+ */
+async function withJoinDeniedAuditFailure<T>(fn: () => Promise<T>): Promise<T> {
+  await owner`
+    CREATE OR REPLACE FUNCTION ${owner(ROLLBACK_TRIGGER_FN)}() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.action = 'access.join_denied'
+         AND NEW.detail->>'email' = 'afldb-issue-179-rollback-force-fail@example.test' THEN
+        RAISE EXCEPTION 'AFLDB-ISSUE-179 forced audit failure for rollback proof';
+      END IF;
+      RETURN NEW;
+    END $$`;
+  await owner`DROP TRIGGER IF EXISTS ${owner(ROLLBACK_TRIGGER)} ON auth_audit_log`;
+  await owner`
+    CREATE TRIGGER ${owner(ROLLBACK_TRIGGER)}
+      BEFORE INSERT ON auth_audit_log
+      FOR EACH ROW EXECUTE FUNCTION ${owner(ROLLBACK_TRIGGER_FN)}()`;
+  try {
+    return await fn();
+  } finally {
+    await owner`DROP TRIGGER IF EXISTS ${owner(ROLLBACK_TRIGGER)} ON auth_audit_log`;
+    await owner`DROP FUNCTION IF EXISTS ${owner(ROLLBACK_TRIGGER_FN)}()`;
+  }
 }
 
 beforeAll(async () => {
@@ -297,5 +340,92 @@ describe('AFLDB-ISSUE-178 concurrency', () => {
       expect(allowed).toBeNull();
       expect(audits).toEqual(['access.join_denied']);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-179: denying a beta join request is atomic against a real
+ * PostgreSQL, the narrower sibling of ISSUE-178. Before this fix,
+ * `denyJoinRequest` committed the join-request UPDATE and the
+ * access.join_denied audit row as two independent statements -- the
+ * UPDATE on `authSql`, the audit on the pooled `audit()`. A request could
+ * end up permanently 'denied' with no audit row if the second write
+ * failed. The fix moves both into one `authSql.begin` transaction with
+ * `auditInTransaction`, keeping the same `WHERE id = ? AND status =
+ * 'pending'` predicate as both the eligibility check and the concurrency
+ * boundary approveJoinRequest already relies on.
+ */
+describe('AFLDB-ISSUE-179 denyJoinRequest happy path', () => {
+  it('denies the request and audits it, atomically', async () => {
+    const email = `${MARKER_179.toLowerCase()}-happy@example.test`;
+    const id = await createJoinRequest(email);
+
+    const result = await denyJoinRequest({}, form(id));
+
+    expect(result.error).toBeUndefined();
+    expect(result.message).toBe(`${email} denied.`);
+
+    const request = await readJoinRequest(id);
+    expect(request.status).toBe('denied');
+    expect(request.reviewedBy).toBe(fixtureAdmin.id);
+    expect(request.reviewedAt).toBeInstanceOf(Date);
+
+    expect(await auditActionsFor(id)).toEqual(['access.join_denied']);
+  });
+
+  it('reports the same refusal for an unknown id as an already-reviewed one', async () => {
+    const email = `${MARKER_179.toLowerCase()}-already@example.test`;
+    const id = await createJoinRequest(email);
+    await owner`UPDATE beta_join_requests SET status = 'approved' WHERE id = ${id}`;
+
+    const reviewed = await denyJoinRequest({}, form(id));
+    const unknown = await denyJoinRequest({}, form(999999999));
+
+    expect(reviewed.error).toBe('Already reviewed or not found.');
+    expect(unknown.error).toBe(reviewed.error);
+    expect(await auditActionsFor(id)).toEqual([]);
+  });
+});
+
+describe('AFLDB-ISSUE-179 a genuine mid-transaction failure rolls everything back', () => {
+  it('leaves the request pending with no audit row when the audit insert fails', async () => {
+    const id = await createJoinRequest(ROLLBACK_FORCE_FAIL_EMAIL);
+
+    await withJoinDeniedAuditFailure(async () => {
+      await expect(denyJoinRequest({}, form(id))).rejects.toThrow(
+        /AFLDB-ISSUE-179 forced audit failure/,
+      );
+    });
+
+    const request = await readJoinRequest(id);
+    expect(request.status).toBe('pending');
+    expect(request.reviewedBy).toBeNull();
+    expect(request.reviewedAt).toBeNull();
+
+    expect(await auditActionsFor(id)).toEqual([]);
+  });
+});
+
+describe('AFLDB-ISSUE-179 concurrency', () => {
+  it('lets exactly one of two concurrent denials of the same request succeed', async () => {
+    const email = `${MARKER_179.toLowerCase()}-concurrent@example.test`;
+    const id = await createJoinRequest(email);
+
+    const [a, b] = await Promise.all([
+      denyJoinRequest({}, form(id)),
+      denyJoinRequest({}, form(id)),
+    ]);
+
+    const succeeded = [a, b].filter((r) => r.message);
+    const refused = [a, b].filter((r) => r.error);
+    expect(succeeded).toHaveLength(1);
+    expect(refused).toHaveLength(1);
+    expect(refused[0]!.error).toBe('Already reviewed or not found.');
+
+    const request = await readJoinRequest(id);
+    expect(request.status).toBe('denied');
+    expect(request.reviewedBy).toBe(fixtureAdmin.id);
+
+    expect(await auditActionsFor(id)).toEqual(['access.join_denied']);
   });
 });

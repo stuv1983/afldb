@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Join-request denial commits atomically with its audit row (AFLDB-ISSUE-179) - 15 September 2026
+
+- `denyJoinRequest` now runs the `beta_join_requests` denial and the `access.join_denied` audit
+  row inside one transaction (`authSql.begin` with `auditInTransaction`), instead of as two
+  independent statements. Previously a failure on the audit write could leave a request
+  permanently recorded as denied with no audit trail.
+- The existing `WHERE id = ? AND status = 'pending'` predicate is unchanged and remains the sole
+  eligibility/concurrency boundary. No intermediate status was introduced, no migration was
+  required, and no privilege was widened. `approveJoinRequest` (AFLDB-ISSUE-178) is unaffected.
+
 ### Join-request approval commits atomically with its allowlist entry and audit row (AFLDB-ISSUE-178) - 15 September 2026
 
 - `approveJoinRequest` now runs the `beta_join_requests` approval, the `beta_allowed_emails`
