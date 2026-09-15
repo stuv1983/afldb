@@ -423,7 +423,14 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
  * chronology contract, actual coaching still required, one-sided club
  * composition still fails closed.
  */
-export const PARSER_VERSION = 41;
+// v42 -- AFLDB-ISSUE-188: extractHavingClause now refuses every
+// grouped-result word (draws/wins/losses/lose/lost/win/won/games) when a
+// player subject ("players"/"who") is present and no club/team subject is,
+// so player-subject questions no longer have "won"/"win"/"wins" consumed
+// as a grouped team-result HAVING clause. Subject-less grouped readings
+// ("exactly three wins against Carlton") and explicit club/team subjects
+// are unaffected.
+export const PARSER_VERSION = 42;
 
 // ------------------------------------------------------------------ grain
 

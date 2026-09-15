@@ -15,6 +15,24 @@ commit.
 
 ## [Unreleased]
 
+### NL search: player-subject "won"/"win"/"wins" questions no longer misroute to a grouped club wins count (AFLDB-ISSUE-188) - 15 September 2026
+
+- `extractHavingClause` (`src/search/nl/parser.ts`) now refuses its whole grouped-result word
+  list (`draws`/`wins`/`losses`/`lose`/`lost`/`win`/`won`/`games`) when the question has a player
+  subject ("players"/"who") and no club/team subject. Previously only `games` was gated on a club
+  subject; the result words were assumed unambiguous, so "players who have won 3 premierships",
+  "players who won 2 brownlow medals" and "players with more than 100 wins" had "won"/"win"/"wins"
+  claimed as a grouped `team_match` having clause, the stripped number left the real career stat
+  word ("premierships"/"brownlow medals") with no number to bind, and the question answered a
+  club-wins count list instead of the intended player list.
+- Refused player-subject questions now fall through to the existing career-condition extractor,
+  producing a `player_career` condition on the correct column (`premierships`, `brownlow_medals`,
+  `wins`) instead of a `team_match` having clause.
+- Unaffected: explicit club/team-subject grouped readings ("clubs that have won more than 10
+  premierships", "teams with more than 2 wins against Richmond") and subject-less grouped readings
+  ("exactly three wins against Carlton") are unchanged.
+- `PARSER_VERSION` bumped to 42.
+
 ### NL search: "how many" declines instead of silently answering a single-game/season/match leader (AFLDB-ISSUE-190) - 15 September 2026
 
 - `validatePlan` (`src/search/nl/plan.ts`) now refuses a `count` aggregation on `player_game`,

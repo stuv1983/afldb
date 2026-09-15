@@ -1392,18 +1392,26 @@ function extractResultFilter(text: string): { text: string; resultFilter?: NlQue
  * Richmond") counts, per club organization, the matches in scope that
  * satisfy a per-match result predicate, then thresholds that count.
  *
- * `games` is the un-predicated member of the same family -- every match
- * in scope counts -- and it is admitted ONLY when the question named a
- * club subject. That word alone is genuinely ambiguous: "players with
- * more than 200 games" is a career column over the SAME vocabulary, and
- * reading it as a grouped club count would answer a different question.
- * The result words carry no such ambiguity, so they need no subject.
+ * Every word in this family is genuinely ambiguous against player career
+ * columns over the SAME vocabulary ("players who have won 3 premierships",
+ * "players with more than 100 wins"), and reading those as a grouped club
+ * count would answer a different question. `games` was gated on a club
+ * subject first (AFLDB-ISSUE-110); the result words need the same
+ * protection, but a positive club-subject cue alone is too narrow -- it is
+ * start-anchored (CLUB_SUBJECT_LEADING) and misses "exactly three wins
+ * against Carlton" / "at least three wins against Carlton", which name no
+ * subject word at all and were already a working grouped reading. So the
+ * words are admitted when the question names a club/team subject, OR when
+ * it names no player subject either; they are refused only when a player
+ * subject is present and no club subject is (AFLDB-ISSUE-188).
  */
-function extractHavingClause(text: string, clubSubject: boolean): {
+function extractHavingClause(text: string, clubSubject: boolean, playerSubject: boolean): {
   text: string;
   havingClause?: { metric: NlHavingMetric; op: NlCompareOp; value: number };
   consumed: string[];
 } {
+  if (!clubSubject && playerSubject) return { text, consumed: [] };
+
   const words: [RegExp, NlHavingMetric][] = [
     [/\bdraws?\b/, 'draws'],
     [/\bwins?\b/, 'wins'],
@@ -1412,7 +1420,7 @@ function extractHavingClause(text: string, clubSubject: boolean): {
     [/\b(?:win|won)\b/, 'wins'],
     // Last, so a result word still governs when both are present:
     // "teams with more than 2 wins in games against Carlton" counts wins.
-    ...(clubSubject ? [[/\bgames?\b/, 'games'] as [RegExp, NlHavingMetric]] : []),
+    [/\bgames?\b/, 'games'],
   ];
   let working = text;
   for (const [re, metric] of words) {
@@ -2344,8 +2352,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // Probed BEFORE extractAggregation, which consumes the "<subject>
   // with" cue outright -- by the time CLUB_SUBJECT_LEADING is tested at
   // step 10.5 the leading "teams"/"clubs"/"sides" word is already gone.
-  // Only extractHavingClause reads this, to disambiguate "games".
+  // Only extractHavingClause reads this, to disambiguate "games" and (per
+  // AFLDB-ISSUE-188) to refuse the grouped result words entirely on a
+  // player-subject question ("players with more than 100 wins" would
+  // otherwise lose its own "players" cue to extractAggregation's "<subject>
+  // with" -> list stripping before this ran).
   const clubSubjectCue = CLUB_SUBJECT_LEADING.test(text.trim());
+  const playerSubjectCue = /\bplayers?\b|\bwho\b/.test(text);
 
   const aggResult = extractAggregation(text);
   text = aggResult.text;
@@ -2355,7 +2368,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   text = streakResult.text;
   consumedTokens.push(...streakResult.consumed);
 
-  const havingResult = extractHavingClause(text, clubSubjectCue);
+  const havingResult = extractHavingClause(text, clubSubjectCue, playerSubjectCue);
   text = havingResult.text;
   consumedTokens.push(...havingResult.consumed);
 

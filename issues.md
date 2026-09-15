@@ -31266,11 +31266,11 @@ then `npx tsc --noEmit`. No DB required.
 
 - **Severity:** High (P1). Wrong entity and wrong statistic, confidence 1.00, validated.
 - **Area:** NL search / grouped team-result extraction — `src/search/nl/parser.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15.
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review; re-verified by Stage 2 on main `8a0c4cb`.
-- **Key files:** `src/search/nl/parser.ts` — `extractHavingClause` (~1402-1468; only the `games`
-  word is gated on `clubSubject`), call site (~2358, before career conditions), grain election
-  precedence (~2759-2761); `src/db/queries/nl/team-match.ts` `answerTeamAggregate`.
+- **Key files:** `src/search/nl/parser.ts` — `extractHavingClause` (~1402-1470), call site
+  (~2352-2374); `src/search/nl/plan.ts` — `PARSER_VERSION` (~423-430); `tests/nl-parser.test.ts` —
+  "regression: extractHavingClause requires a club/team subject (AFLDB-ISSUE-188)".
 
 ### Trigger examples
 - "players who have won 3 premierships"
@@ -31328,6 +31328,54 @@ None.
 
 ### Operator verification expectations
 `npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts`, `npx tsc --noEmit`.
+
+### Resolution (2026-09-15)
+
+**Root cause confirmed:** the having-word list (`draws|wins|losses|lose|lost|win|won`) in
+`extractHavingClause` ran at parser step 8 on every question with a number in a 20-character
+window; only `games` was gated on a leading club/team subject (AFLDB-ISSUE-110). A player-subject
+question naming "won"/"win"/"wins" had the word and its number claimed as a grouped `team_match`
+having clause; the stripped number then left a following career stat word
+("premierships"/"brownlow medals") with no number for `CAREER_STAT_WORDS` to bind, so it was
+dropped, and the question answered a club-count list instead of a player list.
+
+**Fix:** `extractHavingClause(text, clubSubject, playerSubject)` takes a second flag. The semantic
+rule:
+- grouped-result words (`draws/wins/losses/lose/lost/win/won/games`) remain valid whenever the
+  question names an explicit club/team subject (`CLUB_SUBJECT_LEADING`: leading `teams?`/`clubs?`/
+  `sides?`) — e.g. "clubs that have won more than 10 premierships", "teams with more than 2 wins
+  against Richmond".
+- subject-less grouped readings remain valid — e.g. "exactly three wins against Carlton", "at
+  least three wins against Carlton" name no subject word at all and are unaffected.
+- grouped-result extraction is refused ONLY when a player subject (`/\bplayers?\b|\bwho\b/`) is
+  present AND no club/team subject is present.
+- those refused player-subject questions then fall through unchanged to the existing
+  `extractCareerConditions` path (`CAREER_STAT_WORDS`), producing a `player_career` condition
+  instead of a `team_match` having clause.
+
+`PARSER_VERSION` is 42.
+
+**Semantic edge case discovered during implementation:** a plain positive club-subject gate
+(mirroring the pre-existing `games` gate exactly) is too narrow on its own — `CLUB_SUBJECT_LEADING`
+is start-anchored, so it would have also blocked the already-working subject-less grouped reading
+"exactly three wins against Carlton" / "at least three wins against Carlton" (confirmed by a
+pre-existing regression in `tests/nl-semantic-mapping.test.ts`, "AFLDB-ISSUE-110 C" describe
+block). The OR-with-absence-of-player-subject gate above is what the issue's own Implementation
+boundary specified, and is required to avoid that regression.
+
+**Operator validation evidence:** operator confirmed 2026-09-15 that
+`npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts` and `npx tsc --noEmit`
+both pass green on `sonnet/issue-188-nl-having-subject`. During implementation, `tests/nl-parser.test.ts`
+(360 → 367 tests, 7 new) and `tests/nl-semantic-mapping.test.ts` (159 tests, including the
+"AFLDB-ISSUE-110 C" head-to-head/having-clause regressions) were also run together (519 tests,
+all passing), plus `tests/nl-audit-acceptance.test.ts`, `tests/nl-regression-corpus.test.ts`,
+`tests/nl-plan.test.ts`, `tests/nl-stress-corpus.test.ts`, `tests/nl-stress-v2.test.ts`,
+`tests/nl-describe.test.ts`, `tests/query-intent.test.ts` (597 tests, all passing) as a broader
+adjacent-suite check. `npx tsc --noEmit` was clean throughout.
+
+**Follow-up (not part of this fix):** AFLDB-ISSUE-189 (subject election generally, including a
+club subject that is not the leading word) remains open and separate — this fix reads the same
+`CLUB_SUBJECT_LEADING`/subject-cue mechanism it already had, and does not widen subject detection.
 
 ## AFLDB-ISSUE-189 — NL: a club/team subject that is not the leading word is answered at player grain, and "teams with the most X" dumps club seasons
 
