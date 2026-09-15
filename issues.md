@@ -1335,6 +1335,25 @@ created, reopened, resolved, or materially reclassified.
      below, *Resolution (2026-09-13)*, and `AFLDB-ISSUE-165.md` §21. Removed from this table and
      from `IssuesIndex.md`; 2 -> 1. -->
 | `AFLDB-ISSUE-156` | Medium | Admin / Auth / Data management / Acquisition / Operations (umbrella) | **OPEN — UMBRELLA.** Owns the former `AFLDB-ISSUE-155` Phases D–I plus the two prerequisites found during C1/C2 (audit visibility, capability enforcement). Children: **157 (P1) RESOLVED 2026-09-11**, merged `3bbcab0`; **158 (P2) RESOLVED 2026-09-11**, merged `92a898f`; **159 (P3) RESOLVED 2026-09-11**, merged `af6379e`; **160 (P3b), 161 (P3c), 162 (P3d) and 163 (P3e) RESOLVED 2026-09-12** on the combined Admin Centre DEV acceptance at `main` `3272434` (migrations 096 → 097 → 098 applied in order, `db:privileges` reconciled, then the code; production build PASS with 1533/1533 static pages; `afldb.service` healthy; `/api/health` `status=ok` / `database=ok`; functional acceptance of every surface as Admin and Super Admin; responsive acceptance at 1440, 1024, 768 and 375). **165 (P5) RESOLVED 2026-09-13** — Awards & Honours administration correction/void/replacement lifecycle, DEV-deployed and DEV-accepted (see the retired `AFLDB-ISSUE-165` entry above). **P4 ALLOCATED 2026-09-13 as `AFLDB-ISSUE-167`** (Special records administration and durable suppression). **P4 RESOLVED 2026-09-14 on DEV acceptance as `AFLDB-ISSUE-167`; Stages 0–8 COMMITTED AND PUSHED** on `opus/issue-167-special-records-admin` (Stage 8 fix = `026ec2a`, `HEAD = @{u}`; merged to local `main` at `da69ef0`, pending push to `origin/main`) — migration `102_special_records_lifecycle.sql` plus the promotion-lineage entries applied to `afldb_test` and `afldb_dev`, the read-only admin surface, both replay adapters with their importer refusals, the public read-model suppression filters and the Super Admin mutation surface; **Stage 7 (the promotion/build gate) is PASS, committed and pushed at `c847b88`** — G-6 PASS with no new refusal class, `npm run build` exit 0, the promotion replay step corrected to name both special-record adapters, and one build-only defect fixed (`identity.ts` reached a Client Component with a `node:crypto` import). **Stage 8 is COMPLETE — DEV migrated, deployed and accepted 2026-09-14** (migration `102` applied to `afldb_dev` before the code, 102/102, 0 pending; DEV runs the Stage 8 fix `026ec2a`), which resolves P4 / `AFLDB-ISSUE-167`; **ISSUE-167 contacted no production host at any point, and its production promotion is carried on this umbrella, not on ISSUE-167**. **P6–P12 remain named placeholders with no ID yet.** **PRODUCTION PROMOTION EXECUTED 2026-09-14** — the carried checklist is **discharged**: `afldb_prod` deployed in place from `0955db3` to `a5c4a043aedbf4cee3dc18cc652496699d15cbb1` (50 commits; 165, 167, 166, 153, 164 and 144 ship runtime code), migrations `099` → `100` → `101` → `102` applied before the code (102/102, 0 pending, no checksum drift), `BUILD_ID F18g9rGqBr-3cvaECe2Qz`, `MainPID` 1209640, 2 workers, health `ok`/`ok`, all seven whole-table fingerprints byte-identical before and after, 5 lifecycle tables all-`active` / 0 void, D-5 grants absent at table and column level, 0 open import batches. **No replay adapter was run and none was required** (`docs/production-promotion.md`'s replay governs a rebuilt-database candidate promotion, not an in-place deployment; `data_overrides` held 0 PROD rows). **No `db:privileges` step** (no `prod` target exists, and 101/102 contain no `GRANT` by design). Proven backup taken first. **Authenticated rendered PROD acceptance PASSED 2026-09-14** (Super Admin / Admin / Contributor, no production mutation). Full record: *Production promotion executed (2026-09-14)* in this entry. **Superseded — pre-promotion (2026-09-12): Production is not untouched** — `afldb_prod` carried migrations 092–098, applied 2026-09-12, and the production host checkout was observed at `0955db3`. The exact Admin Centre production acceptance/deployment scope was not reconstructed as part of the `AFLDB-ISSUE-137` investigation. Runbook `AFLDB-ISSUE-156.md`. | **Operator:** the production promotion is **done** (2026-09-14, `a5c4a04` live) — authenticated rendered acceptance PASSED 2026-09-14 across Super Admin / Admin / Contributor with no production mutation. Nothing from the promotion remains outstanding. P6 is not allocated. *Superseded history:* the Admin Centre batch (160–163) was DEV-accepted and awaiting the next release/promotion stage — a separate decision under the carried checklist in this entry’s *P3b–P3e complete (2026-09-12)* record (migrations 096 → 097 → 098 → `db:privileges` → code; the replay order; the `AFLDB-ISSUE-160` gate-2 PROD read-only probes; gate 9’s real-importer half; the never-run all-refs migration collision check for 096/097/098). ISSUE-165's own PROD promotion is likewise carried here, not on ISSUE-165. **Correction (2026-09-12): decision S-1 — sequencing against "the paused ISSUE-151 PROD promotion" — is moot.** That promotion (stamp `20260907-234124`) completed 2026-09-08 01:11:24.440219 AEST, before ISSUE-160 existed (created 2026-09-11); there is no paused promotion left to sequence against, so S-1 does not gate this batch's own promotion. See the `AFLDB-ISSUE-151` entry. The next phase after P4 receives an ID at its start. |
+<!-- RETIRED 2026-09-15 — `AFLDB-ISSUE-174` is **Resolved** and is NO LONGER an open issue. Full
+     visual/layout/interaction redesign of the Coaches route family (`/coaches`, `/coaches/[slug]`,
+     `/coaches/compare`) per the `AFLDB-ISSUE-174.md` runbook, implemented and closed out same day
+     (§18 Phases 1-5): deduplicated the standalone coach page's totals, converted every major
+     section to `CollapsibleTable` disclosures, simplified the opponent-selector markup to match
+     its player-linked twin (ISSUE-172's `scroll: false` fix preserved), wired
+     `ExpandableTableFrame` onto the wide club/venue tables, changed the index's default sort to
+     `name asc` with a new cross-link to `/records/coaches`, and gave the compare page's two-coach
+     comparison grid a deterministic container-query two-column breakpoint (a same-class self-query
+     defect found and fixed during the Phase 4 rendered pass). A final Vercel Web Interface
+     Guidelines review found 0 MUST FIX and 1 SHOULD FIX (`CoachHeadToHeadVenueTable` missing the
+     `ExpandableTableFrame` wiring the runbook's own table strategy called for), fixed the same
+     session with a focused regression re-run (16/16). Full pre-review regression 81/81,
+     `npm run typecheck` passed. No schema, query, identity, route/URL, permission, admin or
+     ISSUE-173 layout-architecture change. `frontendLayout` restored to `classic` on DEV; PROD
+     untouched. Uncommitted, worktree `D:\dev\afldb-issue-174`, branch
+     `claude/issue-174-coaches-design` — operator to commit/push/`merge:ready`. Full evidence: the
+     `AFLDB-ISSUE-174` entry below, *Resolution (2026-09-15)*, and `AFLDB-ISSUE-174.md` §20.
+     Removed from this table and from `IssuesIndex.md`; 2 -> 1. -->
 <!-- RETIRED 2026-09-14 — `AFLDB-ISSUE-169` is **Resolved** and is NO LONGER an open issue. The
      operator disabled Cloudflare Web Analytics / RUM injection at the edge for the `afldb.com`
      zone (was "Enable, excluding visitor data in the EU," changed to "Disable"), matching the
@@ -29277,3 +29296,87 @@ Broader adoption of `ExpandableTableFrame` beyond the Coaches list.
 - **Validation:** `npm test -- tests/site-settings.test.ts tests/admin-settings-actions.test.ts` — 2 files, 41/41 passed (operator-run). `npm run typecheck` — route types generated, TypeScript clean (operator-run). Vercel Web Interface Guidelines: initial MUST FIX + SHOULD FIX both RESOLVED by remediation, re-audit found nothing new. Manual DEV rendered acceptance via Playwright (authenticated as the existing Super Admin account through the real `/admin/login` form, no auth path bypassed) — routes `/`, `/players`, `/clubs`, `/coaches`, `/admin/settings`; viewports 1440×900 and 375×800 (≤640px); `/players` (13,273-row sortable/paginated table) as the table-heavy route. PASS on: Super Admin Layout section separate from Appearance; `classic`/`sidebar` persistence across save+reload; layout changes never alter the saved theme (`frontendTheme` held at `editorial` throughout); classic and sidebar desktop structure (single `nav[aria-label="Primary"]`, never inside `#main`; accessibility tree confirms `navigation "Primary"`/`main` as siblings in `sidebar`); mobile convergence onto the existing `TabBar` in both presets with the desktop/sidebar nav computed `display: none` and unfocusable while hidden; no duplicate navigation; no horizontal overflow on any tested route/viewport; `/players` usable in both layouts; zero console errors/warnings, no page errors, no relevant failed requests, no hydration-mismatch messages, no obvious CLS/FOUC. Zero ISSUE-173 defects found. Full record: `AFLDB-ISSUE-173.md` §17.
 - **Resolution (2026-09-15):** DEV's live `frontendLayout` setting was returned to `classic` through the normal Super Admin settings UI after the acceptance pass (save + reload confirmed `classic` persisted and `frontendTheme` remained `editorial`). PROD untouched; branch `claude/issue-173-layout-styles` remains unmerged — this resolution covers DEV validation and issue tracking only, not a production deployment.
 - **Follow-up (explicitly outside this issue, not blocking resolution):** missing `<fieldset>`/`<legend>` grouping on radio-button settings sections (Appearance, Layout, Grid Solver) — pre-existing pattern, not introduced by ISSUE-173, not tracked separately. Sidebar nav touch-target height (~30-34px; clears the WCAG 24px minimum, below the 44px recommendation) — OPTIONAL, low impact. `<main id="main">` has no `tabindex`, so the site-wide skip link does not move DOM focus on activation — identical in `classic`, predates ISSUE-173. Additional layout presets beyond `classic`/`sidebar`, a distinct mobile-only layout paradigm, and per-page bespoke tuning inside `sidebar` remain explicitly deferred (`AFLDB-ISSUE-173.md` §13).
+
+## AFLDB-ISSUE-174 — Coaches page family: full design/layout review
+
+- **Severity:** Low (design/UX quality, not a defect)
+- **Area:** UI / Public frontend / Coaches page family (`/coaches`, `/coaches/[slug]`, `/coaches/compare`)
+- **Status:** RESOLVED 2026-09-15. Runbook §18 Phases 1-5 all complete, including the final Vercel
+  Web Interface Guidelines review and its one SHOULD FIX remediation. Uncommitted in worktree
+  `D:\dev\afldb-issue-174`, branch `claude/issue-174-coaches-design` — operator to commit/push/
+  `merge:ready`. No PROD action in scope.
+- **Key files/subsystems:** `src/app/coaches/page.tsx`, `src/app/coaches/[slug]/page.tsx`, `src/app/coaches/compare/{page.tsx,state.ts}`, `src/components/CoachCareerRecord.tsx`, `CoachOpponentSelector.tsx`, `CoachOpponentHistoryClient.tsx`, `CoachComparisonView.tsx`, `CoachComparisonControls.tsx`, `CoachComparisonCareer.tsx`, `CoachHeadToHead.tsx`, `PlayerCoachingCareer.tsx`, `ClubCoachRecords.tsx` (neighbour only); runbook `AFLDB-ISSUE-174.md`.
+- **Context:** `AFLDB-ISSUE-172` fixed several bounded Coaches interaction defects (opponent selector full-reload/scroll-top regression, `ExpandableTableFrame` wired to the index table) but explicitly deferred "the complete Coaches page visual/layout redesign" to a dedicated design pass. `AFLDB-ISSUE-173` (RESOLVED same day) then added the `classic`/`sidebar` selectable public layouts, which this design must work inside without redesigning.
+- **Current state (2026-09-15, design/planning session):** Inspected the actual Coaches route/component structure directly (no assumed route names) — three routes (`/coaches`, `/coaches/[slug]`, `/coaches/compare`), all rendering through one shared record-presentation module (`CoachCareerRecord.tsx`) used identically by the standalone coach page, the player-linked "Coaching Career" panel, and both pages' opponent-scoped slice. Confirmed the existing "almanac" design system (cream/ink paper, single gold accent, ruled lines not cards, Newsreader serif + IBM Plex Sans/Mono, 2px radius) from `globals.css`/`themes.css` and treated it as authoritative — this design works inside it, not as a second visual identity. Confirmed via direct comparison against `src/app/players/[slug]/page.tsx` that the Coaches page family is the **only** profile-style surface that never uses `CollapsibleTable`/`CollapsiblePanel` disclosure, which every major player-page section does — identified as the mechanical cause of the "cramped/squashed" complaint (up to 7 stacked, uncollapsible tables on the compare page). Found and documented six other concrete, code-grounded problems: duplicated totals (stat-strip + `CoachTotalsTable` back to back on the standalone page), two visual weights for the same one-field opponent-selector control (heavy `fieldset`/`legend` vs. the player-linked twin's plain inline label+select), no `ExpandableTableFrame` wiring on the wide (8-column) club/venue tables despite ISSUE-172 building it and inviting exactly this adoption, a content-driven (not deterministic) two-column comparison grid whose collapse threshold falls inside the 641–1080px band and shifts with the ISSUE-173 sidebar layout's narrower content column, and `/coaches`' default sort competing with `/records/coaches`' leaderboard framing with no cross-link forward. Computed the sidebar layout's actual content width (~692px at 1024px viewport, ~1104px at 1440px) against `layouts.css`'s grid definition and `--measure`/`--gutter` tokens, and used that to reason precisely about where the wide coaching tables need `ExpandableTableFrame` in each layout. Produced `AFLDB-ISSUE-174.md`: full current-state inventory, confirmed problems, design goals, information hierarchy (wireframe-level) for the index/detail/compare pages, club-history/history-v-team treatment (preserving the ISSUE-172 fix by construction), table strategy, search/filter placement, classic- and sidebar-layout behaviour, a per-width responsive table (375/640/768/1024/1440px), accessibility/keyboard considerations, component reuse vs. new components (no new component files — props, markup simplification, disclosure wrapping, scoped CSS only), CSS/layout architecture, exact affected files, explicit backend/data non-goals, a reuse-existing-tests strategy, a five-phase implementation plan and deferred follow-ups. Distinguished category-2 data (`getCoachRecordsByMetric`, available via an existing query, unused on any reviewed page) from this issue's scope, and deliberately declined to redesign the compare page's per-coach table pairing into a single merged comparison table, since `CoachComparisonCareer`'s own code comments record a prior deliberate decision to mirror `ClubComparisonCareer`'s side-by-side convention — changing only the coach side would create presentation drift between two comparison surfaces built to mirror each other. No code changed; no test run; no database, query, identity, route/URL, permission, admin or ISSUE-173 layout-architecture change proposed.
+- **Implementation (2026-09-15, same worktree, phased per §18):** **Phase 1** (coach detail page) —
+  `CoachCareerBody` gained `showTotalsTable` (default `true`) and `expandWideTables` (default
+  `false`) props; `/coaches/[slug]` passes `showTotalsTable={false}` (removing the duplicate totals
+  table under the stat-strip) and `expandWideTables` (wiring `ExpandableTableFrame` onto the club
+  and venue tables); "Coaching record"/"History against club" became `CollapsibleTable`
+  disclosures; `CoachOpponentSelector` dropped its `fieldset`/`legend`/`.filter-grid` for a plain
+  `<label>+<select>`, `onChange`/`router.push(..., { scroll: false })` untouched.
+  `tests/coach-career-record.test.ts` + `tests/coach-profile-route.test.ts` extended, 38/38.
+  **Phase 2** (`/coaches` index) — `defaultSort`/`defaultDir` changed `games`/`desc` ->
+  `name`/`asc`; one `.section-note` cross-link to `/records/coaches` added.
+  `tests/coaches.test.ts` extended (a DB-facing-dependency mock on `@/db/client`, not
+  `@/db/queries/coaches`, was required to keep the module DB-free without breaking real coverage of
+  `coachPerspectiveMargin`/`selectCareerRecordMatch`), 12/12. **Phase 3** (compare page) —
+  `CoachComparisonCareer`'s three sections and `CoachHeadToHeadSection` (all three states) became
+  `CollapsibleTable` disclosures; the three comparison grids gained a `grid-compare` class for a new
+  deterministic two-column breakpoint. `tests/coach-comparison-career.test.ts` +
+  `tests/coach-head-to-head-view.test.ts` extended, 31/31. **Phase 4** (rendered acceptance,
+  local dev server against the shared DEV database, operator-authorised) — Playwright pass across
+  `classic`/`sidebar` at 375/640/768/1024/1440px covering the index, a multi-club coach
+  (Malthouse), a single-club coach (Scott), the zero-game coach (Adamson), the compare page and the
+  opponent-history interaction: no horizontal overflow, no console/hydration errors, ISSUE-172's
+  scroll-preserving navigation intact, `ExpandableTableFrame` focus trap/Escape/focus-restore intact
+  even nested inside a now-collapsible `<details>`. **One genuine defect found and fixed during this
+  pass:** the deterministic comparison-grid rule initially put `container-type: inline-size` and its
+  `@container` override on the same `.grid-compare` class, which is disallowed (a size-containment
+  container cannot be the query target of its own `@container` rule) and silently never applied —
+  the grid was actually still running on `.grid-panels`' plain `auto-fit`, which coincidentally
+  looked right at most probed widths because its own natural breakpoint sits close to the intended
+  672px one. Fixed by moving `container-type` onto a new wrapping `.grid-compare-container` element
+  around each of the three grids (`src/styles/globals.css`,
+  `src/components/CoachComparisonCareer.tsx`); re-verified correct and independent per layout at the
+  same viewport (e.g. 1024px: two columns in `classic`, one in `sidebar`) across all five widths in
+  both layouts after the fix, with the focused Phase 3 suites re-confirmed 31/31. `frontendLayout`
+  was restored to `classic` on the shared DEV database afterward, and the local dev server stopped.
+- **Validation (pre-review):** Per-phase focused unit suites above (Phases 1-3, 81/81 combined)
+  plus the Phase 4 rendered acceptance pass. `npx vitest run tests/coach-career-record.test.ts
+  tests/coach-profile-route.test.ts tests/coaches.test.ts tests/coach-comparison-career.test.ts
+  tests/coach-head-to-head-view.test.ts` — 5 files, 81/81 passed (operator-run). `npm run
+  typecheck` — next typegen + `tsc --noEmit` passed (operator-run).
+- **Phase 5 — final Vercel Web Interface Guidelines review (2026-09-15):** Scope: the `/coaches`
+  index, standalone coach profile, history-against-club controls, comparison page,
+  `CollapsibleTable`/`ExpandableTableFrame` usage, the comparison-grid CSS, and
+  responsive/accessibility behaviour introduced or changed by this issue. (The `web-design-guidelines`
+  skill was not present in this session's available-skills list; the guidelines were applied
+  directly against the diffed code instead.) **0 MUST FIX. 1 SHOULD FIX, found and fixed:** the
+  runbook's own table strategy (§7) calls for `ExpandableTableFrame` on `CoachHeadToHeadVenueTable`
+  (9 columns — the widest table in this feature), but `CoachHeadToHead.tsx` never wired it in,
+  unlike the equal/lesser-width `CoachClubTable`/`CoachVenueHistoryTable` (8 columns) Phase 1
+  already wired. Fixed: `CoachHeadToHead.tsx` now wraps `CoachHeadToHeadVenueTable` in
+  `ExpandableTableFrame` (guarded on `venues.length > 0`, matching `CoachCareerBody`'s own
+  convention). `tests/coach-head-to-head-view.test.ts` extended with two cases (expand control
+  present with venue data; absent when there is none). Post-fix validation:
+  `npx vitest run tests/coach-head-to-head-view.test.ts` — 1 file, 16/16 passed (operator-run).
+  **Optional/pre-existing, left out of scope:** `CoachOpponentSelector`'s markup now matches
+  `CoachOpponentHistoryClient` exactly (both `.filter-group` div + inline label/select) —
+  intentional, not a defect. `.grid-compare-container`'s `container-type: inline-size` establishes
+  a containing block for `position: fixed` descendants (relevant to `ExpandableTableFrame`'s fixed
+  overlay), but no `ExpandableTableFrame` is nested inside `.grid-compare-container` anywhere today,
+  so this has no live effect. The standalone page's "Clear" link lost its `.btn.btn-secondary`
+  styling when `fieldset`/`.filter-actions` were dropped; checked against the rest of the codebase,
+  a plain-text `Clear` link next to a filter (no button styling) is already the dominant site
+  convention (`admin/draft`, `admin/coaches`, `admin/awards/*`, `admin/records/*`) — not a
+  regression. Full record: `AFLDB-ISSUE-174.md` §20.
+- **Resolution (2026-09-15):** Implementation plus rendered acceptance plus the Vercel review and
+  its remediation together satisfy the runbook's §18 five-phase plan. No schema, query, identity,
+  route/URL, permission, admin, or ISSUE-173 layout-architecture change at any point.
+  `frontendLayout` confirmed restored to `classic` on the shared DEV database; PROD untouched
+  throughout. Removed from `IssuesIndex.md` and the Open Issues table; 2 -> 1. Not committed, not
+  pushed, not merged — the reviewed local change remains in worktree `D:\dev\afldb-issue-174`,
+  branch `claude/issue-174-coaches-design`, for the operator to commit and run
+  `npm run merge:ready -- --issue 174`. `CHANGELOG.md`'s `[Unreleased]` entry updated to record the
+  final Vercel review outcome. No PROD action of any kind was taken.

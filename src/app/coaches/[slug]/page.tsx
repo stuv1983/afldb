@@ -5,6 +5,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CoachCareerBody, CoachOpponentRecordBody } from '@/components/CoachCareerRecord';
 import { CoachOpponentSelector } from '@/components/CoachOpponentSelector';
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { getComparisonOrganizations, type ComparisonOrganization } from '@/db/queries/club-comparison';
 import type { CoachCareer } from '@/db/queries/coaches';
@@ -219,14 +220,12 @@ export default async function CoachPage({
         </div>
       </div>
 
-      <section className="section">
-        <h2>Coaching record</h2>
-        <CoachCareerBody career={career} linkClubs />
-      </section>
+      <CollapsibleTable title="Coaching record">
+        <CoachCareerBody career={career} linkClubs showTotalsTable={false} expandWideTables />
+      </CollapsibleTable>
 
       {career.totals.games > 0 && (
-        <section className="section">
-          <h2>History against club</h2>
+        <CollapsibleTable title="History against club">
           <CoachOpponentSelector organizations={organizations} selected={opponent} basePath={path} />
 
           {selection.kind === 'invalid' && (
@@ -235,7 +234,7 @@ export default async function CoachPage({
           {selection.kind === 'resolved' && (
             <CoachOpponentRecordBody record={selection.record} showCoachedClub={career.clubs.length > 1} />
           )}
-        </section>
+        </CollapsibleTable>
       )}
     </>
   );

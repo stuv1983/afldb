@@ -242,6 +242,27 @@ describe('CoachCareerBody — the shared career presentation (AFLDB-ISSUE-170 St
     expect(html).toContain('MCG');
   });
 
+  it('shows the totals table by default but omits it when showTotalsTable is false (AFLDB-ISSUE-174: the standalone page already has its own stat-strip)', () => {
+    const withTotals = renderToStaticMarkup(CoachCareerBody({ career: career(), linkClubs: true }));
+    const withoutTotals = renderToStaticMarkup(
+      CoachCareerBody({ career: career(), linkClubs: true, showTotalsTable: false }),
+    );
+    expect(withTotals).toContain('Grand Finals');
+    expect(withoutTotals).not.toContain('Grand Finals');
+    // Everything else — the tables Stage 1D added — stays present either way.
+    expect(withoutTotals).toContain('Biggest win and loss');
+    expect(withoutTotals).toContain('Venue history');
+  });
+
+  it('wraps the club and venue tables in ExpandableTableFrame only when expandWideTables is true (AFLDB-ISSUE-174)', () => {
+    const plain = renderToStaticMarkup(CoachCareerBody({ career: career(), linkClubs: true }));
+    const expandable = renderToStaticMarkup(
+      CoachCareerBody({ career: career(), linkClubs: true, expandWideTables: true }),
+    );
+    expect(plain).not.toContain('Expand table');
+    expect(expandable.match(/Expand table/g)).toHaveLength(2);
+  });
+
   it('links each club only when linkClubs is true — the one real difference between the standalone and player-linked surfaces, now expressed as a single shared component instead of two duplicated implementations', () => {
     const c = career();
     const linked = renderToStaticMarkup(CoachCareerBody({ career: c, linkClubs: true }));
@@ -305,6 +326,16 @@ describe('CoachOpponentSelector — the standalone coach page\'s client-side Sta
     expect(html).toContain('Fitzroy');
     expect(html).toContain('Current clubs');
     expect(html).toContain('Former clubs');
+  });
+
+  it('uses a plain label+select, not the fieldset/legend/.filter-grid wrapper (AFLDB-ISSUE-174: matches CoachOpponentHistoryClient\'s single-control weight)', () => {
+    const html = renderToStaticMarkup(
+      CoachOpponentSelector({ organizations: [org()], selected: undefined, basePath: '/coaches/some-coach-1' }),
+    );
+    expect(html).not.toContain('<fieldset');
+    expect(html).not.toContain('<legend');
+    expect(html).not.toContain('filter-grid');
+    expect(html).toContain('filter-group');
   });
 
   it('offers a Clear link back to the base path only once an opponent is selected', () => {

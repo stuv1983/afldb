@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { ExpandableTableFrame } from '@/components/ExpandableTableFrame';
 import { SortableTable } from '@/components/SortableTable';
 import type {
   CoachCareer,
@@ -279,15 +280,31 @@ export function CoachVenueHistoryTable({ venues }: { venues: VenueLike[] }) {
  * it (AFLDB-ISSUE-170 Stage 1A) rather than rendering a table of invented
  * zeros — the Jim Adamson case (coach id 315, Stage 0 §0.2).
  */
-export function CoachCareerBody({ career, linkClubs }: { career: CoachCareer; linkClubs: boolean }) {
+export function CoachCareerBody({
+  career,
+  linkClubs,
+  showTotalsTable = true,
+  expandWideTables = false,
+}: {
+  career: CoachCareer;
+  linkClubs: boolean;
+  /** `false` on the standalone coach page, whose `.stat-strip` already shows these totals (AFLDB-ISSUE-174). */
+  showTotalsTable?: boolean;
+  /** Wraps the club and venue tables in `ExpandableTableFrame` (AFLDB-ISSUE-174), matching the Coaches index's own wiring. Off by default so `PlayerCoachingCareer`'s existing panel is unaffected. */
+  expandWideTables?: boolean;
+}) {
   if (career.totals.games === 0) {
     return <p className="muted">No canonical coaching match is currently recorded for this coach.</p>;
   }
   const showCoachedClub = career.clubs.length > 1;
+  const clubTable = <CoachClubTable clubs={career.clubs} linkClubs={linkClubs} />;
+  const venueTable = <CoachVenueHistoryTable venues={career.venues} />;
   return (
     <>
-      <CoachTotalsTable totals={career.totals} />
-      <CoachClubTable clubs={career.clubs} linkClubs={linkClubs} />
+      {showTotalsTable && <CoachTotalsTable totals={career.totals} />}
+      {expandWideTables && career.clubs.length > 0 ? (
+        <ExpandableTableFrame title="Club-by-club coaching record">{clubTable}</ExpandableTableFrame>
+      ) : clubTable}
       <h3>Biggest win and loss</h3>
       <CoachBiggestWinLossTable
         biggestWin={career.biggestWin}
@@ -295,7 +312,9 @@ export function CoachCareerBody({ career, linkClubs }: { career: CoachCareer; li
         showCoachedClub={showCoachedClub}
       />
       <h3>Venue history</h3>
-      <CoachVenueHistoryTable venues={career.venues} />
+      {expandWideTables && career.venues.length > 0 ? (
+        <ExpandableTableFrame title="Venue history">{venueTable}</ExpandableTableFrame>
+      ) : venueTable}
     </>
   );
 }

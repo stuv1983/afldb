@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { CollapsibleTable } from '@/components/CollapsibleTable';
+import { ExpandableTableFrame } from '@/components/ExpandableTableFrame';
 import { SortableTable } from '@/components/SortableTable';
 import type { ResolvedCoach } from '@/app/coaches/compare/state';
 import type {
@@ -235,13 +237,12 @@ export function CoachHeadToHeadSection({
 }) {
   if (headToHead === null) {
     return (
-      <section className="section">
-        <h2>Head-to-head</h2>
+      <CollapsibleTable title="Head-to-head">
         <p className="notice" role="status">
           Direct head-to-head data is not currently available for {coachA.coach.displayName} and{' '}
           {coachB.coach.displayName}. Try again shortly.
         </p>
-      </section>
+      </CollapsibleTable>
     );
   }
 
@@ -251,8 +252,7 @@ export function CoachHeadToHeadSection({
 
   if (totals.meetings === 0) {
     return (
-      <section className="section">
-        <h2>Head-to-head</h2>
+      <CollapsibleTable title="Head-to-head">
         <CoachComparisonContextTable
           coachA={coachA}
           coachB={coachB}
@@ -264,13 +264,12 @@ export function CoachHeadToHeadSection({
           No canonical match has {coachA.coach.displayName} and {coachB.coach.displayName} coaching
           opposing clubs against each other.
         </p>
-      </section>
+      </CollapsibleTable>
     );
   }
 
   return (
-    <section className="section">
-      <h2>Head-to-head</h2>
+    <CollapsibleTable title="Head-to-head">
       <CoachComparisonContextTable
         coachA={coachA}
         coachB={coachB}
@@ -318,7 +317,13 @@ export function CoachHeadToHeadSection({
       />
 
       <h3>Venue history</h3>
-      <CoachHeadToHeadVenueTable venues={headToHead.venues} />
-    </section>
+      {headToHead.venues.length > 0 ? (
+        <ExpandableTableFrame title="Head-to-head venue history">
+          <CoachHeadToHeadVenueTable venues={headToHead.venues} />
+        </ExpandableTableFrame>
+      ) : (
+        <CoachHeadToHeadVenueTable venues={headToHead.venues} />
+      )}
+    </CollapsibleTable>
   );
 }

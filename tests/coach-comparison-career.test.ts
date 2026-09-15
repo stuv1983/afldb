@@ -255,4 +255,21 @@ describe('CoachComparisonCareer', () => {
     expect(html).toContain('Alastair Clarkson');
     expect(html).toContain('Chris Scott');
   });
+
+  it('wraps Career, Biggest win and loss, and Venue history as three open-by-default disclosures (AFLDB-ISSUE-174)', () => {
+    const html = renderToStaticMarkup(
+      CoachComparisonCareer({ coachA, coachB, careerA, careerB }),
+    );
+    expect((html.match(/<details/g) ?? []).length).toBe(3);
+    expect(html).toContain('<h2 class="table-details-title">Career</h2>');
+    expect(html).toContain('<h2 class="table-details-title">Biggest win and loss</h2>');
+    expect(html).toContain('<h2 class="table-details-title">Venue history</h2>');
+  });
+
+  it('applies the deterministic two-column comparison-grid class to every side-by-side grid (AFLDB-ISSUE-174 §11)', () => {
+    const html = renderToStaticMarkup(
+      CoachComparisonCareer({ coachA, coachB, careerA, careerB }),
+    );
+    expect((html.match(/class="grid grid-panels grid-shrink grid-compare"/g) ?? []).length).toBe(3);
+  });
 });

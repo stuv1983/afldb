@@ -362,6 +362,34 @@ describe('the route resolves in one hop and never loops', () => {
   });
 });
 
+describe('the coach detail page adopts the disclosure/expand-table conventions (AFLDB-ISSUE-174)', () => {
+  it('wraps Coaching record and History against club as two open-by-default disclosures', async () => {
+    data.coach = MALTHOUSE;
+    const html = await renderCoachPage('mick-malthouse-3');
+
+    expect((html.match(/<details/g) ?? []).length).toBe(2);
+    expect(html).toContain('<h2 class="table-details-title">Coaching record</h2>');
+    expect(html).toContain('<h2 class="table-details-title">History against club</h2>');
+  });
+
+  it('does not duplicate the stat-strip totals in a second table', async () => {
+    data.coach = MALTHOUSE;
+    const html = await renderCoachPage('mick-malthouse-3');
+
+    // "Grand Finals" is the totals table's own label; the stat-strip states
+    // it as "Grand Finals"/value separately, so a single occurrence means
+    // CoachTotalsTable was suppressed via showTotalsTable={false}.
+    expect(html.match(/Grand Finals/g)).toHaveLength(1);
+  });
+
+  it('wires ExpandableTableFrame around the club and venue tables', async () => {
+    data.coach = MALTHOUSE;
+    const html = await renderCoachPage('mick-malthouse-3');
+
+    expect(html.match(/Expand table/g)).toHaveLength(2);
+  });
+});
+
 describe('coach-context surfaces link to coach pages (Stage 1E)', () => {
   it('the coaches index links a player-linked coach to their coach page', async () => {
     const { coachProfilePath } = await import('@/lib/format');

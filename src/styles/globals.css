@@ -849,6 +849,26 @@ details.filter-details > form { padding: 0.85rem; }
    table. `min-width: 0` puts the overflow back inside `.table-wrap`, which
    is where it was always meant to be. Opt-in, so no existing grid moves. */
 .grid-shrink > * { min-width: 0; }
+/* AFLDB-ISSUE-174 §11. A coach (or club) comparison is always exactly two
+   items, never "however many happen to fit" -- `.grid-panels`' `auto-fit`
+   reflow silently drops to one column below ~654-672px of available width
+   (two 320px tracks plus the `.grid` gap), a threshold that lands inside
+   the 641-1080px "cramped" band the brief calls out and moves around with
+   `sidebar`'s narrower content column (ISSUE-173). `.grid-compare-container`
+   measures its OWN rendered width via `container-type: inline-size`, which
+   already reflects whichever layout put it there, so one rule covers both
+   classic and sidebar without this file reading `data-site-layout`.
+   `container-type` has to live on a WRAPPING element, never on `.grid-compare`
+   itself: a size-containment container cannot be a query target of its own
+   `@container` rule (the querying element must be a descendant), so putting
+   both on one class silently no-ops the override and leaves `.grid-panels`'
+   own `auto-fit` in charge -- exactly what happened until this was caught in
+   the Phase 4 rendered pass, where two coaches' panels quietly kept riding a
+   third, always-empty `auto-fit` track instead of the intended `1fr 1fr`. */
+.grid-compare-container { container-type: inline-size; }
+@container (min-width: 672px) {
+  .grid-compare { grid-template-columns: 1fr 1fr; }
+}
 .card {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
