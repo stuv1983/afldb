@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Admin-created match round_code fallback now uses the established numbered-round vocabulary (AFLDB-ISSUE-183) - 15 September 2026
+
+- `createMatch()`'s blank/omitted-`roundCode` fallback for a normal numbered home-and-away round now
+  derives `round_code` as the plain decimal string (e.g. `"5"`), matching the vocabulary every other
+  writer already uses (`src/lib/external-afl/current-season-import.ts`,
+  `src/lib/ingest/datasets.ts`), instead of the previous `` `R${roundNumber}` `` (e.g. `"R5"`).
+- Explicitly supplied `roundCode` values and finals/special-round derivation (`GF`/`PF`/`SF`/`QF`/
+  `EF`/`WF`) are unchanged.
+- A DEV read-only audit of `afldb_dev` found the existing home-and-away `round_code` vocabulary
+  already fully numeric — 16,327 numeric rows, 0 `R`-prefixed rows — so no historical backfill or
+  migration was required.
+
 ### Admin canonical match creation refuses duplicates by canonical identity, not match_key text (AFLDB-ISSUE-182) - 15 September 2026
 
 - `createMatch()`'s duplicate pre-check now compares canonical, DB-typed columns — `season`,

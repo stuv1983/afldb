@@ -28685,3 +28685,126 @@ existing duplicate groups on this predicate.
 Resolved: canonical-column duplicate detection and real database-backed integration coverage are in
 place and operator-verified. The follow-ups above are genuine and remain worth tracking, but none is
 a blocker and none is opened as a separate tracked issue by this closeout.
+
+---
+
+## AFLDB-ISSUE-183 — Normalize admin-created match round_code fallback
+
+- **Severity:** Low (text-consistency defect, no DB constraint violated, no data-integrity impact).
+- **Area:** Admin canonical match creation — `src/db/queries/match-admin.ts` (`createMatch`);
+  `tests/integration/match-admin-create.test.ts`.
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-183`, branch
+  `sonnet/issue-183-admin-round-code-normalization`.
+- **Found:** 2026-09-15, as the AFLDB-ISSUE-182 closeout follow-up (see that entry's Follow-up
+  section, first bullet).
+- **Resolved:** 2026-09-15, on operator verification (focused integration suite, typecheck, and a
+  DEV read-only round_code vocabulary audit — see Operator verification below).
+- **Key files:** `src/db/queries/match-admin.ts:144-159` (fallback + finals switch);
+  `tests/integration/match-admin-create.test.ts` (tests H, I).
+
+### Finding
+`createMatch()`'s blank-`roundCode` fallback for a normal numbered round (`round_type =
+'home_and_away'`) rendered `` `R${roundNumber}` `` (e.g. `"R5"`), diverging from the decimal-string
+vocabulary every other writer uses for the same case:
+
+- `src/lib/external-afl/current-season-import.ts:398-406` (`roundCodes()`) returns
+  `[String(match.roundNumber)]` for a numbered round;
+- `src/lib/ingest/datasets.ts:481-500` requires the source file's own `round_code` column verbatim
+  (historically AFL Tables' plain decimal string) and only recognises `EF/QF/SF/PF/GF/WF` as
+  non-numeric codes;
+- `tests/integration/match-admin-create.test.ts`'s own `baseInput()` and `seedNameKeyedMatch()`
+  helpers already assumed `String(roundNumber)` before this fix, for the same reason.
+
+`round_code` is free text with no DB CHECK tying it to `round_number`/`round_type` on `matches`
+(unlike `fixtures`, which has `fixtures_round_number_ck`), so nothing enforced consistency — the
+divergence was silent.
+
+**Finals/special rounds do not share this fallback.** `createMatch()`'s blank-`roundCode` handling
+branches on `isFinal` (`round_type !== 'home_and_away'`) before reaching the numbered-round case; a
+final already derives its code from an explicit `switch (input.roundType)` — `GF`/`PF`/`SF`/`QF`/
+`EF`/`WF` (default `'Final'`, currently unreachable since every declared `roundType` union member is
+covered by a case) — which is exactly the vocabulary `datasets.ts` and `current-season-import.ts`
+also use. That branch is unchanged by this issue, and no additional finals test was needed under the
+issue brief's own criterion (item D: only add a regression test if finals share the fallback path).
+
+### Fix
+`src/db/queries/match-admin.ts:147`: blank/omitted `roundCode` + non-final round now derives
+`String(roundNumber)` instead of `` `R${roundNumber}` ``. An explicitly supplied `roundCode` is
+unaffected — still trimmed and uppercased exactly as before. No migration, no historical-row rewrite,
+no importer change, no `match_key` format change, no change to the ISSUE-182 duplicate-identity
+predicate (which already keyed on `round_type`/`round_number`, not `round_code`, per that issue's own
+comment). Updated a stale in-code comment (`match-admin.ts` duplicate-detection block) that had cited
+the old `"R5"` behaviour as a documented reason `round_code` isn't used for dedup — the underlying
+point (free text, no DB-enforced link, still not safe to rely on given an admin can supply an
+arbitrary explicit code and historical rows may predate this fix) stands and was preserved.
+
+### Tests added
+`tests/integration/match-admin-create.test.ts`:
+- **H.** blank `roundCode` + numbered round -> stored `round_code` is `String(roundNumber)`, not
+  `R`-prefixed.
+- **I.** explicit `roundCode` (with whitespace/mixed case) is preserved trimmed/uppercased, not
+  overwritten by the derived fallback.
+
+Existing tests A/C/D/E/G (result/winner/margin derivation, audit write, rollback-on-audit-failure,
+duplicate refusal) all use `baseInput()`'s explicit `roundCode: String(roundNumber)` and are
+unaffected by this change; no update needed. `tests/admin-match-mutations.test.ts` has a static
+assertion for the `wildcard_final` finals case (`case 'wildcard_final': roundCode = 'WF'; break;`)
+but none for the numbered-round fallback text, so no update was needed there either.
+
+### Operator verification
+
+Focused integration (`npx vitest run tests/integration/match-admin-create.test.ts`), 15 September
+2026: 1 test file passed, 8/8 tests passed, including this issue's H and I (blank `roundCode` on a
+numbered round stores the decimal string, e.g. `"5"`, not `"R5"`; an explicitly supplied `roundCode`
+remains handled by the existing normalization path, unchanged by the fallback). The previously
+existing AFLDB-ISSUE-182 cases A-E/G remain green.
+
+Typecheck (`npx tsc --noEmit -p tsconfig.json`): PASS.
+
+### DEV read-only audit
+
+Vocabulary census for numbered home-and-away rounds:
+
+```sql
+SELECT
+  CASE
+    WHEN round_code ~ '^[0-9]+$' THEN 'numeric'
+    WHEN round_code ~ '^[Rr][0-9]+$' THEN 'R-prefixed'
+    ELSE 'other'
+  END AS pattern,
+  count(*) AS n
+FROM matches
+WHERE round_type = 'home_and_away'
+GROUP BY 1
+ORDER BY 1;
+```
+
+Existing `R`-prefixed rows, for inspection:
+
+```sql
+SELECT m.id, m.season, m.round_type, m.round_number, m.round_code,
+       hc.name AS home_club, ac.name AS away_club, m.match_date
+FROM matches m
+JOIN clubs hc ON hc.id = m.home_club_id
+JOIN clubs ac ON ac.id = m.away_club_id
+WHERE m.round_type = 'home_and_away'
+  AND m.round_code ~ '^[Rr][0-9]+$'
+ORDER BY m.season, m.round_number;
+```
+
+Both are read-only `SELECT`s against `afldb_dev`.
+
+**Result** (operator run, 15 September 2026, against `afldb_dev` via `AFLDB_OWNER_DATABASE_URL`):
+census — numeric: 16,327, R-prefixed: 0, other: 0. The `R[0-9]+` inspection query returned 0 rows.
+
+**Conclusion:** existing DEV home-and-away `round_code` vocabulary is already fully numeric. The
+pre-fix admin fallback was inconsistent with the rest of the repository in principle, but had not
+actually produced any `R`-prefixed rows in `afldb_dev`. No historical cleanup/backfill is required,
+and no separate cleanup issue is warranted.
+
+### Migration/grants
+None required. `round_code` is an existing free-text column; this is an application-code-only
+change.
+
+### Follow-up
+None. The DEV audit found no `R`-prefixed rows, so no cleanup/backfill issue is opened.

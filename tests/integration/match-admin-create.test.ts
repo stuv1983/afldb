@@ -500,4 +500,37 @@ describe('AFLDB-ISSUE-182 -- createMatch() against a real database', () => {
     expect((caught as Error | undefined)?.message).toMatch(/already exists for that season, round, date and clubs/);
     expect(await countIdentity(roundNumber, matchDate, clubA, clubB)).toBe(1);
   });
+
+  // AFLDB-ISSUE-183: a blank/omitted roundCode on a normal numbered round
+  // used to fall back to `R${roundNumber}` ("R5"), diverging from the
+  // decimal-string vocabulary every importer writes ("5") -- see
+  // src/lib/external-afl/current-season-import.ts:roundCodes() and
+  // src/lib/ingest/datasets.ts's required source round_code column. Finals
+  // round_type values do not share this fallback (they derive GF/PF/SF/QF/
+  // EF/WF from round_type via a separate branch, unchanged here) and are
+  // not re-tested by this issue.
+  it('H. derives the decimal-string round_code, not "R5", when roundCode is blank for a numbered round', async () => {
+    const roundNumber = nextRound();
+    const matchDate = `${season}-01-01`;
+    const created = await createMatch(baseInput({ roundNumber, matchDate, roundCode: undefined }));
+    committedMatchIds.push(created.id);
+
+    const [row] = await owner<{ roundCode: string }[]>`
+      SELECT round_code AS "roundCode" FROM matches WHERE id = ${created.id}`;
+    expect(row.roundCode).toBe(String(roundNumber));
+    expect(row.roundCode).not.toMatch(/^R/i);
+  });
+
+  it('I. preserves an explicitly supplied roundCode (trimmed/uppercased) rather than deriving one', async () => {
+    const roundNumber = nextRound();
+    const matchDate = `${season}-01-01`;
+    const created = await createMatch(baseInput({
+      roundNumber, matchDate, roundCode: `  round${roundNumber}  `,
+    }));
+    committedMatchIds.push(created.id);
+
+    const [row] = await owner<{ roundCode: string }[]>`
+      SELECT round_code AS "roundCode" FROM matches WHERE id = ${created.id}`;
+    expect(row.roundCode).toBe(`ROUND${roundNumber}`);
+  });
 });

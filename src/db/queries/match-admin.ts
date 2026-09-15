@@ -144,7 +144,10 @@ export async function createMatch(input: CreateMatchInput): Promise<{
   let roundCode = (input.roundCode || '').trim().toUpperCase();
   if (!roundCode) {
     if (!isFinal) {
-      roundCode = `R${roundNumber}`;
+      // AFLDB-ISSUE-183: decimal-string vocabulary, matching every other
+      // writer (src/lib/external-afl/current-season-import.ts roundCodes(),
+      // src/lib/ingest/datasets.ts source round_code) -- not "R5".
+      roundCode = String(roundNumber);
     } else {
       switch (input.roundType) {
         case 'grand_final': roundCode = 'GF'; break;
@@ -233,14 +236,16 @@ export async function createMatch(input: CreateMatchInput): Promise<{
       //
       // round_code is not used either: it is free text with no DB-enforced
       // link back to round_number/round_type for `matches` (unlike
-      // `fixtures`, which has fixtures_round_number_ck), and this
-      // function's own blank-roundCode fallback below renders "R5" rather
-      // than the decimal-string vocabulary every importer writes ("5") --
-      // so two rows for the same real round can legitimately carry
-      // different round_code text. round_type and round_number are both
-      // DB-typed (an enum and a smallint, tied together for every writer by
-      // matches_round_number_ck) and identical for the same real round
-      // regardless of who wrote it, so they stand in for round_code here.
+      // `fixtures`, which has fixtures_round_number_ck). This function's own
+      // blank-roundCode fallback below now matches the decimal-string
+      // vocabulary every importer writes (AFLDB-ISSUE-183), but an admin can
+      // still supply an explicit roundCode verbatim, and historical rows may
+      // predate that fix -- so two rows for the same real round can still
+      // legitimately carry different round_code text. round_type and
+      // round_number are both DB-typed (an enum and a smallint, tied
+      // together for every writer by matches_round_number_ck) and identical
+      // for the same real round regardless of who wrote it, so they stand in
+      // for round_code here.
       //
       // Home/away order is compared exactly, not symmetrically: no
       // repository evidence supports treating a reversed pair as the same
