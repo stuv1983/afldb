@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Submission promotion is locked and commits atomically with its status transition (AFLDB-ISSUE-175) - 15 September 2026
+
+- `promoteSubmission` now locks the `data_submissions` row (`SELECT ... FOR UPDATE`) and commits
+  the promoted data together with the final `promoted`/`failed` status write in the same
+  `afldb_import` transaction. Previously the status flip was a separate, unguarded statement:
+  two concurrent promotions of the same submission could both apply, and a promotion whose data
+  commit succeeded but whose trailing status write failed could leave the submission looking
+  `approved` — and rejectable — after its data was already live.
+- Promotion eligibility is unchanged (`approved` or a previously `failed` submission may be
+  promoted); a retry from `failed` that fails again stays `failed` with the updated error. No
+  intermediate status was introduced, no migration was required, and no privilege was widened —
+  the fix uses a column grant on `data_submissions` that migration 023 already made to
+  `afldb_import`.
+
 ### Special-record admin mutations validate the match link before writing (AFLDB-ISSUE-176) - 15 September 2026
 
 - `createFirstKickGoal`/`replaceFirstKickGoal` (`player_achievements`) and
