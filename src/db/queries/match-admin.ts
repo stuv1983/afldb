@@ -433,6 +433,35 @@ export async function deleteMatch(input: {
         };
       }
 
+      // AFLDB-ISSUE-177: a current-season staging/reconciliation row can
+      // still point at this match (`staging.external_current_matches.
+      // local_match_id`, migration 063). Nulling or detaching that link here
+      // would discard reconciliation provenance the current-season importer
+      // relies on to avoid re-resolving the same external game next run, so
+      // the row is left untouched and the delete is refused instead -- same
+      // shape as the Brownlow and collateral refusals above. The FK itself
+      // (no ON DELETE clause, so NO ACTION) remains the final backstop if a
+      // staging row is relinked between this check and the DELETE below; see
+      // the catch around the transaction for that race.
+      const stagingLinks = await tx<{ sourceKey: string; externalGameId: string }[]>`
+        SELECT s.key AS "sourceKey", e.external_game_id AS "externalGameId"
+          FROM staging.external_current_matches e
+          JOIN sources s ON s.id = e.source_id
+         WHERE e.local_match_id = ${input.matchId}
+         ORDER BY s.key, e.external_game_id
+      `;
+      if (stagingLinks.length > 0) {
+        const named = stagingLinks.map((r) => `${r.sourceKey} ${r.externalGameId}`).join(', ');
+        return {
+          ok: false as const,
+          error:
+            `Match #${input.matchId} is still linked by ${stagingLinks.length} `
+            + `current-season staging record${stagingLinks.length === 1 ? '' : 's'} `
+            + `(${named}) and cannot be deleted. Clear or re-resolve the staging link `
+            + 'through the current-season import process first.',
+        };
+      }
+
       // 2. Identify all affected players in this match
       const playerRows = await tx<{ playerId: number }[]>`
         SELECT DISTINCT player_id AS "playerId"
@@ -487,6 +516,28 @@ export async function deleteMatch(input: {
       deletedId: result.deletedId,
       affectedPlayers: result.affectedPlayers,
     };
+  } catch (error) {
+    // AFLDB-ISSUE-177 concurrency backstop. The staging pre-check above is a
+    // point-in-time read, not a lock, so a concurrent current-season import
+    // run can relink `local_match_id` to this match between that check and
+    // `DELETE FROM matches` above. The FK is what actually stops that race,
+    // and it raises a raw 23503 (foreign_key_violation) -- exactly the
+    // opaque database exception this issue exists to keep out of the admin
+    // UI. It is mapped to the same refusal shape without inspecting the
+    // constraint name (which FK fired can't be known without that, and isn't
+    // needed for a useful message); every other error still throws.
+    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503') {
+      return {
+        ok: false,
+        error:
+          `Match #${input.matchId} could not be deleted: another record still depends on it `
+          + '(for example, a current-season staging link created or changed while the '
+          + 'deletion was running). Retry the deletion; if it keeps failing, check '
+          + 'current-season staging and contact an administrator if the dependency does '
+          + 'not clear.',
+      };
+    }
+    throw error;
   } finally {
     await importSql.end({ timeout: 5 });
   }
