@@ -169,6 +169,20 @@ export async function addAllowedEmail(
   return { message: `${email} can now request a sign-in link on the beta page.` };
 }
 
+/**
+ * Approve a pending join request (AFLDB-ISSUE-178).
+ *
+ * The three writes -- the request becoming approved, the email landing in
+ * beta_allowed_emails, and the access.join_approved audit row -- share one
+ * transaction (authSql.begin, auditInTransaction) for the same reason
+ * deleteAccessCode's do: a request must never end up "approved" without
+ * actually being allowlisted, and an approval must never go live without
+ * the audit row that says who allowed it and why. The `WHERE id = ? AND
+ * status = 'pending'` predicate on the first UPDATE is unchanged and is
+ * still what decides the race between two administrators -- whichever
+ * transaction's UPDATE commits first advances the row past 'pending' and
+ * the other's RETURNING is empty, inside or outside a transaction.
+ */
 export async function approveJoinRequest(
   _previous: AccessState,
   formData: FormData,
@@ -177,22 +191,29 @@ export async function approveJoinRequest(
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
-  const [row] = await authSql<{ email: string }[]>`
-    UPDATE beta_join_requests SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
-     WHERE id = ${id} AND status = 'pending'
-    RETURNING email
-  `;
-  if (!row) return { error: 'Already reviewed or not found.' };
+  const email = await authSql.begin(async (tx) => {
+    const [row] = await tx<{ email: string }[]>`
+      UPDATE beta_join_requests SET status = 'approved', reviewed_by = ${admin.id}, reviewed_at = now()
+       WHERE id = ${id} AND status = 'pending'
+      RETURNING email
+    `;
+    if (!row) return null;
 
-  await authSql`
-    INSERT INTO beta_allowed_emails (email, note, added_by)
-    VALUES (${row.email}, 'via join request', ${admin.id})
-    ON CONFLICT (email) DO UPDATE SET revoked_at = NULL, note = EXCLUDED.note
-  `;
-  await audit('access.join_approved', { requestId: id, email: row.email },
-    { userId: admin.id, label: admin.email });
+    await tx`
+      INSERT INTO beta_allowed_emails (email, note, added_by)
+      VALUES (${row.email}, 'via join request', ${admin.id})
+      ON CONFLICT (email) DO UPDATE SET revoked_at = NULL, note = EXCLUDED.note
+    `;
+    await auditInTransaction(tx, 'access.join_approved', { requestId: id, email: row.email },
+      { userId: admin.id, label: admin.email });
+
+    return row.email;
+  });
+
+  if (!email) return { error: 'Already reviewed or not found.' };
+
   revalidatePath('/admin/access');
-  return { message: `${row.email} approved and allowlisted.` };
+  return { message: `${email} approved and allowlisted.` };
 }
 
 export async function denyJoinRequest(
