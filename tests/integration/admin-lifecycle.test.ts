@@ -43,6 +43,7 @@ vi.mock('next/headers', () => ({
 // After the mock, which vitest hoists above the imports.
 import {
   applyLifecycleMutation,
+  listAdminAccounts,
   runLifecycleSteps,
   type LifecycleMutationInput,
 } from '@/db/queries/admin-users';
@@ -416,11 +417,13 @@ describe('a deactivated account keeps its history and loses its access', () => {
 
     await applyLifecycleMutation(sql, input('deactivate', actor, target));
 
-    // 1. The adminLogin predicate (src/lib/auth/login.ts) finds nothing.
+    // 1. The adminLogin predicate (src/app/admin/login/actions.ts). Kept in
+    //    step with that file's real role list by
+    //    tests/auth.test.ts's source-contract check (AFLDB-ISSUE-186).
     const login = await observer`
       SELECT id FROM auth_users
        WHERE lower(email) = lower(${target.email})
-         AND role IN ('admin', 'super_admin', 'contributor')
+         AND role IN ('admin', 'super_admin')
          AND disabled_at IS NULL
     `;
     expect(login).toEqual([]);
@@ -439,6 +442,102 @@ describe('a deactivated account keeps its history and loses its access', () => {
     await expect(observer.begin(async (tx) => {
       await tx`DELETE FROM auth_users WHERE id = ${target.id}`;
     })).rejects.toMatchObject({ code: '23503' });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-186 Phase A: the deprecated contributor CSV pipeline is
+ * retired at the account/access boundary only -- no schema change, no
+ * DEV/PROD mutation, no disabled_at backfill. A fixture contributor row is
+ * created here with disabled_at left NULL on purpose (createAccount's
+ * default): retirement must hold even for a contributor account nobody has
+ * ever explicitly deactivated, which is the state every real contributor
+ * row is left in by this issue.
+ */
+describe('AFLDB-ISSUE-186: the retired contributor role cannot authenticate, but its history survives', () => {
+  it('is excluded from the login predicate by role alone, disabled_at IS NULL and all', async () => {
+    const target = await createAccount({ role: 'contributor' });
+    expect((await readAccount(target.id)).disabledAt).toBeNull();
+
+    // Same predicate as adminLogin() (src/app/admin/login/actions.ts) --
+    // kept accurate by tests/auth.test.ts's source-contract check.
+    const login = await observer`
+      SELECT id FROM auth_users
+       WHERE lower(email) = lower(${target.email})
+         AND role IN ('admin', 'super_admin')
+         AND disabled_at IS NULL
+    `;
+    expect(login).toEqual([]);
+  });
+
+  it('is excluded from getAdminUser even with a live, unexpired, unrevoked session', async () => {
+    const target = await createAccount({ role: 'contributor' });
+    await createSession(target.id);
+
+    // Same predicate as getAdminUser() (src/lib/auth/session.ts) -- proven
+    // against the real function, via its captured SQL text, in
+    // tests/auth.test.ts. Reproduced here against a real row/session pair
+    // so the DB half of the claim -- a contributor session issued before
+    // retirement, still perfectly live by every OTHER predicate here -- is
+    // proven too, not merely asserted.
+    const found = await observer`
+      SELECT u.id
+        FROM auth_sessions s
+        JOIN auth_users u ON u.id = s.user_id
+       WHERE s.user_id = ${target.id}
+         AND s.expires_at > now()
+         AND s.revoked_at IS NULL
+         AND u.disabled_at IS NULL
+         AND u.role IN ('admin', 'super_admin')
+    `;
+    expect(found).toEqual([]);
+    // The session row itself is untouched -- no revocation sweep was run
+    // or is needed; the row lookup above is simply never satisfied again.
+    expect(await liveSessionCount(target.id)).toBe(1);
+  });
+
+  it('test B: remains fully readable in the admin roster, unmutated', async () => {
+    const target = await createAccount({ role: 'contributor', hasPassword: true, hasTotp: true });
+
+    const { accounts } = await listAdminAccounts(observer, { id: target.id, role: 'super_admin' });
+    const row = accounts.find((a) => a.id === target.id);
+
+    expect(row).toBeDefined();
+    expect(row).toMatchObject({
+      role: 'contributor',
+      disabledAt: null,
+      hasPassword: true,
+      hasTotp: true,
+    });
+  });
+
+  it('test H: uploaded_by/reviewed_by FK attribution to a contributor row is untouched by retirement', async () => {
+    // This issue changes no schema and mutates no data_submissions row; the
+    // FK that makes that history durable is migration 023's, unmodified
+    // here. Proven the same way the deactivation case above proves it: the
+    // referencing row exists and the referenced account cannot be deleted
+    // out from under it -- retirement narrows WHO can sign in, never what
+    // a past submission is attributed to.
+    const target = await createAccount({ role: 'contributor' });
+    const [submission] = await observer<{ id: number }[]>`
+      INSERT INTO data_submissions (dataset, filename, content, content_sha256, uploaded_by, row_count)
+      VALUES ('match_results', 'i186-fixture.csv', '\\x'::bytea, ${randomUUID()}, ${target.id}, 0)
+      RETURNING id
+    `;
+    try {
+      await expect(observer.begin(async (tx) => {
+        await tx`DELETE FROM auth_users WHERE id = ${target.id}`;
+      })).rejects.toMatchObject({ code: '23503' });
+
+      const [row] = await observer<{ uploadedBy: number }[]>`
+        SELECT uploaded_by AS "uploadedBy" FROM data_submissions WHERE id = ${submission.id}
+      `;
+      expect(row.uploadedBy).toBe(target.id);
+    } finally {
+      // Must run before afterEach's DELETE FROM auth_users, or this
+      // fixture's own FK would refuse that cleanup for every later test.
+      await observer`DELETE FROM data_submissions WHERE id = ${submission.id}`;
+    }
   });
 });
 

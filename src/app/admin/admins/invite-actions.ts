@@ -28,16 +28,31 @@ export async function createInvite(
   const requestedRole = String(formData.get('role') ?? 'admin');
   const requestedManage = formData.get('canManageAdmins') === 'on';
 
+  // AFLDB-ISSUE-186 Phase A: the Contributor role is retired for new
+  // accounts. The invite form no longer offers it (InviteManager.tsx), so
+  // this is the server-side boundary for a request that bypasses the UI
+  // (or names it directly). Refused outright rather than silently
+  // downgraded to 'admin' -- unlike the super_admin/can-manage-admins
+  // downgrade below, which only ever narrows a request to a role the
+  // caller is already permitted to grant, silently substituting 'admin'
+  // here would grant MORE than was asked for (ROLE_RANK: contributor 0 <
+  // admin 1), which is not a safe default for an unrecognised/rejected
+  // request.
+  if (requestedRole === 'contributor') {
+    await audit('admin.invite_refused', { email, role: requestedRole, reason: 'contributor_retired' },
+      { userId: admin.id, label: admin.email });
+    return { error: 'The Contributor role is retired. New Contributor invites can no longer be issued.' };
+  }
+
   // Only an actual super admin may hand out super_admin or the delegated
   // manage-admins power — a plain admin holding can_manage_admins may
-  // invite an ordinary admin or a contributor, never a peer or better.
-  // Silently downgrading rather than erroring keeps a delegated manager's
-  // form usable without ever needing to explain a permission they don't
-  // have.
+  // invite an ordinary admin, never a peer or better. Silently downgrading
+  // rather than erroring keeps a delegated manager's form usable without
+  // ever needing to explain a permission they don't have.
   const role = admin.role === 'super_admin' && requestedRole === 'super_admin'
     ? 'super_admin'
-    : requestedRole === 'contributor' ? 'contributor' : 'admin';
-  const canManageAdmins = admin.role === 'super_admin' && role !== 'contributor' && requestedManage;
+    : 'admin';
+  const canManageAdmins = admin.role === 'super_admin' && requestedManage;
 
   // Accepting an invite is also a credential RESET: confirmEnrolment upserts
   // on email, overwriting whatever account already holds that address --

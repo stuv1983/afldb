@@ -32,11 +32,25 @@ const sessionRow = vi.hoisted(() => ({
     canManageAdmins: boolean; mustChangePassword: boolean;
   },
 }));
+/**
+ * The admin_invites row loadLiveInvite() (src/app/admin/invite/[token]/
+ * actions.ts) should find, if any -- AFLDB-ISSUE-186 Phase A's
+ * confirmEnrolment/beginEnrolment contributor-invite-refusal tests below.
+ */
+const inviteRow = vi.hoisted(() => ({
+  row: null as null | {
+    id: number; email: string; role: 'contributor' | 'admin' | 'super_admin';
+    canManageAdmins: boolean; pendingTotpSecret: string | null;
+  },
+}));
 vi.mock('@/db/authClient', () => {
   const sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     poolQueries.push({ strings: [...strings], values });
     if (sessionRow.row && strings.join('').includes('FROM auth_sessions s')) {
       return Promise.resolve([sessionRow.row]);
+    }
+    if (inviteRow.row && strings.join('').includes('FROM admin_invites')) {
+      return Promise.resolve([inviteRow.row]);
     }
     return Promise.resolve([]);
   };
@@ -70,8 +84,11 @@ vi.mock('next/navigation', () => ({
 
 import type postgres from 'postgres';
 
+import { createInvite } from '@/app/admin/admins/invite-actions';
+import { beginEnrolment, confirmEnrolment } from '@/app/admin/invite/[token]/actions';
 import { adminNavFor, isCurrentAdminPath, type AdminNavViewer } from '@/app/admin/nav-model';
 import {
+  LIFECYCLE_ACTIONS,
   LIFECYCLE_AUDIT_ACTION,
   canActOnLifecycle,
   isActive,
@@ -651,6 +668,72 @@ describe('admin lifecycle policy', () => {
       expect(normaliseLifecycleReason(undefined)).toBeNull();
     });
   });
+
+  // AFLDB-ISSUE-186 Phase A, test E (corrected 2026-09-15 on operator
+  // review: the original version of this test asserted no lifecycleTransition
+  // result could ever be role: 'contributor', for every starting role
+  // INCLUDING 'contributor' itself -- but 'deactivate'/'reactivate' are
+  // role-PRESERVING actions by design (lifecycleTransition returns
+  // `role: target.role` for both), and Phase A deliberately keeps an
+  // existing contributor row exactly that role for historical
+  // compatibility. contributor -> contributor under either action is not a
+  // transition ONTO contributor, it is the same, unchanged, retired role
+  // being carried forward -- the previous assertion conflated "the output
+  // contains role: 'contributor'" with "this action ASSIGNED
+  // role: 'contributor'", which is a different, false claim for those two
+  // actions. The actual invariant, proven below in three parts: (1) no
+  // action ever MINTS role='contributor' for an account that did not
+  // already have it; (2) the two actions with a fixed, explicit
+  // destination ('promote' -> super_admin, 'demote' -> admin) never land on
+  // contributor, regardless of the starting role passed in; (3) the two
+  // role-preserving actions ('deactivate'/'reactivate') are exactly that --
+  // preserving, not assigning -- for every starting role, contributor
+  // included.
+  it('never assigns the retired contributor role to an account that did not already have it', () => {
+    for (const action of LIFECYCLE_ACTIONS) {
+      for (const role of ['admin', 'super_admin'] as const) {
+        expect(lifecycleTransition(action, account({ role })).role).not.toBe('contributor');
+      }
+    }
+  });
+
+  it('promote and demote always land on a fixed, non-contributor role, regardless of the starting role', () => {
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      expect(lifecycleTransition('promote', account({ role })).role).toBe('super_admin');
+      expect(lifecycleTransition('demote', account({ role })).role).toBe('admin');
+    }
+  });
+
+  it('deactivate and reactivate preserve an existing contributor role rather than assigning it', () => {
+    for (const role of ['contributor', 'admin', 'super_admin'] as const) {
+      expect(lifecycleTransition('deactivate', account({ role })).role).toBe(role);
+      expect(lifecycleTransition('reactivate', account({ role })).role).toBe(role);
+    }
+  });
+
+  // Requirement 3: reactivation (disabled_at -> NULL, `active: true`) does
+  // not, and must not, restore a contributor's ability to sign in. The
+  // authentication boundary this depends on -- getAdminUser()/adminLogin()
+  // excluding role='contributor' outright, independent of disabled_at -- is
+  // proven directly against the real functions in the "getAdminUser rejects
+  // ..." and "the interactive login predicate ..." describe blocks below,
+  // and against a real row/session pair in
+  // tests/integration/admin-lifecycle.test.ts. What this test adds is the
+  // missing link between the two: that reactivating an existing contributor
+  // really does produce the `active: true` (disabled_at NULL) state those
+  // other tests assume, not some other state a disabled_at check might
+  // still catch.
+  it('reactivating an existing contributor clears disabled_at but leaves the role -- and the ban -- in place', () => {
+    const reactivated = lifecycleTransition(
+      'reactivate',
+      account({ role: 'contributor', disabledAt: new Date('2026-09-01') }),
+    );
+    expect(reactivated).toEqual({ role: 'contributor', active: true, canManageAdmins: false });
+    // active: true is exactly the disabled_at IS NULL state getAdminUser()/
+    // adminLogin() are proven to reject by ROLE ALONE elsewhere in this
+    // file -- reactivation cannot be a backdoor around the role exclusion,
+    // because nothing about the role exclusion reads disabled_at at all.
+  });
 });
 
 /**
@@ -675,6 +758,146 @@ describe('getAdminUser rejects a disabled account and a revoked session', () => 
     expect(statement).toContain('s.revoked_at IS NULL');
     expect(statement).toContain('s.expires_at > now()');
     requestCookie.admin = null;
+  });
+
+  // AFLDB-ISSUE-186 Phase A, test A: the authoritative session lookup no
+  // longer admits 'contributor' at all, independent of disabled_at -- an
+  // existing contributor row with a live, unexpired, unrevoked session
+  // (disabled_at still NULL, exactly as retirement leaves it) still gets
+  // getAdminUser() === null on its very next request.
+  it('never admits the retired contributor role, disabled_at or not (AFLDB-ISSUE-186)', async () => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '4:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    // The fake pool only special-cases the auth_sessions JOIN when
+    // sessionRow.row is set AND the query text matches -- setting it here
+    // would prove nothing, because the real getAdminUser() SQL is what
+    // decides whether a contributor row is even eligible to be returned.
+    // Left explicitly null (rather than relying on it never having been
+    // set yet) and asserting the statement text is the correct proof:
+    // this query, as written, can never select role='contributor'.
+    sessionRow.row = null;
+    poolQueries.length = 0;
+    const result = await getAdminUser();
+
+    expect(result).toBeNull();
+    const statement = poolQueries.at(-1)!.strings.join('?');
+    expect(statement).toContain("u.role IN ('admin', 'super_admin')");
+    expect(statement).not.toContain('contributor');
+    requestCookie.admin = null;
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A, tests C/D: the invite-creation and invite-
+// acceptance boundaries both refuse the retired contributor role, not
+// merely the UI that used to offer it.
+describe('the retired contributor role cannot be granted through an invite (AFLDB-ISSUE-186)', () => {
+  afterEach(() => {
+    sessionRow.row = null;
+    inviteRow.row = null;
+    poolQueries.length = 0;
+  });
+
+  it('createInvite refuses a request for role=contributor at the server, not just in the UI', async () => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    sessionRow.row = {
+      id: 1, email: 'boss@example.test', role: 'super_admin',
+      canManageAdmins: false, mustChangePassword: false,
+    };
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '1:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+
+    const form = new FormData();
+    form.set('email', 'new-contributor@example.test');
+    form.set('role', 'contributor');
+
+    const result = await createInvite({}, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.inviteLink).toBeUndefined();
+    // Refused, and refused loudly: an admin.invite_refused row, not a
+    // silent no-op and not a downgraded 'admin' invite (ROLE_RANK would
+    // make that a privilege ESCALATION over what was actually asked for).
+    const insertedInvite = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO admin_invites'));
+    expect(insertedInvite).toBeUndefined();
+    const audited = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO auth_audit_log'));
+    expect(audited?.values).toContain('admin.invite_refused');
+    requestCookie.admin = null;
+  });
+
+  it('beginEnrolment refuses to redeem an invite already issued with role=contributor', async () => {
+    inviteRow.row = {
+      id: 9, email: 'stale-invite@example.test', role: 'contributor',
+      canManageAdmins: false, pendingTotpSecret: null,
+    };
+    const form = new FormData();
+    form.set('token', 'irrelevant-token');
+    form.set('password', 'a perfectly fine password');
+    form.set('confirmPassword', 'a perfectly fine password');
+
+    const result = await beginEnrolment({ step: 'password' }, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.step).toBe('password');
+    // Refused before staging any credential: no UPDATE against the
+    // invite's pending_password_hash/pending_totp_secret columns.
+    const staged = poolQueries.find((q) => q.strings.join('').includes('pending_password_hash'));
+    expect(staged).toBeUndefined();
+  });
+
+  it('confirmEnrolment refuses the same stale invite at its own step too', async () => {
+    inviteRow.row = {
+      id: 9, email: 'stale-invite@example.test', role: 'contributor',
+      canManageAdmins: false, pendingTotpSecret: 'JBSWY3DPEHPK3PXP',
+    };
+    const form = new FormData();
+    form.set('token', 'irrelevant-token');
+    form.set('totp', '123456');
+
+    const result = await confirmEnrolment({ step: 'confirm' }, form);
+
+    expect(result.error).toMatch(/retired/i);
+    expect(result.step).toBe('password');
+    // Never reached the transaction that would create/overwrite the
+    // auth_users row -- proven by there being no INSERT for it, rather
+    // than by mocking the raw `postgres` package this module opens its
+    // own connection with.
+    const insertedUser = poolQueries.find((q) => q.strings.join('').includes('INSERT INTO auth_users'));
+    expect(insertedUser).toBeUndefined();
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A: a source-contract check, the same convention as
+// the ROUTE_GUARD/EQUIVALENT_ROLE_GUARD tables further down this file, for
+// the one query this suite cannot otherwise reach without a real database
+// and a real password/TOTP pair -- adminLogin() itself. REPO/readSource are
+// declared further down the file but are in scope here: module-level
+// `const`s are available to every it() closure by the time tests run.
+describe('the interactive login predicate excludes the retired contributor role (AFLDB-ISSUE-186)', () => {
+  it('src/app/admin/login/actions.ts no longer admits role=contributor', () => {
+    const source = readSource(join(REPO, 'src', 'app', 'admin', 'login', 'actions.ts'));
+    expect(source).toContain("role IN ('admin', 'super_admin')");
+    // The word itself legitimately appears in this file's own explanatory
+    // comment (and did before this issue, in the predicate it replaced) --
+    // the actual contract is the SQL clause, not the absence of the word.
+    expect(source).not.toMatch(/role IN \([^)]*'contributor'[^)]*\)/);
+  });
+});
+
+// AFLDB-ISSUE-186 Phase A, test C: the UI-level half of "no new contributor
+// invite" -- createInvite()'s own refusal (tested above) is the actual
+// boundary; this proves the form does not even offer the choice.
+describe('the admin invite form no longer offers the retired contributor role (AFLDB-ISSUE-186)', () => {
+  it('src/app/admin/admins/InviteManager.tsx has no Contributor <option>', () => {
+    const source = readSource(join(ADMIN_ROOT, 'admins', 'InviteManager.tsx'));
+    expect(source).not.toMatch(/<option value="contributor">/);
+    // The account/history surfaces that must keep LABELLING an existing
+    // contributor row are untouched -- this checks the invite FORM only.
+    expect(source).toContain('<option value="admin">Admin</option>');
   });
 });
 

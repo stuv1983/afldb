@@ -55,6 +55,19 @@ export async function beginEnrolment(
 
   const invite = await loadLiveInvite(token);
   if (!invite) return { step: 'password', error: 'This invite link is invalid, used or expired.' };
+  // AFLDB-ISSUE-186 Phase A: createInvite() no longer issues a role =
+  // 'contributor' invite (see its own comment), but this closes the
+  // window for any invite row created before that change shipped --
+  // token_hash rows already in admin_invites are untouched data, not
+  // something this issue drops or rewrites, so the guard belongs at
+  // redemption time, not as a migration against admin_invites itself.
+  if (invite.role === 'contributor') {
+    return {
+      step: 'password',
+      error: 'This invite is for the retired Contributor role and can no longer be used. '
+        + 'Ask a super admin for a new invite.',
+    };
+  }
 
   if (password.length < MIN_PASSWORD_LENGTH) {
     return { step: 'password', error: `The password must be at least ${MIN_PASSWORD_LENGTH} characters.` };
@@ -91,6 +104,17 @@ export async function confirmEnrolment(
 
   const invite = await loadLiveInvite(token);
   if (!invite) return { step: 'password', error: 'This invite link is invalid, used or expired.' };
+  // Mirrors beginEnrolment's guard above -- checked again here, before the
+  // transaction that actually creates/overwrites the auth_users row, in
+  // case this step is ever reached without the first (a direct POST, a
+  // resumed multi-tab flow against a link issued before this change).
+  if (invite.role === 'contributor') {
+    return {
+      step: 'password',
+      error: 'This invite is for the retired Contributor role and can no longer be used. '
+        + 'Ask a super admin for a new invite.',
+    };
+  }
 
   const [pending] = await authSql<{ pendingPasswordHash: string | null; pendingTotpSecret: string | null }[]>`
     SELECT pending_password_hash AS "pendingPasswordHash", pending_totp_secret AS "pendingTotpSecret"

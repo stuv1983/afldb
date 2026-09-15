@@ -209,6 +209,13 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
   if (colon <= 0) return null;
   const token = claim.sub.slice(colon + 1);
 
+  // AFLDB-ISSUE-186 Phase A: 'contributor' is deliberately absent from this
+  // list. The role value, and any existing contributor row, are retained
+  // (disabled_at is not touched), but this is the one query every admin
+  // request re-checks (getAdminUser is the authoritative session lookup,
+  // not the signed cookie alone), so excluding the role here is sufficient
+  // to reject an already-issued contributor session on its very next
+  // request -- no session-revocation sweep or disabled_at backfill needed.
   const [row] = await authSql<{
     id: number; email: string; role: 'admin' | 'super_admin' | 'contributor';
     canManageAdmins: boolean; mustChangePassword: boolean;
@@ -221,7 +228,7 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
        AND s.expires_at > now()
        AND s.revoked_at IS NULL
        AND u.disabled_at IS NULL
-       AND u.role IN ('admin', 'super_admin', 'contributor')
+       AND u.role IN ('admin', 'super_admin')
   `;
   return row ?? null;
 });
@@ -271,6 +278,14 @@ export async function requireUploader(): Promise<AdminUser> {
  * honours revocation and disablement. It was hand-copied into seven files;
  * centralising it means a new admin route cannot quietly ship with a weaker
  * (or missing) check.
+ *
+ * AFLDB-ISSUE-186 Phase A: getAdminUser() no longer returns a contributor
+ * row at all (see its own comment), so the branch below is unreachable
+ * from a real request today. Left in place as defense-in-depth -- nothing
+ * about this function's own contract changes if the role is ever admitted
+ * again upstream -- and because AdminUser['role'] still carries the type
+ * for the account-history/roster surfaces that must keep reading existing
+ * contributor rows (src/db/queries/admin-users.ts, AdminSessionsClient.tsx).
  *
  * A contributor session passes getAdminUser() (it needs to, for
  * requireUploader() above) but is bounced to /admin/upload here rather
