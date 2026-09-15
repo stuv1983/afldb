@@ -4,15 +4,14 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 5
+**Open issues:** 4
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-188 | High | NL search / `extractHavingClause` | Open / Planning | Sonnet: gate every grouped-result word on a club/team subject; extend `tests/nl-parser.test.ts` |
-| AFLDB-ISSUE-189 | High | NL search / club-subject election | Open / Planning | Opus High: decide decline-vs-club-grain for non-leading club subjects, then implement pre-extraction subject cue + metric-less `club_season` refusal |
-| AFLDB-ISSUE-190 | High | NL search / `validatePlan` aggregation gate | Open / Planning | Sonnet: refuse `agg.kind='count'` on grains without count semantics; extend `tests/nl-plan.test.ts` |
+| AFLDB-ISSUE-189 | High | NL search / club-subject election | Open / Runbook approved | Fresh Sonnet 5 / Fable High session: execute `AFLDB-ISSUE-189.md` Steps 1-8 (pre-extraction club-subject cue, R2/R3 refusals, `club_season` ranking backstop, `PARSER_VERSION` 44) |
 | AFLDB-ISSUE-191 | Medium | NL search / boundary extractor | Open / Planning | Sonnet: stop bare "first" electing a debut boundary; run period-split before boundary; extend `tests/nl-parser.test.ts` |
 | AFLDB-ISSUE-192 | Low | NL search / `team-match.ts` symmetric metrics | Open / Planning | Sonnet: rank one row per match for side-independent metrics; extend `tests/integration/nl-answers-team-club.test.ts` |
+| AFLDB-ISSUE-193 | Medium | NL search / `extractHavingClause` club-subject premiership count | Open / Planning | Decide decline-by-name when a club subject's having number governs a career-only noun (premierships/flags); update the ISSUE-188 regression in `tests/nl-parser.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -31756,3 +31755,61 @@ None.
 ### Operator verification expectations
 `npx vitest run tests/integration/nl-answers-team-club.test.ts` against `afldb_test`
 (`AFLDB_TEST_DATABASE_URL`), `npx tsc --noEmit`.
+
+## AFLDB-ISSUE-193 — NL: club-subject "won more than N premierships/flags" counts match wins (team_match having clause)
+
+- **Severity:** Medium (P2). A confident club list answers a different question.
+- **Area:** NL search / grouped having-clause extraction — `src/search/nl/parser.ts`
+  `extractHavingClause`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, during AFLDB-ISSUE-189 planning (Opus 5 High), by reading code and an
+  accepted regression. Not reproduced against a database.
+- **Key files:** `src/search/nl/parser.ts` — `extractHavingClause` (~1398-1413, grouped-result
+  words `draws|wins|losses|lose|lost|win|won|games`), step 8 subject cues (~2360-2371);
+  `tests/nl-parser.test.ts` (~562-566).
+
+### Trigger examples
+- "clubs that have won more than 10 premierships"
+
+### Expected vs actual
+Expected: decline by name. AFLDB has no club-lineage premiership-count grain, and AFLDB-ISSUE-188's
+own Expected section said "the club phrasing should decline (club premiership counts are not a
+grain)". Actual: `team_match`, `havingClause {metric:'wins', op:'gt', value:10}`, which counts
+**match wins** per club and never premierships. The accepted ISSUE-188 regression at
+`tests/nl-parser.test.ts:562-566` asserts that plan.
+
+### Root cause
+`extractHavingClause` claims "won" plus the following number as a grouped match-result count
+whenever a club/team subject is present. It does not check what noun the number actually governs,
+so "premierships"/"flags" is left unread and the question becomes a club match-win threshold.
+
+### Relationship to prior issues
+Distinct semantic defect uncovered by one accepted AFLDB-ISSUE-188 regression. ISSUE-188 stays
+closed (its player-subject gate is correct). Out of scope for AFLDB-ISSUE-189 (operator decision
+2026-09-15): the 189 runbook leaves `extractHavingClause` inputs and that test unchanged.
+
+### Implementation boundary
+Parser only: when a club/team subject is present and the having number governs a career-only noun
+(`premierships`/`flags`, and any other `CAREER_STAT_WORDS` noun that is not a grouped match
+result), decline by name instead of claiming a having clause. Keep the genuine grouped match-result
+readings unchanged.
+
+### Non-goals
+No club-lineage premiership totals grain. No change to player-subject gating (ISSUE-188) or to
+ISSUE-189's club-season refusals.
+
+### Required tests
+`tests/nl-parser.test.ts`: change the ISSUE-188 case "clubs that have won more than 10
+premierships" to a decline; add "teams that have won 5 flags" (decline). Keep "teams with more than
+2 wins against Richmond" and "teams to lose 5 times by more than 100 points" unchanged.
+
+### Acceptance criteria
+- No club-subject premiership/flags count produces a `havingClause`.
+- Existing grouped match-result questions are unchanged.
+- `PARSER_VERSION` bumped.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts`, `npx tsc --noEmit`.
