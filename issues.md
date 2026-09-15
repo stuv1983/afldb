@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 3
+**Open issues:** 2
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-191 | Medium | NL search / boundary extractor | Open / Planning | Sonnet: stop bare "first" electing a debut boundary; run period-split before boundary; extend `tests/nl-parser.test.ts` |
 | AFLDB-ISSUE-192 | Low | NL search / `team-match.ts` symmetric metrics | Open / Planning | Sonnet: rank one row per match for side-independent metrics; extend `tests/integration/nl-answers-team-club.test.ts` |
 | AFLDB-ISSUE-193 | Medium | NL search / `extractHavingClause` club-subject premiership count | Open / Planning | Decide decline-by-name when a club subject's having number governs a career-only noun (premierships/flags); update the ISSUE-188 regression in `tests/nl-parser.test.ts` |
 
@@ -31742,7 +31741,7 @@ instead of answering wrong.
 
 - **Severity:** Medium (P2 wrong answer; P3 unnecessary decline, same root).
 - **Area:** NL search / boundary extraction — `src/search/nl/parser.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15 (Sonnet 5).
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review (findings 6 and 7, consolidated by
   Stage 2); re-verified on main `8a0c4cb`.
 - **Key files:** `src/search/nl/parser.ts` — `DEBUT_RE = /first|debut(ed)?/` (~1249),
@@ -31799,6 +31798,50 @@ None.
 
 ### Operator verification expectations
 `npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts`, `npx tsc --noEmit`.
+
+### Resolution (2026-09-15, Sonnet 5)
+
+**Fix implemented** (`src/search/nl/parser.ts`, `src/search/nl/plan.ts`):
+- `extractPeriodSplit`/`extractScoreCheckpoint` now run before `extractBoundary` (new step 6.5,
+  ahead of the former step 7), so `PERIOD_SPLIT_WORDS`' intact phrases ("first quarter", "first
+  half") consume their own tokens before boundary extraction can read a bare "first" out of them.
+- `DEBUT_RE` (`/first|debut(ed)?/`) replaced with two narrower patterns: `DEBUT_WORD_RE`
+  (`debut(ed)?` only) and `FIRST_GAME_RE` (`first (?:ever )?games?`). Bare "first" no longer
+  elects a debut boundary by itself; the debut word must be literally "debut(ed)" or "first"
+  governing a game noun directly ("first game", "first ever game").
+- Grain election's `boundary` branch (`parser.ts` grain-election switch) now refuses
+  (`status: 'none', reason: 'unrecognised'`) when `playerMetricResult.metric` was also
+  independently consumed, instead of silently dropping the metric and answering plain boundary
+  membership.
+- `PARSER_VERSION` bumped 44 → 45 (`plan.ts`).
+
+**Implementation correction found during operator verification:** the first pass of the fix
+narrowed the trailing "game" token strip in `extractBoundary` to `if (debutWord)` only, carried
+over from the (wrong) assumption that only the bare-debut path needed it. `LAST_GAME_RE` matches
+("last", "retired") stopped having their own "game" token stripped, so `"players whose last game
+was a grand final"` still correctly set `boundary: { event: 'last_game', where: 'grand_final' }`
+but declined anyway via leftover-token accounting on the unconsumed "game". The final fix widens
+the strip condition to `if (debutWord || last)`, excluding `firstGame` because `FIRST_GAME_RE`
+already consumes "first game" as one intact phrase. No existing regression test was weakened or
+rewritten to compensate.
+
+**Behaviour after the fix:**
+- "who kicked the first goal in a grand final" no longer becomes a debut/boundary plan.
+- "highest first quarter score in a grand final" correctly plans as a period-split `team_match`
+  (`periodSplit: 'Q1'`, `scope.matchType: 'grand_final'`).
+- "players whose first game was a grand final", "players whose last game was a grand final", and
+  "players who debuted in a grand final" all remain valid boundary plans.
+- A genuine boundary combined with an independently consumed player metric fails closed.
+
+**Validation:** `npx vitest run tests/nl-parser.test.ts` → 379/379 passed;
+`npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts` → 561/561 passed;
+`npx tsc --noEmit` → clean. Operator-run, 2026-09-15.
+
+**Files changed:** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`,
+`tests/nl-parser.test.ts` (three new cases added to the existing
+"7. career-boundary queries" describe block; no existing test edited or weakened).
+
+**Follow-up (not part of this fix):** AFLDB-ISSUE-192, AFLDB-ISSUE-193 — unrelated and untouched.
 
 ## AFLDB-ISSUE-192 — NL: symmetric team-match metrics return each match once per side, duplicating rows and halving a top-N
 
