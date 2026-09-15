@@ -123,13 +123,18 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
   // attendance/total_score are identical for both SIDES rows of a match,
-  // so with no clubFor/clubAgainst/matchup scope to justify a per-side
-  // row, both rows would tie and rank() would return the same match
-  // twice (AFLDB-ISSUE-192). Restrict to the home-perspective row so the
-  // match is ranked once; side-scoped and side-dependent (margin/team
-  // score) queries are unaffected.
+  // so with no clubFor/clubAgainst scope to justify a per-side row, both
+  // rows would tie and rank() would return the same match twice
+  // (AFLDB-ISSUE-192). Restrict to the home-perspective row so the match
+  // is ranked once; side-scoped and side-dependent (margin/team score)
+  // queries are unaffected. scope.matchup is deliberately excluded here:
+  // it's a physical-match filter (either club can be on either side), not
+  // a directional perspective -- validatePlan rejects matchup combined
+  // with clubFor/clubAgainst (plan.ts), so it never masks a genuine side
+  // scope, and a matchup-scoped symmetric metric must still canonicalise
+  // to one row per match (AFLDB-ISSUE-194).
   const isSymmetricMetric = plan.metric === 'attendance' || plan.metric === 'total_score';
-  const hasSideScope = Boolean(plan.scope.clubFor || plan.scope.clubAgainst || plan.scope.matchup);
+  const hasSideScope = Boolean(plan.scope.clubFor || plan.scope.clubAgainst);
   const where = foldAnd([
     ...scopeClauses(plan.scope),
     plan.resultFilter === 'won' ? sql`t.final_winner_club_id = t.club_id` : sql`TRUE`,

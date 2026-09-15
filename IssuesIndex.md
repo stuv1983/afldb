@@ -4,7 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -25,18 +25,17 @@ clean `tsc --noEmit`). AFLDB-ISSUE-195 resolved 2026-09-16 (Sonnet 5 High, from 
 `AFLDB-ISSUE-195.md`, Option B — subject-gated "won the/a premiership" vocabulary plus a narrow
 club-season ownership guard, no runbook correction needed — operator-validated: 398/398
 `nl-parser.test.ts`, 167/167 `nl-semantic-mapping.test.ts`, clean `tsc --noEmit`); see `issues.md`.
-AFLDB-ISSUE-194 remains open. Stage 2 status:
-**PASS WITH NEW ISSUES — not signed off.**
+AFLDB-ISSUE-194 resolved 2026-09-16 (Sonnet 5 Medium, `sonnet/issue-194-team-match-symmetric-matchup`,
+unmerged — operator-validated: 34/34 `tests/integration/nl-answers-team-club.test.ts`, clean
+`tsc --noEmit`); see `issues.md`. AFLDB-ISSUE-187..196 all now resolved. Stage 2 status:
+**PASS WITH NEW ISSUES RESOLVED — corpus comparison/triage still not started.**
 
-| ID | Severity | Area | State | Key files | Next action |
-|---|---|---|---|---|---|
-| AFLDB-ISSUE-194 | Low/P3 | NL team-match compiler | Open, not implemented | `src/db/queries/nl/team-match.ts` | Extend the ISSUE-192 home-side gate to `scope.matchup`; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
+No open issues.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
 ## Stage 2 sign-off conditions (not yet met)
 
-- AFLDB-ISSUE-194 resolved.
 - Mapped regression suites green.
 - `npx tsc --noEmit` clean.
 - A fresh V1 parse-only corpus run compared row-by-row against the retained baseline
