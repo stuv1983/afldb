@@ -394,6 +394,59 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     });
   });
 
+  describe('AFLDB-ISSUE-187: a METRIC_WORDS threshold must not strand a career condition', () => {
+    it.each([
+      'players with 40 disposals in a game and no premierships',
+      'players with more than 30 disposals and 5 goals in a game',
+      'players with 300 games and more than 30 disposals in a game',
+      'richmond players with 40 disposals in a game and 200 games',
+    ])('declines instead of silently dropping the career condition: %s', async (question) => {
+      const parsed = await parseNlQuestion(question, ctx);
+      expect(parsed.status).toBe('none');
+      if (parsed.status === 'none') expect(parsed.reason).toBe('unrecognised');
+    });
+
+    it('still plans a single-clause non-career threshold with no career condition present', async () => {
+      const p = await plan('players with more than 30 disposals in a game');
+      expect(p).toMatchObject({
+        grain: 'player_game', mode: 'single', metric: 'disposals',
+        metricCondition: { op: 'gt', value: 30 },
+        careerConditions: [],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still plans a sole career condition alone at career grain', async () => {
+      const p = await plan('players with no premierships');
+      expect(p).toMatchObject({
+        grain: 'player_career',
+        careerConditions: [{ kind: 'column', column: 'premierships', op: 'eq', value: 0 }],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still converts a sole career-vocabulary threshold onto a named season', async () => {
+      const p = await plan('players with more than 2 goals in 1989');
+      expect(p).toMatchObject({
+        grain: 'player_season', metric: 'goals',
+        scope: { seasonMin: 1989, seasonMax: 1989 },
+        metricCondition: { op: 'gt', value: 2 },
+        careerConditions: [],
+      });
+      expect(validatePlan(p)).not.toHaveProperty('error');
+    });
+
+    it('still fails the existing mixed game/career condition closed via validatePlan', async () => {
+      const p = await plan('players with no more than 4 goals in a game and no premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.careerConditions).toEqual([
+        { kind: 'column', column: 'premierships', op: 'eq', value: 0 },
+      ]);
+      expect(p.metricCondition).toEqual({ op: 'lte', value: 4 });
+      expect(validatePlan(p)).toHaveProperty('error');
+    });
+  });
+
   describe('AFLDB-ISSUE-110 B: typed player game/season metric thresholds', () => {
     it('routes an exact named year to a season threshold', async () => {
       const p = await plan('players with more than 2 goals in 1989');

@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 6
+**Open issues:** 5
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-187 | High | NL search / parser grain election | Open / Planning | Sonnet: fail closed when a non-career grain leaves `careerResult.conditions` unconsumed; extend `tests/nl-semantic-mapping.test.ts` |
 | AFLDB-ISSUE-188 | High | NL search / `extractHavingClause` | Open / Planning | Sonnet: gate every grouped-result word on a club/team subject; extend `tests/nl-parser.test.ts` |
 | AFLDB-ISSUE-189 | High | NL search / club-subject election | Open / Planning | Opus High: decide decline-vs-club-grain for non-leading club subjects, then implement pre-extraction subject cue + metric-less `club_season` refusal |
 | AFLDB-ISSUE-190 | High | NL search / `validatePlan` aggregation gate | Open / Planning | Sonnet: refuse `agg.kind='count'` on grains without count semantics; extend `tests/nl-plan.test.ts` |
@@ -31194,7 +31193,7 @@ evidence-gated cleanup (Phases B/C).
 - **Severity:** High (P1). A confident, validated answer to a strict superset of the question; the
   dropped clause is invisible in headline, interpretation and confidence.
 - **Area:** NL search / parser grain election — `src/search/nl/parser.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15.
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review (Fable 5.1, medium effort); re-verified by
   Stage 2 on main `8a0c4cb` through the real parser with the `tests/nl-parser.test.ts` fake
   directory (scratch probe, not retained).
@@ -31261,6 +31260,64 @@ None.
 ### Operator verification expectations
 `npx vitest run tests/nl-semantic-mapping.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts`
 then `npx tsc --noEmit`. No DB required.
+
+### Resolution (2026-09-15)
+
+**Root cause confirmed:** `extractCareerConditions` (step 10) and `extractPlayerMetricThreshold`
+(step 11) are independent producers that never checked each other's claims. A `METRIC_WORDS`
+stat threshold (e.g. "40 disposals in a game") is claimed by `extractPlayerMetricThreshold` into
+`pendingMetricCondition`; a co-occurring career-vocabulary clause (e.g. "no premierships", "200
+games") is separately claimed by `extractCareerConditions` into `careerResult.conditions`. Grain
+election then read `pendingMetricCondition` alone to route straight to `player_game`/`player_season`
+(the `scoped || inOneGame` branch and its siblings), bypassing every existing consumption path —
+those only run when `grain === 'player_career'`. The final `careerConditions` field is built as
+`grain === 'player_career' || 'coach_record' ? careerResult.conditions : []`, so the still-populated
+`careerResult.conditions` array was discarded there with no refusal, and the plan answered the
+`player_game`/`player_season` reading of the METRIC_WORDS clause alone, silently dropping the career
+condition.
+
+**Fix:** after grain election and all existing condition-conversion logic runs, a new guard (parser
+~3118-3143) checks whether the elected grain is a non-career execution path — anything other than
+`player_career`/`coach_record` — while `careerResult.conditions` still holds an entry. Such a grain
+has no field for a career-wide condition to ride (a game/season/team-match plan compiles to one
+scope plus at most one `metricCondition`, never a career-wide predicate), so if one remains
+unconsumed the parser now fails closed: `status: 'none'`, `reason: 'unrecognised'`, with a note
+naming the stranded condition's column. Valid career-grain questions are unaffected (the guard is
+gated on `grain !== 'player_career' && grain !== 'coach_record'`).
+
+To make "unconsumed" accurate rather than assumed, the three pre-existing sole-career-condition
+conversions (parser ~3003-3073 — a single career-vocabulary threshold reinterpreted as a
+`player_season`/`player_game` `metricCondition` when the question's own wording names a season,
+single game, or scoped total) now explicitly `careerResult.conditions.splice(0, 1)` once they
+repurpose the condition, instead of leaving it in the array and relying on the same
+grain-gated-assignment to discard it silently downstream. This has no behavioural effect on those
+paths (the condition was always dropped from the final plan at that assignment either way); it only
+keeps the array truthful for the new guard, so those legitimate conversions do not trip a false
+decline.
+
+`PARSER_VERSION` is 43.
+
+**Edge case discovered during implementation:** the sole-career-condition conversions do not fire
+at all when a `METRIC_WORDS` threshold has already claimed `pendingMetricCondition` (they are all
+gated on `!metricCondition`), so in the defect's own trigger shape the career condition was never a
+candidate for those conversions in the first place — it was genuinely orphaned, not merely
+mis-tracked. This confirmed the fix belongs in a new terminal guard rather than in extending an
+existing conversion branch, consistent with the issue's implementation boundary (no new grain, no
+compiler change).
+
+**Operator validation evidence:** operator confirmed 2026-09-15 that
+`npx vitest run tests/nl-semantic-mapping.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts`
+passed green on `sonnet/issue-187-nl-career-condition-grain`, including the new
+`AFLDB-ISSUE-187: a METRIC_WORDS threshold must not strand a career condition` block covering all
+four trigger phrasings (now declining `status: 'none'` / `reason: 'unrecognised'`), a single
+non-career threshold with no career condition present (still plans), a sole career condition alone
+(still plans at `player_career`), a sole career-vocabulary threshold converting onto a named season
+(still plans at `player_season`), and the pre-existing AFLDB-ISSUE-110 A mixed game/career decline
+(unchanged, still fails via `validatePlan`, not via this new parse-time guard).
+
+**Follow-up (not part of this fix):** AFLDB-ISSUE-189 (club/team subject election), AFLDB-ISSUE-191
+(boundary extractor claiming bare "first"), and AFLDB-ISSUE-192 (symmetric team-match metrics) are
+separate defects in the same subsystem and remain open and untouched by this fix.
 
 ## AFLDB-ISSUE-188 — NL: `extractHavingClause` claims "won/win/wins" on player-subject questions and answers with grouped club wins
 

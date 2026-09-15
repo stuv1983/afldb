@@ -3016,6 +3016,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_season';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else {
       const refusedCondition = seasonCondition?.kind === 'column' ? seasonCondition : fallbackCondition;
       if (refusedCondition?.kind === 'column') {
@@ -3038,6 +3039,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       mode = 'single';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else if (
       !inOneGame
       && (seasons.seasonMin !== undefined || seasons.seasonMax !== undefined)
@@ -3047,6 +3049,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       grain = 'player_season';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     } else if (
       // Explicit match-level scope beside a claimed career-vocabulary
       // threshold: "players with more than 2 goals against Carlton" is a
@@ -3066,6 +3069,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       mode = 'sum';
       metric = soleCareerCondition.column;
       metricCondition = { op: soleCareerCondition.op, value: soleCareerCondition.value };
+      careerResult.conditions.splice(0, 1);
     }
   }
   if (metricCondition && grain === 'player_career') {
@@ -3109,6 +3113,33 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
         metricCondition = { op: hoisted.op, value: hoisted.value };
       }
     }
+  }
+
+  // AFLDB-ISSUE-187. A non-career grain has no field for a career
+  // condition to ride: player_game/player_season/team_match/etc. compile
+  // to a single scope with at most one metricCondition, never a
+  // career-wide predicate like "no premierships". Every grain branch above
+  // that legitimately repurposes a career condition (the sole-condition
+  // season/game conversions, the "in a game" hoist) removes it from
+  // careerResult.conditions as it does so, so anything still sitting here
+  // is genuinely unconsumed -- the METRIC_WORDS threshold path elects a
+  // non-career grain via pendingMetricCondition without ever looking at
+  // careerResult.conditions at all ("40 disposals in a game and no
+  // premierships" landed on player_game with the premiership condition
+  // simply dropped at the careerConditions assignment below). Refuse by
+  // name rather than silently answering a strict superset of the question.
+  if (
+    grain !== 'player_career' && grain !== 'coach_record'
+    && careerResult.conditions.length > 0
+  ) {
+    const [unconverted] = careerResult.conditions;
+    report.confidence = 1;
+    report.notes.push(
+      unconverted.kind === 'column'
+        ? `That "${unconverted.column}" condition is a career-wide fact and cannot also be limited to this question's other scope.`
+        : 'A career-wide condition in this question cannot also be limited to its other scope.',
+    );
+    return { status: 'none', reason: 'unrecognised', report };
   }
 
   const scope: NlMatchScope = emptyScope();

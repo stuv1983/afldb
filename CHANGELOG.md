@@ -15,6 +15,28 @@ commit.
 
 ## [Unreleased]
 
+### NL search: a game/season stat threshold no longer silently drops a co-occurring career condition (AFLDB-ISSUE-187) - 15 September 2026
+
+- Grain election (`src/search/nl/parser.ts`) now fails closed when it elects a non-career grain
+  (`player_game`, `player_season`, `team_match`, etc.) while `careerResult.conditions` still holds
+  a condition no conversion path consumed. Previously a `METRIC_WORDS` stat threshold (e.g. "40
+  disposals in a game") could route straight to `player_game` while a co-occurring career-vocabulary
+  clause ("no premierships", "200 games") was claimed by `extractCareerConditions` but never
+  consumed, then silently discarded at the final `careerConditions` assignment — the plan answered
+  the narrower per-game question with confidence 1.00 as if it were the whole question asked.
+- Affected phrasings now decline (`status: 'none'`, `reason: 'unrecognised'`) naming the stranded
+  condition, instead of answering a strict superset of the question: "players with 40 disposals in
+  a game and no premierships", "players with more than 30 disposals and 5 goals in a game",
+  "players with 300 games and more than 30 disposals in a game", "richmond players with 40
+  disposals in a game and 200 games".
+- The pre-existing sole-career-condition conversions onto `player_season`/`player_game` (a single
+  career-vocabulary threshold reinterpreted via the question's own season/single-game/scoped-total
+  wording) are unchanged in behaviour and now explicitly remove the condition they repurpose from
+  `careerResult.conditions`, so they are not caught by the new guard.
+- Unaffected: valid career-grain questions, and single-clause non-career thresholds with no
+  career condition present, plan exactly as before.
+- `PARSER_VERSION` bumped to 43.
+
 ### NL search: player-subject "won"/"win"/"wins" questions no longer misroute to a grouped club wins count (AFLDB-ISSUE-188) - 15 September 2026
 
 - `extractHavingClause` (`src/search/nl/parser.ts`) now refuses its whole grouped-result word
