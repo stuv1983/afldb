@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### Reviewed match-result submissions now preserve provenance on promotion (AFLDB-ISSUE-185) - 15 September 2026
+
+- `matchResults.promoteRow()` (the `match_results` CSV admin-upload dataset,
+  `src/lib/ingest/datasets.ts`) now writes `source_id`, `source_record_id` and `import_batch_id`
+  on every canonical match it creates, using the `sourceId`/`batchId` the promotion pipeline
+  (`src/lib/ingest/pipeline.ts`) already resolves for every dataset — previously received and
+  silently discarded, unlike its sibling `playerMatchStats.promoteRow()`, which already wrote
+  `source_id`/`import_batch_id`.
+- `source_id` resolves to the existing shared `sources.key = 'sports_data_lab'` row, the same
+  source every admin-upload dataset promotes under. `source_record_id` reuses the dataset's
+  existing `match_key` compound identity (season|round|date|home|away) — there is no external id
+  in this CSV format to carry instead, so this follows the `all_australian` dataset's established
+  convention of deriving an identity from the resolved fields, rather than inventing a new format
+  or reusing AFLDB-ISSUE-184's `match:<uuid>` minted-token convention (a different creation path).
+- Re-promoting a corrected file against an **existing** canonical match (`ON CONFLICT (match_key)
+  DO UPDATE`) never rewrites that row's `source_id`/`source_record_id`/`import_batch_id` — a match
+  already owned by `afltables`, `manual_admin_edit`, or an earlier promotion keeps its original
+  provenance untouched, exactly as every other manual/admin correction path already leaves
+  provenance stable once set.
+- Because the settle/canonical-apply reconciliation ownership gate already reads `matches.source_id`
+  generically, a `match_results`-promoted match is now treated as owned by `sports_data_lab` and
+  refused for adoption by a foreign source on both the automatic (unattended settle) and the
+  human-reviewed promotion path. No change was made to the reconciliation logic itself; only the
+  provenance value `matchResults.promoteRow()` writes changed.
+- No migration, no source-registry seed, and no backfill. A DEV read-only audit of `afldb_dev`
+  found zero historical `match_results` import batches and zero `match_results` data submissions —
+  every one of the 17,051 provenanced matches in `afldb_dev` is `afltables`-sourced, and this
+  change is a forward correctness fix with no historical rows to reconcile. The one pre-existing
+  `NULL`-source match (id 17269, a 2026 semi-final, already noted under AFLDB-ISSUE-184) remains
+  unrelated and unprovable, and was left untouched.
+
 ### Admin-created matches now carry manual creation provenance (AFLDB-ISSUE-184) - 15 September 2026
 
 - `createMatch()` now stamps every admin-created canonical match with `source_id` resolved to the

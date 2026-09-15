@@ -581,11 +581,16 @@ const matchResults: DatasetSpec = {
     };
   },
 
-  async promoteRow(row, resolved, { sql }) {
+  async promoteRow(row, resolved, { sql, sourceId, batchId }) {
     // Reproduces the natural key documented on the matches table itself
     // (season|round|date|home|away, using the era-appropriate club
     // identity's name) so re-uploading a corrected file about an
     // existing historical match updates it rather than duplicating it.
+    // AFLDB-ISSUE-185: this same string is also this dataset's
+    // source_record_id -- there is no external id in the CSV to carry
+    // instead (the file has no source_key column, unlike rising_star),
+    // so it follows all_australian's convention of deriving one from the
+    // resolved identifying fields rather than inventing a new format.
     const matchKey = `${resolved.season}|${row.round_code}|${row.match_date}`
       + `|${resolved.home_club_name}|${resolved.away_club_name}`;
 
@@ -594,7 +599,8 @@ const matchResults: DatasetSpec = {
         (match_key, season, round_code, round_number, round_type, is_final,
          match_date, venue_id, venue_raw, home_club_id, away_club_id,
          home_goals, home_behinds, home_score, away_goals, away_behinds, away_score,
-         result, winner_club_id, margin, attendance, attendance_status)
+         result, winner_club_id, margin, attendance, attendance_status,
+         source_id, source_record_id, import_batch_id)
       VALUES
         (${matchKey}, ${resolved.season}, ${row.round_code}, ${resolved.round_number},
          ${resolved.round_type}::round_type, ${resolved.round_type !== 'home_and_away'},
@@ -603,7 +609,8 @@ const matchResults: DatasetSpec = {
          ${resolved.home_goals}, ${resolved.home_behinds}, ${resolved.home_score},
          ${resolved.away_goals}, ${resolved.away_behinds}, ${resolved.away_score},
          ${resolved.result}::match_result, ${resolved.winner_club_id}, ${resolved.margin},
-         ${resolved.attendance}, ${resolved.attendance_status}::coverage_status)
+         ${resolved.attendance}, ${resolved.attendance_status}::coverage_status,
+         ${sourceId || null}, ${matchKey}, ${batchId})
       ON CONFLICT (match_key) DO UPDATE SET
          round_number = EXCLUDED.round_number,
          round_type   = EXCLUDED.round_type,
@@ -621,6 +628,13 @@ const matchResults: DatasetSpec = {
          margin            = EXCLUDED.margin,
          attendance        = EXCLUDED.attendance,
          attendance_status = EXCLUDED.attendance_status
+      -- source_id/source_record_id/import_batch_id are deliberately absent
+      -- from this SET list (AFLDB-ISSUE-185): they are creation provenance,
+      -- stamped once on INSERT only. An UPDATE here means a corrected file
+      -- was re-promoted against an EXISTING canonical row -- which may be
+      -- owned by afltables, manual_admin_edit, or an earlier promotion --
+      -- and must never silently reassign that row's provenance, exactly as
+      -- applyMatchEdit's score/attendance-group corrections never do.
     `;
   },
 };
