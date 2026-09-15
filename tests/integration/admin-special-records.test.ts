@@ -298,6 +298,8 @@ let s6SourceId: number;
 let s6PlayerId: number;
 let s6MatchId: number;
 let s6MatchKey: string;
+let s6MatchSeason: number;
+let s6OtherPlayerId: number;
 let seeded = 0;
 
 const nextKey = (prefix: string) => `${prefix}-s6-${Date.now().toString(36)}-${seeded += 1}`;
@@ -409,11 +411,36 @@ beforeAll(async () => {
   expect(player, 'afldb_test carries no unambiguously identified player').toBeDefined();
   s6PlayerId = player.id;
 
-  const [match] = await owner<{ id: number; matchKey: string }[]>`
-    SELECT id::int AS id, match_key AS "matchKey" FROM matches ORDER BY id LIMIT 1`;
-  expect(match, 'afldb_test carries no matches').toBeDefined();
+  // AFLDB-ISSUE-176: a match the fixture player actually played in, so the
+  // match-consistency invariant (season agreement, a player_match_stats row)
+  // holds for the combination the manual-creation tests below submit.
+  const [match] = await owner<{ id: number; matchKey: string; season: number }[]>`
+    SELECT m.id::int AS id, m.match_key AS "matchKey", m.season::int AS season
+      FROM player_match_stats pms
+      JOIN matches m ON m.id = pms.match_id
+     WHERE pms.player_id = ${s6PlayerId}
+     ORDER BY m.id LIMIT 1`;
+  expect(match, 'the fixture player carries no player_match_stats row').toBeDefined();
   s6MatchId = match.id;
   s6MatchKey = match.matchKey;
+  s6MatchSeason = match.season;
+
+  // A second unambiguously identified player who did NOT play in that match,
+  // to prove the invariant refuses a mismatched player/match combination.
+  const [otherPlayer] = await owner<{ id: number }[]>`
+    SELECT p.id::int AS id FROM players p
+      JOIN external_identities e ON e.player_id = p.id
+      JOIN sources s ON s.id = e.source_id
+     WHERE s.key = 'afltables' AND e.match_method = 'afltables_profile_url'
+       AND e.status IN ('unique', 'resolved') AND p.id <> ${s6PlayerId}
+       AND NOT EXISTS (
+         SELECT 1 FROM player_match_stats pms
+          WHERE pms.player_id = p.id AND pms.match_id = ${s6MatchId}
+       )
+     GROUP BY p.id HAVING count(*) = 1
+     ORDER BY p.id LIMIT 1`;
+  expect(otherPlayer, 'afldb_test carries no second unambiguously identified player').toBeDefined();
+  s6OtherPlayerId = otherPlayer.id;
 
   // Debris from a crashed earlier run would be REPLAYED by this one.
   await purgeStage6();
@@ -734,7 +761,7 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
     const created = await createFirstKickGoal({
       playerId: s6PlayerId,
       clubNameRaw: S6,
-      season: 1897,
+      season: s6MatchSeason,
       roundRaw: `${S6}-R1`,
       notes: S6,
       consecutiveGoalKicks: 2,
@@ -757,7 +784,7 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
     expect(durable).toHaveLength(1);
     expect(durable[0].fieldGroup).toBe('record');
     expect(durable[0].values).toMatchObject({
-      club_name_raw: S6, season: 1897, round_raw: `${S6}-R1`,
+      club_name_raw: S6, season: s6MatchSeason, round_raw: `${S6}-R1`,
       consecutive_goal_kicks: 2, status: 'active', match_key: s6MatchKey,
     });
     expect(durable[0].values.player_identity).toMatch(/^afltables:/);
@@ -783,7 +810,7 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
         FROM player_achievements
        WHERE source_record_id = ${row!.sourceRecordId}`;
     expect(rebuilt, 'the replay did not rebuild the manual record').toBeDefined();
-    expect(rebuilt.season).toBe(1897);
+    expect(rebuilt.season).toBe(s6MatchSeason);
     expect(rebuilt.roundRaw).toBe(`${S6}-R1`);
     expect(rebuilt.consecutive).toBe(2);
     expect(rebuilt.clubNameRaw).toBe(S6);
@@ -791,6 +818,52 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
     // The two links came back, resolved from the natural identities.
     expect(rebuilt.playerId).toBe(s6PlayerId);
     expect(rebuilt.matchId).toBe(s6MatchId);
+  });
+
+  // AFLDB-ISSUE-176: a special record must not accept a match link that is
+  // inconsistent with the record it is attached to.
+  it('refuses to create a first-kick-goal record whose match is from a different season', async () => {
+    const roundRaw = `${S6}-badseason`;
+    const wrongSeason = s6MatchSeason === 1897 ? 1898 : 1897;
+    const result = await createFirstKickGoal({
+      playerId: s6PlayerId,
+      clubNameRaw: S6,
+      season: wrongSeason,
+      roundRaw,
+      matchId: s6MatchId,
+      adminUserId: actorId,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('validation');
+      expect(result.error).toMatch(/season/);
+    }
+    const [rows] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM player_achievements WHERE round_raw = ${roundRaw}`;
+    expect(rows.n, 'the mismatched-season create wrote a canonical row').toBe(0);
+    const [edits] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_edits WHERE new_values::text LIKE ${`%${roundRaw}%`}`;
+    expect(edits.n, 'the mismatched-season create wrote an audit row').toBe(0);
+  });
+
+  it('refuses to create a first-kick-goal record linking a player absent from the match', async () => {
+    const roundRaw = `${S6}-noplayerstats`;
+    const result = await createFirstKickGoal({
+      playerId: s6OtherPlayerId,
+      clubNameRaw: S6,
+      season: s6MatchSeason,
+      roundRaw,
+      matchId: s6MatchId,
+      adminUserId: actorId,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('validation');
+      expect(result.error).toMatch(/match statistics/);
+    }
+    const [rows] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM player_achievements WHERE round_raw = ${roundRaw}`;
+    expect(rows.n, 'the unplayed-match create wrote a canonical row').toBe(0);
   });
 
   it('creates an after-siren record and refuses a combination the CHECKs reject', async () => {
@@ -827,6 +900,26 @@ describe('Stage 6 — manual creation, and the replay that must rebuild it', () 
       kick_scored: 'goal', kick_effect: 'won', kicker_result: 'win',
       kicker_points: 82, opponent_points: 76, status: 'active',
     });
+  });
+
+  it('refuses to create an after-siren record whose match is from a different season', async () => {
+    const roundRaw = `${S6}-badseason`;
+    const wrongSeason = s6MatchSeason === 1897 ? 1898 : 1897;
+    const result = await createAfterSirenKick({
+      playerId: s6PlayerId,
+      clubNameRaw: S6, opponentNameRaw: S6, competition: S6, premiershipSeason: true,
+      season: wrongSeason, roundRaw, kickScored: 'goal', kickEffect: 'won', kickerResult: 'win',
+      kickerScoreRaw: '12.10 (82)', opponentScoreRaw: '12.4 (76)',
+      kickerPoints: 82, opponentPoints: 76, matchId: s6MatchId, adminUserId: actorId,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('validation');
+      expect(result.error).toMatch(/season/);
+    }
+    const [rows] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM after_siren_kicks WHERE round_raw = ${roundRaw}`;
+    expect(rows.n, 'the mismatched-season create wrote a canonical row').toBe(0);
   });
 
   it('refuses to link a non-premiership manual after-siren row to a match', async () => {

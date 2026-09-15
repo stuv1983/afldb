@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Special-record admin mutations validate the match link before writing (AFLDB-ISSUE-176) - 15 September 2026
+
+- `createFirstKickGoal`/`replaceFirstKickGoal` (`player_achievements`) and
+  `createAfterSirenKick`/`replaceAfterSirenKick` (`after_siren_kicks`) now refuse a supplied
+  `matchId` unless the match exists, belongs to the record's own `season`, and — when a `playerId`
+  is also supplied — that player has a `player_match_stats` row for the match. The refusal happens
+  before any write: not the canonical row, not the durable `data_overrides` payload, not the
+  `data_edits` audit row.
+- No data repair was required: a read-only DEV audit found 0 existing special-record rows
+  violating the invariant.
+
 ### Coaches page family: disclosures, deduplicated totals, expandable tables, deterministic comparison grid (AFLDB-ISSUE-174) - 15 September 2026
 
 - Implemented the `issues/closed/AFLDB-ISSUE-174.md` design/planning runbook's phased plan (§18 Phases 1-4) on

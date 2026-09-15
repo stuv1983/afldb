@@ -6,7 +6,8 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 **Open issues:** 0
 
-There are currently no open AFLDB issues.
+| ID | Severity | Area | State | Next action |
+|---|---|---|---|---|
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -27827,3 +27828,64 @@ Broader adoption of `ExpandableTableFrame` beyond the Coaches list.
   branch `claude/issue-174-coaches-design`, for the operator to commit and run
   `npm run merge:ready -- --issue 174`. `CHANGELOG.md`'s `[Unreleased]` entry updated to record the
   final Vercel review outcome. No PROD action of any kind was taken.
+
+## AFLDB-ISSUE-176 — Special-record match links accept a match inconsistent with the record
+
+- **Severity:** Medium (data-integrity safeguard; a read-only DEV audit against `afldb_dev` found 0
+  existing rows violating the invariant, so this closes a latent gap rather than repairs live data).
+- **Area:** Admin / special-records lifecycle — `src/db/queries/admin-special-records.ts`.
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-176`, branch
+  `sonnet/issue-176-special-record-match-validation`. Not committed (operator commits the reviewed
+  local change).
+- **Found:** 2026-09-15, during an admin-mutation-boundary audit of the special-records lifecycle
+  surface. Three companion findings from the same audit (promotion CAS, `deleteMatch` staging FK,
+  join-request transaction) were not filed as tracked issues as of this entry.
+- **Key files:** `src/db/queries/admin-special-records.ts` (`insertFirstKickGoal`,
+  `insertAfterSirenKick`, new `validateSpecialRecordMatchLink`); `tests/integration/admin-special-records.test.ts`.
+
+### Symptom
+A first-kick-goal (`player_achievements`) or after-the-siren (`after_siren_kicks`) admin mutation
+that supplies `matchId` accepted any existing match id, with no check that the match belongs to the
+record's own `season` or that the linked player actually has a `player_match_stats` row for it.
+
+### Root cause
+`insertFirstKickGoal` and `insertAfterSirenKick` — the shared write path underneath
+`createFirstKickGoal`/`replaceFirstKickGoal` and `createAfterSirenKick`/`replaceAfterSirenKick` —
+called `manualLinkIdentity`, which only confirmed the match row exists. It never compared the
+match's season to the record's `season`, and never confirmed the linked player played in it.
+
+### Fix
+Added `validateSpecialRecordMatchLink(tx, matchId, season, playerId)`, called before
+`manualLinkIdentity` in both `insertFirstKickGoal` and `insertAfterSirenKick`. When `matchId` is
+supplied it refuses — as a `RollbackRefusal`, so the transaction rolls back before writing the
+canonical row, the durable `data_overrides` payload, or the `data_edits` audit row — when: the
+match does not exist (the pre-existing check, preserved); `match.season !== season`; or `playerId`
+is supplied and no `player_match_stats` row exists for `(matchId, playerId)`. Corrections
+(`correctFirstKickGoal`/`correctAfterSirenKick`) were already excluded from touching `match_id` —
+it is not in `FIRST_KICK_CORRECTABLE`/`AFTER_SIREN_CORRECTABLE` — so no change was needed there.
+
+### Validation
+Extended `tests/integration/admin-special-records.test.ts` (runs against `afldb_test`):
+- Fixed the existing "creates a first-kick record whose durable payload the TS adapter re-creates"
+  fixture, which previously paired an arbitrarily-chosen player and match with no relationship
+  (`ORDER BY id LIMIT 1` on each independently) and would have failed under the new invariant.
+  `beforeAll` now derives `s6MatchId`/`s6MatchKey`/`s6MatchSeason` from a real `player_match_stats`
+  row for `s6PlayerId`, and a second player (`s6OtherPlayerId`) confirmed absent from that match.
+- Added three regression cases, each asserting no canonical row, override, or audit row was
+  written: a season-mismatched match refused for `createFirstKickGoal`; a player with no
+  `player_match_stats` row for the match refused for `createFirstKickGoal`; a season-mismatched
+  match refused for `createAfterSirenKick`.
+- Operator ran `npx vitest run tests/integration/admin-special-records.test.ts` on 2026-09-15:
+  1 test file passed, 36/36 tests passed, no skipped tests, executed against the PostgreSQL-backed
+  integration suite. All three new ISSUE-176 regressions passed (season-mismatched match refused for
+  first-kick; player with no `player_match_stats` row refused for first-kick; season-mismatched
+  match refused for after-siren). The broader existing special-record lifecycle coverage — correction
+  writes, compare-and-swap, canonical + durable override + audit atomicity, suppress/reinstate,
+  manual creation and replay, replacement transactions, authority conflict handling, curated-record
+  match deletion refusal — also remained green.
+
+### Follow-up
+None. The DEV audit already confirmed 0 rows currently violate this invariant, so no
+backfill/repair job is required. AFLDB-ISSUE-175/177/178 (promotion CAS, `deleteMatch` staging FK,
+join-request transaction) are separate findings from the same audit and are out of this issue's
+scope.
