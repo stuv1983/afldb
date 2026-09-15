@@ -524,6 +524,60 @@ describe('13. club_season queries', () => {
   });
 });
 
+describe('regression: extractHavingClause requires a club/team subject (AFLDB-ISSUE-188)', () => {
+  // Every grouped-result word (draws/wins/losses/lose/lost/win/won) used to
+  // be admitted with no subject gate at all -- only `games` was gated on a
+  // leading club/team subject (AFLDB-ISSUE-110). A player-subject question
+  // naming "won"/"win"/"wins" was misread as a grouped team_match having
+  // clause: the number was stripped by the having extractor, so a
+  // following career stat word ("premierships", "brownlow medals") was
+  // left with no number and silently dropped, and the question answered a
+  // club-count question ("18 clubs qualify") instead of a player list.
+  it('players who have won 3 premierships -> a player_career condition, not a having clause', async () => {
+    const p = await plan('players who have won 3 premierships');
+    expect(p.grain).toBe('player_career');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gte', value: 3 });
+  });
+
+  it('players who won 2 brownlow medals -> a player_career condition, not a having clause', async () => {
+    const p = await plan('players who won 2 brownlow medals');
+    expect(p.grain).toBe('player_career');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'brownlow_medals', op: 'gte', value: 2 });
+  });
+
+  it('players with more than 100 wins -> no having clause', async () => {
+    const p = await plan('players with more than 100 wins');
+    expect(p.havingClause).toBeUndefined();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'wins', op: 'gt', value: 100 });
+  });
+
+  it('richmond players who have won 3 premierships -> a club-scoped player condition, not a club having clause', async () => {
+    const p = await plan('richmond players who have won 3 premierships');
+    expect(p.grain).not.toBe('team_match');
+    expect(p.havingClause).toBeUndefined();
+  });
+
+  it('clubs that have won more than 10 premierships -> a club/team subject still elects the grouped having clause', async () => {
+    const p = await plan('clubs that have won more than 10 premierships');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 10 });
+  });
+
+  it('teams with more than 2 wins against Richmond -> unchanged club-subject grouped having clause', async () => {
+    const p = await plan('teams with more than 2 wins against Richmond');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 2 });
+  });
+
+  it('teams to lose 5 times by more than 100 points -> unchanged club-subject grouped having clause', async () => {
+    const p = await plan('teams to lose 5 times by more than 100 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'gte', value: 5 });
+  });
+});
+
 describe('12. aggregate-vs-single scope for a named player', () => {
   it('dusty total goals against carlton -> "total" overrides the single-game default to a scoped sum', async () => {
     const p = await plan('dusty total goals against carlton');
