@@ -27889,3 +27889,86 @@ None. The DEV audit already confirmed 0 rows currently violate this invariant, s
 backfill/repair job is required. AFLDB-ISSUE-175/177/178 (promotion CAS, `deleteMatch` staging FK,
 join-request transaction) are separate findings from the same audit and are out of this issue's
 scope.
+
+## AFLDB-ISSUE-175 — Submission promotion has no concurrency guard and can split-brain on failure
+
+- **Severity:** Medium (concurrency/data-integrity defect; requires two concurrent promotion
+  attempts on the same submission or a promotion whose trailing status write fails after the data
+  commit — a narrow, admin-only window. No evidence of an existing violation was gathered against
+  real dev/prod data; see Follow-up).
+- **Area:** Admin / data-submission promotion pipeline — `src/lib/ingest/pipeline.ts`.
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-175`, branch
+  `sonnet/issue-175-submission-promotion-atomicity`.
+- **Found:** 2026-09-15, during the same admin-mutation-boundary audit that opened
+  AFLDB-ISSUE-176/177/178.
+- **Key files:** `src/lib/ingest/pipeline.ts` (`promoteSubmission`);
+  `tests/integration/submission-promotion.test.ts` (new).
+
+### Symptom
+`promoteSubmission` read `data_submissions.status` without a row lock, applied the promoted data
+under `afldb_import` in one transaction, and then flipped `status` to `'promoted'` in a separate,
+unguarded statement on the `afldb_auth` pool. Two concurrent promotions of the same submission
+could both observe `'approved'` and both apply. If the data commit succeeded but the trailing
+status write failed, the submission stayed visibly `'approved'` while its data was already live —
+and `decideSubmission`'s reject path (`status IN ('staged', 'validated', 'approved')`) could then
+mark it `'rejected'` after promotion, a provenance defect rather than merely a display lag.
+
+### Root cause
+No concurrency guard existed between the status read, the promotion transaction, and the final
+status write — three separate, unguarded statements/transactions. Migration 023 had already
+granted `afldb_import` a column-scoped `UPDATE (status, promoted_at, import_batch_id, error)` on
+`data_submissions` for exactly this purpose — `tests/integration/privileges.test.ts:690-707`
+already noted the promotion path used "even less than" that grant — but `promoteSubmission` never
+used it.
+
+### Fix
+`promoteSubmission` now runs entirely inside one `afldb_import` transaction:
+- `SELECT dataset, status::text FROM data_submissions WHERE id = $1 FOR UPDATE` locks the row and
+  is the sole authoritative eligibility check — `status IN ('approved', 'failed')`, preserving the
+  existing retry-from-failed workflow.
+- The dataset-spec lookup and the `data_submission_rows` error-row check now read through the
+  locked transaction (`afldb_import`'s existing `SELECT` grant), replacing the previous separate
+  pre-flight `authSql` reads.
+- The promotion work (award/source lookup, `import_batches` insert, the `spec.promoteRow` loop,
+  batch completion) runs inside a nested `tx.savepoint(...)` — the same idiom already used in
+  `src/lib/acquisition/canonical-apply.ts` — so a genuine failure rolls back only the promotion
+  work, not the row lock or the eventual status write.
+- On success, `status = 'promoted'` (plus `promoted_at`/`import_batch_id`/`error = NULL`) is
+  written in the SAME transaction, CAS-guarded against the exact status value observed under the
+  lock (`lockedStatus`), so the promoted data and the status transition commit or roll back
+  together.
+- On a genuine failure, `status = 'failed'` plus the error is written after the savepoint rolls
+  back, still CAS-guarded against `lockedStatus` — a retry that starts from `'failed'` and fails
+  again lands back on `'failed'` with the new error.
+- A refusal (row not eligible, not found, dataset deregistered, error rows present) performs no
+  status write at all. This is also what a concurrency loser now hits once it re-reads the
+  winner's already-committed status.
+
+No migration or privilege change was required or made; the mechanism relies entirely on the
+column grant migration 023 already made. No intermediate `promoting` status was introduced — the
+row lock plus same-transaction commit closes the window without one.
+
+### Validation
+Operator ran, 2026-09-15:
+- `npx vitest run tests/integration/submission-promotion.test.ts` — 1 test file passed, 7/7 tests
+  passed, no skipped tests, against the PostgreSQL-backed integration suite. Confirmed: exactly one
+  of two concurrent promotions of the same approved submission succeeds; a genuine promotion
+  failure from `approved` rolls back the target writes and sets `status = 'failed'`; a retry from
+  `failed` succeeds and reaches `promoted`; a failed retry that fails again remains `failed` with
+  the new error; a submission with an error row is refused without mutating `status`/`error`; a
+  promotion blocked behind a concurrent reject observes the committed `rejected` state and is
+  refused; `afldb_import` can execute `SELECT ... FOR UPDATE` against `data_submissions` using its
+  existing grants (no privilege widening).
+- `npx vitest run tests/submission-review-actions.test.ts tests/integration/privileges.test.ts` —
+  2 test files passed, 39/39 tests passed (narrow regression check on the submission-decision unit
+  tests and the privilege-grant integration suite).
+- `npm run typecheck` — PASS (Next typegen and `tsc --noEmit` both completed successfully).
+- `npx tsc --noEmit` — PASS.
+
+### Follow-up
+Not blocking. The investigation proposed two read-only SQL audits (a submission whose
+`import_batches` state disagrees with its own `status`/`import_batch_id`; a submission promoted
+more than once) to check whether the pre-fix race had already produced an inconsistent row in dev
+or prod. Those queries were not run as part of this closeout — the identified failure modes are
+behavioural (concurrency/status coherence), not evidence that existing data is already
+inconsistent — and running them remains available to the operator at their discretion.

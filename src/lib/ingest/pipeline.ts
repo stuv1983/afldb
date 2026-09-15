@@ -215,105 +215,183 @@ export type PromoteResult =
   | { ok: true; applied: number; batchId: ImportBatchId }
   | { ok: false; error: string };
 
+type PromotionOutcome =
+  // Nothing was attempted: the row was not in a promotable state when
+  // locked, or a pre-condition failed before any statistical write. The
+  // submission's status/error are left exactly as they were.
+  | { kind: 'refused'; error: string }
+  // The promotion work ran and raised; rolled back to the savepoint and
+  // recorded as 'failed' in the same transaction that holds the lock.
+  | { kind: 'failed'; error: string }
+  | { kind: 'promoted'; applied: number; batchId: ImportBatchId };
+
 /**
- * Promote an approved submission under the import role.
+ * Promote an eligible (approved, or a previously failed) submission under
+ * the import role.
  *
- * All or nothing: one transaction, one import batch. A failure marks the
- * submission 'failed' with the error and leaves the statistical tables
- * untouched.
+ * AFLDB-ISSUE-175: the row is locked with `SELECT ... FOR UPDATE` and the
+ * final status transition is written in the SAME transaction as the
+ * promoted data, using afldb_import's existing column grant (migration
+ * 023) on data_submissions(status, promoted_at, import_batch_id, error).
+ * That closes the window where two concurrent promotions could both
+ * observe an eligible submission, or where the data commit could succeed
+ * while a separate status write silently failed. A second, concurrent
+ * caller blocks on the lock and then re-reads the now-committed status,
+ * which no longer matches 'approved'/'failed' — it is refused and writes
+ * nothing.
+ *
+ * The status actually locked (`lockedStatus`, 'approved' or 'failed') is
+ * reused as the CAS predicate on every write below, so a retry that starts
+ * from 'failed' and fails again lands back on 'failed' with a fresh error,
+ * and a run that starts from 'approved' only ever fails to 'failed' —
+ * never the reverse.
+ *
+ * Genuine promotion failures roll back to a savepoint (the established
+ * pattern in src/lib/acquisition/canonical-apply.ts) rather than the whole
+ * transaction, so the lock, the row read, and the eventual 'failed' write
+ * survive in the same outer transaction. A 'refused' outcome performs no
+ * write at all — the point is that nothing was attempted, so there is
+ * nothing to record.
  */
 export async function promoteSubmission(submissionId: number): Promise<PromoteResult> {
-  const [submission] = await authSql<{ dataset: string; status: string }[]>`
-    SELECT dataset, status::text FROM data_submissions WHERE id = ${submissionId}
-  `;
-  if (!submission) return { ok: false, error: 'Submission not found.' };
-  if (submission.status !== 'approved') {
-    return { ok: false, error: `Submission is ${submission.status}; only approved files promote.` };
-  }
-  const spec = getDataset(submission.dataset);
-  if (!spec) return { ok: false, error: 'Dataset is no longer registered.' };
-
   const importUrl = process.env.AFLDB_IMPORT_DATABASE_URL;
   if (!importUrl) return { ok: false, error: 'AFLDB_IMPORT_DATABASE_URL is not configured.' };
-
-  const rows = await authSql<{
-    rowNo: number;
-    payload: Record<string, string | null>;
-    verdict: string;
-    reasons: { resolved: Record<string, number | string | null> | null };
-  }[]>`
-    SELECT row_no AS "rowNo", payload, verdict, reasons
-      FROM data_submission_rows
-     WHERE submission_id = ${submissionId}
-     ORDER BY row_no
-  `;
-  if (rows.some((r) => r.verdict === 'error' || !r.verdict)) {
-    return { ok: false, error: 'Submission contains error rows; re-validate and fix the file.' };
-  }
 
   // A short-lived import-role connection, closed in finally. Promotion
   // is rare; holding a standing pool for it would be pure liability.
   const importSql = postgres(importUrl, { max: 1, onnotice: () => {} });
   try {
-    const batchId = await importSql.begin(async (tx) => {
-      // Award-shaped datasets (rising_star, all_australian) feed one row
-      // in `awards`; match/player-stat datasets feed the fact tables
-      // directly and have no award to resolve. awardId is null for those.
-      let awardId: number | null = null;
-      if (spec.awardSlug) {
-        const [award] = await tx<{ id: number }[]>`
-          SELECT id FROM awards WHERE slug = ${spec.awardSlug}
+    let outcome: PromotionOutcome;
+    try {
+      outcome = await importSql.begin(async (tx): Promise<PromotionOutcome> => {
+        const [submission] = await tx<{ dataset: string; status: string }[]>`
+          SELECT dataset, status::text AS status
+            FROM data_submissions
+           WHERE id = ${submissionId}
+           FOR UPDATE
         `;
-        if (!award) throw new Error(`award "${spec.awardSlug}" is missing; run the awards import`);
-        awardId = award.id;
-      }
+        if (!submission) return { kind: 'refused', error: 'Submission not found.' };
+        if (!['approved', 'failed'].includes(submission.status)) {
+          return {
+            kind: 'refused',
+            error: `Submission is ${submission.status}; only approved or previously-failed files promote.`,
+          };
+        }
+        const lockedStatus = submission.status;
 
-      const [source] = await tx<{ id: number }[]>`
-        SELECT id FROM sources WHERE key = 'sports_data_lab'
-      `;
-      const [batch] = await tx<{ id: string }[]>`
-        INSERT INTO import_batches (source_id, tool, target_table, notes)
-        VALUES (${source?.id ?? null}, 'admin-upload', ${spec.key},
-                ${'submission ' + submissionId})
-        RETURNING id
-      `;
-      // AFLDB-ISSUE-105: `import_batches.id` is bigint, which postgres.js
-      // delivers as decimal text. Decoded once, here, and opaque from this
-      // point on — it is bound back into SQL and reported, never counted.
-      const runBatchId = asImportBatchId(batch.id);
+        const spec = getDataset(submission.dataset);
+        if (!spec) return { kind: 'refused', error: 'Dataset is no longer registered.' };
 
-      for (const row of rows) {
-        await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
-          sql: tx as unknown as typeof importSql,
-          awardId,
-          sourceId: source?.id ?? 0,
-          batchId: runBatchId,
-        });
-      }
+        const rows = await tx<{
+          rowNo: number;
+          payload: Record<string, string | null>;
+          verdict: string;
+          reasons: { resolved: Record<string, number | string | null> | null };
+        }[]>`
+          SELECT row_no AS "rowNo", payload, verdict, reasons
+            FROM data_submission_rows
+           WHERE submission_id = ${submissionId}
+           ORDER BY row_no
+        `;
+        if (rows.some((r) => r.verdict === 'error' || !r.verdict)) {
+          return {
+            kind: 'refused',
+            error: 'Submission contains error rows; re-validate and fix the file.',
+          };
+        }
 
-      await tx`
-        UPDATE import_batches
-           SET completed_at = now(), status = 'completed',
-               records_read = ${rows.length}, records_inserted = ${rows.length}
-         WHERE id = ${runBatchId}
-      `;
-      return runBatchId;
-    });
+        try {
+          const runBatchId = await tx.savepoint(async (sp): Promise<ImportBatchId> => {
+            // Award-shaped datasets (rising_star, all_australian) feed one
+            // row in `awards`; match/player-stat datasets feed the fact
+            // tables directly and have no award to resolve. awardId is
+            // null for those.
+            let awardId: number | null = null;
+            if (spec.awardSlug) {
+              const [award] = await sp<{ id: number }[]>`
+                SELECT id FROM awards WHERE slug = ${spec.awardSlug}
+              `;
+              if (!award) {
+                throw new Error(`award "${spec.awardSlug}" is missing; run the awards import`);
+              }
+              awardId = award.id;
+            }
 
-    await authSql`
-      UPDATE data_submissions
-         SET status = 'promoted', promoted_at = now(),
-             import_batch_id = ${batchId}, error = NULL
-       WHERE id = ${submissionId}
-    `;
-    return { ok: true, applied: rows.length, batchId };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await authSql`
-      UPDATE data_submissions SET status = 'failed', error = ${message.slice(0, 2000)}
-       WHERE id = ${submissionId}
-    `;
-    return { ok: false, error: `Promotion failed and was rolled back: ${message}` };
+            const [source] = await sp<{ id: number }[]>`
+              SELECT id FROM sources WHERE key = 'sports_data_lab'
+            `;
+            const [batch] = await sp<{ id: string }[]>`
+              INSERT INTO import_batches (source_id, tool, target_table, notes)
+              VALUES (${source?.id ?? null}, 'admin-upload', ${spec.key},
+                      ${'submission ' + submissionId})
+              RETURNING id
+            `;
+            // AFLDB-ISSUE-105: `import_batches.id` is bigint, which
+            // postgres.js delivers as decimal text. Decoded once, here,
+            // and opaque from this point on — it is bound back into SQL
+            // and reported, never counted.
+            const batchId = asImportBatchId(batch.id);
+
+            for (const row of rows) {
+              await spec.promoteRow(row.payload, row.reasons?.resolved ?? {}, {
+                sql: sp as unknown as typeof importSql,
+                awardId,
+                sourceId: source?.id ?? 0,
+                batchId,
+              });
+            }
+
+            await sp`
+              UPDATE import_batches
+                 SET completed_at = now(), status = 'completed',
+                     records_read = ${rows.length}, records_inserted = ${rows.length}
+               WHERE id = ${batchId}
+            `;
+            return batchId;
+          });
+
+          const [updated] = await tx<{ id: number }[]>`
+            UPDATE data_submissions
+               SET status = 'promoted', promoted_at = now(),
+                   import_batch_id = ${runBatchId}, error = NULL
+             WHERE id = ${submissionId} AND status = ${lockedStatus}
+            RETURNING id
+          `;
+          // The row has been locked since the read above, so this should
+          // always match; treated as a promotion failure (not a silent
+          // refusal) if it somehow does not, since work was already
+          // applied.
+          if (!updated) throw new Error('submission status changed unexpectedly during promotion');
+
+          return { kind: 'promoted', applied: rows.length, batchId: runBatchId };
+        } catch (workError) {
+          const message = workError instanceof Error ? workError.message : String(workError);
+          await tx`
+            UPDATE data_submissions
+               SET status = 'failed', error = ${message.slice(0, 2000)}
+             WHERE id = ${submissionId} AND status = ${lockedStatus}
+          `;
+          return { kind: 'failed', error: message };
+        }
+      });
+    } catch (error) {
+      // Something failed before or outside the row lock/savepoint
+      // machinery above (a dropped connection, a bug) rather than as a
+      // handled 'refused'/'failed' outcome. Whether the row was ever
+      // locked, and at what status, is unknown here, so — matching the
+      // "a concurrency loser performs no status write" rule — nothing is
+      // written; the caller sees a failure and may retry.
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: `Promotion failed before completing: ${message}` };
+    }
+
+    if (outcome.kind === 'promoted') {
+      return { ok: true, applied: outcome.applied, batchId: outcome.batchId };
+    }
+    if (outcome.kind === 'failed') {
+      return { ok: false, error: `Promotion failed and was rolled back: ${outcome.error}` };
+    }
+    return { ok: false, error: outcome.error };
   } finally {
     await importSql.end({ timeout: 5 });
   }
