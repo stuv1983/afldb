@@ -452,6 +452,66 @@ describe('team_match matches hand-written SQL', () => {
       expect(m.margin).toBeGreaterThanOrEqual(sample.margin - 1); // Margin
     }
   });
+
+  describe('AFLDB-ISSUE-192 symmetric metrics rank one row per match', () => {
+    it('unscoped "highest attendance" returns distinct matchIds with total equal to the distinct count', async () => {
+      const { rows, total } = await teamMatch({ metric: 'attendance', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      // total (window count()) must equal the number of distinct matches returned,
+      // not double it the way one row per SIDES perspective would.
+      expect(total).toBe(matchIds.length);
+    });
+
+    it('unscoped "highest combined score" (total_score) returns each match once', async () => {
+      const { rows, total } = await teamMatch({ metric: 'total_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      expect(total).toBe(matchIds.length);
+
+      const [expected] = await sql<{ max: number }[]>`
+        SELECT max(home_score + away_score) AS max FROM matches
+        WHERE home_score IS NOT NULL AND away_score IS NOT NULL
+      `;
+      expect(rows[0].value).toBe(expected.max);
+    });
+
+    it('"top 5" by total_score returns five distinct matches, not three matches in six rows', async () => {
+      const { rows } = await teamMatch({ metric: 'total_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+      expect(matchIds.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('a clubFor-scoped total_score ranking still returns one row per that club\'s match (side-specific scope preserved)', async () => {
+      const [org] = await sql<{ id: number }[]>`SELECT id FROM club_organizations ORDER BY id LIMIT 1`;
+      const { rows } = await teamMatch({
+        metric: 'total_score', agg: { kind: 'top_n', n: 5 },
+        scope: { clubFor: { organizationId: org.id, slug: 'x', name: 'x' } },
+      }, 100);
+      expect(rows.length).toBeGreaterThan(0);
+
+      const matchIds = rows.map((r) => r.matchId);
+      expect(new Set(matchIds).size).toBe(matchIds.length);
+
+      const [expected] = await sql<{ count: string }[]>`
+        SELECT count(*) AS count FROM matches
+        WHERE (home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id})
+               OR away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${org.id}))
+          AND home_score IS NOT NULL AND away_score IS NOT NULL
+      `;
+      expect(Number(expected.count)).toBeGreaterThanOrEqual(matchIds.length);
+    });
+
+    it('side-dependent metrics (team_score) are unaffected and keep ranking both sides', async () => {
+      const { rows } = await teamMatch({ metric: 'team_score', agg: { kind: 'top_n', n: 5 } }, 100);
+      expect(rows.length).toBeGreaterThanOrEqual(5);
+    });
+  });
 });
 
 describe('club_season matches hand-written SQL', () => {

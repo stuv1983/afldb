@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### NL search: symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-192) - 15 September 2026
+
+- `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) ranks `attendance` and `total_score` once
+  per physical match instead of once per participating club. The `SIDES` CTE intentionally emits
+  one row per club so every match has two perspective rows; `attendance` and `total_score` are
+  symmetric match-level metrics, so both rows carried the same value and tied at the same rank,
+  letting one match appear twice — halving an effective top-N and doubling the reported `total`.
+- The fix restricts a symmetric, unscoped ranking to the canonical home-side row
+  (`t.club_id = m.home_club_id`), and applies only when the metric is `attendance` or
+  `total_score` and the scope carries no `clubFor`/`clubAgainst`/`matchup`. Side-scoped queries are
+  unchanged, and side-dependent metrics (`team_score`, `opponent_score`, `win_margin`,
+  `loss_margin`, `q3_deficit_overcome`) are unchanged. No generic deduplication framework was
+  introduced.
+
 ### NL search: a club-subject "won more than N premierships/flags" no longer counts match wins (AFLDB-ISSUE-193) - 15 September 2026
 
 - `extractHavingClause` (`src/search/nl/parser.ts`) no longer claims a number for a grouped

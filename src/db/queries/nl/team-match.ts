@@ -122,10 +122,19 @@ export async function answerTeamMatch(plan: NlQueryPlan, limit: number): Promise
   const value = metricValueExpr(plan.metric!);
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankCutoff(plan.agg);
+  // attendance/total_score are identical for both SIDES rows of a match,
+  // so with no clubFor/clubAgainst/matchup scope to justify a per-side
+  // row, both rows would tie and rank() would return the same match
+  // twice (AFLDB-ISSUE-192). Restrict to the home-perspective row so the
+  // match is ranked once; side-scoped and side-dependent (margin/team
+  // score) queries are unaffected.
+  const isSymmetricMetric = plan.metric === 'attendance' || plan.metric === 'total_score';
+  const hasSideScope = Boolean(plan.scope.clubFor || plan.scope.clubAgainst || plan.scope.matchup);
   const where = foldAnd([
     ...scopeClauses(plan.scope),
     plan.resultFilter === 'won' ? sql`t.final_winner_club_id = t.club_id` : sql`TRUE`,
     plan.metric ? sql`${value} IS NOT NULL` : sql`TRUE`,
+    isSymmetricMetric && !hasSideScope ? sql`t.club_id = m.home_club_id` : sql`TRUE`,
   ]);
   
   let periodCte = sql``;
