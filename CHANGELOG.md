@@ -15,6 +15,28 @@ commit.
 
 ## [Unreleased]
 
+### NL search: the boundary extractor no longer claims bare "first" in finals scope (AFLDB-ISSUE-191) - 15 September 2026
+
+- Period-split and score-checkpoint extraction (`extractPeriodSplit`, `extractScoreCheckpoint` in
+  `src/search/nl/parser.ts`) now run before boundary extraction, so phrases such as "first quarter"
+  and "first half" are consumed intact before the boundary extractor can read a bare "first" out of
+  them. Previously boundary ran first and stripped "first" as a debut cue, leaving "quarter"
+  stranded and declining a question the engine already knows how to answer.
+- The boundary debut cue (`DEBUT_RE` in `parser.ts`) is tightened: bare "first" no longer elects a
+  debut boundary by itself. Debut semantics now require the literal word "debut"/"debuted", or
+  "first" directly governing a game noun ("first game", "first ever game").
+- Grain election now fails closed when a genuine boundary is elected alongside an independently
+  consumed player metric, instead of silently dropping the metric and answering plain boundary
+  membership: a boundary question has no metric column of its own.
+- "who kicked the first goal in a grand final" no longer becomes a debut/boundary plan (it declines,
+  since AFLDB has no first-scorer data). "highest first quarter score in a grand final" now
+  correctly plans as a period-split `team_match` (`periodSplit: 'Q1'`, `matchType: 'grand_final'`),
+  instead of declining on a stranded "quarter".
+- Legitimate boundary questions are unaffected: "players whose first game was a grand final",
+  "players whose last game was a grand final", and "players who debuted in a grand final" all still
+  plan as before.
+- `PARSER_VERSION` bumped to 45.
+
 ### NL search: a game/season stat threshold no longer silently drops a co-occurring career condition (AFLDB-ISSUE-187) - 15 September 2026
 
 - Grain election (`src/search/nl/parser.ts`) now fails closed when it elects a non-career grain

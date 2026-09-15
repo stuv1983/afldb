@@ -335,6 +335,37 @@ describe('7. career-boundary queries', () => {
     expect(p.grain).toBe('player_career');
     expect(p.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
   });
+
+  // AFLDB-ISSUE-191: bare "first" in finals wording is not a debut cue --
+  // "the first goal" names a metric event, not a career boundary. A metric
+  // consumed alongside a genuine boundary reading must refuse rather than
+  // silently drop the metric and answer plain boundary membership.
+  it('"who kicked the first goal in a grand final" does not elect a boundary plan', async () => {
+    const result = await parse('who kicked the first goal in a grand final');
+    if (result.status === 'plan') {
+      expect(result.plan.boundary).toBeUndefined();
+    } else {
+      expect(result.reason).toBe('ambiguous');
+    }
+  });
+
+  // "highest first quarter score in a grand final" -- extractPeriodSplit
+  // must consume the intact "first quarter" phrase before extractBoundary
+  // ever sees a bare "first" to misread as a debut event.
+  it('"highest first quarter score in a grand final" plans as a period-split team_match', async () => {
+    const p = await plan('highest first quarter score in a grand final');
+    expect(p.grain).toBe('team_match');
+    expect(p.periodSplit).toBe('Q1');
+    expect(p.scope.matchType).toBe('grand_final');
+    expect(p.boundary).toBeUndefined();
+  });
+
+  // Genuine boundary questions must remain supported after the tightening.
+  it('"players who debuted in a grand final" still reads as a boundary', async () => {
+    const p = await plan('players who debuted in a grand final');
+    expect(p.grain).toBe('player_career');
+    expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+  });
 });
 
 describe('8. compound queries', () => {

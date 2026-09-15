@@ -450,7 +450,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // condition). validatePlan carries a matching backstop for any plan that
 // reaches the compiler with a club_season ranking agg, no metric and no
 // conditions.
-export const PARSER_VERSION = 44;
+// v45 -- AFLDB-ISSUE-191: extractPeriodSplit/extractScoreCheckpoint now run
+// before extractBoundary, so "first quarter"/"first half" in finals scope
+// are read intact instead of having their "first" stripped as a debut cue.
+// The boundary debut word itself is tightened to "debut(ed)" or "first"
+// governing a game noun, no longer bare "first" -- "the first goal in a
+// grand final" no longer elects a debut boundary and drops the metric. A
+// boundary election that still sees a player metric consumed alongside it
+// now refuses outright instead of silently answering plain membership.
+export const PARSER_VERSION = 45;
 
 // ------------------------------------------------------------------ grain
 

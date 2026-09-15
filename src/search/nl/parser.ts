@@ -1246,7 +1246,15 @@ function extractRound(text: string): { text: string; roundNumber?: number; consu
 
 // -------------------------------------------------------------- boundary
 
-const DEBUT_RE = /\b(?:first|debut(?:ed)?)\b/;
+// AFLDB-ISSUE-191: bare "first" is NOT a debut cue on its own -- "the
+// first goal", "first quarter" and "first half" all use the same word
+// for a different concept. The debut word only governs the boundary when
+// it is literally "debut(ed)" or when "first" itself immediately governs
+// a game noun ("first game", "first ever game"). Period-split ("first
+// quarter"/"first half") already ran and consumed its own tokens before
+// this function is called, so it cannot collide with FIRST_GAME_RE here.
+const DEBUT_WORD_RE = /\bdebut(?:ed)?\b/;
+const FIRST_GAME_RE = /\bfirst(?:\s+ever)?\s+games?\b/;
 // Deliberately NOT "final" -- that word is the boundary's TARGET
 // (grand_final/final, read from the already-extracted match type), and
 // including it here would make any single-game-scoped question ("most
@@ -1268,19 +1276,26 @@ function extractBoundary(
   if (matchType !== 'grand_final' && matchType !== 'finals') return { text, consumed: [] };
   const where: NlBoundary['where'] = matchType === 'grand_final' ? 'grand_final' : 'final';
 
-  const debut = DEBUT_RE.exec(text);
-  const last = !debut ? LAST_GAME_RE.exec(text) : null;
-  const eventMatch = debut ?? last;
+  const debutWord = DEBUT_WORD_RE.exec(text);
+  const firstGame = !debutWord ? FIRST_GAME_RE.exec(text) : null;
+  const last = !debutWord && !firstGame ? LAST_GAME_RE.exec(text) : null;
+  const eventMatch = debutWord ?? firstGame ?? last;
   if (!eventMatch) return { text, consumed: [] };
 
   let working = stripMatch(text, eventMatch[0]);
   const consumed = [eventMatch[0]];
-  const gameWord = /\bgames?\b/.exec(working)?.[0];
-  if (gameWord) {
-    working = stripMatch(working, gameWord);
-    consumed.push(gameWord);
+  // FIRST_GAME_RE already matched "first ... game(s)" as one phrase, so
+  // there is no separate "game" word left to strip. The bare debut word
+  // ("debuted in their first game") and "last"/"retired" both still need
+  // their own, possibly non-adjacent, "game(s)" word stripped separately.
+  if (debutWord || last) {
+    const gameWord = /\bgames?\b/.exec(working)?.[0];
+    if (gameWord) {
+      working = stripMatch(working, gameWord);
+      consumed.push(gameWord);
+    }
   }
-  const event: NlBoundary['event'] = debut ? 'debut' : 'last_game';
+  const event: NlBoundary['event'] = last ? 'last_game' : 'debut';
   return { text: working, boundary: { event, where }, consumed };
 }
 
@@ -2344,6 +2359,20 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
 
   const negated = NEGATION_WORDS.test(text);
 
+  // 6.5. Period split / score checkpoint ("first quarter", "at half
+  // time") get first opportunity to consume their tokens, AHEAD of
+  // extractBoundary below. AFLDB-ISSUE-191: "first quarter"/"first half"
+  // are intact phrases PERIOD_SPLIT_WORDS already recognises, but boundary
+  // used to run first and read their bare "first" as a debut event,
+  // stripping it before period-split ever saw the phrase.
+  const periodSplitResult = extractPeriodSplit(text);
+  text = periodSplitResult.text;
+  consumedTokens.push(...periodSplitResult.consumed);
+
+  const scoreCheckpointResult = extractScoreCheckpoint(text);
+  text = scoreCheckpointResult.text;
+  consumedTokens.push(...scoreCheckpointResult.consumed);
+
   // 7. Boundary ("debuted in a grand final", "last game was a final").
   // Reads matchTypeResult, computed above at step 5, rather than
   // re-scanning `text` -- extractMatchType has already consumed the
@@ -2384,14 +2413,6 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const resultFilterResult = extractResultFilter(text);
   text = resultFilterResult.text;
   consumedTokens.push(...resultFilterResult.consumed);
-
-  const periodSplitResult = extractPeriodSplit(text);
-  text = periodSplitResult.text;
-  consumedTokens.push(...periodSplitResult.consumed);
-
-  const scoreCheckpointResult = extractScoreCheckpoint(text);
-  text = scoreCheckpointResult.text;
-  consumedTokens.push(...scoreCheckpointResult.consumed);
 
   const teamMetricResult: { text: string; metric?: string; consumed: string[] } =
     coachReading === 'coach_record' || afterSirenReading ? { text, consumed: [] } : extractTeamMetric(text);
@@ -2783,6 +2804,19 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     grain = 'club_season';
     metric = clubSeasonMetricResult.metric ?? null;
   } else if (boundary) {
+    // AFLDB-ISSUE-191: the boundary grain is a career-membership question
+    // ("did this player's first/last game fall in a final") and has no
+    // metric column of its own. A metric consumed alongside it ("most
+    // goals on debut in a grand final") asks a different, unsupported
+    // question -- refuse it outright rather than silently dropping the
+    // metric and answering plain boundary membership instead.
+    if (playerMetricResult.metric) {
+      report.confidence = 1;
+      report.notes.push(
+        'AFLDB cannot combine a player metric with a debut/last-game boundary question.',
+      );
+      return { status: 'none', reason: 'unrecognised', report };
+    }
     grain = 'player_career';
   } else if (awardResult.awardKey) {
     grain = 'player_career';
