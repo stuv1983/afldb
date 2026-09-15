@@ -9,7 +9,12 @@
  * ON DELETE clause) now gets its own friendly pre-check instead of falling
  * through to the generic 23503 fallback.
  *
- * Three refusal paths are proven here, deliberately kept separate:
+ * AFLDB-ISSUE-181 extends it with a third: `staging.afl_api_lineup.match_id`
+ * (migration 077, nullable, no ON DELETE clause) -- the AFL API team
+ * announcement's staging projection -- now also gets its own friendly
+ * pre-check.
+ *
+ * Four refusal paths are proven here, deliberately kept separate:
  *
  *   1. THE STAGING FRIENDLY PRE-CHECK (ISSUE-177) -- a staging row with
  *      `local_match_id` set to the fixture match is seeded directly, so
@@ -20,20 +25,31 @@
  *      `player_match_period_stats` row is seeded directly, so `deleteMatch`
  *      refuses with a named count instead of forcing a raw FK violation.
  *
- *   3. THE 23503 FALLBACK -- the concurrency backstop for a dependency
- *      relinked between a pre-check and the `DELETE FROM matches` statement.
- *      That exact interleaving cannot be forced deterministically from
- *      outside a single `deleteMatch` call, so this test instead forces a
- *      REAL, un-pre-checked foreign-key violation via
- *      `staging.afl_api_lineup.match_id` (migration 077, nullable, no
- *      ON DELETE clause) -- now that ISSUE-180 pre-checks
- *      `player_match_period_stats`, that table can no longer exercise this
- *      path. `staging.afl_api_lineup` is deliberately left WITHOUT a named
- *      refusal here: it is the remaining out-of-scope blocker reserved for
- *      the next follow-up issue (see the AFLDB-ISSUE-177 follow-up notes),
- *      and this test only proves the generic catch(error.code === '23503')
- *      mapping still works end-to-end against a genuine Postgres error, not
- *      a source-inspected assumption about the code.
+ *   3. THE AFL API LINEUP FRIENDLY PRE-CHECK (ISSUE-181) -- a
+ *      `staging.afl_api_lineup` row with `match_id` set to the fixture match
+ *      is seeded directly (via `staging.source_payloads` /
+ *      `staging.source_record_versions` / `staging.afl_api_lineup`,
+ *      bypassing `persistLineupBundle()` entirely, the same technique the
+ *      pre-ISSUE-181 fallback fixture below used), so `deleteMatch` refuses
+ *      with a named provider game/season instead of forcing a raw FK
+ *      violation.
+ *
+ *   4. THE 23503 FALLBACK -- the concurrency/race-window backstop. Before
+ *      ISSUE-181 this test forced a REAL, un-pre-checked foreign-key
+ *      violation via `staging.afl_api_lineup.match_id`; now that ISSUE-181
+ *      pre-checks that table too, a repository-wide inventory of every
+ *      foreign key into `matches(id)` (see the ISSUE-181 issue entry) found
+ *      NO remaining un-pre-checked dependency any ordinary fixture could use
+ *      to force one. Operator direction (ISSUE-181) was to instead prove the
+ *      fallback's actual remaining purpose -- the documented race window
+ *      between a pre-check and the `DELETE FROM matches` statement, inside
+ *      the same transaction -- using a test-only `BEFORE DELETE` trigger on
+ *      `matches`, scoped to this test's own uniquely-marked fixture match,
+ *      that inserts a genuine `player_match_period_stats` row referencing
+ *      it immediately before PostgreSQL's own delete removes the row. The
+ *      resulting 23503 is real, PostgreSQL-raised, and not source-inspected
+ *      or fabricated; the trigger and its function are dropped in a
+ *      `finally` block so no test-only schema object survives a failed run.
  *
  * None of these tests touch player_match_stats/match_period_scores content:
  * the fixture match has none, so "no partial dependent deletion" is proven
@@ -69,7 +85,7 @@ let seeded = 0;
 
 const nextKey = (prefix: string) => `${MARKER.toLowerCase()}-${prefix}-${Date.now().toString(36)}-${seeded += 1}`;
 
-async function createFixtureMatch(matchKey: string): Promise<number> {
+async function createFixtureMatch(matchKey: string, venueRaw: string = MARKER): Promise<number> {
   const [match] = await owner<{ id: number }[]>`
     INSERT INTO matches (
       match_key, season, round_code, round_type, round_number, is_final, match_date,
@@ -77,7 +93,7 @@ async function createFixtureMatch(matchKey: string): Promise<number> {
       winner_club_id, margin, attendance_status
     ) VALUES (
       ${matchKey}, ${fixtureSeason}::smallint, '1', 'home_and_away', 1, false,
-      ${`${fixtureSeason}-03-01`}::date, ${MARKER}, ${clubHomeId}, ${clubAwayId}, 82, 76,
+      ${`${fixtureSeason}-03-01`}::date, ${venueRaw}, ${clubHomeId}, ${clubAwayId}, 82, 76,
       'home_win', ${clubHomeId}, 6, 'not_collected'
     ) RETURNING id::int AS id`;
   return match.id;
@@ -209,16 +225,8 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
     await owner`DELETE FROM player_match_period_stats WHERE match_id = ${matchId}`;
   });
 
-  it('maps an un-pre-checked FK violation (23503) to a refusal instead of throwing', async () => {
-    // staging.afl_api_lineup.match_id (migration 077) is nullable with no ON
-    // DELETE clause and deleteMatch never clears or checks it -- the
-    // remaining out-of-scope blocker named in the AFLDB-ISSUE-177 follow-up
-    // notes, reserved for a future issue. It is used here ONLY as a reliable
-    // way to force a genuine 23503 that neither pre-check above can have
-    // already caught, now that AFLDB-ISSUE-180 pre-checks
-    // player_match_period_stats. No friendly handling for afl_api_lineup is
-    // added by this test or by ISSUE-180.
-    const matchId = await createFixtureMatch(nextKey('match-c'));
+  it('AFLDB-ISSUE-181: refuses deletion, names the AFL API lineup dependency, and changes nothing', async () => {
+    const matchId = await createFixtureMatch(nextKey('match-e'));
     const providerMatchId = nextKey('provider-match');
     const providerTeamId = nextKey('provider-team');
     const providerPlayerId = nextKey('provider-player');
@@ -232,7 +240,7 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
 
     await owner`
       INSERT INTO staging.source_payloads (source_id, family, payload_hash, hash_recipe, raw_payload)
-      VALUES (${fixtureSourceId}, 'lineup', ${payloadHash}, 'issue-180-fixture',
+      VALUES (${fixtureSourceId}, 'lineup', ${payloadHash}, 'issue-181-fixture',
               ${owner.json({ marker: MARKER } as never)})`;
 
     await owner`
@@ -257,21 +265,115 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
         ${matchId}, ${batch.id}
       )`;
 
-    const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER} 23503 fallback proof` });
+    const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER}-181 refusal proof` });
 
     expect(result.ok, result.ok ? '' : result.error).toBe(false);
     if (!result.ok) {
-      expect(result.error).toMatch(/another record still depends on it/);
+      expect(result.error).toMatch(/AFL API lineup/i);
+      expect(result.error).toContain(String(fixtureSeason));
+      expect(result.error).toContain(providerMatchId);
       expect(result.error).not.toMatch(/foreign key|constraint|SQLSTATE|23503/i);
     }
 
+    // The canonical match survives.
     const [stillMatch] = await owner<{ n: number }[]>`
       SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
     expect(stillMatch.n).toBe(1);
+
+    // The staging lineup row survives, WITH its match_id link intact --
+    // never nulled/detached.
+    const [stillLineup] = await owner<{ matchId: number | null }[]>`
+      SELECT match_id AS "matchId" FROM staging.afl_api_lineup
+       WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
+    expect(stillLineup.matchId).toBe(matchId);
+
+    // Upstream staging lineage (the observation spine) survives untouched.
+    const [stillVersion] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM staging.source_record_versions
+       WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
+    expect(stillVersion.n).toBe(1);
 
     await owner`DELETE FROM staging.afl_api_lineup WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
     await owner`DELETE FROM staging.source_record_versions WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
     await owner`DELETE FROM staging.source_payloads WHERE source_id = ${fixtureSourceId} AND payload_hash = ${payloadHash}`;
     await owner`DELETE FROM import_batches WHERE id = ${batch.id}`;
+  });
+
+  it('maps a genuine race-window FK violation (23503) to a refusal instead of throwing', async () => {
+    // AFLDB-ISSUE-181's FK inventory (see the issue entry) found that every
+    // static foreign key into matches(id) is now pre-checked, actively
+    // cleared, or auto-handled (CASCADE/SET NULL) -- so no ordinary fixture
+    // can force deleteMatch's own `DELETE FROM matches` to hit a raw,
+    // un-pre-checked 23503 any more. The generic catch's real remaining job
+    // is the race window its own comment names: a dependency created AFTER
+    // a pre-check runs but BEFORE `DELETE FROM matches` executes, inside the
+    // SAME transaction. That interleaving can't be forced deterministically
+    // from a second connection, so it is simulated here from INSIDE
+    // deleteMatch's own transaction with a test-only `BEFORE DELETE` trigger
+    // on `matches`.
+    //
+    // The trigger is scoped by a `WHEN` clause to this one fixture match's
+    // unique `venue_raw` marker (generated fresh per run), so it can never
+    // fire for any other row -- in this file or any other test file sharing
+    // afldb_test -- even under parallel test execution. When PostgreSQL
+    // fires it (immediately before removing the matches row, which is
+    // strictly after deleteMatch's own player_match_period_stats pre-check
+    // already ran and found nothing), it inserts a genuine
+    // player_match_period_stats row referencing the match being deleted.
+    // The subsequent NO ACTION FK check on `DELETE FROM matches` then raises
+    // a real PostgreSQL 23503 -- not a fabricated error -- and the whole
+    // transaction, including the trigger's own INSERT, rolls back with it,
+    // so nothing (not even the trigger-injected row) survives.
+    const trapVenue = `${MARKER}-181-23503-trap-${Date.now().toString(36)}-${seeded += 1}`;
+    const matchId = await createFixtureMatch(nextKey('match-c'), trapVenue);
+    const fnName = `fn_issue_181_trap_${matchId}`;
+    const trgName = `trg_issue_181_trap_${matchId}`;
+
+    try {
+      await owner.unsafe(`
+        CREATE OR REPLACE FUNCTION ${fnName}() RETURNS trigger AS $trap$
+        BEGIN
+          INSERT INTO player_match_period_stats (player_id, match_id, club_id, period)
+          VALUES ((SELECT id FROM players ORDER BY id LIMIT 1), OLD.id, OLD.home_club_id, 9);
+          RETURN OLD;
+        END;
+        $trap$ LANGUAGE plpgsql
+      `);
+      await owner.unsafe(`
+        CREATE TRIGGER ${trgName}
+        BEFORE DELETE ON matches
+        FOR EACH ROW
+        WHEN (OLD.venue_raw = '${trapVenue}')
+        EXECUTE FUNCTION ${fnName}()
+      `);
+
+      const result = await deleteMatch({
+        matchId, adminUserId: actorId, reason: `${MARKER} 23503 race-window proof`,
+      });
+
+      expect(result.ok, result.ok ? '' : result.error).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toMatch(/another record still depends on it/);
+        expect(result.error).not.toMatch(/foreign key|constraint|SQLSTATE|23503/i);
+      }
+
+      // No partial deletion: the canonical match survives.
+      const [stillMatch] = await owner<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
+      expect(stillMatch.n).toBe(1);
+
+      // The trigger's own INSERT rolled back with the rest of the failed
+      // transaction -- it does not leak as an orphaned dependent row.
+      const [leaked] = await owner<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM player_match_period_stats WHERE match_id = ${matchId}`;
+      expect(leaked.n).toBe(0);
+    } finally {
+      // Trigger/function/fixture cleanup runs even if an assertion above
+      // throws, so a failed run never leaves test-only schema objects
+      // behind for the next one.
+      await owner.unsafe(`DROP TRIGGER IF EXISTS ${trgName} ON matches`);
+      await owner.unsafe(`DROP FUNCTION IF EXISTS ${fnName}()`);
+      await owner`DELETE FROM matches WHERE id = ${matchId}`;
+    }
   });
 });

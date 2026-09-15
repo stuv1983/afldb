@@ -485,6 +485,47 @@ export async function deleteMatch(input: {
         };
       }
 
+      // AFLDB-ISSUE-181: `staging.afl_api_lineup.match_id` (migration 077)
+      // is nullable with no `ON DELETE` clause. A lineup row is the
+      // provider's team-ANNOUNCEMENT for this fixture -- STAGING-ONLY
+      // evidence, never canonical participation (migration 077's header is
+      // explicit: "an announced player is NOT a player who played") -- but
+      // it is still the source's own observation, carrying its own
+      // provenance chain back through `staging.source_record_versions` and
+      // `staging.source_payloads`. `lineup-store.ts` maintains the
+      // projection by keyed upsert alone and owns an explicit invariant
+      // that it never deletes or truncates a row; there is no importer path
+      // that re-resolves a lineup row's `match_id` to a different match
+      // once linked. Nulling or detaching it here would both violate that
+      // ownership and discard the announcement-to-fixture link, so the
+      // match is refused instead, before anything destructive runs -- same
+      // shape as the Brownlow, collateral, staging and period-stats checks
+      // above.
+      const lineupLinks = await tx<{
+        providerMatchId: string; season: number; rowCount: number;
+      }[]>`
+        SELECT provider_match_id AS "providerMatchId", season, count(*)::int AS "rowCount"
+          FROM staging.afl_api_lineup
+         WHERE match_id = ${input.matchId}
+         GROUP BY provider_match_id, season
+         ORDER BY season, provider_match_id
+      `;
+      if (lineupLinks.length > 0) {
+        const totalRows = lineupLinks.reduce((sum, r) => sum + r.rowCount, 0);
+        const named = lineupLinks
+          .map((r) => `season ${r.season} game ${r.providerMatchId} `
+            + `(${r.rowCount} row${r.rowCount === 1 ? '' : 's'})`)
+          .join(', ');
+        return {
+          ok: false as const,
+          error:
+            `Match #${input.matchId} is still linked by ${totalRows} AFL API lineup `
+            + `staging row${totalRows === 1 ? '' : 's'} (${named}) and cannot be deleted. `
+            + 'Clear or re-resolve the lineup staging link through the AFL API lineup '
+            + 'import process first.',
+        };
+      }
+
       // 2. Identify all affected players in this match
       const playerRows = await tx<{ playerId: number }[]>`
         SELECT DISTINCT player_id AS "playerId"
@@ -540,19 +581,24 @@ export async function deleteMatch(input: {
       affectedPlayers: result.affectedPlayers,
     };
   } catch (error) {
-    // AFLDB-ISSUE-177 concurrency backstop, extended by AFLDB-ISSUE-180. The
-    // staging and period-stats pre-checks above are point-in-time reads, not
-    // locks, so a concurrent write can relink `local_match_id` or insert a
-    // period-stats row between that check and `DELETE FROM matches` above.
-    // This is also still the ONLY guard for `staging.afl_api_lineup.match_id`
-    // (migration 077, nullable, no `ON DELETE`), which remains deliberately
-    // unchecked -- a named refusal for it is out of this issue's scope (see
-    // the AFLDB-ISSUE-177 follow-up). Whatever FK actually fires, it raises a
-    // raw 23503 (foreign_key_violation) -- exactly the opaque database
-    // exception this issue exists to keep out of the admin UI. It is mapped
-    // to the same refusal shape without inspecting the constraint name
-    // (which FK fired can't be known without that, and isn't needed for a
-    // useful message); every other error still throws.
+    // AFLDB-ISSUE-177 concurrency backstop, extended by AFLDB-ISSUE-180 and
+    // AFLDB-ISSUE-181. The staging, period-stats and lineup pre-checks above
+    // are each a point-in-time read, not a lock, so a concurrent write can
+    // relink `local_match_id`, insert a period-stats row or insert a lineup
+    // row between that check and `DELETE FROM matches` above. As of
+    // AFLDB-ISSUE-181, every foreign key into `matches(id)` with default
+    // `NO ACTION` that this function's own statements can violate is
+    // pre-checked above (or, for `player_clubs.first_match_id`/
+    // `last_match_id`, actively cleared before the delete by
+    // `clearPlayerClubMatchReferences`) -- see the AFLDB-ISSUE-181 issue
+    // entry for the full inventory. This catch therefore now guards only
+    // that race window and any future dependency this function has not yet
+    // learned about. Whatever FK actually fires, it raises a raw 23503
+    // (foreign_key_violation) -- exactly the opaque database exception this
+    // issue exists to keep out of the admin UI. It is mapped to the same
+    // refusal shape without inspecting the constraint name (which FK fired
+    // can't be known without that, and isn't needed for a useful message);
+    // every other error still throws.
     if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503') {
       return {
         ok: false,
