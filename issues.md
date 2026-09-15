@@ -28038,3 +28038,62 @@ more than once) to check whether the pre-fix race had already produced an incons
 or prod. Those queries were not run as part of this closeout — the identified failure modes are
 behavioural (concurrency/status coherence), not evidence that existing data is already
 inconsistent — and running them remains available to the operator at their discretion.
+
+## AFLDB-ISSUE-178 — Join-request approval is not atomic
+
+- **Severity:** Medium (data-integrity/audit-trail safeguard; no evidence of an already-inconsistent
+  row was sought or found — this closes a latent gap, not a repair of live data).
+- **Area:** Admin / access — `src/app/admin/access/actions.ts` (`approveJoinRequest`).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-178`, branch
+  `sonnet/issue-178-join-approval-atomicity`.
+- **Found:** 2026-09-15, during the same admin-mutation-boundary audit that opened
+  AFLDB-ISSUE-175/176/177.
+- **Resolved:** 2026-09-15.
+- **Key files:** `src/app/admin/access/actions.ts` (`approveJoinRequest`);
+  `tests/integration/join-request-approval.test.ts` (new).
+
+### Symptom
+`approveJoinRequest` committed the `beta_join_requests` UPDATE, the `beta_allowed_emails` upsert
+and the `access.join_approved` audit row as three independent statements on the auth pool. A
+failure on either of the last two left a request recorded as `'approved'` without the email
+actually being allowlisted, or an approval live with no audit row.
+
+### Root cause
+The three writes had no shared transaction boundary, unlike the sibling `deleteAccessCode` action
+in the same file, which already uses `authSql.begin` plus `auditInTransaction` (AFLDB-ISSUE-119/117).
+
+### Fix
+All three writes now run inside one `authSql.begin(async (tx) => ...)` transaction, with
+`auditInTransaction(tx, ...)` replacing the pooled `audit(...)` call for the approval audit row.
+The existing `WHERE id = ? AND status = 'pending'` predicate on the first UPDATE is unchanged and
+remains the sole eligibility/concurrency boundary — two administrators approving the same request
+still cannot both succeed. No intermediate status was introduced. No migration or privilege change
+was required: `afldb_auth` already holds `INSERT`/`UPDATE` on `beta_join_requests` and
+`beta_allowed_emails` and `INSERT` on `auth_audit_log` (migration 023/024).
+
+### Validation
+Operator ran, 2026-09-15:
+- `npx vitest run tests/integration/join-request-approval.test.ts` (against `afldb_test`) — 1 test
+  file passed, 5/5 tests passed. Confirmed: the happy path approves the pending join request,
+  allowlists the email and writes the approval audit atomically; unknown/already-reviewed ids get
+  the same "Already reviewed or not found." refusal; a genuine mid-transaction PostgreSQL 23505
+  failure — forced with a real constraint, not a mocked rejection: `beta_allowed_emails` carries
+  both a byte-wise `UNIQUE(email)` (the `ON CONFLICT` arbiter) and a separate case-insensitive
+  `uq_beta_allowed_emails_lower` (migration 044), so a fixture row planted directly with a
+  different-case twin of the request's email misses the arbiter and hits the case-insensitive index
+  instead — rolls back the entire approval: the request remains pending, `reviewed_by`/
+  `reviewed_at` remain unchanged, no new allowlist state survives, the pre-existing revoked
+  allowlist row remains unchanged, and no approval audit row survives; two concurrent approvals of
+  the same request produce exactly one winner; a concurrent approve-vs-deny race produces exactly
+  one state-transition winner with a consistent final state and audit trail.
+- `npx vitest run tests/admin-access-actions.test.ts tests/integration/access-codes.test.ts`
+  (narrow regression) — 2 test files passed, 21/21 tests passed.
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+
+### Follow-up
+`denyJoinRequest` still writes its audit row as a separate, non-transactional `audit(...)` call
+after its own `UPDATE`. Not changed here per scope — the existing `WHERE status = 'pending'`
+predicate already serializes it safely against a concurrent approval (proved by the new
+approve/deny test above), and a failed audit write after a successful deny is a narrower gap (a
+denial with a missing log entry, not a live-but-unlogged grant of access) than the one this issue
+fixes. Candidate for a follow-up issue if a transactional audit trail for denial is wanted.

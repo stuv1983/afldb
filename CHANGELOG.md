@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Join-request approval commits atomically with its allowlist entry and audit row (AFLDB-ISSUE-178) - 15 September 2026
+
+- `approveJoinRequest` now runs the `beta_join_requests` approval, the `beta_allowed_emails`
+  insert/reactivation and the `access.join_approved` audit row inside one transaction
+  (`authSql.begin` with `auditInTransaction`), instead of as three independent statements.
+  Previously a failure on either of the last two could leave a request recorded as approved
+  without the email actually being allowlisted, or an approval live with no audit trail.
+- The existing `WHERE id = ? AND status = 'pending'` predicate is unchanged and remains the sole
+  eligibility/concurrency boundary — two administrators approving the same request still cannot
+  both succeed. No intermediate status was introduced, no migration was required, and no privilege
+  was widened.
+
 ### Match deletion refuses cleanly when a current-season staging link still points at it (AFLDB-ISSUE-177) - 15 September 2026
 
 - `deleteMatch` now checks `staging.external_current_matches.local_match_id` before deleting a
