@@ -28172,3 +28172,82 @@ privilege widening was required; all existing operator-facing messages were pres
 
 ### Follow-up
 None identified.
+
+## AFLDB-ISSUE-180 — Match deletion falls through to a generic error for period-stat dependents
+
+- **Severity:** Medium (data-integrity/UX safeguard; a read-only DEV audit against `afldb_dev`
+  found 0 `player_match_period_stats` rows, so this closes a latent gap rather than repairs live
+  data).
+- **Area:** Admin / match deletion — `src/db/queries/match-admin.ts` (`deleteMatch`).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-180`, branch
+  `sonnet/issue-180-match-period-stats-delete-refusal`.
+- **Found:** 2026-09-15, as the first of two named follow-ups in the AFLDB-ISSUE-177 follow-up
+  notes (`player_match_period_stats.match_id` and `staging.afl_api_lineup.match_id`).
+- **Resolved:** 2026-09-15.
+- **Key files:** `src/db/queries/match-admin.ts` (`deleteMatch`);
+  `tests/integration/match-admin-delete.test.ts` (extended).
+
+### Symptom
+Deleting a match still referenced by `player_match_period_stats.match_id` (`NOT NULL`, no
+`ON DELETE` clause, migration 062) fell through to ISSUE-177's generic SQLSTATE 23503 fallback
+message ("another record still depends on it ... check current-season staging") instead of a
+message identifying quarter-by-quarter player statistics as the actual blocker.
+
+### Root cause
+`deleteMatch` pre-checked Brownlow, ISSUE-167 special-record collateral, and (as of ISSUE-177)
+current-season staging dependents, but never inspected `player_match_period_stats`, so the only
+thing standing between an admin delete and a misleading generic message was the FK itself.
+
+### Fix
+Added an explicit pre-check inside `deleteMatch`'s existing locked transaction, after the
+ISSUE-177 staging check and before the affected-player/delete work: a `SELECT count(*)` /
+`count(DISTINCT player_id)` against `player_match_period_stats` for the match. If any row matches,
+the match is refused with an error naming the row count and distinct-player count, in the same
+refusal shape as the Brownlow/collateral/staging checks above; no row is touched or detached, and
+no SQLSTATE/constraint text is exposed. The ISSUE-177 generic 23503 fallback and its comment were
+kept as the concurrency/unknown-dependency backstop, extended to note it is now also the only guard
+for the still out-of-scope `staging.afl_api_lineup.match_id` (migration 077, nullable, no
+`ON DELETE`) -- deliberately not handled by this issue. No migration or privilege change was
+required or made.
+
+### Validation
+Extended `tests/integration/match-admin-delete.test.ts` (runs against `afldb_test`):
+- New case: a match carrying a `player_match_period_stats` row refuses deletion with an error
+  matching `/player period statistic/i` and containing the row/player counts, no
+  foreign-key/constraint/SQLSTATE/23503 text; the canonical match and the period-stat row both
+  survive.
+- Existing clean-deletion and ISSUE-177 staging-refusal cases are unchanged and still pass.
+- The ISSUE-177 23503-fallback case was re-pointed at `staging.afl_api_lineup.match_id` (seeded
+  directly through `staging.source_payloads` / `staging.source_record_versions` /
+  `staging.afl_api_lineup`, bypassing the `persistLineupBundle()` application path entirely) since
+  `player_match_period_stats` is now pre-checked and can no longer force an un-pre-checked FK
+  violation. That table gets no friendly handling in this issue -- it remains the explicitly
+  reserved next follow-up, unhandled in production.
+
+Operator ran, 2026-09-15:
+- `npx vitest run tests/integration/match-admin-delete.test.ts` (against `afldb_test`) — 1 test
+  file passed, 4/4 tests passed. Confirmed: the existing ISSUE-177
+  `staging.external_current_matches` refusal still works; a clean match still deletes normally; a
+  match carrying a `player_match_period_stats` row now receives a friendly domain refusal that
+  identifies player period statistics, exposes no raw FK/SQLSTATE text, and leaves both the
+  canonical match and the period-stat row intact; and the generic SQLSTATE 23503 fallback still
+  works end-to-end via the still-unchecked `staging.afl_api_lineup.match_id` dependency.
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+- Read-only DEV audit against `afldb_dev` (via `AFLDB_OWNER_DATABASE_URL`): `period_stat_rows` = 0,
+  `distinct_matches` = 0, no rows returned by the per-period breakdown. No existing
+  `player_match_period_stats` rows, no affected matches, no malformed period values found — no
+  repair or backfill required.
+
+Design confirmed: `player_match_period_stats.match_id` is `NOT NULL REFERENCES matches(id)`,
+default `NO ACTION`; player period statistics are canonical per-period data and are not silently
+deleted or detached; `deleteMatch` now explicitly checks `player_match_period_stats` before any
+destructive work and reports useful period-stat/player counts; the ISSUE-177 generic 23503 fallback
+remains the unknown-dependency/concurrency backstop; `staging.afl_api_lineup` remains intentionally
+unhandled in production, reserved for a separate future issue; no migration or privilege widening
+was required or made.
+
+### Follow-up
+`staging.afl_api_lineup.match_id` (migration 077, nullable, no `ON DELETE`) remains an
+un-pre-checked dependency that falls through to the generic 23503 fallback, deliberately out of
+this issue's scope per the AFLDB-ISSUE-177 follow-up notes. Candidate for a future issue if a named
+refusal for it is wanted.

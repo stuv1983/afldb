@@ -15,6 +15,17 @@ commit.
 
 ## [Unreleased]
 
+### Match deletion refuses cleanly when player period statistics still reference it (AFLDB-ISSUE-180) - 15 September 2026
+
+- `deleteMatch` now explicitly checks `player_match_period_stats` before any destructive work.
+  A match still carrying quarter-by-quarter player statistics is refused with a message naming
+  the row and distinct-player counts, instead of falling through to the generic dependency-refusal
+  message. The period-stat rows are never touched or detached.
+- The existing generic SQLSTATE 23503 fallback (AFLDB-ISSUE-177) remains as the
+  concurrency/unknown-dependency backstop, and is now also the only guard for
+  `staging.afl_api_lineup.match_id`, which is deliberately left unhandled and reserved for a
+  future issue. No migration was required, and no privilege was widened.
+
 ### Join-request denial commits atomically with its audit row (AFLDB-ISSUE-179) - 15 September 2026
 
 - `denyJoinRequest` now runs the `beta_join_requests` denial and the `access.join_denied` audit

@@ -4,32 +4,45 @@
  * `staging.external_current_matches.local_match_id` (migration 063) reach
  * the admin UI as an unhandled exception.
  *
- * Two refusal paths are proven here, deliberately kept separate:
+ * AFLDB-ISSUE-180 extends the same file with a second named dependency:
+ * `player_match_period_stats.match_id` (migration 062, NOT NULL, no
+ * ON DELETE clause) now gets its own friendly pre-check instead of falling
+ * through to the generic 23503 fallback.
  *
- *   1. THE FRIENDLY PRE-CHECK -- a staging row with `local_match_id` set to
- *      the fixture match is seeded directly, so `deleteMatch`'s own SELECT
- *      finds it before anything destructive runs. This is the path every
- *      real operator click takes.
+ * Three refusal paths are proven here, deliberately kept separate:
  *
- *   2. THE 23503 FALLBACK -- the concurrency backstop for a staging row
- *      relinked between that pre-check and the `DELETE FROM matches`
- *      statement. That exact interleaving cannot be forced deterministically
- *      from outside a single `deleteMatch` call, so this test instead forces
- *      a REAL, un-pre-checked foreign-key violation via
- *      `player_match_period_stats.match_id` (migration 062, NOT NULL, no
- *      ON DELETE clause) -- a genuinely different, already-identified but
- *      out-of-scope blocking dependency (see AFLDB-ISSUE-177 follow-up
- *      notes). `deleteMatch` never pre-checks that table, so calling it
- *      against a match carrying a period-stats row exercises the real
- *      catch(error.code === '23503') mapping end-to-end against a genuine
- *      Postgres error, not a source-inspected assumption about the code.
+ *   1. THE STAGING FRIENDLY PRE-CHECK (ISSUE-177) -- a staging row with
+ *      `local_match_id` set to the fixture match is seeded directly, so
+ *      `deleteMatch`'s own SELECT finds it before anything destructive
+ *      runs.
  *
- * Neither test touches player_match_stats/match_period_scores content: the
- * fixture match has none, so "no partial dependent deletion" is proven by
- * the match row itself surviving intact, same as the ISSUE-167 Stage 6
+ *   2. THE PERIOD-STATS FRIENDLY PRE-CHECK (ISSUE-180) -- a
+ *      `player_match_period_stats` row is seeded directly, so `deleteMatch`
+ *      refuses with a named count instead of forcing a raw FK violation.
+ *
+ *   3. THE 23503 FALLBACK -- the concurrency backstop for a dependency
+ *      relinked between a pre-check and the `DELETE FROM matches` statement.
+ *      That exact interleaving cannot be forced deterministically from
+ *      outside a single `deleteMatch` call, so this test instead forces a
+ *      REAL, un-pre-checked foreign-key violation via
+ *      `staging.afl_api_lineup.match_id` (migration 077, nullable, no
+ *      ON DELETE clause) -- now that ISSUE-180 pre-checks
+ *      `player_match_period_stats`, that table can no longer exercise this
+ *      path. `staging.afl_api_lineup` is deliberately left WITHOUT a named
+ *      refusal here: it is the remaining out-of-scope blocker reserved for
+ *      the next follow-up issue (see the AFLDB-ISSUE-177 follow-up notes),
+ *      and this test only proves the generic catch(error.code === '23503')
+ *      mapping still works end-to-end against a genuine Postgres error, not
+ *      a source-inspected assumption about the code.
+ *
+ * None of these tests touch player_match_stats/match_period_scores content:
+ * the fixture match has none, so "no partial dependent deletion" is proven
+ * by the match row itself surviving intact, same as the ISSUE-167 Stage 6
  * pattern this file otherwise follows.
  */
 import './guard';
+
+import { createHash } from 'node:crypto';
 
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -104,7 +117,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Child-before-parent: staging.afl_api_lineup and staging.source_record_versions
+  // both reference import_batches and (via the composite FK) each other's
+  // source_payloads row; sources is deleted last since everything above
+  // references source_id.
+  await owner`DELETE FROM staging.afl_api_lineup WHERE source_id = ${fixtureSourceId}`;
+  await owner`DELETE FROM staging.source_record_versions WHERE source_id = ${fixtureSourceId}`;
+  await owner`DELETE FROM staging.source_payloads WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM staging.external_current_matches WHERE source_id = ${fixtureSourceId}`;
+  await owner`DELETE FROM import_batches WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM sources WHERE key = ${FIXTURE_SOURCE_KEY}`;
   await owner`DELETE FROM matches WHERE venue_raw = ${MARKER}`;
   if (createdThrowawayAdmin) {
@@ -160,16 +181,81 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
     expect(gone.n).toBe(0);
   });
 
-  it('maps an un-pre-checked FK violation (23503) to a refusal instead of throwing', async () => {
-    // player_match_period_stats.match_id (migration 062) is NOT NULL with no
-    // ON DELETE clause and deleteMatch never clears or checks it -- a real,
-    // already-flagged, out-of-scope gap (see AFLDB-ISSUE-177 follow-up notes)
-    // used here only as a reliable way to force a genuine 23503 that the
-    // staging pre-check above cannot have already caught.
-    const matchId = await createFixtureMatch(nextKey('match-c'));
+  it('AFLDB-ISSUE-180: refuses deletion, names the period-stats dependency, and changes nothing', async () => {
+    const matchId = await createFixtureMatch(nextKey('match-d'));
     await owner`
       INSERT INTO player_match_period_stats (player_id, match_id, club_id, period)
       VALUES (${fixturePlayerId}, ${matchId}, ${clubHomeId}, 1)`;
+
+    const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER}-180 refusal proof` });
+
+    expect(result.ok, result.ok ? '' : result.error).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/player period statistic/i);
+      expect(result.error).toContain('1');
+      expect(result.error).not.toMatch(/foreign key|constraint|SQLSTATE|23503/i);
+    }
+
+    // The canonical match survives.
+    const [stillMatch] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
+    expect(stillMatch.n).toBe(1);
+
+    // The period-stat row survives untouched.
+    const [stillStats] = await owner<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM player_match_period_stats WHERE match_id = ${matchId}`;
+    expect(stillStats.n).toBe(1);
+
+    await owner`DELETE FROM player_match_period_stats WHERE match_id = ${matchId}`;
+  });
+
+  it('maps an un-pre-checked FK violation (23503) to a refusal instead of throwing', async () => {
+    // staging.afl_api_lineup.match_id (migration 077) is nullable with no ON
+    // DELETE clause and deleteMatch never clears or checks it -- the
+    // remaining out-of-scope blocker named in the AFLDB-ISSUE-177 follow-up
+    // notes, reserved for a future issue. It is used here ONLY as a reliable
+    // way to force a genuine 23503 that neither pre-check above can have
+    // already caught, now that AFLDB-ISSUE-180 pre-checks
+    // player_match_period_stats. No friendly handling for afl_api_lineup is
+    // added by this test or by ISSUE-180.
+    const matchId = await createFixtureMatch(nextKey('match-c'));
+    const providerMatchId = nextKey('provider-match');
+    const providerTeamId = nextKey('provider-team');
+    const providerPlayerId = nextKey('provider-player');
+    const externalRecordId = `${providerMatchId}|${providerTeamId}|${providerPlayerId}`;
+    const payloadHash = createHash('sha256').update(externalRecordId).digest('hex');
+
+    const [batch] = await owner<{ id: number }[]>`
+      INSERT INTO import_batches (source_id, tool, target_table)
+      VALUES (${fixtureSourceId}, 'tests/integration/match-admin-delete', 'staging.afl_api_lineup')
+      RETURNING id`;
+
+    await owner`
+      INSERT INTO staging.source_payloads (source_id, family, payload_hash, hash_recipe, raw_payload)
+      VALUES (${fixtureSourceId}, 'lineup', ${payloadHash}, 'issue-180-fixture',
+              ${owner.json({ marker: MARKER } as never)})`;
+
+    await owner`
+      INSERT INTO staging.source_record_versions (
+        source_id, family, external_record_id, version_seq, payload_hash,
+        observed_from, opened_by_batch_id
+      ) VALUES (
+        ${fixtureSourceId}, 'lineup', ${externalRecordId}, 1, ${payloadHash},
+        now(), ${batch.id}
+      )`;
+
+    await owner`
+      INSERT INTO staging.afl_api_lineup (
+        source_id, family, external_record_id, version_seq,
+        provider_match_id, provider_team_id, provider_player_id,
+        season, round_number, status, team_status,
+        match_id, projected_by_batch_id
+      ) VALUES (
+        ${fixtureSourceId}, 'lineup', ${externalRecordId}, 1,
+        ${providerMatchId}, ${providerTeamId}, ${providerPlayerId},
+        ${fixtureSeason}::smallint, 1, 'CONCLUDED', 'FINAL_TEAM',
+        ${matchId}, ${batch.id}
+      )`;
 
     const result = await deleteMatch({ matchId, adminUserId: actorId, reason: `${MARKER} 23503 fallback proof` });
 
@@ -183,6 +269,9 @@ describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cann
       SELECT count(*)::int AS n FROM matches WHERE id = ${matchId}`;
     expect(stillMatch.n).toBe(1);
 
-    await owner`DELETE FROM player_match_period_stats WHERE match_id = ${matchId}`;
+    await owner`DELETE FROM staging.afl_api_lineup WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
+    await owner`DELETE FROM staging.source_record_versions WHERE source_id = ${fixtureSourceId} AND external_record_id = ${externalRecordId}`;
+    await owner`DELETE FROM staging.source_payloads WHERE source_id = ${fixtureSourceId} AND payload_hash = ${payloadHash}`;
+    await owner`DELETE FROM import_batches WHERE id = ${batch.id}`;
   });
 });
