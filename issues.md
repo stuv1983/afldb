@@ -4,10 +4,13 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 3
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
+| AFLDB-ISSUE-194 | Low (P3) | NL team-match compiler — `src/db/queries/nl/team-match.ts` | Open | Implement the `scope.matchup` home-side gate for symmetric metrics; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
+| AFLDB-ISSUE-195 | High (P1) | NL parser / club-season semantics — `src/search/nl/vocab.ts`, `parser.ts`, `plan.ts` | Open | Recognise "won the premiership" in `CLUB_SEASON_CONDITION_WORDS` and stop club-season grain election from discarding stranded premiership semantics; regression in the ISSUE-189 block of `tests/nl-parser.test.ts` |
+| AFLDB-ISSUE-196 | High (P1) | NL parser / career numeric binding — `src/search/nl/parser.ts` | Open | Make `extractCareerConditions` bind numbers in sentence order instead of vocabulary order across `at`/`for`/`with`/`across`/`over`; regression in `tests/nl-parser.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32047,3 +32050,212 @@ plan for "clubs that have won more than 10 premierships" was intentionally corre
 issue to assert the decline instead; that ISSUE-188 case is otherwise unaffected (its player-subject
 gating stays correct) and no other ISSUE-188 coverage was weakened. No migration/schema change. No
 follow-up recorded.
+
+## AFLDB-ISSUE-194 — NL: matchup-scoped symmetric team-match metrics duplicate physical matches
+
+- **Severity:** Low (P3).
+- **Area:** NL team-match compiler — `src/db/queries/nl/team-match.ts`.
+- **Status:** Open.
+- **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e` (after the
+  AFLDB-ISSUE-192 merge). Confirmed with DB-backed evidence via `AFLDB_TEST_DATABASE_URL`.
+- **Key files:** `src/db/queries/nl/team-match.ts`.
+
+### Trigger examples
+- "biggest crowd richmond v carlton"
+
+### Affected symmetric metric family
+- `attendance`
+- `total_score`
+
+### Confirmed DB-backed evidence
+```
+MATCHUP-PROBE attendance Adelaide v Brisbane Bears: rows=6 distinct=3 total=6 ids=[10336,10336,10770,10770,10222,10222]
+MATCHUP-PROBE total_score Adelaide v Brisbane Bears: rows=6 distinct=3 total=6 ids=[10222,10222,10664,10664,10815,10815]
+```
+
+### Expected vs actual
+Expected: one result row per physical match; a total equal to the distinct physical-match count;
+a top-N returning N distinct matches subject to normal tie semantics. Actual: each physical match
+appears once per SIDES perspective, the total is doubled, and ranking becomes effectively
+`1,1,3,3,5,5`.
+
+### Root cause
+The AFLDB-ISSUE-192 fix applies the canonical home-side predicate for symmetric metrics only when
+there is no side scope. `scope.matchup` currently counts as side scope, but unlike `clubFor` /
+`clubAgainst`, a matchup constraint admits both SIDES rows representing the same physical match —
+so the home-side restriction is skipped while `attendance` / `total_score` remain symmetric
+match-level metrics.
+
+### Relationship to prior issues
+Does not reopen AFLDB-ISSUE-192 (that fix is correct for the `clubFor`/`clubAgainst` scopes it
+targets). This is a neighbouring, scope-specific defect in the same compiler: a matchup constraint
+was not treated as admitting both sides of a symmetric metric the way ISSUE-192's own fix already
+treats side-scoped queries.
+
+### Implementation boundary
+`src/db/queries/nl/team-match.ts`: extend the ISSUE-192 home-side gate so a `scope.matchup`
+constraint is also recognised as admitting both SIDES rows for `attendance` / `total_score`, and
+the canonical home-side predicate applies in that case too.
+
+### Non-goals
+No change to `clubFor`/`clubAgainst` scope handling (ISSUE-192 unaffected). No change to
+non-symmetric team-match metrics.
+
+### Required tests
+DB-backed regression added to the existing ISSUE-192 symmetric-metric block in
+`tests/integration/nl-answers-team-club.test.ts`, covering "biggest crowd richmond v carlton" (and
+the equivalent `total_score` matchup shape) against `AFLDB_TEST_DATABASE_URL`.
+
+### Acceptance criteria
+- A matchup-scoped `attendance`/`total_score` query returns one row per physical match.
+- Totals/top-N counts equal distinct physical-match counts, not row counts.
+- Existing ISSUE-192 non-matchup symmetric-metric coverage is unchanged.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/integration/nl-answers-team-club.test.ts` against `AFLDB_TEST_DATABASE_URL`,
+`npx tsc --noEmit`.
+
+### Implementation recommendation
+Sonnet 5, Medium effort.
+
+## AFLDB-ISSUE-195 — NL: club-season conjunction can silently discard premiership semantics
+
+- **Severity:** High (P1).
+- **Area:** NL parser / club-season semantic ownership — `src/search/nl/vocab.ts`,
+  `src/search/nl/parser.ts`, `src/search/nl/plan.ts`.
+- **Status:** Open.
+- **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e`. Not
+  reproduced against a database (parser/plan-only defect).
+- **Key files:** `src/search/nl/vocab.ts` `CLUB_SEASON_CONDITION_WORDS`; `src/search/nl/parser.ts`
+  club-season grain election and the bare player/career metric path; `src/search/nl/plan.ts`
+  (`PARSER_VERSION` when implementation ships); `tests/nl-parser.test.ts` (the AFLDB-ISSUE-189
+  club/team subject election block).
+
+### Trigger examples
+- "teams that won the premiership and the wooden spoon"
+
+### Expected vs actual
+Expected: either a `club_season` plan containing both premiership/premier and wooden-spoon
+semantics, or an explicit decline if the conjunction cannot be represented safely. Actual:
+`status: plan`, grain `club_season`, aggregation `list`, conditions contain only `wooden_spoon` —
+premiership semantics disappear. `validatePlan` returns OK and confidence remains 1.
+
+### Root cause
+1. `CLUB_SEASON_CONDITION_WORDS` recognises `premiers`, `premiership team`/`side`, and `won the
+   flag`, but not natural wording such as `won the premiership`.
+2. The still-present `premiership` token is later consumed by the bare player/career metric path.
+3. Club-season grain election ignores `playerMetricResult.metric`.
+4. AFLDB-ISSUE-189's R2 guard does not fire because a valid club-season condition (`wooden_spoon`)
+   already exists.
+5. Confidence counts the stranded word as consumed.
+6. `validatePlan` sees a legitimate conditions-only club-season list and has no evidence that
+   meaning was dropped.
+
+### Relationship to prior issues
+Does not reopen AFLDB-ISSUE-189 (its R2 guard is correct for the case it targets — no legitimate
+club-season condition present). This is the neighbouring, condition-bearing shape ISSUE-189's R2
+does not cover: a conjunction where one clause is recognised as a club-season condition and the
+other is silently misrouted and dropped instead of also being recognised.
+
+### Implementation boundary
+Extend `CLUB_SEASON_CONDITION_WORDS` (`src/search/nl/vocab.ts`) to recognise natural premiership
+wording such as "won the premiership" alongside the existing `premiers`/`premiership team`/`won the
+flag` forms, and ensure club-season grain election does not silently drop a second recognised
+condition consumed elsewhere (`playerMetricResult.metric`) when a conjunction is present — either
+by including it in the club-season conditions, or by declining when both clauses cannot be safely
+combined.
+
+### Non-goals
+No new club-season grain or aggregation. No change to AFLDB-ISSUE-189's R2 guard for the
+no-condition case.
+
+### Required tests
+Added to the existing AFLDB-ISSUE-189 club/team subject election block in
+`tests/nl-parser.test.ts`:
+- "teams that won the premiership and the wooden spoon" must never return a plan containing only
+  `wooden_spoon`.
+- Positive neighbour: "teams that won the flag and the wooden spoon" (already-recognised wording)
+  must continue to behave correctly.
+
+### Acceptance criteria
+- The trigger phrasing either carries both semantics or declines by name — never silently drops
+  premiership meaning while returning a confident plan.
+- `PARSER_VERSION` bumped when implemented.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts`, `npx tsc --noEmit`.
+
+### Implementation recommendation
+Sonnet 5, High effort.
+
+## AFLDB-ISSUE-196 — NL: career-condition numeric binding crosses prepositional clause boundaries
+
+- **Severity:** High (P1).
+- **Area:** NL parser / numeric semantic ownership — `src/search/nl/parser.ts`.
+- **Status:** Open.
+- **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e`. Not
+  reproduced against a database (parser/plan-only defect).
+- **Key files:** `src/search/nl/parser.ts` `extractCareerConditions`, `CAREER_STAT_WORDS`;
+  `src/search/nl/plan.ts` (`PARSER_VERSION` when implementation ships); `tests/nl-parser.test.ts`
+  (career-condition / `clubs_played` binding tests).
+
+### Trigger examples
+- "players with 300 games at 2 clubs"
+
+### Expected vs actual
+Expected: either `games >= 300` AND `clubs_played >= 2`, or an explicit decline if the parser
+cannot safely bind both numbers. Actual: grain `player_career`, metric `games`, aggregation
+`list`; the career condition becomes `clubs_played >= 300`; the literal `2` is orphaned.
+`validatePlan` returns OK and confidence remains high.
+
+### Root cause
+`extractCareerConditions` processes `CAREER_STAT_WORDS` in vocabulary order rather than sentence
+order. `clubs_played` is processed before `games`. Its lookback window clips only at `" and "` and
+commas, so for "300 games at 2 clubs" the window for `clubs` spans the earlier `300`. Numeric
+extraction takes the leftmost digit and binds `300` to `clubs_played`; that number and `clubs` are
+removed. `games` is then read as a bare ranking metric. The orphaned pure-digit `2` is excluded
+from meaningful-token confidence accounting, so `validatePlan` accepts a structurally valid but
+semantically wrong plan.
+
+### Neighbouring risk
+The same mechanism may affect the prepositions `at`, `for`, `with`, `across`, `over`.
+
+### Relationship to prior issues
+New. Distinct mechanism from AFLDB-ISSUE-195 despite sharing the outer "silently wrong career/
+club-season conjunction" failure class — do not combine the two fixes.
+
+### Implementation boundary
+`src/search/nl/parser.ts` `extractCareerConditions`: bind numbers to their governing
+`CAREER_STAT_WORDS` noun in sentence order (or otherwise scope each noun's lookback window so it
+cannot cross an earlier noun's own bound number), across `at`/`for`/`with`/`across`/`over`.
+
+### Non-goals
+No new career-condition grain or metric.
+
+### Required tests
+Added to the career-condition / `clubs_played` binding tests in `tests/nl-parser.test.ts`:
+- "players with 300 games at 2 clubs"
+- one sibling such as "players with 300 games for 2 clubs"
+
+The parser must never bind `clubs_played` to `300` for either shape.
+
+### Acceptance criteria
+- Both required test phrasings bind `games >= 300` and `clubs_played >= 2` (or decline by name),
+  never `clubs_played >= 300` with an orphaned literal.
+- `PARSER_VERSION` bumped when implemented.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts`, `npx tsc --noEmit`.
+
+### Implementation recommendation
+Sonnet 5, High effort. Do not combine with AFLDB-ISSUE-195 — unrelated mechanisms and fixes despite
+the shared outer failure class.
