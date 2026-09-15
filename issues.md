@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 4
+**Open issues:** 3
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-189 | High | NL search / club-subject election | Open / Runbook approved | Fresh Sonnet 5 / Fable High session: execute `AFLDB-ISSUE-189.md` Steps 1-8 (pre-extraction club-subject cue, R2/R3 refusals, `club_season` ranking backstop, `PARSER_VERSION` 44) |
 | AFLDB-ISSUE-191 | Medium | NL search / boundary extractor | Open / Planning | Sonnet: stop bare "first" electing a debut boundary; run period-split before boundary; extend `tests/nl-parser.test.ts` |
 | AFLDB-ISSUE-192 | Low | NL search / `team-match.ts` symmetric metrics | Open / Planning | Sonnet: rank one row per match for side-independent metrics; extend `tests/integration/nl-answers-team-club.test.ts` |
 | AFLDB-ISSUE-193 | Medium | NL search / `extractHavingClause` club-subject premiership count | Open / Planning | Decide decline-by-name when a club subject's having number governs a career-only noun (premierships/flags); update the ISSUE-188 regression in `tests/nl-parser.test.ts` |
@@ -31438,7 +31437,7 @@ club subject that is not the leading word) remains open and separate — this fi
 - **Severity:** High (P1 for the player-grain misroute; P2 for the metric-less club-season dump).
 - **Area:** NL search / subject and grain election — `src/search/nl/parser.ts`,
   `src/search/nl/vocab.ts`, `src/search/nl/plan.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15 (Sonnet 5), from the approved runbook `AFLDB-ISSUE-189.md`.
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review (findings 3 and 5, consolidated by Stage 2
   as one root cause); re-verified on main `8a0c4cb`.
 - **Key files:** `src/search/nl/vocab.ts` — `CLUB_SUBJECT_LEADING` (~921, start-anchored),
@@ -31518,6 +31517,107 @@ None.
 ### Operator verification expectations
 `npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts`,
 `npx tsc --noEmit`; a targeted `nl:stress` pass on the club-subject corpus rows if one exists.
+
+### Resolution (2026-09-15, Sonnet 5, from the approved runbook)
+
+**Root cause confirmed** (against `PARSER_VERSION` 43, before this fix): the subject check
+(`CLUB_SUBJECT_LEADING`, `vocab.ts:921`) was start-anchored and tested only on `text` after it had
+already been mutated by earlier extractors. "which club/team…" never matched (the subject word is
+not leading), and `extractAggregation`'s `players?|teams?|clubs? with` → list stripping
+(`vocab.ts:168`) had already consumed "teams with" before the probe ran (`parser.ts:2397` at the
+time). With no cue set, election fell through the career branches and a career-column metric
+(premierships/flags/wins) elected `player_career`; `club`/`clubs`/`team`/`teams`/`which` are
+stopwords, so the lost subject cost no confidence. Separately, when "most" was stripped first
+("teams with the most premierships") the probe DID fire: `extractClubSeasonMetric` found nothing,
+the club_season branch ignored the already-consumed career metric, `structureOnly` was false so
+the default aggregation was `max`, and `validatePlan` accepted a metric-null `club_season` ranking
+that `answerClubSeason` (`club-season.ts`) silently degraded to `answerList` — the 25 most recent
+club seasons, presented as an answer to a ranking question.
+
+**Semantic decision (operator-approved, recorded in `AFLDB-ISSUE-189.md` D1/D2):** Decision B where
+a faithful club grain exists (`club_season`), Decision A (decline by name) everywhere else. No new
+club-lineage totals grain was built — none exists for all-time premierships/wins, and building one
+was explicitly out of scope. A club_season ranking answers one season at a time; an unscoped
+"teams with the most wins" is never reinterpreted as a best single season. The ISSUE-188
+`extractHavingClause` club-subject premiership misread (own having-clause: "clubs that have won
+more than 10 premierships" → `team_match`) is unchanged and tracked separately as AFLDB-ISSUE-193,
+which stays open.
+
+**Implementation** (`src/search/nl/vocab.ts`, `src/search/nl/parser.ts`, `src/search/nl/plan.ts`):
+- `vocab.ts`: added `CLUB_SUBJECT_CUE`, the authoritative club/team-subject cue — leading
+  `^(?:the )?(?:teams?|clubs?|sides?)\b\s+\S` or interrogative `\b(?:which|what)
+  (?:teams?|clubs?|sides?)\b` — evaluated on the canonicalised question, before any extractor runs.
+  `CLUB_SUBJECT_LEADING` is unchanged and still feeds `extractHavingClause`'s inputs untouched (the
+  ISSUE-188 contract).
+- `parser.ts`: computes `clubSubjectPreCue = CLUB_SUBJECT_CUE.test(normalised)` directly after
+  `let text = normalised;`, before any extractor can strip the cue. `clubSubjectPresent` (feeding
+  club-season election) becomes `clubSubjectPreCue || CLUB_SUBJECT_LEADING.test(text.trim())`, ORing
+  in every existing positive. Two refusals by name sit immediately before the existing ISSUE-187
+  guard, so a club question gets a club-shaped reason rather than the career-condition note:
+  - **R2** (`grain === 'club_season' && metric === null && clubSeasonConditionResult.conditions.length === 0`):
+    "AFLDB answers club questions one season at a time (wins, losses, draws, percentage, premiers,
+    wooden spoons, finals); it does not total a club's premierships or other records across its
+    history."
+  - **R3** (`grain === 'club_season' && metric !== null && clubSeasonConditionResult.conditions.length === 0 && !inOneSeason && !(seasons.seasonMin !== undefined && seasons.seasonMin === seasons.seasonMax) && !(clubFor && seasonWorded)`):
+    "Club wins, losses, draws and percentage are ranked one season at a time; add \"in a season\" or
+    a year to ask for the best single season. AFLDB does not total them across a club's history."
+    This also catches an open season range on the club-subject path ("since 2000"), which reads as
+    a total over a span rather than a single season.
+  - No separate player-grain refusal was added: with the pre-cue set and no player named, election
+    always reaches `club_season` unless an earlier club-grained branch (team_match/having,
+    team_streak, coach_record, after_siren) already claimed the question — a guard would be
+    unreachable.
+- `plan.ts`: `validatePlan` gained a backstop after the existing metric-null block — a `club_season`
+  ranking agg (`max`/`min`/`top_n`) with `metric === null` and no `clubSeasonConditions` is refused
+  ("A club-season ranking needs a statistic to rank by."), independent of parser path, so the
+  compiler-side silent-`answerList`-degrade cannot resurface through any future parser change or a
+  directly constructed plan. List/count club_season plans (conditions-only, e.g. "teams that won the
+  wooden spoon") are deliberately not refused — they are not rankings.
+- `PARSER_VERSION` bumped to 44.
+- No change to `club-season.ts`, `describe.ts`, `team-match.ts`, `query-intent.ts` or schema.
+
+**Final semantic contract:**
+- An authoritative club/team subject cue is captured on the canonicalised question, before any
+  extractor can strip it.
+- Non-subject uses of "clubs"/"teams" (a bare, non-leading occurrence such as "players who played
+  for the most clubs", "exactly two clubs") remain player-career `clubs_played` semantics — never a
+  subject cue.
+- `club_season` answers a question only when the wording establishes genuine season semantics: "in
+  a season", a single year (`seasonMin === seasonMax`), a club-season condition (premier/wooden
+  spoon/made finals/missed finals), or the unchanged named-club NL-017 path
+  (`clubFor && seasonWorded`, including its season-range acceptance).
+- An unscoped club/team ranking ("which team has the most wins") declines by name (R3) rather than
+  being reinterpreted as a best single season.
+- A metric-less, condition-less `club_season` ranking fails closed at both the parser (R2) and the
+  compiler boundary (`validatePlan` backstop).
+- Valid season-scoped club/team questions ("which team has the most wins in a season", "which club
+  had the most losses in 2017", "which clubs won the wooden spoon") continue to answer at
+  `club_season` exactly as before.
+- Grains that already answered club/team subjects correctly (`team_match` including having clauses,
+  `team_streak`, `head_to_head`, `achievement_summary`, `coach_record`, family) precede `club_season`
+  in election and are unaffected.
+
+**Validation** (operator-run, no DB — no compiler/SQL/schema/describe change; every positive lands
+on a `club_season`/`team_streak` shape already verified against hand-written SQL in
+`tests/integration/nl-answers-team-club.test.ts:457-510`; every other row is a parse-time decline):
+1. `npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts tests/nl-regression-corpus.test.ts`
+   — green. Covers the new `AFLDB-ISSUE-189: club/team subject election` describe in
+   `tests/nl-parser.test.ts` (D1-D9 declines by rule, P1-P5 positives, N1-N2 player-subject
+   neighbours) and the new `validatePlan: club_season ranking backstop (AFLDB-ISSUE-189)` describe in
+   `tests/nl-plan.test.ts` (V1-V3), plus every unchanged assertion listed in the runbook's §5
+   regression matrix (describe 13 club_season cases, the ISSUE-188 having-clause describe including
+   "clubs that have won more than 10 premierships" → `team_match` tracked by ISSUE-193, first-kick
+   summaries, "most wins"/"most premierships" → `player_career`, NL-017, and the
+   `nl-semantic-mapping.test.ts` club-subject having cases).
+2. `npx tsc --noEmit` — green.
+3. `npx vitest run tests/nl-audit-acceptance.test.ts tests/nl-describe.test.ts tests/nl-stress-corpus.test.ts tests/nl-stress-v2.test.ts tests/query-intent.test.ts`
+   — green (adjacent gate, run once after 1-2 passed).
+
+Operator confirmed all gates green 2026-09-15.
+
+**Follow-up (not part of this fix):** AFLDB-ISSUE-193 (club-subject "won more than N
+premierships/flags" misreads via the `team_match` having clause) remains open and is not touched by
+this resolution. AFLDB-ISSUE-191 and AFLDB-ISSUE-192 are unrelated and untouched.
 
 ## AFLDB-ISSUE-190 — NL: "how many …" yields `agg.kind='count'` on grains with no count semantics and answers with the rank-one leader
 

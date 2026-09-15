@@ -1,7 +1,9 @@
 # AFLDB-ISSUE-189 — Approved Runbook
 
 ## Status / objective
-- **Status:** Runbook approved 2026-09-15 (planned by Opus 5 High in plan mode). Not implemented.
+- **Status:** Runbook approved 2026-09-15 (planned by Opus 5 High in plan mode). Implemented Steps
+  1-7 2026-09-15 (Sonnet 5, this worktree); operator validation gates (§6.1-6.3) green; Step 8
+  close-out completed 2026-09-15 (Sonnet 5). Resolved — see `issues.md` AFLDB-ISSUE-189.
 - **Objective:** a club/team-subject question never answers at player grain, and never answers as a
   metric-less or season-less `club_season` dump. Answer at `club_season` only when the wording
   establishes season semantics; otherwise decline with a stated reason.

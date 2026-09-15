@@ -920,6 +920,22 @@ export const STOPWORDS = new Set([
  */
 export const CLUB_SUBJECT_LEADING = /^(?:teams?|clubs?|sides?)\b\s+\S/;
 
+/**
+ * AFLDB-ISSUE-189's authoritative club/team-subject cue. Evaluated once on
+ * the canonicalised question, before any extractor runs -- `extractAggregation`
+ * strips "teams with" and other extractors mutate `text` before
+ * `CLUB_SUBJECT_LEADING` ever sees it, so a cue read after extraction depends
+ * on extractor order and silently loses "which club/team…" (the subject word
+ * is never leading in the interrogative form) and "teams with the most X"
+ * (the leading words are consumed by `AGG_WORDS` first).
+ *
+ * A bare, non-leading "clubs"/"teams" ("played for the most clubs", "exactly
+ * two clubs", "most clubs") is deliberately NOT a cue here either: that
+ * wording means the player_career `clubs_played` column, not a club/team
+ * subject -- the same v9 lesson `CLUB_SUBJECT_LEADING` above records.
+ */
+export const CLUB_SUBJECT_CUE = /^(?:the )?(?:teams?|clubs?|sides?)\b\s+\S|\b(?:which|what) (?:teams?|clubs?|sides?)\b/;
+
 // ------------------------------------------------------- first-kick goal
 
 /**

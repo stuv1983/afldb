@@ -617,6 +617,30 @@ describe('validatePlan: count aggregation gate (AFLDB-ISSUE-190)', () => {
   });
 });
 
+describe('validatePlan: club_season ranking backstop (AFLDB-ISSUE-189)', () => {
+  it('refuses a metric-less, condition-less club_season ranking (max)', () => {
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: null, agg: { kind: 'max' }, clubSeasonConditions: [],
+    }))).toHaveProperty('error');
+  });
+
+  it('refuses a metric-less, condition-less club_season ranking (min and top_n)', () => {
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: null, agg: { kind: 'min' }, clubSeasonConditions: [],
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: null, agg: { kind: 'top_n', n: 5 }, clubSeasonConditions: [],
+    }))).toHaveProperty('error');
+  });
+
+  it('still accepts a metric-less club_season list with a condition', () => {
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: null, agg: { kind: 'list' },
+      clubSeasonConditions: [{ kind: 'premier' }],
+    }))).not.toHaveProperty('error');
+  });
+});
+
 describe('plan token round-trip', () => {
   it('encodes and decodes a plan losslessly', () => {
     const plan = basePlan({
