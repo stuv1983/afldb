@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Match deletion refuses cleanly when a current-season staging link still points at it (AFLDB-ISSUE-177) - 15 September 2026
+
+- `deleteMatch` now checks `staging.external_current_matches.local_match_id` before deleting a
+  match and refuses with a named `<sourceKey> <externalGameId>` list when a current-season staging
+  row still points at it, instead of letting the underlying foreign-key constraint fail with a raw
+  PostgreSQL error. The staging link is never nulled or detached — reconciliation provenance for
+  the current-season importer is preserved, and the admin is directed to resolve the link through
+  the current-season import process.
+- The FK remains in place as a concurrency backstop: a race between the pre-check and the delete is
+  still caught, with only SQLSTATE 23503 mapped to the same generic dependency-refusal message; all
+  other errors continue to throw. No migration or privilege change was required.
+
 ### Submission promotion is locked and commits atomically with its status transition (AFLDB-ISSUE-175) - 15 September 2026
 
 - `promoteSubmission` now locks the `data_submissions` row (`SELECT ... FOR UPDATE`) and commits

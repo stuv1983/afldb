@@ -27829,6 +27829,72 @@ Broader adoption of `ExpandableTableFrame` beyond the Coaches list.
   `npm run merge:ready -- --issue 174`. `CHANGELOG.md`'s `[Unreleased]` entry updated to record the
   final Vercel review outcome. No PROD action of any kind was taken.
 
+## AFLDB-ISSUE-177 — Match deletion exposes a raw FK failure for staged current-season links
+
+- **Severity:** Medium (data-integrity/UX safeguard; a read-only DEV audit against `afldb_dev`
+  found 0 staging links currently pointing at any match, so this closes a latent gap rather than
+  repairs live data).
+- **Area:** Admin / match deletion — `src/db/queries/match-admin.ts` (`deleteMatch`).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-177`, branch
+  `sonnet/issue-177-match-delete-staging-fk`.
+- **Found:** 2026-09-15, during the same admin-mutation-boundary audit that opened
+  AFLDB-ISSUE-175/176/178.
+- **Key files:** `src/db/queries/match-admin.ts` (`deleteMatch`);
+  `tests/integration/match-admin-delete.test.ts` (new).
+
+### Symptom
+Deleting a match still referenced by `staging.external_current_matches.local_match_id` (nullable
+FK to `matches(id)`, default `NO ACTION`, migration 063) failed with a raw PostgreSQL
+`foreign_key_violation` (SQLSTATE 23503) surfaced straight through `deleteMatch`, instead of a
+clean, named refusal.
+
+### Root cause
+`deleteMatch` had no domain-level awareness of the `staging.external_current_matches` link. The
+only thing standing between an admin delete and an opaque FK error was the database constraint
+itself.
+
+### Fix
+Added an explicit pre-check inside `deleteMatch`'s existing locked transaction, after the
+ISSUE-167 special-record collateral check and before the affected-player/delete work: a `SELECT`
+against `staging.external_current_matches` joined to `sources` for
+`local_match_id = matchId`. If any row matches, the match is refused with an error naming each
+`<sourceKey> <externalGameId>` pair and directing the admin to the current-season import process;
+`local_match_id` is never nulled or detached, preserving current-season reconciliation provenance.
+The FK itself is left in place as a concurrency backstop: the pre-check is a point-in-time read,
+not a lock, so a `catch` around the transaction maps a real SQLSTATE 23503 (and only that code) to
+the same generic dependency-refusal shape, without inspecting which constraint fired; every other
+error still rethrows. No migration or privilege change was required — the FK and its partial index
+already existed.
+
+### Validation
+New `tests/integration/match-admin-delete.test.ts` (runs against `afldb_test`), operator-run
+2026-09-15:
+- `npx vitest run tests/integration/match-admin-delete.test.ts` — 1 test file passed, 3/3 tests
+  passed: a match linked by `staging.external_current_matches` refuses deletion, with the error
+  naming the source key and external game id and no raw SQL/constraint text, while the canonical
+  match row and the staging link (`local_match_id` intact) both survive; an otherwise-clean match
+  still deletes normally; and a real, un-pre-checked SQLSTATE 23503 (forced via the existing
+  `player_match_period_stats.match_id` FK, migration 062, out of this issue's scope) is mapped to
+  the generic dependency refusal rather than thrown, with the match surviving.
+- Adjacent regression, `npx vitest run tests/integration/admin-special-records.test.ts` — 1 test
+  file passed, 36/36 tests passed.
+- Adjacent regression, `npx vitest run tests/integration/admin-brownlow.test.ts --hookTimeout=60000`
+  (the default 30s hook timeout was insufficient for this suite's `beforeAll` over the SSH tunnel
+  and timed out on the first attempt with no assertions run; the extended timeout is a test-runner
+  parameter only, not a product change) — 1 test file passed, 44/44 tests passed. The stderr logged
+  by the "rolls the facts back when the required audit row cannot be written" case is expected —
+  that test deliberately raises the ISSUE-155 audit probe error — and the test passed.
+- `npx tsc --noEmit -p tsconfig.json` — passed, no errors.
+
+### Follow-up
+`player_match_period_stats.match_id` (migration 062, `NOT NULL`, no `ON DELETE`) and
+`staging.afl_api_lineup.match_id` (migration 077, nullable, no `ON DELETE`) can each independently
+block `deleteMatch` the same way and currently fall through to the generic SQLSTATE 23503
+fallback rather than a named refusal. Not fixed here; candidate for a follow-up issue if a named
+refusal for either is wanted. AFLDB-ISSUE-175/176/178 (promotion CAS, special-record match
+validation, join-request transaction) are separate findings from the same audit and are out of
+this issue's scope.
+
 ## AFLDB-ISSUE-176 — Special-record match links accept a match inconsistent with the record
 
 - **Severity:** Medium (data-integrity safeguard; a read-only DEV audit against `afldb_dev` found 0
