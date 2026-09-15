@@ -1119,6 +1119,41 @@ async function manualLinkIdentity(
   return { playerIdentity, matchKey };
 }
 
+/**
+ * The match-consistency invariant a manual special-record write must satisfy
+ * before it may name a match at all (AFLDB-ISSUE-176): the match must exist,
+ * it must belong to the record's own season, and — when the write also names
+ * a player — that player must actually have a `player_match_stats` row for
+ * it. A record naming a match the player never played in, or a match from a
+ * different season, is not evidence the record can carry, so this throws
+ * before `insertFirstKickGoal` / `insertAfterSirenKick` writes anything: no
+ * canonical row, no durable `data_overrides` payload, no audit row.
+ */
+async function validateSpecialRecordMatchLink(
+  tx: Tx, matchId: number | null, season: number, playerId: number | null,
+): Promise<void> {
+  if (matchId === null) return;
+  const [match] = await tx<{ season: number }[]>`
+    SELECT season::int AS season FROM matches WHERE id = ${matchId}
+  `;
+  if (!match) throw new RollbackRefusal('validation', 'The selected match does not exist.');
+  if (match.season !== season) {
+    throw new RollbackRefusal('validation',
+      `The selected match is from the ${match.season} season, not ${season}: a special `
+      + "record's match must belong to the record's own season.");
+  }
+  if (playerId !== null) {
+    const [played] = await tx<{ id: number }[]>`
+      SELECT id FROM player_match_stats WHERE match_id = ${matchId} AND player_id = ${playerId}
+    `;
+    if (!played) {
+      throw new RollbackRefusal('validation',
+        'The selected player has no match statistics for the selected match, so the two cannot '
+        + 'be linked together on this record.');
+    }
+  }
+}
+
 // =========================================================================
 // player_achievements -- the first-kick goal
 // =========================================================================
@@ -1443,6 +1478,7 @@ async function insertFirstKickGoal(tx: Tx, input: CreateFirstKickGoalInput & {
   }
   const playerNameClean = input.playerNameClean?.trim() || playerNameRaw;
 
+  await validateSpecialRecordMatchLink(tx, input.matchId ?? null, input.season, input.playerId ?? null);
   const links = await manualLinkIdentity(tx, input.playerId ?? null, input.matchId ?? null);
 
   const sourceId = await manualSourceId(tx);
@@ -2018,6 +2054,7 @@ async function insertAfterSirenKick(tx: Tx, input: CreateAfterSirenKickInput & {
   }
   const playerNameClean = input.playerNameClean?.trim() || playerNameRaw;
 
+  await validateSpecialRecordMatchLink(tx, input.matchId ?? null, input.season, input.playerId ?? null);
   const links = await manualLinkIdentity(tx, input.playerId ?? null, input.matchId ?? null);
 
   const sourceId = await manualSourceId(tx);

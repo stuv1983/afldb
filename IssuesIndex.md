@@ -6,6 +6,4 @@
 
 **Open issues:** 0
 
-There are currently no open AFLDB issues.
-
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
