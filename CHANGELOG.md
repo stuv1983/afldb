@@ -15,6 +15,29 @@ commit.
 
 ## [Unreleased]
 
+### NL search: career-condition numbers no longer cross prepositional clause boundaries (AFLDB-ISSUE-196) - 16 September 2026
+
+- `extractCareerConditions` (`src/search/nl/parser.ts`) now resolves pending `CAREER_STAT_WORDS`
+  entries in the order their stat word occurs in the question, not in `CAREER_STAT_WORDS`'s fixed
+  vocabulary order. Each entry's noun, comparator and number are matched and stripped from the
+  working text before the next pending entry's backward lookback window is built, so a
+  later-in-vocabulary noun can no longer reach across an earlier, unconsumed clause's own number or
+  comparator and steal it.
+- "players with 300 games at 2 clubs" previously bound `clubs_played >= 300` (stealing `games`'s own
+  `300`) while silently orphaning the literal `2` and leaking `games` as a bare ranking metric. It
+  now correctly binds `games >= 300` and `clubs_played >= 2`. The same fix applies to the `for` and
+  `over` linking words, comparator wording ("more than"/"over N"), reversed clause order, and
+  number-word forms ("three premierships at two clubs"). A related comparator-misattribution failure
+  (`"players with more than 300 games at 2 clubs"` binding `op: 'gt'` to `clubs_played` instead of
+  `games`) is fixed by the same mechanism.
+- `"players with 300 games across 2 clubs"` intentionally still declines: `across` is not in
+  `STOPWORDS` (unlike `at`/`for`/`with`/`over`), so it remains an unsupported leftover token even
+  though both numeric conditions resolve correctly internally. This is expected current vocabulary
+  behaviour, not a regression; adding `across` to `STOPWORDS` is a separate, out-of-scope vocabulary
+  decision this issue does not make.
+- No new career-condition grain, column, metric, or generic consumed/unowned-token framework was
+  introduced. `PARSER_VERSION` bumped to 47.
+
 ### NL search: symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-192) - 15 September 2026
 
 - `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) ranks `attendance` and `total_score` once

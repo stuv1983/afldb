@@ -251,15 +251,19 @@ is exactly the shape of the required matrix (§5).
 | 3 | `players with 300 games and 2 clubs` | plan | `games gte 300`, `clubs_played gte 2` | **already correct** — existing `" and "` window clip isolates the clauses | unchanged (still correct) |
 | 4 | `players with 2 clubs and 300 games` | plan | `clubs_played gte 2`, `games gte 300` | **already correct** — `clubs_played` (array-earlier and sentence-earlier here) claims its own preceding `2` before `games` is tried | unchanged (still correct) |
 | 5 | `players with more than 300 games at 2 clubs` | plan | `games gt 300`, `clubs_played gte 2` | `clubs_played gt 300` (steals both the number *and* the comparator); `games` orphaned | fixed: `games gt 300`, `clubs_played gte 2` |
-| 6 | `players with 300 games across 2 clubs` | plan | `games gte 300`, `clubs_played gte 2` | same defect as #1 (`across` is not a boundary today) | fixed: both conditions |
+| 6 | `players with 300 games across 2 clubs` | **decline (safe)** — corrected 2026-09-16, see Addendum below | numeric ownership resolves correctly internally (`games gte 300`, `clubs_played gte 2`), but the plan is not executed because `across` is unsupported vocabulary | same defect as #1 (`across` is not a boundary today) *and* wrongly executes | corrected: `status: none`, `reason: 'ambiguous'`, `unsupportedTerms` includes `across` — **not** the old wrong-accepted-plan behaviour |
 | 7 | `players with over 300 games at 2 clubs` | plan | `games gt 300`, `clubs_played gte 2` | `clubs_played gt 300` (via the same unclipped-window defect: `over(?=\s+\d)` and the leftmost digit both land in the `clubs` window) | fixed: `games gt 300`, `clubs_played gte 2` |
 | 8 | `players with 10 premierships in 300 games` | plan | `premierships gte 10`, `games gte 300` | **already correct** — `premierships` is both array-first and sentence-first here, and its own preceding `10` is never contested | unchanged (still correct) |
 | 9 | `players with 300 games` (baseline) | plan | `games gte 300` | correct | unchanged |
 | 10 | `players with 2 clubs` (baseline) | plan | `clubs_played gte 2` | correct | unchanged |
 | — | `players with three premierships at two clubs` (number-word form) | plan | `premierships gte 3`, `clubs_played gte 2` | same defect as #1/#2/#6, number-word path: `clubs_played` window reaches back across `"at"` and finds `"three"` before `"premierships"` is ever tried | fixed: sentence order resolves `premierships` (sentence-first) before `clubs_played`, so `clubs_played`'s window only ever contains `"...at two clubs"` |
 
-None of the ten required cases, nor the number-word variant, should decline — every one names two
-unambiguous career-stat nouns each with its own unambiguous governing number once correctly bound.
+**Corrected 2026-09-16:** none of the required cases, nor the number-word variant, should decline
+**except case 6**, which safely declines for an unrelated, pre-existing vocabulary reason (`across`
+is not in `STOPWORDS`) rather than for any numeric-ownership defect. See the Addendum at the foot of
+this document for the full correction and rationale. Every other case names two unambiguous
+career-stat nouns each with its own unambiguous governing number once correctly bound, and none of
+them should decline.
 
 ---
 
@@ -282,8 +286,15 @@ Add (exact expected conditions, matching §5):
 4. **Comparative form** — `'players with more than 300 games at 2 clubs'` →
    `games gt 300`, `clubs_played gte 2`. This is the case that most directly proves the
    comparator-misattribution half of the bug is fixed, not just the digit-selection half.
-5. **Third preposition, for completeness against the audit's neighbouring-risk list** —
-   `'players with 300 games across 2 clubs'` → `games gte 300`, `clubs_played gte 2`.
+5. **Third preposition, for completeness against the audit's neighbouring-risk list — corrected
+   2026-09-16, see Addendum below.** `'players with 300 games across 2 clubs'` does **not** assert
+   `status: 'plan'`. `across` is not in `STOPWORDS` (unlike `at`/`for`/`with`/`over`), so after
+   correct numeric-ownership extraction it remains as a leftover, unsupported meaningful token and
+   the plan safely declines. Assert the safe-decline contract instead: `status: 'none'`,
+   `reason: 'ambiguous'`, and `'across'` present in `report.unsupportedTerms` — proving both that
+   ownership no longer misbinds (`clubs_played` is not left at the old wrong `300`) and that the
+   decline is caused specifically by the unsupported linking word, not a reversion to the original
+   defect.
 6. Optionally, the `over` form (`'players with over 300 games at 2 clubs'`) if the implementer
    wants the full §5 matrix directly represented in this block rather than relying on manual
    verification; not strictly required since it exercises the same code path as case 4.
@@ -397,3 +408,62 @@ are a distinct, larger piece of work this plan does not cover.
 9. Update `issues.md` AFLDB-ISSUE-196 (status, root cause as actually fixed, validation evidence)
    and remove it from `IssuesIndex.md`/the Open Issues table once the operator confirms the
    validation commands passed — this is implementation-session work, not this plan's.
+
+---
+
+## Addendum (2026-09-16) — correcting a contradiction in the original §5/§6 `across` contract
+
+**Context.** Implementation (Sonnet 5 High, branch `sonnet/issue-196-nl-numeric-binding`) built
+exactly what §3 specified. Operator validation then found a single failing regression: the case-6
+`across` test. Investigation (Sonnet 5 High, same session) confirmed the numeric-ownership fix is
+correct — the failure is a genuine contradiction inside this runbook's own analysis, not an
+implementation defect and not an unauthorised scope expansion by the test author.
+
+**What actually happens for `'players with 300 games across 2 clubs'`.** Sentence-order extraction
+resolves both clauses correctly and internally: `games` (occurs first in the sentence) claims its
+own `300` and is stripped from `working` before `clubs_played`'s window is built, so `clubs_played`
+correctly claims its own `2`. This is the numeric-ownership fix working as designed — the old wrong
+plan (`clubs_played gte 300` with `2` orphaned) does not occur. But the linking word `across` is not
+in `STOPWORDS` (`vocab.ts:857-895`; confirmed only `at`/`for`/`with`/`over` are present, at
+`vocab.ts:859,880` — `across` is absent). Career-condition extraction only ever strips the noun and
+its own comparator/number (`parser.ts`'s `spans` array), never the surrounding preposition, so
+`across` remains in `working` after both clauses are correctly resolved. `meaningfulTokens`
+(`parser.ts:128-130`) does not filter it out (not a stopword, not a digit), so it survives into
+`totalTokens`; it is never added to `consumedSet` (nothing consumes it); it therefore lands in
+`leftoverTokens` (`parser.ts:3712-3714`) and `report.unsupportedTerms` (`parser.ts:3728`). The
+confidence-gating code at `parser.ts:3745-3764` requires `leftoverTokens.length === 0` to execute in
+the clarify band, so the plan declines with `reason: 'ambiguous'` even though both conditions are
+internally correct. Observed operator evidence matches this exactly: `status: none`,
+`reason: ambiguous`, `confidence: 0.65`, `unsupportedTerms` including `across`.
+
+**Why this is a contradiction in the original document, not a new finding.** §2's Option-B-rejection
+text already named this exact mechanism: *"Adding `'across'` as a boundary word also requires adding
+`'across'` to `STOPWORDS`... Skipping this would leave `'across'` in `working` as an unconsumed,
+non-stopword token in case 6 (§5), lowering `tokenRatio` and adding a spurious entry to
+`unsupportedTerms`."* That passage is correct and, in hindsight, applies regardless of which option
+is chosen — Option C never consumes the linking preposition either, since §3 changes only
+entry-selection order, not the window/span logic that strips text. The original §5 row 6 and §6 item
+5 nonetheless asserted case 6 would fully plan after Option C, without re-applying this
+already-identified risk to Option C's own predicted outcome. That inconsistency, not an
+implementation error, is what operator validation surfaced.
+
+**Resolution — corrected contract for case 6 only:**
+- Sentence-order extraction fixes numeric ownership **before** confidence gating runs; this is a
+  precondition proven by the corrected test (§6 item 5 above), not something the decline
+  contradicts.
+- Supporting the linking word `across` (i.e., adding it to `STOPWORDS` so a "the numbers are right,
+  just an unrecognised connective is left over" question can execute) would require a separate,
+  dedicated vocabulary/`STOPWORDS` decision — exactly the kind of change §2 already rejected making
+  as part of this fix (Option B was rejected partly *because* it required such an edit).
+- AFLDB-ISSUE-196 does **not** add that vocabulary support. Its scope is numeric/comparator
+  ownership only, per §2's Decision and §8's non-goals, both unchanged by this addendum.
+- No follow-up issue is required solely for `across` being unsupported wording. This is pre-existing,
+  expected current vocabulary behaviour (the same class of gap that keeps countless other
+  unrecognised words from executing), not a defect. Track it only if a future corpus/user-reported
+  case shows a real, repeated need to recognise `across` as a linking word.
+
+**Files changed by this addendum:** `AFLDB-ISSUE-196.md` (this document — §5 row 6, the paragraph
+below the §5 table, §6 item 5, and this Addendum) and `tests/nl-parser.test.ts` (the case-6 `across`
+regression only, corrected to assert the safe-decline contract). No production file
+(`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`) changed. `PARSER_VERSION` stays at `47` — no
+parser behaviour changed, only this document's and one test's expectations.

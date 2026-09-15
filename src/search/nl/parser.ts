@@ -1073,11 +1073,34 @@ function extractCareerConditions(text: string): {
   }
 
   // "exactly two clubs", "250 games", "200+ games", "at least 50 votes".
-  for (const [re, column] of CAREER_STAT_WORDS) {
-    const match = re.exec(working);
-    if (!match) continue;
-    // A window before the stat word carries the count and its operator.
-    const idx = working.indexOf(match[0]);
+  //
+  // Entries are resolved in the order their stat word actually occurs in
+  // `working` (sentence order), not CAREER_STAT_WORDS's fixed vocabulary
+  // order. "players with 300 games at 2 clubs" -- CAREER_STAT_WORDS tries
+  // clubs_played (array position 3) before games (array position 5); with
+  // no "and"/comma between the two clauses for the window-clip below to
+  // bite on, clubs_played's backward-looking window used to span the
+  // whole sentence and its leftmost-digit search stole games' own "300",
+  // leaving clubs_played misbound to 300 and games/2 orphaned. Resolving
+  // whichever pending stat word's match occurs earliest in `working`
+  // instead means the earlier clause's noun, comparator and number are
+  // matched and stripped from `working` before the later clause's window
+  // is ever built, so the later window can no longer reach back across a
+  // preposition into a clause that has already claimed its own number.
+  const pending = new Set(CAREER_STAT_WORDS);
+  while (pending.size > 0) {
+    let best: { entry: [RegExp, NlCareerColumn]; match: RegExpExecArray; idx: number } | null = null;
+    for (const entry of pending) {
+      const [candidateRe] = entry;
+      const candidateMatch = candidateRe.exec(working);
+      if (!candidateMatch) continue;
+      const candidateIdx = working.indexOf(candidateMatch[0]);
+      if (!best || candidateIdx < best.idx) best = { entry, match: candidateMatch, idx: candidateIdx };
+    }
+    if (!best) break;
+    pending.delete(best.entry);
+    const [, column] = best.entry;
+    const { match, idx } = best;
 
     // "3 grand finals", "played in at least 1 preliminary final" -- the
     // bare /\bfinals?\b/ entry above reads ANY qualified final phrase as

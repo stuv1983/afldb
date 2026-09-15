@@ -466,7 +466,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // existing R2 club_season decline instead of silently answering a match-win
 // threshold under the wrong noun. Genuine grouped match-result readings
 // ("teams with more than 2 wins against Richmond") are unchanged.
-export const PARSER_VERSION = 46;
+// v47 -- AFLDB-ISSUE-196: extractCareerConditions now resolves CAREER_STAT_WORDS
+// occurrences in the order they appear in the question, not CAREER_STAT_WORDS's
+// fixed vocabulary order, so a later-in-vocabulary noun's lookback window can no
+// longer reach a number that an earlier-in-the-sentence noun has already
+// claimed. "players with 300 games at 2 clubs" (and the same shape with
+// "for"/"across"/"over") now binds games >= 300 and clubs_played >= 2 instead
+// of misreading clubs_played >= 300 with the literal 2 silently orphaned. A
+// comparator word ("more than"/"over") now resolves against its own clause's
+// number for the same reason, rather than being pulled into a neighbouring
+// clause's window.
+export const PARSER_VERSION = 47;
 
 // ------------------------------------------------------------------ grain
 
