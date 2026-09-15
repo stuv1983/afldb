@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### Admin canonical match creation refuses duplicates by canonical identity, not match_key text (AFLDB-ISSUE-182) - 15 September 2026
+
+- `createMatch()`'s duplicate pre-check now compares canonical, DB-typed columns — `season`,
+  `round_type`, `round_number` (NULL-safe), `match_date`, `home_club_id`, `away_club_id` — instead
+  of comparing the `match_key` string. `match_key` has three mutually incompatible rendering schemes
+  across this repository (this admin path: club IDs; manual dataset ingest: club names; the
+  canonical-apply/settle path: the legacy bundle's own key, carried verbatim), so a row for the same
+  real match written under a different scheme previously would not share this path's key and could
+  be silently duplicated. Home/away order is compared exactly, not symmetrically. A defensive catch
+  for SQLSTATE 23505 (the pre-existing `matches_match_key_key` UNIQUE constraint) was added around
+  the transaction, translating a genuine concurrent-submission race into the same friendly,
+  detail-free message — this is a backstop for that pre-existing constraint, not a new
+  concurrency guarantee over the canonical tuple (no database uniqueness constraint over it was
+  added).
+- `tests/integration/match-admin-create.test.ts` added: the first database-backed integration
+  coverage for `createMatch()`, including the cross-rendering duplicate regression (a match seeded
+  with a club-NAME-keyed `match_key` is still recognised as a duplicate of an admin create using the
+  same canonical identity), successful creation, home==away rejection, a bounded-lifespan club
+  identity rejected outside its valid season, and rollback of the match and its quarter-score
+  collateral when the required audit write fails.
+- No migration, schema change, or privilege change. `createMatch()`'s provenance behaviour
+  (`matches.source_id`/`source_record_id` left unpopulated on admin-created rows) is unchanged — no
+  established manual-admin convention for that exists on `matches` today; see the issue entry for
+  the follow-up recommendation.
+
 ### Match deletion refuses cleanly when AFL API lineup staging still references it (AFLDB-ISSUE-181) - 15 September 2026
 
 - `deleteMatch` now explicitly checks `staging.afl_api_lineup` before any destructive work. A

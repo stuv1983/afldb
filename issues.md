@@ -28387,3 +28387,301 @@ no migration or privilege widening was required or made.
 ### Follow-up
 None. The repository-wide FK inventory above found no additional unhandled `matches(id)` dependency,
 and the DEV audit confirmed 0 rows currently affected, so no backfill/repair job is required.
+
+---
+
+## AFLDB-ISSUE-182 — Harden admin canonical match creation (duplicate detection + DB test coverage)
+
+- **Severity:** Medium (architectural scoping + a documented duplicate-key correctness gap; not a
+  live incident).
+- **Area:** Admin / canonical match creation — `src/db/queries/match-admin.ts` (`createMatch`),
+  `src/app/admin/data-editor/actions.ts` (`createMatchAction`),
+  `src/app/admin/data-editor/CreateMatchForm.tsx`;
+  `tests/integration/match-admin-create.test.ts` (new).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-182`, branch
+  `sonnet/issue-182-admin-match-creation`.
+- **Found:** 2026-09-15, investigating the project-direction goal of admin-native canonical match
+  creation independent of the AFL Tables free API.
+- **Resolved:** 2026-09-15, on operator verification (focused integration suite, existing regression
+  suite, typecheck, and a DEV read-only duplicate-group audit — see Operator verification below).
+- **Key files:** `src/db/queries/match-admin.ts` (`createMatch`); `tests/integration/match-admin-create.test.ts` (new).
+
+### Key finding: the requested capability already exists
+The issue brief's premise — "AFLDB currently still relies on external ingestion/API paths for
+adding match data" — does not hold. `createMatch()` (`match-admin.ts:131-320`) has existed for some
+time (CHANGELOG "Comprehensive Match Browser in Data Editor" entry) and is a complete, wired,
+super-admin-only, transactional, audited match-creation path:
+
+- gated by `requireCapability('data.dataEditor')`, which is `SUPER_ADMIN_ONLY`
+  (`src/lib/auth/capabilities.ts:80`);
+- validates home ≠ away club, numeric score consistency (`src/lib/admin-match.ts`), and that each
+  selected club is the historical identity active in the target season
+  (`afldb_identity_for_season`);
+- upserts the `seasons` row if missing (league inferred `AFL` if `season >= 1990` else `VFL`);
+- generates `match_key` and pre-checks it for a duplicate inside the transaction;
+- inserts `matches` plus any `match_period_scores`, recomputes `season metadata`, `club_seasons`
+  and Brownlow-eligibility status, and writes the `data_edits` audit row — all inside one
+  `importSql.begin` transaction (AFLDB-ISSUE-027 shape: a failed audit insert rolls the match back);
+- `createMatchAction` additionally writes an `audit('match.created', …)` activity-log entry and
+  revalidates `/`, `/matches`, `/matches/[id]`, `/seasons/[year]`.
+
+So items 2, 3, 6, 7 and 8 of the original investigation brief (existing write paths, existing admin
+functionality, permissions, audit, transactionality) are **already implemented and already the
+right shape** — not gaps to design. The remaining, genuinely open items are the duplicate-key
+correctness defect and the test-coverage gap below.
+
+### Real gap 1 — `match_key` rendering is one of three incompatible formulas (duplicate prevention)
+`createMatch()`'s duplicate pre-check queries `matches` by `match_key`, rendered as
+`${season}|${roundCode}|${matchDate}|${homeClubId}|${awayClubId}` (club **IDs**). This is
+documented in `src/lib/acquisition/canonical-apply.ts:39-42,663-665` as **one of three incompatible
+match_key renderings in this repository**: the legacy/manual dataset-ingest path
+(`src/lib/ingest/datasets.ts:589-590`) renders `season|round_code|match_date|home_club_name|
+away_club_name` (club **names**), and the settle/canonical-apply path writes the bundle
+projection's own key verbatim (never re-rendered, from the legacy AFL Tables import). Those
+comments state explicitly that reusing `createMatch()`'s renderer elsewhere "inserts a duplicate
+fixture instead of conflicting" — i.e. the `matches_match_key_key` UNIQUE constraint only catches a
+duplicate within the *same* rendering scheme. An admin creating a match for a game that was already
+imported (under a name- or bundle-keyed `match_key`) would not be caught by the current pre-check or
+the UNIQUE constraint, and would insert a genuine duplicate row.
+
+**Recommendation:** change the admin duplicate check to query the underlying normalised columns
+directly — `season`, `round_code` (or `round_type` + `round_number`), `match_date`, `home_club_id`,
+`away_club_id` — rather than the `match_key` string. Those columns are consistent regardless of
+which writer produced the row; only the derived string differs. This does not require a migration;
+it is a query change in `createMatch()`. Whether `match_key` itself should eventually be unified is
+a separate, larger question (three call sites, one CHANGELOG-documented incompatibility) and is
+explicitly **out of scope** for ISSUE-182.
+
+### Real gap 2 — no integration test exercises `createMatch()` against a real database
+`tests/admin-match-mutations.test.ts` is a static/source-inspection suite (it `expect(matchAdmin)
+.toContain(...)` against the file's own text) — useful for pinning invariants like "no `Date.now()`
+in the key" and "cites `manual_admin_edit`", but it never calls `createMatch()` against a database.
+There is no `tests/integration/match-admin-create.test.ts` sibling to the existing
+`tests/integration/match-admin-delete.test.ts` (which does seed real rows against
+`AFLDB_TEST_DATABASE_URL` and exercise `deleteMatch` end to end, following the `./guard` import
+convention). Successful creation, invalid club pairing, duplicate prevention (the real column-based
+check, not the string check), and rollback/audit atomicity are therefore currently unproven by any
+runnable test.
+
+### Real gap 3 — no general provenance on an admin-created match
+`matches` carries the standard provenance quartet (`source_id`, `source_record_id`,
+`import_batch_id`, `imported_at`) added by `add_provenance_columns('matches')`
+(`src/db/migrations/064_matches_external_provenance.sql`). `createMatch()`'s INSERT does not
+populate `source_id` / `source_record_id` for the match row itself (only `attendance_source_id` is
+set, and only when attendance is supplied). The sibling manual-entry surface, `fixtures`
+(migration 097), requires `source_id` = the `manual_admin_edit` source and a `source_record_id` on
+every row. Recommend the same for `matches` on admin creation, for consistency and so a
+manually-created match is distinguishable from an imported one by provenance columns rather than by
+absence of data.
+
+### Fixture-vs-match scope (investigation item 11)
+`matches` requires `home_score`/`away_score`/`result`/`margin` `NOT NULL` and
+`validateAdminMatchNumbers` (`src/lib/admin-match.ts`) refuses a create unless both a) goals+behinds
+or an explicit score are given for *both* sides — so `createMatch()` structurally cannot create a
+"result unknown" row. A separate, already-implemented registry (`fixtures`, migration 097,
+AFLDB-ISSUE-162, `src/db/queries/admin-fixtures.ts`) exists precisely for a scheduled match with no
+score, keyed by a minted `fixture_key`, with its own admin CRUD (`createFixture`,
+`rescheduleFixture`, `changeFixtureVenue`, `cancelFixture`, `voidFixture`, etc.) and its own
+capability (`data.fixtures.edit`). "Played" is derived at read time by matching `season` +
+`round_code` + club pair between `fixtures` and `matches` (`resolvePlayed`,
+`admin-fixtures.ts:492`) — no write from one table to the other. **Recommendation: ISSUE-182 should
+not touch fixture creation at all** — that product need is already met by ISSUE-162. ISSUE-182's
+scope is hardening the existing completed/in-progress `matches` creation path only.
+
+### Recommended ISSUE-182 implementation boundary
+Given the above, the smallest useful next slice is:
+1. Fix the duplicate-prevention query in `createMatch()` to check `(season, round_code, match_date,
+   home_club_id, away_club_id)` columns instead of (or in addition to, defence in depth) the
+   `match_key` string.
+2. Populate `source_id` (`manual_admin_edit`) and a `source_record_id` (the rendered `match_key`, or
+   a minted token) on the `matches` INSERT, matching the `fixtures` precedent.
+3. Add `tests/integration/match-admin-create.test.ts` (sibling to `match-admin-delete.test.ts`):
+   successful creation; invalid club pairing (same club both sides); a club not the active
+   historical identity in the target season; duplicate prevention across differently-rendered
+   `match_key`s (seed a row with a name-keyed or bundle-style key, then attempt an admin create for
+   the same season/round/date/clubs and confirm refusal); permission enforcement
+   (`requireCapability` denies non-super-admin); rollback/audit atomicity (a forced failure inside
+   the transaction leaves no `matches` row and no `data_edits` row).
+4. No UI change is required — `CreateMatchForm.tsx` / `createMatchAction` already collect and pass
+   every field needed.
+
+**Out of scope, confirmed by evidence above:** fixture/future-match creation (already ISSUE-162),
+editing an existing match, match deletion (already hardened through ISSUE-177/180/181), player
+lineups/stats/Brownlow/special records, bulk import, contributor workflow, public API, admin-centre
+redesign, and unifying the three `match_key` renderings repository-wide.
+
+### Migration
+Not required. Item 1 is a query change (existing columns already carry the needed data). Item 2
+writes to columns that already exist (`source_id`/`source_record_id` from migration 064). No schema
+change, no privilege widening.
+
+### Permissions
+No change recommended. `data.dataEditor` (`SUPER_ADMIN_ONLY`) is already the correct gate — matches
+the boundary already drawn for `data.coaches.edit`, `data.playerLinks`, and `data.brownlow.finalise`
+("becomes a public statistical fact immediately, with no draft stage"). A contributor-submission
+workflow is a materially larger feature and is not recommended for this slice.
+
+### Questions genuinely unresolved from repository evidence
+- Whether the three incompatible `match_key` renderings should eventually be unified is an
+  operator/architecture decision with a large blast radius (touches the legacy importer, the
+  current-season canonical-apply path, and every historical row); repository evidence documents the
+  incompatibility but does not by itself dictate a resolution. Recommend tracking that separately if
+  and when it causes an actual duplicate, rather than folding it into ISSUE-182.
+- Whether `source_record_id` for an admin-created match should be the rendered `match_key` or a
+  minted token (the way `fixtures.fixture_key` is minted) is a naming convention choice, not
+  something the schema or existing precedent fully settles either way.
+
+### Operator read-only SQL (if useful, DEV, read-only)
+```sql
+-- Confirm the match_key rendering actually in use across existing rows, to gauge how many
+-- historical/current-season rows would NOT match an ID-based or name-based admin duplicate check.
+SELECT source_id, count(*) AS rows,
+       count(*) FILTER (WHERE match_key ~ '^\d{4}\|[A-Za-z0-9]+\|\d{4}-\d{2}-\d{2}\|\d+\|\d+$') AS id_keyed
+  FROM matches
+ GROUP BY source_id
+ ORDER BY rows DESC;
+```
+
+### Implementation (2026-09-15)
+Implemented items 1 and 3 of the recommended boundary. Item 2 (provenance) was investigated a final
+time per operator instruction and deliberately left unchanged (see below) — no code change was
+warranted.
+
+**Duplicate detection (item 1).** `createMatch()`'s pre-insert check
+(`src/db/queries/match-admin.ts`) now compares canonical columns —
+`season`, `round_type`, `round_number` (NULL-safe), `match_date`, `home_club_id`, `away_club_id` —
+instead of the `match_key` string. `round_code` was considered and rejected as the round
+component: it is free text with no DB-enforced tie to `round_number`/`round_type` on `matches`
+(unlike `fixtures_round_number_ck` on the `fixtures` table), and `createMatch()`'s own
+blank-round-code fallback renders `"R5"` rather than the decimal-string vocabulary every importer
+writes (`"5"`) — so two rows for the same real round can legitimately carry different `round_code`
+text even from this one function. `round_type`/`round_number` are DB-typed (an enum and a smallint,
+tied together for every writer by `matches_round_number_ck`) and are therefore canonical regardless
+of which path wrote the row. Home/away order is compared exactly, not symmetrically — no repository
+evidence supports treating a reversed pair as the same match; `admin-fixtures.ts`'s own read-time
+played resolution already treats a home/away swap as a distinct, surfaced state
+(`played_home_away_differs`), never as an equivalence. A defensive catch for SQLSTATE 23505 (the
+`matches_match_key_key` UNIQUE constraint) was added around the transaction, translating a genuine
+concurrent-submission race into the same friendly message, mirroring AFLDB-ISSUE-181's `deleteMatch`
+23503 fallback shape — never exposing the constraint name.
+
+The `"R5"`-vs-`"5"` `round_code` inconsistency itself was left unfixed (out of scope; not part of
+the requested hardening, and not part of the new duplicate predicate since round_type/round_number
+were used instead) — flagged below as a follow-up.
+
+**Provenance (item 2, re-investigated, no change made).** `add_provenance_columns('matches')`
+(migration 064) leaves `source_id`/`source_record_id` nullable — no NOT NULL, no default forcing a
+value. A `manual_admin_edit` source-and-minted-token convention (`manual_admin_edit:<randomUUID
+token>`, or a natural key for `match_coaches`) is well established across `coaches.ts`,
+`admin-draft.ts` and `players.ts` for OTHER manually admin-created canonical rows. Searched every
+`INSERT`/`UPDATE` against `matches` in the repository (`match-admin.ts`, `canonical-apply.ts`,
+`datasets.ts`) for any prior application of that convention to the `matches` table itself: none
+exists. `createMatch()` has never populated `matches.source_id`/`source_record_id` for the match
+row itself (only `attendance_source_id`, a different column, when attendance is supplied). Per
+operator instruction — "if no established convention exists, DO NOT invent one" — no code change
+was made. `fixtures` was inspected only as a comparison (per instruction), not treated as automatic
+precedent, precisely because it is a different table with its own identity story
+(`fixture_key`-minted rows), not a demonstrated convention for `matches`.
+
+**Integration tests.** `tests/integration/match-admin-create.test.ts` added (sibling of
+`match-admin-delete.test.ts`, same `./guard` import convention). `afldb_test` proved to be
+migration-built only — schema and constraints, but none of the reference/historical data (`clubs`,
+`club_organizations`, `seasons`, real venues) a rebuilt or imported database carries — so the suite
+seeds and tears down every row it needs itself, uniquely marked and never assuming any
+production-like row exists:
+
+- **Seasons:** two synthetic years, `2099` (the general test season) and `2050` (the stale
+  identity's sole valid year), inserted directly (`clubs.first_season`/`last_season` and
+  `matches.season` FK to `seasons(year)`).
+- **Club organizations and clubs:** three fixture organizations and three fixture club identities
+  (`afldb-issue-182-club-a`/`-b`/`-stale`), built with the established self-referencing
+  `current_identity_id` pattern from `tests/integration/nl-semantic-mapping.test.ts` (`SET
+  CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`, insert with a placeholder, then update to
+  self). Club Stale is bounded `first_season = last_season = 2050`, so `afldb_identity_for_season`
+  genuinely does not resolve it for season 2099 — the historical-identity refusal (test D) is
+  proved from schema semantics alone, not from a named production club.
+- **A permanent keep-alive match** (round 1, season 2099), seeded directly and torn down only in
+  `afterAll`: `recomputeClubSeasons` (called inside every successful `createMatch`/`deleteMatch`)
+  throws "refusing to rebuild club_seasons from nothing" when a season has zero non-final matches,
+  which a synthetic season holding only per-test rows would hit the moment the last one is cleaned
+  up in `afterEach`.
+- **No venue fixture:** the `venue_raw`-only path is exercised instead, since `matches.venue_id` is
+  nullable by design and this avoids a dependency on any venue row existing.
+- Cleanup is idempotent and pattern-based (by fixture slug/marker), run at the start of `beforeAll`
+  as well as in `afterAll`, so a previous crashed run cannot leave unique-slug fixtures behind to
+  collide with the next one — the same convention `nl-semantic-mapping.test.ts` uses. FK-safe order:
+  matches (and `data_edits` audit rows) before `club_seasons` before `clubs` before
+  `club_organizations`/`seasons`.
+
+Covers: (A) successful creation with derived result/winner/margin, quarter scores and the required
+`data_edits` audit row (`row_id` selected with an explicit `::int` cast — `data_edits.row_id` is
+`bigint`, and the driver returns a `bigint` column as a string); (B) the critical regression — a
+duplicate is refused even when the existing row's `match_key` was rendered with club NAMES
+(mirroring `src/lib/ingest/datasets.ts:589-590`) rather than this path's club-ID rendering, proving
+the refusal does not depend on `match_key` equality; (C) home == away refused before any transaction
+opens; (D) the bounded stale club identity refused for a season outside its window, with no partial
+row; (E) a forced audit-write failure (test-only `BEFORE INSERT` trigger on `data_edits`, scoped by
+a unique `note` marker, mirroring AFLDB-ISSUE-181's `BEFORE DELETE` trigger technique) proves the
+match row, its quarter scores and the audit attempt all roll back together; (G) an immediate
+identical-input retry is still refused (the original match_key-equality scenario, preserved).
+Permission enforcement (item F) was deliberately NOT re-tested here: `createMatchAction` calls
+`requireCapability('data.dataEditor')` (`SUPER_ADMIN_ONLY`) as the first thing it awaits, and
+`tests/auth.test.ts`'s existing "capability enforcement contract" and "requireCapability against the
+real guard" suites already exercise that exact boundary generically, across every declared
+capability including `data.dataEditor`, against every viewer role. Adding a second, action-layer
+permission test here would duplicate that coverage and conflate it with this file's DB-transaction
+tests.
+
+**Files changed:** `src/db/queries/match-admin.ts` (duplicate check + 23505 backstop only —
+`deleteMatch` untouched); `tests/integration/match-admin-create.test.ts` (new).
+
+**Migration/grants:** None. Both changes use columns and grants that already exist.
+
+### Operator verification (2026-09-15)
+- `npx vitest run tests/integration/match-admin-create.test.ts` — 1 file, 6/6 tests passed (A, B, C,
+  D, E, G, as described above).
+- `npx vitest run tests/admin-match-mutations.test.ts` — 1 file, 16/16 passed (the pre-existing
+  static-assertion suite; no regression).
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+- DEV read-only audit against `afldb_dev` (via `AFLDB_OWNER_DATABASE_URL`), grouping existing rows
+  on the implemented predicate (`season, round_type, round_number, match_date, home_club_id,
+  away_club_id`): **0 duplicate groups**. A second read-only query for reversed home/away pairs on
+  the same season/round/date: **0 pairs**. DEV data supports the implemented predicate as-is; no
+  repair or backfill is required, and no historical reversed-pair edge case exists to account for.
+
+**On concurrency — do not overstate.** Duplicate detection here is an **application-level**
+pre-insert check inside `createMatch()`'s own transaction. It is not made concurrency-safe by the
+SQLSTATE 23505 catch added alongside it: that catch only translates a violation of the
+*pre-existing* `matches_match_key_key` UNIQUE constraint (a different, narrower key than the
+canonical tuple this issue added) into a friendly message — it does not add a uniqueness constraint
+over `(season, round_type, round_number, match_date, home_club_id, away_club_id)`, and no such
+constraint was added. Two concurrent `createMatch()` calls for the same real match under
+*differently-rendered* `match_key`s (the exact scenario test B proves is now refused when
+sequential) could in principle still both pass the canonical-column SELECT before either commits,
+since that SELECT takes no lock and the pre-existing UNIQUE constraint would not catch a
+name/bundle-vs-ID key mismatch either. This is a genuine, accepted residual gap, not a defect
+introduced by this issue: closing it fully would require a database-enforced uniqueness mechanism
+over the canonical columns (e.g. a partial unique index), which was deliberately not added here
+(see Migration/grants above) pending evidence that it is needed — the DEV audit above found no
+existing duplicate groups on this predicate.
+
+### Follow-up
+- The `createMatch()` blank-`round_code` fallback renders `"R5"` instead of the established
+  decimal-string vocabulary (`"5"`) every importer writes for a home-and-away round. Not a DB
+  constraint violation (`matches` has no CHECK tying `round_code` to `round_number`, unlike
+  `fixtures`), so it silently produces inconsistent `round_code` text on any admin-created match
+  where the round code field is left blank. Not fixed here (out of the requested hardening scope,
+  and not load-bearing for the new duplicate predicate, which uses `round_type`/`round_number`
+  instead). Worth a narrow follow-up issue if `round_code` text consistency ever matters to a reader
+  (round pages, NL search) for an admin-created row.
+- Whether `matches.source_id`/`source_record_id` should ever adopt the `manual_admin_edit:<token>`
+  convention already used for `coaches`/`draft_picks`/`players` remains an open, operator-level
+  product decision — not attempted here per instruction.
+- The three incompatible `match_key` renderings themselves remain unreconciled, as instructed
+  (`match-admin.ts`, `datasets.ts`, `canonical-apply.ts`). A future normalisation issue, if ever
+  pursued, is unrelated to this issue's duplicate-detection fix, which no longer depends on
+  `match_key` equality for admin-created rows.
+
+Resolved: canonical-column duplicate detection and real database-backed integration coverage are in
+place and operator-verified. The follow-ups above are genuine and remain worth tracking, but none is
+a blocker and none is opened as a separate tracked issue by this closeout.
