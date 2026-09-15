@@ -17,7 +17,7 @@ commit.
 
 ### Coaches page family: disclosures, deduplicated totals, expandable tables, deterministic comparison grid (AFLDB-ISSUE-174) - 15 September 2026
 
-- Implemented the `AFLDB-ISSUE-174.md` design/planning runbook's phased plan (§18 Phases 1-4) on
+- Implemented the `issues/closed/AFLDB-ISSUE-174.md` design/planning runbook's phased plan (§18 Phases 1-4) on
   top of the existing "almanac" design system and the `AFLDB-ISSUE-173` `classic`/`sidebar`
   layouts — no new visual identity, no schema/query/route/permission change.
 - `/coaches/[slug]`: "Coaching record" and "History against club" are now `CollapsibleTable`
@@ -1626,7 +1626,7 @@ commit.
   and a leftover `promotion_staging` schema fails closed everywhere (refused by every checker
   phase, by `CREATE SCHEMA`, and by the plan validator for any `IF [NOT] EXISTS` or out-of-place
   `DROP SCHEMA`) with §7.2 requiring inspection and a recorded finding before any hand cleanup or
-  retry. `ISSUE-151-staged-reinstate-rehearsal.sh` reproduces
+  retry. `issues/closed/ISSUE-151-staged-reinstate-rehearsal.sh` reproduces
   the exact case on two throwaway databases.
 
 ### Public UI - historical venue record pages (AFLDB-ISSUE-150) - 7 September 2026

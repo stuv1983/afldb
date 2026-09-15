@@ -5,7 +5,7 @@
  *
  * Every draft-facing PUBLIC page is `force-dynamic` (`/draft`,
  * `/draft/[year]`, `/players`) and needs no cache invalidation at all
- * (AFLDB-ISSUE-160 runbook §7 / `AFLDB-ISSUE-156.md` §7 row P3b); club pages
+ * (AFLDB-ISSUE-160 runbook §7 / `issues/closed/AFLDB-ISSUE-156.md` §7 row P3b); club pages
  * do not render draft data (§0.1). Only two surfaces are actually cached:
  * `/players/[slug]` (ISR, one hour) and `/sitemap.xml` (enumerates players,
  * so a newly created player needs it). Those are the only two shapes this

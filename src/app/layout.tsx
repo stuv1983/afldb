@@ -100,7 +100,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // preset renders it in the header as before. This is the one difference
   // pure CSS cannot express, because it changes which element is PrimaryNav's
   // parent. Both branches render the exact same `PrimaryNav`/`TabBar`
-  // components — see AFLDB-ISSUE-173.md — so the nav model and its
+  // components — see issues/closed/AFLDB-ISSUE-173.md — so the nav model and its
   // interactions (including the mobile TabBar) are never duplicated.
   //
   // `<main id="main">` must wrap ONLY page content in both presets: the

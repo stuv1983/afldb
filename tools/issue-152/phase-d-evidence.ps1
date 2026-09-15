@@ -52,7 +52,7 @@
 
 .PARAMETER SqlFile
     The evidence script, executed unmodified. Relative paths resolve against the
-    repository root. Default: ISSUE-152-phase-d-evidence.sql.
+    closed-issue archive. Default: issues/closed/ISSUE-152-phase-d-evidence.sql.
 
 .PARAMETER Database
     Target database. Must end in `_test` (CLAUDE.md 10: integration databases
@@ -78,7 +78,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $SqlFile = 'ISSUE-152-phase-d-evidence.sql',
+    [string] $SqlFile = 'issues/closed/ISSUE-152-phase-d-evidence.sql',
     [string] $Database = 'afldb_test',
     [string] $EnvKey = 'DATABASE_URL',
     [string] $OutFile = '',

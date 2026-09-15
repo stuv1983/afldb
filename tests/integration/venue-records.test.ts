@@ -9,7 +9,7 @@
  * data has one), so the suite does not hard-code an id that a rebuild
  * could move.
  *
- * Mirrors ISSUE-150-venue-evidence.sql, which is the semantic contract.
+ * Mirrors issues/closed/ISSUE-150-venue-evidence.sql, which is the semantic contract.
  */
 import './guard';
 

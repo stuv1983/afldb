@@ -8,7 +8,7 @@
  * This file must never redeclare a theme-owned token (colour, radius,
  * `--font-*`, `--measure`, `--gutter`): it reads those tokens for spacing
  * consistency but does not define them, so any theme/layout combination
- * stays coherent. See AFLDB-ISSUE-173.md for the full design rationale.
+ * stays coherent. See issues/closed/AFLDB-ISSUE-173.md for the full design rationale.
  *
  * `classic` (the default) needs no rules here — it is today's markup,
  * unchanged. Everything below applies to the `sidebar` preset only, whose

@@ -6,7 +6,7 @@
  * query rather than against a number copied out of the evidence pack: two
  * code paths agreeing is evidence, one code path agreeing with itself is
  * not. The measured populations from the read-only evidence run of
- * 2026-09-09 (`ISSUE-152-phase-d-evidence.sql`, transcript preserved
+ * 2026-09-09 (`issues/closed/ISSUE-152-phase-d-evidence.sql`, transcript preserved
  * under `nl-ui-out-152-phaseg/evidence/`) are asserted once, as a fixture
  * contract, so a data change that moves them is a deliberate decision
  * rather than a silent one.

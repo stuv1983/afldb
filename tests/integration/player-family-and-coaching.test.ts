@@ -257,7 +257,7 @@ describe('getCoachCareer — biggest win/loss', () => {
 
   it('Jim Adamson (coach id 315): zero canonical coaching assignments render safely, never a fabricated record', async () => {
     const adamson = await getCoach(315);
-    expect(adamson, 'Jim Adamson (id 315) — see AFLDB-ISSUE-170.md §0.2; discovery evidence may be stale').toBeDefined();
+    expect(adamson, 'Jim Adamson (id 315) — see issues/closed/AFLDB-ISSUE-170.md §0.2; discovery evidence may be stale').toBeDefined();
 
     const career = await getCoachCareer(315);
     expect(career).not.toBeNull();

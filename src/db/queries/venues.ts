@@ -107,7 +107,7 @@ export async function getVenueStates(): Promise<string[]> {
 // AFLDB-ISSUE-150 — venue historical record page
 //
 // Every function here is scoped to one venue by `matches.venue_id` and
-// mirrors the semantics of `ISSUE-150-venue-evidence.sql`, which is the
+// mirrors the semantics of `issues/closed/ISSUE-150-venue-evidence.sql`, which is the
 // correctness contract:
 //
 //  - historical club identities are preserved — the club columns come

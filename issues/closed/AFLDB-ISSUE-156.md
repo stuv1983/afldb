@@ -1,6 +1,10 @@
 # AFLDB-ISSUE-156 — Admin Centre completion (umbrella runbook)
 
-**Status:** Open / Planning complete — no implementation started. **Correction (2026-09-12):** every
+**Status:** Closed 2026-09-15 by operator decision. The implemented children and production
+promotion evidence remain recorded below; unallocated placeholder phases do not remain open issue
+IDs. No new implementation or validation is claimed by this bookkeeping closeout.
+
+**Correction (2026-09-12):** every
 "S-1" / "paused ISSUE-151 PROD promotion" reference later in this document describes the
 `20260907-234124` promotion, which has since **completed** — 2026-09-08 01:11:24.440219 AEST,
 `auth_audit_log` id 196, under `AFLDB-ISSUE-125`, using this issue's `AFLDB-ISSUE-151`

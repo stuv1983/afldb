@@ -340,7 +340,7 @@ describe('Stage 7 canonical metadata', () => {
  * Linux runtime: it runs on the developer workstation over a forwarded
  * database connection, which adds per-statement latency. That makes it
  * conservative against the 1.5 s ceiling but leaves the Linux route
- * recheck outstanding (see the Stage 7 log in AFLDB-ISSUE-144.md). The
+ * recheck outstanding (see the Stage 7 log in issues/closed/AFLDB-ISSUE-144.md). The
  * same test run on Linux is the recheck.
  */
 describe('Stage 7 route budget', () => {

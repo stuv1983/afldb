@@ -580,7 +580,7 @@ export function parseSiteTheme(value: unknown): SiteTheme {
  * Theme owns colour, typography and the `--measure`/`--gutter` density
  * tokens; layout owns composition — where navigation sits and how the
  * content column is arranged. Neither reads the other, and every
- * theme/layout combination is valid. See `AFLDB-ISSUE-173.md` for the full
+ * theme/layout combination is valid. See `issues/closed/AFLDB-ISSUE-173.md` for the full
  * design rationale.
  */
 export type SiteLayout = 'classic' | 'sidebar';

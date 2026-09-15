@@ -632,7 +632,7 @@ npm test -- \
 
 D11 is proven by `tests/nl-plan.test.ts:182-183` inside this run.
 `nl-expanded-ui-corpus-generator.test.ts` is the suite that **depends on the root
-`tmp-generate-expanded-ui-corpus.mjs`**, so it is the one test that fails if the
+`tools/nl/generate-expanded-ui-corpus.mjs`**, so it is the one test that fails if the
 scratch payload is removed.
 
 Then, separately, so the expected ISSUE-072 failure cannot be confused with
