@@ -28808,3 +28808,643 @@ change.
 
 ### Follow-up
 None. The DEV audit found no `R`-prefixed rows, so no cleanup/backfill issue is opened.
+
+---
+
+## AFLDB-ISSUE-184 — Define provenance for admin-created canonical matches
+
+- **Severity:** Medium (data-model/design gap: no defect, no data-integrity failure, but an
+  unresolved convention affects how the settle/canonical-apply ownership gate treats
+  admin-created rows).
+- **Area:** Admin canonical match creation — `src/db/queries/match-admin.ts` (`createMatch`);
+  provenance quartet (`migration 064`); ownership model in
+  `src/lib/acquisition/canonical-apply.ts` / `reconciliation.ts`.
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-184`, branch
+  `sonnet/issue-184-admin-match-provenance`. Design accepted, implemented, and operator-verified
+  the same day (focused integration suite, ownership-gate unit fixture, typecheck, DEV read-only
+  audit — see Operator verification below). No migration, seed, or DB mutation was needed or made.
+- **Found:** 2026-09-15, scoped out of AFLDB-ISSUE-182 ("we explicitly did NOT invent a
+  provenance convention... because there was no established match-specific convention").
+- **Resolved:** 2026-09-15, on operator verification (integration suite 10/10, ownership-gate
+  fixture 7/7, typecheck PASS, DEV read-only audit against `afldb_dev`).
+
+### 1. Schema semantics (migration 064 + `add_provenance_columns`, `001_foundations.sql:110-121`)
+
+`add_provenance_columns(target)` (used by every imported-fact table, including `matches` via
+064) adds exactly:
+
+- `source_id        smallint REFERENCES sources(id)` — nullable, no default.
+- `source_record_id text` — nullable, no default.
+- `import_batch_id  bigint   REFERENCES import_batches(id)` — nullable, no default.
+- `imported_at      timestamptz NOT NULL DEFAULT now()` — **always populated**, including for
+  every pre-existing row at the moment 064 ran (ALTER TABLE backfills the default). It is
+  therefore **not usable as a signal of "this row was ever actually imported"** — a
+  `createMatch()` row gets a real `imported_at` (the INSERT instant) even though nothing
+  imported it. `imported_at` is re-stamped to `now()` on every canonical-apply UPDATE
+  (`canonical-apply.ts:684,731,808`) but is otherwise inert.
+
+064's own comments (`003:12-15`) define the intended meaning precisely:
+`source_id` = "Source for match rows inserted or reconciled after the original legacy import";
+`source_record_id` = "External source match identifier, scoped by source_id." Migration 064 adds
+**no index and no uniqueness constraint** on `matches(source_id, source_record_id)` — unlike
+`player_achievements_source_uq` / `after_siren_kicks_source_uq` (101/102) or
+`award_winners`/`award_nominations`'s `ON CONFLICT (award_id, source_record_id)` (both partial,
+`WHERE source_record_id IS NOT NULL`). `matches` relies on its own `match_key` unique constraint
+and `createMatch()`'s ISSUE-182 duplicate check for identity instead.
+
+`sources` (`001_foundations.sql:41-51`): `id smallint`, `key text UNIQUE`, `name`, `url`, `kind`
+CHECK'd to `('upstream_dataset','scrape','manual','derived')`, `description`. `kind = 'manual'`
+is an existing, seeded registry category — not something that needs inventing.
+
+### 2. Existing match provenance writers
+
+| Writer | `source_id` | `source_record_id` | `import_batch_id` | `imported_at` | Immutable on later edit? |
+|---|---|---|---|---|---|
+| `createMatch()` (`match-admin.ts:131-301`, admin UI) | **never set** (NULL) | **never set** (NULL) | **never set** (NULL) | INSERT instant (column default) | N/A — never written in the first place |
+| AFL Tables historical import (`tools/migration/import_fitzroy_core.py:3002-3054`) | `sources.key='afltables'` | upstream natural key: `m.game_id` verbatim | `import_batch()` batch id | INSERT/UPSERT instant | **No** — `ON CONFLICT ... DO UPDATE SET source_id = EXCLUDED.source_id, source_record_id = EXCLUDED.source_record_id, import_batch_id = EXCLUDED.import_batch_id` on every re-run of the importer itself (a full re-import, not an admin edit) |
+| Current-season settle/canonical-apply (`canonical-apply.ts:643-649,682-686`) | `SETTLE_SOURCE_KEY = 'afltables'` (`settle-afltables.ts:108`) | `unit.externalRecordId` (the settle bundle's external record id) | `unit.batchId` | re-stamped to `now()` on every applied UPDATE | Governed by the ownership gate below — an `updateable` verdict re-stamps all three; a `refused` verdict leaves them untouched |
+| `staging.external_current_matches` (Squiggle/Kali, migration 063) | `sources.key IN ('squiggle_api','kali_afl_stats')` — but this is a **staging** table, not `matches` itself; it never writes `matches.source_id` directly, only `local_match_id` back-reference | `external_game_id` | n/a (`fetched_at`/`last_seen_at` instead) | n/a | Feeds settle/canonical-apply, which is the actual `matches` writer |
+| `applyMatchEdit` / `data_edits` score-group correction (`src/db/queries/data-edits.ts:367-435`) | **left untouched** | **left untouched** | **left untouched** | **left untouched** | **Yes, by design** — the UPDATE statement (`data-edits.ts:396-407`) never mentions any provenance column; only `home_goals`/`home_behinds`/etc./`result`/`winner_club_id`/`margin` are set. Confirmed independently by `canonical-apply.ts:96-99`'s own comment: "`applyDataEdit` does not re-stamp `matches.source_id` for the score group". |
+| `applyMatchEdit` attendance-group correction (`data-edits.ts:352-366`) | n/a (different column) | n/a | n/a | n/a | Sets `matches.attendance_source_id` (a **separate**, single-field provenance column from migration 020, not part of the 064 quartet) to `manual_admin_edit` when a figure is typed; leaves it NULL when clearing. The 064 quartet (`source_id`/`source_record_id`/`import_batch_id`) is untouched by this path too. |
+| Rebuild tooling (`tools/migration/common.py`, replay/promotion paths) | Only touches non-`matches` tables' `manual_admin_edit` overrides (players, coaches, draft, fixtures, club leadership); does not write `matches.source_id` | — | — | — | — |
+| Tests (`tests/integration/match-admin-create.test.ts`) | Not asserted (createMatch's current behaviour of leaving it NULL) | Not asserted | Not asserted | Not asserted | — |
+
+**Key finding:** `createMatch()` is the only match-family writer that leaves all four provenance
+columns completely null, and this is a known, documented gap — `canonical-apply.ts:98`
+("`createMatch` writes no provenance at all") already lists it as one of four reasons a
+source-less canonical row's ownership cannot be proven from anything the settle role can read.
+
+### 3. Manual/admin provenance conventions elsewhere (players, coaches, draft, fixtures, season
+lists, club leadership, special records, Brownlow)
+
+Every one of these entities already uses the **same** convention, established independently
+across eight modules and confirmed to agree by cross-file comments (e.g.
+`player-identity.ts` / `players.ts` / `tools/migration/common.py` all describe the identical
+shape):
+
+- **Source registry:** `sources.key = 'manual_admin_edit'` (seeded once, `057_data_edits.sql:36-42`,
+  `kind = 'manual'`). No entity has its own separate manual source; all reuse this one row.
+- **`source_record_id` / token format:** a `crypto.randomUUID()` (or Web Crypto
+  `crypto.randomUUID()` in the one client-reachable module, `special-records/identity.ts`),
+  **minted once at creation**, generally embedded in a compound key:
+  - Players/coaches/draft: bare token, referenced as `manual_admin_edit:<token>` in
+    `data_overrides.entity_key` and `external_identities`.
+  - Fixtures (097), club leadership (098): `data_overrides` key
+    `'manual_admin_edit:<token>'`, described explicitly as "**minted once at creation and NEVER
+    edited**... the durable [fixture/appointment] identity" (097:220, 098:279).
+  - Special records (`player_achievements`, `after_siren_kicks`, migrations 101/102):
+    `source_record_id = '<family>:<uuid>'` (e.g. `first_kick_goal:<uuid>`), with `source_id` set
+    to the `manual_admin_edit` sources row — `mintManualSourceRecordId()`
+    (`src/lib/special-records/identity.ts:165-`).
+- **Is the token random or deterministic?** Always a random UUID v4, never derived from content
+  (name, date, role, etc.). `098_club_leadership.sql:279` is explicit about why: "Never derived
+  from role, dates, notes or a player display name — every one of those is a fact an
+  administrator is expected to change, and a key over mutable facts would move the record's
+  identity when they did."
+- **Does the identifier survive future edits?** **Yes, always.** Every migration comment
+  describing these tokens ("minted once at creation and NEVER edited", 097/098) and the score-group
+  edit path (§2 above) agree: an in-place field correction never changes the row's
+  `source_id`/`source_record_id`. Only `data_edits` (players/matches) or the equivalent
+  `data_overrides` row records that a correction happened.
+- **Does a new edit generate a new token, or is the creation identity preserved?** **Creation
+  identity is preserved.** A **replacement** (voiding one row and creating a materially different
+  one, e.g. special records' void-then-replace lifecycle, migration 102) mints a **new** UUID for
+  the new row — "a replacement is always a new `manual_admin_edit` row whose minted uuid cannot
+  collide with it by construction" (102:85). This is a *new row*, not a mutation of the original
+  row's identity. An in-place edit of the same logical record does not remint.
+- **Importer non-collision guarantee:** every one of these migrations states the same invariant —
+  "Importer-written rows only... a future importer writes under its OWN source_id, never over a
+  `manual_admin_edit` row" (097:234, 098:293). Ownership by source key is what protects a manual
+  row from being silently overwritten by a later automated import.
+
+### 4. Source registry semantics
+
+- `sources.key = 'manual_admin_edit'` already exists (seeded by 057, `kind = 'manual'`) and is
+  reused by every manual-provenance writer above. **A generic manual/admin source already
+  exists; introducing a new key such as `admin/manual` is not necessary** on registry-existence
+  grounds alone (see §11 for whether a *match-specific* key is nonetheless warranted).
+- `kind` values seen in the registry: `upstream_dataset` (afltables, squiggle_api,
+  kali_afl_stats), `scrape` (fitzroy-style scrapes, per `DOB_EVIDENCE_TYPE` context), `manual`
+  (manual_admin_edit — human-entry channel), and `derived` (not directly relevant here).
+  Sources represent **both** upstream systems and a single human-entry channel; they are not
+  exclusively upstream-system identifiers.
+
+### 5. Meaning of `source_record_id` — repository evidence, not assumption
+
+Across every existing writer (AFL Tables `game_id`, Squiggle/Kali `external_game_id`, award
+`source_key`/`record_id`, special-records `<family>:<uuid>`, fixtures/coaches/draft
+`manual_admin_edit:<token>`), `source_record_id` is used **consistently as (A) the stable
+identity of the source record**, scoped by `source_id` — never as (B) an edit-event id, (C) an
+upstream natural key exclusively (that's only true for genuinely upstream sources; for manual
+rows there is no upstream natural key, so a minted UUID substitutes), or (D) an arbitrary trace
+token. The special-records migration comments (§3 above) are explicit that the minted UUID is
+"the durable... identity," and the whole family/fixtures/club-leadership convention exists
+precisely so that record identity — not edit-event identity — is what these tokens carry.
+
+Therefore `manual_admin_edit:<token>` unambiguously means **"this canonical row was originally
+created manually"** (identity of the record), never "this specific edit event came from an
+admin." The audit trail for *who edited what and when* is a completely separate mechanism
+(`data_edits`, or the entity-specific override audit for players/coaches/etc.) — see §6.
+
+### 6. Relationship to `data_edits` / audit trail
+
+`data_edits.table_name` (057) is already CHECKed to `('players', 'matches')` — `matches` is
+already a registered target for the manual-edit audit log; no migration is needed to let a match
+correction be audited. `createMatch()` writes a `data_edits` row transactionally (confirmed in
+ISSUE-182/183's own key-files listings) and `createMatchAction` writes activity logging
+separately.
+
+**Recommendation: keep these fully separate**, exactly as the existing score/attendance edit
+paths already do:
+
+- `matches.source_id`/`source_record_id`/`import_batch_id` = **immutable row-level provenance**:
+  where did this canonical row's *content* originate (an upstream system, or a human typing it
+  in from scratch). Set once, essentially never touched by a later correction.
+- `data_edits` = **mutable, append-only edit history**: every subsequent correction to any
+  editable field, regardless of the row's origin, with old/new values, admin user, timestamp,
+  and an optional note.
+
+Filling `matches` provenance for admin-created rows would **complement**, not duplicate, the
+audit trail: provenance answers "whose row is this / who may safely overwrite it" (feeds the
+ownership gate, §7 below); `data_edits` answers "what changed, when, and why." Conflating them —
+e.g. re-stamping `source_record_id` on every edit — would break the ownership model's assumption
+that `source_id`/`source_record_id` identify the *record*, not the *latest edit*, and would
+diverge from every other entity's established convention.
+
+### 7. Interaction with the settle/canonical-apply ownership gate — the concrete reason this
+matters beyond bookkeeping
+
+`src/lib/acquisition/canonical-apply.ts` and `reconciliation.ts` already implement a real
+ownership model keyed on `matches.source_id`:
+
+- `NULL` `source_id` → `TargetOwnership = { state: 'unowned' }`
+  (`reconciliation.ts:122-131`, "a **declared** absence of ownership, which Decision E permits
+  this source to write"). Under the generic gate (`evaluateTargetOwnership`, used for the
+  human-reviewed promotion queue), `unowned` → `verdict: 'ok'`, `basis: 'unowned'` — **a
+  source-less row (which is what every `createMatch()` row is today) remains adoptable by a
+  human reviewer through the promotion queue.** Under the strict automatic-path predicate
+  (`autoApplyOwnership`, used by unattended settle), `unowned`/NULL is deliberately folded into
+  `refused` / `ownership_indeterminate` — settle will **never** silently overwrite an
+  admin-created match, but only because NULL can't be proven safe, not because it's recognised as
+  manually authored.
+- A `source_id` that resolves to a **known** key → `{ state: 'owned', sourceKey }`. If the
+  promoting source (e.g. `afltables`) differs from the owner, both gates return
+  `foreign_owned_collision` / `refused foreign_source_owner` — i.e. **explicitly protected**,
+  not merely indeterminate.
+
+**This is the strongest evidence in the repository for what admin-created match provenance
+should do.** Leaving `source_id` NULL (current behaviour) means an admin-created match is
+"unowned," which a human operator can later overwrite via the reviewed promotion queue without
+the system recognising it was hand-entered. Stamping `source_id = manual_admin_edit` would move
+admin-created matches into the `owned` / `foreign_source_owner` bucket for every *other* source,
+i.e. explicitly protected from both the automatic settle path (already true today, incidentally)
+**and** the human-reviewed promotion path (not true today) — while still leaving the row
+`updateable` if some future tool explicitly promotes *as* `manual_admin_edit`.
+
+### 8. Update/edit semantics — the critical decision, answered by existing precedent
+
+- **Imported match, later corrected manually:** `source_id`/`source_record_id` **stay as the
+  original source**. This is not just a recommendation — it is what `applyMatchEdit`'s score-group
+  path already does today (§2, §6): the correction lands only in `data_edits`; the row's
+  provenance columns are never touched. The same rule should extend to any newly-provenanced
+  field group for matches.
+- **Manually created match, later edited:** provenance (`source_id = manual_admin_edit`,
+  `source_record_id = <minted token>`) should likewise **stay unchanged** across in-place edits —
+  consistent with every other entity's "minted once, never edited" convention (§3). Only
+  `data_edits` records the correction.
+
+### 9. Delete/recreate semantics
+
+Existing precedent (special records' void-then-replace lifecycle, migration 102, §3 above) is
+unambiguous: **a replacement is a new row with a newly minted `source_record_id`**, never a reuse
+of the deleted row's token. `deleteMatch` (ISSUE-180/181) is a hard delete of the `matches` row
+(no soft-void state on `matches` itself, unlike `player_achievements`/`after_siren_kicks`), so
+"delete and recreate" for a match is structurally just "create a new row," which would go through
+`createMatch()` again and mint a fresh token under the recommended model. `source_record_id`
+should **not** be derived from canonical match identity (season/round/date/clubs) — that
+identity is already `match_key`, and a content-derived token would collide with the "never
+derived from mutable facts" principle §3 established for exactly this reason (an admin
+correcting the date/round of a manually entered match must not change its provenance identity).
+
+### 10. DEV read-only audit SQL (not run — provided for the operator; all read-only against
+`afldb_dev`)
+
+```sql
+-- Total matches
+SELECT count(*) AS total_matches FROM matches;
+
+-- Provenance column population
+SELECT
+  count(*)                                   AS total,
+  count(source_id)                           AS source_id_populated,
+  count(source_record_id)                    AS source_record_id_populated,
+  count(import_batch_id)                     AS import_batch_id_populated,
+  count(imported_at)                         AS imported_at_populated,
+  count(*) FILTER (
+    WHERE source_id IS NULL AND source_record_id IS NULL AND import_batch_id IS NULL
+  )                                           AS provenance_entirely_null
+FROM matches;
+
+-- Counts grouped by source key (NULL group = provenance-null rows)
+SELECT s.key AS source_key, count(m.id) AS match_count
+FROM matches m
+LEFT JOIN sources s ON s.id = m.source_id
+GROUP BY s.key
+ORDER BY match_count DESC;
+
+-- Example source_record_id formats per source (5 samples each)
+SELECT source_key, source_record_id FROM (
+  SELECT s.key AS source_key, m.source_record_id,
+         row_number() OVER (PARTITION BY s.key ORDER BY m.id) AS rn
+  FROM matches m
+  JOIN sources s ON s.id = m.source_id
+  WHERE m.source_record_id IS NOT NULL
+) ranked
+WHERE rn <= 5
+ORDER BY source_key, rn;
+
+-- Season distribution of provenance-null matches
+SELECT season, count(*) AS provenance_null_matches
+FROM matches
+WHERE source_id IS NULL AND source_record_id IS NULL AND import_batch_id IS NULL
+GROUP BY season
+ORDER BY season;
+
+-- Does any current canonical match already use a manual/admin source?
+SELECT m.id, m.season, m.round_code, m.match_date, m.source_record_id
+FROM matches m
+JOIN sources s ON s.id = m.source_id
+WHERE s.key = 'manual_admin_edit'
+ORDER BY m.id;
+```
+
+### 11. Product recommendation
+
+**Option B: reuse the existing `manual_admin_edit` source, with a stable, match-scoped
+`source_record_id` minted once at creation.**
+
+- **`source_id`:** `(SELECT id FROM sources WHERE key = 'manual_admin_edit')` — the same source
+  row every other manually-created entity uses. No new registry key. (Rejected: Option C,
+  introducing a dedicated `match_manual`/`admin_manual` source — no repository evidence supports
+  a match-specific manual source when every other entity converges on one shared key, and a new
+  key would only be justified if matches needed to be distinguished from *other* manually-created
+  entities at the ownership-gate level, which nothing in `canonical-apply.ts` currently requires.
+  Rejected: Option A, leaving provenance null — this is the status quo, and §7 shows it leaves
+  admin-created matches adoptable by the human-reviewed promotion queue as if unowned, which is
+  the opposite of the intent.)
+- **`source_record_id` format:** a minted `crypto.randomUUID()`, following the special-records
+  precedent of a family-scoped compound key: `match:<uuid>` (mirrors `first_kick_goal:<uuid>` /
+  `after_siren:<uuid>` — `mintManualSourceRecordId`-style, extended with a `'match'` family).
+  Minted once inside `createMatch()`'s existing transaction, alongside the `data_edits` INSERT.
+- **`import_batch_id`:** left NULL. No `import_batches` row exists for a single admin keystroke;
+  every existing manual-provenance writer (players, coaches, fixtures, special records) also
+  leaves it NULL — `import_batch_id` is specifically for tool/batch-run imports.
+- **`imported_at`:** left at its column default (INSERT instant) — already the current, harmless
+  behaviour; no change needed since the column is `NOT NULL DEFAULT now()` regardless.
+- **Subsequent edits:** `source_id`/`source_record_id` are **never** re-stamped on a later
+  correction (§8) — `data_edits` alone records the change. This matches the score-group path's
+  existing, already-shipped behaviour.
+- **Contributor-promotion behaviour:** see §12 (deferred).
+
+### 12. Contributor workflow (future) — where the distinction belongs
+
+Not designing the contributor system, but per the issue's item 7: a future distinction between
+direct super-admin entry, an approved contributor submission, and imported API data should **not**
+be encoded in `source_id`/`source_record_id` — those identify *what the row's content is
+grounded in* (a source, in the provenance sense), and collapsing "who/how it was approved" into
+that key would break the one-key-per-source-system invariant every existing writer relies on
+(`ownershipOf` resolves a single `sourceKey` per row). The natural home for a
+super-admin-vs-contributor distinction is **audit metadata** — either a new field on `data_edits`
+(e.g. an edit "channel"/"role" column) or a separate contributor-submission/review table
+analogous to `promotion_candidates`, whose approval writes the eventual `manual_admin_edit`
+provenance in exactly the same shape a direct super-admin entry would. This keeps `source_id`
+answering only "which system is this row's content grounded in," while submission lineage
+answers "who proposed/approved it," consistent with §6's recommended separation of concerns.
+
+### 13. Migration impact
+
+**No migration, no new constraint/index, no seed required.** `sources.key = 'manual_admin_edit'`
+already exists (057). The recommended model is a pure application-code change inside
+`createMatch()`: mint the token, stamp the three columns on INSERT. No schema change is implied
+by leaving `import_batch_id` NULL (already nullable) or by not adding a uniqueness constraint on
+`(source_id, source_record_id)` (matches already has its own identity via `match_key` +
+ISSUE-182's duplicate check; unlike special records, `source_record_id` is not matches' only
+identity signal, so a `matches_source_uq`-style constraint is not evidently needed — flagged as
+an open question in §15, not a decision).
+
+### 14. Historical/backfill question
+
+**Do not backfill.** Provenance-null `matches` rows in `afldb_dev` today could come from **either**
+an admin-created row **or** a legacy import that predates 064 (064 added the columns to the
+already-populated `matches` table with no backfill of its own — pre-064 rows got NULL, not a
+retroactively-inferred source). There is no reliable way to distinguish "was hand-typed by an
+admin" from "was imported before provenance tracking existed" purely from `source_id IS NULL`; the
+DEV audit query in §10 (season distribution of provenance-null rows) is precisely what would show
+whether the null population looks like "the entire historical import" (expected, if pre-064 rows
+dominate) versus "a handful of specific admin-created rows" (which would need cross-referencing
+against `data_edits`/activity-log creation events, not the provenance columns themselves, to
+identify reliably). Backfilling based on provenance-null status alone would be inventing evidence
+the issue brief explicitly warns against (item 13).
+
+### 15. Testing implications (for the eventual implementation issue, not built here)
+
+- `createMatch()` stamps `source_id = manual_admin_edit` and a freshly minted, uniquely-formatted
+  `source_record_id` (e.g. matches `^match:[0-9a-f-]{36}$`) on every successful insert.
+- Two admin-created matches in the same test run get **different** `source_record_id` values (no
+  collision from reusing a token).
+- `data_edits` remains the sole record of subsequent corrections — a follow-up edit via
+  `applyMatchEdit`/`data-edits.ts` must leave `source_id`/`source_record_id` **unchanged** (extend
+  the existing score/attendance-group coverage with an explicit provenance-preservation
+  assertion).
+- Transaction rollback (existing ISSUE-182 test D, "rollback-on-audit-failure") must be confirmed
+  to also roll back the provenance columns — i.e. a rolled-back `createMatch()` leaves no orphan
+  `manual_admin_edit` `source_record_id` token bound to nothing.
+- An imported match (seeded with `afltables` provenance, e.g. via `seedNameKeyedMatch()`-style
+  fixtures) that later receives a manual correction through the admin data-editor must be proven
+  to **retain** its original `afltables` `source_id`/`source_record_id` — not silently switch to
+  `manual_admin_edit`.
+- ISSUE-182's existing duplicate-refusal tests (cases A-E/G) must remain green unaffected by the
+  provenance change — duplicate detection does not key on the new columns.
+- If a `(source_id, source_record_id)` uniqueness constraint is added (open question, §13), a test
+  proving the mint cannot collide even under concurrent `createMatch()` calls.
+
+### Unresolved / genuinely not answerable from repository evidence
+
+1. Whether `matches` should eventually get a `(source_id, source_record_id)` uniqueness
+   constraint (partial, `WHERE source_record_id IS NOT NULL`, mirroring 101/102's pattern) — no
+   repository evidence currently requires it, since `match_key` + ISSUE-182's duplicate check
+   already provide identity, but it's a defensible defensive addition an operator may want when
+   this is actually implemented.
+2. The exact minted `source_record_id` family prefix string (`match:` proposed here by analogy
+   with `first_kick_goal:`/`after_siren:`) is a naming choice, not something repository evidence
+   pins down — worth operator confirmation before implementation.
+3. Whether the DEV provenance-null population (§10, §14) is dominated by pre-064 legacy rows or
+   contains any genuinely admin-created rows cannot be determined without actually running the
+   §10 audit SQL on `afldb_dev`, which this investigation deliberately did not do.
+4. The shape of future contributor-submission lineage (§12) is explicitly out of scope and only
+   sketched at the level of "not in `source_id`" — the actual review/approval table design is
+   unresolved and was not attempted.
+
+### Migration/grants
+None required for the investigation itself. See §13 for the (also none-required) migration
+impact of the recommended implementation.
+
+### Follow-up (superseded — see Implementation below)
+Originally: implementation deferred to a separate session. Superseded 2026-09-15 — the operator
+authorized implementation the same day, on the design already established above.
+
+### Implementation (2026-09-15)
+
+**Exact production change** — `src/db/queries/match-admin.ts`, inside `createMatch()`'s existing
+`importSql.begin(async (tx) => { ... })` transaction, between the duplicate-identity check and the
+`INSERT INTO matches`:
+
+- The pre-existing `attendanceSourceId` lookup (previously gated `if (attendance !== null)`) now
+  runs unconditionally: `SELECT id FROM sources WHERE key = 'manual_admin_edit'`. If no row is
+  found, `createMatch()` throws `'The manual_admin_edit provenance source is not configured.'`
+  **before any INSERT** — no source-less match, no partial commit. This is the same refusal
+  message and query shape the file already used for `attendance_source_id`; §11's recommendation
+  to use "the narrowest existing repository convention for resolving required source rows" meant
+  reusing this one, not introducing a new lookup helper.
+- A per-call `matchSourceRecordId = 'match:' + randomUUID()` is minted once (import added:
+  `import { randomUUID } from 'node:crypto';`, mirroring the same import every other manual-writer
+  module uses — admin-coaches.ts, admin-fixtures.ts, etc.).
+- `INSERT INTO matches (...)` now includes `source_id, source_record_id` in its column and VALUES
+  lists, set to the resolved `manualSource.id` and the minted token. `import_batch_id` is left out
+  of the column list entirely (as it already was) — it stays NULL by omission, exactly per §11.
+  `imported_at` is untouched — existing `NOT NULL DEFAULT now()` column behaviour.
+
+No other function in `match-admin.ts` (`searchAdminMatches`, `deleteMatch`) was touched.
+
+**`manual_admin_edit` lookup behaviour** — a plain `SELECT` inside the same transaction as the
+match INSERT; a missing row throws synchronously, propagates out of `importSql.begin()`, and rolls
+back the whole transaction (nothing was inserted yet at that point, so there is nothing to roll
+back beyond the lookup itself — but the throw also means the season/venue work done in steps 1-2
+above it never commits either, since it is all one transaction). No new source row is ever
+inserted by this code path.
+
+**`source_record_id` format** — `` `match:${randomUUID()}` ``, e.g.
+`match:3fa85f64-5717-4562-b3fc-2c963f66afa6`. Matches the `<family>:<uuid>` shape
+`src/lib/special-records/identity.ts` established for `first_kick_goal`/`after_siren`, extended
+with a new `match` family for this table (not registered in that module's
+`SPECIAL_RECORD_FAMILIES`, since `matches` is not a special-records table — this is a parallel,
+independently-formatted convention for the same shared `manual_admin_edit` source, exactly as
+fixtures'/coaches'/draft's bare-token convention already coexists with special records' prefixed
+one under the same source).
+
+**Transaction/rollback semantics** — unchanged from before this issue: the provenance stamp is
+computed and inserted inside the pre-existing `importSql.begin(...)` callback, before the required
+`recordDataEdit(tx, ...)` audit write. A failure anywhere in that callback (the forced-audit-write
+trigger in test E, a constraint violation, etc.) rolls back the match row and its provenance
+together — there is no separate commit for provenance. Test E/K makes this explicit.
+
+**Edit-preservation finding** — confirmed, not changed: `src/db/queries/data-edits.ts`'s
+`applyMatchEdit()` (`attendance`, `score`, `match_time`, `match_event`, `notes` groups) never
+references `matches.source_id`/`source_record_id` in any `UPDATE` statement. No code change was
+needed or made here, per the brief's instruction 3 — confirmed by direct re-inspection of every
+`case` branch, and now also proven by test L against a live admin-created row.
+
+**Reconciliation-ownership proof** — no change to `src/lib/acquisition/canonical-apply.ts` or
+`reconciliation.ts` (none was needed: `autoApplyOwnership`/`evaluateTargetOwnership` already read
+whatever `source_id` a row carries generically, via `ownershipOf()`). What changed is only the
+*value* `createMatch()` now writes. Proof is the new unit-level fixture in
+`tests/current-season-import.test.ts`'s existing `'E3 — the automatic-path ownership predicate'`
+describe block: a row with `{ state: 'owned', sourceKey: 'manual_admin_edit' }` is `refused` /
+`foreign_source_owner` under **both** `autoApplyOwnership` (the settle path) and
+`evaluateTargetOwnership` (the human-reviewed promotion-queue path) when a different source (e.g.
+`afltables`) is the one applying — in contrast to the pre-existing `'unowned'` (NULL) case, which
+the generic gate still answers `'ok'`/`'unowned'` for. That divergence is exactly the protection
+§7 of the investigation predicted. A stale in-file comment in the same describe block ("createMatch
+writes no provenance at all") was corrected in the same edit, since it is no longer true after this
+implementation.
+
+**Migration/seed/backfill status** — **none of the three.** `sources.key = 'manual_admin_edit'`
+already existed (migration 057); no new migration, no new source-registry seed, no new constraint
+or index, and **no backfill of existing NULL-provenance matches** — the investigation's §14 finding
+(NULL provenance is not reliable evidence a row was admin-created; pre-064 legacy rows are
+indistinguishable from admin-created rows on that signal alone) stands unchanged, and no backfill
+was attempted or proposed.
+
+### Tests added/changed
+
+`tests/integration/match-admin-create.test.ts`:
+- **J.** (new) Two admin-created matches in the same run each get
+  `sources.key = 'manual_admin_edit'`, a `source_record_id` matching
+  `/^match:[0-9a-f-]{36}$/i` (UUID v4 shape), `import_batch_id IS NULL`, and distinct tokens from
+  each other.
+- **L.** (new) `createMatch()` then a real `saveEdit()` `match_event` correction: `source_id`/
+  `source_record_id` are byte-for-byte unchanged after the edit; the edit itself is recorded as a
+  `data_edits` row (`field_group = 'match_event'`) and nowhere else. Cleans up its own
+  `data_overrides` row in a `finally` block (no FK ties it to `matches`, so it is not covered by
+  this file's `deleteMatch()`-based `afterEach`) — the same convention
+  `tests/integration/data-editor.test.ts` already uses for its own `matches`/`notes` override
+  proof.
+- **E/K.** (extended, renamed from **E**) The existing forced-audit-failure rollback test gained
+  one more assertion: no `matches` row owned by `manual_admin_edit` survives for that round's
+  identity either — proves the provenance stamp rolls back with the rest of the transaction, not
+  just the match/quarter-score/audit rows the test already checked.
+
+`tests/current-season-import.test.ts` (`'E3 — the automatic-path ownership predicate'` describe
+block, `AFLDB-ISSUE-099 settle — ownership...` section):
+- **M.** (new) `autoApplyOwnership({ state: 'owned', sourceKey: 'manual_admin_edit' }, 'afltables')`
+  → `refused`/`foreign_source_owner`; `evaluateTargetOwnership(...)` on the same fixture →
+  `foreign_owned_collision`/`foreign_source_owner`. Pure-function, DB-free — the narrowest home for
+  this proof, per the brief's own guidance to prefer an existing helper test over an end-to-end
+  promotion scenario.
+- One stale comment corrected (see Reconciliation-ownership proof above) in the immediately
+  preceding test, which had asserted "createMatch writes no provenance at all" as its reasoning.
+
+**N. (missing `manual_admin_edit` source, rollback proof) — not added.** Documented inline in
+`match-admin-create.test.ts` as a comment rather than a test: `sources.key = 'manual_admin_edit'`
+is a single globally-seeded row (057) that every other manual-provenance integration suite in the
+repository also depends on concurrently (admin-coaches, admin-fixtures, admin-draft,
+admin-season-lists, admin-club-leadership, admin-special-records, `data-editor.test.ts`'s
+attendance-group path, and this file's own pre-184 `attendanceSourceId` behaviour).
+`createMatch()` opens its own connection/transaction, so proving the refusal would require
+deleting or renaming that row on a connection OUTSIDE the test's own transaction — visible to every
+other `afldb_test` connection, including any other integration file running at the same time. The
+brief's own escape hatch ("if this would require brittle global mutation of shared source rows,
+stop and report rather than building an unsafe test") applies directly, so this was not built. No
+existing test in the repository exercises a missing `manual_admin_edit` row for ANY writer
+(coaches/fixtures/etc. all have the identical unguarded gap), so this is a pre-existing coverage
+pattern, not a regression introduced here.
+
+### DEV read-only audit (operator-run; all read-only against `afldb_dev`)
+
+```sql
+-- 1. Total matches
+SELECT count(*) AS total_matches FROM matches;
+
+-- 2. source_id populated/null counts
+SELECT
+  count(*) FILTER (WHERE source_id IS NOT NULL) AS source_id_populated,
+  count(*) FILTER (WHERE source_id IS NULL)     AS source_id_null
+FROM matches;
+
+-- 3. Grouped match counts by source key (NULL group = source_id IS NULL)
+SELECT s.key AS source_key, count(m.id) AS match_count
+FROM matches m
+LEFT JOIN sources s ON s.id = m.source_id
+GROUP BY s.key
+ORDER BY match_count DESC;
+
+-- 4. Season distribution of NULL-source matches
+SELECT season, count(*) AS null_source_matches
+FROM matches
+WHERE source_id IS NULL
+GROUP BY season
+ORDER BY season;
+
+-- 5. Does any current canonical match already use manual_admin_edit?
+SELECT m.id, m.season, m.round_code, m.match_date, m.source_record_id
+FROM matches m
+JOIN sources s ON s.id = m.source_id
+WHERE s.key = 'manual_admin_edit'
+ORDER BY m.id;
+
+-- 6. Example source_record_id formats per source (5 samples each)
+SELECT source_key, source_record_id FROM (
+  SELECT s.key AS source_key, m.source_record_id,
+         row_number() OVER (PARTITION BY s.key ORDER BY m.id) AS rn
+  FROM matches m
+  JOIN sources s ON s.id = m.source_id
+  WHERE m.source_record_id IS NOT NULL
+) ranked
+WHERE rn <= 5
+ORDER BY source_key, rn;
+
+-- 7. Mismatched population: source_id set but source_record_id NULL, and vice versa
+SELECT
+  count(*) FILTER (WHERE source_id IS NOT NULL AND source_record_id IS NULL) AS source_id_only,
+  count(*) FILTER (WHERE source_id IS NULL AND source_record_id IS NOT NULL) AS source_record_id_only
+FROM matches;
+```
+
+No backfill is proposed from these results alone (§14 of the investigation stands): a non-zero
+NULL-source count is expected and not itself evidence of anything to fix.
+
+### Operator verification (2026-09-15)
+
+**Focused integration** — `npx vitest run tests/integration/match-admin-create.test.ts`: 1 test
+file passed, 10/10 tests passed. ISSUE-184 coverage within that run:
+- **E/K** — a forced audit-write failure rolls back the match, its quarter-score collateral, and
+  its creation provenance together.
+- **J** — an admin-created match receives `manual_admin_edit` provenance with a distinct, stable
+  `match:<uuid>` token per match.
+- **L** — a subsequent edit preserves `source_id`/`source_record_id` unchanged and records the
+  correction only in `data_edits`.
+
+**Reconciliation ownership** —
+`npx vitest run tests/current-season-import.test.ts -t "E3 — the automatic-path ownership predicate"`:
+1 test file passed, 7/7 relevant tests passed, including the new fixture proving a
+`manual_admin_edit`-owned match is treated as foreign-owned/protected by both the automatic
+(settle) and the generic (human-reviewed promotion) ownership gates.
+
+**Typecheck** — `npx tsc --noEmit -p tsconfig.json`: PASS.
+
+**DEV read-only audit** (`afldb_dev`, via `AFLDB_OWNER_DATABASE_URL`):
+
+| Metric | Value |
+|---|---|
+| Total matches | 17,052 |
+| `source_id` populated | 17,051 |
+| `source_id` NULL | 1 |
+| `source_record_id` populated | 17,051 |
+| `import_batch_id` populated | 17,051 |
+| `imported_at` populated | 17,052 |
+| `source_id` non-null + `source_record_id` null | 0 |
+| `source_id` null + `source_record_id` non-null | 0 |
+
+Grouped by source: `afltables` 17,051; NULL-source 1. `manual_admin_edit` currently owns **0**
+matches (expected — the admin match-creation UI has not been used to create a match since this
+change shipped). NULL-source season distribution: **2026 → 1 row.**
+
+**The one NULL-source row, identified:**
+
+| Field | Value |
+|---|---|
+| id | 17269 |
+| match_key | `2026\|SF\|2026-09-13\|9\|10` |
+| season / round | 2026, `semi_final`, round_number NULL, round_code `SF` |
+| match_date | 2026-09-13 |
+| home / away | Fremantle / Geelong |
+| venue_raw | Perth Stadium |
+| source_id / source_record_id / import_batch_id | NULL / NULL / NULL |
+| imported_at | 2026-09-13T11:24:57.424Z |
+
+**Disposition — not backfilled, left as-is.** Its `match_key` shape is compatible with either the
+admin creation path or another pre-184 writer that left provenance NULL; compatibility is not
+proof of origin. `imported_at` is not evidence of import, since that column carries
+`NOT NULL DEFAULT now()` regardless of how a row was created (§1 above). No other repository
+evidence (no `data_edits` row, no `data_overrides` row, no activity-log entry inspected as part of
+this DEV audit) was used to attribute this row, because the brief for this audit was read-only and
+did not request that further investigation. Per §14 of the investigation and the explicit
+instruction accompanying this closeout: **this row's origin is not provable from current evidence,
+it is not backfilled, and no speculative follow-up issue is opened solely because it is
+NULL-source.** It is recorded here as a known, existing, unresolved-provenance canonical row —
+one instance of the general population the investigation's §14 already anticipated could exist
+after this change shipped, for any table.
+
+### Unresolved / genuinely not answerable from repository evidence
+Carried forward from the investigation, still unresolved and still not required for this issue's
+scope:
+1. Whether `matches` should eventually get a `(source_id, source_record_id)` uniqueness
+   constraint — no evidence currently requires it.
+2. The `match:` `source_record_id` prefix was implemented as proposed; no repository evidence
+   contradicted it, so this is no longer open.
+3. Whether DEV's NULL-source population is dominated by pre-184/pre-064 legacy rows was
+   partially answered by this closeout's audit (1 row, 2026 season, of unprovable origin) — it is
+   not the large historical population the investigation worried about, but the single row found
+   is itself unresolved for the reasons stated above.
+4. **Contributor-submission lineage remains a genuine open product question**, unaddressed by this
+   issue by design (§12 of the investigation): a future distinction between direct super-admin
+   entry, an approved contributor submission, and imported data still needs a design — provisionally
+   sketched as audit-metadata/submission-lineage, not as a new `source_id`/`source_record_id`
+   value — but no such design was attempted here and none is needed until contributor submission
+   is actually built.
+
+### Migration/grants
+None. Confirmed unchanged from the investigation and from implementation.
+
+### Changelog
+`CHANGELOG.md` `[Unreleased]` updated with a matching entry.

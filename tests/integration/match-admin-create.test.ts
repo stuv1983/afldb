@@ -49,6 +49,7 @@ import {
   afterAll, afterEach, beforeAll, describe, expect, it,
 } from 'vitest';
 
+import { saveEdit } from '@/db/queries/data-edits';
 import { createMatch, deleteMatch, type CreateMatchInput } from '@/db/queries/match-admin';
 
 const testDbUrl = process.env.AFLDB_TEST_DATABASE_URL!;
@@ -417,7 +418,7 @@ describe('AFLDB-ISSUE-182 -- createMatch() against a real database', () => {
     expect(await countIdentity(roundNumber, matchDate, staleClubId, clubB)).toBe(0);
   });
 
-  it('E. rolls back the match and its quarter scores when the required audit write fails', async () => {
+  it('E/K. rolls back the match, its quarter scores and its creation provenance when the required audit write fails', async () => {
     const roundNumber = nextRound();
     const matchDate = `${season}-01-01`;
     const marker = `${MARKER}-audit-trap-${roundNumber}`;
@@ -472,6 +473,19 @@ describe('AFLDB-ISSUE-182 -- createMatch() against a real database', () => {
           JOIN matches m ON m.id = mps.match_id
          WHERE m.season = ${season} AND m.round_type = 'home_and_away' AND m.round_number = ${roundNumber}`;
       expect(period.n).toBe(0);
+
+      // AFLDB-ISSUE-184 (K): the manual_admin_edit source_id/source_record_id
+      // stamp createMatch() mints for this row rolls back with everything
+      // else -- no orphaned provenance-bearing match survives a failed
+      // creation. Redundant with the countIdentity(...) check above (the
+      // same match_key columns identify it either way), but asserted
+      // directly against provenance since that is what K asks for.
+      const [orphanProvenance] = await owner<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM matches m
+          JOIN sources s ON s.id = m.source_id
+         WHERE s.key = 'manual_admin_edit' AND m.season = ${season}
+           AND m.round_type = 'home_and_away' AND m.round_number = ${roundNumber}`;
+      expect(orphanProvenance.n).toBe(0);
 
       // The trigger's own target row rolled back with everything else.
       const [audit] = await owner<{ n: number }[]>`
@@ -533,4 +547,134 @@ describe('AFLDB-ISSUE-182 -- createMatch() against a real database', () => {
       SELECT round_code AS "roundCode" FROM matches WHERE id = ${created.id}`;
     expect(row.roundCode).toBe(`ROUND${roundNumber}`);
   });
+
+  // AFLDB-ISSUE-184: admin-created canonical matches previously left
+  // source_id/source_record_id/import_batch_id entirely NULL --
+  // canonical-apply.ts's own S5 comment named this as one of the reasons a
+  // source-less canonical row's ownership could never be proven. createMatch()
+  // now stamps the same manual_admin_edit provenance every other
+  // admin/manual writer in the repository uses (fixtures, coaches, draft,
+  // club leadership, special records): source_id resolves to the shared
+  // manual_admin_edit sources row, source_record_id is a token minted once
+  // at creation ('match:<uuid>'), and import_batch_id stays NULL (no
+  // import_batches row exists for a single admin keystroke).
+  it('J. an admin-created match receives manual_admin_edit creation provenance, with a distinct token per match', async () => {
+    const roundNumberOne = nextRound();
+    const roundNumberTwo = nextRound();
+    const matchDate = `${season}-01-01`;
+
+    const createdOne = await createMatch(baseInput({ roundNumber: roundNumberOne, matchDate }));
+    committedMatchIds.push(createdOne.id);
+    const createdTwo = await createMatch(baseInput({ roundNumber: roundNumberTwo, matchDate }));
+    committedMatchIds.push(createdTwo.id);
+
+    const rows = await owner<{
+      id: number; sourceKey: string | null; sourceRecordId: string | null; importBatchId: number | null;
+    }[]>`
+      SELECT m.id, s.key AS "sourceKey", m.source_record_id AS "sourceRecordId",
+             m.import_batch_id AS "importBatchId"
+        FROM matches m
+        LEFT JOIN sources s ON s.id = m.source_id
+       WHERE m.id IN (${createdOne.id}, ${createdTwo.id})
+       ORDER BY m.id`;
+    expect(rows).toHaveLength(2);
+
+    const uuidRe = /^match:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    for (const row of rows) {
+      expect(row.sourceKey).toBe('manual_admin_edit');
+      expect(row.sourceRecordId).toMatch(uuidRe);
+      expect(row.importBatchId).toBeNull();
+    }
+    // Two creates in the same run never share a token.
+    expect(rows[0].sourceRecordId).not.toBe(rows[1].sourceRecordId);
+  });
+
+  it('L. a subsequent match edit preserves creation provenance; the correction lands only in data_edits', async () => {
+    const roundNumber = nextRound();
+    const matchDate = `${season}-01-01`;
+    const created = await createMatch(baseInput({ roundNumber, matchDate }));
+    committedMatchIds.push(created.id);
+
+    const [before] = await owner<{
+      matchKey: string; sourceId: number | null; sourceRecordId: string | null;
+    }[]>`
+      SELECT match_key AS "matchKey", source_id AS "sourceId", source_record_id AS "sourceRecordId"
+        FROM matches WHERE id = ${created.id}`;
+
+    const editNote = `${MARKER}-provenance-preservation-${roundNumber}`;
+    try {
+      const result = await saveEdit({
+        entityKey: 'matches',
+        rowId: created.id,
+        groupKey: 'match_event',
+        raw: { match_event: `${MARKER} edited ${roundNumber}` },
+        adminUserId: actorId,
+        note: editNote,
+      });
+      expect(result).toMatchObject({ ok: true });
+
+      const [after] = await owner<{
+        sourceId: number | null; sourceRecordId: string | null; matchEvent: string | null;
+      }[]>`
+        SELECT source_id AS "sourceId", source_record_id AS "sourceRecordId", match_event AS "matchEvent"
+          FROM matches WHERE id = ${created.id}`;
+      // The edit landed...
+      expect(after.matchEvent).toBe(`${MARKER} edited ${roundNumber}`);
+      // ...but did not touch the creation provenance stamped by createMatch().
+      expect(after.sourceId).toBe(before.sourceId);
+      expect(after.sourceRecordId).toBe(before.sourceRecordId);
+
+      // The correction is recorded separately, in data_edits, not by
+      // mutating provenance.
+      const [edit] = await owner<{ fieldGroup: string; rowId: number }[]>`
+        SELECT field_group AS "fieldGroup", row_id::int AS "rowId" FROM data_edits
+         WHERE table_name = 'matches' AND note = ${editNote}`;
+      expect(edit?.fieldGroup).toBe('match_event');
+      expect(edit?.rowId).toBe(created.id);
+    } finally {
+      // saveEdit()'s data_overrides row (entity_type='matches', keyed by
+      // match_key) has no FK to matches and is not covered by this file's
+      // deleteMatch()-based afterEach, so it is cleaned up explicitly here
+      // -- the same convention tests/integration/data-editor.test.ts uses
+      // for its own matches/'notes' override proof.
+      await owner`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'matches' AND entity_key = ${before.matchKey} AND field_group = 'match_event'`;
+    }
+  });
+
+  // M. Reconciliation-ownership proof: whether a manual_admin_edit-owned
+  // match is treated as foreign-owned/protected by the settle/promotion
+  // ownership gate is a pure function of autoApplyOwnership()/
+  // evaluateTargetOwnership() (src/lib/acquisition/canonical-apply.ts,
+  // reconciliation.ts) -- it needs no database row, since those functions
+  // take a TargetOwnership value directly. That narrower, DB-free proof
+  // lives alongside the gate's existing direct unit coverage in
+  // tests/current-season-import.test.ts's 'E3 -- the automatic-path
+  // ownership predicate' describe block (new case: "treats an
+  // admin-created (manual_admin_edit-owned) row as foreign-owned, on both
+  // the automatic and the generic gate"), rather than an elaborate
+  // end-to-end promotion scenario duplicated here.
+
+  // N. Missing manual_admin_edit source, rollback proof: NOT ADDED.
+  // sources.key = 'manual_admin_edit' is a single, globally-seeded row
+  // (migration 057) that every other manual-provenance writer's own
+  // integration suite also depends on (admin-coaches, admin-fixtures,
+  // admin-draft, admin-season-lists, admin-club-leadership,
+  // admin-special-records, data-editor's attendance-group path, and this
+  // file's own attendanceSourceId behaviour, pre-184). createMatch() opens
+  // its OWN connection/transaction, so proving the missing-source refusal
+  // would require deleting or renaming that row OUTSIDE this test's own
+  // transaction -- a genuinely global mutation visible to every other
+  // afldb_test connection for the duration of the test, including any
+  // other integration file running concurrently against the same
+  // database. That is exactly the "brittle global mutation of shared
+  // source rows" the AFLDB-ISSUE-184 brief says to stop and report on
+  // rather than build. The refusal branch itself
+  // (`if (!manualSource) throw new Error('The manual_admin_edit provenance
+  // source is not configured.')`, match-admin.ts) is the same pattern the
+  // pre-184 attendanceSourceId lookup already used unit-untested; no
+  // existing test in this repository exercises a missing manual_admin_edit
+  // row for ANY writer, so this gap is consistent with established
+  // practice rather than a new one.
 });
