@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Match deletion refuses cleanly when AFL API lineup staging still references it (AFLDB-ISSUE-181) - 15 September 2026
+
+- `deleteMatch` now explicitly checks `staging.afl_api_lineup` before any destructive work. A
+  match still referenced by an AFL API team-announcement lineup row is refused with a message
+  naming the row count and each distinct season/provider-game the announcement was for, instead of
+  falling through to the generic dependency-refusal message. The lineup rows, and the staging
+  observation lineage behind them, are never touched, nulled or detached.
+- The existing generic SQLSTATE 23503 fallback (AFLDB-ISSUE-177) remains as the
+  race/concurrency/unknown-dependency backstop. A repository-wide inventory of every foreign key
+  into `matches(id)` found no remaining un-pre-checked dependency, so integration coverage for that
+  fallback now proves the actual race window it exists for, via a test-only trigger, rather than
+  relying on a permanently-unchecked table. No migration was required, and no privilege was
+  widened.
+
 ### Match deletion refuses cleanly when player period statistics still reference it (AFLDB-ISSUE-180) - 15 September 2026
 
 - `deleteMatch` now explicitly checks `player_match_period_stats` before any destructive work.
@@ -22,9 +36,9 @@ commit.
   the row and distinct-player counts, instead of falling through to the generic dependency-refusal
   message. The period-stat rows are never touched or detached.
 - The existing generic SQLSTATE 23503 fallback (AFLDB-ISSUE-177) remains as the
-  concurrency/unknown-dependency backstop, and is now also the only guard for
-  `staging.afl_api_lineup.match_id`, which is deliberately left unhandled and reserved for a
-  future issue. No migration was required, and no privilege was widened.
+  concurrency/unknown-dependency backstop. At the time of this change it was also the only guard
+  for `staging.afl_api_lineup.match_id`; see AFLDB-ISSUE-181, which added a named refusal for that
+  dependency too. No migration was required, and no privilege was widened.
 
 ### Join-request denial commits atomically with its audit row (AFLDB-ISSUE-179) - 15 September 2026
 

@@ -28251,3 +28251,139 @@ was required or made.
 un-pre-checked dependency that falls through to the generic 23503 fallback, deliberately out of
 this issue's scope per the AFLDB-ISSUE-177 follow-up notes. Candidate for a future issue if a named
 refusal for it is wanted.
+
+## AFLDB-ISSUE-181 — Match deletion falls through to a generic error for AFL API lineup staging
+
+- **Severity:** Medium (data-integrity/UX safeguard; the DEV read-only audit found 0
+  `staging.afl_api_lineup` rows and 0 linked matches, so this closes a latent gap rather than
+  repairs live data).
+- **Area:** Admin / match deletion — `src/db/queries/match-admin.ts` (`deleteMatch`).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-181`, branch
+  `sonnet/issue-181-afl-api-lineup-delete-refusal`.
+- **Found:** 2026-09-15, as the second of two named follow-ups in the AFLDB-ISSUE-177 follow-up
+  notes (`player_match_period_stats.match_id`, resolved by AFLDB-ISSUE-180, and
+  `staging.afl_api_lineup.match_id`, this issue).
+- **Resolved:** 2026-09-15.
+- **Key files:** `src/db/queries/match-admin.ts` (`deleteMatch`);
+  `tests/integration/match-admin-delete.test.ts` (extended).
+
+### Symptom
+Deleting a match still referenced by `staging.afl_api_lineup.match_id` (nullable, no `ON DELETE`
+clause, migration 077) fell through to the ISSUE-177 generic SQLSTATE 23503 fallback message
+("another record still depends on it ... check current-season staging") instead of a message
+identifying AFL API lineup staging as the actual blocker.
+
+### Root cause
+`deleteMatch` pre-checked Brownlow, ISSUE-167 special-record collateral, ISSUE-177 current-season
+staging and ISSUE-180 period stats, but never inspected `staging.afl_api_lineup`, so the only thing
+standing between an admin delete and a misleading generic message was the FK itself.
+
+### Schema/lifecycle finding
+`staging.afl_api_lineup` (migration 077) holds one row per AFL API provider lineup/team-announcement
+player row. Row identity is `(source_id, family, external_record_id)`, where `external_record_id`
+is the composite `provider_match_id|provider_team_id|provider_player_id` — never `match_id`.
+`match_id` (along with `club_id`/`player_id`) is nullable **by structural necessity**: a team
+announcement precedes the match, and `matches.home_score`/`away_score`/`result`/`margin` are all
+`NOT NULL`, so an unplayed fixture cannot exist in `matches` yet at announcement time. A non-NULL
+`match_id` links the announcement to the fixture it was for and never asserts the announced player
+played in it (participation lives only in `player_match_stats`, which this table does not
+reference). `src/lib/acquisition/lineup-store.ts` (`persistLineupBundle`) is the only production
+writer; it resolves none of `match_id`/`club_id`/`player_id` (`matchIdsResolved` stays 0 by design —
+"no approved deterministic provider-id path exists"), maintains the projection by keyed upsert only,
+and explicitly owns the invariant that it never deletes, truncates or re-links a row. No other
+production code path writes or re-resolves `match_id` on this table. So today `match_id` is expected
+to be NULL for every row written through the real import path; a non-NULL value would only occur
+once an as-yet-unbuilt deterministic match-resolution bridge exists. Given that, and given
+`lineup-store.ts`'s explicit no-relink invariant, silently nulling or detaching `match_id` during
+match deletion is not supported by any existing reconciliation lifecycle — the default direction
+(refuse) is correct.
+
+### Fix
+Added an explicit pre-check inside `deleteMatch`'s existing locked transaction, after the ISSUE-180
+period-stats check and before the affected-player/delete work: a `SELECT ... GROUP BY
+provider_match_id, season` against `staging.afl_api_lineup` for `match_id = matchId`. If any row
+matches, the match is refused with an error naming the total row count and each distinct
+`season <year> game <providerMatchId>` grouping, in the same refusal shape as the checks above; no
+row is touched, nulled or detached, and no SQLSTATE/constraint text is exposed. The ISSUE-177
+generic 23503 fallback and its comment were updated to reflect that, as of this issue, every
+foreign key into `matches(id)` this function's own statements can violate is either pre-checked
+(Brownlow RESTRICT, special-record collateral, current-season staging, period stats, AFL API
+lineup) or actively cleared before the delete (`player_clubs.first_match_id`/`last_match_id` via
+`clearPlayerClubMatchReferences`) or auto-handled by the FK itself (`match_period_scores` and
+`coaches.match_id` are `ON DELETE CASCADE`; `brownlow_round_votes.match_id` is `ON DELETE SET
+NULL`) — see the "Repository-wide FK inventory" note below. No migration or privilege change was
+required — the FK already existed and no widening was needed.
+
+### Repository-wide FK inventory (design requirement 9/10 — not a general redesign, a one-time
+count taken to satisfy this issue's own testing requirement)
+Every `REFERENCES matches(id)` / `REFERENCES matches (id)` in `src/db/migrations/`:
+`player_match_stats.match_id` (004, actively `DELETE`d by `deleteMatch`),
+`match_period_scores.match_id` (003, `ON DELETE CASCADE`),
+`player_clubs.first_match_id`/`last_match_id` (007, actively cleared via
+`clearPlayerClubMatchReferences` before delete),
+`player_achievements.match_id` (053, ISSUE-167 collateral check),
+`player_match_period_stats.match_id` (062, ISSUE-180 pre-check),
+`staging.external_current_matches.local_match_id` (063, ISSUE-177 pre-check),
+`staging.afl_api_lineup.match_id` (077, this issue's pre-check),
+`coaches.match_id` (087, `ON DELETE CASCADE`),
+`after_siren_kicks.match_id` (089, ISSUE-167 collateral check),
+`brownlow_round_votes.match_id` (094, `ON DELETE SET NULL`),
+`brownlow_vote_entry_state.match_id` (094, `ON DELETE RESTRICT`, pre-checked as the Brownlow
+refusal). **No unhandled foreign key into `matches(id)` remains** as of this issue.
+
+### Test-fixture consequence — resolved by operator direction
+`tests/integration/match-admin-delete.test.ts`'s existing generic-23503-fallback test used
+`staging.afl_api_lineup` specifically because it was the last still-unchecked dependency. Once this
+issue pre-checks it, that fixture no longer forces a raw FK violation. Per the FK inventory above,
+no other real un-pre-checked foreign key into `matches(id)` remains in the schema for a replacement
+fixture. Two options were raised for operator decision: (a) retire/relabel the scenario, relying on
+the named-refusal tests for behavioural coverage; or (b) force a genuine 23503 through the actual
+race the fallback exists for, using a test-only `BEFORE DELETE` trigger. **Operator chose (b).**
+Implemented: the test creates its own fixture match with a uniquely-generated `venue_raw` marker,
+then creates a test-only PL/pgSQL trigger function and a `BEFORE DELETE ON matches FOR EACH ROW
+WHEN (OLD.venue_raw = '<unique marker>')` trigger scoped to that exact row (so it can never fire for
+any other match, in this file or any other test file sharing `afldb_test`, even under parallel test
+execution). The trigger inserts a real `player_match_period_stats` row referencing `OLD.id`
+immediately before PostgreSQL removes the `matches` row — i.e. strictly after `deleteMatch`'s own
+`player_match_period_stats` pre-check already ran and found nothing, and strictly inside
+`deleteMatch`'s own transaction. The resulting `NO ACTION` FK violation is a genuine
+PostgreSQL-raised 23503, and the whole transaction (including the trigger's own `INSERT`) rolls
+back with it, so nothing survives — proven by asserting the canonical match survives and the
+trigger-injected row does not leak. Trigger and function are named per-match-id
+(`trg_issue_181_trap_<id>`/`fn_issue_181_trap_<id>`) and dropped with `DROP ... IF EXISTS` in a
+`finally` block, alongside deleting the fixture match itself, so no test-only schema object or row
+survives a failed run.
+
+### Validation
+Extended `tests/integration/match-admin-delete.test.ts` (runs against `afldb_test`), operator-run
+2026-09-15:
+- `npx vitest run tests/integration/match-admin-delete.test.ts` — 1 test file passed, 5/5 tests
+  passed. Confirmed: the existing ISSUE-177 `staging.external_current_matches` refusal still works;
+  a clean match still deletes normally; the existing ISSUE-180 `player_match_period_stats` refusal
+  still works; a match carrying a `staging.afl_api_lineup` row (seeded directly through
+  `staging.source_payloads`/`staging.source_record_versions`/`staging.afl_api_lineup`, bypassing
+  `persistLineupBundle()`) now receives a friendly domain refusal naming the season and provider
+  game id, exposes no raw FK/SQLSTATE text, and leaves the canonical match, the staging lineup row
+  (`match_id` intact) and the upstream `staging.source_record_versions` row all intact; and the
+  trigger-based race-window simulation described above produced a genuine PostgreSQL 23503 at
+  `DELETE FROM matches`, which `deleteMatch` mapped to the generic dependency refusal, with the
+  match surviving and the trigger-injected `player_match_period_stats` row rolled back rather than
+  leaked. Trigger and function cleanup via `DROP ... IF EXISTS` in `finally` executed without error.
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+- Read-only DEV audit against `afldb_dev` (via `AFLDB_OWNER_DATABASE_URL`): `total_lineup_rows` = 0,
+  `linked_rows` (`match_id IS NOT NULL`) = 0, `distinct_matches` = 0, `orphaned_match_links` = 0. No
+  existing `staging.afl_api_lineup` rows of any kind, no linked matches, no orphaned match
+  references found — no repair or backfill required.
+
+Design confirmed: `staging.afl_api_lineup.match_id` is nullable and `REFERENCES matches(id)` with
+default `NO ACTION`; `deleteMatch` now explicitly checks this dependency before any destructive work
+and reports useful row-count/provider-game/season identifying information; staging lineage is
+preserved — no row is deleted, detached, or nulled; all previously named match-delete dependency
+checks (Brownlow, ISSUE-167 special-record collateral, ISSUE-177 staging, ISSUE-180 period stats)
+remain intact; the generic 23503 fallback remains the race/concurrency/unknown-dependency backstop,
+now proven end-to-end via a genuine PostgreSQL-raised violation rather than a still-unchecked table;
+no migration or privilege widening was required or made.
+
+### Follow-up
+None. The repository-wide FK inventory above found no additional unhandled `matches(id)` dependency,
+and the DEV audit confirmed 0 rows currently affected, so no backfill/repair job is required.
