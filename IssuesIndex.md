@@ -27,7 +27,7 @@ clean `tsc --noEmit`). AFLDB-ISSUE-194 and 195 remain open. Stage 2 status:
 | ID | Severity | Area | State | Key files | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-194 | Low/P3 | NL team-match compiler | Open, not implemented | `src/db/queries/nl/team-match.ts` | Extend the ISSUE-192 home-side gate to `scope.matchup`; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
-| AFLDB-ISSUE-195 | High/P1 | NL parser / club-season semantics | Open, not implemented | `src/search/nl/vocab.ts`, `parser.ts`, `plan.ts` | Recognise "won the premiership" and stop grain election dropping stranded premiership semantics; regression in the ISSUE-189 block of `tests/nl-parser.test.ts` |
+| AFLDB-ISSUE-195 | High/P1 | NL parser / club-season semantics | Runbook approved (`AFLDB-ISSUE-195.md`), not implemented | `src/search/nl/vocab.ts`, `parser.ts`, `plan.ts` | Implement the approved runbook: subject-gated "won the/a premiership" vocabulary + club-season ownership guard; regression block in `tests/nl-parser.test.ts` (AFLDB-ISSUE-189 describe) |
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 

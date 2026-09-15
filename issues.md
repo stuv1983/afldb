@@ -32125,7 +32125,8 @@ Sonnet 5, Medium effort.
 - **Severity:** High (P1).
 - **Area:** NL parser / club-season semantic ownership — `src/search/nl/vocab.ts`,
   `src/search/nl/parser.ts`, `src/search/nl/plan.ts`.
-- **Status:** Open.
+- **Status:** Open — runbook approved 2026-09-16 (Sonnet 5 High, plan mode, worktree
+  `sonnet/issue-195-plan`, from main `414efea`). Not implemented.
 - **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e`. Not
   reproduced against a database (parser/plan-only defect).
 - **Key files:** `src/search/nl/vocab.ts` `CLUB_SEASON_CONDITION_WORDS`; `src/search/nl/parser.ts`
@@ -32192,6 +32193,19 @@ None.
 
 ### Implementation recommendation
 Sonnet 5, High effort.
+
+### Planning (2026-09-16, Sonnet 5 High)
+Approved runbook: `AFLDB-ISSUE-195.md` (worktree `D:\dev\afldb-issue-195-plan`, branch
+`sonnet/issue-195-plan`). Not implemented by this session (planning only, per its own scope
+boundary). **Decision: Option B** — a subject-gated vocabulary addition ("won the/a premiership",
+tried only when `clubSubjectPresent` is true) plus a narrow ownership guard (once grain elects
+`club_season`, a non-null `playerMetricResult.metric` other than the `clubs_played` subject-noun
+collision now declines instead of being silently dropped). Vocabulary-only (Option A) was verified
+sufficient for the confirmed trigger but proven insufficient in general — the identical drop
+mechanism reproduces for other unrecognised `CAREER_STAT_WORDS` words (traced for bare "finals"
+alongside "wooden spoon" in the runbook §2.2). `PARSER_VERSION` 47 → 48. See the runbook for the
+full root-cause trace, rejected alternatives, semantic matrix, regression-test matrix, and ordered
+implementation steps.
 
 ## AFLDB-ISSUE-196 — NL: career-condition numeric binding crosses prepositional clause boundaries
 
