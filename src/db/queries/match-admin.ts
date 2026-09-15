@@ -462,6 +462,29 @@ export async function deleteMatch(input: {
         };
       }
 
+      // AFLDB-ISSUE-180: `player_match_period_stats.match_id` (migration
+      // 062) is `NOT NULL` with no `ON DELETE` clause. Quarter-by-quarter
+      // player statistics are canonical per-period data, not detachable
+      // metadata, so a match that still carries them is refused here, before
+      // anything destructive runs -- the same shape as the Brownlow,
+      // collateral and staging refusals above, rather than letting the raw
+      // FK violation fall through to the generic 23503 fallback below.
+      const [periodStats] = await tx<{ rowCount: number; playerCount: number }[]>`
+        SELECT count(*)::int AS "rowCount", count(DISTINCT player_id)::int AS "playerCount"
+          FROM player_match_period_stats
+         WHERE match_id = ${input.matchId}
+      `;
+      if (periodStats.rowCount > 0) {
+        return {
+          ok: false as const,
+          error:
+            `Match #${input.matchId} still has ${periodStats.rowCount} player period `
+            + `statistic${periodStats.rowCount === 1 ? '' : 's'} recorded across `
+            + `${periodStats.playerCount} player${periodStats.playerCount === 1 ? '' : 's'} `
+            + 'and cannot be deleted while that data exists.',
+        };
+      }
+
       // 2. Identify all affected players in this match
       const playerRows = await tx<{ playerId: number }[]>`
         SELECT DISTINCT player_id AS "playerId"
@@ -517,15 +540,19 @@ export async function deleteMatch(input: {
       affectedPlayers: result.affectedPlayers,
     };
   } catch (error) {
-    // AFLDB-ISSUE-177 concurrency backstop. The staging pre-check above is a
-    // point-in-time read, not a lock, so a concurrent current-season import
-    // run can relink `local_match_id` to this match between that check and
-    // `DELETE FROM matches` above. The FK is what actually stops that race,
-    // and it raises a raw 23503 (foreign_key_violation) -- exactly the
-    // opaque database exception this issue exists to keep out of the admin
-    // UI. It is mapped to the same refusal shape without inspecting the
-    // constraint name (which FK fired can't be known without that, and isn't
-    // needed for a useful message); every other error still throws.
+    // AFLDB-ISSUE-177 concurrency backstop, extended by AFLDB-ISSUE-180. The
+    // staging and period-stats pre-checks above are point-in-time reads, not
+    // locks, so a concurrent write can relink `local_match_id` or insert a
+    // period-stats row between that check and `DELETE FROM matches` above.
+    // This is also still the ONLY guard for `staging.afl_api_lineup.match_id`
+    // (migration 077, nullable, no `ON DELETE`), which remains deliberately
+    // unchecked -- a named refusal for it is out of this issue's scope (see
+    // the AFLDB-ISSUE-177 follow-up). Whatever FK actually fires, it raises a
+    // raw 23503 (foreign_key_violation) -- exactly the opaque database
+    // exception this issue exists to keep out of the admin UI. It is mapped
+    // to the same refusal shape without inspecting the constraint name
+    // (which FK fired can't be known without that, and isn't needed for a
+    // useful message); every other error still throws.
     if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23503') {
       return {
         ok: false,
