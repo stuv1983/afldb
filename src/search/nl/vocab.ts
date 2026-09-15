@@ -543,10 +543,25 @@ export const CLUB_SEASON_CONDITION_WORDS: [RegExp, 'premier' | 'wooden_spoon' | 
   // meaningless in this vocabulary, so there is nothing for it to collide
   // with here.
   [/\bspoons?\b/, 'wooden_spoon'],
-  [/\bpremiers?\b|\bpremiership (?:team|side)\b|\bwon the flag\b/, 'premier'],
+  [/\bpremiers?\b|\bpremiership (?:team|side)s?\b|\bwon the flag\b/, 'premier'],
   [/\b(?:missed|missing|miss(?:es)?) (?:the )?finals\b/, 'missed_finals'],
   [/\b(?:made|make|makes|making|qualified for|reached) (?:the )?finals\b/, 'made_finals'],
 ];
+
+/**
+ * AFLDB-ISSUE-195: "won the premiership"/"won a premiership" name the same
+ * club-season is_premier column as the unambiguous phrases in
+ * CLUB_SEASON_CONDITION_WORDS above, but unlike "premiers"/"premiership
+ * team(s)/side(s)"/"won the flag" this phrasing is also completely natural
+ * PLAYER-subject English ("Dusty won the premiership with Richmond in
+ * 2017"). Tried ONLY when an independent club/team subject cue
+ * (clubSubjectPresent, computed before this extractor runs and unaffected
+ * by whether this phrase itself matches) is already present -- never on
+ * the strength of this phrase alone. See extractClubSeasonConditions's
+ * `subjectGated` parameter in parser.ts.
+ */
+export const CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED: [RegExp, 'premier'] =
+  [/\bwon (?:the |a )?premiership\b/, 'premier'];
 
 /**
  * Player stat vocabulary. Multi-word / numeric-named stats first, same

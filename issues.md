@@ -4,12 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 2
+**Open issues:** 1
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
 | AFLDB-ISSUE-194 | Low (P3) | NL team-match compiler — `src/db/queries/nl/team-match.ts` | Open | Implement the `scope.matchup` home-side gate for symmetric metrics; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
-| AFLDB-ISSUE-195 | High (P1) | NL parser / club-season semantics — `src/search/nl/vocab.ts`, `parser.ts`, `plan.ts` | Open | Recognise "won the premiership" in `CLUB_SEASON_CONDITION_WORDS` and stop club-season grain election from discarding stranded premiership semantics; regression in the ISSUE-189 block of `tests/nl-parser.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32125,8 +32124,7 @@ Sonnet 5, Medium effort.
 - **Severity:** High (P1).
 - **Area:** NL parser / club-season semantic ownership — `src/search/nl/vocab.ts`,
   `src/search/nl/parser.ts`, `src/search/nl/plan.ts`.
-- **Status:** Open — runbook approved 2026-09-16 (Sonnet 5 High, plan mode, worktree
-  `sonnet/issue-195-plan`, from main `414efea`). Not implemented.
+- **Status:** Resolved 2026-09-16 (Sonnet 5 High), operator-validated.
 - **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e`. Not
   reproduced against a database (parser/plan-only defect).
 - **Key files:** `src/search/nl/vocab.ts` `CLUB_SEASON_CONDITION_WORDS`; `src/search/nl/parser.ts`
@@ -32206,6 +32204,93 @@ mechanism reproduces for other unrecognised `CAREER_STAT_WORDS` words (traced fo
 alongside "wooden spoon" in the runbook §2.2). `PARSER_VERSION` 47 → 48. See the runbook for the
 full root-cause trace, rejected alternatives, semantic matrix, regression-test matrix, and ordered
 implementation steps.
+
+### Implementation (2026-09-16, Sonnet 5 High)
+Implemented from approved runbook `AFLDB-ISSUE-195.md` (Option B) on
+`sonnet/issue-195-nl-club-season-semantics`, worktree `D:\dev\afldb-issue-195`. Line numbers in the
+runbook were re-verified against this worktree's base (`3373335`, already carrying the merged
+AFLDB-ISSUE-196 fix) and matched exactly — no drift, no deviation from the approved runbook. Not
+committed, not merged by this session (Git remains user-operated per `CLAUDE.md`).
+
+### Implemented contract
+
+`CLUB_SEASON_CONDITION_WORDS`' `premier` entry (`src/search/nl/vocab.ts`) is widened to also accept
+plural `premiership team(s)/side(s)` wording. A new, separately-gated export
+`CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED` (`/\bwon (?:the |a )?premiership\b/`) is tried by
+`extractClubSeasonConditions` only when the caller passes `subjectGated: true` — the call site in
+`parser.ts` passes the existing `clubSubjectPresent` flag, so the new wording is read only for
+questions that already carry an independent club/team subject cue, never on its own strength. Both
+map to the same existing `'premier'` club-season condition kind; no new condition kind, grain, or
+aggregation was introduced.
+
+A new, narrowly-scoped ownership guard runs immediately after the existing AFLDB-ISSUE-189 R2/R3
+guards, before the AFLDB-ISSUE-187 guard: once grain has elected `club_season`,
+`grain === 'club_season' && playerMetricResult.metric && playerMetricResult.metric !== 'clubs_played'`
+now declines (`status: 'none'`) instead of letting the plan assemble silently. `playerMetricResult`
+is never read by any `club_season` plan field (its metric comes only from `clubSeasonMetricResult`,
+its conditions only from `clubSeasonConditionResult`), so a non-null `playerMetricResult.metric`
+surviving to grain election is a word the parser recognised as meaningful that the elected grain
+cannot represent — the exact consumed-but-unowned signal this issue targets. This prevents that
+stranded career-stat semantic from silently disappearing merely because another, legitimate
+club-season condition (for example `wooden_spoon`) already makes the plan structurally acceptable to
+the pre-existing R2/R3 checks.
+
+`clubs_played` is intentionally exempt from the guard: `CAREER_STAT_WORDS`' `clubs_played` entry is
+the bare literal word `club(s)`, and in several currently-valid club-season questions that word is
+the question's own subject noun re-matching that entry after the rest of the sentence has been
+stripped (confirmed against `'which clubs won the wooden spoon'`, `'which club had the most losses
+in 2017'`, `'clubs that made finals'`, `'clubs that missed finals'` — all pre-existing, currently
+green tests). Without the carve-out, the guard would turn all four of those correct, already-green
+plans into false declines. No other `CAREER_STAT_WORDS` column shares this bare-subject-noun
+property, so the carve-out is exactly this one value, not a broader category.
+
+`"teams that won the premiership and the wooden spoon"` now plans `club_season` with
+`clubSeasonConditions` containing both `{ kind: 'premier' }` and `{ kind: 'wooden_spoon' }`,
+`metric: null` — previously it silently dropped to `clubSeasonConditions: [{ kind: 'wooden_spoon' }]`
+with no trace of the premiership half. `"teams that played the finals and won the wooden spoon"` (the
+guard-proof case, distinct from the vocabulary fix — "played the finals" is not recognised
+club-season wording) now fails closed via the new guard rather than silently answering only the
+wooden-spoon half. AFLDB-ISSUE-189's all-time club/team premiership declines (`'which team has won
+the most premierships'`, `'teams with more than 5 premierships'`) are unaffected — R2 still fires
+first on those, before the new guard's precondition can even be reached. AFLDB-ISSUE-188's
+player-career premiership queries (`'players who have won 3 premierships'`, `'richmond players who
+have won 3 premierships'`, `'which player has the most premierships'`) are unaffected — none carries
+a leading/interrogative club/team subject, so `clubSubjectPresent` is `false`, the gated wording is
+never tried, and grain never reaches `club_season` for them, so the guard's own precondition never
+fires either. No SQL, compiler, or schema change — the existing club-season compiler already ANDs an
+arbitrary-length `clubSeasonConditions` array. `PARSER_VERSION` is `48`.
+
+### Validation
+
+Operator-run, all green:
+- `npx vitest run tests/nl-parser.test.ts` → 398/398 passed
+- `npx vitest run tests/nl-semantic-mapping.test.ts` → 167/167 passed
+- `npx tsc --noEmit` → clean
+
+### Resolution
+
+Resolved 2026-09-16 (Sonnet 5 High), operator-validated. `CLUB_SEASON_CONDITION_WORDS`' `premier`
+entry now also accepts plural `premiership team(s)/side(s)` wording, and a new, separately-gated
+`CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED` entry recognises `"won the/a premiership"` for club/team-
+subject questions only (gated on the pre-existing `clubSubjectPresent` flag), mapping to the same
+`'premier'` club-season condition kind. A narrow ownership guard now declines once `club_season`
+grain is elected if `playerMetricResult.metric` remains non-null and is not the `clubs_played`
+subject-noun-collision exemption, closing the general consumed-but-unowned mechanism the vocabulary
+fix alone could not close (demonstrated for bare "finals" in the approved runbook). `"teams that won
+the premiership and the wooden spoon"` now preserves both conditions; `"teams that played the finals
+and won the wooden spoon"` now fails closed instead of silently answering only the wooden-spoon half.
+AFLDB-ISSUE-189's all-time club/team premiership declines and AFLDB-ISSUE-188's player-career
+premiership queries are both unaffected. `PARSER_VERSION` bumped 47 → 48. No migration/schema change.
+Implementation matched the approved runbook exactly — no runbook correction was needed. No new
+follow-up issue recorded; the runbook's own named non-goals (a named-club phrasing such as "richmond
+won the premiership and the wooden spoon", and the pre-existing "minor premiers" ambiguity) remain
+explicitly out of scope, not defects.
+
+**Files changed (implementation session, `sonnet/issue-195-nl-club-season-semantics`,
+`D:\dev\afldb-issue-195`):** `src/search/nl/vocab.ts`, `src/search/nl/parser.ts`,
+`src/search/nl/plan.ts`, `tests/nl-parser.test.ts`, `issues.md`, `IssuesIndex.md`,
+`CHANGELOG.md`. Not committed, not merged by this session — Git remains user-operated per
+`CLAUDE.md`.
 
 ## AFLDB-ISSUE-196 — NL: career-condition numeric binding crosses prepositional clause boundaries
 

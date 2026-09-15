@@ -731,6 +731,69 @@ describe('AFLDB-ISSUE-189: club/team subject election', () => {
       expect(p.grain).toBe('player_career');
     });
   });
+
+  describe('AFLDB-ISSUE-195: premiership + wooden-spoon conjunction ownership', () => {
+    it('teams that won the premiership and the wooden spoon -> both conditions, not a silent narrow to wooden_spoon alone', async () => {
+      const p = await plan('teams that won the premiership and the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that won the flag and the wooden spoon -> positive control, already-recognised wording', async () => {
+      const p = await plan('teams that won the flag and the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that were premiers and won the wooden spoon -> alternate phrasing', async () => {
+      const p = await plan('teams that were premiers and won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('premiership teams that won the wooden spoon -> plural "premiership teams" form', async () => {
+      const p = await plan('premiership teams that won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'premier' });
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('teams that won the premiership -> standalone gated wording', async () => {
+      const p = await plan('teams that won the premiership');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toEqual([{ kind: 'premier' }]);
+      expect(p.metric).toBeNull();
+    });
+
+    it('teams that played the finals and won the wooden spoon -> guard proof: declines rather than silently answering the wooden spoon half alone', async () => {
+      const result = await parse('teams that played the finals and won the wooden spoon');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('which clubs won the wooden spoon -> clubs_played carve-out still green', async () => {
+      const p = await plan('which clubs won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBeNull();
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('clubs that made finals -> clubs_played carve-out still green', async () => {
+      const p = await plan('clubs that made finals');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'made_finals' });
+    });
+
+    it('clubs that missed finals -> clubs_played carve-out still green', async () => {
+      const p = await plan('clubs that missed finals');
+      expect(p.grain).toBe('club_season');
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'missed_finals' });
+    });
+  });
 });
 
 describe('12. aggregate-vs-single scope for a named player', () => {
