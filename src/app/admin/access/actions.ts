@@ -216,6 +216,19 @@ export async function approveJoinRequest(
   return { message: `${email} approved and allowlisted.` };
 }
 
+/**
+ * Deny a pending join request (AFLDB-ISSUE-179).
+ *
+ * The narrower sibling of approveJoinRequest's ISSUE-178 fix: denial does
+ * not allowlist anything, but the request becoming 'denied' and the
+ * access.join_denied audit row must still land together. Before this fix
+ * they were two independent statements on the pooled `audit()`, so a
+ * request could be permanently recorded as denied with no audit trail if
+ * the second write failed. Same shape as approveJoinRequest: one
+ * `authSql.begin` transaction, `auditInTransaction` for the audit row, and
+ * the unchanged `WHERE id = ? AND status = 'pending'` predicate deciding
+ * the race against a concurrent approve or deny of the same row.
+ */
 export async function denyJoinRequest(
   _previous: AccessState,
   formData: FormData,
@@ -224,17 +237,24 @@ export async function denyJoinRequest(
   const id = Number(formData.get('id'));
   if (!Number.isInteger(id)) return { error: 'Bad request id.' };
 
-  const [row] = await authSql<{ email: string }[]>`
-    UPDATE beta_join_requests SET status = 'denied', reviewed_by = ${admin.id}, reviewed_at = now()
-     WHERE id = ${id} AND status = 'pending'
-    RETURNING email
-  `;
-  if (!row) return { error: 'Already reviewed or not found.' };
+  const email = await authSql.begin(async (tx) => {
+    const [row] = await tx<{ email: string }[]>`
+      UPDATE beta_join_requests SET status = 'denied', reviewed_by = ${admin.id}, reviewed_at = now()
+       WHERE id = ${id} AND status = 'pending'
+      RETURNING email
+    `;
+    if (!row) return null;
 
-  await audit('access.join_denied', { requestId: id, email: row.email },
-    { userId: admin.id, label: admin.email });
+    await auditInTransaction(tx, 'access.join_denied', { requestId: id, email: row.email },
+      { userId: admin.id, label: admin.email });
+
+    return row.email;
+  });
+
+  if (!email) return { error: 'Already reviewed or not found.' };
+
   revalidatePath('/admin/access');
-  return { message: `${row.email} denied.` };
+  return { message: `${email} denied.` };
 }
 
 export async function revokeAllowedEmail(

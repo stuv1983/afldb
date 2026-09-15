@@ -28097,3 +28097,78 @@ predicate already serializes it safely against a concurrent approval (proved by 
 approve/deny test above), and a failed audit write after a successful deny is a narrower gap (a
 denial with a missing log entry, not a live-but-unlogged grant of access) than the one this issue
 fixes. Candidate for a follow-up issue if a transactional audit trail for denial is wanted.
+Tracked as AFLDB-ISSUE-179.
+
+## AFLDB-ISSUE-179 — Join-request denial is not atomic against its audit row
+
+- **Severity:** Medium (audit-trail safeguard, narrower than ISSUE-178: denial does not grant
+  access; no evidence of an already-inconsistent row was sought or found).
+- **Area:** Admin / access — `src/app/admin/access/actions.ts` (`denyJoinRequest`).
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-179`, branch
+  `sonnet/issue-179-join-denial-atomicity`.
+- **Found:** 2026-09-15, as the named follow-up in AFLDB-ISSUE-178.
+- **Resolved:** 2026-09-15.
+- **Key files:** `src/app/admin/access/actions.ts` (`denyJoinRequest`);
+  `tests/integration/join-request-approval.test.ts` (extended).
+
+### Symptom
+`denyJoinRequest` committed the `beta_join_requests` UPDATE (`status = 'denied'`,
+`reviewed_by`, `reviewed_at`) and the `access.join_denied` audit row as two independent
+statements — the UPDATE on `authSql`, the audit on the pooled `audit(...)`. A failure on the
+second write left a request permanently recorded as `'denied'` with no `access.join_denied`
+audit row.
+
+### Root cause
+Same class of gap as ISSUE-178: the two writes had no shared transaction boundary, unlike
+`approveJoinRequest` (fixed in ISSUE-178) and `deleteAccessCode`, which already use
+`authSql.begin` plus `auditInTransaction`.
+
+### Fix
+Both writes now run inside one `authSql.begin(async (tx) => ...)` transaction, with
+`auditInTransaction(tx, 'access.join_denied', ...)` replacing the pooled `audit(...)` call. The
+existing `WHERE id = ? AND status = 'pending'` predicate on the UPDATE is unchanged and remains
+the sole eligibility/concurrency boundary. No intermediate status was introduced.
+`approveJoinRequest` was not touched. No migration or privilege change was required:
+`afldb_auth` already holds `UPDATE` on `beta_join_requests` and `INSERT` on `auth_audit_log`
+(migration 023), the same grants ISSUE-178 relied on.
+
+### Testing added
+`tests/integration/join-request-approval.test.ts` extended with:
+- happy path — pending → denied, `reviewed_by`/`reviewed_at` set, exactly one
+  `access.join_denied` audit row, `"<email> denied."` message;
+- already-reviewed/unknown id — both refuse with `"Already reviewed or not found."`, no mutation,
+  no audit row;
+- a genuine mid-transaction failure — a narrowly-scoped, content-matched `BEFORE INSERT` trigger
+  on `auth_audit_log` (same technique as AFLDB-ISSUE-160 gate 8) raises only for the fixture's own
+  `access.join_denied` row, created and dropped around the single test that uses it; proves the
+  request stays `'pending'` with `reviewed_by`/`reviewed_at` unchanged and no audit row survives;
+- concurrency — two concurrent denials of the same request: exactly one succeeds, the other gets
+  the standard refusal, exactly one committed audit row exists;
+- approve-vs-deny concurrency was already covered by the existing ISSUE-178 test and was not
+  duplicated.
+
+### Validation
+Operator ran, 2026-09-15:
+- `npx vitest run tests/integration/join-request-approval.test.ts` (against `afldb_test`) — 1 test
+  file passed, 9/9 tests passed. Confirmed: pending join request denial commits the denied status
+  and `access.join_denied` audit atomically; `reviewed_by`/`reviewed_at` are set on success;
+  unknown/already-reviewed ids get the standard "Already reviewed or not found." refusal; a
+  genuine database-side failure on the audit insert (the ISSUE-160-style content-scoped trigger)
+  rolls the entire denial transaction back — request remains pending, `reviewed_by`/`reviewed_at`
+  remain unchanged, no `access.join_denied` audit row survives; two concurrent denial attempts
+  produce exactly one winner and one committed denial audit row. The existing ISSUE-178 approval
+  coverage in the same suite remained green: approval happy path, genuine approval rollback,
+  concurrent approvals, and approve-vs-deny concurrency.
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+- `npx vitest run tests/admin-access-actions.test.ts tests/integration/access-codes.test.ts`
+  (narrow regression) — 2 test files passed, 21/21 tests passed.
+
+Design confirmed: `denyJoinRequest` uses `authSql.begin(async (tx) => ...)`; the
+`beta_join_requests` denial UPDATE and the `access.join_denied` audit share that transaction via
+`auditInTransaction(tx, ...)`; `WHERE id = ? AND status = 'pending'` remains the sole
+eligibility/concurrency boundary; no intermediate status was introduced; no migration or
+privilege widening was required; all existing operator-facing messages were preserved;
+`approveJoinRequest` is unchanged from ISSUE-178.
+
+### Follow-up
+None identified.
