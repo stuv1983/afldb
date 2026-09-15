@@ -430,7 +430,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // as a grouped team-result HAVING clause. Subject-less grouped readings
 // ("exactly three wins against Carlton") and explicit club/team subjects
 // are unaffected.
-export const PARSER_VERSION = 42;
+// v43 -- AFLDB-ISSUE-187: grain election now refuses by name when a
+// non-career grain is elected (player_game/player_season/team_match/etc.)
+// while careerResult.conditions still holds a condition no branch
+// converted -- previously a METRIC_WORDS threshold (e.g. "40 disposals in
+// a game") could elect player_game while a co-occurring career condition
+// ("no premierships") was silently dropped at the careerConditions
+// assignment, answering a strict superset of the question with confidence
+// 1.00. The sole-career-condition season/game conversions now remove the
+// condition from careerResult.conditions as they consume it, so the new
+// guard only fires on genuinely unconverted conditions.
+export const PARSER_VERSION = 43;
 
 // ------------------------------------------------------------------ grain
 
