@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 1
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
+| AFLDB-ISSUE-197 | High (P1) | NL resolver/parser boundary — surname candidate truncation | Planning complete, runbook written, not implemented | Implement `AFLDB-ISSUE-197.md` (Option C: dedicated `resolvePlayerFamily`), then run the unit + DB-backed test matrix |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32523,3 +32524,108 @@ behaviour, not a defect; track it only if future corpus/user evidence shows it m
 `D:\dev\afldb-issue-196`):** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`,
 `tests/nl-parser.test.ts`, `AFLDB-ISSUE-196.md`, `issues.md`, `IssuesIndex.md`. Not committed, not
 merged by this session — Git remains user-operated per `CLAUDE.md`.
+
+---
+
+## AFLDB-ISSUE-197 — NL surname candidate resolution is truncated before ambiguity checks
+
+- **Severity:** High (P1) — fail-open: confident (certainty 1.0), factually wrong answers.
+- **Area:** NL resolver/parser boundary — `src/db/queries/nl/resolve.ts`, `src/search/nl/parser.ts`.
+- **Status:** Open — planning complete, runbook `AFLDB-ISSUE-197.md` written, not implemented.
+- **Found:** 2026-09-16, Stage 2 closeout audit of the 208 V1 `AMBIGUITY_NOT_DETECTED` hard
+  failures (40 rows classified `GENUINE_FAIL_OPEN`, all one root cause).
+- **Key files:** `src/db/queries/nl/resolve.ts` `resolvePlayer` (`searchPlayers(name, 5)`);
+  `src/search/nl/parser.ts` player-mention step (`parser.ts:2646-2786`), `NL_LIMITS.maxPlayerCandidates`
+  (`plan.ts:1341`); `tests/nl-parser.test.ts`; `tests/integration/nl-semantic-mapping.test.ts`.
+
+### Trigger examples
+- "Ablett most goals" / "most games" / "most disposals" / "most marks" / "most tackles"
+  (true family: 7 plausible Abletts; production sees 5, omitting Kevin and Nathan Ablett).
+- "Brown most goals" (true surname-family leader Jonathan Brown, 594; truncated result Ben Brown,
+  360). "Brown most games" (true leader Jonathan Brown, 256; truncated result Gavin Brown, 254).
+- "Jones most goals" (true leader Peter Jones, 284; truncated result Jack Jones, 156).
+- Generic surnames past the documented 12-candidate cap that still answer instead of declining:
+  Johnson (59), Brown (92), Smith (136), Williams (97), Jones (79), Wilson (54), Anderson (49).
+
+### Expected vs actual
+Expected: 2–12 plausible identities rank as a complete family (`scope.playerIdIn` names every one);
+more than 12 declines as a generic surname clash (`NL_LIMITS.maxPlayerCandidates`,
+`plan.ts:1341,2143`). Actual: `resolve.ts:171` calls `searchPlayers(name, 5)`, so the parser's
+ambiguity branch (`parser.ts:2741-2784`) never sees more than 5 candidates. `plausible.length` can
+never exceed 5, so the `>12 → decline` branch (`parser.ts:2778-2784`) is dead in production. A
+≤12 real family (Ablett) silently ranks over an incomplete subset; a >12 generic family (Brown,
+Smith, ...) silently ranks over an arbitrary 5-player subset instead of declining, at certainty 1.0.
+
+### Root cause
+`resolvePlayer` (`src/db/queries/nl/resolve.ts:170-177`) is the sole production implementation of
+`NlParseContext.resolvePlayer` and feeds *both* the accept branch and the ambiguity/family branch
+from the same 5-row `searchPlayers` call. `NL_LIMITS.maxPlayerCandidates`'s own comment
+(`plan.ts:1335-1340`, "five Abletts is the widest genuine one seen") is itself an artefact of this
+truncation — the true family is 7. Existing regression tests for the ambiguity branch
+(`tests/nl-parser.test.ts:44-79`) inject a synthetic candidate array directly, proving the parser's
+branch logic but never exercising the production resolver boundary that actually truncates it —
+exactly the gap the audit found.
+
+### Rejected naive fix
+Widening `searchPlayers(name, 5)` to `searchPlayers(name, 13)` is unsafe: `searchPlayers`'s
+`WHERE`/`ORDER BY` matches by raw substring containment across the whole name (`LIKE '%term%'`),
+which is looser than the parser's own whole-word-prefix plausibility predicate
+(`candidateNameWords`, `parser.ts:1818-1824`). A short/common token can substring-match unrelated
+names at the same score tier and crowd a true family member out of the fetch window, silently
+reproducing the same incomplete-subset hazard at a larger N. Full analysis in
+`AFLDB-ISSUE-197.md` §6.
+
+### Chosen design
+A new dedicated resolver, `resolvePlayerFamily`, implements the parser's whole-word-prefix
+predicate directly in SQL (not the generic ranked/fuzzy `searchPlayers` query), fetching
+`NL_LIMITS.maxPlayerCandidates + 1` rows so the parser can distinguish "≤12, complete" from ">12,
+decline" from one call, with no substring-vs-prefix mismatch. `resolvePlayer`'s existing 5-row cap
+and the accept branch are untouched. No schema/migration required (reuses the existing
+`gin_trgm_ops` index on `players.search_name` / `player_name_aliases.search_alias` as a pre-filter).
+Full design in `AFLDB-ISSUE-197.md` §7.
+
+### Non-goals
+`compare-runs.ts`/`--report-only` harness; team streak/coach-record semantics; AFLW
+competition-aware NL work; corpus relabelling of any kind; broad player-search redesign beyond this
+exact contract. A related-but-distinct, unreproduced observation about the accept branch's
+`nameMatches` certainty check (not a wrong-answer defect) is noted but not tracked separately — see
+`AFLDB-ISSUE-197.md` §15.
+
+### Required tests
+Unit (`tests/nl-parser.test.ts`, fake `resolvePlayerFamily`): 2-candidate family ranks; exactly 12
+ranks; exactly 13 declines; 0/1 candidates preserves the existing "unknown spelling, not ambiguity"
+contract; existing full-name accept-branch tests unmodified; a defensive re-check that a
+non-plausible candidate is still dropped before `scope.playerIdIn`.
+
+Integration (`tests/integration/nl-semantic-mapping.test.ts`, real `buildNlParseContext()`,
+synthetic `FIXTURE_PREFIX` players — proves the production boundary, not just the parser branch): a
+7-player synthetic family ranks completely and picks the correct highest-games member; a 13-player
+synthetic family declines; a wrong-answer proof where the true top member is not among the first 5
+by `searchPlayers`' own ranking; a 2-player family end-to-end; existing Ablett Jnr/Snr and
+alias-aware `searchPlayers` tests unmodified. Full matrix in `AFLDB-ISSUE-197.md` §9.
+
+### Acceptance criteria
+- 0/1 plausible: unchanged. 2–12: complete family ranked, no omission (Ablett: all 7). >12:
+  declines, no top-N prominence subset ever substitutes for the family (Brown, Smith, Johnson,
+  Williams, Jones, Wilson, Anderson).
+- All required tests pass; no existing test weakened, skipped, or deleted.
+- `npx tsc --noEmit` clean.
+- `PARSER_VERSION` bumped with a `v49` history comment; `NL_LIMITS.maxPlayerCandidates`'s stale
+  comment corrected.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts`, `npx vitest run tests/integration/nl-semantic-mapping.test.ts`
+(requires `AFLDB_TEST_DATABASE_URL` ending `_test`), `npx tsc --noEmit`.
+
+### Corpus follow-up (not part of this issue)
+Once implemented and validated: the 35 generic-surname corpus rows become clean passes on decline;
+the 5 Ablett rows relabel from expected-decline to expected-success across the complete 7-player
+family; the remaining 168 stale streak/coaching rows are a separate, unrelated correction.
+
+### Implementation recommendation
+Sonnet 5, High effort — matches the complexity class of AFLDB-ISSUE-195/196 (NL resolver/parser
+boundary safety fix, cross-file contract, an explicitly-rejected naive option, DB-backed regression
+requirement). Full runbook: `AFLDB-ISSUE-197.md`.

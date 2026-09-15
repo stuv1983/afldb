@@ -4,7 +4,19 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+- **AFLDB-ISSUE-197** — High (P1). NL resolver/parser boundary: `resolvePlayer`
+  (`src/db/queries/nl/resolve.ts`) hard-caps surname candidates at 5 before the parser's ambiguity
+  check runs, so the documented 2–12 "complete family" / >12 "decline" contract
+  (`NL_LIMITS.maxPlayerCandidates`) is unreachable in production — a ≤12 real family (Ablett, 7
+  players) ranks over an incomplete subset, and a >12 generic surname (Brown, Smith, Johnson,
+  Williams, Jones, Wilson, Anderson) answers confidently instead of declining. Found by the Stage 2
+  closeout audit's 40 `GENUINE_FAIL_OPEN` rows (2026-09-16). Planning complete: runbook
+  `AFLDB-ISSUE-197.md` (chosen fix: Option C, a dedicated `resolvePlayerFamily` resolver mirroring
+  the parser's whole-word-prefix predicate in SQL; naive "just raise the limit" Option A rejected
+  as unsafe). Not implemented. Next action: implement per the runbook, `PARSER_VERSION` 48 → 49, on
+  a fresh session/worktree.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -27,10 +39,11 @@ club-season ownership guard, no runbook correction needed — operator-validated
 `nl-parser.test.ts`, 167/167 `nl-semantic-mapping.test.ts`, clean `tsc --noEmit`); see `issues.md`.
 AFLDB-ISSUE-194 resolved 2026-09-16 (Sonnet 5 Medium, `sonnet/issue-194-team-match-symmetric-matchup`,
 unmerged — operator-validated: 34/34 `tests/integration/nl-answers-team-club.test.ts`, clean
-`tsc --noEmit`); see `issues.md`. AFLDB-ISSUE-187..196 all now resolved. Stage 2 status:
-**PASS WITH NEW ISSUES RESOLVED — corpus comparison/triage still not started.**
-
-No open issues.
+`tsc --noEmit`); see `issues.md`. AFLDB-ISSUE-187..196 all now resolved. The Stage 2 corpus triage
+of the 208 `AMBIGUITY_NOT_DETECTED` rows (2026-09-16) classified 40 as `GENUINE_FAIL_OPEN`, 168 as
+`STALE_CORPUS_EXPECTATION`, and opened AFLDB-ISSUE-197 for the 40 (one root cause). Stage 2 status:
+**BLOCKED ON AFLDB-ISSUE-197 — planning complete, not implemented; corpus relabelling still not
+started.**
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -43,6 +56,7 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 - The current 208 `AMBIGUITY_NOT_DETECTED` corpus rows triaged into stale/incorrect corpus
   expectations vs. genuine fail-open defects.
 - Any genuine reproducible fail-open found during that triage tracked as a new issue before
-  sign-off.
+  sign-off — done: AFLDB-ISSUE-197 (40 rows, one root cause). Sign-off additionally requires
+  AFLDB-ISSUE-197 resolved and the 35 affected generic-surname/Ablett corpus rows relabelled.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
