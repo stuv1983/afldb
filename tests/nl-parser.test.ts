@@ -578,6 +578,120 @@ describe('regression: extractHavingClause requires a club/team subject (AFLDB-IS
   });
 });
 
+describe('AFLDB-ISSUE-189: club/team subject election', () => {
+  // R2: a club_season plan with no metric and no conditions -- there is no
+  // club-lineage totals grain (all-time premierships, all-time wins).
+  describe('decline: R2, metric-less/condition-less club_season', () => {
+    it('which club has won the most premierships', async () => {
+      const result = await parse('which club has won the most premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with more than 5 premierships', async () => {
+      const result = await parse('teams with more than 5 premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('clubs with 10 flags', async () => {
+      const result = await parse('clubs with 10 flags');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with 5 premierships', async () => {
+      const result = await parse('teams with 5 premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+
+    it('teams with the most premierships', async () => {
+      const result = await parse('teams with the most premierships');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+    });
+  });
+
+  // R3: a ranked club_season metric with no season semantics -- an
+  // unscoped club/team ranking never gets reinterpreted as a best single
+  // season.
+  describe('decline: R3, ranked club_season metric with no season semantics', () => {
+    it('which team has the most wins', async () => {
+      const result = await parse('which team has the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('teams with the most wins (behaviour change: was previously answered as a season record)', async () => {
+      const result = await parse('teams with the most wins');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('which team has the most wins since 2000 -> a season range still reads as a total over a span', async () => {
+      const result = await parse('which team has the most wins since 2000');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+
+    it('top 5 teams by percentage', async () => {
+      const result = await parse('top 5 teams by percentage');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.notes.join(' ')).toMatch(/ranked one season at a time/);
+    });
+  });
+
+  describe('positive: club grain answered faithfully', () => {
+    it('which team has the most wins in a season', async () => {
+      const p = await plan('which team has the most wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'max' });
+    });
+
+    it('which club had the most losses in 2017', async () => {
+      const p = await plan('which club had the most losses in 2017');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('losses');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('the side with the fewest wins in a season', async () => {
+      const p = await plan('the side with the fewest wins in a season');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBe('wins');
+      expect(p.agg).toEqual({ kind: 'min' });
+    });
+
+    it('which clubs won the wooden spoon -> a conditions-only list, no ranked metric', async () => {
+      const p = await plan('which clubs won the wooden spoon');
+      expect(p.grain).toBe('club_season');
+      expect(p.metric).toBeNull();
+      expect(p.clubSeasonConditions).toContainEqual({ kind: 'wooden_spoon' });
+    });
+
+    it('which team has the longest winning streak', async () => {
+      const p = await plan('which team has the longest winning streak');
+      expect(p.grain).toBe('team_streak');
+    });
+  });
+
+  describe('neighbour: player subject kept', () => {
+    it('which player has the most premierships -> player_career, no club cue', async () => {
+      const p = await plan('which player has the most premierships');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('premierships');
+    });
+
+    it('players who played for the most clubs -> player_career, a bare non-leading "clubs" is not a subject cue', async () => {
+      const p = await plan('players who played for the most clubs');
+      expect(p.grain).toBe('player_career');
+    });
+  });
+});
+
 describe('12. aggregate-vs-single scope for a named player', () => {
   it('dusty total goals against carlton -> "total" overrides the single-game default to a scoped sum', async () => {
     const p = await plan('dusty total goals against carlton');

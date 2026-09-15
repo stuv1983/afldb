@@ -76,7 +76,7 @@ import {
   RELATIONSHIP_POPULATION_CUES, RELATIONSHIP_POSSESSIVE_RE, RELATIONSHIP_SYMMETRIC_CUES,
   DECADE_RE,
   MATCH_EVENT_WORDS, RIVALRY_WORDS,
-  CLUB_SUBJECT_LEADING, COMPARE_OP_WORDS,
+  CLUB_SUBJECT_LEADING, CLUB_SUBJECT_CUE, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
   NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
@@ -1743,6 +1743,11 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   const normalised = canonicalise(query);
   const report = emptyReport(normalised);
   let text = normalised;
+  // AFLDB-ISSUE-189: club/team-subject cue, computed before any extractor
+  // runs. Extractors mutate `text` (extractAggregation strips "teams with"
+  // outright) and the interrogative form ("which club…") is never leading,
+  // so a cue read after extraction depends on extractor order.
+  const clubSubjectPreCue = CLUB_SUBJECT_CUE.test(normalised);
 
   const totalTokens = meaningfulTokens(normalised);
   const consumedTokens: string[] = [];
@@ -2394,7 +2399,9 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // The match is stripped at step 11 instead to allow career conditions
   // to see unstripped words if they overlap.
 
-  const clubSubjectPresent = CLUB_SUBJECT_LEADING.test(text.trim());
+  // AFLDB-ISSUE-189: the pre-computed cue ORs in every existing positive
+  // (for example, where a season prefix has since been stripped from `text`).
+  const clubSubjectPresent = clubSubjectPreCue || CLUB_SUBJECT_LEADING.test(text.trim());
 
   // 10. Career conditions (numeric thresholds/negatives on career columns).
   // Suppressed for an after-siren question for the same reason step 5a is:
@@ -3113,6 +3120,31 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
         metricCondition = { op: hoisted.op, value: hoisted.value };
       }
     }
+  }
+
+  // AFLDB-ISSUE-189 (D1/D2). A club_season ranking answers one season at a
+  // time; there is no club-lineage totals grain (all-time premierships,
+  // all-time wins). Decline by name rather than let answerClubSeason
+  // silently degrade to answerList (R2) or rank a single season under what
+  // reads as an all-time question (R3). Runs before the ISSUE-187 guard so
+  // a club question gets a club-shaped reason rather than the
+  // career-condition note.
+  if (
+    grain === 'club_season' && metric === null && clubSeasonConditionResult.conditions.length === 0
+  ) {
+    report.confidence = 1;
+    report.notes.push('AFLDB answers club questions one season at a time (wins, losses, draws, percentage, premiers, wooden spoons, finals); it does not total a club\'s premierships or other records across its history.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+  if (
+    grain === 'club_season' && metric !== null && clubSeasonConditionResult.conditions.length === 0
+    && !inOneSeason
+    && !(seasons.seasonMin !== undefined && seasons.seasonMin === seasons.seasonMax)
+    && !(clubFor && seasonWorded)
+  ) {
+    report.confidence = 1;
+    report.notes.push('Club wins, losses, draws and percentage are ranked one season at a time; add "in a season" or a year to ask for the best single season. AFLDB does not total them across a club\'s history.');
+    return { status: 'none', reason: 'unrecognised', report };
   }
 
   // AFLDB-ISSUE-187. A non-career grain has no field for a career

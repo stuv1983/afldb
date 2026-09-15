@@ -440,7 +440,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // 1.00. The sole-career-condition season/game conversions now remove the
 // condition from careerResult.conditions as they consume it, so the new
 // guard only fires on genuinely unconverted conditions.
-export const PARSER_VERSION = 43;
+// v44 -- AFLDB-ISSUE-189: a club/team subject is now detected before any
+// extractor can strip it (CLUB_SUBJECT_CUE, evaluated on the canonicalised
+// question). club_season grain election now refuses by name rather than
+// answer at player grain or dump metric-less/season-less club seasons: R2
+// declines a club_season plan with no metric and no conditions (no
+// club-lineage totals grain exists), R3 declines a ranked club_season
+// metric with no season semantics (a season, "in a season", or a season
+// condition). validatePlan carries a matching backstop for any plan that
+// reaches the compiler with a club_season ranking agg, no metric and no
+// conditions.
+export const PARSER_VERSION = 44;
 
 // ------------------------------------------------------------------ grain
 
@@ -1777,6 +1787,22 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
       || (raw.grain === 'team_match' && !raw.havingClause))
   ) {
     return { error: 'This kind of question needs a statistic to rank by.' };
+  }
+  // AFLDB-ISSUE-189 backstop. A club_season RANKING (max/min/top_n) must
+  // never proceed with neither a metric to rank by nor a club-season
+  // condition to define a qualifying set: answerClubSeason
+  // (club-season.ts) silently degrades a metric-less plan to answerList,
+  // returning an arbitrary, unranked slice of the most recent club seasons
+  // presented under a ranking question. The parser refuses this shape by
+  // name (R2); this keeps the invariant true for any future parser path or
+  // directly constructed plan. List/count plans are deliberately not
+  // refused here -- they are not rankings, and existing fixtures build
+  // list/count club_season plans with conditions or metrics.
+  if (
+    raw.grain === 'club_season' && raw.metric === null && raw.clubSeasonConditions.length === 0
+    && (raw.agg.kind === 'max' || raw.agg.kind === 'min' || raw.agg.kind === 'top_n')
+  ) {
+    return { error: 'A club-season ranking needs a statistic to rank by.' };
   }
 
   // A metric threshold is honoured only where a compiler actually consumes

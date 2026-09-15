@@ -69,6 +69,36 @@ commit.
   count semantics correctly.
 - No parser or vocabulary change; `PARSER_VERSION` is unchanged.
 
+### NL search: a club/team subject is captured before extraction; unscoped club/team rankings decline instead of answering at player grain or dumping club seasons (AFLDB-ISSUE-189) - 15 September 2026
+
+- Added `CLUB_SUBJECT_CUE` (`src/search/nl/vocab.ts`), evaluated on the canonicalised question
+  before any extractor runs, and fed into club-season grain election
+  (`src/search/nl/parser.ts`) alongside the existing post-extraction `CLUB_SUBJECT_LEADING` probe.
+  Previously the only subject check ran on already-mutated text, so "which club has won the most
+  premierships" (the subject word is never leading) and "teams with the most premierships" (the
+  leading words are consumed by aggregation extraction first) lost their club/team subject
+  entirely and fell through to `player_career`, answering a player board for a club question.
+- Grain election now declines two club_season shapes by name instead of answering them: a plan
+  with no metric and no club-season condition ("which club has won the most premierships", "teams
+  with 5 premierships" — AFLDB has no club-lineage totals grain for all-time premierships/wins/etc);
+  and a ranked metric (wins/losses/draws/percentage) with no season semantics ("which team has the
+  most wins", "top 5 teams by percentage", "which team has the most wins since 2000") — these no
+  longer silently answer a best single season for what reads as an all-time question.
+  `validatePlan` (`src/search/nl/plan.ts`) carries a matching backstop refusing any club_season
+  ranking plan (`max`/`min`/`top_n`) with no metric and no conditions, closing the same path for
+  any future parser change or a directly constructed plan.
+- Unaffected: valid season-scoped club/team questions ("which team has the most wins in a season",
+  "which club had the most losses in 2017", "which clubs won the wooden spoon") continue to answer
+  at `club_season` exactly as before; a bare, non-leading "clubs"/"teams" ("players who played for
+  the most clubs") keeps meaning the player-career `clubs_played` column; grains that already
+  answered club/team subjects correctly (`team_match` including having clauses, `team_streak`,
+  `head_to_head`, `achievement_summary`, `coach_record`, family, and the named-club NL-017 path)
+  are unchanged; the ISSUE-188 `extractHavingClause` club-subject having-clause gate is untouched.
+- A related club-subject misread — "clubs that have won more than 10 premierships" counting match
+  wins via a `team_match` having clause — is tracked separately as AFLDB-ISSUE-193 and was not
+  fixed here.
+- `PARSER_VERSION` bumped to 44.
+
 ### Contributor account/access retired; deprecated CSV pipeline left in place for later cleanup (AFLDB-ISSUE-186) - 15 September 2026
 
 - The `contributor` staff role — the account type behind the deprecated `/admin/upload` CSV
