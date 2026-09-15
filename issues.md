@@ -29448,3 +29448,708 @@ None. Confirmed unchanged from the investigation and from implementation.
 
 ### Changelog
 `CHANGELOG.md` `[Unreleased]` updated with a matching entry.
+
+---
+
+## AFLDB-ISSUE-185 — Preserve provenance when reviewed match-result submissions are promoted
+
+- **Severity:** Medium (data-integrity/provenance gap — a real defect, not merely a design gap:
+  a reviewed, super-admin-approved `match_results` promotion silently drops provenance the
+  ingest pipeline already resolved).
+- **Area:** `src/lib/ingest/datasets.ts` (`matchResults.promoteRow`), the existing
+  `data_submissions`/`promoteSubmission` CSV admin-upload pipeline
+  (`src/lib/ingest/pipeline.ts`). Retitled 2026-09-15 from "Define contributor-promoted match
+  provenance and lineage" — see **Rescope** below.
+- **Status:** Resolved 2026-09-15. Worktree `D:\dev\afldb-issue-185`, branch
+  `sonnet/issue-185-contributor-match-provenance`. Operator-verified: focused integration
+  (`tests/integration/match-results-promotion.test.ts`) 3/3 PASS; regression
+  (`tests/current-season-import.test.ts`) 256 passed, 4 skipped, 0 failures; `npx tsc --noEmit`
+  PASS. DEV read-only audit run against `afldb_dev` — see **DEV audit results** below. No
+  migration, seed, or DB mutation made or required.
+- **Found:** 2026-09-15, during the original investigation (§1–2 below): `matchResults.promoteRow`
+  receives `sourceId`/`batchId` from `promoteSubmission` but never wrote them, unlike its sibling
+  `playerMatchStats.promoteRow`.
+- **Resolved:** 2026-09-15, on operator verification (integration suite 3/3, full regression
+  suite 256/256 with the brittle-test correction applied, typecheck PASS, DEV read-only audit
+  against `afldb_dev` confirming zero historical `match_results` batches/submissions to backfill).
+
+### Rescope (2026-09-15)
+
+The original brief asked for an evidence-backed provenance/lineage **design** for a future
+"contributor submits one match, a super admin approves it" workflow. The investigation below
+(§1–19, unchanged) found that workflow does not exist, and design work for it (a new
+`match_submissions` table, a new source key, canonical-lineage FKs, reviewer-model changes)
+remains genuinely future, undecided product work — **not implemented here**.
+
+The investigation also surfaced a concrete, present-day defect that does not depend on any of
+those undecided questions: the CSV `match_results` dataset — the one pathway by which reviewed,
+super-admin-approved human data **already** becomes a canonical `matches` row today — receives
+`sourceId`/`batchId` from the ingest machinery and silently discards both. This issue is rescoped
+to fix exactly that defect, following the narrowest pattern already established by this exact
+ingest family (not ISSUE-184's `manual_admin_edit`/minted-UUID family, which governs a different
+creation path). The future contributor-workflow design questions are carried forward, unimplemented
+— see **Deferred** below.
+
+### 1–2. Existing contributor/submission model and promotion patterns
+
+No per-match "contributor proposes one match, a super admin approves it" workflow exists
+anywhere in the repository. What exists instead:
+
+- **`auth_users.role`** (033) is `'admin' | 'super_admin' | 'contributor'`. A contributor is an
+  **enrolled staff account** (password + TOTP, invited exactly like an admin — migration 030) —
+  **not** a public/anonymous website visitor. `capabilities.ts` gives `contributor` exactly one
+  capability, `acquisition.legacyIntake` (`ALL_STAFF`), gating `/admin/upload` and nothing else;
+  every other admin surface is closed to it by `requireAdmin()`'s role redirect (033's own
+  comment).
+- **`data_submissions` / `data_submission_rows`** (023, `submission_status` enum
+  `staged → validated → {rejected|approved} → promoted|failed`) is a **whole-CSV-file** pipeline,
+  not a per-record one. `uploaded_by` and `reviewed_by` both `REFERENCES auth_users(id)` — this
+  **is** the repository's existing, working submission-lineage + reviewer/audit-history model
+  (constructs C and B of the brief's four-concept split, already separated from provenance).
+  `decideSubmission`/`runPromotion` (`src/app/admin/submissions/[id]/actions.ts`) require
+  `requireSuperAdmin()` for approve/reject/promote — a contributor uploads, only a super admin
+  approves/promotes, matching the brief's item 7 framing exactly.
+- **`promoteSubmission`** (`pipeline.ts:256-398`) resolves `sources.key = 'sports_data_lab'` —
+  one fixed source row, shared by **every** dataset and **every** uploader — and inserts a real
+  `import_batches` row (`tool='admin-upload'`, `target_table=<dataset key>`,
+  `notes='submission <id>'`, the latter free text, **not** an FK). `sourceId`/`batchId` are then
+  passed into each dataset's `promoteRow`.
+- **Load-bearing finding, independent of contributor semantics but directly relevant to this
+  design:** `matchResults.promoteRow` (`datasets.ts:584-625`) receives `sourceId`/`batchId` but
+  its `INSERT INTO matches` **omits `source_id`, `source_record_id` and `import_batch_id`
+  entirely** — the three arguments are simply unused. `playerMatchStats.promoteRow`, in the same
+  file, **does** write `source_id`/`import_batch_id` on its INSERT. So the one existing pathway
+  by which reviewed, human-submitted data already becomes a canonical `matches` row today leaves
+  it **completely unprovenanced** — the same class of gap ISSUE-184 fixed for `createMatch()`,
+  on the same table, via the CSV/admin-upload path instead of the single-record admin form.
+  `sports_data_lab` itself is seeded with `kind = 'derived'`
+  (`tools/migration/import_legacy_afl.py:66-67`, `"Legacy normalisation and derivation layer
+  used as the migration source"`) — its reuse for admin-upload promotion is a convenience
+  borrowing of an existing row, not a purpose-built "reviewed submission" source; it should not
+  be treated as an authoritative model to extend.
+- **Canonical-promotion pattern for automated evidence** (current-season/AFL Tables):
+  `promotion_candidates`/`promotion_decisions` (074) key a queued proposal on
+  `(source_id, family, external_record_id, target_table)` and point **at** the canonical row via
+  `target_table`/`target_id` — never the reverse. `canonical-apply.ts`/`reconciliation.ts`
+  (`evaluateTargetOwnership`, `autoApplyOwnership`) read `matches.source_id` generically: `NULL`
+  → `unowned` (auto-path refuses, human-review path permits); resolved to a known key → `owned`,
+  refused for any other source; unreadable id → `indeterminate`, refused everywhere. This gate is
+  **agnostic to which source key is used** — whichever key contributor-promoted matches end up
+  with, this generic behaviour applies unchanged (see §19).
+- **Direct admin single-match creation** (ISSUE-184, resolved same day): `source_id =
+  manual_admin_edit`, `source_record_id = match:<uuid>` minted once inside `createMatch()`'s
+  transaction; `data_edits` carries the audit trail; provenance never re-stamped on edit.
+  Special records/fixtures/coaches/draft/club leadership all converge on the identical
+  `manual_admin_edit` + minted-UUID-token convention (`<family>:<uuid>` or
+  `manual_admin_edit:<token>` in `data_overrides.entity_key`) — "minted once, never edited,"
+  replacement mints a new token.
+- **Cross-cutting convention, observed in every lineage/audit table inspected** (`data_edits`,
+  `data_overrides`, `promotion_candidates`): the lineage/audit row always carries a pointer
+  **toward** the canonical row (`table_name`+`row_id`, `entity_key`, `target_table`+`target_id`).
+  **No canonical row anywhere in the schema carries an inbound FK to its own lineage/audit
+  source.** This is strong, consistent repository evidence for how a future contributor-match
+  lineage table should be shaped (§8, §16).
+
+### 3. Four concepts, located in the existing model
+
+- **A. Canonical source provenance** = the 064 quartet on `matches`
+  (`source_id`/`source_record_id`/`import_batch_id`) — "what channel is this row's content
+  grounded in," set once, essentially immutable. Feeds the ownership gate.
+- **B. Submission lineage** = "which submission caused this row." For the existing CSV pipeline
+  this is only approximately captured — `import_batches.notes` is free text naming a
+  `data_submissions.id`, and only at the **batch** level (many rows per batch), never per
+  canonical row. **No FK from `matches` to `data_submissions` exists, and none is needed under
+  the observed convention above** — the lineage table should point at the match, not vice versa.
+- **C. Reviewer/audit history** = `data_submissions.reviewed_by`/`reviewed_at` (file-level) +
+  `auth_audit_log` (`submission.approved`/`submission.promoted`/etc., actor + timestamp) +
+  `data_edits` (row-level, for direct edits). Already fully separate from A in every existing
+  writer — this is the established, working pattern, not something to invent.
+- **D. Evidence provenance** = what upstream source a contributor cited. **Nothing in the schema
+  captures this today.** For the CSV pipeline the "evidence" is simply the uploaded file's bytes
+  (`data_submissions.content`); there is no citation/reference column anywhere, and no table for
+  a hypothetical single-match submission exists at all to hang one on.
+
+### 4. Contributor identity semantics
+
+`auth_users(id, email, role, password_hash, totp_secret, ...)` — stable identifier is the
+integer `id`. **No existing writer anywhere in the repository embeds email, username, or any
+other human-identifying value into `sources`/`source_record_id`** — every human-provenance token
+(`manual_admin_edit:<uuid>`, `match:<uuid>`, `<family>:<uuid>`) is a random UUID, content- and
+identity-free by explicit design (098's comment: never derived from anything an administrator is
+expected to change). Actor identity lives exclusively in audit/session tables today
+(`auth_audit_log.actor_user_id`, `data_submissions.uploaded_by`/`reviewed_by`,
+`data_edits.admin_user_id`) — this precedent should extend directly and without modification to
+any future match-submission lineage table.
+
+### 5. Source registry
+
+Three existing keys already touch match-family human/reviewed data, none of which represents
+"created by a contributor, as distinct from an admin typing it directly":
+
+| Key | `kind` | Meaning | Used by |
+|---|---|---|---|
+| `manual_admin_edit` | `manual` | A human (super admin) directly entered/corrected the fact | `createMatch()`, attendance edits, every other manual-entity writer |
+| `sports_data_lab` | `derived` | The predecessor project's legacy derivation layer (migration-era) | Reused, by convenience, as the fixed source for **every** admin-upload CSV promotion regardless of dataset/uploader |
+| `afltables` / `squiggle_api` / `kali_afl_stats` | `upstream_dataset` | Automated upstream feeds | Settle, current-season observation |
+
+No key means "a contributor's submission, approved by a super admin." Two evidence-grounded
+options, not a decision:
+
+- **(i) Reuse `manual_admin_edit`.** ISSUE-184 §12 (written before this issue existed) already
+  argued the contributor/admin distinction belongs in audit metadata, not `source_id` — a super
+  admin is the one who ultimately authorises the canonical write either way, so the ownership-gate
+  behaviour (protected from every automated feed, adoptable only by another manual write) should
+  arguably be identical regardless of who typed the original text.
+- **(ii) Mint a new key** (e.g. `contributor_submission`), preserving a lever for a future policy
+  divergence (e.g. "contributor-sourced facts may later be auto-replaced by an authoritative
+  feed; directly-admin-typed ones never should") without touching every already-approved row.
+
+Repository evidence does not resolve this alone — it is a product-intent question (§19,
+unresolved list item 1).
+
+### 6–9, 18. Ownership, approval semantics, `source_record_id` format, and the recommended model
+
+**Recommendation for a NEW canonical match created from an approved contributor submission:**
+
+- **`source_id`:** reuse `manual_admin_edit` (option (i) above), on the reasoning that the
+  ownership gate should treat every human-vetted, super-admin-authorised canonical fact
+  identically regardless of who originally typed it — consistent with ISSUE-184 §12's explicit
+  steer to keep this distinction out of `source_id`. If the operator instead wants contributor
+  provenance distinguishable at the ownership-gate level (option (ii)), that is a one-line change
+  to which source row is resolved; nothing else in this recommendation depends on the choice.
+- **`source_record_id`:** a freshly minted `match:<uuid>`, generated **at promotion/INSERT time**
+  (not at submission time) — identical shape to ISSUE-184's direct-admin-created matches, so it
+  identifies the canonical record, never the submission or an edit event, per the brief's item 8
+  constraint.
+- **`import_batch_id`:** left `NULL`, matching every other `manual_admin_edit` writer — unless
+  the implementation deliberately routes contributor-match promotion through the existing
+  `promoteSubmission()`/`import_batches` machinery, in which case it should be populated for
+  real (this would also be the natural place to fix the pre-existing `matchResults.promoteRow`
+  gap in §1-2 above). That routing choice is a design fork for the implementation issue, not
+  resolved here (§19 unresolved list item 2).
+- **Submission lineage:** a **new** table (working name `match_submissions`), not a repurposing
+  of the generic, file-shaped `data_submissions`. Columns modelled directly on `data_submissions`'
+  existing shape: `id`, `payload jsonb` (the proposed match fields), `submitted_by integer
+  REFERENCES auth_users(id)`, `submitted_at`, `status` (mirroring `submission_status`'s shape),
+  `reviewed_by integer REFERENCES auth_users(id)`, `reviewed_at`, `decision_note text`,
+  `canonical_match_id integer REFERENCES matches(id)` — **nullable, set only on promotion** — per
+  §2's cross-cutting "lineage points at canonical, never the reverse" convention.
+  `evidence_citation text` (optional, contributor-supplied free text/URL) covers concept D.
+- **Approval/reviewer history:** `match_submissions.reviewed_by`/`reviewed_at` plus
+  `auth_audit_log` entries mirroring `submission.approved`/`submission.promoted` — kept fully
+  separate from A, exactly as `data_edits`/`data_submissions` already do.
+- **Evidence attribution:** `match_submissions.evidence_citation` — documentation for the
+  reviewer, never itself a `sources` registry entry or folded into `source_record_id`.
+
+**For a CORRECTION submission applied to an EXISTING match:**
+
+- `matches.source_id`/`source_record_id` **do not change** — ISSUE-184 §8's rule, extended
+  without modification (the score/attendance-group `data_edits` path already behaves this way).
+- Contributor/reviewer history for a correction needs its own shape decision: either the same
+  `match_submissions` table with a `submission_type = 'correction'` discriminator and a
+  `target_match_id` set at creation (instead of `canonical_match_id` set only at promotion), or a
+  separate table, since a correction proposes a field delta rather than a full match payload. No
+  repository precedent settles this — the CSV pipeline's upsert-by-natural-key treats create and
+  correct identically and tracks lineage for neither (§19 unresolved list item 3).
+- The approved change itself applies through the existing `data_edits` path. **Gap:**
+  `data_edits.admin_user_id` is `NOT NULL` and has no room for "proposed by a contributor, applied
+  by this admin" — recording that distinction would need either a new nullable column on
+  `data_edits` or reliance on the paired `match_submissions` row alone. Not decided here.
+
+**For a DELETE/RECREATE:** `deleteMatch` remains a hard delete (ISSUE-180/181, unchanged); a
+subsequent contributor-submitted recreation mints a brand-new `source_record_id` and a brand-new
+`match_submissions` row, exactly as ISSUE-184 §9 established for direct admin recreation. The
+original submission's `canonical_match_id` is left pointing at the now-deleted id rather than
+repointed — special records' "a replacement is a new row, never a reuse" principle (migration
+102) — so history is not silently rewritten.
+
+### 10. Rejected submissions
+
+The existing `data_submissions` pattern already generalises cleanly: `status = 'rejected'` +
+`reviewed_by`/`reviewed_at`, with `promoteSubmission()`'s own status check (`'approved'` or
+`'failed'` only) making it structurally impossible for a rejected submission to reach promotion.
+A `match_submissions` table should copy this guard verbatim.
+
+### 11. Multiple contributors / duplicates
+
+No existing precedent for **semantic** duplicate detection across submissions from different
+contributors — the CSV pipeline's only duplicate handling is content-hash idempotency (043),
+which resolves identical re-uploads of the same file back to one submission, not two contributors
+independently describing the same match in different words. This is new design surface; the
+provenance implication only (per the brief's item 13, not a full resolution design) is that the
+canonical row must still end up with exactly one `source_record_id`/creation lineage — a second,
+later-reviewed submission describing an already-promoted match should attach as lineage/evidence
+to the existing row (via `canonical_match_id`, once resolved to point at it) rather than mint a
+second competing token.
+
+### 12. Privacy / API implications
+
+`auth_users`, `data_submissions`, and `data_submission_rows` are **already** withheld from
+`afldb_app` by explicit omission (023's own comment: "The read-only site role sees none of
+this"). `sources.key`/`name` and `source_record_id` are opaque and already implicitly
+public-safe. A future `match_submissions` table must follow the identical pattern: no
+`afldb_app` grant, so contributor/reviewer identity can never reach a public API surface merely
+because canonical provenance (`source_id`/`source_record_id`) is exposed.
+
+### 13. Migration impact of the recommended design
+
+- **Zero migration** if `source_id`/`source_record_id` reuse `manual_admin_edit` and the
+  `match:<uuid>` format exactly as ISSUE-184 implemented — the registry row and token shape
+  already exist.
+- **A new migration** for `match_submissions` (table + FKs + `afldb_auth`/`afldb_import` grants,
+  mirroring 023's shape) is required for the submission-lineage half of this design, whenever a
+  real single-match contributor submission UI is built — not needed for the CSV pipeline gap
+  fix below.
+- **Independently of contributor semantics**, `matchResults.promoteRow`'s existing provenance gap
+  (§1-2) is real today and worth fixing regardless of which model this issue's implementation
+  picks — flagged here, not fixed (investigation only).
+
+### 14. DEV read-only audit SQL (not run — read-only against `afldb_dev`)
+
+```sql
+-- 1. Source registry entries touching match-family human/reviewed data
+SELECT id, key, name, kind, description FROM sources
+ WHERE key IN ('manual_admin_edit', 'sports_data_lab', 'afltables', 'squiggle_api', 'kali_afl_stats')
+ ORDER BY key;
+
+-- 2. Staff roles and counts
+SELECT role, count(*) AS accounts, count(*) FILTER (WHERE disabled_at IS NULL) AS active
+  FROM auth_users GROUP BY role ORDER BY role;
+
+-- 3. Submission volume and terminal states, by dataset
+SELECT dataset, status, count(*) FROM data_submissions GROUP BY dataset, status ORDER BY dataset, status;
+
+-- 4. Has any match_results submission actually promoted, and what did it leave on matches?
+SELECT ds.id AS submission_id, ds.status, ds.import_batch_id, ib.tool, ib.target_table, ib.notes
+  FROM data_submissions ds
+  LEFT JOIN import_batches ib ON ib.id = ds.import_batch_id
+ WHERE ds.dataset = 'match_results'
+ ORDER BY ds.id;
+
+-- 5. Confirms/refutes the promoteRow provenance gap in practice: matches whose match_key could
+--    plausibly trace to a CSV promotion (heuristic only -- no real link exists to check exactly)
+--    versus their actual provenance
+SELECT count(*) AS total,
+       count(*) FILTER (WHERE source_id IS NULL) AS null_provenance,
+       count(*) FILTER (WHERE s.key = 'manual_admin_edit') AS manual_admin_edit,
+       count(*) FILTER (WHERE s.key = 'sports_data_lab') AS sports_data_lab
+  FROM matches m LEFT JOIN sources s ON s.id = m.source_id;
+
+-- 6. Any existing lineage from import_batches notes back to a data_submissions row for matches
+SELECT ib.id, ib.tool, ib.target_table, ib.notes, ib.created_at
+  FROM import_batches ib
+ WHERE ib.target_table = 'match_results'
+ ORDER BY ib.id;
+```
+
+### 15. Testing implications (for the eventual implementation issue, not built here)
+
+- A `match_submissions` creation-approval-promotion cycle stamps the correct
+  `source_id`/`source_record_id`/`import_batch_id` per whichever model is chosen, on the
+  resulting `matches` row.
+- The canonical row's `source_record_id` is minted once, at promotion, and two independently
+  approved submissions in the same test run get distinct tokens.
+- The approving admin is recorded on `match_submissions.reviewed_by`, never on `matches` itself.
+- A rejected submission creates no canonical row and no provenance of any kind.
+- A correction submission, once applied, leaves the target match's `source_id`/`source_record_id`
+  byte-for-byte unchanged (same style as ISSUE-184's test L).
+- A second, later submission describing an already-promoted match does not mint a competing
+  `source_record_id` or rewrite the first one's.
+- `autoApplyOwnership`/`evaluateTargetOwnership` fixtures: a contributor-promoted match's
+  `source_id` is `refused`/`foreign_source_owner` against `afltables` (and every other automated
+  source) under both the settle path and the human-reviewed promotion-queue path — the same
+  fixture style as ISSUE-184's test M, just against whichever key this issue's implementation
+  picks.
+- Transaction rollback (submission approval/promotion failure) leaves neither a canonical
+  `matches` row nor a partial `match_submissions` lineage row.
+- No `auth_users.email` or other contributor-identifying value ever appears in `matches`,
+  `sources`, or any column reachable by `afldb_app`.
+- The independently-discovered `matchResults.promoteRow` provenance gap (§1-2), if fixed as part
+  of this implementation, needs its own regression test proving `source_id`/`source_record_id`/
+  `import_batch_id` are populated on promotion, parallel to `playerMatchStats.promoteRow`'s
+  existing (implicit) coverage.
+
+### 19. Reconciliation impact
+
+No new ownership semantics are required. `evaluateTargetOwnership`/`autoApplyOwnership`
+(`reconciliation.ts`/`canonical-apply.ts`) already read `matches.source_id` generically via
+`ownershipOf()` — whichever source key this design settles on, a contributor-promoted match
+becomes `owned`, refused for the automatic settle path against any other source, and refused for
+the human-reviewed `promotion_candidates` queue too (collision, not merely indeterminate) unless
+a reviewer explicitly promotes *as* the same source key. This is very likely correct product
+intent (an approved contributor match is a human-vetted fact AFL Tables should never silently
+overwrite) but is a consequence of the source-key choice in §5, not something requiring new gate
+logic either way.
+
+### Unresolved / genuinely not answerable from repository evidence
+
+1. **Reuse `manual_admin_edit` vs mint a new `contributor_submission` source key (§5, §6-9).**
+   Both are evidence-consistent; the choice is product intent (does a contributor-originated fact
+   ever need different auto-adoption treatment from a directly-admin-typed one?), not something
+   the repository currently answers.
+2. **Whether contributor-match promotion should route through the existing
+   `import_batches`/`promoteSubmission()` machinery** (populating `import_batch_id` for real, and
+   incidentally fixing the CSV pipeline's own `matchResults.promoteRow` provenance gap) **or stay
+   batch-less like `createMatch()`** (§6-9). Both are defensible; no repository evidence compels
+   one over the other for a genuinely new, purpose-built table.
+3. **The shape of correction-submission lineage** (§9) — same `match_submissions` table with a
+   type discriminator, or a separate table for field-delta proposals. The CSV pipeline gives no
+   precedent either way.
+4. **Whether `data_edits` needs a new nullable "proposed by" column** to record contributor
+   authorship of an applied correction distinct from the approving admin (§9), or whether the
+   paired `match_submissions` row alone is sufficient audit trail.
+5. **Duplicate-submission resolution** (§11) is out of scope by the brief's own instruction; only
+   the provenance implication (one creation token, later submissions attach as lineage) is
+   settled here.
+6. **Whether the pre-existing `matchResults.promoteRow` provenance gap (§1-2) should be fixed as
+   part of this issue's eventual implementation, or tracked and fixed separately** — it predates
+   this issue, is independent of the contributor-provenance decision, but shares the exact same
+   code path a contributor-submission-via-CSV design would need to touch.
+
+### Migration/grants
+None for this investigation. See §13 for the (non-zero, deferred) migration impact of the
+recommended implementation.
+
+### Follow-up (superseded — see Implementation below)
+Originally: a scoped implementation issue, opened once the operator decided unresolved items 1-2,
+should implement whichever contributor-provenance model was chosen. Superseded 2026-09-15 — the
+operator rescoped this issue directly to the concrete `matchResults.promoteRow` defect (unresolved
+item 6) instead, deferring the contributor-workflow model design (items 1-5, and §1-19 generally)
+to future, unopened work. See **Rescope** above and **Implementation** below.
+
+### Implementation (2026-09-15)
+
+**1. Exact existing `matchResults` promotion flow, traced before editing:**
+
+`stageSubmission()` (`pipeline.ts:28-128`) parses the uploaded CSV into `data_submission_rows`
+under `afldb_auth`. `validateSubmission()` (`pipeline.ts:143-212`) calls
+`matchResults.validateRow()`, which resolves `season`/`home_club`/`away_club`/`venue` against the
+real reference tables and writes a `resolved` object (`season`, `round_number`, `round_type`,
+`home_club_id`, `home_club_name`, `away_club_id`, `away_club_name`, `venue_id`, scores, `result`,
+`winner_club_id`, `margin`, `attendance`/`attendance_status`) into
+`data_submission_rows.reasons.resolved` — this is the **only** place a `matches` field set is
+computed; `promoteRow` itself does no resolution. A super admin then `decideSubmission()`s
+(`approve`) and `runPromotion()`s (`src/app/admin/submissions/[id]/actions.ts`), which calls
+`promoteSubmission()` (`pipeline.ts:256-398`). Inside one `afldb_import` transaction + savepoint,
+`promoteSubmission` resolves `sources.key = 'sports_data_lab'` (`sourceId`) and inserts a real
+`import_batches` row (`tool='admin-upload'`, `target_table='match_results'`,
+`notes='submission <id>'`) to get `batchId`, then calls `spec.promoteRow(row.payload,
+row.reasons.resolved, { sql, awardId: null, sourceId, batchId })` for every row. Before this fix,
+`matchResults.promoteRow` destructured only `{ sql }` from that context — `sourceId` and `batchId`
+were supplied and simply never read.
+
+**2. `source_record_id` convention — evidence, not invention (brief item 1):**
+
+The CSV has **no** `source_key`/external-id column (`requiredColumns` = `season, round_code,
+match_date, venue, home_club, away_club, home_score, away_score`) — unlike `rising_star`, which
+does carry one and uses it verbatim (`row.source_key`). The narrowest existing convention for
+exactly this situation, within the **same ingest family** (not ISSUE-184's manual/admin family),
+is `all_australian`'s: derive a compound key from the resolved identifying fields
+(`` `${resolved.season}:${row.player}:${row.club ?? ''}` ``) when the file supplies no external
+id. `matchResults.promoteRow` already computes exactly such a compound key for `match_key` itself
+— `` `${resolved.season}|${row.round_code}|${row.match_date}|${resolved.home_club_name}|${resolved.away_club_name}` ``
+— so `source_record_id` reuses that same string, unprefixed, matching `rising_star`/
+`all_australian`'s own unprefixed convention (contrast ISSUE-184's `match:<uuid>`/
+`<family>:<uuid>` prefixing, which belongs to the manual-admin family and was deliberately **not**
+applied here — different creation path, different established convention). No `(source_id,
+source_record_id)` uniqueness constraint exists on `matches` (confirmed in the original ISSUE-184
+investigation), so reusing `match_key`'s value as `source_record_id` creates no collision risk.
+
+**3. Comparison with sibling implementations (brief item 2):** `playerMatchStats.promoteRow`
+writes `source_id = ${sourceId || null}` and `import_batch_id = ${batchId}` directly (no
+`source_record_id` — `player_match_stats` was never given that column by migration 064, which
+only targets `matches`). `matchResults.promoteRow` now follows the identical `${sourceId ||
+null}` guard (protects against `sourceId` resolving to `0` when the `sports_data_lab` lookup
+fails, exactly as `playerMatchStats` already guards), extended with `source_record_id` since
+`matches` (unlike `player_match_stats`) carries that column.
+
+**4. Exact production change** — `src/lib/ingest/datasets.ts`, `matchResults.promoteRow` only:
+
+- `promoteRow(row, resolved, { sql })` → `promoteRow(row, resolved, { sql, sourceId, batchId })`.
+- `INSERT INTO matches (...)` column/value lists gained `source_id, source_record_id,
+  import_batch_id` → `${sourceId || null}, ${matchKey}, ${batchId}` (the pre-existing `matchKey`
+  local variable, not a new value).
+- **`ON CONFLICT (match_key) DO UPDATE SET` deliberately does NOT list these three columns.**
+  This is the existing-row/collision decision (brief item 4): `matchResults` is documented as an
+  upsert-by-natural-key ("re-uploading a corrected file... updates the same match rather than
+  duplicating it"), so a conflict very plausibly means "a corrected CSV row landed on a match
+  originally created by `afltables`, `manual_admin_edit`, or an earlier promotion." Because
+  provenance columns are simply absent from the `SET` list, PostgreSQL leaves whatever the
+  existing row already carries completely untouched on every `UPDATE` branch — full stop, no
+  `COALESCE`, no re-stamping `import_batch_id` either (unlike `rising_star`/`all_australian`,
+  which DO re-stamp `import_batch_id` on conflict, because their `ON CONFLICT` arbiter IS
+  `source_record_id` itself, so every conflict is by construction the same source re-promoting
+  its own record — `matches`' arbiter is `match_key`, so that assumption does not hold and was not
+  carried over). This was not ambiguous enough to warrant stopping: it is the direct extension of
+  the established "creation provenance is stamped once, corrections never touch it"
+  principle (ISSUE-184 §8, `applyMatchEdit`'s existing score/attendance-group behaviour) applied
+  uniformly to a second write path onto the same table, and it strictly cannot silently overwrite
+  another source's ownership — the explicit thing brief item 4 warned against.
+- No other function, file, or dataset was touched. `createMatch()`, ISSUE-184's
+  `manual_admin_edit` behaviour, `reconciliation.ts`/`canonical-apply.ts`, contributor auth,
+  `data_submissions` workflow, `pipeline.ts`'s `sourceId`/`batchId` resolution, and `match_key`
+  generation are all unchanged.
+
+**5. Submission lineage separation (brief item 5):** unaffected — `uploaded_by`/`reviewed_by`
+already live only on `data_submissions`, untouched by this change. No contributor/reviewer
+identity is written to `source_id`/`source_record_id`; both remain a source-registry id and a
+match-identity string, exactly as before, just no longer NULL.
+
+**6. Transaction/rollback behaviour:** unchanged — the three new columns are part of the same
+single `INSERT` statement `matchResults.promoteRow` already ran; there is no separate commit path
+for provenance. A failure anywhere in `promoteSubmission`'s per-row loop (which runs inside
+`tx.savepoint(...)`, `pipeline.ts:304-351`) rolls the savepoint back, so a `matches` row from this
+dataset either lands fully provenanced or not at all — proven by test D below with a real
+FK-violating value, not a mocked failure.
+
+### Tests added
+
+`tests/integration/match-results-promotion.test.ts` (new file — no existing suite calls
+`matchResults.promoteRow` against a real database; `tests/integration/datasets.test.ts` covers
+only the pure `validateRow`/`fileKey` half). Runs entirely through the real
+`promoteSubmission()` pipeline, matching `tests/integration/submission-promotion.test.ts`'s own
+convention (which already owns the dataset-agnostic locking/concurrency/atomicity proofs and is
+not re-tested here). Season 2073 reserved (unclaimed elsewhere as of this issue); two real,
+existing club identities read — never written — matching
+`tests/integration/wildcard-final-fixture.ts`'s convention. `sources.key = 'sports_data_lab'` is
+seeded idempotently (`ON CONFLICT (key) DO NOTHING`) if a schema-migration-only `afldb_test` does
+not already carry it (only `tools/migration/import_legacy_afl.py`'s Python seed list does, not
+any SQL migration) — mirrors migration 057's own idiom for `manual_admin_edit` and is never
+deleted, matching that row's "single globally-seeded, shared" treatment.
+
+- **A–C.** One promoted `match_results` submission persists `source_id` = the resolved
+  `sports_data_lab` id, `source_record_id` = the exact computed `match_key` string, and
+  `import_batch_id` = the batch id `promoteSubmission` actually returned.
+- **D.** A submission whose resolved `home_club_id`/`winner_club_id` is a non-existent club id
+  forces a real FK violation inside the `INSERT`, inside the savepoint; `promoteSubmission`
+  returns `ok: false`, and no `matches` row exists at all afterwards — proves the provenance
+  columns cannot land independently of the rest of the row.
+- **item 4 (existing-row/collision).** A match pre-seeded with `source_id = afltables` and a
+  distinct `source_record_id`, then "corrected" by a re-promoted `match_results` submission on the
+  same `match_key`: the score visibly updates (proves the promotion really ran against that row),
+  but `source_id`/`source_record_id` remain exactly `afltables`/the original value — proves the
+  `ON CONFLICT` branch's omission of those columns from `SET` in practice, not just by inspection.
+- **E (sibling non-regression).** Not a new test: `playerMatchStats.promoteRow` was not touched,
+  and its existing coverage (`tests/integration/datasets.test.ts`,
+  `tests/integration/submission-promotion.test.ts`'s generic locking suite) is unchanged and
+  unaffected. Adding a redundant duplicate here was avoided per the brief's own instruction.
+- **F (ownership protection).** Two additions to the existing "narrow test boundary"
+  (`tests/current-season-import.test.ts`):
+  - The generic gate **already** proved a `sports_data_lab`-owned row is
+    `foreign_owned_collision`/`foreign_source_owner` against a different promoting source (a
+    pre-existing assertion at the `'refuses a foreign-owned target and an owner it cannot read'`
+    test, unrelated to this issue but directly on point) — noted, not duplicated.
+  - One new case added to the `'E3 — the automatic-path ownership predicate'` describe block,
+    mirroring the existing `AFLDB-ISSUE-184` (`manual_admin_edit`) case exactly:
+    `autoApplyOwnership({ state: 'owned', sourceKey: 'sports_data_lab' }, 'afltables')` →
+    `refused`/`foreign_source_owner`, and the same fixture through `evaluateTargetOwnership` →
+    `foreign_owned_collision`/`foreign_source_owner`. Proves the automatic settle path, not only
+    the generic human-reviewed one, now also refuses to silently adopt a `match_results`-promoted
+    row.
+
+### DEV read-only audit (operator-run; all read-only against `afldb_dev`)
+
+```sql
+-- 1. Match counts grouped by source (NULL group = provenance-null rows)
+SELECT s.key AS source_key, count(m.id) AS match_count
+FROM matches m
+LEFT JOIN sources s ON s.id = m.source_id
+GROUP BY s.key
+ORDER BY match_count DESC;
+
+-- 2. source_id / source_record_id / import_batch_id population consistency
+--    (a row with source_id set but source_record_id NULL, or vice versa, would be an
+--    inconsistency neither this fix nor any existing writer should ever produce)
+SELECT
+  count(*) AS total,
+  count(*) FILTER (WHERE source_id IS NOT NULL AND source_record_id IS NULL) AS source_id_only,
+  count(*) FILTER (WHERE source_id IS NULL AND source_record_id IS NOT NULL) AS record_id_only,
+  count(*) FILTER (WHERE source_id IS NULL AND source_record_id IS NULL) AS provenance_entirely_null
+FROM matches;
+
+-- 3. Import batches recorded against the match_results dataset specifically
+--    (tool='admin-upload' is shared by every CSV dataset; target_table narrows it)
+SELECT id, source_id, target_table, notes, status, completed_at, records_inserted
+FROM import_batches
+WHERE tool = 'admin-upload' AND target_table = 'match_results'
+ORDER BY id;
+
+-- 4. data_submissions that reached 'promoted' for match_results, and what they left behind
+--    (import_batch_id is the only link to #3; there is no FK from any matches row to
+--    data_submissions -- this is a manual, batch-level cross-reference only)
+SELECT ds.id AS submission_id, ds.status, ds.import_batch_id, ds.promoted_at
+FROM data_submissions ds
+WHERE ds.dataset = 'match_results'
+ORDER BY ds.id;
+
+-- 5. Does the one already-known NULL-provenance match (id 17269, Fremantle v Geelong, 2026
+--    semi-final -- intentionally NOT backfilled under ISSUE-184) show any positive link to a
+--    match_results submission? (Expected: no -- this query does not reclassify it either way.)
+SELECT m.id, m.season, m.round_code, m.match_date, m.source_id, m.source_record_id,
+       m.import_batch_id
+FROM matches m
+WHERE m.id = 17269;
+
+-- 6. Any OTHER currently-NULL-provenance match whose match_key matches the exact string
+--    matchResults.promoteRow would have computed (heuristic evidence only -- a matching shape
+--    is not proof of origin, since afltables/manual creation could coincidentally produce the
+--    same field values; provided for the operator's own judgement, not backfill)
+SELECT id, season, round_code, match_date, match_key
+FROM matches
+WHERE source_id IS NULL AND source_record_id IS NULL
+ORDER BY id;
+```
+
+### Migration/seed/backfill status
+
+**None of the three, and none required.** `sources.key = 'sports_data_lab'` already exists in any
+database built from a genuine historical import; `matches.source_id`/`source_record_id`/
+`import_batch_id` are the pre-existing 064 columns. This is a pure application-code change inside
+one function. **No backfill of historically-promoted `matches` rows was attempted or proposed** —
+per brief item 8, query 4 above shows only a **batch-level** link (`data_submissions.import_batch_id`
+→ `import_batches.id` → `import_batches.target_table = 'match_results'`), never a per-row link from
+an individual `matches` id back to the specific submission/row that created it. Even where a
+promoted batch is positively identified, there is no deterministic way to attribute a *specific*
+NULL-provenance `matches` row to that batch rather than to a pre-064 legacy import or an
+old, pre-184 `createMatch()` call — exactly the same non-identifiability ISSUE-184 §14 already
+established for its own writer. The one known NULL-provenance row (id 17269) is explicitly left
+alone (query 5); no other row is reclassified.
+
+### Deferred — future contributor-workflow design (not implemented, not redesigned here)
+
+Carried forward from the original investigation, unresolved, and explicitly out of this issue's
+now-narrower scope:
+
+- A future direct contributor match-entry/correction workflow (distinct from the existing
+  whole-CSV-file `data_submissions` pipeline) likely needs its own, separate: canonical source
+  provenance, submission lineage, reviewer/audit history, and evidence attribution — sketched but
+  not designed in §3/§6-9/§18 above.
+- The choice between reusing `manual_admin_edit` versus minting a dedicated contributor source key
+  for that future workflow (§5, §18) remains open product intent, not something this fix resolves
+  or forecloses — `sports_data_lab` was reused here only because it is **already** the resolved
+  source for the entire existing CSV pipeline, not as a recommendation for any future single-match
+  contributor path.
+- No new issue ID was opened for this deferred work, per the brief's instruction; it remains
+  documented here and should be split into its own tracked issue if and when that workflow is
+  actually planned.
+
+### Brittle-test correction (2026-09-15, operator-discovered)
+
+Operator verification ran the tests in the report above and found one unrelated failure:
+`tests/current-season-import.test.ts` → `'import-batch ids are opaque identifiers at the driver
+boundary'` → `'decodes the id at each INSERT rather than trusting the declaration'`. Not an
+ISSUE-185 production defect — `src/lib/ingest/pipeline.ts` was not touched by this issue and its
+`INSERT INTO import_batches ... RETURNING id` was already correct (typed `{ id: string }[]`,
+decoded through `asImportBatchId(batch.id)`, inside the pre-existing
+`tx.savepoint(async (sp) => ...)`). The test's own assertion was brittle: it required the literal
+substring `` const [batch] = await tx<{ id: string }[]>` `` across every module in
+`BATCH_ID_SOURCES`, but `pipeline.ts` legitimately binds that row through `sp` (the savepoint
+handle), not `tx` — the only one of the six inspected modules (`observation-store.ts`,
+`current-season-import.ts`, `settle-afltables.ts`, `lineup-store.ts`, `ingest/pipeline.ts`,
+`import-first-kick-goal.ts`) that runs this INSERT inside a savepoint rather than directly inside
+its transaction.
+
+**Fix:** `tests/current-season-import.test.ts`, the same `'decodes the id at each INSERT...'`
+test — replaced the hard-coded-`tx` `.toContain(...)` string assertion with a handle-agnostic
+regex `.toMatch(/const \[batch\] = await \w+<\{ id: string \}\[\]>`/)`. `\w+` accepts `tx`, `sp`,
+or any other legitimate handle name in a module not yet written; the exact `{ id: string }[]`
+type parameter, the `const [batch] = await` destructuring shape, and the trailing template-literal
+backtick are all still required verbatim, so `{ id: number }[]` or an untyped `RETURNING id` still
+fail to match, preserving the real invariant. The second assertion in the same test
+(`.toContain('asImportBatchId(batch.id)')`) was already handle-agnostic and untouched — it was
+never the failing line.
+
+No production file was touched (`pipeline.ts`, `datasets.ts` unchanged). No other ISSUE-185 file
+changed.
+
+**Re-run:**
+```
+npx vitest run tests/current-season-import.test.ts
+```
+
+### Operator verification (2026-09-15, final)
+
+- `npx vitest run tests/integration/match-results-promotion.test.ts` — 1 file, 3/3 tests PASS:
+  A-C (a promoted match persists `source_id`, `source_record_id` and `import_batch_id`), D (a
+  failed promotion rolls back completely, leaving no partially-provenanced canonical row), and the
+  existing-row collision case (re-promotion over an already-owned row preserves that row's
+  original provenance).
+- `npx vitest run tests/current-season-import.test.ts` — 1 file, 256 passed, 4 skipped, 0
+  failures (up from 255 passed / 1 failed before the brittle-test correction above). Includes the
+  AFLDB-ISSUE-185 ownership case proving a `sports_data_lab`-owned match is treated as
+  foreign-owned/protected by both `autoApplyOwnership` and `evaluateTargetOwnership`, and the
+  import-batch opaque-id boundary tests, all green.
+- `npx tsc --noEmit` — PASS.
+
+### DEV audit results (read-only, `afldb_dev`, 2026-09-15)
+
+Run using the §17/Implementation audit SQL provided earlier in this entry.
+
+- **Matches by source:** `afltables` — 17,051 matches, all 17,051 with `source_record_id`
+  populated, all 17,051 with `import_batch_id` populated. `NULL` source — 1 match, 0 with
+  `source_record_id`, 0 with `import_batch_id`.
+- **Provenance consistency:** 17,052 total matches; 0 rows with `source_id` set but
+  `source_record_id` missing; 0 rows with `source_record_id` set but `source_id` missing; 0 rows
+  with `import_batch_id` set but `source_id` missing.
+- **`match_results` import batches:** 0. **`match_results` data_submissions:** 0. **Canonical
+  matches linked to a `match_results` batch:** 0.
+- **Known NULL-source match:** id 17269, `match_key = 2026|SF|2026-09-13|9|10`, season 2026,
+  `round_type = semi_final`, `round_code = SF`, match_date 2026-09-13, Fremantle v Geelong, venue
+  Perth Stadium, `source_id`/`source_record_id`/`import_batch_id` all NULL.
+
+**Conclusion:** `afldb_dev` has never had a `match_results` CSV submission promoted through this
+pathway — zero `import_batches` rows for it, zero `data_submissions` rows for it, and zero
+canonical matches traceable to one. **There is therefore no historical backfill to perform, and
+none was attempted.** Every one of the 17,051 provenanced matches in `afldb_dev` is `afltables`-
+sourced (the historical bulk import), fully consistent (`source_id`/`source_record_id`/
+`import_batch_id` all populated together, never partially). The single NULL-provenance row (id
+17269) has no positive link of any kind to `match_results`/`sports_data_lab` and **remains
+unrelated/unprovable — it was not reclassified, backfilled, or otherwise touched**, consistent
+with ISSUE-184 §14's original finding that NULL provenance alone cannot distinguish a pre-064
+legacy row from any other unprovenanced origin. ISSUE-185 is confirmed to be a **forward
+correctness fix only**: it changes what a *future* `match_results` promotion writes, and changes
+nothing about any row that exists in `afldb_dev` today.
+
+### Confirmed implementation (final)
+
+`src/lib/ingest/datasets.ts`, `matchResults.promoteRow()` — now writes the provenance already
+supplied by the promotion pipeline on every newly-created canonical row:
+
+- `source_id` = the resolved `sourceId` (`sports_data_lab`, the same source
+  `promoteSubmission()` already resolves for every CSV dataset).
+- `source_record_id` = the existing `matchKey` compound identity (season|round|date|home|away),
+  already computed for the `match_key` column itself — no new identity scheme invented.
+- `import_batch_id` = the `batchId` `promoteSubmission()` already supplies.
+- `imported_at` = existing schema/default behaviour, unchanged.
+
+**Existing-row behaviour:** `ON CONFLICT (match_key) DO UPDATE` does not list `source_id`,
+`source_record_id`, or `import_batch_id` in its `SET` clause, so re-promoting a corrected file
+against an already-canonical row (owned by `afltables`, `manual_admin_edit`, or an earlier
+promotion) leaves that row's original provenance completely untouched — proven directly by the
+integration suite's existing-row collision test.
+
+**Transaction behaviour:** provenance is written in the same `INSERT` as the rest of the row;
+promotion runs inside `promoteSubmission()`'s existing savepoint/transaction; rollback is atomic
+— proven directly by test D.
+
+**No migration. No source seed. No backfill.**
+
+### Deferred — future contributor-workflow design (still not implemented)
+
+Unchanged from the Rescope above; explicitly preserved, not implemented, and not tracked under a
+new issue ID:
+
+- **Canonical provenance**, **submission lineage**, **reviewer/audit history**, and **evidence
+  attribution** for a future direct contributor match-entry/correction workflow (distinct from
+  today's whole-CSV-file `data_submissions` pipeline this issue fixed) remain undesigned — see §3,
+  §6-9 and §18 above for what was sketched but not decided.
+- The choice between reusing `manual_admin_edit` versus minting a dedicated contributor source key
+  for that future workflow (§5, §18) remains open product intent. `sports_data_lab` was used here
+  only because it is already the resolved source for the entire existing CSV pipeline this issue
+  fixed — not as a recommendation for any future single-match contributor path.
+- Should that workflow be planned, it should be split into its own tracked issue rather than
+  reopening this one.
+
+### Migration/grants
+None. Confirmed unchanged from the investigation, the implementation, and the operator
+verification.

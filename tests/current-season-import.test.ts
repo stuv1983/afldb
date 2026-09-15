@@ -3056,6 +3056,23 @@ describe('AFLDB-ISSUE-099 settle — ownership, data_issues identity and corrobo
         .toEqual({ verdict: 'foreign_owned_collision', detail: 'foreign_source_owner' });
     });
 
+    it('AFLDB-ISSUE-185: treats a match_results-promoted (sports_data_lab-owned) row as foreign-owned, on both the automatic and the generic gate', () => {
+      // Since 185, matchResults.promoteRow() stamps source_id on a newly
+      // created row instead of leaving it NULL, moving a promoted match out
+      // of 'unowned' into 'owned' by 'sports_data_lab' -- the same key
+      // src/lib/ingest/pipeline.ts already resolves for every admin-upload
+      // dataset (044_schema_integrity.sql:287-289). The generic gate already
+      // proved this collision from the S3 refusal side (see 'refuses a
+      // foreign-owned target and an owner it cannot read' above); this pins
+      // the automatic-path predicate too, mirroring the manual_admin_edit
+      // case immediately above it.
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'sports_data_lab' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+      expect(evaluateTargetOwnership({ state: 'owned', sourceKey: 'sports_data_lab' }, 'afltables'))
+        .toEqual({ verdict: 'foreign_owned_collision', detail: 'foreign_source_owner' });
+    });
+
     it('refuses an unreadable owner and an unresolved identity', () => {
       expect(autoApplyOwnership(resolved({ state: 'indeterminate' }), 'afltables'))
         .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
@@ -3613,10 +3630,20 @@ describe('import-batch ids are opaque identifiers at the driver boundary', () =>
   });
 
   it('decodes the id at each INSERT rather than trusting the declaration', () => {
+    // Handle-agnostic (AFLDB-ISSUE-185 operator verification, 2026-09-15):
+    // src/lib/ingest/pipeline.ts legitimately runs its INSERT INTO
+    // import_batches inside a `tx.savepoint(async (sp) => ...)` and so binds
+    // the row through `sp`, not `tx` -- every other source in
+    // BATCH_ID_SOURCES happens to use `tx`, but nothing about the invariant
+    // being proved (RETURNING id typed as the driver's decimal text, never
+    // narrowed) depends on which identifier names the transaction/savepoint
+    // handle. `\w+` accepts either, and any other legitimate handle name,
+    // while still requiring the exact `{ id: string }[]` type parameter --
+    // `{ id: number }[]` or an untyped call still fail to match.
     for (const [name, source] of BATCH_ID_SOURCES) {
       if (!source.includes('INSERT INTO import_batches')) continue;
       expect(source, `${name} must type RETURNING id as the driver's text`)
-        .toContain('const [batch] = await tx<{ id: string }[]>`');
+        .toMatch(/const \[batch\] = await \w+<\{ id: string \}\[\]>`/);
       expect(source, `${name} must decode the id at the boundary`)
         .toContain('asImportBatchId(batch.id)');
     }
