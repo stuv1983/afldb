@@ -62,6 +62,7 @@ import {
   ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
@@ -1225,11 +1226,17 @@ function extractCareerConditions(text: string): {
  * extractCareerConditions needs) -- each phrase already names exactly one
  * true/false club_seasons column, so a match is the condition.
  */
-function extractClubSeasonConditions(text: string): { text: string; conditions: NlClubSeasonCondition[]; consumed: string[] } {
+function extractClubSeasonConditions(
+  text: string,
+  subjectGated: boolean,
+): { text: string; conditions: NlClubSeasonCondition[]; consumed: string[] } {
   const conditions: NlClubSeasonCondition[] = [];
   const consumed: string[] = [];
   let working = text;
-  for (const [re, kind] of CLUB_SEASON_CONDITION_WORDS) {
+  const words = subjectGated
+    ? [...CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED]
+    : CLUB_SEASON_CONDITION_WORDS;
+  for (const [re, kind] of words) {
     const match = re.exec(working);
     if (!match) continue;
     conditions.push({ kind });
@@ -2533,7 +2540,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // at all); the metric word ("wins"/"losses"/"draws") is only tried once
   // a cue already exists, since those words also name a player career
   // column -- see CLUB_SEASON_METRIC_WORDS's header comment.
-  const clubSeasonConditionResult = extractClubSeasonConditions(text);
+  const clubSeasonConditionResult = extractClubSeasonConditions(text, clubSubjectPresent);
   text = clubSeasonConditionResult.text;
   consumedTokens.push(...clubSeasonConditionResult.consumed);
 
@@ -3242,6 +3249,28 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   ) {
     report.confidence = 1;
     report.notes.push('Club wins, losses, draws and percentage are ranked one season at a time; add "in a season" or a year to ask for the best single season. AFLDB does not total them across a club\'s history.');
+    return { status: 'none', reason: 'unrecognised', report };
+  }
+
+  // AFLDB-ISSUE-195. Once grain has elected club_season, playerMetricResult
+  // is never read by any club_season plan field (metric comes only from
+  // clubSeasonMetricResult, conditions only from clubSeasonConditionResult)
+  // -- so a non-null playerMetricResult.metric surviving to this point is a
+  // word the parser recognised as meaningful that the elected grain cannot
+  // represent, not a word that was safely ignored. clubs_played is excluded:
+  // a bare "club(s)" left over here is this question's OWN subject noun
+  // re-matching CAREER_STAT_WORDS' clubs_played entry (confirmed against
+  // "which clubs won the wooden spoon", "which club had the most losses in
+  // 2017", "clubs that made/missed finals" -- all currently-passing tests),
+  // never a second requested semantic.
+  if (
+    grain === 'club_season' && playerMetricResult.metric
+    && playerMetricResult.metric !== 'clubs_played'
+  ) {
+    report.confidence = 1;
+    report.notes.push(
+      `AFLDB could not combine "${playerMetricResult.metric}" with this club-season question in one plan; ask the two questions separately.`,
+    );
     return { status: 'none', reason: 'unrecognised', report };
   }
 

@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### NL search: a club-season "won the premiership" no longer strands its condition when conjoined with another (AFLDB-ISSUE-195) - 16 September 2026
+
+- `CLUB_SEASON_CONDITION_WORDS`' `premier` entry (`src/search/nl/vocab.ts`) now also accepts plural
+  "premiership team(s)/side(s)" wording. A new, separately-gated entry recognises "won the/a
+  premiership" — tried only when the question already carries an independent club/team subject cue
+  (`clubSubjectPresent`), so it cannot manufacture a false club-season reading for a player-subject
+  question such as "Dusty won the premiership with Richmond in 2017". Both map to the same existing
+  `'premier'` club-season condition.
+- "teams that won the premiership and the wooden spoon" previously planned `club_season` with only
+  `wooden_spoon` in `clubSeasonConditions` — the still-unrecognised "premiership" word was silently
+  stolen by the bare career-metric fallback and then discarded because no `club_season` plan field
+  reads it. It now correctly carries both `premier` and `wooden_spoon` conditions.
+- A new, narrowly-scoped ownership guard closes the general mechanism, not just this one trigger:
+  once grain elects `club_season`, a leftover recognised career-stat word (for example "finals" in
+  "teams that played the finals and won the wooden spoon") now declines by name instead of letting
+  the plan silently answer only its other, recognised condition. `clubs_played` is exempted, since a
+  bare "club(s)" left over in several valid club-season questions is that question's own subject
+  noun re-matching the same vocabulary entry, not a second requested semantic.
+- AFLDB-ISSUE-189's all-time club/team premiership declines ("which team has won the most
+  premierships", "teams with more than 5 premierships") and AFLDB-ISSUE-188's player-career
+  premiership queries ("players who have won 3 premierships", "which player has the most
+  premierships") are unaffected. No new club-season grain, condition kind, or generic
+  consumed/unowned-token framework was introduced; no SQL/compiler/schema change. `PARSER_VERSION`
+  bumped 47 → 48.
+
 ### NL search: career-condition numbers no longer cross prepositional clause boundaries (AFLDB-ISSUE-196) - 16 September 2026
 
 - `extractCareerConditions` (`src/search/nl/parser.ts`) now resolves pending `CAREER_STAT_WORDS`

@@ -476,7 +476,18 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // comparator word ("more than"/"over") now resolves against its own clause's
 // number for the same reason, rather than being pulled into a neighbouring
 // clause's window.
-export const PARSER_VERSION = 47;
+// v48 -- AFLDB-ISSUE-195: CLUB_SEASON_CONDITION_WORDS' premier entry now also
+// recognises plural "premiership teams/sides"; a new, separately-gated
+// CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED entry recognises "won the/a
+// premiership" but only when an independent club/team subject cue
+// (clubSubjectPresent) is already established, so it cannot manufacture a
+// false club-season reading for a player-subject question. Grain election
+// also gained a narrow ownership guard: once grain elects club_season, a
+// non-null playerMetricResult.metric (other than the clubs_played
+// subject-noun collision) now declines rather than being silently dropped --
+// "teams that won the premiership and the wooden spoon" now carries both
+// conditions instead of only wooden_spoon.
+export const PARSER_VERSION = 48;
 
 // ------------------------------------------------------------------ grain
 
