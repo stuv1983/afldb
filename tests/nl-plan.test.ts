@@ -559,6 +559,64 @@ describe('describePlan', () => {
   });
 });
 
+describe('validatePlan: count aggregation gate (AFLDB-ISSUE-190)', () => {
+  it('refuses count on grains whose compiler ranks rather than counts', () => {
+    expect(validatePlan(basePlan({
+      grain: 'player_game', metric: 'goals', mode: 'single', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'player_game', metric: 'goals', mode: 'sum', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'player_season', metric: 'goals', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'team_match', metric: 'team_score', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+    // player_career and club_season only escape the gate with no metric
+    // (a plain list, answered with its own row count); naming a metric
+    // routes them to the same ranked compiler as every other grain.
+    expect(validatePlan(basePlan({
+      grain: 'player_career', metric: 'games', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: 'wins', agg: { kind: 'count' },
+    }))).toHaveProperty('error');
+  });
+
+  it('still accepts a count of a plain, unranked player_career/club_season list', () => {
+    expect(validatePlan(basePlan({
+      grain: 'player_career', metric: null, agg: { kind: 'count' },
+      careerPredicates: [{ builder: 'played_a_grand_final', params: {} }],
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'club_season', metric: null, agg: { kind: 'count' },
+      clubSeasonConditions: [{ kind: 'premier' }],
+    }))).not.toHaveProperty('error');
+  });
+
+  it('still accepts count on head_to_head, coach_record and after_siren', () => {
+    expect(validatePlan(basePlan({
+      grain: 'head_to_head', metric: null, agg: { kind: 'count' },
+      headToHead: { kind: 'record' },
+      scope: {
+        matchup: {
+          clubA: { organizationId: 1, slug: 'a', name: 'A' },
+          clubB: { organizationId: 2, slug: 'b', name: 'B' },
+        },
+      },
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'coach_record', metric: null, agg: { kind: 'count' },
+      scope: { clubFor: { organizationId: 1, slug: 'richmond', name: 'Richmond' } },
+    }))).not.toHaveProperty('error');
+    expect(validatePlan(basePlan({
+      grain: 'after_siren', metric: null, agg: { kind: 'count' },
+      afterSiren: { subject: 'player' },
+    }))).not.toHaveProperty('error');
+  });
+});
+
 describe('plan token round-trip', () => {
   it('encodes and decodes a plan losslessly', () => {
     const plan = basePlan({

@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### NL search: "how many" declines instead of silently answering a single-game/season/match leader (AFLDB-ISSUE-190) - 15 September 2026
+
+- `validatePlan` (`src/search/nl/plan.ts`) now refuses a `count` aggregation on `player_game`,
+  `player_season` and `team_match` outright, and on `player_career`/`club_season` whenever a
+  metric is named. Previously these grains' compilers ranked rows via a shared `rankCutoff`
+  helper that treated any non-`top_n` aggregation as cutoff 1, so "how many goals has X kicked"
+  and similar phrasings answered a single best game/season/match under a confident "count"
+  headline instead of a real total.
+- Unaffected: `player_career`/`club_season` questions with no named metric (e.g. "how many
+  players had a brother who played AFL") still answer a genuine row count, as do
+  `head_to_head`, `coach_record` and `after_siren` questions, all of which already implement
+  count semantics correctly.
+- No parser or vocabulary change; `PARSER_VERSION` is unchanged.
+
 ### Contributor account/access retired; deprecated CSV pipeline left in place for later cleanup (AFLDB-ISSUE-186) - 15 September 2026
 
 - The `contributor` staff role — the account type behind the deprecated `/admin/upload` CSV

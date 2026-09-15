@@ -1727,6 +1727,26 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
     }
   }
 
+  // AFLDB-ISSUE-190. `count` has defined semantics only where a compiler
+  // branches on it: head_to_head/coach_record/after_siren, already gated
+  // above, and player_career/club_season with no metric, which answer the
+  // qualifying list and its row count (player-career.ts answerList,
+  // club-season.ts's equivalent) rather than a ranking. Every other
+  // reachable shape -- player_game, player_season, team_match, and
+  // player_career/club_season once a metric is named -- ranks rows via
+  // rankCutoff, which silently treats any non-top_n aggregation as cutoff
+  // 1: "how many goals has X kicked" would otherwise answer his single
+  // biggest game and present it as a total.
+  if (
+    raw.agg.kind === 'count'
+    && (
+      raw.grain === 'player_game' || raw.grain === 'player_season' || raw.grain === 'team_match'
+      || ((raw.grain === 'player_career' || raw.grain === 'club_season') && raw.metric !== null)
+    )
+  ) {
+    return { error: 'This kind of question has no defined total to count; it ranks by a statistic instead.' };
+  }
+
   if (raw.metric !== null && !isNlMetric(raw.grain, raw.metric)) {
     return { error: `"${raw.metric}" is not a recognised statistic for this kind of question.` };
   }

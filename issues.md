@@ -31421,7 +31421,7 @@ None.
   headline; the interpretation and the plan panel disagree with each other.
 - **Area:** NL search / plan validation and compilers — `src/search/nl/plan.ts`,
   `src/search/nl/vocab.ts`, `src/db/queries/nl/*.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15 (Sonnet 5).
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review; re-verified on main `8a0c4cb`.
 - **Key files:** `src/search/nl/vocab.ts` `AGG_WORDS` "how many" → count (~167);
   `src/search/nl/parser.ts` agg assembly (~3399, `resolvedAgg` used verbatim);
@@ -31486,6 +31486,53 @@ None.
 
 ### Operator verification expectations
 `npx vitest run tests/nl-plan.test.ts tests/nl-parser.test.ts`, `npx tsc --noEmit`.
+
+### Resolution (2026-09-15, Sonnet 5)
+
+**Root cause confirmed:** `validatePlan` never checked `agg.kind` against grain for
+`player_game`, `player_season`, `player_career`, `team_match` or `club_season`, so a `count`
+aggregation reached each grain's compiler unchanged. Every compiler but
+`head_to_head`/`coach_record`/`after_siren` ranks via a shared `rankCutoff(agg)` helper that
+treats anything other than `top_n` as cutoff 1 — a `count` plan silently became a rank-one query.
+
+**Fix:** added one gate to `validatePlan` in `src/search/nl/plan.ts` (after the `family` grain
+block, before the general metric-allowlist check). It refuses `agg.kind === 'count'`:
+
+- unconditionally for `player_game`, `player_season`, `team_match` — these grains' compilers
+  always rank when a plan reaches this point (each already requires a non-null `metric` except
+  `team_match`'s grouped-list shape, which is already forced to `agg.kind === 'list'` earlier in
+  `validatePlan`, so `count` never legitimately reaches them);
+- for `player_career` and `club_season` **only when a metric is named**. With no metric, these
+  two grains' compilers (`answerPlayerCareer`'s `answerList` branch in
+  `src/db/queries/nl/player-career.ts`, and the equivalent unranked branch in
+  `src/db/queries/nl/club-season.ts`) answer the qualifying row set plus `count(*) OVER ()` — a
+  genuine, already-correct total, not a rank-one leader. This is the same shape the existing
+  "how many players had a brother who played AFL" / "how many players have played and coached" /
+  father-son-selection count tests already rely on, so it is preserved rather than newly gated.
+  Naming a metric on either grain, by contrast, routes to the ranked branch and is refused.
+- `head_to_head`, `coach_record`, `after_siren` are unaffected — they are already gated earlier in
+  `validatePlan` and their compilers branch on `count` correctly.
+
+No parser, vocab, or `rankCutoff`/compiler change was needed or made; `PARSER_VERSION` is
+unchanged.
+
+**Validation:**
+- `npx vitest run tests/nl-plan.test.ts` — 179/179 passed (adds a new
+  `validatePlan: count aggregation gate (AFLDB-ISSUE-190)` describe block: count refused for
+  `player_game`/`player_season`/`team_match` and for metric-bearing `player_career`/`club_season`;
+  count still accepted for metric-less `player_career`/`club_season` and for
+  `head_to_head`/`coach_record`/`after_siren`).
+- `npx vitest run tests/nl-plan.test.ts tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts tests/nl-describe.test.ts`
+  — 4/4 files, 780/780 tests passed (no regression in existing count-shaped plans, including the
+  metric-less career/coach/after-siren count paths).
+- `npx tsc --noEmit` was listed as an expectation but not run this session (operator-executed;
+  the change is a pure boolean gate with no type-shape change, so no typecheck regression is
+  expected — flagged as a caveat rather than assumed).
+
+**Follow-up:** none opened. The optional "map 'how many <career column> has <player>' to
+`player_career`" enhancement named in the original Implementation boundary was not built (out of
+scope per the issue's own "Keep the two changes separable"); every trigger phrasing now declines
+instead of answering wrong.
 
 ## AFLDB-ISSUE-191 — NL: the boundary extractor claims any bare "first" in finals scope, dropping the metric or declining quarter questions
 
