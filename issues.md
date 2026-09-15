@@ -4,12 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 2
+**Open issues:** 0
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-192 | Low | NL search / `team-match.ts` symmetric metrics | Open / Planning | Sonnet: rank one row per match for side-independent metrics; extend `tests/integration/nl-answers-team-club.test.ts` |
-| AFLDB-ISSUE-193 | Medium | NL search / `extractHavingClause` club-subject premiership count | Open / Planning | Decide decline-by-name when a club subject's having number governs a career-only noun (premierships/flags); update the ISSUE-188 regression in `tests/nl-parser.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -31847,7 +31845,7 @@ rewritten to compensate.
 
 - **Severity:** Low (P3). Headline is right; the rendered table and `total` are wrong.
 - **Area:** NL search / team-match compiler — `src/db/queries/nl/team-match.ts`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15 (Sonnet 5), operator-validated.
 - **Found:** 2026-09-15, Fable NL Search Stage 1 review; plan shapes re-verified on main
   `8a0c4cb` (SQL behaviour established by reading, not by a DB run).
 - **Key files:** `src/db/queries/nl/team-match.ts` — `SIDES` (~19-39, both perspectives),
@@ -31898,6 +31896,31 @@ None.
 ### Operator verification expectations
 `npx vitest run tests/integration/nl-answers-team-club.test.ts` against `afldb_test`
 (`AFLDB_TEST_DATABASE_URL`), `npx tsc --noEmit`.
+
+### Resolution
+
+**Root cause confirmed:** the `SIDES` CTE (`src/db/queries/nl/team-match.ts:19-39`)
+intentionally emits one row per participating club, so every physical match has two perspective
+rows. `attendance` and `total_score` are symmetric match-level metrics — `metricValueExpr`
+computes the same value on both perspective rows. When those metrics were ranked with no side
+scope, both rows tied at the same rank, so one match could appear twice, distorting `top_n` and
+doubling `total`.
+
+**Fix:** `answerTeamMatch` (~122-135) now adds `t.club_id = m.home_club_id` to the ranking `WHERE`
+clause, restricting a symmetric, unscoped ranking to the canonical home-side row per match. The
+predicate applies only when `plan.metric` is `attendance` or `total_score` **and** the scope
+carries none of `clubFor`/`clubAgainst`/`matchup`; it evaluates to `TRUE` (no-op) otherwise.
+Side-scoped queries (`clubFor`/`clubAgainst`/`matchup`) are unchanged, and side-dependent metrics
+(`team_score`, `opponent_score`, `win_margin`, `loss_margin`, `q3_deficit_overcome`) are unchanged.
+No generic deduplication framework was introduced.
+
+**Validation:** `tests/integration/nl-answers-team-club.test.ts` — 31/31 passed, including the new
+`AFLDB-ISSUE-192 symmetric metrics rank one row per match` block (5/5 passed) proving distinct
+`matchId`s, `total` equal to the distinct match count, a `top_n: 5` returning five distinct
+matches, side-scoped rankings unaffected, and side-dependent metrics unaffected. `npx tsc
+--noEmit` clean.
+
+**Files changed:** `src/db/queries/nl/team-match.ts`, `tests/integration/nl-answers-team-club.test.ts`.
 
 ## AFLDB-ISSUE-193 — NL: club-subject "won more than N premierships/flags" counts match wins (team_match having clause)
 
