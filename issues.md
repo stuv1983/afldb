@@ -4,10 +4,16 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 6
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
+| AFLDB-ISSUE-187 | High | NL search / parser grain election | Open / Planning | Sonnet: fail closed when a non-career grain leaves `careerResult.conditions` unconsumed; extend `tests/nl-semantic-mapping.test.ts` |
+| AFLDB-ISSUE-188 | High | NL search / `extractHavingClause` | Open / Planning | Sonnet: gate every grouped-result word on a club/team subject; extend `tests/nl-parser.test.ts` |
+| AFLDB-ISSUE-189 | High | NL search / club-subject election | Open / Planning | Opus High: decide decline-vs-club-grain for non-leading club subjects, then implement pre-extraction subject cue + metric-less `club_season` refusal |
+| AFLDB-ISSUE-190 | High | NL search / `validatePlan` aggregation gate | Open / Planning | Sonnet: refuse `agg.kind='count'` on grains without count semantics; extend `tests/nl-plan.test.ts` |
+| AFLDB-ISSUE-191 | Medium | NL search / boundary extractor | Open / Planning | Sonnet: stop bare "first" electing a debut boundary; run period-split before boundary; extend `tests/nl-parser.test.ts` |
+| AFLDB-ISSUE-192 | Low | NL search / `team-match.ts` symmetric metrics | Open / Planning | Sonnet: rank one row per match for side-independent metrics; extend `tests/integration/nl-answers-team-club.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -31182,3 +31188,419 @@ evidence-gated cleanup (Phases B/C).
   any future phase (load-bearing for historical canonical rows well beyond this pipeline).
 
 **Migration/grants:** None. No schema, grant, or DEV/PROD data change of any kind.
+
+## AFLDB-ISSUE-187 — NL: a game/season threshold on a `METRIC_WORDS` stat silently drops every other career condition
+
+- **Severity:** High (P1). A confident, validated answer to a strict superset of the question; the
+  dropped clause is invisible in headline, interpretation and confidence.
+- **Area:** NL search / parser grain election — `src/search/nl/parser.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review (Fable 5.1, medium effort); re-verified by
+  Stage 2 on main `8a0c4cb` through the real parser with the `tests/nl-parser.test.ts` fake
+  directory (scratch probe, not retained).
+- **Key files:** `src/search/nl/parser.ts` — `extractPlayerMetricThreshold` election (~2491-2501),
+  `scoped || inOneGame` election to `player_game` (~2853-2858), `careerConditions` zeroed for
+  non-career grains (~3132-3133), the existing hoist guard that only covers career-vocabulary
+  thresholds (~3079-3099); `tests/nl-semantic-mapping.test.ts` (~382, the sibling shape that
+  already fails closed).
+
+### Trigger examples
+- "players with 40 disposals in a game and no premierships"
+- "players with more than 30 disposals and 5 goals in a game"
+- "players with 300 games and more than 30 disposals in a game"
+- "richmond players with 40 disposals in a game and 200 games"
+
+### Expected vs actual
+Expected: a plan carrying both constraints, or a fail-closed decline exactly as "players with no
+more than 4 goals in a game and no premierships" already does. Actual (all four): `player_game`
+/`single`, `metricCondition` retained, `careerConditions: []`, confidence 1.00, `validatePlan` OK.
+`answerSingle` lists every qualifying disposal game under "N qualifying performances".
+
+### Root cause
+`extractCareerConditions` (step 10) claims the premierships/goals/games clause and marks it
+consumed. `extractPlayerMetricThreshold` (step 11) claims the disposals threshold and sets
+`pendingMetricCondition`. Grain election lands on `player_game`; the hoist/refusal block at ~3079
+is skipped because `metricCondition` is already set; line ~3132 keeps career conditions only for
+`player_career`/`coach_record`, so the clause is discarded with its tokens already in the ledger.
+
+### Impact
+Any compound question pairing a per-game/per-season stat threshold with a career count or
+negation answers the wider question confidently. Same defect class as AFLDB-ISSUE-110's
+silent-scope findings (A/B, answered_caveat), new path.
+
+### Relationship to prior issues
+AFLDB-ISSUE-110 closed the career-vocabulary variants (hoist guard, season backstop). The
+`METRIC_WORDS` threshold path was never covered. Not a regression of a specific fix.
+
+### Implementation boundary
+Parser only. After grain election, when `grain !== 'player_career' && grain !== 'coach_record'`
+and `careerResult.conditions.length > 0` and no conversion consumed them, refuse by name with a
+stated note (same pattern as the `relationshipRead` guard at ~2904). Do not attempt to compose a
+career predicate onto a game/season grain.
+
+### Non-goals
+No new grain, no compiler change, no `validatePlan` change unless a plan-level backstop is
+cheap (a `player_game`/`player_season` plan can never carry `careerConditions`, and already
+fails validation if it does, so the fix must be in the parser).
+
+### Required tests
+`tests/nl-semantic-mapping.test.ts` beside ~382 (or `tests/nl-parser.test.ts`): the four trigger
+phrasings must not return `status: 'plan'` with empty `careerConditions`; the existing
+"no more than 4 goals in a game and no premierships" decline must still hold; single-clause
+thresholds ("players with more than 30 disposals in a game") must still plan.
+
+### Acceptance criteria
+- Every trigger phrasing declines with a reason naming the unconverted condition.
+- No existing `tests/nl-*.test.ts` regression; Phase D/F corpora unchanged in answered count
+  except for rows that were answering this defect (report them).
+- `PARSER_VERSION` bumped in the same commit.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-semantic-mapping.test.ts tests/nl-parser.test.ts tests/nl-plan.test.ts`
+then `npx tsc --noEmit`. No DB required.
+
+## AFLDB-ISSUE-188 — NL: `extractHavingClause` claims "won/win/wins" on player-subject questions and answers with grouped club wins
+
+- **Severity:** High (P1). Wrong entity and wrong statistic, confidence 1.00, validated.
+- **Area:** NL search / grouped team-result extraction — `src/search/nl/parser.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review; re-verified by Stage 2 on main `8a0c4cb`.
+- **Key files:** `src/search/nl/parser.ts` — `extractHavingClause` (~1402-1468; only the `games`
+  word is gated on `clubSubject`), call site (~2358, before career conditions), grain election
+  precedence (~2759-2761); `src/db/queries/nl/team-match.ts` `answerTeamAggregate`.
+
+### Trigger examples
+- "players who have won 3 premierships"
+- "players who won 2 brownlow medals"
+- "players with more than 100 wins"
+- "clubs that have won more than 10 premierships"
+- "richmond players who have won 3 premierships" (answers "1 club qualifies")
+
+### Expected vs actual
+Expected: `player_career` list with `premierships >= 3` / `brownlow_medals >= 2` / `wins > 100`;
+the club phrasing should decline (club premiership counts are not a grain). Actual: every one is
+`team_match`, `metric null`, `agg list`, `havingClause {metric:'wins', ...}`, confidence 1.00,
+`validatePlan` OK. Headline "18 clubs qualify", interpretation "Clubs with at least 3 wins".
+
+### Root cause
+The having-word list (`draws|wins|losses|lose|lost|win|won`) runs at step 8 on every question
+with a number in a 20-character window; only `games` requires a leading club subject. "won" is
+also a stopword, so it costs nothing. The number is stripped by the having extractor, so
+"premierships"/"brownlow medals" later match `CAREER_STAT_WORDS` with no number and are consumed
+as a bare metric that the `havingClause` election branch ignores.
+
+### Impact
+The most natural wording for multi-premiership or multi-Brownlow players returns a club list
+counted on wins. "players with more than 100 wins" returns clubs instead of players.
+
+### Relationship to prior issues
+AFLDB-ISSUE-110 final finding D (`extractHavingClause` widened to `games`, `PARSER_VERSION` 34)
+gated `games` on a club subject precisely because that word is ambiguous; the result words were
+assumed unambiguous, which player-subject phrasings disprove. Related to AFLDB-ISSUE-189 (subject
+election); kept separate because a local gate fixes this without the broader decision.
+
+### Implementation boundary
+Parser only: gate the whole `words` list on a club/team subject cue (or on the absence of a
+`players?`/`who` subject), and refuse when a career stat word survives after a having number was
+consumed. If AFLDB-ISSUE-189 lands a shared pre-extraction subject cue, this should read it.
+
+### Non-goals
+No change to `answerTeamAggregate`, the drill-down gate, or the club-subject grouped semantics
+that already work ("teams with more than 2 wins against Richmond").
+
+### Required tests
+`tests/nl-parser.test.ts`: "players who have won 3 premierships" → `player_career` with
+`premierships gte 3`; "players who won 2 brownlow medals" → `brownlow_medals gte 2`; "players with
+more than 100 wins" → no `havingClause`; existing grouped cases (`teams with more than 2 wins
+against richmond`, `teams to lose 5 times by more than 100 points`) unchanged.
+
+### Acceptance criteria
+- No player-subject question produces a `havingClause`.
+- Existing club-subject grouped questions and `tests/integration/nl-answers-team-club.test.ts`
+  unchanged.
+- `PARSER_VERSION` bumped.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts`, `npx tsc --noEmit`.
+
+## AFLDB-ISSUE-189 — NL: a club/team subject that is not the leading word is answered at player grain, and "teams with the most X" dumps club seasons
+
+- **Severity:** High (P1 for the player-grain misroute; P2 for the metric-less club-season dump).
+- **Area:** NL search / subject and grain election — `src/search/nl/parser.ts`,
+  `src/search/nl/vocab.ts`, `src/search/nl/plan.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review (findings 3 and 5, consolidated by Stage 2
+  as one root cause); re-verified on main `8a0c4cb`.
+- **Key files:** `src/search/nl/vocab.ts` — `CLUB_SUBJECT_LEADING` (~921, start-anchored),
+  `AGG_WORDS` `players?|teams?|clubs? with` → list (~168, strips the subject before the probe);
+  `src/search/nl/parser.ts` — subject probes (~2348, ~2384), club_season election (~2762-2764),
+  career fallthrough (~2865-2871), aggregation default (~3396-3399); `src/search/nl/plan.ts` —
+  metric-null permitted for `club_season` (~1737-1743); `src/db/queries/nl/club-season.ts`
+  `answerList` (~72-87).
+
+### Trigger examples
+Player-grain misroute (P1):
+- "which club has won the most premierships" → `player_career premierships max` (a player board)
+- "which team has the most wins" → `player_career wins max`
+- "teams with more than 5 premierships", "clubs with 10 flags", "teams with 5 premierships" →
+  `player_career` list with a `premierships` condition
+Club-season dump (P2):
+- "teams with the most premierships" → `club_season`, `metric null`, `agg max`, no conditions →
+  `answerList` returns the 25 most recent club seasons as "25 club seasons match"
+
+### Expected vs actual
+Expected: decline (no club-lineage premiership/wins-total grain exists) or a club-grained answer.
+Never a player list, never an unranked club-season dump. Actual: as above, confidence 1.00,
+`validatePlan` OK for all six. `club`/`clubs`/`team`/`teams`/`which` are stopwords, so the lost
+subject costs nothing in confidence.
+
+### Root cause
+Club subject detection is (a) start-anchored and (b) evaluated after destructive extraction:
+"which club" never matches; "teams with" is consumed as the list aggregation before the probe at
+~2384 runs. With no cue, election falls through to the career branches. When "most" is consumed
+first ("teams with the most premierships") the probe does fire, `extractClubSeasonMetric` finds
+nothing, the consumed bare career metric is ignored by the club_season branch, `structureOnly`
+is false, the default aggregation is `max`, and `validatePlan` accepts a metric-less
+`club_season` ranking.
+
+### Impact
+"which club has won the most premierships" is among the commonest football questions and returns
+player rows. The dump case is the exact class `PARSER_VERSION` 9 recorded as fixed for "most
+clubs" (`plan.ts` header) and the `UNANSWERABLE_TOPICS` "best team of all time" entry was added
+to prevent.
+
+### Relationship to prior issues
+Regression of the version-9 class (different trigger wording; the version-9 fix required a word
+after "clubs" and did not consider aggregation stripping). Related to AFLDB-ISSUE-188 (shared
+subject-cue fix would serve both). ISSUE-110 semantic decision S1 (club-scoped predicates) does
+not cover this.
+
+### Implementation boundary
+Requires an adjudication first (Opus High): for a club/team subject with a career-column metric
+("premierships", "wins", "flags") the options are (1) decline by name, (2) route to an existing
+club grain where one exists (`club_season wins` for "most wins in a season"), or (3) build a
+club-lineage totals grain. Only (1) and (2) are in scope for this issue. Then: compute the
+club-subject cue from the canonicalised text before any extraction (`CLUB_SUBJECT` anywhere,
+plus `which (club|team|side)`), carry it to election, refuse any player-grain plan when the cue
+is set and no player is named, and add a `validatePlan` backstop refusing `club_season` with
+`metric null` and `agg max/min` when `clubSeasonConditions` is empty.
+
+### Non-goals
+No club-lineage premiership grain in this issue. No change to "teams that won the wooden spoon"
+or "fewest wins by a premier" (conditions-only lists stay valid).
+
+### Required tests
+`tests/nl-parser.test.ts`: the six trigger phrasings must not produce `player_career` or a
+metric-less `club_season` ranking; existing club_season cases (~474-516, ~813) unchanged.
+`tests/nl-plan.test.ts`: a `club_season` plan with `metric null`, `agg max`, no conditions fails
+validation.
+
+### Acceptance criteria
+- All six phrasings decline with a stated reason, or answer at a club grain whose description
+  names the club subject.
+- Player-subject questions ("which player has the most premierships", confirmed correct today)
+  unchanged.
+- `PARSER_VERSION` bumped.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts`,
+`npx tsc --noEmit`; a targeted `nl:stress` pass on the club-subject corpus rows if one exists.
+
+## AFLDB-ISSUE-190 — NL: "how many …" yields `agg.kind='count'` on grains with no count semantics and answers with the rank-one leader
+
+- **Severity:** High (P1). A career-total question gets a single-game number under a confident
+  headline; the interpretation and the plan panel disagree with each other.
+- **Area:** NL search / plan validation and compilers — `src/search/nl/plan.ts`,
+  `src/search/nl/vocab.ts`, `src/db/queries/nl/*.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review; re-verified on main `8a0c4cb`.
+- **Key files:** `src/search/nl/vocab.ts` `AGG_WORDS` "how many" → count (~167);
+  `src/search/nl/parser.ts` agg assembly (~3399, `resolvedAgg` used verbatim);
+  `src/search/nl/plan.ts` `validatePlan` (no aggregation-kind gate for `player_game`,
+  `player_season`, `player_career`, `team_match`, `club_season`, `team_streak` beyond streak);
+  `rankCutoff` in `src/db/queries/nl/player-game.ts` (~79-81), `player-career.ts` (~276-278),
+  `team-match.ts` (~110-112), `club-season.ts` (~52-54), `player-season.ts` (~35-37) — anything
+  but `top_n` becomes cutoff 1; `src/search/nl/describe.ts` (~376-381).
+
+### Trigger examples
+- "how many goals has dustin martin kicked" → `player_game/single`, `agg count`, player pinned →
+  best single-game haul
+- "how many goals has dustin martin kicked in 2017" → best single game in 2017
+- "how many goals has dustin martin kicked against carlton" → best single game v Carlton
+- "how many disposals has dustin martin had" → best single-game disposals
+- "how many goals were kicked at the mcg in 2017" → `player_game/sum`, `agg count` → ONE player's
+  MCG total, under a question about all goals at the ground
+("kicked" is a stopword so these reach a plan; the "kick" spelling declines — not a fix.)
+
+### Expected vs actual
+Expected: a total, or a decline. Actual: confidence 1.00, `validatePlan` OK; `answerSingle` /
+`answerSum` run `rank() … WHERE rnk <= 1`; `describePlan` says "Searched for a count of
+single-match goals." while `describeAnswer` says "Highest single-game performance".
+
+### Root cause
+`count` is a legitimate aggregation only for `head_to_head`, `coach_record` and `after_siren`,
+whose compilers branch on it. Every other compiler's `rankCutoff` treats a non-`top_n`
+aggregation as 1, and `validatePlan` never checks aggregation kind against grain. "how many games
+has dustin martin played" is right only because the pinned player is the sole ranked row.
+
+### Impact
+Very common question shape; wrong number with a confident headline.
+
+### Relationship to prior issues
+New. ISSUE-110's "answered_caveat"/discarded-field rule was applied per field but never to the
+aggregation kind.
+
+### Implementation boundary
+`validatePlan`: refuse `agg.kind === 'count'` for every grain except `head_to_head`,
+`coach_record` and `after_siren` with a stated reason. Optionally, and only if cheap, map "how
+many <career column> has <player>" to `player_career` with the player pinned (which already
+returns the career total). Keep the two changes separable.
+
+### Non-goals
+No new count/total grain. No change to coach/after-siren/head-to-head count paths.
+
+### Required tests
+`tests/nl-plan.test.ts`: `player_game`, `player_season`, `player_career`, `team_match`,
+`club_season` plans with `agg count` fail validation; coach/after-siren/H2H counts still pass.
+`tests/nl-parser.test.ts`: "how many goals has dustin martin kicked" does not execute as
+`player_game/single`.
+
+### Acceptance criteria
+- Every trigger phrasing declines (or, if the optional mapping ships, answers the career total
+  with a description that says "career total").
+- Existing `tests/nl-*.test.ts` and `tests/integration/nl-answers-coaching.test.ts`,
+  `nl-answers-after-siren.test.ts` unchanged.
+- `PARSER_VERSION` bumped if the parser changes.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-plan.test.ts tests/nl-parser.test.ts`, `npx tsc --noEmit`.
+
+## AFLDB-ISSUE-191 — NL: the boundary extractor claims any bare "first" in finals scope, dropping the metric or declining quarter questions
+
+- **Severity:** Medium (P2 wrong answer; P3 unnecessary decline, same root).
+- **Area:** NL search / boundary extraction — `src/search/nl/parser.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review (findings 6 and 7, consolidated by
+  Stage 2); re-verified on main `8a0c4cb`.
+- **Key files:** `src/search/nl/parser.ts` — `DEBUT_RE = /first|debut(ed)?/` (~1249),
+  `extractBoundary` (~1264-1285), call at ~2338 (before `extractPeriodSplit` at ~2370), boundary
+  election ahead of the metric branch (~2765-2766); `src/search/nl/vocab.ts`
+  `PERIOD_SPLIT_WORDS` (~248, needs the intact phrase "first quarter").
+
+### Trigger examples
+- "who kicked the first goal in a grand final" → `player_career`, `metric null`,
+  `boundary {debut, grand_final}`, confidence 1.00, `validatePlan` OK → lists every player whose
+  debut was a Grand Final; the consumed "goal" metric vanishes (P2).
+- "highest first quarter score in a grand final" → declines `ambiguous`, leftover "quarter"
+  (P3); the unscoped "highest first quarter score" parses correctly to `team_match team_score Q1`.
+- "most disposals in a grand final in the first quarter" → declines on leftover "quarter"
+  instead of the honest period-split refusal.
+
+### Expected vs actual
+Expected: the first phrasing declines (no first-scorer data); the second plans as
+`team_match`, `team_score`, `periodSplit Q1`, `matchType grand_final`. Actual as above.
+
+### Root cause
+Once `extractMatchType` has consumed a grand-final/finals scope, `extractBoundary` reads any
+bare "first" as a debut event, strips it, and election prefers `boundary` over
+`playerMetricResult` without checking that a metric was also consumed. Period-split extraction
+runs after boundary, so "first quarter" is never seen intact.
+
+### Impact
+A confident answer to a different question in the first case; a supported team_match shape
+declines in the second.
+
+### Relationship to prior issues
+New. The boundary family predates ISSUE-110; the ISSUE-129 wildcard work touched match types,
+not boundary.
+
+### Implementation boundary
+Parser only: run `extractPeriodSplit`/`extractScoreCheckpoint` before `extractBoundary` (or
+exclude "first" followed by quarter/half/term/goal), require the debut word to govern a game noun
+or be "debut", and refuse when a boundary is set while a player metric was consumed.
+
+### Non-goals
+No change to genuine boundary questions ("players who debuted in a grand final", "last game was
+a final").
+
+### Required tests
+`tests/nl-parser.test.ts`: "who kicked the first goal in a grand final" does not yield a boundary
+plan; "highest first quarter score in a grand final" → `team_match`, `periodSplit Q1`,
+`matchType grand_final`; existing boundary cases unchanged.
+
+### Acceptance criteria
+As above plus `PARSER_VERSION` bump.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/nl-parser.test.ts tests/nl-plan.test.ts`, `npx tsc --noEmit`.
+
+## AFLDB-ISSUE-192 — NL: symmetric team-match metrics return each match once per side, duplicating rows and halving a top-N
+
+- **Severity:** Low (P3). Headline is right; the rendered table and `total` are wrong.
+- **Area:** NL search / team-match compiler — `src/db/queries/nl/team-match.ts`.
+- **Status:** Open / Planning.
+- **Found:** 2026-09-15, Fable NL Search Stage 1 review; plan shapes re-verified on main
+  `8a0c4cb` (SQL behaviour established by reading, not by a DB run).
+- **Key files:** `src/db/queries/nl/team-match.ts` — `SIDES` (~19-39, both perspectives),
+  ranking (~210-233, no per-match collapse); `src/search/nl/describe.ts` (~296-299, dedupe by
+  `matchId` fixes the headline only); `src/components/NlAnswerSection.tsx` (~83-84, renders
+  `rows` and `total`).
+
+### Trigger examples
+- "biggest crowd", "highest attendance at the mcg", "highest combined score" — all parse to
+  `team_match` with no `clubFor`/`clubAgainst`/`matchup`.
+
+### Expected vs actual
+Expected: one row per match; a top-N of N matches. Actual: `attendance` and `total_score` are
+identical for both `SIDES` rows, so both tie at rank 1; the table shows the match twice with
+`total` 2; for `top_n` the ranks run 1,1,3,3,5,5 so "top 5" returns three matches in six rows.
+
+### Root cause
+`metricValueExpr` for side-independent metrics does not depend on `t.club_id`, and nothing
+collapses `SIDES` to one row per match before `rank()` when no side filter is present.
+
+### Impact
+Duplicate rows and a wrong count in a rendered table; bounded because the lead is right and the
+side-dependent metrics (margins, team score) are unaffected.
+
+### Relationship to prior issues
+New. `tests/nl-regression-corpus.test.ts` NL-013 (~469-491) fixed `total_score` metric
+selection but asserts only the metric name.
+
+### Implementation boundary
+Compiler only: when the metric is `attendance` or `total_score` and the scope carries no
+`clubFor`/`clubAgainst`/`matchup`, rank over `DISTINCT ON (match_id)` (or restrict to the home
+side) before applying the cutoff. `q3_deficit_overcome`, margins and `team_score` stay per side.
+
+### Non-goals
+No parser change; no change to `answerTeamAggregate` or the drill-down.
+
+### Required tests
+`tests/integration/nl-answers-team-club.test.ts`: `total_score` and `attendance` with empty scope
+return distinct `matchId`s and `total` equal to the distinct count; a `top_n: 5` returns five
+matches. `tests/nl-describe.test.ts` tie wording unchanged.
+
+### Acceptance criteria
+As above; side-dependent metric tests unchanged.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+`npx vitest run tests/integration/nl-answers-team-club.test.ts` against `afldb_test`
+(`AFLDB_TEST_DATABASE_URL`), `npx tsc --noEmit`.
