@@ -1066,6 +1066,89 @@ describe('regression: two career conditions in one sentence do not cross-contami
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 5 });
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'finals', op: 'gt', value: 5 });
   });
+
+  // AFLDB-ISSUE-196. CAREER_STAT_WORDS' fixed array order tries clubs_played
+  // (array position 3) before games (array position 5); with no "and"/comma
+  // between the two clauses for the window-clip above to bite on,
+  // clubs_played's backward-looking window used to span the whole sentence
+  // and its leftmost-digit search stole games' own "300", misbinding
+  // clubs_played to 300 and orphaning games/2. extractCareerConditions now
+  // resolves whichever pending stat word's match occurs earliest in the
+  // sentence, so games (which occurs first) claims its own "300" and is
+  // stripped before clubs_played's window is ever built.
+  it('AFLDB-ISSUE-196: "at" no longer lets clubs_played steal games\' number', async () => {
+    const p = await plan('players with 300 games at 2 clubs');
+    expect(p.metric).toBeNull();
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: the same defect via "for" instead of "at"', async () => {
+    const p = await plan('players with 300 games for 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  // AFLDB-ISSUE-196 addendum (2026-09-16): "across" resolves numeric
+  // ownership correctly (games claims its own 300, clubs_played its own 2)
+  // -- the same sentence-order fix as the "at"/"for" cases above -- but
+  // "across" itself is not in STOPWORDS (unlike "at"/"for"/"with"/"over"),
+  // so it survives extraction as a leftover, unsupported meaningful token
+  // and the plan safely declines rather than executing. This is NOT the
+  // pre-fix defect: the pre-fix defect was a confidently WRONG accepted
+  // plan (clubs_played misbound to 300, status 'plan'); this is a decline
+  // (status 'none'), which is a categorically different, safe outcome.
+  // Adding "across" to STOPWORDS to make this plan is a separate
+  // vocabulary decision this issue deliberately does not make (see
+  // AFLDB-ISSUE-196.md's Addendum).
+  it('AFLDB-ISSUE-196: "across" safely declines on unsupported vocabulary, not the old clubs_played misbinding', async () => {
+    const result = await parse('players with 300 games across 2 clubs');
+    expect(result.status).toBe('none');
+    if (result.status === 'none') {
+      expect(result.reason).toBe('ambiguous');
+    }
+    expect(result.report.unsupportedTerms).toContain('across');
+  });
+
+  it('AFLDB-ISSUE-196: reversed sentence order still binds each clause to its own number', async () => {
+    const p = await plan('players with 2 clubs and 300 games');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+  });
+
+  // The comparator-misattribution half of the bug: COMPARE_OP_WORDS and the
+  // digit search both used to scan the same unclipped window independently,
+  // so "more than" could land on clubs_played's clause even though it
+  // belongs to games. Sentence-order resolution fixes this too, because
+  // games' whole clause (noun + "more than" + "300") is claimed and
+  // stripped before clubs_played's window is ever built.
+  it('AFLDB-ISSUE-196: a comparator word binds to its own clause, not a neighbouring one', async () => {
+    const p = await plan('players with more than 300 games at 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: "over N" as a comparator also binds to its own clause', async () => {
+    const p = await plan('players with over 300 games at 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gt', value: 300 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: a number-word clause is bound in sentence order too', async () => {
+    const p = await plan('players with three premierships at two clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'gte', value: 3 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-196: single-condition control -- a bare games clause is unaffected', async () => {
+    const p = await plan('players with 300 games');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 300 });
+  });
+
+  it('AFLDB-ISSUE-196: single-condition control -- a bare clubs clause is unaffected', async () => {
+    const p = await plan('players with 2 clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
 });
 
 /**

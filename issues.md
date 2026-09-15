@@ -4,13 +4,12 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 3
+**Open issues:** 2
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
 | AFLDB-ISSUE-194 | Low (P3) | NL team-match compiler — `src/db/queries/nl/team-match.ts` | Open | Implement the `scope.matchup` home-side gate for symmetric metrics; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
 | AFLDB-ISSUE-195 | High (P1) | NL parser / club-season semantics — `src/search/nl/vocab.ts`, `parser.ts`, `plan.ts` | Open | Recognise "won the premiership" in `CLUB_SEASON_CONDITION_WORDS` and stop club-season grain election from discarding stranded premiership semantics; regression in the ISSUE-189 block of `tests/nl-parser.test.ts` |
-| AFLDB-ISSUE-196 | High (P1) | NL parser / career numeric binding — `src/search/nl/parser.ts` | Open | Make `extractCareerConditions` bind numbers in sentence order instead of vocabulary order across `at`/`for`/`with`/`across`/`over`; regression in `tests/nl-parser.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32198,7 +32197,7 @@ Sonnet 5, High effort.
 
 - **Severity:** High (P1).
 - **Area:** NL parser / numeric semantic ownership — `src/search/nl/parser.ts`.
-- **Status:** Open.
+- **Status:** Resolved 2026-09-16 (Sonnet 5 High), operator-validated.
 - **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e`. Not
   reproduced against a database (parser/plan-only defect).
 - **Key files:** `src/search/nl/parser.ts` `extractCareerConditions`, `CAREER_STAT_WORDS`;
@@ -32254,8 +32253,113 @@ The parser must never bind `clubs_played` to `300` for either shape.
 None.
 
 ### Operator verification expectations
-`npx vitest run tests/nl-parser.test.ts`, `npx tsc --noEmit`.
+`npx vitest run tests/nl-parser.test.ts`, `npx vitest run tests/nl-semantic-mapping.test.ts`,
+`npx tsc --noEmit`.
 
 ### Implementation recommendation
 Sonnet 5, High effort. Do not combine with AFLDB-ISSUE-195 — unrelated mechanisms and fixes despite
 the shared outer failure class.
+
+### Implementation (2026-09-16, Sonnet 5 High)
+Implemented from approved runbook `AFLDB-ISSUE-196.md` (Option C) on
+`sonnet/issue-196-nl-numeric-binding`, worktree `D:\dev\afldb-issue-196`. Not committed, not merged
+by this session (Git remains user-operated per `CLAUDE.md`).
+
+**Mechanism:** `extractCareerConditions`'s main loop (`src/search/nl/parser.ts`, was the
+`for (const [re, column] of CAREER_STAT_WORDS)` loop) now maintains `CAREER_STAT_WORDS` entries in
+a `pending` `Set` and, each iteration, re-scans every still-pending entry against the current
+`working` text, picking whichever entry's match occurs at the lowest `working.indexOf(...)` index
+(i.e. earliest in the sentence, not earliest in the fixed vocabulary array). That entry is removed
+from `pending`, and the existing window/comparator/digit/number-word matching and span-stripping
+body runs unchanged. Because the winning clause's noun, comparator and number are stripped from
+`working` before the next noun's window is built, a later-processed noun's backward lookback window
+can never reach a number or comparator word that an earlier (in text order) clause has already
+claimed. `CAREER_STAT_WORDS` itself, its other consumer (the bare ranking-metric fallback), and
+`CAREER_ONLY_METRICS` are unchanged. `vocab.ts`/`STOPWORDS` untouched, no new grain/boundary-word
+list, matching the runbook's non-goals.
+
+`PARSER_VERSION` bumped `46` → `47` in `src/search/nl/plan.ts`, with a `v47` history comment.
+
+**Tests:** ten new cases added to the existing
+`describe('regression: two career conditions in one sentence do not cross-contaminate', ...)` block
+in `tests/nl-parser.test.ts` (original trigger, `for`/`across` siblings, reversed order, `more than`
+comparator, `over` comparator, number-word form, and two single-condition controls), covering the
+full required matrix in the runbook's §5/§6. No existing test in that file or
+`tests/nl-semantic-mapping.test.ts` was modified, weakened or removed.
+
+**Not run by this session** (Git/shell execution is user-operated per `CLAUDE.md` §9; no explicit
+authorisation given this session): `npx vitest run tests/nl-parser.test.ts`,
+`npx vitest run tests/nl-semantic-mapping.test.ts`, `npx tsc --noEmit`. Operator verification
+required before this issue is marked Resolved.
+
+### Operator validation (2026-09-16) and runbook correction
+Operator ran the three validation commands: `tests/nl-parser.test.ts` 388/389 passed,
+`tests/nl-semantic-mapping.test.ts` 167/167 passed, `npx tsc --noEmit` clean. One failure: the
+`'players with 300 games across 2 clubs'` regression (`status: none`, `reason: ambiguous`,
+`confidence: 0.65`, `unsupportedTerms` including `across`).
+
+Investigated (Sonnet 5 High, same worktree): the numeric-ownership fix is correct for this case —
+`games`/`clubs_played` resolve internally as `gte 300`/`gte 2`, not the old `clubs_played gte 300`
+misbinding. The decline is a separate, pre-existing mechanism: `across` is not in `STOPWORDS`
+(`vocab.ts:857-895`; only `at`/`for`/`with`/`over` are present), so it survives extraction as a
+leftover unsupported token and the confidence gate (`parser.ts:3745-3764`, requires
+`leftoverTokens.length === 0`) declines. This confirmed a genuine self-contradiction in the approved
+`AFLDB-ISSUE-196.md`: §2's own Option-B-rejection text had already identified this exact mechanism,
+but §5 row 6 / §6 item 5 nonetheless required `across` to fully plan.
+
+Corrected the runbook contract per operator direction (Option 1): amended `AFLDB-ISSUE-196.md` (§5
+row 6, the paragraph below the §5 table, §6 item 5, and a new dated Addendum) to make the `across`
+case's contract a safe decline — `status: none`, `reason: ambiguous`, `unsupportedTerms` containing
+`across` — instead of a successful plan. Corrected the single `tests/nl-parser.test.ts` regression to
+match (no other test touched). No production file (`parser.ts`, `vocab.ts`) changed; `PARSER_VERSION`
+unchanged at `47`. The original runbook's error was expecting `across` to execute; the corrected
+contract (safe decline) does not weaken the numeric-ownership acceptance criteria — `games`/
+`clubs_played` still resolve correctly for that phrasing internally, only the confidence-gated
+execution decision changed to match actual, expected vocabulary behaviour.
+
+### Implemented contract
+
+`extractCareerConditions` (`src/search/nl/parser.ts`) now processes pending `CAREER_STAT_WORDS`
+entries in current textual order rather than fixed vocabulary-array order: each iteration it re-scans
+every not-yet-resolved entry against the current `working` text and resolves whichever one's match
+occurs earliest in the sentence, stripping that clause's noun/comparator/number before the next
+entry's lookback window is built. This prevents a later textual career clause from reaching backward
+across an earlier, not-yet-consumed clause and stealing its number or comparator. All other
+number/comparator/window extraction logic (the `and`/comma window clip, `NUMBER_PLUS_RE`,
+`COMPARE_OP_WORDS`, bare-digit and number-word search, span stripping) is unchanged. No new
+consumed/unowned-token framework was introduced; `CAREER_STAT_WORDS` itself, its other consumer (the
+bare ranking-metric fallback), and `CAREER_ONLY_METRICS` are unaffected.
+
+`"players with 300 games at 2 clubs"` now binds `games >= 300` and `clubs_played >= 2` (previously
+`clubs_played >= 300` with the `2` silently orphaned). The equivalent supported forms — `for`,
+comparator wording (`more than`), `over N`, reversed condition order (`"2 clubs and 300 games"`), and
+number words (`"three premierships at two clubs"`) — all resolve correctly by the same mechanism.
+`"players with 300 games across 2 clubs"` intentionally remains a safe decline: `across` is
+unsupported vocabulary (not in `STOPWORDS`), and this issue deliberately does not broaden `STOPWORDS`
+or parser vocabulary to make it plan — that is a separate, out-of-scope vocabulary decision (see the
+runbook's Addendum). `PARSER_VERSION` is `47`.
+
+### Validation
+
+Operator-run, all green:
+- `npx vitest run tests/nl-parser.test.ts` → 389/389 passed
+- `npx vitest run tests/nl-semantic-mapping.test.ts` → 167/167 passed
+- `npx tsc --noEmit` → clean
+
+### Resolution
+
+Resolved 2026-09-16 (Sonnet 5 High), operator-validated. `extractCareerConditions` binds each
+career-stat numeric/comparator clause to its own governing noun in textual (sentence) order instead
+of fixed `CAREER_STAT_WORDS` vocabulary order, fixing cross-clause number/comparator theft across
+`at`/`for`/comparator wording/`over N`/reversed order/number-word forms. `PARSER_VERSION` bumped
+46 → 47. One regression (`across`) required a runbook correction mid-implementation — the approved
+runbook had wrongly required that unsupported-vocabulary phrasing to execute; the corrected contract
+(safe decline, `unsupportedTerms` includes `across`) is documented in `AFLDB-ISSUE-196.md`'s Addendum
+and does not weaken the numeric-ownership acceptance criteria. No migration/schema change. No new
+follow-up issue recorded — the `across`/`STOPWORDS` gap is pre-existing, expected vocabulary
+behaviour, not a defect; track it only if future corpus/user evidence shows it matters.
+
+**Files changed (implementation session, `sonnet/issue-196-nl-numeric-binding`,
+`D:\dev\afldb-issue-196`):** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`,
+`tests/nl-parser.test.ts`, `AFLDB-ISSUE-196.md`, `issues.md`, `IssuesIndex.md`. Not committed, not
+merged by this session — Git remains user-operated per `CLAUDE.md`.
