@@ -3028,13 +3028,32 @@ describe('AFLDB-ISSUE-099 settle — ownership, data_issues identity and corrobo
 
     it('refuses source_id IS NULL, which the generic gate admits', () => {
       // The whole point of E3. applyDataEdit does not re-stamp
-      // matches.source_id for the score group, createMatch writes no
-      // provenance at all, and afldb_import cannot read data_edits, so NULL
-      // means "provenance unknown", never "free to adopt".
+      // matches.source_id for the score group, and afldb_import cannot
+      // read data_edits, so NULL means "provenance unknown", never "free
+      // to adopt". (Pre-AFLDB-ISSUE-184, createMatch() also left every row
+      // NULL; since 184 it stamps manual_admin_edit instead -- see the
+      // 'manual_admin_edit-owned row' case below -- but NULL still occurs
+      // for rows created before 184 shipped, and for any other writer that
+      // leaves it unset.)
       expect(autoApplyOwnership(resolved({ state: 'unowned' }), 'afltables'))
         .toEqual({ verdict: 'refused', detail: 'ownership_indeterminate' });
       // Proven divergent from the generic gate on the same input.
       expect(evaluateTargetOwnership({ state: 'unowned' }, 'afltables').verdict).toBe('ok');
+    });
+
+    it('AFLDB-ISSUE-184: treats an admin-created (manual_admin_edit-owned) row as foreign-owned, on both the automatic and the generic gate', () => {
+      // Since 184, createMatch() stamps source_id = manual_admin_edit
+      // instead of leaving it NULL, which moves an admin-created match out
+      // of 'unowned' (adoptable by a human reviewer through the promotion
+      // queue -- see the previous test's divergence) into 'owned' by a
+      // source no automated importer promotes as. Unlike NULL, this is
+      // refused on BOTH gates, not just the automatic one -- the concrete
+      // protection the investigation's ownership-gate finding predicted.
+      expect(autoApplyOwnership(
+        resolved({ state: 'owned', sourceKey: 'manual_admin_edit' }), 'afltables',
+      )).toEqual({ verdict: 'refused', detail: 'foreign_source_owner' });
+      expect(evaluateTargetOwnership({ state: 'owned', sourceKey: 'manual_admin_edit' }, 'afltables'))
+        .toEqual({ verdict: 'foreign_owned_collision', detail: 'foreign_source_owner' });
     });
 
     it('refuses an unreadable owner and an unresolved identity', () => {

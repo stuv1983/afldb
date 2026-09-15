@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
+
 import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { recordDataEdit } from '@/db/queries/audit-log';
@@ -266,16 +268,30 @@ export async function createMatch(input: CreateMatchInput): Promise<{
         throw new Error(`Match #${duplicate.id} already exists for that season, round, date and clubs.`);
       }
 
-      let attendanceSourceId: number | null = null;
-      if (attendance !== null) {
-        const [manualSource] = await tx<{ id: number }[]>`
-          SELECT id FROM sources WHERE key = 'manual_admin_edit'
-        `;
-        if (!manualSource) {
-          throw new Error('The manual_admin_edit provenance source is not configured.');
-        }
-        attendanceSourceId = manualSource.id;
+      // AFLDB-ISSUE-184: an admin-created match needs the SAME
+      // manual_admin_edit lookup the attendance figure already used, now
+      // run unconditionally and reused for the row's own creation
+      // provenance. Failing here (rather than leaving source_id NULL)
+      // matches the repository-wide convention every other manual writer
+      // follows (097/098/101/102, admin-coaches.ts's attendanceSourceId
+      // above pre-184): a required source row that is unexpectedly missing
+      // refuses the write instead of silently creating a source-less row.
+      const [manualSource] = await tx<{ id: number }[]>`
+        SELECT id FROM sources WHERE key = 'manual_admin_edit'
+      `;
+      if (!manualSource) {
+        throw new Error('The manual_admin_edit provenance source is not configured.');
       }
+      const attendanceSourceId: number | null = attendance !== null ? manualSource.id : null;
+
+      // The row's own creation identity: minted once, here, and never
+      // reminted by a later edit (AFLDB-ISSUE-184 §3/§8/§9 -- the same
+      // "mint once, survive every edit" convention as fixtures/coaches/
+      // club-leadership/special-records/draft). import_batch_id is
+      // deliberately left NULL (not in the column list below): no
+      // import_batches row exists for a single admin keystroke, matching
+      // every other manual-provenance writer.
+      const matchSourceRecordId = `match:${randomUUID()}`;
 
       // 4. Insert into matches
       const [matchRow] = await tx<{ id: number; season: number }[]>`
@@ -286,7 +302,8 @@ export async function createMatch(input: CreateMatchInput): Promise<{
           home_goals, home_behinds, home_score,
           away_goals, away_behinds, away_score,
           result, winner_club_id, margin,
-          attendance, attendance_status, attendance_source_id, match_event, notes
+          attendance, attendance_status, attendance_source_id, match_event, notes,
+          source_id, source_record_id
         ) VALUES (
           ${matchKey}, ${input.season}, ${roundCode}, ${roundNumber}, ${input.roundType}::round_type, ${isFinal},
           ${input.matchDate}::date, ${input.matchTime || null}, ${input.venueId || null}, ${venueRaw},
@@ -295,7 +312,8 @@ export async function createMatch(input: CreateMatchInput): Promise<{
           ${awayGoals}, ${awayBehinds}, ${awayScore},
           ${result}::match_result, ${winnerClubId}, ${margin},
           ${attendance}, ${attendanceStatus}::coverage_status, ${attendanceSourceId},
-          ${input.matchEvent?.trim() || null}, ${input.notes?.trim() || null}
+          ${input.matchEvent?.trim() || null}, ${input.notes?.trim() || null},
+          ${manualSource.id}, ${matchSourceRecordId}
         )
         RETURNING id, season
       `;
