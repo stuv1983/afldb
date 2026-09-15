@@ -34,12 +34,18 @@ export async function adminLogin(
     return { error: 'Too many attempts. Wait fifteen minutes.' };
   }
 
+  // AFLDB-ISSUE-186 Phase A: 'contributor' deliberately excluded, matching
+  // getAdminUser() in session.ts. An existing contributor row (valid
+  // password + TOTP, disabled_at still NULL) can no longer establish a
+  // session here at all -- interactive sign-in is closed at this query,
+  // not merely at a later role check, so the account never even reaches
+  // createAdminSession().
   const [user] = await authSql<{
     id: number; email: string; passwordHash: string | null; totpSecret: string | null;
   }[]>`
     SELECT id, email, password_hash AS "passwordHash", totp_secret AS "totpSecret"
       FROM auth_users
-     WHERE email = ${email} AND role IN ('admin', 'super_admin', 'contributor')
+     WHERE email = ${email} AND role IN ('admin', 'super_admin')
        AND disabled_at IS NULL
   `;
 

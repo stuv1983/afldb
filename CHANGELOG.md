@@ -15,6 +15,37 @@ commit.
 
 ## [Unreleased]
 
+### Contributor account/access retired; deprecated CSV pipeline left in place for later cleanup (AFLDB-ISSUE-186) - 15 September 2026
+
+- The `contributor` staff role — the account type behind the deprecated `/admin/upload` CSV
+  submission workflow — can no longer authenticate or establish a usable admin session.
+  `getAdminUser()` (`src/lib/auth/session.ts`) and `adminLogin()`
+  (`src/app/admin/login/actions.ts`) both now exclude `role='contributor'` from their queries,
+  independent of `disabled_at`. An already-issued contributor session fails on its very next
+  authenticated request, because `getAdminUser()` re-checks the account's role on every request —
+  no session-revocation sweep was needed.
+- No new contributor account can be created or redeemed through any supported path: the admin
+  invite form no longer offers "Contributor", `createInvite()` refuses a server-side request for
+  `role=contributor` outright, and `beginEnrolment()`/`confirmEnrolment()` both refuse to redeem
+  an invite link already carrying `role='contributor'` (including one minted before this change).
+- Existing historical `contributor` identities are fully retained: no `auth_users` row was
+  deleted, mutated or reclassified, the `'contributor'` DB enum/check value (migration 033) is
+  unchanged, and every existing FK attribution to a contributor account (for example
+  `data_submissions.uploaded_by`/`reviewed_by`) remains intact. A contributor account still
+  remains readable in the admin roster and history views. Reactivating a deactivated contributor
+  account restores `disabled_at IS NULL` but does not restore the ability to sign in — the
+  authentication boundary excludes the role itself, independent of `disabled_at`.
+- The deprecated CSV submission pipeline itself is unchanged and left in place for a later
+  cleanup phase: `/admin/upload`, `/admin/submissions/[id]`, `src/lib/ingest/pipeline.ts`,
+  `datasets.ts` and `csv.ts`, `/api/admin/email-intake`, `tools/email_intake/`, the
+  `deploy/afldb-email-intake.service`/`.timer` unit definitions, `data_submissions`,
+  `data_submission_rows`, `acquisition.legacyIntake`, `sources.key='sports_data_lab'` and
+  `import_batches` are all untouched.
+- AFL Tables/current-season ingestion, observation, settle and reconciliation are unaffected —
+  no file in that subsystem was touched.
+- No migration, no schema or grant change, and no data backfill of any kind. AFLDB-ISSUE-185's
+  provenance fix is unaffected and remains correct.
+
 ### Reviewed match-result submissions now preserve provenance on promotion (AFLDB-ISSUE-185) - 15 September 2026
 
 - `matchResults.promoteRow()` (the `match_results` CSV admin-upload dataset,

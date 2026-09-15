@@ -30153,3 +30153,1032 @@ new issue ID:
 ### Migration/grants
 None. Confirmed unchanged from the investigation, the implementation, and the operator
 verification.
+
+---
+
+## AFLDB-ISSUE-186 — Retire deprecated contributor CSV submission pipeline
+
+- **Severity:** Low (architectural cleanup driven by product direction, not a defect).
+- **Area:** `src/app/admin/upload/`, `src/app/admin/submissions/[id]/`, `src/lib/ingest/`
+  (`pipeline.ts`, `datasets.ts`, `csv.ts`), `src/app/api/admin/email-intake/route.ts`,
+  `tools/email_intake/`, `auth_users.role='contributor'`, `data_submissions`/`data_submission_rows`.
+- **Status:** Resolved 2026-09-15 (Phase A — account/access retirement — only; Phases B/C
+  deferred, not tracked under a new issue ID). Worktree `D:\dev\afldb-issue-186`, branch
+  `sonnet/issue-186-retire-contributor-csv`. Operator-verified: `tests/auth.test.ts` 165/165,
+  `tests/integration/admin-lifecycle.test.ts` 21/21, `tests/current-season-import.test.ts`
+  256 passed/4 skipped/0 failed, `npx tsc --noEmit` PASS. No migration, no schema/grant change,
+  no DEV/PROD data mutation. See **Resolution (Phase A closeout)** at the end of this entry for
+  the full verification record and confirmed final state.
+
+### 1. Dependency map (routes, code, schema, tests, docs)
+
+**Routes / UI**
+- `src/app/admin/upload/page.tsx`, `UploadForm.tsx`, `actions.ts` (`uploadSubmission`) — the
+  upload form. Gated by `requireCapability('acquisition.legacyIntake')`.
+- `src/app/admin/submissions/[id]/page.tsx`, `ReviewControls.tsx`, `actions.ts`
+  (`runValidation`, `decideSubmission`, `runPromotion`) — the review/approve/promote page.
+  `runValidation` gated `requireAdmin()`; `decideSubmission`/`runPromotion` gated
+  `requireSuperAdmin()`.
+- `src/app/admin/nav-model.ts` — a contributor's entire nav is `{Upload a file, Change
+  password}`; `acquisition.legacyIntake` also appears as "Legacy file intake" under the
+  Acquisition group for admin/super_admin.
+- `src/app/admin/page.tsx` (dashboard) — queries `data_submissions` directly (joined to
+  `auth_users`) for a "Data submissions" table/count-badge, independent of `db-health.ts`.
+- `src/db/queries/db-health.ts` — a separate `submissionStatusCounts`-shaped query
+  (`GROUP BY status`) against `data_submissions` via `authSql`, feeding `/admin/db-health`.
+- `src/app/admin/admins/InviteManager.tsx` + `invite-actions.ts` — the "Contributor
+  (upload only)" option in the admin invite role `<select>`; `invite-actions.ts` downgrades any
+  non-super-admin-issued, non-recognised role request to `'admin'` unless it names
+  `'contributor'` explicitly.
+- `src/app/admin/admins/AdminSessionsClient.tsx` — renders `"Contributor"` as a role label in
+  the admin roster.
+- `src/app/admin/admins/lifecycle-actions.ts`, `password-actions.ts`, `actions.ts` — a
+  delegated `can_manage_admins` admin may invite/reset/revoke a contributor (never a peer);
+  these files carry that reasoning in comments and branch on `role === 'contributor'`.
+
+**Application/pipeline**
+- `src/lib/ingest/pipeline.ts` — `stageSubmission`, `validateSubmission`, `promoteSubmission`,
+  `MAX_UPLOAD_BYTES`. Whole-file pipeline: staged → validated → approved/rejected → promoted/failed.
+  Promotion resolves the hardcoded `sources.key='sports_data_lab'` and writes a real
+  `import_batches` row (`tool='admin-upload'`) inside a savepoint under `afldb_import`.
+- `src/lib/ingest/datasets.ts` — the `DatasetSpec` registry (`DATASETS`, `getDataset`) plus six
+  concrete specs: `rising_star`, `all_australian`, `match_results`, `player_match_stats`,
+  `player_bio`, `match_attendance`. **Also exports** `resolveSeason`, `resolveClub`,
+  `resolvePlayer` (and a private `resolveVenue`/`resolveMatch`) — generic name/club/player
+  resolution helpers.
+- `src/lib/ingest/csv.ts` — dependency-free RFC 4180 parser (`parseCsv`, `toObjects`,
+  `CsvError`).
+- `src/app/api/admin/email-intake/route.ts` — the email counterpart of `/admin/upload`,
+  authenticated by a shared secret (`AFLDB_EMAIL_INTAKE_SECRET`) plus re-resolving the claimed
+  sender against `auth_users` (role in `admin`/`super_admin`/`contributor`). Calls the **same**
+  `stageSubmission`/`validateSubmission` — not a separate pipeline.
+- `tools/email_intake/fetch_and_stage.py` (+ `test_fetch_and_stage.py`) — the IMAP poller that
+  forwards attachments to the route above. Exists solely to feed this pipeline.
+- `deploy/afldb-email-intake.service` + `deploy/afldb-email-intake.timer` — a real, deployed
+  systemd oneshot service + timer that runs `fetch_and_stage.py` on a schedule and POSTs to the
+  app's own `/api/admin/email-intake` route on loopback. **Actively deployed infrastructure**,
+  not merely code sitting unused — must be stopped/disabled/removed on the server as part of
+  Phase A, in step with the route's removal (an operator action, not a repository change alone).
+- `tools/records/import-first-kick-goal.ts` — imports **only** `resolveClub`/`resolvePlayer`
+  from `datasets.ts` (not any `DatasetSpec`, not `DATASETS`/`getDataset`). This is the one
+  external, non-deprecated caller into `datasets.ts`.
+
+**Auth / capability**
+- `src/db/migrations/033_contributor_role.sql` — adds `'contributor'` to
+  `auth_users.role`/`admin_invites.role` CHECK constraints.
+- `src/lib/auth/session.ts` — `requireUploader()` (admits all three roles),
+  `requireAdmin()`/`requireCapability()` (redirect a contributor to `/admin/upload`),
+  `getAdminUser()`'s role union type.
+- `src/lib/auth/capabilities.ts` — `'contributor'` in `CapabilityRole`; `ALL_STAFF` used only by
+  `acquisition.legacyIntake`, the sole capability a contributor has.
+
+**Database schema / grants**
+- `src/db/migrations/023_auth_submissions.sql` — creates `data_submissions`,
+  `data_submission_rows`, `submission_status` enum; grants `afldb_auth`
+  SELECT/INSERT/UPDATE(+DELETE on rows) and `afldb_import` a narrow column-level UPDATE.
+- `src/db/migrations/043_submission_content_lookup.sql` — `ix_data_submissions_content`
+  (sha256 idempotency index for the email-retry path).
+- `src/db/migrations/041_fk_indexes_and_dead_indexes.sql` — `ix_data_submissions_uploaded_by`,
+  `ix_data_submissions_reviewed_by`.
+- `src/db/migrations/044_schema_integrity.sql` — `data_submission_rows_verdict_ck` CHECK.
+- `src/db/migrations/031/039/045` (`afldb_app`-fail-closed / `afldb_import`-fail-closed
+  reconciler passes) and `066/071/091/056` — carry `data_submissions`/`data_submission_rows`
+  through the standard REVOKE-then-narrow-GRANT idiom (never granted to `afldb_app`); not
+  pipeline-specific code, just the generic privilege reconciler enumerating every operational
+  table it must not leave world-readable.
+- `tools/maintenance/privileges.sql` — the authoritative grant reconciler: explicit
+  `data_submissions`/`data_submission_rows` grants to `afldb_auth`/`afldb_import` (lines ~281-287,
+  439-446, 494-496), guarded by `to_regclass(...) IS NOT NULL` so it already degrades gracefully
+  if the tables are later dropped.
+- `tools/db/promotion-inventory.ts` — lists `data_submissions`/`data_submission_rows` under
+  subsystem `"contributor uploads"`, `productionOnly: true`, `treatment: 'reinstate'` — the
+  DB-rebuild/promotion machinery (`docs/production-promotion.md`) treats them as
+  **production-owned tables that must survive a rebuild**, not disposable scratch state.
+
+**Tests**
+- `tests/integration/submission-promotion.test.ts` — `promoteSubmission` end-to-end.
+- `tests/integration/match-results-promotion.test.ts` — ISSUE-185's provenance regression
+  (routes through `promoteSubmission`, but asserts `matchResults.promoteRow` behaviour — shared
+  infrastructure, see §2).
+- `tests/integration/email-intake.test.ts` — the email-intake route.
+- `tests/integration/admin-awards.test.ts` (partial, ~L1268-1301) — `sports_data_lab` source
+  resolution and `award_winners` entity-key shape shared with the awards admin domain.
+- `tests/integration/datasets.test.ts` — `DATASETS`/`getDataset`/CSV round-trip.
+- `tests/integration/privileges.test.ts`, `tests/db-promotion-check.test.ts` — generic grant/
+  promotion-inventory reconciler tests that happen to enumerate these tables among many others.
+- `tests/submission-review-actions.test.ts` — mocks `@/lib/ingest/pipeline`; exercises
+  `runValidation`/`decideSubmission`/`runPromotion`.
+- `tests/catalogue-lookups.test.ts` — `Object.hasOwn` guard on `DATASETS`/`getDataset`
+  (shares its discipline with other catalogue lookups; not upload-specific in intent, but its
+  fixture data is the dataset registry).
+- `tests/auth.test.ts` (~L99) — imports `csv.ts` incidentally for an unrelated fixture; also
+  the capability-declared-vs-enforced sweep that covers `acquisition.legacyIntake`.
+- `tests/current-season-import.test.ts` — several `sports_data_lab`/`ownershipOf` fixtures
+  including the ISSUE-185 case; these test the **generic** ownership gate reading
+  `matches.source_id`, not the pipeline itself.
+- `tests/data-overrides-source-contract.test.ts` (~L1205),
+  `tests/honours-lifecycle-public-contract.test.ts` (~L108) — read `datasets.ts` source text to
+  assert the All-Australian D-12 override-refusal guard exists; these protect the **award
+  overwrite-refusal contract**, not the upload path per se.
+
+**Docs**
+- `docs/admin-and-beta.md` — the primary contributor/upload/submission-review narrative
+  (roles table, `/admin/upload` walkthrough, email-intake section, sample-CSV section).
+- `docs/production-promotion.md` — `data_submissions`/`data_submission_rows` in the
+  production-owned-table inventory and FK-dependency notes (§7.4-adjacent).
+- `docs/acquisition/AFLDB-2026-API-ACQUISITION.md` — one reference to the `sports_data_lab`
+  `source_id` convention when discussing a new source key.
+- `CHANGELOG.md` — historical entries recording when this pipeline and its guards were built
+  (ISSUE-155/156/158/167/185 etc.) — historical record, not a "current docs" item.
+- `.agents/skills/afldb-debug/SKILL.md` — matched a `contributor` grep hit; not inspected in
+  detail (debug-skill content, not a page describing the feature to users/admins).
+
+### 2. Shared vs. exclusive code
+
+**Exclusive to the deprecated pipeline (safe to remove once retired):**
+- `src/app/admin/upload/**`, `src/app/admin/submissions/[id]/**`.
+- `src/lib/ingest/pipeline.ts` in full (`stageSubmission`/`validateSubmission`/
+  `promoteSubmission`/`MAX_UPLOAD_BYTES`) — no caller outside upload/email-intake/tests.
+- `src/app/api/admin/email-intake/route.ts` and `tools/email_intake/**` — exist only to feed
+  `stageSubmission`.
+- The six `DatasetSpec` objects and the `DATASETS`/`getDataset` registry in `datasets.ts` —
+  no caller outside the pipeline/tests reads `DATASETS` or calls `getDataset`.
+- `src/lib/ingest/csv.ts` — no importer outside `pipeline.ts` and one incidental test fixture
+  import in `tests/auth.test.ts`.
+- The dashboard's `data_submissions` query block in `src/app/admin/page.tsx` and the
+  `submissionStatusCounts`-style query in `src/db/queries/db-health.ts`.
+- `auth_users.role='contributor'` **as a capability holder** — its one capability
+  (`acquisition.legacyIntake`) has no other grantee purpose (§3).
+
+**Shared infrastructure — do NOT remove:**
+- `resolveSeason`/`resolveClub`/`resolvePlayer` in `datasets.ts`, consumed by
+  `tools/records/import-first-kick-goal.ts`. Must be extracted/retained (e.g. moved to a
+  `src/lib/ingest/resolvers.ts` or similar) even if every `DatasetSpec` is deleted.
+- `import_batches`, `sources`, `data_edits`, `awards`/`award_nominations`/`award_winners`,
+  `matches`, `player_match_stats`, `players` — all generic canonical/ingest infrastructure used
+  far beyond this pipeline (bulk migration, current-season import, settle, admin CRUD).
+- `sources.key='sports_data_lab'` — seeded by, and load-bearing for, the **original historical
+  bulk migration** (`tools/migration/import_legacy_afl.py`, `import_awards.py` legacy-winners
+  path), not created by or exclusive to the CSV pipeline. Canonical `award_winners`/
+  `award_nominations`/`players` rows outside this pipeline reference it (see closed
+  ISSUE-080/093/095/112 evidence). **Must never be deleted** regardless of what happens to the
+  pipeline (§8 below).
+- `tools/maintenance/privileges.sql`'s general REVOKE-then-GRANT reconciliation pattern and
+  `tools/db/promotion-inventory.ts`'s rebuild machinery — both enumerate these tables as two
+  entries among dozens; the mechanism is shared, only the two table-name entries are
+  pipeline-specific and become dead (not wrong) once the tables are gone.
+- `requireUploader()`/`requireCapability()`/capability-table machinery in
+  `session.ts`/`capabilities.ts` — generic guard infrastructure; only the `'contributor'` role
+  value and the `acquisition.legacyIntake` capability entry are pipeline-specific.
+- The admin invite/lifecycle/password-reset delegation logic
+  (`invite-actions.ts`/`lifecycle-actions.ts`/`password-actions.ts`/`actions.ts`) — generic
+  admin-account-management code; only the `'contributor'`-branches within it are pipeline-tied.
+
+### 3. Contributor-role audit
+
+- **`auth_users.role`** (migration 033) CHECK constraint: `'admin' | 'super_admin' |
+  'contributor'`. A contributor is an **enrolled staff account** (password + TOTP, invited
+  through the same flow as an admin — migration 030), not a public/anonymous visitor.
+- **Capability:** exactly one — `acquisition.legacyIntake` (`ALL_STAFF` in
+  `capabilities.ts`) — gating `/admin/upload` and (via `requireUploader`) the submission-status
+  view of a submission the contributor themself uploaded. Every other `requireAdmin()`-gated
+  surface redirects a contributor straight back to `/admin/upload`
+  (`session.ts` `requireAdmin`/`requireCapability`).
+- **Used for anything else?** No route, action, or capability besides `acquisition.legacyIntake`
+  admits `'contributor'`. It DOES appear, structurally, in the admin **identity/lifecycle**
+  system: the invite role selector, the invite-role-downgrade guard, admin roster labels, and
+  delegated-manager reach rules (`hasAdminManagementAccess`) all have explicit
+  `role === 'contributor'` branches — this is bookkeeping *about* the role's existence in
+  `auth_users`, not a second use of the role.
+- **Repository-evidence answer to A/B/C/D:**
+  - **(A) exists only for CSV upload** — true for the role's only *capability*.
+  - **(B) used for anything else** — no capability, but yes for **identity plumbing** (the role
+    enum value itself is threaded through invite/lifecycle/session code that must keep working
+    for admin/super_admin regardless).
+  - Recommendation is **(D), not (C)**: removing the enum value outright means touching the
+    CHECK constraints (033), every `role === 'contributor'` branch across 8+ files, the invite
+    `<select>` option, and — critically — deciding what happens to any **already-enrolled**
+    contributor account (`auth_users` rows, sessions, audit history referencing them). Retiring
+    the *capability surface* (Phase A: delete `/admin/upload`, delete
+    `acquisition.legacyIntake`, remove the invite `<select>` option so no *new* contributor can
+    be created) is far safer and reversible; retiring the *role value itself* is a separate,
+    later, harder-edged decision this investigation does not resolve (see Unresolved list).
+
+### 4. Admin UI audit — routes/links/copy to remove in Phase A
+
+- `/admin/upload` (page, form, action) — remove entirely.
+- `/admin/submissions/[id]` (review page, controls, actions) — remove entirely once no new
+  submission can be created (nothing left to review).
+- `nav-model.ts`: the entire contributor-branch return block; the `'Legacy file intake'` entry
+  in the Acquisition group; the `'contributor'` case anywhere `AdminRole`/`CapabilityViewer`
+  role unions are matched.
+- Dashboard (`admin/page.tsx`): the `data_submissions` query, the "submission(s) awaiting
+  review" notice, and the "Data submissions" section/table.
+- `db-health.ts`: the submission-status-counts query and whatever `/admin/db-health` panel
+  renders it.
+- `InviteManager.tsx`/`invite-actions.ts`: the "Contributor (upload only)" `<option>` and the
+  role-downgrade special-case for it (so no *new* contributor can be invited) — this can ship in
+  Phase A without touching the CHECK constraint, since an empty option list still permits
+  existing contributor accounts to keep signing in under Phase A.
+- `AdminSessionsClient.tsx`: the `"Contributor"` role-label branch stays as long as any
+  contributor account can still exist in the roster (do not remove ahead of the account
+  question being resolved).
+- `docs/admin-and-beta.md`: the `/admin/upload`, submission-review, and email-intake sections
+  need a "removed" note once Phase A ships (not rewritten yet — investigation only).
+
+### 5. Historical data retention — `data_submissions`/`data_submission_rows`
+
+- **Semantics:** append-mostly with one lifecycle field (`status`) mutated in place
+  (`staged → validated → {approved|rejected} → promoted|failed`); `content`/`content_sha256`/
+  `payload` are never rewritten after insert. Not a pure audit ledger (status transitions
+  in-place, no history-of-status-changes table), but the byte-for-byte upload and the per-row
+  verdicts are immutable once written.
+- **FK exposure:** `data_submissions.import_batch_id → import_batches(id)` (outbound only).
+  Nothing in the schema points *at* `data_submissions`/`data_submission_rows` except
+  `data_submission_rows.submission_id → data_submissions(id) ON DELETE CASCADE` (internal to the
+  pair). No canonical table (`matches`, `award_winners`, `player_match_stats`, `players`) carries
+  an inbound FK to either table — consistent with ISSUE-185 §2's cross-cutting finding that no
+  canonical row anywhere links back to its lineage/audit source.
+- **DEV/PROD data:** DEV read-only audit is not yet run for this issue (§6 below has the exact
+  SQL), but ISSUE-185's same-day DEV audit already established, for the `match_results` dataset
+  specifically: **zero** `data_submissions` rows, **zero** `import_batches` rows with
+  `target_table='match_results'`, **zero** canonical `matches` traceable to one. That does not
+  cover the other five datasets or PROD — see §6/§7.
+- `docs/production-promotion.md` and `tools/db/promotion-inventory.ts` already classify both
+  tables `productionOnly: true, treatment: 'reinstate'` — i.e. the DB-rebuild runbook's own
+  design assumes PROD may hold real history here that a rebuild must not silently drop.
+
+**Recommendation: (A) — remove UI/code, retain tables read-only**, pending the PROD audit in
+§7. Dropping (B/C) is not evidence-backed yet: DEV's zero-usage finding is dataset-scoped
+(match_results only) and PROD has never been inspected for this pipeline. Retaining the tables
+costs nothing (they already have narrow, correct grants and no application code needs to read
+them once the review UI is gone — a later, even more minimal, read-only historical viewer could
+be added if an operator ever needs to see what was once submitted, but nothing requires one).
+
+### 6. DEV read-only audit SQL (not run — read-only against `afldb_dev`)
+
+```sql
+-- 1. Submission volume and terminal states, by dataset (all six, not just match_results)
+SELECT dataset, status, count(*) FROM data_submissions GROUP BY dataset, status ORDER BY dataset, status;
+
+-- 2. Row volume and min/max timestamps
+SELECT count(*) AS total_rows FROM data_submission_rows;
+SELECT min(uploaded_at) AS earliest, max(uploaded_at) AS latest,
+       min(promoted_at) AS earliest_promotion, max(promoted_at) AS latest_promotion
+  FROM data_submissions;
+
+-- 3. Uploader / reviewer role distribution
+SELECT u.role, count(*) AS submissions
+  FROM data_submissions s JOIN auth_users u ON u.id = s.uploaded_by
+ GROUP BY u.role ORDER BY u.role;
+SELECT u.role, count(*) AS reviews
+  FROM data_submissions s JOIN auth_users u ON u.id = s.reviewed_by
+ WHERE s.reviewed_by IS NOT NULL
+ GROUP BY u.role ORDER BY u.role;
+
+-- 4. import_batches created by the admin-upload tool, by target dataset
+SELECT target_table, count(*), min(created_at), max(created_at)
+  FROM import_batches WHERE tool = 'admin-upload'
+ GROUP BY target_table ORDER BY target_table;
+
+-- 5. sources row(s) touched
+SELECT id, key, name, kind, description FROM sources WHERE key = 'sports_data_lab';
+
+-- 6. Canonical rows still referencing an admin-upload import_batch_id, per target table
+SELECT count(*) FROM matches WHERE import_batch_id IN
+  (SELECT id FROM import_batches WHERE tool = 'admin-upload' AND target_table = 'match_results');
+SELECT count(*) FROM player_match_stats WHERE import_batch_id IN
+  (SELECT id FROM import_batches WHERE tool = 'admin-upload' AND target_table = 'player_match_stats');
+SELECT count(*) FROM award_nominations WHERE import_batch_id IN
+  (SELECT id FROM import_batches WHERE tool = 'admin-upload' AND target_table = 'rising_star');
+SELECT count(*) FROM award_winners WHERE import_batch_id IN
+  (SELECT id FROM import_batches WHERE tool = 'admin-upload' AND target_table = 'all_australian');
+
+-- 7. Any foreign keys anywhere in the schema referencing these two tables
+SELECT conname, conrelid::regclass AS referencing_table
+  FROM pg_constraint
+ WHERE confrelid IN ('data_submissions'::regclass, 'data_submission_rows'::regclass)
+   AND contype = 'f';
+
+-- 8. auth_users with role='contributor' -- do any exist, active or not
+SELECT id, email, disabled_at IS NULL AS active, created_at FROM auth_users WHERE role = 'contributor';
+
+-- 9. Whether DEV has EVER used this pipeline at all (any dataset, any status)
+SELECT count(*) AS any_submission_ever FROM data_submissions;
+```
+
+### 7. Production data safety
+
+DEV showing zero (or low) usage for one dataset does **not** establish PROD is empty for all
+six — DEV and PROD have historically diverged in usage (this repository's own memory/evidence
+trail already documents PROD lagging or diverging from DEV on unrelated features). PROD has not
+been inspected for this issue and this investigation does **not** recommend inspecting it now
+(out of scope per the brief).
+
+**Recommendation:** conservative. Schema removal (dropping `data_submissions`/
+`data_submission_rows`, revoking the now-dead `afldb_auth`/`afldb_import` grants on them, and
+retiring `import_batches.target_table` values for the six datasets) must wait for a dedicated
+PROD read-only audit using SQL equivalent to §6, run by the operator against PROD directly (this
+issue does not touch PROD). Structural evidence alone (no inbound FK, DEV mostly/entirely
+unused) is sufficient to justify Phase A (UI/code removal) but **not** sufficient to justify
+Phase C (schema drop) — that needs the actual PROD counts.
+
+### 8. Dataset registry impact (six datasets, not four)
+
+| Dataset | Used only by CSV submission? | Reusable/shared logic inside it? | Recommendation |
+|---|---|---|---|
+| `match_results` | Yes — no other importer/tool references `DATASETS.match_results` or `matchResults.promoteRow`. `resolveClub`/`resolveSeason` it calls are the shared helpers, not exclusive to it. | Its `promoteRow` is the exact function ISSUE-185 fixed for provenance — retiring the pipeline removes the only caller of that fix, but the fix itself (writing `source_id`/`source_record_id`/`import_batch_id`) stays correct until the spec is deleted (§15/ISSUE-185 interaction). | Delete with the pipeline. |
+| `player_match_stats` | Yes — no other caller. | None beyond shared helpers. | Delete with the pipeline. |
+| `rising_star` | Yes. | None beyond shared helpers; its D-12-adjacent override read is local to this spec. | Delete with the pipeline. |
+| `all_australian` | Yes. | Its D-12 override-refusal guard is protected by `tests/data-overrides-source-contract.test.ts`/`honours-lifecycle-public-contract.test.ts` — those tests assert the **admin-awards correction/void contract survives**, not that this spec must survive; once the spec is deleted the guard is moot and those specific assertions should be removed (not weakened) as part of that same change. | Delete with the pipeline. |
+| `player_bio` | Yes. | None. | Delete with the pipeline. |
+| `match_attendance` | Yes. | None. | Delete with the pipeline. |
+| `resolveSeason`/`resolveClub`/`resolvePlayer` (not a dataset, but registry-adjacent) | **No** — `tools/records/import-first-kick-goal.ts` depends on `resolveClub`/`resolvePlayer` today. | This IS the shared, reusable part of `datasets.ts`. | **Retain**, relocated out of `datasets.ts` if the file itself is deleted. |
+
+Do not delete `datasets.ts` as a single unit — the six `DatasetSpec` objects and the `DATASETS`/
+`getDataset` registry function are the disposable part; the three resolver helpers are not.
+
+### 9. CSV parser impact
+
+`src/lib/ingest/csv.ts` has exactly one production importer (`pipeline.ts`) and one incidental
+test-fixture import (`tests/auth.test.ts` line ~99, unrelated to CSV behaviour itself — worth
+re-checking at implementation time whether that import survives independent of this file).
+**No other tool, admin route, or importer parses CSV through this module** — `tools/migration/`
+and `tools/aflw/` use Python-side CSV/SQLite handling, not this TypeScript parser. **Exclusive —
+candidate for removal** alongside `pipeline.ts`.
+
+### 10. Promotion pipeline impact
+
+- **Exclusive callers:** `promoteSubmission` is called only from
+  `src/app/admin/submissions/[id]/actions.ts` (`runPromotion`) and directly by
+  `tests/integration/submission-promotion.test.ts`/`match-results-promotion.test.ts`. No other
+  caller anywhere in the tree.
+- **Concurrency/locking:** `SELECT ... FOR UPDATE` row lock on the `data_submissions` row inside
+  an `afldb_import`-role transaction, with the status CAS write in the same transaction
+  (AFLDB-ISSUE-175, documented in the function's own comment) — self-contained to this function;
+  no other subsystem depends on this locking pattern existing.
+- **Import role requirements:** a short-lived `postgres(importUrl, { max: 1 })` connection using
+  `AFLDB_IMPORT_DATABASE_URL`, exactly like every other import path (bulk migration,
+  current-season, settle) — the *mechanism* (import role, savepoints, `import_batches` bookkeeping)
+  is shared; only this specific call site and its two SQL statements
+  (`SELECT id FROM sources WHERE key='sports_data_lab'`, the `import_batches` INSERT with
+  `tool='admin-upload'`) are exclusive.
+- **Auth grants:** the column-level `GRANT UPDATE (status, promoted_at, import_batch_id, error)
+  ON data_submissions TO afldb_import` (023) exists only for this function.
+- **Tests:** `submission-promotion.test.ts`, `match-results-promotion.test.ts`,
+  `submission-review-actions.test.ts` (mocked). **No non-deprecated caller exists anywhere in
+  the repository** — full removal of `promoteSubmission`/`validateSubmission`/`stageSubmission`
+  is recommended once the review/upload UI and email-intake route are gone.
+
+### 11. Database grants/roles that become dead after retirement
+
+- `GRANT SELECT, INSERT, UPDATE ON data_submissions, data_submission_rows TO afldb_auth` (023).
+- `GRANT DELETE ON data_submission_rows TO afldb_auth` (023).
+- `GRANT SELECT ON data_submissions, data_submission_rows TO afldb_import` and the narrow
+  `UPDATE (status, promoted_at, import_batch_id, error)` column grant (023, re-asserted by the
+  039/045 fail-closed reconciler passes).
+- The corresponding entries in `tools/maintenance/privileges.sql` (~L281-287, 439-446, 494-496).
+- **Not dead:** `afldb_auth`'s grants on `players`, `player_clubs`, `clubs`, `club_aliases`,
+  `seasons`, `awards`, `award_nominations`, `award_winners`, `import_batches` (023 §6) — these
+  back the shared resolver helpers' read access and are load-bearing for whatever retains
+  `resolveClub`/`resolveSeason`/`resolvePlayer`, wherever they end up living.
+- Grants are not edited in this issue (investigation only, per the brief).
+
+### 12. Migration strategy — recommended phased retirement
+
+**Phase A (route/UI/capability removal; DB untouched):**
+- Delete `/admin/upload/**`, `/admin/submissions/[id]/**`.
+- Remove `acquisition.legacyIntake` from `capabilities.ts`'s `Capability` union and
+  `CAPABILITY_ROLES`; remove its `nav-model.ts` entries and the contributor-only nav branch
+  (replace with either "no nav at all" or a decision on what a contributor session should see —
+  Unresolved item below).
+- Remove the `data_submissions` dashboard block from `admin/page.tsx` and the
+  submission-status-counts query from `db-health.ts`.
+- Remove the "Contributor (upload only)" invite option so no *new* contributor account can be
+  created (`InviteManager.tsx`/`invite-actions.ts`), while leaving the `'contributor'` CHECK
+  constraint and any already-enrolled accounts alone.
+- Remove `src/app/api/admin/email-intake/route.ts` and `tools/email_intake/**`, and — on the
+  server — stop/disable/remove the deployed `afldb-email-intake.timer`/`.service` units
+  (`deploy/afldb-email-intake.{service,timer}`) so the poller stops running against a route that
+  no longer exists (an operator/deploy action, not just a code deletion).
+- Update `docs/admin-and-beta.md` to describe the surface as removed.
+- Leave `data_submissions`/`data_submission_rows`, `sources.key='sports_data_lab'`, all grants,
+  and `auth_users.role='contributor'` (the enum value and any existing rows) completely intact.
+
+**Phase B (dead application code / tests / dataset registry):**
+- Delete `src/lib/ingest/pipeline.ts`, `src/lib/ingest/csv.ts`.
+- Delete the six `DatasetSpec` objects and `DATASETS`/`getDataset` from `datasets.ts`, retaining
+  (relocating) `resolveSeason`/`resolveClub`/`resolvePlayer` for
+  `tools/records/import-first-kick-goal.ts`.
+- Delete `submission-promotion.test.ts`, `match-results-promotion.test.ts`,
+  `email-intake.test.ts`, `submission-review-actions.test.ts`, `catalogue-lookups.test.ts`'s
+  dataset-registry cases, `integration/datasets.test.ts`; trim the
+  `data-overrides-source-contract.test.ts`/`honours-lifecycle-public-contract.test.ts` assertions
+  that name `datasets.ts`'s D-12 guard (the guard is gone with the spec).
+- Trim `tools/maintenance/privileges.sql` and the fail-closed-reconciler migrations' *future*
+  additions to stop granting on these tables (existing migrations are history and are not
+  rewritten); a *new* migration is the only way to actually REVOKE what 023 already granted.
+- Decide the `auth_users.role='contributor'` enum question (§3/§13's Unresolved items) here, not
+  in Phase A.
+
+**Phase C (schema drop — gated on the PROD audit, §7):**
+- Only after an operator-run PROD audit (§6-equivalent SQL against PROD) confirms no retained
+  history requirement, drop `data_submissions`/`data_submission_rows`, the `submission_status`
+  enum, and their now-fully-dead grants in a real migration; remove their entries from
+  `tools/db/promotion-inventory.ts`.
+- `sources.key='sports_data_lab'` is **never** part of this phase (§2, §14) — it is retained
+  indefinitely regardless of this pipeline's fate.
+
+This is the brief's own Phase A/B/C shape; repository evidence supports it directly (Phase A is
+low-risk and reversible, Phase C has a hard external dependency this session cannot discharge).
+
+### 13. Handling existing pending submissions
+
+`data_submissions.status` can be `staged`/`validated`/`approved`/`rejected`/`promoted`/`failed`
+in DEV/PROD at any time; this investigation did not query which (that is exactly §6/§7's job).
+Evidence-backed recommendation, independent of the actual counts:
+
+- **Refuse new uploads** — Phase A deletes the upload route entirely, so this is automatic, not
+  a policy toggle.
+- **Do not build machinery to "let existing approved submissions finish"** — `promoteSubmission`
+  is deleted in Phase B, so any submission sitting at `approved` when Phase B ships simply never
+  gets promoted through this path again. If any exist in PROD at cutover, the operator should be
+  told to either promote them (running the existing, still-working pipeline) or accept they stay
+  `approved`/unpromoted permanently before Phase B removes the promote action. This is a
+  one-time operational step, not new product logic.
+- **Freeze immediately (Phase A) is correct** — there is no partial/in-flight state a CSV
+  submission can be "mid-way" through in a way that a UI/route removal corrupts; `staged`/
+  `validated`/`approved`/`rejected`/`promoted`/`failed` are all terminal-or-safe-to-freeze states
+  once no new transitions can be initiated.
+- **Expose historical submissions read-only** — not required by any evidence found (no current
+  page other than the deleted review UI reads individual submissions), but §5's "retain tables"
+  recommendation already preserves the *data* for a future read-only viewer if ever needed;
+  building one is not part of this issue's recommended scope.
+
+### 14. Source/provenance consequences
+
+- **`sources.key='sports_data_lab'`:** retained unconditionally (§2, §8). It predates and
+  outlives this pipeline — seeded by `tools/migration/import_legacy_afl.py` as the historical
+  bulk-migration source (`kind='derived'`), and referenced by canonical `award_winners`/
+  `award_nominations`/`players` rows created by `import_awards.py`'s legacy-winners path, not
+  only by admin-upload promotions. Deleting this row would orphan those canonical rows'
+  `source_id` and break the reconciliation ownership gate (`evaluateTargetOwnership`) for every
+  row it owns — far outside this issue's blast radius.
+- **Canonical rows already owned by `sports_data_lab`:** untouched by retiring the pipeline.
+  `matches`/`award_winners`/`award_nominations`/`player_match_stats` rows keep whatever
+  `source_id`/`source_record_id`/`import_batch_id` they were promoted with; nothing in Phase
+  A/B/C rewrites existing canonical data.
+- **`import_batches` rows with `tool='admin-upload'`:** retained (generic `import_batches`
+  table, not dropped); they remain valid historical batch records even after the code that once
+  created new ones is deleted — exactly like every other retired-tool's old batches.
+  `target_table` values (`match_results`, `player_match_stats`, `rising_star`,
+  `all_australian`) stay meaningful as historical labels.
+- **Reconciliation ownership:** `evaluateTargetOwnership`/`autoApplyOwnership` read
+  `matches.source_id` generically (ISSUE-185 §19) — retiring the pipeline changes nothing about
+  this gate's behaviour for already-promoted rows; it only stops new `sports_data_lab`-owned
+  rows from being created via this path (they could, in principle, still be created via a future
+  different path, which is out of scope here).
+
+### 15. ISSUE-185 interaction
+
+- **ISSUE-185 must NOT be reverted.** Its fix (`matchResults.promoteRow` writing
+  `source_id`/`source_record_id`/`import_batch_id`) is correct and load-bearing for as long as
+  `promoteSubmission`/`matchResults` exist — i.e. through Phase A and up to the moment Phase B
+  deletes `datasets.ts`'s `match_results` spec entirely. There is no intermediate state in this
+  plan where the fixed code runs with the fix removed.
+- **The fix remains correct for historical/remaining promoted rows** regardless of retirement:
+  any `matches` row already promoted with proper provenance keeps it forever (Phase C never
+  rewrites canonical data, only drops the now-orphaned staging tables).
+- **Retirement removes the path, not the fix.** Phase B deletes the entire `matchResults`
+  `DatasetSpec` (validateRow + promoteRow together) as one unit, once the pipeline that calls it
+  is gone — this is "delete the whole feature", not "restore the pre-185 defect while keeping
+  the feature". The two are not separable in a way that would recreate ISSUE-185's bug: you
+  cannot end up with a live `matchResults.promoteRow` that has silently regressed to omitting
+  provenance, because Phase B removes the function outright rather than editing it.
+
+### 16. Test inventory (see §1 for the classified list)
+
+- **Delete (exercise only retired behaviour):** `submission-promotion.test.ts`,
+  `match-results-promotion.test.ts`, `email-intake.test.ts`, `submission-review-actions.test.ts`,
+  `integration/datasets.test.ts`, the dataset-registry-specific cases in
+  `catalogue-lookups.test.ts`.
+- **Must stay (protect shared infrastructure, not this pipeline):**
+  `current-season-import.test.ts`'s `sports_data_lab`/ownership-gate fixtures (they test the
+  generic reconciliation gate, using `sports_data_lab` merely as one of several source-key
+  fixtures); `integration/privileges.test.ts` and `db-promotion-check.test.ts` (generic grant/
+  rebuild-inventory reconcilers — only their fixture *data* shrinks by two table names, the
+  tests themselves stay); `integration/admin-awards.test.ts`'s unrelated majority (only its
+  narrow `sports_data_lab` source-resolution assertions near L1268-1301 need review at
+  implementation time, not deletion of the file).
+- **Need rewriting (assert routes/capabilities that will no longer exist):**
+  `tests/auth.test.ts`'s capability-declared-vs-enforced sweep (once
+  `acquisition.legacyIntake` is removed from `capabilities.ts`, the sweep's own logic handles
+  this automatically — no test *code* change needed, only the table entry disappearing);
+  anything in an admin-lifecycle/invite test that currently asserts the "Contributor" `<option>`
+  is present in `InviteManager.tsx` (not located by name in this investigation — grep at
+  implementation time before deleting/rewriting).
+- **`data-overrides-source-contract.test.ts`/`honours-lifecycle-public-contract.test.ts`:**
+  their `datasets.ts`-naming assertions should be deleted (not weakened) in the same commit that
+  deletes the D-12 guard they check for, since the guard and the assertion protecting it must
+  move together.
+
+### 17. Documentation/tracking needing updates when removal happens
+
+- `docs/admin-and-beta.md` — the roles table, `/admin/upload` walkthrough, submission-review
+  section, and email-intake section all need a "removed" note or deletion once Phase A ships.
+- `docs/production-promotion.md` — the `data_submissions`/`data_submission_rows` inventory rows
+  need to move from "reinstate" to "dropped, see AFLDB-ISSUE-186" once Phase C actually runs
+  (not before — the doc must track reality, not intent).
+- `CHANGELOG.md` — an `Unreleased` entry is appropriate once Phase A actually ships (not added
+  in this investigation-only turn, per the brief).
+- **Not rewritten:** every closed-issue historical record referencing `sports_data_lab`/
+  `data_submissions`/contributor (ISSUE-080/093/095/112/155/156/158/165/167/185, etc.) — these
+  are historical fact, not current-state documentation, and rewriting them would falsify the
+  record of what was true when they were written.
+
+### 18. Recommended end state
+
+- **Auth:** `acquisition.legacyIntake` capability removed; the `'contributor'` **role value**
+  itself is a separate, unresolved decision (§3/Unresolved) — recommend leaving the CHECK
+  constraint and any existing rows alone through Phase A/B, revisited only once an operator
+  confirms whether any contributor account still needs to exist/sign in for any reason.
+- **UI:** `/admin/upload`, `/admin/submissions/[id]`, the dashboard submission block, the
+  db-health submission-status panel, and the invite-role "Contributor" option all removed.
+- **Application:** `pipeline.ts`, `csv.ts`, the email-intake route and poller, and the six
+  `DatasetSpec` objects (+ `DATASETS`/`getDataset`) all removed; `resolveSeason`/`resolveClub`/
+  `resolvePlayer` retained (relocated).
+- **Datasets:** all six removed (`match_results`, `player_match_stats`, `rising_star`,
+  `all_australian`, `player_bio`, `match_attendance`) — none has a non-deprecated caller.
+- **DB:** `data_submissions`/`data_submission_rows` **retained, read-only** (grants to
+  `afldb_auth`/`afldb_import` become dead but are not revoked until Phase C); dropped only in
+  Phase C after a PROD audit. `sources.key='sports_data_lab'` retained permanently. Migration
+  required only for Phase C (grant revocation + table drop); Phase A/B need none.
+- **Historical data:** preserved in place (tables retained, no migration, no data movement)
+  until/unless Phase C's PROD audit clears a drop.
+- **Sources/provenance:** `sports_data_lab` source row, all already-promoted canonical rows'
+  provenance, and all existing `import_batches` rows (`tool='admin-upload'`) are permanently
+  retained and untouched by every phase.
+
+### 19. Implementation slices
+
+Genuinely too large for one issue, given the open product questions below gate Phase B/C and
+Phase A alone already touches ~15 files across routes/nav/capabilities/dashboard/invite UI.
+Recommend three follow-up issues, boundaries matching §12 exactly:
+
+1. **Phase A** — route/UI/nav/capability/invite-option removal, DB completely untouched. Safe
+   to implement as soon as the operator confirms the Unresolved contributor-account question
+   below (or explicitly defers it, since Phase A does not require answering it).
+2. **Phase B** — dead pipeline/dataset code + test removal, once Phase A has shipped and no
+   in-flight `approved` submission remains unpromoted (operator confirms via the promote-or-
+   accept step in §13).
+3. **Phase C** — schema drop, gated strictly on an operator-run PROD audit (§6-equivalent SQL
+   against PROD) showing no retained-history requirement.
+
+No new issue IDs created in this turn, per the brief.
+
+### Unresolved / genuinely not answerable from repository evidence
+
+1. **Does any real contributor account exist today (DEV or PROD), and does it need to keep
+   working after Phase A?** Determines whether `'contributor'` stays a live, sign-in-capable
+   role indefinitely (option D) or can eventually be removed from the CHECK constraint (option
+   C) — repository code alone cannot answer this; needs the §6/§7 audits.
+2. **What should a contributor session see/do immediately after Phase A**, if any such account
+   still exists and Phase A has removed their only reachable route? (E.g. a "this capability has
+   been retired, contact an administrator" page vs. simply disabling the account.) Product
+   decision, not evidence-backed by the repository.
+3. **Whether any PROD `data_submissions` row represents data that was promoted and IS the sole
+   source of some canonical fact** (vs. also independently present via the historical bulk
+   migration or another importer) — only the PROD audit (§6/§7) can answer this, and it gates
+   Phase C specifically, not Phase A/B.
+4. **Whether `deploy/afldb-email-intake.timer`/`.service` is currently enabled/running on the
+   PROD host right now.** The unit files exist in the repository and are clearly deployed
+   infrastructure (not dead code), but this investigation did not inspect the server — an
+   operator must confirm the timer is stopped/disabled on the host itself (not just that the
+   repository's route is deleted) before or alongside Phase A, so the poller is not left
+   retrying against a 404 (`fetch_and_stage.py`'s own design treats a delivery failure as
+   EX_TEMPFAIL/retry-later, per the service file's comment, so an orphaned timer would fail
+   loudly and repeatedly rather than silently).
+
+### Phase A implementation (2026-09-15) — rescoped to account/access retirement only
+
+**Decision, superseding §12's original Phase A scope above:** do not remove any CSV pipeline
+route, code, table or systemd/email-intake machinery yet. Instead, make the pipeline dormant by
+retiring the `contributor` role's ability to authenticate and by closing every path that could
+create a new one — leaving every item in this entry's §8/§18 "retained" and "removed" lists from
+the original investigation completely untouched. Implemented on `sonnet/issue-186-retire-
+contributor-csv`, uncommitted, no migration, no DEV/PROD mutation, no `npm run build`/broad test
+run performed.
+
+**1. Authoritative disable mechanism found:** `auth_users.disabled_at` (migration 023,
+`timestamptz`, `NULL` = active), already honoured by `getAdminUser()` and `adminLogin()`
+(`disabled_at IS NULL`), and already the primitive the account lifecycle (`admin-lifecycle.ts`/
+`admin-users.ts`) is built on. **Not used here**: flipping it on every `role='contributor'` row
+would need either a DEV/PROD `UPDATE` (explicitly disallowed this turn) or a migration/backfill
+(schema change, also out of scope). Instead, `'contributor'` was removed from the role list in
+the two queries that are the actual authentication boundary — the narrower, no-schema, no-data-
+mutation guard the brief asked for when no blanket per-row flip is available. `disabled_at`
+remains the correct mechanism for retiring one *individual* account (unaffected, unchanged) and
+is exactly what `AdminSessionsClient.tsx`/`lifecycleTransition` continue to use for that.
+
+**2/3/4. Auth/session changes — the two queries that decide "can this account be used right
+now":**
+- `src/lib/auth/session.ts`, `getAdminUser()`: `AND u.role IN ('admin', 'super_admin',
+  'contributor')` → `AND u.role IN ('admin', 'super_admin')`. This is the per-request,
+  database-backed session check every admin page/action re-runs (the signed cookie alone is
+  never trusted) — so an **already-issued** contributor session, still live by every other
+  predicate (unexpired, unrevoked, `disabled_at IS NULL`), is refused on its very next request.
+  No session-revocation sweep needed or added: nothing about `auth_sessions` changes, the row
+  simply stops satisfying the lookup that matters.
+- `src/app/admin/login/actions.ts`, `adminLogin()`: the identical role-list edit, so a
+  contributor **cannot even start a new session** with a fully valid password + current TOTP
+  code — the account fails at the same `SELECT` that already excludes an unknown email, well
+  before password/TOTP are meaningfully checked (both are still evaluated against a dummy hash
+  either way, preserving the existing timing-safety property; the caller sees the same generic
+  "Sign-in failed" message as any other wrong-credential attempt, no new information disclosed).
+- Existing sessions: confirmed **no bespoke invalidation was needed** — `getAdminUser()`'s own
+  per-request re-check already does the job (§4 of the brief). This is the same mechanism that
+  already makes deactivation (`disabled_at`) take effect without a session sweep; retirement
+  reuses it, at the role level rather than the row level.
+- `requireAdmin()`/`requireCapability()`'s existing `admin.role === 'contributor'` redirect
+  branches are now unreachable from a real request (nothing they could act on ever arrives) but
+  were **left in place** as defense-in-depth and because `AdminUser['role']` still needs to carry
+  the value for account-history/roster reads (see §5 below) — documented in a new comment on
+  `requireAdmin()` rather than deleted.
+
+**5. New-contributor creation closed, at both ends:**
+- `InviteManager.tsx`: the `<option value="contributor">Contributor (upload only)</option>` in
+  the invite form's role `<select>` removed. UI convenience only.
+- `src/app/admin/admins/invite-actions.ts`, `createInvite()`: **the actual server boundary.**
+  A request naming `role=contributor` (bypassing the UI, or from a link/bookmark predating this
+  change) is refused outright — `{ error: 'The Contributor role is retired...' }` — and audited
+  as `admin.invite_refused` with `reason: 'contributor_retired'`. Refused, not silently
+  downgraded to `'admin'`: unlike the existing super_admin/`can_manage_admins` downgrade (which
+  only ever narrows a request to a role the caller already has standing to grant), silently
+  substituting `'admin'` here would grant **more** than was asked for
+  (`ROLE_RANK`: contributor 0 < admin 1) — an unsafe default for a rejected request.
+- `src/app/admin/invite/[token]/actions.ts`, `beginEnrolment()` and `confirmEnrolment()`: a
+  second, independent boundary — refuses to redeem **any** `admin_invites` row whose `role` is
+  already `'contributor'`, which closes the window for an invite link minted *before* this change
+  shipped (those rows are untouched data, not rewritten or migrated). Checked at both steps
+  (password-setting and TOTP-confirmation) so the guard holds even if a resumed multi-tab flow or
+  a direct POST skips the first check. Neither step reaches its state-changing work (the
+  `pending_password_hash`/`pending_totp_secret` `UPDATE`, or the transaction that creates/
+  overwrites the `auth_users` row) once refused.
+
+**6. Role-change protection:** inspected `admin-lifecycle.ts`'s `lifecycleTransition()` — the
+only function that decides what role an *existing* account moves to via the supported lifecycle
+actions (`promote`/`demote`/`deactivate`/`reactivate`). It only ever produces `'super_admin'`
+(promote), `'admin'` (demote), or the target's unchanged existing role (deactivate/reactivate) —
+**no code path anywhere already produced `role='contributor'` for an existing account**, so no
+change was required here; a new exhaustive unit test (`tests/auth.test.ts`) now proves this
+structurally for every action/starting-role combination, guarding against a future regression.
+The invite-based path (the *only* place `role='contributor'` was ever written for a new or
+re-invited row) is the one closed in §5. Moving an *existing* contributor row to `admin`/
+`super_admin` via a fresh invite to their address remains possible, unchanged — retirement closes
+the door only in the contributor direction, as the brief asked.
+
+**7. `acquisition.legacyIntake` capability: left in place, unchanged.** Per the brief's
+preference for account-level shutdown over permission refactoring. It remains declared in
+`capabilities.ts` (`ALL_STAFF`) and `nav-model.ts`'s contributor-only nav branch is untouched —
+both are now unreachable dead code for the same reason `requireAdmin()`'s branch is (no
+contributor session can ever exist to evaluate them), not because either was edited.
+
+**8/9/10. Left completely untouched, confirmed by inspection, not by omission:** `/admin/upload`,
+`/admin/submissions/[id]`, `src/lib/ingest/{pipeline,datasets,csv}.ts`, `/api/admin/email-intake`,
+`tools/email_intake/`, `deploy/afldb-email-intake.{service,timer}`, `data_submissions`,
+`data_submission_rows`, `sports_data_lab`, `import_batches`, and every AFL Tables/current-season/
+settle/reconciliation/canonical-apply/shared-resolver-helper file. `git status` confirms no file
+outside the list in "Files changed" below was touched.
+
+**Email-intake independence (brief item 9) — inspected, not modified:**
+`src/app/api/admin/email-intake/route.ts:131` still reads
+`role IN ('admin', 'super_admin', 'contributor') AND disabled_at IS NULL` — **unchanged**, and
+this query is completely independent of both edits above (it is neither `getAdminUser()` nor
+`adminLogin()`). Since no `disabled_at` was set on any contributor row (mutation explicitly
+disallowed this turn), **the email-intake path is not affected by this Phase A change at all**:
+any sender email that resolves to an enabled `admin`/`super_admin`/`contributor` `auth_users` row
+can still stage and validate a submission through it, exactly as before. `tools/email_intake/
+fetch_and_stage.py` reads the sender identity from the actual email's `From` header at runtime
+(`sender_email`, `fetch_and_stage.py:281-285`) — it is not hardcoded to a contributor-specific
+account, so this dependency is on *whichever* real mailbox address(es) have been used historically,
+which this investigation cannot determine without a mailbox/PROD audit. **Conclusion: Phase A
+does not disable this ingress. Phase B must handle it separately** — either by revoking
+`'contributor'` from that route's own role list (a one-line, symmetric edit once Phase B is
+scoped) or by decommissioning the route/timer entirely per the original §12 plan.
+
+**Systemd inspection commands (operator-run, read-only):**
+```bash
+# Whether the timer/service unit is installed, enabled and/or currently active on the host:
+systemctl status afldb-email-intake.timer
+systemctl status afldb-email-intake.service
+systemctl is-enabled afldb-email-intake.timer
+systemctl list-timers afldb-email-intake.timer
+# Recent run history/exit codes (EX_TEMPFAIL = 75 is an expected retry, not a hard failure):
+journalctl -u afldb-email-intake.service -n 50 --no-pager
+```
+
+**11. Tests added** (all new/edited; no existing test weakened, none deleted):
+- `tests/auth.test.ts`:
+  - Test A: `getAdminUser()` (real function, captured SQL) never admits `role='contributor'`,
+    independent of `disabled_at`.
+  - Test A (login): source-contract check that `adminLogin()`'s SQL role list excludes
+    `'contributor'` (the DB-dependent behavioural equivalent is the integration test below).
+  - Tests C/D: `createInvite()` refuses `role=contributor` at the server and audits the refusal;
+    `beginEnrolment()`/`confirmEnrolment()` both refuse to redeem a pre-existing
+    `role='contributor'` invite row, before any state-changing write.
+  - Test C (UI): `InviteManager.tsx` no longer renders the Contributor `<option>`.
+  - Test E (corrected 2026-09-15 on operator review — see "Operator verification" below):
+    `lifecycleTransition()` never *assigns* `'contributor'` to an account that did not already
+    hold it (starting from `admin`/`super_admin`, every action); `promote`/`demote` always land
+    on their fixed, non-contributor destination regardless of starting role; `deactivate`/
+    `reactivate` are proven to *preserve* an existing contributor's role rather than assign it;
+    and reactivating an existing contributor is proven to clear `disabled_at` while the
+    authentication boundary's role exclusion (proven elsewhere in the same file) still holds.
+- `tests/integration/admin-lifecycle.test.ts` (real `afldb_test`, own disposable fixtures,
+  cleaned up by id — no DEV/PROD row touched):
+  - Test A: a fresh contributor fixture with `disabled_at IS NULL` is excluded from the (updated)
+    login predicate by role alone.
+  - Test A (session): a contributor fixture with a live, unexpired, unrevoked session is excluded
+    from the (updated) `getAdminUser()` predicate by role alone; the session row itself is proven
+    untouched (`liveSessionCount` still 1) — no revocation was needed.
+  - Test B: an existing contributor row remains fully readable via `listAdminAccounts()` — role,
+    `disabledAt`, `hasPassword`, `hasTotp` all intact.
+  - Test H: a `data_submissions` row attributed to a contributor fixture via `uploaded_by` still
+    blocks that account's deletion (`23503`) and still resolves correctly — proving retirement
+    changes nothing about historical FK attribution. (The existing "adminLogin predicate" inline
+    check on the pre-existing deactivated-admin test was also updated to match the real query.)
+  - The existing `'promote', ..., { expectedRole: 'contributor' }` and `contributor`-fixture
+    viability/eligibility cases elsewhere in `tests/auth.test.ts` were left unmodified: nothing
+    about lifecycle-eligibility for a contributor *target* changed.
+- **Test G (AFL Tables/current-season), identified rather than added:** no file in
+  `src/search/`, `src/lib/acquisition/`, `settle-afltables.ts`, `canonical-apply.ts`,
+  `reconciliation.ts`, or the shared `resolveSeason`/`resolveClub`/`resolvePlayer` helpers was
+  touched, so `tests/current-season-import.test.ts` (already exhaustive over the ownership/
+  reconciliation gate, including its own `sports_data_lab`/AFLDB-ISSUE-185 fixtures) is the
+  existing, sufficient regression proof; the operator's targeted re-run below confirms it.
+- **Not added, and why:** no test exercises `data_submission_rows`, `import_batches`, or the
+  promotion pipeline directly — the brief's "avoid broad pipeline tests" instruction, honoured
+  because nothing in the pipeline changed.
+
+**12. DEV read-only audit SQL (not run — read-only against `afldb_dev`):**
+```sql
+-- 1. auth_users by role, and how many contributor accounts exist
+SELECT role, count(*) AS accounts FROM auth_users GROUP BY role ORDER BY role;
+SELECT id, email, disabled_at IS NULL AS active, created_at, must_change_password
+  FROM auth_users WHERE role = 'contributor' ORDER BY id;
+
+-- 2. Whether any contributor account is ALREADY disabled (pre-existing state, unrelated to
+--    this change -- Phase A sets no disabled_at)
+SELECT count(*) AS already_disabled FROM auth_users
+ WHERE role = 'contributor' AND disabled_at IS NOT NULL;
+
+-- 3. Last session/login activity per contributor account, if any
+SELECT u.id, u.email,
+       (SELECT max(s.created_at) FROM auth_sessions s WHERE s.user_id = u.id) AS last_session_created,
+       (SELECT max(a.at) FROM auth_audit_log a
+         WHERE a.actor_user_id = u.id AND a.action = 'admin.login') AS last_login
+  FROM auth_users u WHERE u.role = 'contributor' ORDER BY u.id;
+
+-- 4. data_submissions attribution to contributor accounts (uploaded_by / reviewed_by)
+SELECT u.id, u.email, count(*) AS uploaded
+  FROM data_submissions ds JOIN auth_users u ON u.id = ds.uploaded_by
+ WHERE u.role = 'contributor' GROUP BY u.id, u.email ORDER BY u.id;
+SELECT u.id, u.email, count(*) AS reviewed
+  FROM data_submissions ds JOIN auth_users u ON u.id = ds.reviewed_by
+ WHERE u.role = 'contributor' GROUP BY u.id, u.email ORDER BY u.id;
+
+-- 5. Any pending (staged/validated/approved) submission uploaded by a contributor -- these are
+--    NOT frozen by Phase A (the review/promote UI is untouched) but a super admin can no longer
+--    be told about a NEW one arriving via that account's own interactive session (only via
+--    email-intake or another admin noticing it on the dashboard)
+SELECT ds.id, ds.dataset, ds.status, ds.uploaded_at, u.email AS uploaded_by_email
+  FROM data_submissions ds JOIN auth_users u ON u.id = ds.uploaded_by
+ WHERE u.role = 'contributor' AND ds.status IN ('staged', 'validated', 'approved')
+ ORDER BY ds.uploaded_at;
+
+-- 6. Any pending admin_invites row still offering role='contributor' (would now be refused at
+--    redemption by the new guard, but worth knowing whether any are outstanding)
+SELECT id, email, created_at, expires_at, used_at, revoked_at
+  FROM admin_invites WHERE role = 'contributor' AND used_at IS NULL AND revoked_at IS NULL
+ ORDER BY id;
+```
+
+**Exact operator verification commands (not run by this turn):**
+```bash
+npx vitest run tests/auth.test.ts
+npx vitest run tests/integration/admin-lifecycle.test.ts
+npx vitest run tests/current-season-import.test.ts
+npx tsc --noEmit
+```
+
+**Files changed:** `src/lib/auth/session.ts`, `src/app/admin/login/actions.ts`,
+`src/app/admin/admins/invite-actions.ts`, `src/app/admin/invite/[token]/actions.ts`,
+`src/app/admin/admins/InviteManager.tsx`, `tests/auth.test.ts`,
+`tests/integration/admin-lifecycle.test.ts`, plus this issue's own tracking in `issues.md`/
+`IssuesIndex.md`. No migration, no `CHANGELOG.md` entry (deferred per the brief), no other file.
+
+**What remains for Phase B/C (unchanged from the original investigation, reconfirmed here):**
+- **Phase B:** retire the email-intake ingress (route + poller + systemd units) once the operator
+  confirms it is safe to do so, or at minimum drop `'contributor'` from its role list to close
+  the gap identified above independently of a full removal; then remove the dead CSV routes/UI/
+  pipeline code/dataset registry/tests per the original investigation's §12 Phase B.
+- **Phase C:** schema/grant cleanup (`data_submissions`/`data_submission_rows` drop, dead
+  `afldb_auth`/`afldb_import` grants), strictly gated on a PROD read-only audit — unchanged,
+  still not performed, still not recommended without it.
+- **Product questions still open:** whether any real contributor account should ever be fully
+  removed (vs. permanently retained, disabled-by-role) is not decided by this turn — Phase A is
+  deliberately reversible (no data changed, `'contributor'` remains a valid enum value and a
+  readable role) so that decision can wait.
+
+### Operator verification (2026-09-15)
+
+`npx vitest run tests/auth.test.ts` — 161 passed, 1 failed. `npx vitest run
+tests/integration/admin-lifecycle.test.ts` — environment-only failure (no `afldb_test`
+connectivity in the operator's run; not a code defect, not investigated further here since the
+brief scoped this turn to the one test-contract defect below). Neither `tsc --noEmit` nor a
+broader test/build run was requested or performed.
+
+**Test-contract defect found and fixed — `tests/auth.test.ts`, "admin lifecycle policy" describe
+block, `'never transitions any account onto the retired contributor role'`.** Inspected
+`lifecycleTransition()`/`LIFECYCLE_ACTIONS` (`src/lib/auth/admin-lifecycle.ts:178-192`); **no
+production defect** — the function is exactly as intended: `'promote'` always returns
+`role: 'super_admin'`, `'demote'` always returns `role: 'admin'` (both fixed, independent of the
+target's starting role), and `'deactivate'`/`'reactivate'` both return `role: target.role`
+**by design** — they are role-preserving lifecycle actions, not role-assigning ones, and Phase A
+depends on exactly this: an existing `role='contributor'` row must survive a deactivate/
+reactivate cycle as `'contributor'`, unchanged, per this issue's own "existing account rows
+remain in the database for historical references" requirement.
+
+The original test was over-broad: it asserted `lifecycleTransition(action, account({ role }))`
+is never `role: 'contributor'` for **every** starting role including `'contributor'` itself,
+across **all four** actions. For `'deactivate'`/`'reactivate'` starting from `role: 'contributor'`,
+the function correctly returns `role: 'contributor'` (preserving it) — a true, intended
+behaviour the test wrongly read as "assigning the retired role" and failed on. The test conflated
+*the output containing* `role: 'contributor'` with *the action assigning* `role: 'contributor'`;
+those are the same claim only for `'promote'`/`'demote'` (fixed destination, so any occurrence
+would be an assignment) and different claims for `'deactivate'`/`'reactivate'` (role-preserving,
+so an occurrence starting from `'contributor'` is preservation, not assignment).
+
+**Fix** (`tests/auth.test.ts`): replaced the single over-broad assertion with four narrower ones,
+matching the brief's four required invariants exactly:
+1. `'never assigns the retired contributor role to an account that did not already have it'` —
+   every action, starting only from `'admin'`/`'super_admin'` (the two roles that must never
+   become contributor), asserts `.role !== 'contributor'`.
+2. `'promote and demote always land on a fixed, non-contributor role, regardless of the starting
+   role'` — every starting role including `'contributor'`, asserts `promote → 'super_admin'` and
+   `demote → 'admin'` exactly, closing the "no explicit promotion/demotion path has contributor
+   as a destination" requirement directly rather than by omission.
+3. `'deactivate and reactivate preserve an existing contributor role rather than assigning it'` —
+   every starting role including `'contributor'`, asserts the role is unchanged by either action
+   (`.role === role`), stating the preservation behaviour as a positive contract instead of
+   leaving it as an untested gap the old assertion happened to allow.
+4. `'reactivating an existing contributor clears disabled_at but leaves the role -- and the ban --
+   in place'` — a direct, single-case proof (the brief's requirement 3) that
+   `lifecycleTransition('reactivate', {role: 'contributor', disabledAt: <set>})` yields
+   `{ role: 'contributor', active: true, canManageAdmins: false }` — i.e. reactivation really
+   does clear `disabled_at` — cross-referenced (not re-proven) against the existing "getAdminUser
+   rejects…"/"the interactive login predicate…" tests and the DB-backed AFLDB-ISSUE-186 describe
+   block in `tests/integration/admin-lifecycle.test.ts`, which already prove the role exclusion
+   holds independent of `disabled_at`.
+
+No change was made to `lifecycleTransition()`, `LIFECYCLE_ACTIONS`, or any other production file.
+No existing contributor row is auto-promoted/rewritten by this fix or by the function it tests.
+The `'contributor'` DB role value is untouched.
+
+**Email-intake systemd evidence (streamanator, 2026-09-15, operator-run, read-only):**
+```
+systemctl is-enabled afldb-email-intake.timer    => not-found
+systemctl is-active  afldb-email-intake.timer    => inactive
+systemctl is-enabled afldb-email-intake.service  => not-found
+systemctl is-active  afldb-email-intake.service  => inactive
+systemctl status ...                             => units could not be found
+journalctl -u afldb-email-intake.service --since "30 days ago"  => No entries
+```
+**Conclusion:** the repository's deployment definitions (`deploy/afldb-email-intake.{service,
+timer}`) exist, but **neither unit is installed on streamanator** (`not-found`, not merely
+`disabled`) and there is no execution history in the last 30 days. **There is therefore no live
+systemd email-intake ingress to disable on this host during Phase A.** This narrows, but does not
+close, the Phase B email-intake finding above: the *application route*
+(`/api/admin/email-intake`) still independently accepts a `role IN ('admin', 'super_admin',
+'contributor')` sender on **any** host where it is deployed and reachable, and this check was
+against streamanator only — it does not by itself prove the route is unreachable everywhere (a
+different/future host, or a manually-triggered POST, is unaffected by a systemd unit being
+absent here). The repository's email-intake implementation (route, poller script, unit files)
+was **not deleted or modified** this turn, per the brief.
+
+**Operator rerun command** (corrected test only; not run by this turn):
+```
+npx vitest run tests/auth.test.ts
+```
+
+### Resolution (Phase A closeout, 2026-09-15)
+
+**Resolved scope:** contributor account/access retirement only. The deprecated contributor CSV
+submission pipeline itself — routes, application code, schema, and the email-intake ingress —
+was deliberately left physically present and is carried forward as deferred cleanup (see
+**Deferred** below), not implemented or removed by this resolution.
+
+**Root cause / motivation** (unchanged from the original investigation): the contributor CSV
+upload workflow is deprecated product direction, not a defect. Direct/admin CRUD is the
+supported path; contributor CSV submission is not part of the future model. Phase A makes that
+pathway dormant at the account/access boundary while the physical pipeline awaits a later,
+evidence-gated cleanup (Phases B/C).
+
+**Fix (confirmed final state):**
+- `getAdminUser()` (`src/lib/auth/session.ts`) no longer admits `role='contributor'` — the
+  per-request, database-backed session re-check every admin route relies on now excludes the
+  role outright, independent of `disabled_at`.
+- `adminLogin()` (`src/app/admin/login/actions.ts`) no longer admits `role='contributor'` — a
+  contributor cannot establish a new session even with a fully valid password and current TOTP
+  code.
+- An already-issued contributor session fails on its very next authenticated request, because
+  `getAdminUser()` re-checks the account role on every request; no bespoke session-revocation
+  mechanism was needed or added.
+- `InviteManager.tsx` no longer offers "Contributor" in the invite role selector.
+- `createInvite()` (`src/app/admin/admins/invite-actions.ts`) rejects a server-side request for
+  `role=contributor` outright (audited as `admin.invite_refused`), rather than silently
+  downgrading it — a downgrade to `'admin'` would over-grant relative to what was asked.
+- `beginEnrolment()`/`confirmEnrolment()` (`src/app/admin/invite/[token]/actions.ts`) both reject
+  redemption of any `admin_invites` row already carrying `role='contributor'`, closing the
+  window for an invite link minted before this change shipped.
+- `lifecycleTransition()` (`src/lib/auth/admin-lifecycle.ts`) is **unchanged** — `promote` always
+  lands on `super_admin`, `demote` always lands on `admin`, and `deactivate`/`reactivate`
+  deliberately preserve an existing account's role, including `'contributor'`. No lifecycle
+  action starting from `admin`/`super_admin` can assign `'contributor'`.
+- The `'contributor'` DB enum/check value (migration 033) is retained, unmodified.
+- Every existing `auth_users` row with `role='contributor'` is retained, unmutated — no
+  `disabled_at` backfill, no role rewrite, no deletion.
+- Historical FK attribution (`data_submissions.uploaded_by`/`reviewed_by → auth_users(id)`)
+  remains fully intact and enforced exactly as before.
+
+**Explicitly confirmed:**
+- Contributor role rows are retained for historical compatibility — nothing about this
+  resolution deletes, mutates, or reclassifies an existing contributor account.
+- An existing contributor cannot authenticate even when active, and remains unable to
+  authenticate after a `reactivate` lifecycle action clears `disabled_at` — reactivation restores
+  `active: true` but leaves `role: 'contributor'` unchanged, and the authentication boundary
+  excludes that role independently of `disabled_at` entirely.
+- No new contributor account can be created through any supported invite/enrolment path — the
+  UI no longer offers it, the server refuses it, and redemption of a pre-existing
+  contributor-role invite link is refused at both enrolment steps.
+- AFL Tables/current-season ingestion, observation, settle and reconciliation are unaffected —
+  no file in that subsystem was touched, and the full regression suite
+  (`tests/current-season-import.test.ts`) passed unchanged.
+- AFLDB-ISSUE-185's provenance fix (`matchResults.promoteRow()` writing `source_id`/
+  `source_record_id`/`import_batch_id`) remains untouched and valid; it was not reverted, and
+  remains correct for as long as the (still-present, still-dormant) CSV pipeline exists.
+
+**Operator verification (2026-09-15, final):**
+- `npx vitest run tests/auth.test.ts` — 1 file, 165/165 passed, 0 failures. Confirms: contributor
+  excluded from `getAdminUser` regardless of `disabled_at`; interactive login excludes
+  contributor; `createInvite` rejects `role=contributor` server-side; stale contributor-role
+  invites cannot begin or complete enrolment; the invite UI no longer offers Contributor; no
+  lifecycle action starting from `admin`/`super_admin` can assign contributor; `promote` always
+  lands on `super_admin`; `demote` always lands on `admin`; `deactivate`/`reactivate` deliberately
+  preserve an existing contributor role; a reactivated contributor remains `role='contributor'`
+  and therefore remains blocked from authentication. (The earlier lifecycle-test defect —
+  treating contributor→contributor preservation as "assigning" contributor — was corrected in
+  the prior verification round; the replacement tests distinguish role-preserving actions from
+  role-assigning ones.)
+- `npx vitest run tests/integration/admin-lifecycle.test.ts` — 1 file, 21/21 passed. Confirms,
+  against a real database with disposable fixtures (no DEV/PROD row touched): contributor
+  excluded from the login predicate even when enabled; contributor excluded from `getAdminUser`
+  even with a live, valid session; a contributor row remains readable in the admin roster;
+  `data_submissions.uploaded_by`/`reviewed_by` FK attribution remains intact; no contributor
+  data/history mutation was required by any of it.
+- `npx vitest run tests/current-season-import.test.ts` — 1 file, 256 passed, 4 skipped, 0
+  failures. Confirms AFL Tables/current-season ingestion, observation, settle and reconciliation
+  are unaffected by contributor retirement.
+- `npx tsc --noEmit -p tsconfig.json` — PASS.
+- **streamanator email-intake operational check** (read-only, operator-run):
+  ```
+  afldb-email-intake.timer:   is-enabled => not-found   is-active => inactive   status => unit could not be found
+  afldb-email-intake.service: is-enabled => not-found   is-active => inactive   status => unit could not be found
+  journalctl -u afldb-email-intake.service --since "30 days ago"  => No entries
+  ```
+  Conclusion: the repository's deployment definitions
+  (`deploy/afldb-email-intake.{service,timer}`) exist, but streamanator does not currently have
+  either unit installed, and there is no execution history in the last 30 days. There is
+  therefore no live systemd email-intake ingress on this host to disable as part of Phase A. This
+  narrows, but does not close, the Phase B finding that the application route
+  (`/api/admin/email-intake`) itself still independently accepts a contributor-role sender on any
+  host where it is deployed and reachable — a check against one host is not proof for every host.
+
+**Deferred (not implemented, not tracked under a new issue ID — revisit only if/when planned):**
+- Phase B: remove the dead CSV routes/UI/pipeline code and dataset registry
+  (`/admin/upload`, `/admin/submissions/[id]`, `src/lib/ingest/{pipeline,datasets,csv}.ts`), and
+  separately retire the email-intake ingress (`/api/admin/email-intake`, `tools/email_intake/`,
+  `deploy/afldb-email-intake.{service,timer}`) — at minimum dropping `'contributor'` from that
+  route's own role list, or decommissioning it entirely.
+- Capability cleanup: `acquisition.legacyIntake` remains declared in `capabilities.ts` and
+  `nav-model.ts`'s contributor-only nav branch remains in place — both dead code today, left
+  as-is per the brief's preference for account-level shutdown over permission refactoring.
+- Optional, later contributor role/schema cleanup: whether the `'contributor'` DB enum/check
+  value should ever be removed entirely remains open product intent, not decided here.
+- `data_submissions`/`data_submission_rows` retention-vs-drop decision: unchanged from the
+  original investigation — retained read-only, drop gated strictly on a PROD read-only audit
+  this turn does not perform.
+- `sources.key='sports_data_lab'` and `import_batches` remain permanently retained regardless of
+  any future phase (load-bearing for historical canonical rows well beyond this pipeline).
+
+**Migration/grants:** None. No schema, grant, or DEV/PROD data change of any kind.
