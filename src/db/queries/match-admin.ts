@@ -219,13 +219,46 @@ export async function createMatch(input: CreateMatchInput): Promise<{
       }
       if (!venueRaw) venueRaw = 'AFL Venue';
 
-      // 3. Generate the stable natural match key. A retry must not create a
-      // second copy of the same fixture under a time-based suffix.
-      const baseKey = `${input.season}|${roundCode}|${input.matchDate}|${input.homeClubId}|${input.awayClubId}`;
-      const matchKey = baseKey;
-      const [existing] = await tx<{ id: number }[]>`SELECT id FROM matches WHERE match_key = ${matchKey}`;
-      if (existing) {
-        throw new Error(`Match #${existing.id} already exists for that season, round, date and clubs.`);
+      // 3. Duplicate detection by canonical identity, not by match_key
+      // string equality (AFLDB-ISSUE-182). match_key has three mutually
+      // incompatible rendering schemes in this repository -- this admin
+      // path renders club IDs, src/lib/ingest/datasets.ts renders club
+      // NAMES, and src/lib/acquisition/canonical-apply.ts writes the
+      // legacy/current-season bundle's own key verbatim (see that file's
+      // header, ~L39-42 and ~L663-665: "createMatch() is deliberately not
+      // reused ... a wrong rendering inserts a duplicate fixture instead of
+      // conflicting"). A row for the SAME real match written under a
+      // different scheme would not share this path's match_key, so
+      // checking the string could silently admit a duplicate.
+      //
+      // round_code is not used either: it is free text with no DB-enforced
+      // link back to round_number/round_type for `matches` (unlike
+      // `fixtures`, which has fixtures_round_number_ck), and this
+      // function's own blank-roundCode fallback below renders "R5" rather
+      // than the decimal-string vocabulary every importer writes ("5") --
+      // so two rows for the same real round can legitimately carry
+      // different round_code text. round_type and round_number are both
+      // DB-typed (an enum and a smallint, tied together for every writer by
+      // matches_round_number_ck) and identical for the same real round
+      // regardless of who wrote it, so they stand in for round_code here.
+      //
+      // Home/away order is compared exactly, not symmetrically: no
+      // repository evidence supports treating a reversed pair as the same
+      // match. admin-fixtures.ts's own read-time played resolution treats a
+      // home/away swap as a distinct, surfaced condition
+      // ("played_home_away_differs"), never as an equivalence to collapse.
+      const matchKey = `${input.season}|${roundCode}|${input.matchDate}|${input.homeClubId}|${input.awayClubId}`;
+      const [duplicate] = await tx<{ id: number }[]>`
+        SELECT id FROM matches
+         WHERE season = ${input.season}
+           AND round_type = ${input.roundType}::round_type
+           AND round_number IS NOT DISTINCT FROM ${roundNumber}
+           AND match_date = ${input.matchDate}::date
+           AND home_club_id = ${input.homeClubId}
+           AND away_club_id = ${input.awayClubId}
+      `;
+      if (duplicate) {
+        throw new Error(`Match #${duplicate.id} already exists for that season, round, date and clubs.`);
       }
 
       let attendanceSourceId: number | null = null;
@@ -314,6 +347,20 @@ export async function createMatch(input: CreateMatchInput): Promise<{
     });
 
     return created;
+  } catch (error) {
+    // A race between the canonical-identity pre-check above and this
+    // function's own INSERT -- two concurrent submissions for the identical
+    // season, round, date and clubs -- still resolves through the
+    // matches_match_key_key UNIQUE constraint, since match_key is rendered
+    // deterministically from those same inputs. That is a genuine
+    // PostgreSQL-raised backstop for the race window, not the primary
+    // duplicate check, so it is translated the same way AFLDB-ISSUE-181's
+    // deleteMatch() 23503 fallback is: a useful message, not a raw
+    // constraint name.
+    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505') {
+      throw new Error('That match already exists for this season, round, date and clubs.');
+    }
+    throw error;
   } finally {
     await importSql.end({ timeout: 5 });
   }
