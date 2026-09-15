@@ -63,6 +63,23 @@ commit.
 - No new career-condition grain, column, metric, or generic consumed/unowned-token framework was
   introduced. `PARSER_VERSION` bumped to 47.
 
+### NL search: matchup-scoped symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-194) - 16 September 2026
+
+- `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) now applies the AFLDB-ISSUE-192 canonical
+  home-side restriction for `attendance`/`total_score` whenever there is no `clubFor`/`clubAgainst`
+  scope, `scope.matchup` included. Only `clubFor`/`clubAgainst` are perspective-sensitive
+  (directional); `scope.matchup` is a symmetric physical-match filter (either club can be home or
+  away), so it no longer suppresses canonicalisation.
+- "biggest crowd richmond v carlton" and equivalent `total_score` matchup questions previously
+  ranked each physical match twice — once per `SIDES` perspective — doubling row counts and
+  producing ranking patterns like `1,1,3,3,5,5` instead of `1,2,3,4,5`. They now emit one row per
+  physical match, matching AFLDB-ISSUE-192's existing unscoped/side-scoped behaviour.
+- `validatePlan` (`src/search/nl/plan.ts`) already refuses a plan combining `scope.matchup` with
+  `scope.clubFor`/`scope.clubAgainst`, so a matchup constraint can never mask a genuine directional
+  side scope. `clubFor`/`clubAgainst` behaviour and non-symmetric team-match metrics are unchanged.
+  No new grain, metric, or parser semantics; `PARSER_VERSION` not bumped; no SQL/schema change
+  beyond the narrowed gate condition.
+
 ### NL search: symmetric team-match rankings no longer duplicate a match per side (AFLDB-ISSUE-192) - 15 September 2026
 
 - `answerTeamMatch` (`src/db/queries/nl/team-match.ts`) ranks `attendance` and `total_score` once

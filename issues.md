@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 0
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-194 | Low (P3) | NL team-match compiler — `src/db/queries/nl/team-match.ts` | Open | Implement the `scope.matchup` home-side gate for symmetric metrics; DB-backed regression in `tests/integration/nl-answers-team-club.test.ts` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32053,7 +32052,7 @@ follow-up recorded.
 
 - **Severity:** Low (P3).
 - **Area:** NL team-match compiler — `src/db/queries/nl/team-match.ts`.
-- **Status:** Open.
+- **Status:** Resolved 2026-09-16 (Sonnet 5 Medium), operator-validated.
 - **Found:** 2026-09-16, Stage 2 closeout audit (Sonnet 5 High), on main `e833d1e` (after the
   AFLDB-ISSUE-192 merge). Confirmed with DB-backed evidence via `AFLDB_TEST_DATABASE_URL`.
 - **Key files:** `src/db/queries/nl/team-match.ts`.
@@ -32118,6 +32117,68 @@ None.
 
 ### Implementation recommendation
 Sonnet 5, Medium effort.
+
+### Implementation notes (2026-09-16)
+`hasSideScope` (line ~132) narrowed from `clubFor || clubAgainst || matchup` to `clubFor ||
+clubAgainst` only; the canonical home-side predicate (`t.club_id = m.home_club_id`) now applies to
+`attendance`/`total_score` whenever there is no `clubFor`/`clubAgainst`, matchup included.
+`validatePlan` (`src/search/nl/plan.ts` ~line 2246) already refuses a plan combining `scope.matchup`
+with `scope.clubFor`/`scope.clubAgainst`, so this change cannot mask a genuine directional scope.
+DB-backed regression added to the existing ISSUE-192 block in
+`tests/integration/nl-answers-team-club.test.ts` (matchup-scoped attendance, matchup-scoped
+total_score, and a validatePlan mutual-exclusion control) using the Adelaide/Brisbane Bears pair
+from the Stage 2 evidence. Not yet run by this session (DB-backed test execution is operator work
+per repository policy) — operator validation required before Resolved.
+
+### Operator validation round 1 (2026-09-16)
+32/34 passed; the 2 new matchup symmetric-metric tests failed (`total = 5` vs. a hand-written
+count of 9). Root cause was in the new tests, not production: `team-match.ts`'s `total` is
+`count(*) OVER ()` computed after the `rnk <= n` filter (line ~242-244) — the size of the ranked
+result (ties at the cutoff included), not the full filtered historical count. The two tests
+compared `total` against every eligible historical match instead of the top-`n` ranked set.
+Corrected both tests to assert against a hand-written `rank() OVER (...) WHERE rnk <= n` query
+mirroring the compiler's own ranking shape, added an `eligibleMatchCount` guard (>5) so the tests
+genuinely exercise the ranking limit, and asserted returned match IDs/values equal the independent
+top-5 SQL result in order. No production code changed in this round.
+
+### Validation
+
+Operator-run, all green (2026-09-16):
+- `npx vitest run tests/integration/nl-answers-team-club.test.ts` → 34/34 passed
+- `npx tsc --noEmit` → clean
+
+### Resolution
+
+Resolved 2026-09-16 (Sonnet 5 Medium), operator-validated. In `src/db/queries/nl/team-match.ts`,
+`hasSideScope` (the gate controlling the AFLDB-ISSUE-192 canonical home-side predicate for
+`attendance`/`total_score`) is narrowed from `clubFor || clubAgainst || matchup` to `clubFor ||
+clubAgainst` only: only those two scopes are perspective-sensitive (directional), so only they
+still suppress canonicalisation. `scope.matchup` is a symmetric physical-match filter (either club
+can be home or away) and no longer suppresses the home-side restriction, so matchup-scoped
+`attendance`/`total_score` rankings now emit one canonical row per physical match instead of one
+per SIDES perspective. `clubFor`/`clubAgainst` behaviour is unchanged (AFLDB-ISSUE-192 unaffected).
+Non-symmetric team-match metrics are unchanged. `validatePlan` (`src/search/nl/plan.ts` ~line 2246)
+already refuses a plan combining `scope.matchup` with `scope.clubFor`/`scope.clubAgainst`, so a
+matchup constraint can never mask a genuine directional side scope — confirmed by a dedicated
+regression asserting that rejection. No parser semantics changed; `PARSER_VERSION` not bumped
+(compiler/query fix, not parser behaviour). No migration/schema change.
+
+**Test-contract correction (discovered during operator validation, round 1):** the initial
+regression incorrectly asserted `total` equals the full historical matchup count. `team-match.ts`
+computes `total` after the rank cutoff (`r.rnk <= n`), so for a normal top-5 ranking `total`
+reflects the ranked result set (5, or more only if ties straddle the cutoff), not all eligible
+historical matches (9, in the Adelaide v Brisbane Bears fixture). The corrected regression instead
+compares the NL top-5 against an independently hand-written SQL top-N ranking over `matches`
+(`rank() OVER (ORDER BY value DESC) ... WHERE rnk <= 5`), asserting unique match IDs, exact top-N
+ordering and values, and — via an `eligibleMatchCount` guard (>5) — that the fixture genuinely has
+more eligible matches than the ranking limit so the test exercises the cutoff rather than passing
+vacuously. This was a test-contract correction only; production code did not change after the
+original compiler fix (`hasSideScope` narrowing, above).
+
+**Files changed (implementation session, `sonnet/issue-194-team-match-symmetric-matchup`,
+`D:\dev\afldb-issue-194`):** `src/db/queries/nl/team-match.ts`,
+`tests/integration/nl-answers-team-club.test.ts`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md`.
+Not committed, not merged by this session — Git remains user-operated per `CLAUDE.md`.
 
 ## AFLDB-ISSUE-195 — NL: club-season conjunction can silently discard premiership semantics
 

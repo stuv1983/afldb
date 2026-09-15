@@ -507,6 +507,123 @@ describe('team_match matches hand-written SQL', () => {
       expect(Number(expected.count)).toBeGreaterThanOrEqual(matchIds.length);
     });
 
+    describe('AFLDB-ISSUE-194 matchup-scoped symmetric metrics still rank one row per physical match', () => {
+      async function matchupScope(): Promise<{ clubA: { organizationId: number; slug: string; name: string }; clubB: { organizationId: number; slug: string; name: string } }> {
+        const [adelaide] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'adelaide'`;
+        const [brisbaneBears] = await sql<{ id: number }[]>`SELECT id FROM club_organizations WHERE slug = 'brisbane-bears'`;
+        return {
+          clubA: { organizationId: adelaide.id, slug: 'adelaide', name: 'Adelaide' },
+          clubB: { organizationId: brisbaneBears.id, slug: 'brisbane-bears', name: 'Brisbane Bears' },
+        };
+      }
+
+      const matchupFilterSql = (orgIdA: number, orgIdB: number) => sql`
+        ((home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdA})
+          AND away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdB}))
+         OR (home_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdB})
+             AND away_club_id IN (SELECT id FROM clubs WHERE organization_id = ${orgIdA})))
+      `;
+
+      // Distinct eligible physical matches, uncapped -- used only to prove the
+      // fixture has more than `n` matches, so the ranking-limit assertions
+      // below actually exercise the cutoff rather than happening to pass
+      // because every eligible match fits under it.
+      async function eligibleMatchCount(orgIdA: number, orgIdB: number, metricColumn: 'attendance' | 'total_score'): Promise<number> {
+        const notNull = metricColumn === 'attendance'
+          ? sql`attendance IS NOT NULL`
+          : sql`home_score IS NOT NULL AND away_score IS NOT NULL`;
+        const [row] = await sql<{ count: string }[]>`
+          SELECT count(*) AS count FROM matches
+           WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND ${notNull}
+        `;
+        return Number(row.count);
+      }
+
+      // Same rank()/rnk<=n/ORDER BY value DESC, matchDate shape the compiler
+      // uses (team-match.ts), applied directly to `matches` since
+      // attendance/total_score are per-match, not per-side, values.
+      async function topNAttendance(orgIdA: number, orgIdB: number, n: number): Promise<{ id: number; value: number }[]> {
+        const rows = await sql<{ id: number; value: number }[]>`
+          WITH scored AS (
+            SELECT id, attendance AS value, match_date,
+                   rank() OVER (ORDER BY attendance DESC) AS rnk
+              FROM matches
+             WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND attendance IS NOT NULL
+          )
+          SELECT id, value FROM scored WHERE rnk <= ${n} ORDER BY value DESC, match_date
+        `;
+        return rows;
+      }
+
+      async function topNTotalScore(orgIdA: number, orgIdB: number, n: number): Promise<{ id: number; value: number }[]> {
+        const rows = await sql<{ id: number; value: number }[]>`
+          WITH scored AS (
+            SELECT id, (home_score + away_score) AS value, match_date,
+                   rank() OVER (ORDER BY (home_score + away_score) DESC) AS rnk
+              FROM matches
+             WHERE ${matchupFilterSql(orgIdA, orgIdB)} AND home_score IS NOT NULL AND away_score IS NOT NULL
+          )
+          SELECT id, value FROM scored WHERE rnk <= ${n} ORDER BY value DESC, match_date
+        `;
+        return rows;
+      }
+
+      it('matchup-scoped "biggest crowd" (attendance) returns the top-5 physical matches, not doubled perspective rows', async () => {
+        const matchup = await matchupScope();
+        const eligible = await eligibleMatchCount(matchup.clubA.organizationId, matchup.clubB.organizationId, 'attendance');
+        expect(eligible).toBeGreaterThan(5); // otherwise this test can't exercise the ranking limit
+
+        const { rows, total } = await teamMatch({
+          metric: 'attendance', agg: { kind: 'top_n', n: 5 },
+          scope: { matchup },
+        }, 100);
+
+        const matchIds = rows.map((r) => r.matchId);
+        expect(new Set(matchIds).size).toBe(matchIds.length); // no physical match appears twice
+        expect(total).toBe(matchIds.length); // total = ranked row count (post rnk<=n), not the full 9-match history
+
+        const expected = await topNAttendance(matchup.clubA.organizationId, matchup.clubB.organizationId, 5);
+        expect(matchIds).toEqual(expected.map((r) => r.id));
+        expect(rows.map((r) => r.value)).toEqual(expected.map((r) => r.value));
+      });
+
+      it('matchup-scoped "highest combined score" (total_score) returns the top-5 physical matches, not doubled perspective rows', async () => {
+        const matchup = await matchupScope();
+        const eligible = await eligibleMatchCount(matchup.clubA.organizationId, matchup.clubB.organizationId, 'total_score');
+        expect(eligible).toBeGreaterThan(5);
+
+        const { rows, total } = await teamMatch({
+          metric: 'total_score', agg: { kind: 'top_n', n: 5 },
+          scope: { matchup },
+        }, 100);
+
+        const matchIds = rows.map((r) => r.matchId);
+        expect(new Set(matchIds).size).toBe(matchIds.length);
+        expect(total).toBe(matchIds.length);
+
+        const expected = await topNTotalScore(matchup.clubA.organizationId, matchup.clubB.organizationId, 5);
+        expect(matchIds).toEqual(expected.map((r) => r.id));
+        expect(rows.map((r) => r.value)).toEqual(expected.map((r) => r.value));
+
+        // Ranking correctness: value strictly non-increasing across returned rows.
+        for (let i = 1; i < rows.length; i++) {
+          expect(rows[i].value).toBeLessThanOrEqual(rows[i - 1].value);
+        }
+      });
+
+      it('matchup scope cannot coexist with clubFor/clubAgainst (validatePlan rejects it, confirming matchup and side scope are mutually exclusive)', async () => {
+        const matchup = await matchupScope();
+        const raw: NlQueryPlan = {
+          v: 1, grain: 'team_match', metric: 'total_score', agg: { kind: 'max' },
+          scope: { matchup, clubFor: matchup.clubA },
+          careerConditions: [], careerPredicates: [], clubSeasonConditions: [],
+          tiePolicy: 'all', limit: 25,
+        };
+        const validated = validatePlan(raw);
+        expect('error' in validated).toBe(true);
+      });
+    });
+
     it('side-dependent metrics (team_score) are unaffected and keep ranking both sides', async () => {
       const { rows } = await teamMatch({ metric: 'team_score', agg: { kind: 'top_n', n: 5 } }, 100);
       expect(rows.length).toBeGreaterThanOrEqual(5);
