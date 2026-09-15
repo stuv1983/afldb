@@ -590,10 +590,20 @@ describe('regression: extractHavingClause requires a club/team subject (AFLDB-IS
     expect(p.havingClause).toBeUndefined();
   });
 
-  it('clubs that have won more than 10 premierships -> a club/team subject still elects the grouped having clause', async () => {
-    const p = await plan('clubs that have won more than 10 premierships');
-    expect(p.grain).toBe('team_match');
-    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 10 });
+  // AFLDB-ISSUE-193: "premierships" governs the number here, not match
+  // wins -- AFLDB has no club-lineage premiership-count grain, so this
+  // must decline by name rather than silently answer a club match-win
+  // threshold under a career-only noun.
+  it('clubs that have won more than 10 premierships -> declines, not a club having clause on match wins', async () => {
+    const result = await parse('clubs that have won more than 10 premierships');
+    expect(result.status).not.toBe('plan');
+    expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
+  });
+
+  it('teams that have won 5 flags -> declines, not a club having clause on match wins', async () => {
+    const result = await parse('teams that have won 5 flags');
+    expect(result.status).not.toBe('plan');
+    expect(result.report.notes.join(' ')).toMatch(/does not total a club's premierships/);
   });
 
   it('teams with more than 2 wins against Richmond -> unchanged club-subject grouped having clause', async () => {

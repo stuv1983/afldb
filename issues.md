@@ -31904,7 +31904,7 @@ None.
 - **Severity:** Medium (P2). A confident club list answers a different question.
 - **Area:** NL search / grouped having-clause extraction — `src/search/nl/parser.ts`
   `extractHavingClause`.
-- **Status:** Open / Planning.
+- **Status:** Resolved 2026-09-15 (Sonnet 5), operator-validated.
 - **Found:** 2026-09-15, during AFLDB-ISSUE-189 planning (Opus 5 High), by reading code and an
   accepted regression. Not reproduced against a database.
 - **Key files:** `src/search/nl/parser.ts` — `extractHavingClause` (~1398-1413, grouped-result
@@ -31956,3 +31956,71 @@ None.
 
 ### Operator verification expectations
 `npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts`, `npx tsc --noEmit`.
+
+### Root cause
+
+Numeric-comparator ownership inside `extractHavingClause`: the grouped-result extractor saw result
+wording such as `won` and claimed the nearest number without checking which noun that number
+actually governed. In "clubs that have won more than 10 premierships", `10` belongs to
+`premierships`, not match wins — the extractor claimed it as a `team_match` wins threshold anyway
+and the career-only noun was silently lost.
+
+### Fix (2026-09-15, Sonnet 5)
+
+`extractHavingClause` (`src/search/nl/parser.ts`) now checks the text immediately following the
+number it is about to claim, not just the wider verb-anchored window. A new
+`GOVERNED_NON_RESULT_CAREER_NOUN_RE` (derived from `CAREER_STAT_WORDS`, minus the four nouns this
+family already owns — `wins`/`losses`/`draws`/`games`) matches when that following text names a
+career/season-total noun instead (`premierships`/`flags`, `finals`, `clubs`, `goals`, `brownlow
+medals`/`votes`). When it matches, the candidate number/value is discarded (`value = null`) and the
+loop tries the next grouped-result word, so the whole extractor makes no claim at all — the number
+and its governing noun are left untouched in the text.
+
+The lookahead is taken from the number's own absolute position in `working`, not from a slice of
+the already 20-char-truncated verb `window`: the premierships case put "10" near the far edge of
+that window, leaving too few characters inside it to see all of "premierships" and silently
+under-matching the guard.
+
+With no `havingClause` and no `teamMetricResult.metric`, "clubs that have won more than 10
+premierships" falls through grain election to the existing `clubSeasonCuePresent` branch
+(`clubSubjectPreCue` fires on the leading "clubs"), electing `club_season` with `metric === null`
+and no `clubSeasonConditionResult` conditions (the premierships condition lands in
+`careerResult.conditions`, a different bucket). That hits the pre-existing AFLDB-ISSUE-189 R2 guard
+unchanged, declining with "AFLDB answers club questions one season at a time ... it does not total
+a club's premierships or other records across its history." No new decline path or note text was
+added; the fix routes the query into an existing, already-tested fail-closed guard instead of
+letting `extractHavingClause` intercept it first.
+
+`tests/nl-parser.test.ts`: the ISSUE-188 regression at (was) ~593-597 asserted the incorrect
+`team_match`/`havingClause {metric:'wins', op:'gt', value:10}` plan — updated in place to assert a
+decline matching the R2 note, per this issue's Required tests. Added "teams that have won 5 flags"
+(decline) alongside it. The other three ISSUE-188 cases in that `describe` block (player-subject
+gating, "richmond players who have won 3 premierships") and the two preserved grouped-result cases
+("teams with more than 2 wins against Richmond", "teams to lose 5 times by more than 100 points")
+are untouched and still pass.
+
+`PARSER_VERSION` bumped 45 → 46 (`src/search/nl/plan.ts`) with a `// v46` comment in the existing
+style, since this changes a query outcome (decline instead of a plan).
+
+**Not new premiership-total support.** This is a wrong-answer prevention fix, not a feature: AFLDB
+still has no all-time club-premiership totals grain (unchanged from ISSUE-189), and the query now
+declines by name instead of silently answering the wrong question. Legitimate grouped team-result
+queries ("teams with more than 2 wins against Richmond", "teams to lose 5 times by more than 100
+points") are unchanged.
+
+**Files changed:** `src/search/nl/parser.ts`, `src/search/nl/plan.ts`, `tests/nl-parser.test.ts`.
+
+### Validation
+
+Operator-run, both green:
+- `npx vitest run tests/nl-parser.test.ts tests/nl-semantic-mapping.test.ts` → 547/547 passed
+- `npx tsc --noEmit` → clean
+
+### Resolution
+
+Resolved 2026-09-15 (Sonnet 5). The ISSUE-188 assertion at `tests/nl-parser.test.ts` that
+previously blessed the incorrect `team_match`/`havingClause {metric:'wins', op:'gt', value:10}`
+plan for "clubs that have won more than 10 premierships" was intentionally corrected under this
+issue to assert the decline instead; that ISSUE-188 case is otherwise unaffected (its player-subject
+gating stays correct) and no other ISSUE-188 coverage was weakened. No migration/schema change. No
+follow-up recorded.

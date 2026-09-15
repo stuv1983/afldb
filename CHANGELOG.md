@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### NL search: a club-subject "won more than N premierships/flags" no longer counts match wins (AFLDB-ISSUE-193) - 15 September 2026
+
+- `extractHavingClause` (`src/search/nl/parser.ts`) no longer claims a number for a grouped
+  team-result threshold (wins/losses/draws/games) without checking which noun that number actually
+  governs. A new guard checks the text immediately following the candidate number against
+  non-result career/season nouns (`premierships`/`flags`, `finals`, `clubs`, `goals`, `brownlow
+  medals`/`votes`) before claiming the threshold; when one of those nouns is what the number
+  governs, the extractor makes no claim at all.
+- "clubs that have won more than 10 premierships" previously elected `team_match` with
+  `havingClause { metric: 'wins', op: 'gt', value: 10 }`, silently answering a match-win threshold
+  instead of a premiership count. It now falls through to the existing AFLDB-ISSUE-189 fail-closed
+  behaviour and declines by name, since AFLDB still has no all-time club-premiership totals grain.
+  This is a wrong-answer prevention fix, not new premiership-total support.
+- Legitimate grouped team-result questions are unchanged: "teams with more than 2 wins against
+  Richmond" and "teams to lose 5 times by more than 100 points" still plan as before.
+- `PARSER_VERSION` bumped to 46.
+
 ### NL search: the boundary extractor no longer claims bare "first" in finals scope (AFLDB-ISSUE-191) - 15 September 2026
 
 - Period-split and score-checkpoint extraction (`extractPeriodSplit`, `extractScoreCheckpoint` in

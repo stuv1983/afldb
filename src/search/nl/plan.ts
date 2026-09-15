@@ -458,7 +458,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // grand final" no longer elects a debut boundary and drops the metric. A
 // boundary election that still sees a player metric consumed alongside it
 // now refuses outright instead of silently answering plain membership.
-export const PARSER_VERSION = 45;
+// v46 -- AFLDB-ISSUE-193: extractHavingClause no longer claims a number
+// whose governing noun is a career/season total ("premierships"/"flags"
+// and the other CAREER_STAT_WORDS AFLDB does not grain at club level) as a
+// grouped team_match wins/losses count. A club/team-subject question like
+// "clubs that have won more than 10 premierships" now falls through to the
+// existing R2 club_season decline instead of silently answering a match-win
+// threshold under the wrong noun. Genuine grouped match-result readings
+// ("teams with more than 2 wins against Richmond") are unchanged.
+export const PARSER_VERSION = 46;
 
 // ------------------------------------------------------------------ grain
 
