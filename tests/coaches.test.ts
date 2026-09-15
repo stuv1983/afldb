@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   coachPerspectiveMargin,
@@ -96,5 +97,68 @@ describe('selectCareerRecordMatch', () => {
   it('returns null for either direction when there are no qualifying matches (zero-game coach)', () => {
     expect(selectCareerRecordMatch([], 'win')).toBeNull();
     expect(selectCareerRecordMatch([], 'loss')).toBeNull();
+  });
+});
+
+/**
+ * AFLDB-ISSUE-174 §18 Phase 2 — the index's job is find/browse by name, not
+ * rank by games (that is `/records/coaches`' job), so the default sort
+ * changed from games-desc to name-asc. Fixture games are chosen so the two
+ * orders disagree (name-asc: Adams, Zamboni; games-desc: Zamboni, Adams),
+ * which is what actually pins the change rather than the label on the prop.
+ */
+const listCoachesMock = vi.hoisted(() => ({
+  coaches: [] as { id: number; displayName: string; firstSeason: number | null; lastSeason: number | null; games: number }[],
+}));
+
+// src/db/queries/coaches.ts imports `sql` from here at module load, and the
+// real client throws immediately if DATABASE_URL is not set (it is not, in
+// a unit-test run) -- so the DB-facing dependency is stubbed here, never
+// the queries module itself. This lets `importOriginal` below evaluate the
+// REAL coaches.ts (keeping coachPerspectiveMargin/selectCareerRecordMatch
+// genuine) without ever touching a database.
+vi.mock('@/db/client', () => ({
+  sql: () => { throw new Error('tests/coaches.test.ts must not execute real SQL'); },
+}));
+
+vi.mock('@/db/queries/coaches', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/db/queries/coaches')>();
+  return { ...actual, listCoaches: async () => listCoachesMock.coaches };
+});
+
+describe('/coaches index defaults to name-ascending, not games-descending', () => {
+  beforeEach(() => {
+    listCoachesMock.coaches = [
+      { id: 1, displayName: 'Zed Zamboni', firstSeason: 2000, lastSeason: 2010, games: 50 },
+      { id: 2, displayName: 'Amy Adams', firstSeason: 1990, lastSeason: 1995, games: 10 },
+    ];
+  });
+
+  it('renders rows in name order (Amy Adams before Zed Zamboni), not games order', async () => {
+    const CoachesPage = (await import('@/app/coaches/page')).default;
+    const html = renderToStaticMarkup(await CoachesPage());
+
+    expect(html.indexOf('Amy Adams')).toBeLessThan(html.indexOf('Zed Zamboni'));
+  });
+
+  it('marks the Name column, not Games, as the active ascending sort', async () => {
+    const CoachesPage = (await import('@/app/coaches/page')).default;
+    const html = renderToStaticMarkup(await CoachesPage());
+    const headers = [...html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)]
+      .map((m) => ({ raw: m[0], text: m[1].replace(/<[^>]*>/g, '') }));
+
+    const nameHeader = headers.find((h) => h.text.includes('Name'));
+    const gamesHeader = headers.find((h) => h.text.includes('Games'));
+
+    expect(nameHeader?.raw).toContain('aria-sort="ascending"');
+    expect(gamesHeader?.raw).toContain('aria-sort="none"');
+  });
+
+  it('adds a cross-link to the records leaderboard', async () => {
+    const CoachesPage = (await import('@/app/coaches/page')).default;
+    const html = renderToStaticMarkup(await CoachesPage());
+
+    expect(html).toContain('href="/records/coaches"');
+    expect(html).toContain('Games and win-percentage leaderboards');
   });
 });

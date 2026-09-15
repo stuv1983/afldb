@@ -47,38 +47,32 @@ export function CoachOpponentSelector({
   }
 
   return (
-    <div className="section">
-      <fieldset className="filter-group">
-        <legend>Choose an opponent</legend>
-        <div className="filter-grid">
-          <div>
-            <label htmlFor="coach-opponent">Opponent club</label>
-            <select
-              id="coach-opponent"
-              name="opponent"
-              value={selected ?? ''}
-              onChange={(e) => onChange(e.target.value)}
-            >
-              <option value="">Choose an opponent…</option>
-              {current.length > 0 && (
-                <optgroup label="Current clubs">
-                  {current.map((o) => <option key={o.id} value={o.slug}>{o.name}</option>)}
-                </optgroup>
-              )}
-              {former.length > 0 && (
-                <optgroup label="Former clubs">
-                  {former.map((o) => <option key={o.id} value={o.slug}>{o.name}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </div>
-        </div>
-        {selected && (
-          <div className="filter-actions">
-            <Link className="btn btn-secondary" href={basePath} prefetch={false} scroll={false}>Clear</Link>
-          </div>
+    <div className="filter-group">
+      <label htmlFor="coach-opponent">Opponent club</label>{' '}
+      <select
+        id="coach-opponent"
+        name="opponent"
+        value={selected ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Choose an opponent…</option>
+        {current.length > 0 && (
+          <optgroup label="Current clubs">
+            {current.map((o) => <option key={o.id} value={o.slug}>{o.name}</option>)}
+          </optgroup>
         )}
-      </fieldset>
+        {former.length > 0 && (
+          <optgroup label="Former clubs">
+            {former.map((o) => <option key={o.id} value={o.slug}>{o.name}</option>)}
+          </optgroup>
+        )}
+      </select>
+      {selected && (
+        <>
+          {' '}
+          <Link href={basePath} prefetch={false} scroll={false}>Clear</Link>
+        </>
+      )}
     </div>
   );
 }

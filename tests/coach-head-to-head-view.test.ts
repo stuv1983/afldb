@@ -226,6 +226,35 @@ describe('CoachHeadToHeadSection', () => {
     expect(html).not.toContain('undefined');
   });
 
+  it('wraps the whole section as one open-by-default disclosure (AFLDB-ISSUE-174)', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({ coachA, coachB, headToHead: headToHead() }),
+    );
+    expect((html.match(/<details/g) ?? []).length).toBe(1);
+    expect(html).toContain('<h2 class="table-details-title">Head-to-head</h2>');
+  });
+
+  it('keeps the disclosure wrapper for the failed-load and never-met states too', () => {
+    const failed = renderToStaticMarkup(
+      CoachHeadToHeadSection({ coachA, coachB, headToHead: null }),
+    );
+    expect((failed.match(/<details/g) ?? []).length).toBe(1);
+
+    const neverMet = renderToStaticMarkup(
+      CoachHeadToHeadSection({
+        coachA, coachB,
+        headToHead: {
+          coachAId: 1, coachBId: 2,
+          totals: { meetings: 0, aWins: 0, bWins: 0, draws: 0, aWinPct: null, bWinPct: null, finals: 0, grandFinals: 0 },
+          biggestWinA: null, biggestWinB: null, venues: [],
+          overlap: overlap({ seasons: 8 }),
+          firstMeeting: null, lastMeeting: null,
+        },
+      }),
+    );
+    expect((neverMet.match(/<details/g) ?? []).length).toBe(1);
+  });
+
   it("renders each coach's first and most recent direct meeting with season, date and venue", () => {
     const html = renderToStaticMarkup(
       CoachHeadToHeadSection({ coachA, coachB, headToHead: headToHead() }),
@@ -253,5 +282,20 @@ describe('CoachHeadToHeadSection', () => {
     );
     const noMeetingCells = html.match(/No canonical direct meeting on record\./g) ?? [];
     expect(noMeetingCells.length).toBe(2);
+  });
+
+  it('wraps the 9-column venue table in ExpandableTableFrame, matching the club/venue tables elsewhere in this issue (AFLDB-ISSUE-174)', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({ coachA, coachB, headToHead: headToHead() }),
+    );
+    expect(html.match(/Expand table/g)).toHaveLength(1);
+  });
+
+  it('does not offer an expand control when there is no venue history to expand', () => {
+    const html = renderToStaticMarkup(
+      CoachHeadToHeadSection({ coachA, coachB, headToHead: headToHead({ venues: [] }) }),
+    );
+    expect(html).not.toContain('Expand table');
+    expect(html).toContain('No canonical direct-meeting venue history on record.');
   });
 });

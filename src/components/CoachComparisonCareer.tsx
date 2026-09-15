@@ -1,5 +1,6 @@
 import type { ResolvedCoach } from '@/app/coaches/compare/state';
 import { CoachBiggestWinLossTable, CoachTotalsTable, CoachVenueHistoryTable } from '@/components/CoachCareerRecord';
+import { CollapsibleTable } from '@/components/CollapsibleTable';
 import type { CoachCareer } from '@/db/queries/coaches';
 
 /**
@@ -64,45 +65,48 @@ export function CoachComparisonCareer({
 
   return (
     <>
-      <section className="section">
-        <h2>Career</h2>
-        <div className="grid grid-panels grid-shrink">
-          {pairs.map(({ coach, career }) => (
-            <div key={coach.coach.id}>
-              <h3>{coach.coach.displayName}</h3>
-              <CoachTotalsTable totals={career.totals} />
-            </div>
-          ))}
+      <CollapsibleTable title="Career">
+        <div className="grid-compare-container">
+          <div className="grid grid-panels grid-shrink grid-compare">
+            {pairs.map(({ coach, career }) => (
+              <div key={coach.coach.id}>
+                <h3>{coach.coach.displayName}</h3>
+                <CoachTotalsTable totals={career.totals} />
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </CollapsibleTable>
 
-      <section className="section">
-        <h2>Biggest win and loss</h2>
-        <div className="grid grid-panels grid-shrink">
-          {pairs.map(({ coach, career }) => (
-            <div key={coach.coach.id}>
-              <h3>{coach.coach.displayName}</h3>
-              <CoachBiggestWinLossTable
-                biggestWin={career.biggestWin}
-                biggestLoss={career.biggestLoss}
-                showCoachedClub={career.clubs.length > 1}
-              />
-            </div>
-          ))}
+      <CollapsibleTable title="Biggest win and loss">
+        <div className="grid-compare-container">
+          <div className="grid grid-panels grid-shrink grid-compare">
+            {pairs.map(({ coach, career }) => (
+              <div key={coach.coach.id}>
+                <h3>{coach.coach.displayName}</h3>
+                <CoachBiggestWinLossTable
+                  biggestWin={career.biggestWin}
+                  biggestLoss={career.biggestLoss}
+                  showCoachedClub={career.clubs.length > 1}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </CollapsibleTable>
 
-      <section className="section">
-        <h2>Venue history</h2>
-        <div className="grid grid-panels grid-shrink">
-          {pairs.map(({ coach, career }) => (
-            <div key={coach.coach.id}>
-              <h3>{coach.coach.displayName}</h3>
-              <CoachVenueHistoryTable venues={career.venues} />
-            </div>
-          ))}
+      <CollapsibleTable title="Venue history">
+        <div className="grid-compare-container">
+          <div className="grid grid-panels grid-shrink grid-compare">
+            {pairs.map(({ coach, career }) => (
+              <div key={coach.coach.id}>
+                <h3>{coach.coach.displayName}</h3>
+                <CoachVenueHistoryTable venues={career.venues} />
+              </div>
+            ))}
+          </div>
         </div>
-      </section>
+      </CollapsibleTable>
     </>
   );
 }

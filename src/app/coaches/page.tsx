@@ -29,14 +29,17 @@ export default async function CoachesPage() {
         <p className="subtitle">
           {formatNumber(coaches.length)} people have coached a VFL/AFL match.
         </p>
+        <p className="section-note">
+          See also: <Link href="/records/coaches">Games and win-percentage leaderboards →</Link>
+        </p>
       </div>
 
       <CollapsibleTable id="coaches" title="Coaches" note={`${formatNumber(coaches.length)} found`}>
         <ExpandableTableFrame title="Coaches">
           <div className="table-wrap">
             <SortableTable
-              defaultSort="games"
-              defaultDir="desc"
+              defaultSort="name"
+              defaultDir="asc"
               columns={[
                 { key: 'name', label: 'Name', sortType: 'text' },
                 { key: 'seasons', label: 'Seasons', sortType: 'number', className: 'num nowrap' },

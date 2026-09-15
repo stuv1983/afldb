@@ -15,6 +15,60 @@ commit.
 
 ## [Unreleased]
 
+### Coaches page family: disclosures, deduplicated totals, expandable tables, deterministic comparison grid (AFLDB-ISSUE-174) - 15 September 2026
+
+- Implemented the `AFLDB-ISSUE-174.md` design/planning runbook's phased plan (§18 Phases 1-4) on
+  top of the existing "almanac" design system and the `AFLDB-ISSUE-173` `classic`/`sidebar`
+  layouts — no new visual identity, no schema/query/route/permission change.
+- `/coaches/[slug]`: "Coaching record" and "History against club" are now `CollapsibleTable`
+  disclosures, matching every other AFLDB profile page. `CoachCareerBody` gained a
+  `showTotalsTable` prop (default `true`); the standalone page passes `showTotalsTable={false}` so
+  the `.stat-strip` headline is no longer immediately followed by a second `CoachTotalsTable`
+  showing the same six numbers. `PlayerCoachingCareer` is unaffected — its call site keeps the
+  default `true`. `CoachClubTable`/`CoachVenueHistoryTable` gained `ExpandableTableFrame` wiring on
+  this route via a new `expandWideTables` prop (default `false`, also preserving
+  `PlayerCoachingCareer`'s existing rendering).
+- `CoachOpponentSelector` dropped its `fieldset`/`legend`/`.filter-grid` wrapper for a plain
+  `<label htmlFor>+<select>`, matching the player-linked `CoachOpponentHistoryClient` control
+  exactly. The `AFLDB-ISSUE-172` `router.push(..., { scroll: false })` fix is untouched and was
+  re-verified working (no full reload, no scroll-to-top) on both layouts.
+- `/coaches`: default sort changed from `games desc` to `name asc`, so the index reads as a
+  browse/lookup surface rather than competing with `/records/coaches`' leaderboard framing. Added
+  one cross-link from the index to `/records/coaches`.
+- `/coaches/compare`: `CoachComparisonCareer` ("Career", "Biggest win and loss", "Venue history")
+  and `CoachHeadToHeadSection` ("Head-to-head") are now independent `CollapsibleTable` disclosures,
+  matching the player page's stacked-disclosure convention. The two-coach comparison tables remain
+  side-by-side per-coach tables, deliberately not merged into a single metric-rows table — changing
+  only the coach side of that convention would create presentation drift from `ClubComparisonCareer`.
+  `getCoachRecordsByMetric` remains unused/unexposed, per the runbook's explicit non-goal.
+- The compare page's comparison grid now switches deterministically between one and two columns at
+  a fixed available-content-width threshold (a CSS container query, `.grid-compare-container` /
+  `.grid-compare`, 672px), rather than `.grid-panels`' generic `auto-fit` reflow, which previously
+  collapsed to one column at a threshold that silently shifted with the `sidebar` layout's narrower
+  content column. Verified to switch independently and correctly per layout at the same viewport
+  (e.g. 1024px: two columns in `classic`, one column in `sidebar`, because their actual content
+  widths differ).
+- **Found and fixed during rendered acceptance:** the first version of the container-query rule put
+  `container-type: inline-size` and the `@container` override on the same class, which silently
+  never applied (a size-containment container cannot be the query target of its own `@container`
+  rule) — the grid was still running on plain `auto-fit`, which happened to look right at most
+  probed widths only because its own natural breakpoint sits close to the intended one. Fixed by
+  moving `container-type` onto a dedicated wrapping `.grid-compare-container` element around each
+  of the three comparison grids.
+- Validated with focused unit tests across five suites (`coach-career-record`,
+  `coach-profile-route`, `coaches`, `coach-comparison-career`, `coach-head-to-head-view`) — 81/81 —
+  and a manual DEV-database-backed rendered-acceptance pass (Playwright) across `classic`/`sidebar`
+  at 375/640/768/1024/1440px covering the index, a multi-club coach, a single-club coach, the
+  zero-game coach case, the compare page and the opponent-history interaction: no horizontal
+  overflow, no hydration/console errors, `ExpandableTableFrame` keyboard/focus behaviour intact.
+  `npm run typecheck` also passed.
+- **Final Vercel Web Interface Guidelines review:** 0 MUST FIX, 1 SHOULD FIX found and fixed —
+  `CoachHeadToHeadVenueTable` (9 columns, the widest table in this feature) was missing the
+  `ExpandableTableFrame` wiring the runbook's own table strategy called for, unlike the
+  equal/lesser-width club and venue tables Phase 1 already wired; `CoachHeadToHead.tsx` now wraps
+  it the same way. `tests/coach-head-to-head-view.test.ts` extended; post-fix regression 16/16.
+  Remaining findings were optional or pre-existing site convention, out of scope.
+
 ### Super Admin selectable frontend layout styles (AFLDB-ISSUE-173) - 15 September 2026
 
 - Added a new, independent Super Admin setting, **Layout** (`classic | sidebar`, default
