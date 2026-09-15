@@ -1420,6 +1420,21 @@ function extractResultFilter(text: string): { text: string; resultFilter?: NlQue
  * it names no player subject either; they are refused only when a player
  * subject is present and no club subject is (AFLDB-ISSUE-188).
  */
+
+/**
+ * AFLDB-ISSUE-193: career/season-total nouns this family's own words
+ * (draws/wins/losses/games) never mean, checked against the text right
+ * after a candidate number so extractHavingClause below can tell "10" in
+ * "won more than 10 premierships" apart from "10" in "more than 10 wins".
+ * Reuses CAREER_STAT_WORDS's nouns rather than a separate list, minus the
+ * four this family already claims itself.
+ */
+const GOVERNED_NON_RESULT_CAREER_NOUN_RE = new RegExp(
+  `^\\s*(?:${CAREER_STAT_WORDS
+    .filter(([, column]) => column !== 'wins' && column !== 'losses' && column !== 'draws' && column !== 'games')
+    .map(([re]) => re.source)
+    .join('|')})`,
+);
 function extractHavingClause(text: string, clubSubject: boolean, playerSubject: boolean): {
   text: string;
   havingClause?: { metric: NlHavingMetric; op: NlCompareOp; value: number };
@@ -1448,24 +1463,50 @@ function extractHavingClause(text: string, clubSubject: boolean, playerSubject: 
       let op: NlCompareOp = 'gte';
       let value: number | null = null;
       let countStr = '';
-      
+      let countEnd = -1;
+
       const twice = /\btwice\b/.exec(window);
       const thrice = /\b(?:thrice|3 times)\b/.exec(window);
       const times = /\b(\d{1,4})\s+times\b/.exec(window);
-      if (twice) { value = 2; countStr = twice[0]; }
-      else if (thrice) { value = 3; countStr = thrice[0]; }
-      else if (times) { value = Number(times[1]); countStr = times[0]; }
+      if (twice) { value = 2; countStr = twice[0]; countEnd = twice.index + twice[0].length; }
+      else if (thrice) { value = 3; countStr = thrice[0]; countEnd = thrice.index + thrice[0].length; }
+      else if (times) { value = Number(times[1]); countStr = times[0]; countEnd = times.index + times[0].length; }
       else {
         const digits = /\b(\d{1,4})\b/.exec(window);
-        if (digits) { value = Number(digits[1]); countStr = digits[0]; }
+        if (digits) { value = Number(digits[1]); countStr = digits[0]; countEnd = digits.index + digits[0].length; }
         else {
           // The same number-word vocabulary the threshold extractors use
           // ("exactly three wins against Carlton") -- digits win when both
           // are present, mirroring readCount's rule.
           for (const [word, n] of Object.entries(NUMBER_WORDS)) {
             const wordMatch = new RegExp(`\\b${word}\\b`).exec(window);
-            if (wordMatch) { value = n; countStr = wordMatch[0]; break; }
+            if (wordMatch) { value = n; countStr = wordMatch[0]; countEnd = wordMatch.index + wordMatch[0].length; break; }
           }
+        }
+      }
+
+      // AFLDB-ISSUE-193: the number just found must actually govern THIS
+      // family's grouped match-result noun (or none -- "won more than 10"
+      // bare defaults to games/wins). When the noun immediately after the
+      // number instead names a career/season total AFLDB does not grain
+      // this way ("10 premierships", "5 flags", "2 brownlow medals"),
+      // claiming it here answers a different question -- "clubs that have
+      // won more than 10 premierships" used to elect a team_match wins
+      // having clause and silently lose "premierships" entirely. Checked
+      // against a fresh lookahead from the number's OWN position in
+      // `working`, not a slice of the already-truncated verb `window` --
+      // that window's budget is sized around the verb, and a number near
+      // its far edge (as in the premierships example) can leave too few
+      // characters left inside `window` to see the whole governing noun,
+      // silently under-matching. Never checked against text BEFORE the
+      // number: a LEADING "clubs"/"teams" subject noun must never collide
+      // with this.
+      if (value !== null && countEnd >= 0) {
+        const absoluteCountEnd = windowStart + countEnd;
+        const afterNumber = working.slice(absoluteCountEnd, absoluteCountEnd + 20);
+        if (GOVERNED_NON_RESULT_CAREER_NOUN_RE.test(afterNumber)) {
+          value = null;
+          countStr = '';
         }
       }
 
