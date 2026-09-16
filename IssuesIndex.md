@@ -69,12 +69,16 @@ all now resolved. Stage 2 is **not** closed by this: the three soft classes rema
 (item 4 below), and the rest of the Stage 2 closeout sequence remains outstanding.
 
 **AFLDB-ISSUE-200 opened 2026-09-16** (planning only, Sonnet 5) for item 4's soft-class audit. Runbook
-`AFLDB-ISSUE-200.md` written; classification schema, audit tooling proposal (`tools/nl/
-audit-issue-200-extract.ts` + `audit-issue-200-cluster.ts`, not yet written), and a finding that
+`AFLDB-ISSUE-200.md` written; classification schema, audit tooling proposal, and a finding that
 `failures.csv` lacks the `expected_*` fields this audit needs (use `results.jsonl` instead) are all
-recorded there. No parser/planner/scorer code changed; no DEV commands run this session (no DEV file
-access from this Windows session). Next: an implementation session with DEV file access writes the
-tooling and performs the actual 1,063-row classification per the runbook.
+recorded there. **Implementation session, 2026-09-16 (Sonnet 5):** `tools/nl/audit-issue-200-extract.ts`
+and `tools/nl/audit-issue-200-cluster.ts` (plus a shared constants module) are now written, with
+DB-free unit tests against synthetic fixtures (`tests/nl-issue-200-audit-extract.test.ts`,
+`tests/nl-issue-200-audit-cluster.test.ts`). No parser/planner/scorer code changed; no DEV commands
+run this session either (still no DEV file access from Windows), and `npm run typecheck`/the new
+tests have not yet been executed by any session -- see `issues.md` for the exact commands. Next: an
+operator/session with DEV file access runs the two scripts against `/home/arm/nl-stress-v50-cleaned/`
+and performs the actual 1,063-row cluster classification per the runbook.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -94,12 +98,13 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    (`tools/nl/fix-issue-199-stale-expectations.ts`), operator-run against the real canonical CSV
    (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
    173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
-4. **In progress — AFLDB-ISSUE-200** (opened 2026-09-16, planning done, implementation not started).
-   Audit and classify all 1,063 soft rows (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
-   `WRONG_FAILURE_REASON` 70) into stale-expectation / genuine-defect / intentional-decline /
-   taxonomy-drift / scorer-artifact / duplicate-manifestation clusters before deciding what, if
-   anything, needs fixing. Not the same task as the fresh exploratory Codex corpus sweep, which
-   remains a separate, later Stage 2 phase gated on this audit's genuine-defect follow-ons and any
-   justified corpus corrections landing first. Runbook: `AFLDB-ISSUE-200.md`.
+4. **In progress — AFLDB-ISSUE-200** (opened 2026-09-16, planning done, audit tooling implemented
+   and unit-tested 2026-09-16, DEV run not started). Audit and classify all 1,063 soft rows
+   (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) into
+   stale-expectation / genuine-defect / intentional-decline / taxonomy-drift / scorer-artifact /
+   duplicate-manifestation clusters before deciding what, if anything, needs fixing. Not the same
+   task as the fresh exploratory Codex corpus sweep, which remains a separate, later Stage 2 phase
+   gated on this audit's genuine-defect follow-ons and any justified corpus corrections landing
+   first. Runbook: `AFLDB-ISSUE-200.md`.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

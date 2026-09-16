@@ -1,8 +1,17 @@
 # AFLDB-ISSUE-200 — Audit remaining NL V2 soft findings
 
-Status: **Planning** (2026-09-16, Sonnet 5). This is a triage/audit runbook, not an implementation
-runbook: no parser/planner/scorer code changes are proposed or made here. See `issues.md` for the
-ledger entry.
+Status: **Implementation done, DEV run pending** (planning 2026-09-16, tooling implemented
+2026-09-16, both Sonnet 5). §4's two scripts are written and unit-tested against synthetic
+fixtures; the actual DEV extraction/clustering run against `nl-stress-v50-cleaned/` has not been
+performed. No parser/planner/scorer code changes are proposed or made here or by the tooling. See
+`issues.md` for the ledger entry and full implementation notes.
+
+**Deviation from this runbook, found during implementation:** §4a describes `groupPrefix` as
+"already exported logic in stress-test.ts, reused." `tools/nl/stress-test.ts`'s `groupPrefix` is
+in fact a private, non-exported function. `audit-issue-200-extract.ts` carries its own
+`templatePrefix`, an exact duplicate of the same one-line formula, rather than exporting a path
+parameter onto the stress harness's function for this unrelated read-only tool. No behavioural
+difference.
 
 ## 0. Terminology note (read first)
 
