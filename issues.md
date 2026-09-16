@@ -4,7 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 1
+
+| ID | Severity | Area | State | Next action |
+|---|---|---|---|---|
+| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Planning complete, not implemented | Operator runs `AFLDB-ISSUE-204.md` §6 investigation commands, then implement per §7-§9 |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -18,9 +22,11 @@ also normalized 72 previously grain-equivalent GWS player-season rows to exact e
 as a byproduct of the same fix) -- see its detailed entry below.
 AFLDB-ISSUE-203 opened 2026-09-16 (Sonnet 5, planning only) for the third follow-on ("zero"
 word-form not bound as numeric equality in career conditions, 15 manifestations), resolved
-2026-09-16 (Sonnet 5, operator-validated) -- see its detailed entry below. The remaining follow-on
-item (pre-1965 stale-coverage corpus correction) remains open but not yet opened as a tracked
-issue.
+2026-09-16 (Sonnet 5, operator-validated) -- see its detailed entry below.
+AFLDB-ISSUE-204 opened 2026-09-16 (Sonnet 5, planning only) for the fourth and final follow-on: a
+guarded V3->V4 corpus correction for the 180-row `coverage_unavailable|fgf` stale-expectation
+cluster (disposals/marks/tackles in finals/Grand Finals, seasons 1897-1926) -- see its detailed
+entry below and `AFLDB-ISSUE-204.md` for the full runbook. Not yet implemented.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -34010,3 +34016,89 @@ operator validation. Recorded as a residual risk, not broadened into this issue'
 
 Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELOG.md` updated under
 `Unreleased`.
+
+---
+
+## AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
+
+- **Status:** Implementation complete, pending operator validation (2026-09-16, Sonnet 5). Fourth and
+  final of AFLDB-ISSUE-200's three candidate defect follow-ons plus its one guarded-correction
+  follow-on (Stage 2 next-task item 5d). Full runbook: `AFLDB-ISSUE-204.md`. Correction tool and tests
+  written this session; not yet run against the real corpus.
+
+### Naming correction
+
+Requested under the working title "pre-1965 first-goal-final coverage expectations." The `fgf` in the
+cluster key `coverage_unavailable|fgf` is `equivalenceGroup.split('|')[0]` (`templatePrefix`,
+`tools/nl/audit-issue-200-extract.ts:85-87`) -- a template mnemonic authored in the external corpus
+itself, not a value this repository defines anywhere. AFLDB-ISSUE-200's real-audit evidence already
+decoded the cluster's actual content as disposals/marks/tackles player-statistic questions about
+Finals/Grand Finals matches, not a "first goal of a final" achievement/event query (no such achievement
+type exists in `src/search/nl/` or `src/lib/`). Working reading: `fgf` = "Finals/Grand Final," to be
+confirmed against the corpus's raw `equivalence_group` column per `AFLDB-ISSUE-204.md` §6, not assumed.
+Ledger title corrected accordingly.
+
+### Evidence (operator-verified 2026-09-16, superseding the prior planning session's re-derivation plan)
+
+The operator independently re-inspected the current parser-v53/V3 evidence directly and confirmed the
+family's exact composition: 180 rows, category `finals_grand_final`, template `fgf`, disposals/marks/
+tackles (60 each), finals/grand_final (90 each, corpus values `final`/`grand_final`), seasons 1897-1926
+inclusive at 6 rows per season, all currently mis-specified as `expected_status=success` with
+`expected_coverage_behavior=full`/`expected_min_confidence=0.80`. This supersedes the prior planning
+session's proposal to build a new `audit-issue-204-extract.ts` tool to re-derive the same evidence --
+that tool was not built or needed. Independently corroborated by AFLDB-ISSUE-200's own
+`coverage_unavailable|fgf` disposition and AFLDB-ISSUE-203's operator-run parser-v53 rerun against the
+unchanged V3 corpus (zero collateral movement across three parser versions). Full evidence:
+`AFLDB-ISSUE-204.md` §1.
+
+### Source-of-truth coverage rule (confirmed by direct source inspection)
+
+`NL_COVERAGE`, `src/search/nl/plan.ts:1104-1144`. `disposals`/`marks` share `firstSeason: 1965`
+(`plan.ts:1135-1136`); `tackles` is a **separate floor, `firstSeason: 1987`** (`plan.ts:1138`) -- not
+1965, contrary to the issue's working title. Enforcement: `nlCoverageFor` (`plan.ts:1181-1195`) selects
+the rule by metric; `nlCoverageGap` (`plan.ts:1202-1222`) tests `[firstSeason, +Infinity)` containment
+against the requested season range -- `firstSeason` itself is inside the covered interval, so the
+cutoff is **inclusive**. All 180 rows (seasons 1897-1926 per the carried-forward evidence) fall before
+both floors, so the decline is correct for the whole family under either floor; the family is **at
+least two subfamilies by coverage floor** (disposals+marks at 1965, tackles at 1987), further split by
+match type (finals/grand_final), not one homogeneous family. Full trace: `AFLDB-ISSUE-204.md` §2.
+
+### Runtime-correctness proof
+
+`nlCoverageGap` is a pure season-interval containment test with no finals/grand-final special-casing
+and no path by which a pre-floor season could be answered; for every row in this family
+`seasonMax (≤1926) < firstSeason (1965 or 1987)`, so the gap fires unconditionally. The runtime is
+already correct; this is a corpus-only correction, satisfying the task's "critical distinction"
+requirement. No row in the carried-forward evidence is boundary-adjacent to either floor. Full
+argument: `AFLDB-ISSUE-204.md` §3.
+
+### Implementation
+
+New guarded correction tool `tools/nl/fix-issue-204-stale-coverage-expectations.ts`, following
+`tools/nl/fix-issue-201-stale-boundary-expectations.ts`'s precedent field-for-field (success->decline,
+fail-closed, self-verifying). Unlike ISSUE-199/201, which hardcoded an audited literal id list, this
+tool *derives* its 180 targets from each row's own `category`/`equivalence_group` template signature
+(the same signature `audit-issue-200-extract.ts` uses to build the `coverage_unavailable|fgf` cluster
+key) and then individually re-verifies every candidate against the full audited old-field shape and
+its own question text before accepting it, aborting on any mismatch, missing/duplicate id, or a
+derived count/distribution other than the audited 180 (60/60/60 metric, 90/90 match-type, 30 seasons
+of 6). Corrected fields: `expected_status=decline`, `verification_level=EXPECTED_DECLINE`,
+`expected_failure_reason=coverage_unavailable`, `expected_coverage_behavior`/`expected_min_confidence`
+cleared; grain/mode/metric/aggregation/season/match-type preserved. Focused DB-free tests:
+`tests/nl-issue-204-corpus-fix.test.ts` (14 cases: happy path, row-count/ordering/non-target-identity
+invariants, and one refusal case per fail-closed invariant). `PARSER_VERSION` unchanged at 53; no
+`src/search/nl/` or `src/db/` file touched. Full design, operator commands, and expected V4 benchmark:
+`AFLDB-ISSUE-204.md` §5-§9.
+
+### Scope
+
+In scope (implemented): the new guarded correction script and its DB-free unit tests; V3->V4 corpus
+output (operator-run, not yet executed). Out of scope: parser/runtime code; `PARSER_VERSION`; the 70
+`WRONG_FAILURE_REASON` taxonomy-drift rows; AFLDB-ISSUE-201/202/203 behaviour; any other historical
+coverage policy.
+
+### Next action
+
+Operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real V3->V4
+correction, the parser-v53 rerun against V4, and the row-id-level before/after comparison) and reports
+results before this issue is marked resolved or `CHANGELOG.md` is updated.

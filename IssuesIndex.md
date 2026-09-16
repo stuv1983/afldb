@@ -4,7 +4,17 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+- **AFLDB-ISSUE-204** — Low severity, NL search stress corpus (`tools/nl/`, corpus-only, no runtime
+  code implicated). Implementation complete 2026-09-16 (Sonnet 5), pending operator validation.
+  Guarded V3→V4 correction tool (`tools/nl/fix-issue-204-stale-coverage-expectations.ts`) and tests
+  (`tests/nl-issue-204-corpus-fix.test.ts`) written for the 180-row `coverage_unavailable|fgf`
+  stale-expectation cluster (disposals/marks in finals/Grand Finals before 1965, tackles before 1987 —
+  two coverage floors, not one; see `AFLDB-ISSUE-204.md` §2). Targets are criteria-derived
+  (category/equivalence-group signature, re-verified per row against the audited old-field shape), not
+  a hardcoded id list. Next action: operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests,
+  `tsc --noEmit`, the real V3→V4 correction, parser-v53 rerun against V4, before/after row comparison).
 
 AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
 (Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
@@ -139,13 +149,15 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `CLUB_NICKNAMES` addition, operator-validated against the retained V3 corpus (465 → 265 soft).
    The same fix also normalized all 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows (GWS Giants player-season
    leading-goalkicker questions) to exact expected semantics as a byproduct, so that class is now 0.
-   Stage 2 is **not yet** closed: **(c) opened 2026-09-16 as AFLDB-ISSUE-203** (planning only,
-   `PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions, 15
-   manifestations) — not yet implemented; (d) a separate, guarded corpus-correction task for the 180
-   pre-1965 finals/Grand Final disposals/marks/tackles rows currently asserting a stale
-   `expected_status=success` remains open but not yet opened as a tracked issue. The 70
-   `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness blocker, unless a later
-   diagnostic-taxonomy cleanup is deliberately opened. Only after (c) resolves and (d) lands is the
-   fresh exploratory Codex corpus sweep in scope, per the original Stage 2 boundary.
+   Stage 2 is **not yet** closed: **(c) opened 2026-09-16 as AFLDB-ISSUE-203, resolved 2026-09-16**
+   (`PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions, 15
+   manifestations, operator-validated, `PARSER_VERSION` 52→53); **(d) opened 2026-09-16 as
+   AFLDB-ISSUE-204** (implementation complete, guarded corpus correction for the 180 `coverage_unavailable|fgf`
+   disposals/marks/tackles finals/Grand Final rows currently asserting a stale
+   `expected_status=success` — two coverage floors, not one: disposals/marks before 1965, tackles
+   before 1987 — pending operator validation). The 70 `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not
+   a correctness blocker, unless a later diagnostic-taxonomy cleanup is deliberately opened. Only after
+   (d) resolves is the fresh exploratory Codex corpus sweep in scope, per the original Stage 2
+   boundary.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
