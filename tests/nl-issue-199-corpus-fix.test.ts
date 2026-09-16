@@ -5,8 +5,11 @@
  * would be the external ~/nl-stress-corpus.csv, which this repository does
  * not carry) with the exact id layout tools/nl/fix-issue-199-stale-
  * expectations.ts expects, then proves the invariants the script's own
- * header comment promises: it fixes exactly the audited 173 rows, refuses
- * on any before-state/count/id mismatch, and never touches anything else.
+ * header comment promises: it fixes exactly the audited 173 rows using the
+ * operator's audited parser-v50 shape (no mirror row required -- the real
+ * corpus has zero successful team_streak/coach_record rows to mirror),
+ * refuses on any before-state/count/id/question-wording mismatch, and
+ * never touches anything else.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -14,7 +17,8 @@ import { toCsv } from '@/lib/csv';
 
 import { parseCsv } from '../tools/nl/corpus';
 import {
-  assertOutputPathIsSafe, correctCorpus, deriveAblettMetric, detectAggregation,
+  assertCoachQuestionMatchesGroup, assertOutputPathIsSafe, assertStreakQuestionMatchesGroup,
+  correctCorpus, deriveAblettMetric,
 } from '../tools/nl/fix-issue-199-stale-expectations';
 
 // ------------------------------------------------------------------ fixture
@@ -56,26 +60,12 @@ function range(from: number, to: number): number[] {
   return ids;
 }
 
-/** The exact 173-row layout the script hardcodes, built as decline rows plus their mirrors. */
+/** The exact 173-row layout the script hardcodes, built as decline rows. No mirror rows needed
+ *  or built -- the real corpus has zero successful team_streak/coach_record rows to mirror, so the
+ *  script derives its correction shape from the operator's audit, not from another row in the file. */
 function buildRows(): Row[] {
   const rows = new Map<number, Row>();
   for (let id = 1; id <= 12000; id++) rows.set(id, baseRow(id));
-
-  // Mirrors the script relies on to confirm each intended shape (distinct clubs/ids from any target).
-  rows.set(1, { ...baseRow(1), expected_grain: 'player_career', expected_metric: 'goals', expected_mode: '' });
-  rows.set(2, { ...baseRow(2), expected_grain: 'player_career', expected_metric: 'games', expected_mode: '' });
-  rows.set(3, { ...baseRow(3), expected_grain: 'player_career', expected_metric: 'disposals', expected_mode: '' });
-  rows.set(4, { ...baseRow(4), expected_grain: 'player_career', expected_metric: 'marks', expected_mode: '' });
-  rows.set(5, { ...baseRow(5), expected_grain: 'player_career', expected_metric: 'tackles', expected_mode: '' });
-  rows.set(6, {
-    ...baseRow(6), expected_grain: 'team_streak', expected_metric: '', expected_mode: '', expected_club: 'Geelong',
-  });
-  rows.set(7, {
-    ...baseRow(7), expected_grain: 'coach_record', expected_metric: 'games', expected_mode: '', expected_club: 'Geelong',
-  });
-  rows.set(8, {
-    ...baseRow(8), expected_grain: 'coach_record', expected_metric: 'wins', expected_mode: '', expected_club: 'Geelong',
-  });
 
   // Ablett -- 11601-11605, decline, no expected_metric of their own.
   for (const id of range(11601, 11605)) {
@@ -99,15 +89,15 @@ function buildRows(): Row[] {
     });
   }
 
-  const streakGroups: [number, number, string][] = [
-    [11651, 11678, 'Adelaide'], [11679, 11706, 'Adelaide'],
-    [11931, 11958, 'Brisbane Lions'], [11959, 11986, 'Brisbane Lions'],
+  const streakGroups: [number, number, string, 'winning' | 'losing'][] = [
+    [11651, 11678, 'Adelaide', 'winning'], [11679, 11706, 'Adelaide', 'losing'],
+    [11931, 11958, 'Brisbane Lions', 'winning'], [11959, 11986, 'Brisbane Lions', 'losing'],
   ];
-  for (const [from, to, club] of streakGroups) {
+  for (const [from, to, club, kind] of streakGroups) {
     for (const id of range(from, to)) {
       rows.set(id, {
         ...baseRow(id),
-        question: `What is ${club}'s longest streak (row ${id})?`,
+        question: `What is ${club}'s longest ${kind} streak (row ${id})?`,
         expected_status: 'decline', expected_grain: '', expected_mode: '', expected_metric: '',
         expected_aggregation: '', expected_club: club,
         verification_level: 'EXPECTED_DECLINE', expected_failure_reason: 'unsupported_feature',
@@ -164,12 +154,15 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     const outputRows = parseBack(outputCsvText);
     const byId = new Map(outputRows.map((row) => [Number(row.id), row]));
 
-    // Ablett goals row derives its metric from its own question text.
+    // Ablett goals row derives its metric from its own question text; mode/limit are always blank
+    // (the audited shape, not derived from a mirror row -- there are none in the real corpus).
     const ablettGoals = byId.get(11601)!;
     expect(ablettGoals.expected_status).toBe('success');
     expect(ablettGoals.expected_grain).toBe('player_career');
     expect(ablettGoals.expected_metric).toBe('goals');
     expect(ablettGoals.expected_aggregation).toBe('max');
+    expect(ablettGoals.expected_mode).toBe('');
+    expect(ablettGoals.expected_limit).toBe('');
     expect(ablettGoals.verification_level).toBe('SEMANTIC');
     expect(ablettGoals.expected_failure_reason).toBe('');
 
@@ -187,6 +180,8 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     expect(adelaideStreak.expected_club).toBe('Adelaide');
     expect(adelaideStreak.expected_metric).toBe('');
     expect(adelaideStreak.expected_aggregation).toBe('max');
+    expect(adelaideStreak.expected_mode).toBe('');
+    expect(adelaideStreak.expected_limit).toBe('');
 
     const brisbaneStreak = byId.get(11959)!;
     expect(brisbaneStreak.expected_club).toBe('Brisbane Lions');
@@ -197,6 +192,9 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     expect(coachGames.expected_grain).toBe('coach_record');
     expect(coachGames.expected_metric).toBe('games');
     expect(coachGames.expected_club).toBe('Adelaide');
+    expect(coachGames.expected_aggregation).toBe('max');
+    expect(coachGames.expected_mode).toBe('');
+    expect(coachGames.expected_limit).toBe('');
 
     const coachWins = byId.get(11791)!;
     expect(coachWins.expected_metric).toBe('wins');
@@ -253,11 +251,32 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     expect(() => correctCorpus(buildCsv(rows))).toThrow(/exactly 12000 data rows/);
   });
 
-  it('refuses when no already-passing mirror row exists for a group', () => {
+  it('fails closed when a winning-streak row\'s question says "losing" instead', () => {
     const rows = buildRows();
-    const mirrorIndex = rows.findIndex((row) => row.id === '6');
-    rows[mirrorIndex] = { ...rows[mirrorIndex], expected_grain: 'player_game' };
-    expect(() => correctCorpus(buildCsv(rows))).toThrow(/team_streak.*Refusing to guess/s);
+    const index = rows.findIndex((row) => row.id === '11651'); // adelaide_winning_streak
+    rows[index] = { ...rows[index], question: 'What is Adelaide\'s longest losing streak (row 11651)?' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11651.*does not contain "winning"/s);
+  });
+
+  it('fails closed when a streak row\'s question names the wrong club', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11651'); // adelaide_winning_streak
+    rows[index] = { ...rows[index], question: 'What is Geelong\'s longest winning streak (row 11651)?' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11651.*does not mention club "Adelaide"/s);
+  });
+
+  it('fails closed when a games-coached row\'s question says "wins" instead', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11763'); // adelaide_games_coached
+    rows[index] = { ...rows[index], question: 'Who coached the most wins for Adelaide? (row 11763)' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11763.*does not contain "games"/s);
+  });
+
+  it('fails closed when a coach row\'s question names the wrong club', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11763'); // adelaide_games_coached
+    rows[index] = { ...rows[index], question: 'Who coached the most games for Geelong? (row 11763)' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11763.*does not mention club "Adelaide"/s);
   });
 
   it('derives all five Ablett metrics from their own question text, ignoring blank Jones expected_metric', () => {
@@ -322,13 +341,37 @@ describe('deriveAblettMetric', () => {
   });
 });
 
-describe('detectAggregation', () => {
-  it('reads a ranked-list ask from the question text itself', () => {
-    expect(detectAggregation('What are Adelaide\'s top 5 winning streaks?')).toEqual({ aggregation: 'top_n', topN: 5 });
+describe('assertStreakQuestionMatchesGroup', () => {
+  it('accepts a question naming the audited kind and club', () => {
+    expect(() => assertStreakQuestionMatchesGroup(11651, 'What is Adelaide\'s longest winning streak?', 'Adelaide', 'winning'))
+      .not.toThrow();
   });
 
-  it('defaults to max when the question names no ranked list', () => {
-    expect(detectAggregation('What is Adelaide\'s longest winning streak?')).toEqual({ aggregation: 'max' });
+  it('refuses a question naming the wrong kind', () => {
+    expect(() => assertStreakQuestionMatchesGroup(11651, 'What is Adelaide\'s longest losing streak?', 'Adelaide', 'winning'))
+      .toThrow(/does not contain "winning"/);
+  });
+
+  it('refuses a question naming the wrong club', () => {
+    expect(() => assertStreakQuestionMatchesGroup(11651, 'What is Geelong\'s longest winning streak?', 'Adelaide', 'winning'))
+      .toThrow(/does not mention club "Adelaide"/);
+  });
+});
+
+describe('assertCoachQuestionMatchesGroup', () => {
+  it('accepts a question naming the audited metric and club', () => {
+    expect(() => assertCoachQuestionMatchesGroup(11763, 'Who coached the most games for Adelaide?', 'Adelaide', 'games'))
+      .not.toThrow();
+  });
+
+  it('refuses a question naming the wrong metric', () => {
+    expect(() => assertCoachQuestionMatchesGroup(11763, 'Who coached the most wins for Adelaide?', 'Adelaide', 'games'))
+      .toThrow(/does not contain "games"/);
+  });
+
+  it('refuses a question naming the wrong club', () => {
+    expect(() => assertCoachQuestionMatchesGroup(11763, 'Who coached the most games for Geelong?', 'Adelaide', 'games'))
+      .toThrow(/does not mention club "Adelaide"/);
   });
 });
 

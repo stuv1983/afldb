@@ -21,8 +21,12 @@
  * WHAT IT REFUSES TO GUESS
  *
  * Every value this script writes is either read directly out of the
- * corpus itself or taken from a source-code fact this repository can cite
- * (a plan.ts metric key, a grain name). Two examples:
+ * corpus itself, taken from a source-code fact this repository can cite
+ * (a plan.ts metric key, a grain name), or taken from the operator's
+ * 2026-09-16 real-corpus audit of parser-v50's own output for these exact
+ * 173 rows (AFLDB-ISSUE-199 handoff, "Real-corpus audit of team_streak and
+ * coach_record") -- itself evidence, not a guess, and cited per group
+ * below. Two examples of the first kind:
  *
  *   - The Ablett per-row metric (goals/games/disposals/marks/tackles) is
  *     read from that row's OWN question text (a strict, single-word match
@@ -34,13 +38,19 @@
  *     expected_metric at all, decline or otherwise. Jones is never read
  *     for this or any other purpose; it stays a genuine, untouched
  *     decline.
- *   - expected_mode, and whether a row should rank with 'max' or a
- *     question-stated 'top N', is confirmed against an already-passing
- *     "mirror" row elsewhere in the same corpus with the same grain
- *     (and, for coach rows, the same metric) -- never asserted from this
- *     script's own assumption. A group with no such mirror in the file
- *     fails closed rather than writing a shape nothing else in the corpus
- *     is known to support.
+ *   - A team-streak/coach-record row's winning/losing (or games/wins) and
+ *     club semantics are confirmed against that row's OWN question text --
+ *     never asserted from this script's own assumption -- before the
+ *     audited shape is written. A second real-corpus validation attempt
+ *     (2026-09-16) disproved an earlier version of this script that
+ *     instead required an already-passing "mirror" row elsewhere in the
+ *     corpus to source the shape from: the real corpus has zero successful
+ *     team_streak or coach_record rows to mirror, so that requirement
+ *     could never be satisfied and the script always failed closed. The
+ *     shape it now writes (aggregation always 'max', metric blank for
+ *     streak / 'games' or 'wins' literal for coach, mode/limit always
+ *     blank) is taken directly from the operator's audit of all 112 + 56
+ *     target rows' actual parser-v50 output, not invented by this script.
  *
  * FAIL-CLOSED, NOT PARTIAL
  *
@@ -50,8 +60,9 @@
  * one of the seven surname groups the issue explicitly keeps untouched, an
  * Ablett question naming zero or more than one audited metric word, an
  * Ablett question's derived metric disagreeing with the audited id-to-
- * metric map, a missing mirror row, or (as a final self-check) any row
- * outside the 173 changing at all.
+ * metric map, a streak/coach question whose text disagrees with its
+ * audited group (winning/losing, games/wins, or club), or (as a final
+ * self-check) any row outside the 173 changing at all.
  *
  * See AFLDB-ISSUE-199.md and tools/nl/README.md for the full corpus
  * schema and the operator's before/after validation procedure.
@@ -62,7 +73,7 @@ import { fileURLToPath } from 'node:url';
 
 import { toCsv } from '@/lib/csv';
 
-import { parseCsv, toExpectation, type StressExpectation } from './corpus';
+import { parseCsv, toExpectation } from './corpus';
 import { flag, option } from './engine';
 
 // --------------------------------------------------------------- constants
@@ -84,6 +95,8 @@ type TargetRow = {
   club?: string;
   /** coach_record only -- a literal plan.ts metric key (plan.ts:972-973), never aliased. */
   metric?: 'games' | 'wins';
+  /** team_streak only -- which half of the group's audited pair this row belongs to. */
+  streakKind?: 'winning' | 'losing';
 };
 
 function range(from: number, to: number): number[] {
@@ -134,19 +147,66 @@ const TARGETS = new Map<number, TargetRow>();
 for (const id of ABLETT_IDS) {
   TARGETS.set(id, { group: 'ablett', grain: 'player_career' });
 }
-for (const id of range(11651, 11678)) TARGETS.set(id, { group: 'adelaide_winning_streak', grain: 'team_streak', club: 'Adelaide' });
-for (const id of range(11679, 11706)) TARGETS.set(id, { group: 'adelaide_losing_streak', grain: 'team_streak', club: 'Adelaide' });
-for (const id of range(11931, 11958)) TARGETS.set(id, { group: 'brisbane_lions_winning_streak', grain: 'team_streak', club: 'Brisbane Lions' });
-for (const id of range(11959, 11986)) TARGETS.set(id, { group: 'brisbane_lions_losing_streak', grain: 'team_streak', club: 'Brisbane Lions' });
+for (const id of range(11651, 11678)) TARGETS.set(id, { group: 'adelaide_winning_streak', grain: 'team_streak', club: 'Adelaide', streakKind: 'winning' });
+for (const id of range(11679, 11706)) TARGETS.set(id, { group: 'adelaide_losing_streak', grain: 'team_streak', club: 'Adelaide', streakKind: 'losing' });
+for (const id of range(11931, 11958)) TARGETS.set(id, { group: 'brisbane_lions_winning_streak', grain: 'team_streak', club: 'Brisbane Lions', streakKind: 'winning' });
+for (const id of range(11959, 11986)) TARGETS.set(id, { group: 'brisbane_lions_losing_streak', grain: 'team_streak', club: 'Brisbane Lions', streakKind: 'losing' });
 for (const id of range(11763, 11790)) TARGETS.set(id, { group: 'adelaide_games_coached', grain: 'coach_record', club: 'Adelaide', metric: 'games' });
 for (const id of range(11791, 11818)) TARGETS.set(id, { group: 'adelaide_wins_coached', grain: 'coach_record', club: 'Adelaide', metric: 'wins' });
 
 // ----------------------------------------------------------------- helpers
 
-/** A row's own question text is the only source for a ranked-list ask ("top 5 ..."); never guessed independently of it. */
-export function detectAggregation(question: string): { aggregation: 'max' | 'top_n'; topN?: number } {
-  const match = question.match(/\btop\s+(\d+)\b/i);
-  return match ? { aggregation: 'top_n', topN: Number(match[1]) } : { aggregation: 'max' };
+/**
+ * A team-streak row's own question text is the only source confirming it
+ * belongs to its audited winning/losing club group -- never asserted from
+ * the group label alone. The operator's real-corpus audit (2026-09-16)
+ * found all 112 target rows share this exact shape (aggregation 'max',
+ * blank metric); this check only confirms the row's wording matches the
+ * group it is about to be corrected as, not the shape itself.
+ */
+export function assertStreakQuestionMatchesGroup(
+  id: number,
+  question: string,
+  club: string,
+  streakKind: 'winning' | 'losing',
+): void {
+  if (!new RegExp(`\\b${streakKind}\\b`, 'i').test(question)) {
+    throw new Error(
+      `Streak row ${id}: question does not contain "${streakKind}", required for the audited ${streakKind} `
+      + `group. Refusing to guess. Question: "${question}"`,
+    );
+  }
+  if (!question.includes(club)) {
+    throw new Error(
+      `Streak row ${id}: question does not mention club "${club}", required for this audited group. `
+      + `Refusing to guess. Question: "${question}"`,
+    );
+  }
+}
+
+/**
+ * A coach-record row's own question text is the only source confirming it
+ * belongs to its audited games/wins-coached club group. Mirrors
+ * assertStreakQuestionMatchesGroup's reasoning for the coach groups.
+ */
+export function assertCoachQuestionMatchesGroup(
+  id: number,
+  question: string,
+  club: string,
+  metric: 'games' | 'wins',
+): void {
+  if (!new RegExp(`\\b${metric}\\b`, 'i').test(question)) {
+    throw new Error(
+      `Coach row ${id}: question does not contain "${metric}", required for the audited ${metric}-coached `
+      + `group. Refusing to guess. Question: "${question}"`,
+    );
+  }
+  if (!question.includes(club)) {
+    throw new Error(
+      `Coach row ${id}: question does not mention club "${club}", required for this audited group. `
+      + `Refusing to guess. Question: "${question}"`,
+    );
+  }
 }
 
 /**
@@ -237,10 +297,11 @@ export function correctCorpus(inputCsvText: string): { outputCsvText: string; su
   const missing = [...TARGETS.keys()].filter((id) => !idToIndex.has(id));
   if (missing.length > 0) throw new Error(`Corpus is missing expected target row id(s): ${missing.join(', ')}.`);
 
-  const expectations: StressExpectation[] = originalRecords.map((record, index) => {
-    const expectation = toExpectation(record);
-    if (!expectation) throw new Error(`Row at data line ${index + 2} has no question text.`);
-    return expectation;
+  // toExpectation()'s only remaining role here is the question-text
+  // invariant it enforces on every row, not the target correction logic
+  // (which reads question text directly -- see the module header).
+  originalRecords.forEach((record, index) => {
+    if (!toExpectation(record)) throw new Error(`Row at data line ${index + 2} has no question text.`);
   });
 
   // ---- audited before-state: every target row is currently a decline row
@@ -254,16 +315,6 @@ export function correctCorpus(inputCsvText: string): { outputCsvText: string; su
   const outputRecords = originalRecords.map((record) => ({ ...record }));
   const targetIdSet = new Set(TARGETS.keys());
 
-  /** First already-passing row (never a target) matching predicate, or undefined. */
-  const findMirror = (predicate: (exp: StressExpectation) => boolean): number | undefined => {
-    for (let index = 0; index < expectations.length; index++) {
-      const exp = expectations[index];
-      if (targetIdSet.has(exp.id) || exp.status !== 'success') continue;
-      if (predicate(exp)) return index;
-    }
-    return undefined;
-  };
-
   let ablettModifications = 0;
   let streakModifications = 0;
   let coachModifications = 0;
@@ -274,41 +325,26 @@ export function correctCorpus(inputCsvText: string): { outputCsvText: string; su
     const question = originalRecords[index].question;
 
     let metricRaw = '';
-    let mirrorIndex: number | undefined;
-    let aggregation: 'max' | 'top_n' = 'max';
-    let topN: number | undefined;
-
     if (target.grain === 'player_career') {
-      const derivedMetric = deriveAblettMetric(id, question);
-      metricRaw = derivedMetric;
-      mirrorIndex = findMirror((exp) => exp.grain === 'player_career' && exp.metric === derivedMetric && exp.aggregation === 'max');
-      if (mirrorIndex === undefined) {
-        throw new Error(`Ablett row ${id}: no already-passing player_career/max/${derivedMetric} row exists to confirm this shape. Refusing to guess.`);
-      }
+      metricRaw = deriveAblettMetric(id, question);
     } else if (target.grain === 'team_streak') {
-      ({ aggregation, topN } = detectAggregation(question));
-      mirrorIndex = findMirror((exp) => exp.grain === 'team_streak' && exp.metric === undefined
-        && exp.aggregation === aggregation && (aggregation !== 'top_n' || exp.topN === topN));
-      if (mirrorIndex === undefined) {
-        throw new Error(`Streak row ${id} (${target.group}): no already-passing team_streak/${aggregation} row exists to confirm this shape. Refusing to guess.`);
-      }
+      assertStreakQuestionMatchesGroup(id, question, target.club!, target.streakKind!);
     } else {
-      ({ aggregation, topN } = detectAggregation(question));
+      assertCoachQuestionMatchesGroup(id, question, target.club!, target.metric!);
       metricRaw = target.metric!;
-      mirrorIndex = findMirror((exp) => exp.grain === 'coach_record' && exp.metric === target.metric
-        && exp.aggregation === aggregation && (aggregation !== 'top_n' || exp.topN === topN));
-      if (mirrorIndex === undefined) {
-        throw new Error(`Coach row ${id} (${target.group}): no already-passing coach_record/${target.metric}/${aggregation} row exists to confirm this shape. Refusing to guess.`);
-      }
     }
-    if (mirrorIndex === undefined) throw new Error(`Internal error: row ${id} has no resolved mirror index.`);
 
+    // Shape is the operator's audited parser-v50 output for these exact
+    // rows (AFLDB-ISSUE-199 handoff), not derived from the question --
+    // every target row in every group shares it: aggregation 'max', mode
+    // and limit blank. See the module header for why this replaced the
+    // earlier mirror-row requirement.
     record.expected_status = 'success';
     record.verification_level = 'SEMANTIC';
     record.expected_grain = target.grain;
-    record.expected_mode = originalRecords[mirrorIndex].expected_mode ?? '';
-    record.expected_aggregation = aggregation;
-    record.expected_limit = aggregation === 'top_n' ? String(topN) : '';
+    record.expected_mode = '';
+    record.expected_aggregation = 'max';
+    record.expected_limit = '';
     record.expected_metric = target.grain === 'team_streak' ? '' : metricRaw;
     record.expected_club = target.club ?? '';
     record.expected_failure_reason = '';

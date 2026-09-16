@@ -32966,10 +32966,14 @@ see `IssuesIndex.md`.
   behaviour is wrong; the V1 stress harness reports 173 stale hard failures for capability that ships.
 - **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
   canonical corpus file itself (`~/nl-stress-corpus.csv`, outside this repository).
-- **Status:** **Open — implemented, awaiting operator validation** (2026-09-16, Sonnet 5), from the
-  approved runbook `AFLDB-ISSUE-199.md`. `tools/nl/fix-issue-199-stale-expectations.ts` written and
-  unit-tested against a synthetic corpus (DB-free); not yet run against the real canonical CSV, which
-  lives outside this repository on the dev host. No Git action taken by this session.
+- **Status:** **Open — implemented (mirror-row dependency removed), awaiting operator validation**
+  (2026-09-16, Sonnet 5), from the approved runbook `AFLDB-ISSUE-199.md`.
+  `tools/nl/fix-issue-199-stale-expectations.ts` rewritten to derive the corrected shape for all 173
+  target rows from the operator's real-corpus audit instead of an already-passing "mirror" row (see
+  "Final-patch revision" below); unit-tested against a synthetic corpus (DB-free, 28/28); not yet run
+  against the real canonical CSV, which lives outside this repository on the dev host. No Git action
+  taken by this session (per `CLAUDE.md` §12/§9, this session ran only local vitest and read-only `git
+  status`/`git diff` for repo hygiene, not commit/push).
 - **Found:** 2026-09-16, post-ISSUE-198 V1 12k-row corpus re-run on `PARSER_VERSION` 50: hard failures
   178 → 173 (only the five ISSUE-198 Jones rows, 11626-11630, moved; full semantic diff confirms zero
   collateral movement). The remaining 173 `AMBIGUITY_NOT_DETECTED` rows were already flagged as
@@ -33038,16 +33042,35 @@ guess:
 
 All of §5's fail-closed conditions are implemented as invariant checks (row count, duplicate ids,
 missing target ids, before-state, target count, an Ablett question naming zero/multiple/wrong metric
-words, missing mirror, plus a post-hoc self-check that no row outside the 173 changed). DB-free unit
-tests (`tests/nl-issue-199-corpus-fix.test.ts`) build a synthetic 12,000-row corpus (Jones rows fixture
-with a **blank** `expected_metric`, reproducing the real failure) and prove: the happy path changes
-exactly 173 rows (5/112/56 split); non-target rows, including Jones, are untouched byte-for-byte; each
-of wrong-before-state, missing-target, duplicate-id, wrong-row-count, missing-mirror, unaudited-metric,
-ambiguous-metric, and metric-disagrees-with-audited-map refuses; `detectAggregation`'s question-text
-parsing; and the `--out`-equals-`--corpus` guard (`assertOutputPathIsSafe`) refuses without
-`--allow-overwrite-input`. Not yet run to completion against the real canonical CSV — that is
-user-executed on the dev host per §7, updated to use `--out ~/nl-stress-corpus-v2.csv` (not overwriting
-`~/nl-stress-corpus.csv` until validated).
+words, a streak/coach question disagreeing with its audited group, plus a post-hoc self-check that no
+row outside the 173 changed). DB-free unit tests (`tests/nl-issue-199-corpus-fix.test.ts`) build a
+synthetic 12,000-row corpus (Jones rows fixture with a **blank** `expected_metric`, reproducing the real
+failure) and prove: the happy path changes exactly 173 rows (5/112/56 split) and writes the audited
+shape (aggregation always `max`, mode/limit always blank); non-target rows, including Jones, are
+untouched byte-for-byte; each of wrong-before-state, missing-target, duplicate-id, wrong-row-count,
+unaudited-metric, ambiguous-metric, metric-disagrees-with-audited-map, wrong-streak-kind,
+wrong-streak-club, wrong-coach-metric, and wrong-coach-club refuses; and the `--out`-equals-`--corpus`
+guard (`assertOutputPathIsSafe`) refuses without `--allow-overwrite-input`. Not yet run to completion
+against the real canonical CSV — that is user-executed on the dev host per §7, updated to use
+`--out ~/nl-stress-corpus-v2.csv` (not overwriting `~/nl-stress-corpus.csv` until validated).
+
+### Final-patch revision (2026-09-16, Sonnet 5, this session)
+A second real-DEV validation attempt (reported in this session's handoff, prior to this repo state)
+found the mirror-row requirement itself was unsatisfiable: the real corpus has zero already-passing
+`team_streak` or `coach_record` rows anywhere in its 12,000 rows, so every streak/coach target failed
+closed by design, just on a different invariant than the first (Ablett/Jones) failure. The script no
+longer looks for a mirror row for any of the 173 targets. Instead it writes a shape hardcoded from the
+operator's own audit of parser-v50's actual output for these exact rows (recorded in this session's
+handoff, "Real-corpus audit of team_streak and coach_record": all 112 streak + 56 coach target rows
+observed as `status success, confidence 1, aggregation max`, streak `metric` blank, coach `metric`
+games/wins per group) — evidence, not a guess. In its place, each streak/coach row's own question text
+is checked against its audited group (winning/losing wording and club for streak; games/wins wording and
+club for coach) via two new exported functions, `assertStreakQuestionMatchesGroup` and
+`assertCoachQuestionMatchesGroup`, so a row whose real wording disagrees with the id range it was
+audited under still fails closed rather than being silently corrected. `detectAggregation` (the earlier
+top-N-in-question-text helper) is removed as dead code — the audit found no top-N shape among any of the
+173 targets, so `expected_aggregation` is fixed to `max` and `expected_limit` fixed blank for all of
+them, per group, rather than derived per-row. Unit tests: 28/28 passing.
 
 ### Non-goals
 Parser/application code changes; AFLW; the fresh Codex exploratory corpus (separate future phase);
