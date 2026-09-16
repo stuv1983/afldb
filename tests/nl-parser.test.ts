@@ -3646,3 +3646,126 @@ describe('AFLDB-ISSUE-198: hyphen/underscore/slash word-boundary consistency', (
   // case) are asserted unmodified by the describe block above this one --
   // nothing new is asserted here, this note only records why (§9 item 4-5).
 });
+
+/**
+ * AFLDB-ISSUE-210. ISSUE-206's exploratory triage found the imperative/
+ * structural-phrasing family ("find", "show", "show me", "list", "give
+ * me") was the dominant soft-decline mechanism (~10,000+ rows): the
+ * leading verb survived canonicalise() as an unmatched leftover token and
+ * tripped the generic decline gate even though grain/metric/scope were
+ * otherwise fully resolvable. The fix is a single ANCHORED strip in
+ * canonicalise() (nl/vocab.ts) -- consumed at most once, only at the very
+ * start of the string -- so every pair below must produce the IDENTICAL
+ * structured plan to its already-supported core form. Against parser v57
+ * (pre-fix) every "wrapped" query in the first block declines or produces
+ * a materially different plan from its core form; against v58 (post-fix,
+ * PARSER_VERSION bumped 57->58) they are identical. See AFLDB-ISSUE-210.md
+ * for the full RED/GREEN record and the exact evidence this was built
+ * from.
+ */
+describe('17. AFLDB-ISSUE-210 imperative/request-wrapper phrasing', () => {
+  /**
+   * Deep-equality on the STRUCTURED PLAN only (never on the NlParse
+   * envelope) is deliberate: `report`/`notes`/consumed-token evidence are
+   * allowed to differ between a wrapped and bare question (the wrapper
+   * itself is a consumed token in one but not the other), but every
+   * meaningful semantic field -- grain, metric, agg, scope, conditions --
+   * must not.
+   */
+  async function expectSameStructuredPlan(wrapped: string, core: string): Promise<void> {
+    const wrappedPlan = await plan(wrapped);
+    const corePlan = await plan(core);
+    expect(wrappedPlan, `"${wrapped}" -> plan differs from its core form "${core}"`).toEqual(corePlan);
+  }
+
+  describe('supported wrapper families, across several already-supported grains', () => {
+    it('"find" + season query (player_season, bare year)', async () => {
+      // The core form keeps the leading "the" the wrapped form leaves
+      // behind after "find " is consumed -- STOPWORDS carries "the" as
+      // semantically inert (nl/vocab.ts:874), but this pairing proves it
+      // structurally rather than assuming it.
+      await expectSameStructuredPlan(
+        'Find the most goals in 2023',
+        'the most goals in 2023',
+      );
+    });
+
+    it('"give me" + club-scoped season leaderboard (player_season)', async () => {
+      await expectSameStructuredPlan(
+        'Give me the most goals by a richmond player in 2017',
+        'the most goals by a richmond player in 2017',
+      );
+    });
+
+    it('"show" (bare, no "me") + club result/extrema (team_match)', async () => {
+      await expectSameStructuredPlan(
+        'Show richmond biggest win since 2000',
+        'richmond biggest win since 2000',
+      );
+    });
+
+    it('"show me" + club result/extrema -- regression guard for the pre-existing CONVERSATIONAL_FILLER entry, unchanged by this fix', async () => {
+      await expectSameStructuredPlan(
+        "Show me Richmond's biggest win",
+        "Richmond's biggest win",
+      );
+    });
+
+    it('"list" + career threshold (player_career)', async () => {
+      await expectSameStructuredPlan(
+        'List players with at least 300 games',
+        'players with at least 300 games',
+      );
+    });
+
+    it('"find" + venue/opponent-scoped named-player stat (player_game)', async () => {
+      await expectSameStructuredPlan(
+        'Find dusty total goals against carlton',
+        'dusty total goals against carlton',
+      );
+    });
+
+    it('"list" + head-to-head compare_wins (AFLDB-ISSUE-209 family)', async () => {
+      await expectSameStructuredPlan(
+        'List which of Richmond and Carlton has more wins head to head',
+        'Which of Richmond and Carlton has more wins head to head',
+      );
+    });
+
+    it('"give me" + a coaching record (coach_record)', async () => {
+      await expectSameStructuredPlan(
+        'Give me damien hardwick coaching record',
+        'damien hardwick coaching record',
+      );
+    });
+  });
+
+  describe('negative controls: the wrapper strip must not reach into meaningful phrasing', () => {
+    it('leading "find the big sticks" (the goals idiom) is untouched -- the metric is not lost', async () => {
+      // Real supported grammar, not manufactured nonsense: `/\bfind the
+      // (?:big )?sticks\b/` in nl/vocab.ts's metric-word table already
+      // maps this idiom to 'goals'. Without the negative lookahead on
+      // "find" in LEADING_REQUEST_PREFIX_RE, a leading occurrence of this
+      // exact idiom would have "find " stripped as a request wrapper,
+      // leaving "the big sticks" -- which matches no vocabulary at all --
+      // and the question would decline instead of resolving the metric.
+      const p = await plan('Find the big sticks leader for Richmond');
+      expect(p.metric).toBe('goals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+    });
+
+    it('fail-closed: a wrapper around genuine gibberish still declines, not rescued by consuming the leading word', async () => {
+      const result = await parse('Show me purple elephant sandwich');
+      expect(result.status).toBe('none');
+      if (result.status === 'none') expect(result.reason).toBe('unrecognised');
+    });
+
+    it('fail-closed: a wrapper around a recognised-but-unsupported topic still declines the same way as the bare form', async () => {
+      const wrapped = await parse('Find the youngest player ever');
+      const bare = await parse('youngest player ever');
+      expect(wrapped.status).toBe('unanswerable');
+      expect(bare.status).toBe('unanswerable');
+    });
+  });
+});

@@ -85,10 +85,40 @@ export const CONVERSATIONAL_FILLER: RegExp[] = [
 ];
 
 /**
+ * AFLDB-ISSUE-210. A leading imperative/request wrapper around an
+ * otherwise-supported question ("find the players with...", "show me
+ * Richmond's biggest win", "give me the leading goal kickers for
+ * Carlton") adds no domain semantics of its own -- it was the single
+ * largest soft-decline mechanism in the ISSUE-206 exploratory corpus
+ * (~10,000+ rows), because the verb survived as an unmatched leftover
+ * token and tripped the generic decline gate even though grain/metric/
+ * scope were otherwise fully resolvable.
+ *
+ * Deliberately narrow and ANCHORED to the very start of the string, not a
+ * global strip: the same words are common inside meaningful clauses --
+ * "find the big sticks" is the idiom for kicking a goal (matched
+ * elsewhere by `/\bfind the (?:big )?sticks\b/`, see AGG metric words
+ * below) -- and must not be stripped there. The negative lookahead on
+ * "find" protects exactly that idiom; matching only once at the front,
+ * and only this curated set, is what keeps this a request-wrapper
+ * consumer rather than a blanket filler-word deletion -- "who", "the",
+ * "tell" etc. mid-query are untouched.
+ *
+ * "show me" and "(please )?tell me" are already stripped ANYWHERE in the
+ * string by CONVERSATIONAL_FILLER above, so they are not repeated here;
+ * this only adds the forms that are safe SOLELY because they are the
+ * leading word -- "find", "list" and "give" appear inside real domain
+ * phrasing far more plausibly than "show"/"tell" do, so widening them
+ * beyond the leading position was deliberately not attempted.
+ */
+const LEADING_REQUEST_PREFIX_RE = /^(?:give me|find(?!\s+the\s+(?:big\s+)?sticks\b)|show|list)\b\s*/;
+
+/**
  * Lowercase, strip possessives and punctuation the vocabulary below isn't
- * written to expect, drop conversational filler, and apply
- * query-intent.ts's number-word protection ("inside 50s" must never read as
- * the number 50). Run first, always.
+ * written to expect, drop conversational filler, consume a leading
+ * imperative request wrapper, and apply query-intent.ts's number-word
+ * protection ("inside 50s" must never read as the number 50). Run first,
+ * always.
  */
 export function canonicalise(raw: string): string {
   let text = raw
@@ -102,6 +132,7 @@ export function canonicalise(raw: string): string {
     .replace(/[.,!?:;—–…"“”()[\]]/g, ' ');
   for (const filler of CONVERSATIONAL_FILLER) text = text.replace(filler, ' ');
   text = text.replace(/\s+/g, ' ').trim();
+  text = text.replace(LEADING_REQUEST_PREFIX_RE, '').trim();
   return canonicaliseStatWords(text);
 }
 

@@ -4,9 +4,28 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
 
-_No open issues._
+**AFLDB-ISSUE-210** — IMPLEMENTED, PENDING OPERATOR VALIDATION (Sonnet 5,
+2026-09-17). Follow-on item (6) of `AFLDB-ISSUE-206.md`'s six proposals: a
+leading imperative/request-wrapper verb ("find", bare "show", "list", "give
+me" — "show me"/"tell me" already worked) survived `canonicalise()` as an
+unmatched leftover token and tripped the generic decline gate even when the
+rest of the question was otherwise fully supported — the dominant
+soft-decline mechanism ISSUE-206 found (~10,000+ of 15,275 soft-decline
+exploratory rows). Fix: one new anchored `LEADING_REQUEST_PREFIX_RE` in
+`canonicalise()` (`src/search/nl/vocab.ts`), consumed at most once at the
+very start of the string; `find` carries a negative lookahead protecting the
+pre-existing "find the (big) sticks" goals idiom, the one real vocabulary
+collision found. `PARSER_VERSION` 57→58. Key files:
+`src/search/nl/vocab.ts`, `src/search/nl/plan.ts`,
+`tests/nl-parser.test.ts`. **Next action:** operator runs the focused test
+suite (`npx vitest run tests/nl-parser.test.ts`,
+`tests/nl-semantic-mapping.test.ts`, `tests/nl-regression-corpus.test.ts`,
+`tests/nl-stress-corpus.test.ts`, `npm run typecheck`), then the frozen V5
+stable-corpus rerun (must stay 12000/12000/0/0) and the ISSUE-206
+exploratory-corpus evidence-first inventory + post-fix diff on streamanator.
+See `AFLDB-ISSUE-210.md` for the full record and exact commands.
 
 **AFLDB-ISSUE-209 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (3) of `AFLDB-ISSUE-206.md`'s six proposals: `extractHeadToHeadCue`'s `compare_wins` family
