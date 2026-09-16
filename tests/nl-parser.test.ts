@@ -1436,6 +1436,122 @@ describe('confidence gating', () => {
 });
 
 /**
+ * AFLDB-ISSUE-211: "after YEAR" as an EXCLUSIVE season lower bound.
+ * scope.seasonMin = YEAR + 1, because AFL seasons are integer years -- this
+ * is what makes it semantically distinct from "since YEAR" (inclusive,
+ * scope.seasonMin = YEAR), asserted directly below. Each grain here mirrors
+ * an already-supported "since YEAR" form so only the bound-arithmetic is
+ * new, not the surrounding grain/metric/scope machinery.
+ */
+describe('AFLDB-ISSUE-211: after YEAR season bound', () => {
+  it('most goals after 2019 -> exclusive lower bound, seasonMin 2020', async () => {
+    // A bare "most X" with a season bound reads as player_season, exactly
+    // like the equivalent "most goals since 2019" -- only the bound
+    // arithmetic differs here, not the grain.
+    const p = await plan('most goals after 2019');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.seasonMin).toBe(2020);
+    expect(p.scope.seasonMax).toBeUndefined();
+  });
+
+  it('richmond biggest win after 2000 -> exclusive lower bound, seasonMin 2001', async () => {
+    const p = await plan('richmond biggest win after 2000');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('win_margin');
+    expect(p.scope.clubFor?.name).toBe('Richmond');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('most brownlow votes after 2010 -> exclusive lower bound, seasonMin 2011', async () => {
+    // Same player_season reading as "most brownlow votes since 2010".
+    const p = await plan('most brownlow votes after 2010');
+    expect(p.grain).toBe('player_season');
+    expect(p.metric).toBe('brownlow_votes');
+    expect(p.scope.seasonMin).toBe(2011);
+  });
+
+  it('most disposals at the MCG after 1995 -> exclusive lower bound, seasonMin 1996', async () => {
+    const p = await plan('most disposals at the MCG after 1995');
+    expect(p.grain).toBe('player_game');
+    expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    expect(p.scope.seasonMin).toBe(1996);
+  });
+
+  it('teams with the most wins in a season after 2000 -> club_season, exclusive lower bound', async () => {
+    const p = await plan('teams with the most wins in a season after 2000');
+    expect(p.grain).toBe('club_season');
+    expect(p.metric).toBe('wins');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('dusty most goals after 2015 -> named player, exclusive lower bound, no interference with player identity', async () => {
+    const p = await plan('dusty most goals after 2015');
+    expect(p.player?.name).toBe('Dustin Martin');
+    expect(p.metric).toBe('goals');
+    expect(p.scope.seasonMin).toBe(2016);
+  });
+
+  it('adelaide biggest win against gws giants after 2000 -> composition with opponent, no interference with club identity', async () => {
+    const p = await plan('Adelaide biggest win against GWS Giants after 2000');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(p.scope.seasonMin).toBe(2001);
+  });
+
+  it('after 2000 -> seasonMin 2001; since 2000 -> seasonMin 2000 (direct semantic contrast)', async () => {
+    const after = await plan('richmond biggest win after 2000');
+    const since = await plan('richmond biggest win since 2000');
+    expect(after.scope.seasonMin).toBe(2001);
+    expect(since.scope.seasonMin).toBe(2000);
+  });
+
+  describe('negative controls: "after" outside a temporal season expression is untouched', () => {
+    it('who kicked the most goals after the siren -> unchanged after-siren plan, no season bound', async () => {
+      const p = await plan('who kicked the most goals after the siren');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('who kicked a goal after the siren to win -> unchanged after-siren plan, no season bound', async () => {
+      const p = await plan('who kicked a goal after the siren to win');
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('who has kicked the most goals after the siren for richmond in the finals after 2000 -> composed: after-siren untouched, season bound applied', async () => {
+      const p = await plan('who has kicked the most goals after the siren for richmond in the finals after 2000');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2001);
+    });
+  });
+
+  describe('boundary years', () => {
+    it('after 1896 -> seasonMin 1897, the first legal season', async () => {
+      const p = await plan('richmond biggest win after 1896');
+      expect(p.scope.seasonMin).toBe(1897);
+    });
+
+    it('after 2026 -> parses, seasonMin 2027, within NL_LIMITS.maxSeason (may return empty results at execution)', async () => {
+      const p = await plan('richmond biggest win after 2026');
+      expect(p.scope.seasonMin).toBe(2027);
+      expect(p.scope.seasonMin).toBeLessThanOrEqual(NL_LIMITS.maxSeason);
+    });
+
+    it('after 9999 -> seasonMin 10000 exceeds NL_LIMITS.maxSeason, refused by validatePlan like any equally out-of-range season bound', async () => {
+      // parseNlQuestion itself has no season-range gate -- extractSeasons
+      // always sets whatever number the wording names (exactly as
+      // "since 9999" -> seasonMin 9999 would), and validatePlan is the
+      // established layer that declines an out-of-range bound.
+      const p = await plan('richmond biggest win after 9999');
+      expect(p.scope.seasonMin).toBe(10000);
+      const result = validatePlan(p);
+      expect('error' in result).toBe(true);
+    });
+  });
+});
+
+/**
  * Generalises the exact bug class the bare-year gap was: a meaningful,
  * recognisable token (here, a season year) present in the question but
  * with no effect at all on the executed plan -- silently ignored rather

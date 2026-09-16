@@ -623,7 +623,18 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // lookahead so it does not consume the unrelated "find the (big) sticks"
 // goals idiom. "show me" and "(please )?tell me" were already handled
 // (unanchored) by CONVERSATIONAL_FILLER and are unchanged by this fix.
-export const PARSER_VERSION = 58;
+// v59 -- AFLDB-ISSUE-211: extractSeasons (nl/parser.ts) now recognizes
+// "after YEAR" as an EXCLUSIVE lower season bound -- scope.seasonMin =
+// YEAR + 1, distinct from "since YEAR" (inclusive, seasonMin = YEAR). New
+// AFTER_RE (nl/vocab.ts) is anchored to a literal 4-digit year immediately
+// after the word, exactly like the existing SINCE_RE/BEFORE_RE, so it only
+// ever fires on a genuine temporal season expression -- "after the siren"
+// and every other non-temporal "after" phrasing has no year in that
+// position and is untouched. Checked only when "since" hasn't already
+// claimed the lower bound; `since`/`before`/`between`/exact-year/decade
+// semantics are otherwise unchanged. This was AFLDB-ISSUE-206's largest
+// unimplemented soft-decline vocabulary family (~1,200+ exploratory rows).
+export const PARSER_VERSION = 59;
 
 // ------------------------------------------------------------------ grain
 

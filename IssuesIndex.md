@@ -4,9 +4,19 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
 
-_No open issues._
+**AFLDB-ISSUE-211** — Implement `after YEAR` as an exclusive season lower
+bound (`scope.seasonMin = YEAR + 1`). Severity: product gap (largest
+unimplemented soft-decline vocabulary family found by `AFLDB-ISSUE-206.md`,
+follow-on item 5). Area: NL search season extraction (`src/search/nl/parser.ts`
+`extractSeasons`, `src/search/nl/vocab.ts` new `AFTER_RE`). State:
+**implemented, locally GREEN** (`PARSER_VERSION` 58 → 59, worktree
+`sonnet/issue-211-after-year-season-bound`) — awaiting host validation on
+streamanator. Next action: operator runs the frozen V5 stable-corpus gate,
+the exploratory V1 rerun on parser v59, the v58→v59 structured-plan diff, and
+the per-family `after` classification (exact commands in
+`AFLDB-ISSUE-211.md`); resolve only once reconciled.
 
 **AFLDB-ISSUE-210 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (6) of `AFLDB-ISSUE-206.md`'s six proposals: a leading imperative/request-wrapper verb ("find", bare
