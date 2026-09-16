@@ -1,13 +1,10 @@
 # AFLDB-ISSUE-210 — Leading imperative/request-wrapper phrasing ("find", "show", "list", "give me") declines otherwise-supported questions
 
-Status: **IMPLEMENTED, PENDING OPERATOR VALIDATION** (Sonnet 5). Fix implemented
-and focused-tested on `sonnet/issue-210-imperative-nl-phrasing` (base current
-clean `main` after ISSUE-209). Parser version 58. Local test execution and the
-required Linux-host (streamanator) validation have **not** been run by this
-session — CLAUDE.md's shell-execution boundary reserves running
-tests/builds/git for the operator by default, and no explicit override to run
-them directly was given. Exact operator commands are listed under "Required
-verification" below. Do not close this issue until that validation lands.
+Status: **RESOLVED 2026-09-17** (Sonnet 5, operator-validated on streamanator).
+Fix implemented and focused-tested on `sonnet/issue-210-imperative-nl-phrasing`
+(base current clean `main` after ISSUE-209; implementation commit `8324d2a`).
+Parser version 58. Both required operator checks passed — see "Local GREEN
+validation" and "Host validation" below.
 
 This is follow-on item (6) of `AFLDB-ISSUE-206.md`'s six proposals, directly
 from that issue's final triage of the 29,030-row independent exploratory
@@ -181,28 +178,25 @@ entries, `LEADING_REQUEST_PREFIX_RE`'s literal pattern) and independently
 confirmed with a disposable Node one-liner exercising the extracted regex
 against all eleven representative strings — every wrapped string reduces to
 exactly the predicted remainder, and the `find`-idiom guard leaves
-`"find the big sticks leader for richmond"` completely untouched. This
-session did **not** execute `npx vitest` against the pre-fix source (the fix
-was written in the same pass as the analysis, and CLAUDE.md reserves test
-execution for the operator by default) — a literal pre-fix
-`npx vitest run tests/nl-parser.test.ts -t "AFLDB-ISSUE-210"` failing for
-these exact rows, and passing post-fix, is listed under "Required
-verification" and is the actual RED/GREEN evidence this record still needs
-before resolution.
+`"find the big sticks leader for richmond"` completely untouched.
 
-## GREEN evidence
+## Local GREEN validation
 
-**Not yet run.** Exact commands for the operator:
+Worktree-local dependencies installed with `npm ci`. Full focused set:
 
 ```text
-npx vitest run tests/nl-parser.test.ts
-npx vitest run tests/nl-semantic-mapping.test.ts
-npx vitest run tests/nl-regression-corpus.test.ts
-npx vitest run tests/nl-stress-corpus.test.ts
-npm run typecheck
+tests/nl-parser.test.ts             483/483
+tests/nl-regression-corpus.test.ts  163/163
+tests/nl-semantic-mapping.test.ts   174/174
+tests/nl-stress-corpus.test.ts       53/53
+
+Total: 873/873 passed
 ```
 
-All five are required by the issue brief; none were run by this session.
+`npm run typecheck` (`next typegen` + `tsc --noEmit`): clean.
+
+The ISSUE-210-specific describe block (the 8 wrapper/core pairs plus the 3
+negative controls from "RED phase" above): **11/11 passed**.
 
 ## Local collateral findings
 
@@ -218,45 +212,109 @@ All five are required by the issue brief; none were run by this session.
   coverage added by this fix, only exercised by a regression-guard test
   (pair 4 above) to confirm the new anchored stage doesn't disturb them.
 
-## Required verification (operator, Linux host / streamanator)
+## Host validation (streamanator, commit `8324d2a`, `PARSER_VERSION` 58)
 
-1. Local focused suite (five commands listed above under "GREEN evidence").
-2. **RED confirmation** (optional but recommended for full rigor): run
-   `npx vitest run tests/nl-parser.test.ts -t "AFLDB-ISSUE-210"` against the
-   pre-fix `vocab.ts`/`plan.ts` (e.g. via a scoped `git stash push -u -m
-   "issue-210-red-baseline"` of just those two files, restored with `git
-   stash apply <sha>` per the worktree's shared-stash-stack caution — never
-   bare `stash`/`stash pop`), confirming the 8 wrapper-family rows fail and
-   the 3 negative-control rows already pass; then restore the fix and rerun
-   for GREEN.
-3. **Frozen V5 stable-corpus rerun** (`/home/arm/nl-stress-corpus-v5.csv`,
-   parser v58) — must stay **12000 scored / 12000 clean / 0 soft / 0
-   failed**.
-4. **Evidence-first inventory** (still outstanding, per the issue's own
-   requirement not to invent counts): against the retained
-   `/home/arm/nl-exploratory-v1.csv` and/or
-   `/home/arm/nl-exploratory-v57-validation/results.jsonl`, quantify actual
-   `"find ..."`, `"show ..."`, `"show me ..."`, `"list ..."`,
-   `"give me ..."`, `other` row counts among the soft-decline family, and
-   confirm removing only the anchored prefix makes each an already-supported
-   core form.
-5. **Post-fix exploratory rerun** into `/home/arm/nl-exploratory-v58-validation`
-   (parser v58), direct structured-plan diff against the retained
-   `/home/arm/nl-exploratory-v57-validation/results.jsonl` baseline:
-   - how many plans change;
-   - how many soft declines become clean;
-   - whether any previously-`failed` row changes;
-   - whether any already-`clean` plan's structured fields change (would be a
-     regression — must be zero);
-   - whether every changed row classifies into an approved wrapper family
-     (`find`/`show`/`show me`/`list`/`give me`), with no large unexplained
-     `other` bucket — if one appears, stop and investigate before closeout,
-     per the issue's own instruction.
-6. Expected host output directory for parser v58:
-   `/home/arm/nl-stress-v58-v5`.
+### Frozen V5
+
+`/home/arm/nl-stress-corpus-v5.csv`: **12000 scored / 12000 clean / 0 soft /
+0 failed**. No regression.
+
+### Exploratory v57 → v58
+
+Pre-fix baseline `/home/arm/nl-exploratory-v57-validation/results.jsonl`,
+post-fix `/home/arm/nl-exploratory-v58-validation/results.jsonl` — both
+29,030 rows / 29,030 unique IDs.
+
+Aggregate scorer totals:
+
+```text
+v57: 11151 clean / 15249 soft / 1130 failed / 1500 audit-required
+v58: 12439 clean / 13913 soft / 1178 failed / 1500 audit-required
+```
+
+Diagnostic groups: 93.
+
+### Structured-plan diff
+
+Direct v57 → v58 comparison: **1408 changed plans**. Wrapper-family
+distribution of every changed row:
+
+```text
+663 find
+378 list
+367 show
+  0 other
+```
+
+No unrelated wording family changed. `give me` produced zero exploratory
+changed-plan rows — the generated corpus's own templates evidently don't
+happen to use that wrapper; coverage for it rests on the focused tests (RED
+phase pair 2 and pair 8 above), which do exercise it directly.
+
+### Full 1408-row reconciliation
+
+**1288 rows, `soft_fail` → `clean`** (663 `find` + 319 `show` + 306 `list`):
+the direct usability improvement — a semantically empty request wrapper is
+now consumed before parsing the already-supported core query underneath it.
+
+**48 rows, `soft_fail` → `fail`** — all `prefix: show`,
+`category: player_game_single`, and all the pre-existing Gary Ablett
+identity-scoring artifact already named in `AFLDB-ISSUE-206.md`'s triage (26
+`WRONG_PLAYER: Gary Ablett Snr -> Gary Ablett`, 22
+`WRONG_PLAYER: Gary Ablett Jnr -> Gary Ablett`). Consuming the leading `show`
+now lets the parser reach a valid `player_game` plan that a leftover `show`
+previously blocked outright; the exploratory scorer then compares the
+expected suffixed display label ("Gary Ablett Snr"/"Gary Ablett Jnr")
+against the shared canonical display name ("Gary Ablett") the resolver
+correctly returns for the distinct underlying player ID — a pre-existing
+scorer/oracle limitation exposed by newly-increased reachability, not a v58
+parser regression, and not fixed here per the issue's explicit instruction
+not to touch parser behaviour further.
+
+**72 rows, audit-required `decline` → `success`** — all
+`List sons of <PLAYER> with <career condition>`, category
+`relationship_conditions`, expected corpus status `audit`. v57 declined
+(`status: decline`, `plan: null`); v58 now produces a typed `player_career`
+plan (`agg: list`, `relationshipSubject` = the named player,
+`careerPredicates: [son_of_player(<id>)]`, the requested `careerConditions`
+preserved). Representative: `List sons of Patrick Dangerfield with zero
+goals` → `relationshipSubject = Patrick Dangerfield`,
+`careerPredicates = son_of_player(10244)`, `careerConditions = [goals eq
+0]`. These are genuinely newly-reachable, correctly-typed relationship
+plans — the wrapper was the only thing blocking them — but they remain
+audit-required by corpus design (`relationship_conditions` composition
+ownership is intentionally manually audited per `AFLDB-ISSUE-206.md` §6),
+so they are not reclassified as scored successes here, and exploratory V1
+was not modified.
+
+### Interpretation
+
+```text
+1408 changed plans
+1288 soft_fail -> clean
+  48 soft_fail -> fail   (pre-existing Gary Ablett scorer artifact, exposed not caused)
+  72 audit decline -> success   (valid new plans, still intentionally manual-audit)
+```
+
+No query family outside `find`/`show`/`list` (and the already-working
+`show me`, unchanged) moved at all.
 
 ## Resolution
 
-**Not resolved.** Pending the operator verification above. Do not mark
-RESOLVED until Linux-host validation is complete, per the issue brief's
-explicit instruction.
+**RESOLVED 2026-09-17.** Both required checks (frozen V5, direct exploratory
+structured-plan diff) confirmed the fix: 1288 genuine soft-decline-to-clean
+usability improvements, zero unrelated wording-family movement, and both of
+the two non-improvement buckets (48 rows, 72 rows) traced to pre-existing,
+already-documented corpus/scorer conditions rather than new defects. Known
+carried-forward, out-of-scope findings (not fixed here, not newly introduced
+by this issue):
+
+- The Gary Ablett Jnr/Snr canonical-display-name scorer artifact
+  (`AFLDB-ISSUE-206.md`), now additionally visible on 48 `show`-wrapped
+  `player_game_single` rows because those rows are newly reachable at all.
+- `relationship_conditions` composition (`List sons of X with Y`) remains
+  intentionally audit-required by corpus design; this issue made 72 more
+  such rows reachable as typed plans but did not change their audit status.
+
+`PARSER_VERSION` 57 → 58, exactly once. Full record above; no further
+parser, test, or corpus changes were made during closeout.
