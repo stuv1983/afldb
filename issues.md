@@ -32957,3 +32957,198 @@ Follow-up, tracked separately, not blocking this resolution: the unchanged V1 12
 re-run on parser v50 (expected to clear the five Jones rows, 11626-11630) and the subsequent
 corpus-expectation cleanup (Ablett rows, team-streak/coach rows) remain outstanding Stage 2 steps —
 see `IssuesIndex.md`.
+
+---
+
+## AFLDB-ISSUE-199 — NL stress corpus expectation cleanup after Stage 2 parser hardening
+
+- **Severity:** Low — test-tooling/corpus-oracle defect, not an application defect. No user-facing
+  behaviour is wrong; the V1 stress harness reports 173 stale hard failures for capability that ships.
+- **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
+  canonical corpus file itself (`~/nl-stress-corpus.csv`, outside this repository).
+- **Status:** **Resolved 2026-09-16** (Sonnet 5), on operator DEV acceptance. Root cause: 173 rows in
+  the external V1 stress corpus were labelled `expected_status=decline` before three features they now
+  exercise successfully shipped (true 7-identity Ablett family, team-streak support, coach-record
+  support) — a stale-oracle defect in the corpus, not the parser (`PARSER_VERSION` unchanged at 50). Fix:
+  `tools/nl/fix-issue-199-stale-expectations.ts`, a self-verifying correction script, rewrote exactly
+  those 173 rows' expectation columns to the audited success shape; run by the operator against the real
+  canonical CSV, producing `/home/arm/nl-stress-corpus-v2.csv`. Validation: correction-tool summary
+  (173/173 targets modified, 0 non-target rows touched, 5/112/56 split) plus a full parser-v50
+  `nl:stress --parse-only` re-run against the corrected corpus, both reported by the operator — see
+  "Operator validation (2026-09-16)" below. DB-free unit suite 28/28. No Git action taken by this
+  session (per `CLAUDE.md` §12, commit/push remain user-operated).
+- **Found:** 2026-09-16, post-ISSUE-198 V1 12k-row corpus re-run on `PARSER_VERSION` 50: hard failures
+  178 → 173 (only the five ISSUE-198 Jones rows, 11626-11630, moved; full semantic diff confirms zero
+  collateral movement). The remaining 173 `AMBIGUITY_NOT_DETECTED` rows were already flagged as
+  `STALE_CORPUS_EXPECTATION` by the 2026-09-16 Stage 2 closeout triage (`IssuesIndex.md`), pending this
+  dedicated cleanup session.
+- **Key files:** `tools/nl/corpus.ts` (`toExpectation`, `AMBIGUITY_NOT_DETECTED` at line 419),
+  `tools/nl/README.md`, `~/nl-stress-corpus.csv` (canonical, remote, not in Git).
+
+### Symptom
+`npm run nl:stress` against the unchanged V1 12,000-row corpus on parser v50 reports 173 hard
+`AMBIGUITY_NOT_DETECTED` failures, all of which are rows whose `expected_status=decline` predates a
+feature the parser now supports, not genuine fail-opens.
+
+### Root cause
+`tools/nl/corpus.ts`'s `AMBIGUITY_NOT_DETECTED` finding fires whenever an expected-decline row in fact
+answers, regardless of why the row was originally labelled decline. Three feature-support dates make
+173 pre-existing rows stale:
+
+- Ablett (11601-11605, 5 rows) — labelled decline before AFLDB-ISSUE-197 (2026-09-16) proved the true
+  Ablett family is 7 identities, ≤ `NL_LIMITS.maxPlayerCandidates` (12); it now ranks completely.
+- Team streak (112 rows: Adelaide 11651-11706, Brisbane Lions 11931-11986) — labelled decline before
+  team-streak support shipped at parser v16.
+- Coach record (56 rows: Adelaide 11763-11818) — labelled decline before coach-record support shipped
+  at parser v35 (migration 087, AFLDB-ISSUE-152 Phase B).
+
+`5 + 112 + 56 = 173`, exactly the current hard-fail count — the same stale-oracle shape as
+AFLDB-ISSUE-070.
+
+### Canonical source finding (this session)
+No in-repo generator produces the V1 12,000-row corpus. `tools/nl/afldb_nl_mass_generator.py` (5-column
+discovery corpus, `expected_status=unknown` by design) and `tools/nl/generate-expanded-ui-corpus.mjs`
+(~501-row expanded UI/Playwright corpus) are both distinct, unrelated corpora. `tools/nl/corpus.ts`'s
+own header comment ("the corpus was written against its own description of AFL semantics") confirms it
+is a reader/scorer for an externally-authored CSV, not a generator. The canonical file,
+`~/nl-stress-corpus.csv`, lives on the dev host outside this Git repository. Full derivation:
+`AFLDB-ISSUE-199.md` §2-3.
+
+### Chosen design
+A small, checked-in, self-verifying correction script (`tools/nl/fix-issue-199-stale-expectations.ts`,
+not yet written) reads the canonical CSV, asserts its 173-row before-state assumptions, rewrites only
+the expectation columns of exactly those 173 rows (grain/metric/aggregation per feature — see
+`AFLDB-ISSUE-199.md` §4), leaves every other row/column byte-identical, and refuses to run if any
+assumption does not hold. The user runs it against the real file on the dev host and re-runs
+`npm run nl:stress` to validate. Full design, exact per-group expectation values, and explicitly-flagged
+gaps requiring implementation-time DB verification (not fabricated): `AFLDB-ISSUE-199.md` §4-7.
+
+### Implementation (2026-09-16, Sonnet 5)
+`tools/nl/fix-issue-199-stale-expectations.ts` written per the chosen design. It hardcodes the 173
+target ids from this issue's audited groups and, for every field the runbook could not evidence
+directly from this Windows session, derives it at *run time* from the real corpus rather than from a
+guess:
+- **Ablett metric** (goals/games/disposals/marks/tackles per id): read from that Ablett row's OWN
+  question text (a strict single-word match against the five audited metric words), then verified
+  against an explicit audited id-to-metric map before being used; the map only confirms what the
+  question said, it never overrides it. **Revised 2026-09-16** after real operator validation on the
+  dev host failed closed as designed: `Ablett row 11601: template row 11626 carries no expected_metric
+  to mirror.` The original design read the metric from the corresponding Jones row (`id + 25`); Jones
+  rows carry no machine-readable `expected_metric` at all, decline or otherwise, so that assumption was
+  false. Jones is no longer read by the script for any purpose.
+- **`expected_mode`, and `max` vs. a question-stated `top N`:** confirmed against an already-passing
+  "mirror" row elsewhere in the same corpus with the same grain (and, for coach rows, the same metric);
+  a group with no such mirror in the file fails closed rather than writing an unconfirmed shape. `top N`
+  itself is read from the row's own question text, never assumed.
+- **Coach metric literals** (`games`/`wins`) are hardcoded, cited directly from `plan.ts:972-973`'s
+  `coach_record` metrics table, which carries no alias for either name.
+
+All of §5's fail-closed conditions are implemented as invariant checks (row count, duplicate ids,
+missing target ids, before-state, target count, an Ablett question naming zero/multiple/wrong metric
+words, a streak/coach question disagreeing with its audited group, plus a post-hoc self-check that no
+row outside the 173 changed). DB-free unit tests (`tests/nl-issue-199-corpus-fix.test.ts`) build a
+synthetic 12,000-row corpus (Jones rows fixture with a **blank** `expected_metric`, reproducing the real
+failure) and prove: the happy path changes exactly 173 rows (5/112/56 split) and writes the audited
+shape (aggregation always `max`, mode/limit always blank); non-target rows, including Jones, are
+untouched byte-for-byte; each of wrong-before-state, missing-target, duplicate-id, wrong-row-count,
+unaudited-metric, ambiguous-metric, metric-disagrees-with-audited-map, wrong-streak-kind,
+wrong-streak-club, wrong-coach-metric, and wrong-coach-club refuses; and the `--out`-equals-`--corpus`
+guard (`assertOutputPathIsSafe`) refuses without `--allow-overwrite-input`. Not yet run to completion
+against the real canonical CSV — that is user-executed on the dev host per §7, updated to use
+`--out ~/nl-stress-corpus-v2.csv` (not overwriting `~/nl-stress-corpus.csv` until validated).
+
+### Final-patch revision (2026-09-16, Sonnet 5, this session)
+A second real-DEV validation attempt (reported in this session's handoff, prior to this repo state)
+found the mirror-row requirement itself was unsatisfiable: the real corpus has zero already-passing
+`team_streak` or `coach_record` rows anywhere in its 12,000 rows, so every streak/coach target failed
+closed by design, just on a different invariant than the first (Ablett/Jones) failure. The script no
+longer looks for a mirror row for any of the 173 targets. Instead it writes a shape hardcoded from the
+operator's own audit of parser-v50's actual output for these exact rows (recorded in this session's
+handoff, "Real-corpus audit of team_streak and coach_record": all 112 streak + 56 coach target rows
+observed as `status success, confidence 1, aggregation max`, streak `metric` blank, coach `metric`
+games/wins per group) — evidence, not a guess. In its place, each streak/coach row's own question text
+is checked against its audited group (winning/losing wording and club for streak; games/wins wording and
+club for coach) via two new exported functions, `assertStreakQuestionMatchesGroup` and
+`assertCoachQuestionMatchesGroup`, so a row whose real wording disagrees with the id range it was
+audited under still fails closed rather than being silently corrected. `detectAggregation` (the earlier
+top-N-in-question-text helper) is removed as dead code — the audit found no top-N shape among any of the
+173 targets, so `expected_aggregation` is fixed to `max` and `expected_limit` fixed blank for all of
+them, per group, rather than derived per-row. Unit tests: 28/28 passing.
+
+### Operator validation (2026-09-16) — RESOLVED
+Correction tool run against the real canonical corpus (`/home/arm/nl-stress-corpus.csv`), output to
+`/home/arm/nl-stress-corpus-v2.csv`:
+
+| | value |
+|---|---|
+| input rows | 12000 |
+| output rows | 12000 |
+| target rows expected | 173 |
+| target rows modified | 173 |
+| non-target rows modified | 0 |
+| Ablett modifications | 5 |
+| streak modifications | 112 |
+| coach modifications | 56 |
+
+This proves the script changed exactly the audited 173 stale-expectation rows and nothing else.
+
+Parser-v50 re-run against the corrected corpus (`PARSER_VERSION` unchanged at 50), `npm run nl:stress --
+--corpus /home/arm/nl-stress-corpus-v2.csv --parse-only --out /home/arm/nl-stress-v50-cleaned`:
+
+| | v50, unchanged corpus | v50, corrected corpus |
+|---|---|---|
+| total | 12000 | 12000 |
+| clean | 10764 | 10937 |
+| soft | 1063 | 1063 |
+| hard fail | 173 | 0 |
+| `AMBIGUITY_NOT_DETECTED` | 173 | 0 |
+| `GRAIN_EQUIVALENT` | 72 | 72 |
+| `UNEXPECTED_DECLINE` | 921 | 921 |
+| `WRONG_FAILURE_REASON` | 70 | 70 |
+
+`AMBIGUITY_NOT_DETECTED`/hard-fail count moved 173 → 0 exactly as `AFLDB-ISSUE-199.md` §8 predicted, at
+the maximum possible clean count (10937 = 10764 + 173); the three soft classes are unchanged to the row,
+confirming the correction touched no row outside its own 173-row scope and required no parser change.
+DB-free unit suite: `npx vitest run tests/nl-issue-199-corpus-fix.test.ts` — 28/28 passed. This
+satisfies every item in this issue's acceptance criteria below and the runbook's §8 expected-result
+table.
+
+### Non-goals
+Parser/application code changes; AFLW; the fresh Codex exploratory corpus (separate future phase);
+repairing `npm run nl:stress:compare`; relabelling any `GRAIN_EQUIVALENT`/`UNEXPECTED_DECLINE`/
+`WRONG_FAILURE_REASON` row (72/921/70, unrelated, unaudited by this issue).
+
+### Acceptance criteria
+- V1 corpus stays exactly 12,000 rows with the same ids/questions; only the 173 rows' expectation
+  metadata changes.
+- Re-run on `PARSER_VERSION` 50: `AMBIGUITY_NOT_DETECTED` 173 → 0; `GRAIN_EQUIVALENT`,
+  `UNEXPECTED_DECLINE`, `WRONG_FAILURE_REASON` counts unchanged at 72/921/70.
+- `PARSER_VERSION` unchanged at 50.
+- If a genuinely new parser defect surfaces while validating the cleaned corpus: stop, document,
+  propose a separate issue — do not expand this one.
+
+### Migration/schema implications
+None.
+
+### Operator verification expectations
+User-run on the dev host per `CLAUDE.md` §9: back up the canonical CSV, run the correction script,
+`npm run nl:stress -- --corpus <corrected> --out <dir>`, manual comparison of `summary.json`/
+`report.md` against the existing v50 run (`npm run nl:stress:compare` is known-unreliable for V1 output
+and is not repaired by this issue). Full commands: `AFLDB-ISSUE-199.md` §7.
+
+### Corpus follow-up (not part of this issue — Stage 2 remains open)
+This issue discharged the entire hard-fail class it was scoped to (`AMBIGUITY_NOT_DETECTED` 173 → 0,
+confirmed above), but Stage 2 itself is **not** closed by this resolution: the three soft classes
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70, exactly composing the
+current 1,063 soft count, unchanged by this issue's fix) remain open, unaudited by this issue, and
+plausibly hide their own stale-corpus population (the AFLDB-ISSUE-070 precedent). No tracked issue
+number has been assigned to that follow-up audit yet — `IssuesIndex.md`'s Stage 2 next-task item 4 (a
+fresh exploratory stress sweep) is the recommended next step, to be opened as its own issue when work on
+it starts, not folded into this one.
+
+### Implementation recommendation
+Sonnet 5, Medium effort — mechanism is simpler than AFLDB-ISSUE-197/198 (a self-checking CSV correction
+script, no parser code), but correctness depends on reading the real canonical CSV's current rows
+before writing the script's assumptions; recommend running the implementation session where the file
+is directly readable (the dev host) rather than carrying this plan's Windows-session inferences forward
+unverified. Full runbook: `AFLDB-ISSUE-199.md`.

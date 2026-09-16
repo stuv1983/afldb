@@ -56,10 +56,17 @@ accounting elsewhere in the parser — see `issues.md`'s Implementation section)
 `nl-audit-acceptance.test.ts` 10/10, `nl-plan.test.ts` 182/182, plus the integration file above),
 clean `tsc --noEmit`. AFLDB-ISSUE-187..198 all now resolved.
 
-The unchanged V1 12k-row corpus re-run on parser v50 (post-merge Stage 2 step, expected to clear the
-five Jones rows 11626-11630 with no other movement) has NOT been run yet — do not assume its result.
-The corpus relabelling that follows from ISSUE-197/198, and the rest of the Stage 2 closeout sequence
-below, remain outstanding.
+The unchanged V1 12k-row corpus re-run on parser v50 (post-merge Stage 2 step) has now been run: hard
+failures 178 -> 173, confirmed to be exactly the five Jones rows (11626-11630) clearing with zero
+collateral movement. **AFLDB-ISSUE-199 resolved 2026-09-16** (Sonnet 5, from the approved runbook
+`AFLDB-ISSUE-199.md`, revised mid-implementation after two real-DEV validation failures — see
+`issues.md`'s Implementation/Final-patch-revision sections — a self-verifying correction script,
+`tools/nl/fix-issue-199-stale-expectations.ts`, corrected exactly the 173 stale-decline rows; operator-
+validated: correction-tool summary 173/173 targets modified, 0 non-target rows touched, plus a parser-v50
+`nl:stress` re-run showing `AMBIGUITY_NOT_DETECTED`/hard-fail 173 -> 0 with the three soft classes
+unchanged at 72/921/70; DB-free unit suite 28/28; `PARSER_VERSION` unchanged at 50). AFLDB-ISSUE-187..199
+all now resolved. Stage 2 is **not** closed by this: the three soft classes remain open and unaudited
+(item 4 below), and the rest of the Stage 2 closeout sequence remains outstanding.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -71,18 +78,17 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    1271 -> 1241 non-clean rows, 30 rows became clean, 0 new non-clean rows, 0
    changed-but-still-non-clean rows. This comparison is what surfaced the Jones rows (§ above,
    AFLDB-ISSUE-198) as still-hard rather than clean.
-3. Corpus expectation cleanup for the ISSUE-197/198-affected rows, still not performed: 30 of the 35
-   generic-surname rows (Johnson/Brown/Smith/Williams/Wilson/Anderson, all 5 each) stay expected
-   declines and are now clean; the 5 Jones rows (11626-11630) stay expected declines and were still
-   hard failures in the v49 corpus record — AFLDB-ISSUE-198 is now resolved and operator-validated,
-   but do not relabel the Jones rows until the unchanged corpus is re-run on parser v50 and they are
-   confirmed clean row-by-row. The 5 Ablett rows relabel from expected-decline to expected successful
-   ranking across the complete 7-player family. Separately, the 168 stale team-streak/coach-record
-   rows get their own
-   expectation correction (unrelated to ISSUE-197/198, a distinct stale-corpus issue).
-4. A fresh exploratory stress sweep to identify any remaining NL coverage/safety gaps beyond this
-   triage.
-
-Do not alter the corpus before that dedicated session runs it.
+3. **Done, resolved 2026-09-16** — the V1 12k corpus was re-run on parser v50: hard failures 178 ->
+   173 (only the five Jones rows, 11626-11630, moved; confirmed clean via full semantic diff, zero
+   collateral movement). The remaining 173 hard failures (5 Ablett + 112 team-streak + 56 coach-record)
+   were all stale expected-decline rows predating shipped features. **AFLDB-ISSUE-199 resolved
+   2026-09-16** — corrected via a checked-in, self-verifying script
+   (`tools/nl/fix-issue-199-stale-expectations.ts`), operator-run against the real canonical CSV
+   (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
+   173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
+4. **Next.** A fresh exploratory stress sweep to identify any remaining NL coverage/safety gaps beyond
+   this triage, plus a decision on whether the three remaining soft classes (`GRAIN_EQUIVALENT` 72,
+   `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70 — unaudited, unrelated to ISSUE-199, unchanged by
+   its fix) need their own triage before Stage 2 can be declared complete. No issue number assigned yet.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
