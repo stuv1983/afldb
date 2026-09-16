@@ -8,6 +8,25 @@
 
 _No open issues._
 
+**AFLDB-ISSUE-208 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(2) of `AFLDB-ISSUE-206.md`'s six proposals: `extractClubs`'s club-role lookback (`src/search/nl/parser.ts`)
+tested "does an against-like token exist anywhere in a fixed 20-character window", not "what is the
+nearest preposition governing this club" — losing the subject club on 134 after-siren rows ("to win FOR
+Club" mis-read the earlier, unrelated "to" as governing) and 117 leading-opponent/checkpoint rows
+("Against Opponent, ... Subject's ..." let the opponent's own stripped-out "against" leak into the
+subject's shrunken window). One shared mechanism, fixed by a `nearestGoverningPreposition` helper
+anchored to the immediately-preceding token, checked against the pre-mutation text — no vocabulary
+added, no stage reordered, `scope.matchup` unchanged; `PARSER_VERSION` 55→56. Operator-validated on
+streamanator (commit `70b72df`): frozen V5 stable-corpus rerun stayed **12000/12000/0/0**, and a direct
+structured-plan diff of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v55 vs post-fix
+v56) found exactly **251 changed plans** (134 `after_siren` + 117 `team_checkpoint_collision`), zero
+collateral movement elsewhere, clearing all 251 confirmed parser-defect hard failures (aggregate hard
+failures 1381→1130, clean +251, soft unchanged). Implementation commit `70b72df`, unmerged on
+`sonnet/issue-208-club-role-ownership`. One structurally similar, undisturbed finding in
+`assignCrossDomainClubs` (its own fixed-window `AGAINST_PREPOSITION.test` for the played/coached
+opponent refusal) documented but not fixed and not yet opened as its own issue. See `issues.md` and
+`AFLDB-ISSUE-208.md` for the full record.
+
 **AFLDB-ISSUE-207 resolved 2026-09-16** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (1) of `AFLDB-ISSUE-206.md`'s six proposals, the highest-severity finding (281 silently-wrong-answer
 corpus rows). Root cause: `extractHavingClause`'s operator search used an unbounded `±20`-character
