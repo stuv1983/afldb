@@ -6,6 +6,27 @@
 
 **Open issues:** 0
 
+| ID | Severity | Area | Current state | Key files / next action |
+| --- | --- | --- | --- | --- |
+
+**AFLDB-ISSUE-206 resolved 2026-09-16** (Sonnet 5) — final triage of the 29,030-row independent V1
+exploratory corpus, re-verified against current branch source rather than taken on the first-pass
+(Codex) scorer labels. All 1,381 hard failures reconcile exactly to five root causes: 496
+(`team_match_result` symmetric "versus", confirmed corpus-oracle defect — parser already emits a correct
+`matchup` scope, template wrongly asserts directional clubs), 283 (`achievement_summary` aggregation,
+confirmed corpus/scorer defect — the grain's executor never reads `plan.agg`), 351 (Gary Ablett Jnr/Snr,
+confirmed scorer defect — player ID resolves correctly, only display-name string comparison is wrong),
+and **251 genuine parser defects** (`after_siren`/`team_checkpoint_collision` clubFor loss, one shared
+root mechanism: `AGAINST_PREPOSITION`'s 20-character lookback window in `extractClubs` is not anchored to
+the nearest preposition). Two further clusters are silent wrong answers scored `clean`, outside the
+1,381: 281 rows (numeric operator ownership crossing between `extractHavingClause`/`extractMatchFilter`,
+confirmed parser defect, highest severity) and 173 rows (head-to-head "has more wins" phrasing gap).
+Soft declines (15,275) trace mainly to one mechanism (imperative/structural phrasing vocabulary gap,
+~10,000+ rows) plus `after YEAR` (unimplemented, ~1,200+ rows) and a deliberate `career_boundary`
+compiler restriction (907 rows, fails closed by design). Six follow-on proposals recorded in priority
+order in `AFLDB-ISSUE-206.md`, no ISSUE-207+ IDs assigned yet. No parser behaviour, `PARSER_VERSION`, V5
+row or production data changed. See `issues.md` and `AFLDB-ISSUE-206.md` for the full record.
+
 **AFLDB-ISSUE-205 resolved 2026-09-16** (Sonnet 5, operator-validated) — AFLDB-ISSUE-200's
 `TAXONOMY_DRIFT` disposition for the remaining 70 `WRONG_FAILURE_REASON` rows was incomplete: two
 unrelated families, not one benign label mismatch. **Family A (42 rows,** "biggest three quarter time

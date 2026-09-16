@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### NL search: deterministic large-scale exploratory corpus and audit-aware stress reporting (AFLDB-ISSUE-206) - 16 September 2026
+
+- Added a seeded 29,030-row exploratory NL corpus generator, V5 overlap/duplicate guard and distribution manifest, plus parse-only triage tooling that groups findings without using parser output as expected truth.
+- The stress harness now records uncertain `audit` rows without scoring their semantic interpretation, while retaining parser crashes as failures, and recognizes wildcard-final expectations. The frozen V5 corpus and parser version 54 are unchanged.
+- The first parser-v54 exploratory run found accepted-plan scope and condition errors; the ranked evidence and corpus/scorer limitations are recorded in `AFLDB-ISSUE-206.md`. Parser fixes are deferred for operator-reviewed follow-on issues.
+
 ### NL search: fixed an extraction-order defect that silenced the already-implemented Q3-comeback team-match metric, and corrected the 70-row WRONG_FAILURE_REASON stress-corpus family (AFLDB-ISSUE-205) - 16 September 2026
 
 - AFLDB-ISSUE-200's `TAXONOMY_DRIFT` disposition for the remaining 70 `WRONG_FAILURE_REASON` stress-corpus
