@@ -6,6 +6,24 @@
 
 **Open issues:** 0
 
+**AFLDB-ISSUE-204 resolved 2026-09-16** (Sonnet 5, operator-validated) — guarded V3→V4 corpus
+correction for the 180-row `coverage_unavailable|fgf` stale pre-1965/1987 finals-stat coverage
+expectations (disposals/marks/tackles, finals/Grand Finals, seasons 1897-1926). Three fail-closed
+correction-tool defects were found and fixed across three operator runs before the fourth completed
+end-to-end: (1) an over-broad category+template-only selector matched 996 rows, not 180, retargeted to
+the row's full structural signature; (2) a singular-only `/\bfinal\b/i` question-text check rejected
+real plural "finals" wording, widened to `/\bfinals?\b/i`; (3) a season-shape gate wrongly required
+`expected_season_from === expected_season_to` for every row, fixed by branching on
+`expected_match_type` (Grand Final rows carry a blank `expected_season_to`). All three were
+correction-tool-only; no parser/runtime defect was found. Final run: 180/180 targets corrected, 0
+non-targets touched, parser-v53 rerun against V4 = 12000 scored / 11930 clean / 70 soft / 0 failed
+(down from 250 soft), the 180 `UNEXPECTED_DECLINE` rows removed with zero new soft rows and zero
+semantic changes among the rest; `PARSER_VERSION` unchanged at 53. See `issues.md` and
+`AFLDB-ISSUE-204.md` §11 for the full record. AFLDB-ISSUE-187..204 all now resolved. **Stage 2 (the
+AFLDB-ISSUE-200 corpus audit and its four follow-ons) is now closed**; the remaining 70
+`WRONG_FAILURE_REASON` taxonomy-drift rows are a separate, not-yet-opened cleanup/audit task (see
+Stage 2 next task below).
+
 AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
 (Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
 grain-equivalent GWS player-season rows normalized as a byproduct of the same fix.
@@ -139,13 +157,19 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `CLUB_NICKNAMES` addition, operator-validated against the retained V3 corpus (465 → 265 soft).
    The same fix also normalized all 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows (GWS Giants player-season
    leading-goalkicker questions) to exact expected semantics as a byproduct, so that class is now 0.
-   Stage 2 is **not yet** closed: **(c) opened 2026-09-16 as AFLDB-ISSUE-203** (planning only,
-   `PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions, 15
-   manifestations) — not yet implemented; (d) a separate, guarded corpus-correction task for the 180
-   pre-1965 finals/Grand Final disposals/marks/tackles rows currently asserting a stale
-   `expected_status=success` remains open but not yet opened as a tracked issue. The 70
+   Stage 2 was **not yet** closed after (c): **(c) opened 2026-09-16 as AFLDB-ISSUE-203, resolved
+   2026-09-16** (`PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions,
+   15 manifestations, operator-validated, `PARSER_VERSION` 52→53); **(d) opened 2026-09-16 as
+   AFLDB-ISSUE-204, resolved 2026-09-16** (guarded corpus correction for the 180
+   `coverage_unavailable|fgf` disposals/marks/tackles finals/Grand Final rows that asserted a stale
+   `expected_status=success` — two coverage floors, not one: disposals/marks before 1965, tackles
+   before 1987 — retargeted after the first operator run failed closed on an over-broad 996-row
+   selector, then two further fail-closed correction-tool bugs found and fixed; operator-validated:
+   180/180 targets corrected, 0 non-targets touched, parser-v53 rerun 250→70 soft with the 180
+   `UNEXPECTED_DECLINE` rows removed and zero new soft rows, `PARSER_VERSION` unchanged at 53). The 70
    `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness blocker, unless a later
-   diagnostic-taxonomy cleanup is deliberately opened. Only after (c) resolves and (d) lands is the
-   fresh exploratory Codex corpus sweep in scope, per the original Stage 2 boundary.
+   diagnostic-taxonomy cleanup is deliberately opened. **Stage 2 is now closed** — (a)-(d) all resolved.
+   The fresh exploratory Codex corpus sweep is now in scope, per the original Stage 2 boundary, as a
+   separate not-yet-opened task.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
