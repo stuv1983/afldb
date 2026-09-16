@@ -4,18 +4,18 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 0
 
-| ID | Severity | Area | State | Next action |
-|---|---|---|---|---|
-| AFLDB-ISSUE-201 | Medium | NL search (`src/search/nl/plan.ts`, `src/db/queries/nl/player-career.ts`) | Implemented + 2-row corpus correction added, awaiting operator validation | Run `AFLDB-ISSUE-201.md` §7 (unit/integration tests, `tsc --noEmit`, stable v51 corpus rerun) and §10 (guarded-script tests, corpus regeneration, v51-on-v3 rerun); confirm 465 soft / 0 hard |
+No currently open issues.
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
 unsupported-term leakage, `PARSER_BUG` word-form "zero", and a guarded corpus correction for
 `STALE_CORPUS_EXPECTATION` pre-1965 stats) are recorded but not yet opened as tracked issues.
-AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of these -- see its
-detailed entry below.
+AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of these, resolved
+2026-09-16 (Sonnet 5) -- see its detailed entry below. The remaining three follow-on items (GWS
+unsupported-term, "zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not
+yet opened as tracked issues.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33727,7 +33727,48 @@ Expected benchmark after the two-row correction, on rerun: 12000 scored / 11535 
 failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70). Full detail,
 correction-script design, and the exact operator commands are in `AFLDB-ISSUE-201.md` §9–§10.
 
-**Still not done:** the operator has not yet run `AFLDB-ISSUE-201.md` §10 (guarded-script unit tests,
-corpus regeneration, v51-on-v3 rerun, class-count verification, and the two-id clean proof). Do not
-mark this issue resolved, update `IssuesIndex.md`'s open-issue count, or add the `CHANGELOG.md` entry
-until that evidence is recorded here.
+### Final resolution (2026-09-16, Sonnet 5)
+
+**Resolved 2026-09-16**, on operator validation. Implementation commit `366475e1`; closeout-correction
+commit `9533aed0`.
+
+Final local validation: `tests/nl-parser.test.ts`/`tests/nl-plan.test.ts`/`tests/nl-semantic-mapping.test.ts`
+774/774 passed; `tests/integration/nl-answers.test.ts` 33/33 passed; `tests/nl-issue-201-corpus-fix.test.ts`
+17/17 passed; `npx tsc --noEmit` clean.
+
+The guarded correction script (`tools/nl/fix-issue-201-stale-boundary-expectations.ts`) was run
+`/home/arm/nl-stress-corpus-v2.csv` → `/home/arm/nl-stress-corpus-v3.csv`: target rows modified 2,
+non-target rows modified 0, independently confirmed by a V2 → V3 diff (changed ids exactly `[9907,
+10294]`). The parser-v51 rerun against V3 produced the expected final benchmark:
+
+```text
+12000 scored
+11535 clean
+ 465 soft
+   0 failed
+```
+
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70). Both corrected ids are
+absent from `failures.csv`. The v51-on-V2 → v51-on-V3 soft-row diff shows old soft 467, new soft 465,
+removed `[9907, 10294]`, added `[]`, and **zero semantic changes among rows that remained soft** — the
+definitive no-collateral-change proof required before resolution.
+
+**Final accounting:**
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects fixed
+  2 stale corpus expectations corrected
+  0 genuine AFLDB-ISSUE-201 defects remain
+  0 new soft findings
+  0 semantic changes to remaining soft findings
+  0 hard failures
+```
+
+The remaining 465 soft findings are all already-known, out-of-scope families untouched by this issue:
+180 stale pre-1965 FGF coverage expectations, 128 GWS unsupported-term parser bug, 15 `zero` word-form
+parser bug, 72 accepted grain equivalence, 70 accepted taxonomy drift.
+
+Full evidence, correction-script design and the resolution record are in `AFLDB-ISSUE-201.md` §8–§10.
+`CHANGELOG.md` updated under `[Unreleased]`. Removed from `IssuesIndex.md`'s open-issues list and from
+the Open Issues table below (Stage 2 next-task item 5a is now done; items 5b-5d remain open, not yet
+tracked issues).

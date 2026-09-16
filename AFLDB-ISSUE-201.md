@@ -1,12 +1,11 @@
 # AFLDB-ISSUE-201 — Career-boundary season ranges rejected by the player_career validator
 
-Status: **Implemented 2026-09-16, awaiting operator validation** (planning 2026-09-16, implementation
-2026-09-16, both Sonnet 5). First of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2
-next-task item 5a, `PLANNER_VALIDATOR_BUG` / `coverage_unavailable|boundary`, 598 rows). Do not treat
-as resolved until the operator has run the commands in §7 and the stable corpus shows the 598 → 0
-movement with no collateral change to the other five ISSUE-200 clusters. See `issues.md` for the full
-planning-session root-cause record this runbook implements; this file adds the implementation and
-validation record.
+Status: **Resolved 2026-09-16** (planning 2026-09-16, implementation 2026-09-16, closeout correction
+2026-09-16, all Sonnet 5), on operator validation. First of AFLDB-ISSUE-200's three candidate defect
+follow-ons (Stage 2 next-task item 5a, `PLANNER_VALIDATOR_BUG` / `coverage_unavailable|boundary`, 598
+rows). Implementation commit `366475e1`; closeout-correction commit `9533aed0`. See `issues.md` for
+the full planning-session root-cause record this runbook implements; this file adds the
+implementation, closeout-correction and final resolution record (§8).
 
 ## 1. Confirmed root cause (planning session, re-verified before editing)
 
@@ -369,7 +368,81 @@ v51 corpus rerun) must already be green before these.
 
 ## 8. Resolution
 
-Not yet resolved. Record actual command output, pass/fail counts, and the before/after corpus
-comparison here (and in `issues.md`) once the operator runs §7 and §10, then update `IssuesIndex.md`
-and add the `CHANGELOG.md` entry. Per repo precedent (ISSUE-195/197/198/199), the `CHANGELOG.md` entry
-is deferred to this resolution step, not added at implementation/closeout-authoring time.
+**Resolved 2026-09-16** (Sonnet 5), on operator validation. Implementation commit `366475e1`;
+closeout-correction commit `9533aed0`.
+
+### Final operator validation evidence
+
+Local validation:
+- `tests/nl-parser.test.ts` / `tests/nl-plan.test.ts` / `tests/nl-semantic-mapping.test.ts`: **774/774
+  passed**.
+- `tests/integration/nl-answers.test.ts` (DB-backed): **33/33 passed**.
+- `tests/nl-issue-201-corpus-fix.test.ts` (guarded correction script): **17/17 passed**.
+- `npx tsc --noEmit`: **clean**.
+
+Stable corpus validation (corrected V2, `/home/arm/nl-stress-corpus-v2.csv`):
+```text
+v50: 12000 scored, 10937 clean, 1063 soft, 0 failed
+v51: 12000 scored, 11533 clean,  467 soft, 0 failed
+```
+Removed from soft: 596. Added to soft: 0. Cross-referencing AFLDB-ISSUE-200's exact 598
+`PLANNER_VALIDATOR_BUG` ids against v51: 596 cleared, 2 still soft (id 9907, id 10294 — both "...
+Grand Final before 1897", both `seasonMax=1896`, confidence 1, no unsupported terms, both correctly
+declining `coverage_unavailable` / "Season is out of range."). Confirmed stale corpus expectations,
+not residual implementation defects (§9).
+
+Guarded corpus correction (`tools/nl/fix-issue-201-stale-boundary-expectations.ts`,
+`/home/arm/nl-stress-corpus-v2.csv` → `/home/arm/nl-stress-corpus-v3.csv`):
+```text
+input rows: 12000, output rows: 12000
+target rows expected: 2, target rows modified: 2, non-target rows modified: 0
+```
+Independent V2 → V3 diff: changed ids `[9907, 10294]`, changed count 2 — no other row changed.
+
+Final parser-v51 benchmark against V3:
+```text
+12000 scored
+11535 clean
+ 465 soft
+   0 failed
+```
+Soft classes: `GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70. Both
+corrected ids are absent from `failures.csv`. Exact v51-on-V2 → v51-on-V3 soft-row comparison: old
+soft 467, new soft 465, removed `[9907, 10294]`, added `[]`, **zero semantic changes among rows that
+remained soft** — the definitive no-collateral-change proof.
+
+### Final accounting
+
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects fixed
+  2 stale corpus expectations corrected
+  0 genuine AFLDB-ISSUE-201 defects remain
+  0 new soft findings
+  0 semantic changes to remaining soft findings
+  0 hard failures
+```
+
+### Remaining known soft families (465 total, none touched by this issue)
+
+- Stale pre-1965 FGF coverage expectations: 180 (`coverage_unavailable|fgf`, `STALE_CORPUS_EXPECTATION`
+  disposition — separate follow-on).
+- GWS unsupported-term parser bug: 128 (`PARSER_BUG` — separate follow-on).
+- `zero` word-form parser bug: 15 (`PARSER_BUG` — separate follow-on).
+- Legitimate grain equivalence: 72 (`GRAIN_EQUIVALENT_LEGITIMATE` — no fix needed).
+- Accepted taxonomy drift: 70 (`TAXONOMY_DRIFT` — no fix needed).
+
+### Root cause, fix and validation (summary for the ledger)
+
+- **Root cause:** `validatePlan`'s career season-range gate did not exempt `raw.boundary` plans (§1);
+  `player-career.ts` never compiled a boundary plan's season range at all (§1).
+- **Fix:** validator exemption for `raw.boundary`-carrying plans; new `boundarySeasonWhere` compiling
+  the range against `c.debut_season`/`c.final_season` (§3). `PARSER_VERSION` 50 → 51.
+- **Closeout correction:** 2 of the 598 corpus-confirmed manifestations were themselves stale
+  expectations (a season genuinely outside supported coverage), corrected by a guarded, self-verifying
+  script rather than a hand-edit (§9).
+- **Validation:** see evidence above. No collateral movement anywhere in the corpus.
+
+Not touched, per scope, and remaining out of scope: `NL_CAREER_SEASON_OWNING_BUILDERS`/
+`careerPredicatesOwnSeasonRange`, the GWS/`zero` parser bugs, the 180 stale pre-1965 coverage rows, and
+the `GRAIN_EQUIVALENT_LEGITIMATE`/`TAXONOMY_DRIFT` clusters.
