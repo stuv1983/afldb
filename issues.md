@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-200 | Low | Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`) | Audit tooling implemented and unit-tested (Sonnet 5, 2026-09-16); DEV extraction/clustering run not yet performed | Operator, on `streamanator`: run `tools/nl/audit-issue-200-extract.ts` then `tools/nl/audit-issue-200-cluster.ts` per `AFLDB-ISSUE-200.md` §4/§9 against `/home/arm/nl-stress-v50-cleaned/`, then hand the cluster summary back for disposition |
+| AFLDB-ISSUE-200 | Low | Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`) | Real 6-cluster shape found and all 6 dispositions assigned in `tools/nl/issue-200-dispositions.csv` (Sonnet 5, 2026-09-16); final `--apply-dispositions` run against the real audit CSV not yet performed | Operator, on `streamanator`: run `audit-issue-200-cluster.ts --audit /home/arm/issue-200-soft-audit.csv --apply-dispositions tools/nl/issue-200-dispositions.csv --out-final /home/arm/issue-200-soft-audit-final.csv` and report the printed reconciliation |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33162,19 +33162,26 @@ unverified. Full runbook: `AFLDB-ISSUE-199.md`.
 - **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
   canonical corpus file itself (`/home/arm/nl-stress-corpus-v2.csv`, outside this repository), and
   the DEV artifact directory `/home/arm/nl-stress-v50-cleaned/`.
-- **Status:** **Implementation done, DEV run pending** 2026-09-16 (Sonnet 5). Runbook
-  `AFLDB-ISSUE-200.md` written in the prior planning session; this session implemented and
-  unit-tested both audit scripts per §4. The actual per-row/per-cluster classification has still
-  not been performed -- this session (Windows, no DEV file access) could not read
-  `nl-stress-v50-cleaned/results.jsonl`/`entity-index.json` directly, so the tooling was proved
-  against synthetic fixtures only. See Implementation below for exact DEV operator commands.
+- **Status:** **Dispositions assigned, final apply-dispositions run pending** 2026-09-16 (Sonnet 5).
+  Runbook `AFLDB-ISSUE-200.md` written in the prior planning session; tooling implemented and
+  unit-tested in the following session. The operator has since run the extraction/cluster scripts
+  against the real `nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering
+  all 1,063 rows; this session recorded evidence-backed dispositions for all six in a checked-in
+  mapping file (`tools/nl/issue-200-dispositions.csv`) and added DB-free tests proving that mapping
+  reconciles against the real cluster shape. **Not yet done:** the operator has not yet run
+  `audit-issue-200-cluster.ts --apply-dispositions` against the real
+  `/home/arm/issue-200-soft-audit.csv` to produce and confirm the final classified file -- this
+  issue stays open until that run reports the exact reconciliation in the Required accounting table
+  below. This (Windows) session still has no DEV file access.
 - **Found:** 2026-09-16, opened by the user directly (not from a triage). Corresponds to
   `IssuesIndex.md`'s Stage 2 next-task item 4 (the three soft classes flagged as unaudited when
   AFLDB-ISSUE-199 resolved) — this issue is that follow-up audit, now with a tracked number.
 - **Key files:** `tools/nl/corpus.ts` (`scoreRow`, `StressExpectation`, `verdict`),
   `tools/nl/stress-test.ts` (`RunRecord`, `writeOutputs`, `loadEntityIndex`/`saveEntityIndex`),
-  `tools/nl/README.md`, `src/db/queries/nl/log.ts` (`NlFailureReason`), `AFLDB-ISSUE-200.md` (full
-  runbook).
+  `tools/nl/audit-issue-200-shared.ts`, `tools/nl/audit-issue-200-extract.ts`,
+  `tools/nl/audit-issue-200-cluster.ts`, `tools/nl/issue-200-dispositions.csv` (the checked-in
+  disposition mapping), `tools/nl/README.md`, `src/db/queries/nl/log.ts` (`NlFailureReason`),
+  `AFLDB-ISSUE-200.md` (full runbook).
 
 ### Symptom / starting point
 `npm run nl:stress` against the corrected V1 12,000-row corpus on parser v50 reports 0 hard failures
@@ -33261,7 +33268,7 @@ npx tsc --noEmit
 npx vitest run tests/nl-issue-200-audit-extract.test.ts tests/nl-issue-200-audit-cluster.test.ts
 ```
 
-### DEV operator commands (once the two commands above pass)
+### DEV operator commands (extraction + cluster-summary pass, already run by the operator)
 ```
 npx tsx tools/nl/audit-issue-200-extract.ts \
   --results /home/arm/nl-stress-v50-cleaned/results.jsonl \
@@ -33272,11 +33279,85 @@ npx tsx tools/nl/audit-issue-200-cluster.ts \
   --audit /home/arm/issue-200-soft-audit.csv \
   --out-summary /home/arm/issue-200-clusters.md
 ```
-Expected: the extractor prints `72`/`921`/`70`/`1063` and exits 0 (any mismatch or duplicate-id
-failure means the DEV baseline has moved since the ISSUE-199 resolution and needs re-investigation
-before continuing); the cluster script prints an auto-cluster count (unknown ahead of time -- see
-`AFLDB-ISSUE-200.md` §10) and writes `issue-200-clusters.md` for the next disposition pass. No
-parser fix or corpus correction should be attempted from this first pass alone.
+The operator ran this pass and reported exactly six auto-clusters covering all 1,063 rows, with the
+evidence recorded in Real DEV evidence and cluster dispositions below.
+
+### Real DEV evidence and cluster dispositions (2026-09-16, Sonnet 5, from operator-supplied real `results.jsonl` evidence)
+
+The real 2026-09-16 DEV run of `audit-issue-200-extract.ts` + `audit-issue-200-cluster.ts` found
+**exactly six** `auto_cluster_key` values across all 1,063 rows -- one cluster each for
+`GRAIN_EQUIVALENT` (72/72) and `WRONG_FAILURE_REASON` (70/70), and four clusters partitioning the
+whole of `UNEXPECTED_DECLINE` (598 + 180 + 128 + 15 = 921/921). Recorded verbatim in
+`tools/nl/issue-200-dispositions.csv`:
+
+| `auto_cluster_key` | class | rows | disposition | evidence |
+|---|---|---|---|---|
+| `coverage_unavailable\|boundary` | `UNEXPECTED_DECLINE` | 598 | `PLANNER_VALIDATOR_BUG` | Id 9908 ("players whose first game was a Grand Final in 1897") parses correctly -- grain `player_career`, boundary `{event:'debut', where:'grand_final'}`, `seasonMin=seasonMax=1897` -- but the generic player_career season-range validator rejects it: "A career question cannot be restricted to a season range." The season range names *when* the boundary event occurred, not a career aggregation window the validator is right to refuse elsewhere; it does not distinguish the two cases. |
+| `coverage_unavailable\|fgf` | `UNEXPECTED_DECLINE` | 180 | `STALE_CORPUS_EXPECTATION` | All 180 rows are disposals/marks/tackles (60 each) in finals/grand finals (90 each), seasons 1897-1926. Id 8918 ("most disposals in the 1897 Grand Final") plans correctly (`player_game`/`disposals`/`single`/`max`, season 1897, grand final) then correctly declines `coverage_unavailable`: "Disposals were not recorded before 1965." The corpus's `expected_status=success`/`coverageBehaviour=full` is the stale side -- declining rather than fabricating a pre-1965 stat is correct product behaviour. |
+| `unsupported_term\|tm\|gws` | `UNEXPECTED_DECLINE` | 128 | `PARSER_BUG` | `team_match`/H2H margin questions naming "GWS Giants" (e.g. "Adelaide biggest win versus GWS Giants") decline with `unsupported_term`="gws", even though GWS Giants is a recognised club identity elsewhere in the parser/corpus identity handling. The recognised club-name text is leaking into unsupported-term detection for these margin templates. |
+| `player_season->player_game/sum` | `GRAIN_EQUIVALENT` | 72 | `GRAIN_EQUIVALENT_LEGITIMATE` | Expected `player_season` goal totals (e.g. "GWS Giants most goals 1897") are answered via `player_game` rows summed over the one pinned season -- exactly the pair `scoreRow`'s own `seasonSumForSeasonRank`/`GRAIN_EQUIVALENT` branch (`corpus.ts:464-472`) already treats as semantically equivalent. This is the entirety of the `GRAIN_EQUIVALENT` class; no parser or corpus change needed. |
+| `unsupported_topic->unsupported_term` | `WRONG_FAILURE_REASON` | 70 | `TAXONOMY_DRIFT` | "Adelaide biggest three quarter time comeback" (and season-scoped variants) correctly decline in both expected (`unsupported_topic`) and actual (`unsupported_term`) output -- only the failure-reason label differs. This is the entirety of the `WRONG_FAILURE_REASON` class. No semantic-correctness defect. |
+| `unsupported_term\|pc\|zero` | `UNEXPECTED_DECLINE` | 15 | `PARSER_BUG` | `player_career` games/list questions with a numeric zero-goal condition (e.g. "players with 4 games and zero goals") decline with `unsupported_term`="zero" -- the word-form "zero" is not bound to the numeric literal 0 for an equality condition and survives into unsupported-term detection. |
+
+**Required accounting** (matches `AFLDB-ISSUE-200.md` §8's evidence-table shape):
+
+| disposition | clusters | rows |
+|---|---|---|
+| `PLANNER_VALIDATOR_BUG` | 1 | 598 |
+| `STALE_CORPUS_EXPECTATION` | 1 | 180 |
+| `PARSER_BUG` | 2 (gws 128 + zero 15) | 143 |
+| `GRAIN_EQUIVALENT_LEGITIMATE` | 1 | 72 |
+| `TAXONOMY_DRIFT` | 1 | 70 |
+| **Total** | **6** | **1063** |
+
+598 + 180 + 143 + 72 + 70 = 1063, matching `EXPECTED_TOTAL` exactly. All six clusters have a
+disposition; no cluster is `INTENTIONAL_CONSERVATIVE_DECLINE`, `SCORER_HARNESS_ARTIFACT` or
+`DUPLICATE_MANIFESTATION` in this real data.
+
+**Candidate follow-on defect families** (per the task instruction, no issue numbers opened yet):
+1. Career-boundary queries rejected by the generic `player_career` season-range validator — 598 rows
+   (`PLANNER_VALIDATOR_BUG`, `coverage_unavailable|boundary`).
+2. "GWS"/"GWS Giants" leaking into unsupported-term detection for `team_match` margin questions —
+   128 rows (`PARSER_BUG`, `unsupported_term|tm|gws`).
+3. The word "zero" not bound as a numeric-zero career condition — 15 rows (`PARSER_BUG`,
+   `unsupported_term|pc|zero`).
+4. Separate, non-parser follow-up: a guarded corpus correction for the 180 pre-1965
+   disposals/marks/tackles finals/grand-final rows currently asserting `expected_status=success`
+   (`STALE_CORPUS_EXPECTATION`, `coverage_unavailable|fgf`) -- ISSUE-199-style script, run against a
+   copy of the corpus, never in place.
+
+The 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows need no behaviour fix. The 70 `TAXONOMY_DRIFT` rows may
+remain as accepted diagnostic drift; a later diagnostic-taxonomy cleanup is optional, not a
+correctness blocker.
+
+### Disposition mapping artifact and test coverage (2026-09-16, Sonnet 5)
+`tools/nl/issue-200-dispositions.csv` -- the checked-in mapping the six dispositions above are
+recorded in, in the exact schema `applyDispositions`/`readDispositionMapping` expect
+(`auto_cluster_key, cluster_name, disposition, follow_on_issue, rationale`). `follow_on_issue` is
+left blank on every row: per the task instruction, no issue numbers are opened during this audit
+pass. `tests/nl-issue-200-audit-cluster.test.ts` gained a new `describe` block ("real ISSUE-200
+disposition mapping") that reads this real file from disk and (a) asserts its six entries map to
+exactly the dispositions above, and (b) builds a synthetic 1,063-row audit CSV shaped like the real
+six clusters and proves `applyDispositions` reconciles it to the exact per-disposition counts in
+the Required accounting table, with zero unmapped/stale rows -- in addition to, not replacing, the
+pre-existing generic-shape invariant tests.
+
+### DEV operator command (final pass -- not yet run)
+```
+npx tsx tools/nl/audit-issue-200-cluster.ts \
+  --audit /home/arm/issue-200-soft-audit.csv \
+  --apply-dispositions tools/nl/issue-200-dispositions.csv \
+  --out-final /home/arm/issue-200-soft-audit-final.csv
+```
+Expected final reconciliation: 1,063 input rows read from `/home/arm/issue-200-soft-audit.csv`,
+1,063 classified rows written to `issue-200-soft-audit-final.csv`, 0 unmapped clusters, 0 stale
+mapping entries, and disposition totals exactly `PLANNER_VALIDATOR_BUG` 598 /
+`STALE_CORPUS_EXPECTATION` 180 / `PARSER_BUG` 143 / `GRAIN_EQUIVALENT_LEGITIMATE` 72 /
+`TAXONOMY_DRIFT` 70. Any deviation (a seventh cluster, a different per-cluster count) means the real
+audit CSV no longer matches the shape this mapping was written against, and the mismatch should be
+reported rather than the mapping silently widened. Once this command succeeds, ISSUE-200 can move
+to closeout per §9 (open the three follow-on `PARSER_BUG`/`PLANNER_VALIDATOR_BUG` issues, then the
+separate guarded corpus-correction task for the 180 `STALE_CORPUS_EXPECTATION` rows).
 
 ### Non-goals
 Parser/planner/scorer code changes; `PARSER_VERSION` changes; modifying either external corpus file;
@@ -33285,26 +33366,36 @@ before clustering; AFLW; the large fresh Codex exploratory corpus (separate futu
 
 ### Acceptance criteria
 - All 1,063 soft rows accounted for exactly once; class counts reconcile to 72/921/70; disposition
-  counts sum to 1,063.
+  counts sum to 1,063. **Dispositions recorded and reconciled on paper** (Required accounting
+  table above); **the actual `--apply-dispositions` run against the real 1,063-row audit CSV, and
+  its printed reconciliation, is still outstanding** (see DEV operator command (final pass) above).
 - Every genuine defect cluster (`PARSER_BUG`/`PLANNER_VALIDATOR_BUG`/`SCORER_HARNESS_ARTIFACT`) has
   evidence sufficient for a separate follow-on issue (row count, 3+ worked examples, a root-cause
-  hypothesis citing specific code).
+  hypothesis citing specific code). **Done** for all three defect clusters (598/128/15 rows) --
+  see Real DEV evidence and cluster dispositions above.
 - Every `STALE_CORPUS_EXPECTATION`/`INTENTIONAL_CONSERVATIVE_DECLINE` disposition cites the current
-  supported semantics that make it correct, not merely that it reduces the soft count.
+  supported semantics that make it correct, not merely that it reduces the soft count. **Done** for
+  the one `STALE_CORPUS_EXPECTATION` cluster (180 rows, pre-1965 stat coverage).
 - No application/parser/scorer behaviour changed as part of the audit; `PARSER_VERSION` unchanged.
-- `IssuesIndex.md`'s Stage 2 next-task item 4 updated to point at this issue.
+  **Held** this session -- only tooling, tests and documentation changed.
+- `IssuesIndex.md`'s Stage 2 next-task item 4 updated to point at this issue. **Done.**
 
 ### Operator verification expectations
-User/implementation session on the dev host per `CLAUDE.md` §9 (this session made no DEV command
-requests and executed no shell commands): write and unit-test the two scripts, then run them against
-the existing `/home/arm/nl-stress-v50-cleaned/` artifacts (no new stress run needed — the baseline is
-already current). Exact commands: `AFLDB-ISSUE-200.md` §4a/§4c.
+Extraction and cluster-summary pass: **done**, on the dev host, per `AFLDB-ISSUE-200.md` §4a/§4c --
+the operator reported the real six-cluster shape this session's dispositions are based on.
+Remaining: run the final pass (DEV operator command (final pass) above) and report its printed
+reconciliation (row counts in, rows classified, unmapped/stale counts, per-disposition totals) so
+this issue's evidence can be closed against real tool output rather than the hand-reconciled table
+above. This (Windows) session made no DEV command requests and executed no shell commands itself
+(`CLAUDE.md` §9).
 
 ### Migration/schema implications
 None.
 
 ### Implementation recommendation
-Sonnet 5, Medium effort, on a session with direct DEV file read access — the extraction/cluster
-scripts are mechanically simple (same shape as `fix-issue-199-stale-expectations.ts`), but the actual
-per-cluster classification judgement in §4c genuinely needs the real 1,063-row data in hand, which
-this Windows planning session did not have. Full runbook: `AFLDB-ISSUE-200.md`.
+Tooling and dispositions are complete. Next session (any effort level) needs only: run the final
+pass command above, paste its output into this entry, update `IssuesIndex.md`/`issues.md` to
+**Resolved** once reconciliation is confirmed, and then scope the three follow-on defect issues and
+the one corpus-correction task named in Candidate follow-on defect families above -- each as its own
+small, separately-sequenced piece of work (mirroring the ISSUE-197→198→199 precedent), not bundled
+into this issue's closeout.

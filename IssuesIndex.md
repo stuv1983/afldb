@@ -72,13 +72,18 @@ all now resolved. Stage 2 is **not** closed by this: the three soft classes rema
 `AFLDB-ISSUE-200.md` written; classification schema, audit tooling proposal, and a finding that
 `failures.csv` lacks the `expected_*` fields this audit needs (use `results.jsonl` instead) are all
 recorded there. **Implementation session, 2026-09-16 (Sonnet 5):** `tools/nl/audit-issue-200-extract.ts`
-and `tools/nl/audit-issue-200-cluster.ts` (plus a shared constants module) are now written, with
-DB-free unit tests against synthetic fixtures (`tests/nl-issue-200-audit-extract.test.ts`,
-`tests/nl-issue-200-audit-cluster.test.ts`). No parser/planner/scorer code changed; no DEV commands
-run this session either (still no DEV file access from Windows), and `npm run typecheck`/the new
-tests have not yet been executed by any session -- see `issues.md` for the exact commands. Next: an
-operator/session with DEV file access runs the two scripts against `/home/arm/nl-stress-v50-cleaned/`
-and performs the actual 1,063-row cluster classification per the runbook.
+and `tools/nl/audit-issue-200-cluster.ts` (plus a shared constants module) written, with DB-free unit
+tests against synthetic fixtures. **Disposition session, 2026-09-16 (Sonnet 5):** the operator ran
+both scripts against the real `/home/arm/nl-stress-v50-cleaned/` artifacts and found exactly six
+auto-clusters covering all 1,063 rows; this session recorded evidence-backed dispositions for all
+six in a checked-in mapping (`tools/nl/issue-200-dispositions.csv`: `PLANNER_VALIDATOR_BUG` 598,
+`STALE_CORPUS_EXPECTATION` 180, `PARSER_BUG` 143, `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT`
+70 — reconciling to 1063) and added tests proving the mapping reconciles against that real shape. No
+parser/planner/scorer code changed. Next: the operator runs
+`audit-issue-200-cluster.ts --apply-dispositions` against the real
+`/home/arm/issue-200-soft-audit.csv` and confirms the printed reconciliation, which discharges this
+issue; only then are the three candidate defect follow-ons and the one guarded corpus-correction task
+(named in `issues.md`) scoped as separate tracked issues.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -99,12 +104,14 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
    173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
 4. **In progress — AFLDB-ISSUE-200** (opened 2026-09-16, planning done, audit tooling implemented
-   and unit-tested 2026-09-16, DEV run not started). Audit and classify all 1,063 soft rows
-   (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) into
-   stale-expectation / genuine-defect / intentional-decline / taxonomy-drift / scorer-artifact /
-   duplicate-manifestation clusters before deciding what, if anything, needs fixing. Not the same
-   task as the fresh exploratory Codex corpus sweep, which remains a separate, later Stage 2 phase
-   gated on this audit's genuine-defect follow-ons and any justified corpus corrections landing
-   first. Runbook: `AFLDB-ISSUE-200.md`.
+   and unit-tested 2026-09-16, real six-cluster shape found and all six dispositions assigned
+   2026-09-16, final apply-dispositions run pending). All 1,063 soft rows
+   (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) are now classified
+   on paper into exactly six clusters: `PLANNER_VALIDATOR_BUG` 598, `STALE_CORPUS_EXPECTATION` 180,
+   `PARSER_BUG` 143, `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
+   `intentional_conservative_decline`/`scorer_harness_artifact`/`duplicate_manifestation` clusters
+   turned up in the real data. Not the same task as the fresh exploratory Codex corpus sweep, which
+   remains a separate, later Stage 2 phase gated on this audit's genuine-defect follow-ons and any
+   justified corpus corrections landing first. Runbook: `AFLDB-ISSUE-200.md`.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

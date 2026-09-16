@@ -1,10 +1,14 @@
 # AFLDB-ISSUE-200 — Audit remaining NL V2 soft findings
 
-Status: **Implementation done, DEV run pending** (planning 2026-09-16, tooling implemented
-2026-09-16, both Sonnet 5). §4's two scripts are written and unit-tested against synthetic
-fixtures; the actual DEV extraction/clustering run against `nl-stress-v50-cleaned/` has not been
-performed. No parser/planner/scorer code changes are proposed or made here or by the tooling. See
-`issues.md` for the ledger entry and full implementation notes.
+Status: **Dispositions assigned, final apply-dispositions run pending** (planning 2026-09-16,
+tooling implemented 2026-09-16, real-evidence dispositions recorded 2026-09-16, all Sonnet 5). §4's
+two scripts are written and unit-tested; the operator has run the extraction/cluster-summary pass
+against the real `nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering all
+1,063 rows. This session recorded evidence-backed dispositions for all six in the checked-in
+`tools/nl/issue-200-dispositions.csv`. **Not yet done:** the final `--apply-dispositions` run
+against the real audit CSV, and its printed reconciliation. No parser/planner/scorer code changes
+are proposed or made here or by the tooling. See §13 below and `issues.md` for the full evidence and
+implementation notes.
 
 **Deviation from this runbook, found during implementation:** §4a describes `groupPrefix` as
 "already exported logic in stress-test.ts, reused." `tools/nl/stress-test.ts`'s `groupPrefix` is
@@ -297,3 +301,48 @@ Sonnet 5, Medium effort, on the dev host (or a session with direct DEV file read
 extraction/cluster scripts are mechanically simple (mirroring `fix-issue-199-stale-expectations.ts`'s
 shape: read, re-score with existing exports, write), but the actual clustering judgement in §4c
 genuinely needs the real 1,063-row data in hand, which this Windows planning session does not have.
+
+## 13. Real cluster dispositions (2026-09-16, from operator-supplied real `results.jsonl` evidence)
+
+The real DEV run found exactly six `auto_cluster_key` values, not the "several dozen" §10 left open
+as an unknown — one each for `GRAIN_EQUIVALENT` and `WRONG_FAILURE_REASON` (both are, empirically,
+single-cluster classes at 72/72 and 70/70), and four partitioning the whole of `UNEXPECTED_DECLINE`
+(598 + 180 + 128 + 15 = 921/921):
+
+| `auto_cluster_key` | class | rows | disposition |
+|---|---|---|---|
+| `coverage_unavailable\|boundary` | `UNEXPECTED_DECLINE` | 598 | `PLANNER_VALIDATOR_BUG` |
+| `coverage_unavailable\|fgf` | `UNEXPECTED_DECLINE` | 180 | `STALE_CORPUS_EXPECTATION` |
+| `unsupported_term\|tm\|gws` | `UNEXPECTED_DECLINE` | 128 | `PARSER_BUG` |
+| `player_season->player_game/sum` | `GRAIN_EQUIVALENT` | 72 | `GRAIN_EQUIVALENT_LEGITIMATE` |
+| `unsupported_topic->unsupported_term` | `WRONG_FAILURE_REASON` | 70 | `TAXONOMY_DRIFT` |
+| `unsupported_term\|pc\|zero` | `UNEXPECTED_DECLINE` | 15 | `PARSER_BUG` |
+
+Reconciliation: `PLANNER_VALIDATOR_BUG` 598 + `STALE_CORPUS_EXPECTATION` 180 + `PARSER_BUG` 143
+(128 + 15) + `GRAIN_EQUIVALENT_LEGITIMATE` 72 + `TAXONOMY_DRIFT` 70 = **1063**, matching
+`EXPECTED_TOTAL` exactly. Full per-cluster evidence (worked examples, cited code/error text) is in
+`issues.md`'s "Real DEV evidence and cluster dispositions" section and in the rationale column of
+`tools/nl/issue-200-dispositions.csv` itself. This satisfies §7's evidentiary bar for the two
+`PARSER_BUG` clusters and the one `PLANNER_VALIDATOR_BUG` cluster (row count, 3+ worked examples,
+root-cause hypothesis citing the specific validator/parser behaviour), and §7's requirement that
+`STALE_CORPUS_EXPECTATION`/`TAXONOMY_DRIFT` cite current supported semantics, not just a reduced
+soft count.
+
+Per §9: no follow-on issue numbers are opened by this disposition-recording pass. The four candidate
+defect/correction families (§9 items 3-4, i.e. the three code follow-ons plus the one guarded
+corpus-correction task) are named in `issues.md` but not yet scoped as separate tracked issues --
+that happens only after the final `--apply-dispositions` run below confirms the real audit CSV
+matches this six-cluster shape exactly.
+
+**Final DEV command (not yet run):**
+```
+npx tsx tools/nl/audit-issue-200-cluster.ts \
+  --audit /home/arm/issue-200-soft-audit.csv \
+  --apply-dispositions tools/nl/issue-200-dispositions.csv \
+  --out-final /home/arm/issue-200-soft-audit-final.csv
+```
+Expected: 1,063 rows in, 1,063 classified, 0 unmapped, 0 stale, and the per-disposition totals
+above. If the real audit CSV has drifted from this six-cluster shape (a seventh cluster, or a
+different per-cluster count), `applyDispositions` refuses to finish rather than silently
+misclassifying -- that refusal should be reported back rather than the mapping widened to force a
+pass.

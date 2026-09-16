@@ -9,6 +9,9 @@
  * reconciliation, cross-class key collision rejection, unmapped/stale/
  * invalid disposition rejection, and the final per-row accounting.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { toCsv } from '@/lib/csv';
@@ -222,5 +225,85 @@ describe('CSV round-trip (readAuditCsv / readDispositionMapping)', () => {
     const columns = AUDIT_COLUMNS.filter((c) => c !== 'auto_cluster_key');
     const csvText = `${columns.join(',')}\r\n${columns.map(() => '').join(',')}\r\n`;
     expect(() => readAuditCsv(csvText)).toThrow(/missing required column "auto_cluster_key"/);
+  });
+});
+
+// ------------------------------------------------------------------------
+// Real six-cluster mapping (tools/nl/issue-200-dispositions.csv)
+// ------------------------------------------------------------------------
+
+/**
+ * The exact auto_cluster_key -> (class, row count) shape the real 2026-09-16
+ * DEV operator run found across all 1,063 rows (AFLDB-ISSUE-200.md's Final
+ * cluster dispositions). Unlike buildBaselineAuditRows above (a generic,
+ * invented shape proving the mechanism), this fixture proves the real
+ * checked-in mapping file reconciles against the real cluster shape.
+ */
+const REAL_CLUSTER_SHAPE: [TargetClass, string, number][] = [
+  ['UNEXPECTED_DECLINE', 'coverage_unavailable|boundary', 598],
+  ['UNEXPECTED_DECLINE', 'coverage_unavailable|fgf', 180],
+  ['UNEXPECTED_DECLINE', 'unsupported_term|tm|gws', 128],
+  ['GRAIN_EQUIVALENT', 'player_season->player_game/sum', 72],
+  ['WRONG_FAILURE_REASON', 'unsupported_topic->unsupported_term', 70],
+  ['UNEXPECTED_DECLINE', 'unsupported_term|pc|zero', 15],
+];
+
+function buildRealShapedAuditRows(): AuditRow[] {
+  const rows: AuditRow[] = [];
+  let id = 1;
+  for (const [cls, key, count] of REAL_CLUSTER_SHAPE) {
+    for (let i = 0; i < count; i++) {
+      rows.push(makeRow({ id: String(id), class: cls, question: `Question ${id}`, auto_cluster_key: key }));
+      id++;
+    }
+  }
+  return rows;
+}
+
+function readRealDispositionMapping(): DispositionMappingRow[] {
+  const csvText = readFileSync(join(process.cwd(), 'tools', 'nl', 'issue-200-dispositions.csv'), 'utf8');
+  return readDispositionMapping(csvText);
+}
+
+describe('real ISSUE-200 disposition mapping (tools/nl/issue-200-dispositions.csv)', () => {
+  it('maps exactly the six real auto_cluster_key values to the six approved dispositions', () => {
+    const mapping = readRealDispositionMapping();
+    expect(mapping).toHaveLength(6);
+
+    const byKey = new Map(mapping.map((m) => [m.auto_cluster_key, m]));
+    expect(byKey.get('coverage_unavailable|boundary')?.disposition).toBe('PLANNER_VALIDATOR_BUG');
+    expect(byKey.get('coverage_unavailable|fgf')?.disposition).toBe('STALE_CORPUS_EXPECTATION');
+    expect(byKey.get('unsupported_term|tm|gws')?.disposition).toBe('PARSER_BUG');
+    expect(byKey.get('player_season->player_game/sum')?.disposition).toBe('GRAIN_EQUIVALENT_LEGITIMATE');
+    expect(byKey.get('unsupported_topic->unsupported_term')?.disposition).toBe('TAXONOMY_DRIFT');
+    expect(byKey.get('unsupported_term|pc|zero')?.disposition).toBe('PARSER_BUG');
+
+    expect(mapping.every((m) => DISPOSITIONS.includes(m.disposition as (typeof DISPOSITIONS)[number]))).toBe(true);
+    expect(mapping.every((m) => m.rationale.trim().length > 0)).toBe(true);
+  });
+
+  it('reconciles the real mapping against the real 1,063-row cluster shape with zero unmapped/stale rows', () => {
+    const auditRows = buildRealShapedAuditRows();
+    expect(auditRows).toHaveLength(EXPECTED_TOTAL);
+
+    const clusters = buildClusters(auditRows);
+    expect(clusters).toHaveLength(6);
+
+    const mapping = readRealDispositionMapping();
+    const finalRows = applyDispositions(auditRows, clusters, mapping);
+
+    expect(finalRows).toHaveLength(EXPECTED_TOTAL);
+    expect(finalRows.every((r) => r.provisional_disposition !== '')).toBe(true);
+
+    const countsByDisposition = new Map<string, number>();
+    for (const row of finalRows) {
+      countsByDisposition.set(row.provisional_disposition, (countsByDisposition.get(row.provisional_disposition) ?? 0) + 1);
+    }
+    expect(countsByDisposition.get('PLANNER_VALIDATOR_BUG')).toBe(598);
+    expect(countsByDisposition.get('STALE_CORPUS_EXPECTATION')).toBe(180);
+    expect(countsByDisposition.get('PARSER_BUG')).toBe(128 + 15);
+    expect(countsByDisposition.get('GRAIN_EQUIVALENT_LEGITIMATE')).toBe(72);
+    expect(countsByDisposition.get('TAXONOMY_DRIFT')).toBe(70);
+    expect([...countsByDisposition.values()].reduce((a, b) => a + b, 0)).toBe(EXPECTED_TOTAL);
   });
 });
