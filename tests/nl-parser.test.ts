@@ -2925,3 +2925,184 @@ describe('AFLDB-ISSUE-197: surname/family candidate completeness', () => {
     expect(parsed.report.ambiguousPlayer).toBeUndefined();
   });
 });
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-198 -- hyphen/underscore/slash word-boundary consistency
+// -----------------------------------------------------------------------
+// candidateNameWords used to tokenise a candidate's name by plain
+// `\s+`-splitting, while afldb_normalise_name (and the search_name/
+// search_alias columns resolvePlayerFamily reads) treats hyphens,
+// underscores and slashes as ADDITIONAL word breaks, and apostrophes/full
+// stops as deletions rather than breaks. A hyphenated surname was
+// therefore one TypeScript word and two SQL words: "Darcy Byrne-Jones"
+// and "David Rhys-Jones" silently dropped out of the family re-check,
+// undercounting a real 13-identity "Jones" family to 11 and ranking a
+// confident, wrong answer instead of declining. candidatePlayerSpan had a
+// related, one-stage-earlier defect: its `^[a-z]+$` token filter rejected
+// any hyphen/apostrophe-bearing token outright, so a full-name mention of
+// such a player could lose the surname before any resolver ran. Both are
+// fixed by one shared word-boundary contract, `splitNameWords` in
+// parser.ts, applied everywhere a candidate's name or the reader's own
+// mention text is compared word-for-word.
+describe('AFLDB-ISSUE-198: hyphen/underscore/slash word-boundary consistency', () => {
+  function jonesFamily(total: number, hyphenatedCount: number, idBase = 9500): NlPlayerCandidate[] {
+    return Array.from({ length: total }, (_, i) => ({
+      ref: {
+        id: idBase + i,
+        slug: `jones-fixture-${i}`,
+        name: i < hyphenatedCount ? `Xx Byrne-Jones${i}` : `Jones Fixture${i}`,
+      },
+      score: 300,
+    }));
+  }
+
+  function ctxWithFamily(family: NlPlayerCandidate[]): NlParseContext {
+    return { ...ctx, resolvePlayer: () => Promise.resolve([]), resolvePlayerFamily: () => Promise.resolve(family) };
+  }
+
+  it('13-candidate family with 2 hyphenated-surname members declines as ambiguous (true count 13, not undercounted 11)', async () => {
+    const family = jonesFamily(NL_LIMITS.maxPlayerCandidates + 1, 2);
+    const parsed = await parseNlQuestion('jones most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe('jones');
+  });
+
+  it('12-candidate family with 2 hyphenated-surname members ranks the complete family, hyphenated members included', async () => {
+    const family = jonesFamily(NL_LIMITS.maxPlayerCandidates, 2);
+    const parsed = await parseNlQuestion('jones most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+    expect(parsed.plan.scope.playerIdIn).toContain(9500);
+    expect(parsed.plan.scope.playerIdIn).toContain(9501);
+  });
+
+  it('a 7-candidate family (the real Ablett shape) still ranks completely -- unaffected by the hyphen fix', async () => {
+    const family = Array.from({ length: 7 }, (_, i) => ({
+      ref: { id: 9600 + i, slug: `ablett-fixture-${i}`, name: `Ablett Fixture${i}` },
+      score: 300,
+    }));
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(7);
+  });
+
+  it('a full-name mention with a literal hyphen resolves via the accept branch with no leftover unjustified token', async () => {
+    const rhysJones: NlPlayerCandidate = {
+      ref: { id: 9700, slug: 'david-rhys-jones', name: 'David Rhys-Jones' }, score: 1000,
+    };
+    const fullNameCtx: NlParseContext = {
+      ...ctx,
+      // Stands in for searchPlayers's own afldb_normalise_name(query) call
+      // (src/db/queries/search.ts:86), which normalises the WHOLE input
+      // string server-side -- a hyphen reaching this function unsplit is
+      // exactly what production sees and already handles.
+      resolvePlayer: (name: string) => Promise.resolve(
+        name.toLowerCase().replace(/[-_/]/g, ' ').replace(/\s+/g, ' ').trim() === 'david rhys jones'
+          ? [rhysJones] : [],
+      ),
+      resolvePlayerFamily: () => Promise.resolve([]),
+    };
+    const parsed = await parseNlQuestion('david rhys-jones most games', fullNameCtx);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.name).toBe('David Rhys-Jones');
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+    expect(parsed.report.confidence).toBe(1);
+  });
+
+  it('an apostrophe-surname full-name mention resolves via the accept branch (apostrophe is a deletion, not a word split)', async () => {
+    const oBrien: NlPlayerCandidate = {
+      ref: { id: 9701, slug: 'xx-obrien', name: "Xx O'Brien" }, score: 1000,
+    };
+    const apostropheCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: (name: string) => Promise.resolve(
+        name.toLowerCase().replace(/['’.]/g, '').replace(/\s+/g, ' ').trim() === 'xx obrien'
+          ? [oBrien] : [],
+      ),
+      resolvePlayerFamily: () => Promise.resolve([]),
+    };
+    const parsed = await parseNlQuestion("xx o'brien most games", apostropheCtx);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.name).toBe("Xx O'Brien");
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('apostrophe behaviour does not become word-splitting: a bare apostrophe surname stays one word against a plausible family', async () => {
+    // Two players sharing an apostrophe surname -- if the apostrophe were
+    // ever treated as a word break, "o'brien" would spuriously match a
+    // plain surname "brien" or "o" fragment as well as itself.
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9702, slug: 'aa-obrien', name: "Aa O'Brien" }, score: 300 },
+      { ref: { id: 9703, slug: 'bb-obrien', name: "Bb O'Brien" }, score: 290 },
+    ];
+    const parsed = await parseNlQuestion("o'brien most games", ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9702, 9703]);
+  });
+
+  it('a bare hyphenated surname mention (no given name) reaches resolvePlayerFamily with flattened, per-word tokens', async () => {
+    // resolvePlayerFamily normalises each element of `tokens` INDIVIDUALLY
+    // as one SQL term (resolve.ts's `q` CTE): a hyphenated mention word
+    // must already arrive as two separate plain-word elements, or SQL
+    // builds one unmatchable multi-word term instead of two real ones.
+    let receivedTokens: string[] = [];
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9704, slug: 'aa-byrne-jones', name: 'Aa Byrne-Jones' }, score: 100 },
+      { ref: { id: 9705, slug: 'bb-byrne-jones', name: 'Bb Byrne-Jones' }, score: 90 },
+    ];
+    const flattenedCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([]),
+      resolvePlayerFamily: (tokens: string[]) => {
+        receivedTokens = tokens;
+        return Promise.resolve(family);
+      },
+    };
+    const parsed = await parseNlQuestion('byrne-jones most games', flattenedCtx);
+    expect(receivedTokens).toEqual(['byrne', 'jones']);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+    expect(parsed.plan.scope.playerIdIn).toEqual([9704, 9705]);
+  });
+
+  it('underscore and slash separators behave as word breaks too, matching a plain multi-word family mention', async () => {
+    // No production vocabulary currently feeds underscore/slash into a
+    // player mention, but afldb_normalise_name's contract treats them
+    // exactly like hyphens (099_normalise_unicode_whitespace.sql:71-91),
+    // so splitNameWords must too.
+    const family: NlPlayerCandidate[] = [
+      { ref: { id: 9706, slug: 'aa-van-der-berg', name: 'Aa Van_Der/Berg' }, score: 100 },
+      { ref: { id: 9707, slug: 'bb-van-der-berg', name: 'Bb Van_Der/Berg' }, score: 90 },
+    ];
+    const parsed = await parseNlQuestion('van der berg most games', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9706, 9707]);
+  });
+
+  it('a candidate that fails the whole-word-prefix predicate is still dropped after the hyphen fix (defence-in-depth intact)', async () => {
+    const family = [
+      ...jonesFamily(2, 1),
+      { ref: { id: 9999, slug: 'bogus-player', name: 'Bogus Player' }, score: 300 },
+    ];
+    const parsed = await parseNlQuestion('jones most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9500, 9501]);
+    expect(parsed.plan.scope.playerIdIn).not.toContain(9999);
+  });
+
+  // Suffix/alias/nickname/noise-token and the full existing ISSUE-197
+  // boundary corpus (2/12/13-candidate plain families, the 0/1-candidate
+  // non-ambiguity contract, Dustin Martin, the Gary Ablett exact-duplicate
+  // case) are asserted unmodified by the describe block above this one --
+  // nothing new is asserted here, this note only records why (§9 item 4-5).
+});

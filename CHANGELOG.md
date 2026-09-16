@@ -15,6 +15,33 @@ commit.
 
 ## [Unreleased]
 
+### NL search: hyphenated/apostrophe-surname family members no longer silently dropped from the ambiguity re-check (AFLDB-ISSUE-198) - 16 September 2026
+
+- `candidateNameWords` (`src/search/nl/parser.ts`), the parser's defence-in-depth re-check on
+  `resolvePlayerFamily`'s plausible-candidate list, tokenised each candidate's name by plain
+  whitespace-splitting. SQL's `afldb_normalise_name` (and the `search_name`/`search_alias` columns
+  `resolvePlayerFamily` reads) already treats hyphens, underscores and slashes as word breaks, so a
+  hyphenated surname was one word to TypeScript and two words to SQL. A real 13-member Jones family
+  (including `Darcy Byrne-Jones` and `David Rhys-Jones`) undercounted to 11 under the re-check,
+  crossed back under `NL_LIMITS.maxPlayerCandidates` (12), and ranked a confident wrong answer
+  instead of declining as ambiguous.
+- `candidatePlayerSpan` separately rejected any token containing a hyphen or apostrophe outright, so
+  a full-name mention of such a player (e.g. "David Rhys-Jones most games") could lose the surname
+  before any resolver ran, risking a wrong-answer accept-branch match on the given name alone.
+- A new shared helper, `splitNameWords`, mirrors `afldb_normalise_name`'s documented punctuation
+  contract (hyphens/underscores/slashes are word breaks; apostrophes/full stops are deletions, not
+  breaks) in TypeScript, used by `candidateNameWords`, the accept-branch token-justification checks,
+  the ambiguity branch's resolver lookup, and `candidatePlayerSpan`'s widened acceptance test.
+  `candidatePlayerSpan` keeps the original punctuation-bearing token intact when it accepts it
+  (rather than splitting it into separate words), so end-of-pipeline confidence/leftover-token
+  accounting — which compares against the original query's plain-whitespace token count — stays
+  correct.
+- Generic surname families with hyphenated members (e.g. Jones) now correctly decline as ambiguous
+  when they exceed the 12-candidate cap, and full-name queries for hyphenated/apostrophe-surnamed
+  players (e.g. Rhys-Jones, Byrne-Jones, O'Brien) now resolve to the named player instead of a
+  same-given-name decoy or an undetected mention. No SQL/schema/`resolve.ts` change.
+- `PARSER_VERSION` 49 -> 50.
+
 ### NL search: bare-surname family ranking no longer resolves against a silently truncated 5-candidate list (AFLDB-ISSUE-197) - 16 September 2026
 
 - `resolvePlayer` (`src/db/queries/nl/resolve.ts`) hard-capped every surname/family candidate lookup

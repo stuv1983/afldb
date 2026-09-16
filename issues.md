@@ -32740,3 +32740,220 @@ caught next time without a DB round-trip. `PARSER_VERSION` stays 49 (no parser s
 - **Follow-up preserved separately (not part of this issue's resolution):** corpus relabelling
   (35 generic-surname rows, 5 Ablett rows) and the 168 stale streak/coaching rows — tracked under
   Stage 2's next task in `IssuesIndex.md`, not reopened here.
+
+---
+
+## AFLDB-ISSUE-198 — NL family ambiguity cap miscounts hyphenated/apostrophe player names
+
+- **Severity:** High (P1) — fail-open: confident (certainty 1.0), factually wrong answers, same
+  class as AFLDB-ISSUE-197.
+- **Area:** NL parser tokenisation — `src/search/nl/parser.ts` only. No `resolve.ts`/SQL change.
+- **Status:** **Resolved** 2026-09-16 (Sonnet 5), from the approved runbook `AFLDB-ISSUE-198.md`,
+  operator-validated. See "Implementation" below for the one deviation from the runbook's literal
+  §5 Option C code sketch, and "Validation (operator, 2026-09-16)"/"Resolution" below for the
+  DB-backed evidence. The real-Jones V1 corpus re-run (§11) is a separate post-merge Stage 2 step,
+  not performed by this issue — Stage 2 itself stays not-closed.
+- **Found:** 2026-09-16, Stage 2 v49 regression rerun. Rows 11626-11630 ("Jones most
+  goals"/"most games"/"most disposals"/"most marks"/"most tackles") remain hard failures
+  (`AMBIGUITY_NOT_DETECTED: decline -> answered`) even though ISSUE-197 fixed the other six
+  35-row generic-surname families (Johnson, Brown, Smith, Williams, Wilson, Anderson).
+- **Key files:** `src/search/nl/parser.ts` `candidateNameWords` (`parser.ts:1829-1834`),
+  `candidatePlayerSpan` (`parser.ts:1806-1811`); `src/search/nl/plan.ts` (`PARSER_VERSION`);
+  `src/db/migrations/099_normalise_unicode_whitespace.sql` (`afldb_normalise_name` contract, read
+  only, not changed); `tests/nl-parser.test.ts`; `tests/integration/nl-semantic-mapping.test.ts`.
+
+### Trigger examples
+- "Jones most goals"/"most games"/"most disposals"/"most marks"/"most tackles" — real DB evidence:
+  `resolvePlayerFamily(['jones'])` returns 13 plausible candidates (correct), but the parser's own
+  defence-in-depth re-check (`candidateNameWords`) drops `Darcy Byrne-Jones` and
+  `David Rhys-Jones`, undercounting to 11 and ranking instead of declining.
+- Related: a full-name query for a hyphenated/apostrophe-surnamed player (e.g. "David Rhys-Jones
+  most games") loses the surname token entirely at `candidatePlayerSpan` before any resolver runs
+  (§4 of the runbook) — a wrong-answer risk via the accept branch, not just an ambiguity miscount.
+
+### Expected vs actual
+Expected: `resolvePlayerFamily`'s 13 plausible Jones identities all survive the parser's
+whole-word-prefix re-check, so `13 > NL_LIMITS.maxPlayerCandidates` (12) declines as ambiguous.
+Actual: `candidateNameWords` (`parser.ts:1829-1834`) tokenises a candidate's name by plain
+`.split(/\s+/)`, which does not treat a hyphen as a word boundary the way SQL's
+`afldb_normalise_name` (and the `search_name`/`search_alias` columns `resolvePlayerFamily` reads)
+already does. `Darcy Byrne-Jones` -> `{'darcy','byrne-jones'}`, no word starts with `jones`, so both
+hyphenated members are dropped, `plausible.length` becomes 11, `11 <= 12` ranks
+(`parser.ts:2785`) instead of declining.
+
+### Root cause
+Same mismatch class as ISSUE-197 but one function earlier in that issue's own chain of trust:
+ISSUE-197 made `resolvePlayerFamily`'s SQL *mirror* the parser's `candidateNameWords` predicate
+exactly, on the (reasonable, but here incomplete) assumption that `candidateNameWords` itself was
+already correct. It wasn't: it has never applied `afldb_normalise_name`'s hyphen/underscore/slash
+word-break and apostrophe/period-removal rules to the strings it splits. This gap already existed
+in the accept branch's `nameMatches`/`justified`-token logic before ISSUE-197
+(`parser.ts:2710,2729`); ISSUE-197 is what made a *reachable* path (a real, correctly-computed
+13-member family reaching the ambiguity re-check) exercise it with a wrong-answer consequence
+instead of a merely-miscalibrated one.
+
+A second, related instance sits at `candidatePlayerSpan` (`parser.ts:1806-1811`): its
+`/^[a-z]+$/` token filter rejects any token containing a hyphen or apostrophe outright, so a
+hyphenated/apostrophe surname can be dropped from the mention span before any resolver is called at
+all. Full analysis and the decision to fold this into the same fix (rather than a separate issue) in
+`AFLDB-ISSUE-198.md` §4/§6.
+
+### Rejected naive fix
+Reimplementing `afldb_normalise_name`'s punctuation regex as a second, independent TypeScript
+function is rejected per the issue's own instruction and per standing project policy
+(`099_normalise_unicode_whitespace.sql:28-33`: "one function, one behaviour... TypeScript never
+forks it") — the project already had one incident (ISSUE-164) from exactly this shape of
+duplication drifting. Full analysis in `AFLDB-ISSUE-198.md` §5 Option A.
+
+Carrying SQL-normalised words on `NlPlayerCandidate` for `resolvePlayerFamily` alone (Option B) was
+also considered and rejected: larger footprint (type/SQL change), and it does not reach the
+accept-branch or `candidatePlayerSpan` instances of the same gap. Full analysis in
+`AFLDB-ISSUE-198.md` §5 Option B.
+
+### Chosen design
+One small shared TypeScript helper (`splitNameWords`) that applies exactly
+`afldb_normalise_name`'s documented punctuation contract (hyphens/underscores/slashes become word
+breaks; apostrophes/periods are removed, not breaks) to an in-memory name string, with a comment
+naming the SQL function/migration as the source of truth. Used in `candidateNameWords` (fixes the
+reported branch) and in `candidatePlayerSpan`'s tokenisation (fixes the related full-name-mention
+defect, §4). No SQL, schema or `resolve.ts` change. Full design in `AFLDB-ISSUE-198.md` §5 Option C.
+
+### Non-goals
+Corpus relabelling of any kind; `resolvePlayer`/`resolvePlayerFamily` SQL changes; the
+already-declined-out-of-scope ISSUE-197 §15 accept-branch `nameMatches` cap gap (a different,
+count-based gap, not a word-splitting mismatch); any broader `candidatePlayerSpan` redesign beyond
+the one tokenisation-boundary fix (span length limit, `STOPWORDS`, multi-hyphen names beyond what a
+hyphen-as-separator split already handles).
+
+### Required tests
+Unit (`tests/nl-parser.test.ts`, fake resolvers): a 13-candidate fake family with two hyphenated
+`ref.name`s declines; the same family at 12 (one hyphenated member) ranks with that member present
+in `scope.playerIdIn`; a full hyphenated-name query resolves via the accept branch with no leftover
+unjustified token; existing ISSUE-197 and full-name accept-branch tests pass unmodified.
+
+Integration (`tests/integration/nl-semantic-mapping.test.ts`, real `buildNlParseContext()`,
+synthetic `FIXTURE_PREFIX` families, not live "Jones" data — mirrors the ISSUE-197 precedent of
+deterministic fixtures over drift-prone live counts): a 13-player synthetic family with two
+hyphenated-surname members declines; the same family at 12 ranks completely and correctly; a
+synthetic hyphenated-surname player resolves correctly by full-name query (the test that would fail
+today without the `candidatePlayerSpan` fix); existing Ablett Jnr/Snr and alias-aware
+`searchPlayers` tests pass unmodified. Full matrix in `AFLDB-ISSUE-198.md` §9.
+
+### Acceptance criteria
+See `AFLDB-ISSUE-198.md` §12. Corpus disposition (not performed by this issue) in §11: the five
+Jones rows (11626-11630) should become clean declines once implemented, joining the six ISSUE-197
+families already fixed; no other currently-passing row is expected to change.
+
+### Parser-version decision
+Recommend `PARSER_VERSION` 49 -> 50 with a `v50` history comment — real output changes for real
+phrasings in both directions (generic hyphenated/apostrophe families now correctly decline;
+full-name hyphenated/apostrophe mentions now resolve instead of degrading or going undetected),
+matching the standing v44-v49 convention. Full reasoning in `AFLDB-ISSUE-198.md` §10.
+
+### Stage 2 status
+Not closed. The five Jones rows remain genuine failures until this issue is implemented and
+validated. No corpus row touched by this planning session. The five Ablett rows and the 168 stale
+team-streak/coach rows are unrelated and stay exactly as already tracked in `IssuesIndex.md`'s
+Stage 2 next-task list.
+
+### Implementation (2026-09-16, Sonnet 5)
+
+`splitNameWords` added next to `normalisePlayerSuffixes` (`parser.ts`), applying exactly
+`afldb_normalise_name`'s documented punctuation contract (apostrophes/full stops removed; hyphens,
+underscores, slashes become word breaks), with a comment naming the SQL function/migration as the
+source of truth. `candidateNameWords` now splits both the canonical name and `matchedName` through
+it (root-cause fix).
+
+**One deviation from the runbook's literal §5 Option C code sketch, found empirically, not
+predicted by the plan:** the sketch has `candidatePlayerSpan` explode a hyphenated raw token into
+separate plain words in its *returned string* (e.g. "rhys-jones" -> "rhys jones"). Implementing that
+literally breaks the full-name accept-branch case the runbook itself requires (§9 item 3/§12): the
+confidence/leftover-token accounting at the end of `parseNlQuestion` computes `totalTokens` from the
+ORIGINAL query text via a plain `\s+` split (`meaningfulTokens`, unrelated to and correctly untouched
+by this issue's word-boundary fix) and compares it against a `consumedSet` built from whatever the
+player-mention branch pushes into `consumedTokens`. Exploding "rhys-jones" into two consumed tokens
+("rhys", "jones") makes `totalTokens`'s single "rhys-jones" entry unmatched by either — a real
+regression, confirmed with a throwaway repro before writing the real tests (confidence dropped to
+0.75 then to a decline, "rhys-jones" reported as an unsupported leftover term, even though the
+player resolved correctly).
+
+Fix, staying inside the two functions the runbook named: `candidatePlayerSpan` now WIDENS its
+acceptance test using `splitNameWords` (a raw token qualifies when every word it contains under the
+shared contract is plain alphabetic) but returns the ORIGINAL punctuation-bearing token unexploded,
+so `candidateRaw`'s tokenisation stays aligned with `meaningfulTokens`'s plain-`\s+` shape everywhere
+else in the parser. `splitNameWords` is still applied consistently at every point that NEEDS
+SQL-comparable words:
+- a new small `tokenJustifiedBy(token, nameWords)` helper (splits `token`, requires every resulting
+  word to be a whole-word prefix of some name word) replaces the direct `.startsWith` comparison in
+  both the accept branch's `justified` filter and its `nameMatches` count, since a raw mention token
+  can now itself be multi-word ("rhys-jones");
+- the ambiguity branch's `lookupTokens` (fed to `resolvePlayerFamily`) is now
+  `lookupName.split(' ').flatMap(splitNameWords)`, not a plain `.split(' ')` — `resolvePlayerFamily`
+  normalises each array element as ONE SQL term (`resolve.ts`'s `q` CTE), so a hyphenated mention word
+  must already arrive pre-split into separate plain words or SQL builds one unmatchable multi-word
+  term instead of two real ones.
+
+`resolvePlayer`'s own call is unaffected either way: `searchPlayers` applies
+`afldb_normalise_name(query)` to the WHOLE input string server-side (`src/db/queries/search.ts:86`),
+so passing "david rhys-jones" or "david rhys jones" produces the identical SQL term — the split only
+matters on the TypeScript-side word-for-word comparisons and on `resolvePlayerFamily`'s
+per-element-normalised `tokens` array. No `resolve.ts`/SQL change, matching the runbook's non-goal.
+
+**Files changed:** `src/search/nl/parser.ts` (`splitNameWords`, `tokenJustifiedBy`,
+`candidateNameWords`, `candidatePlayerSpan`, the accept-branch `justified`/`nameMatches` checks, the
+ambiguity-branch `lookupTokens`), `src/search/nl/plan.ts` (`PARSER_VERSION` 49 -> 50, `v50` history
+comment), `tests/nl-parser.test.ts` (new `AFLDB-ISSUE-198` describe block, 10 unit cases),
+`tests/integration/nl-semantic-mapping.test.ts` (new fixtures + `AFLDB-ISSUE-198` describe block, 4
+DB-backed cases). `issues.md`/`IssuesIndex.md` updated this session.
+
+**Validation performed:** `npx tsc --noEmit` clean. DB-free suites green: `tests/nl-parser.test.ts`
+(413/413, was 404 before this issue's 9 new cases), `tests/nl-plan.test.ts`, `tests/nl-describe.test.ts`,
+`tests/query-intent.test.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-regression-corpus.test.ts`,
+`tests/nl-semantic-mapping.test.ts` (DB-free variant) — 1070/1070 total, zero regressions.
+
+### Validation (operator, 2026-09-16)
+
+DB-backed integration: `AFLDB_TEST_DATABASE_URL=<afldb_test DSN> npx vitest run
+tests/integration/nl-semantic-mapping.test.ts` — **29/29 passed** (includes the 4 new
+AFLDB-ISSUE-198 DB-backed cases against the real `resolvePlayerFamily`/`candidatePlayerSpan`
+boundary, plus all pre-existing cases in that file, zero regressions).
+
+Combined focused suite, operator-run: **6 files / 964 tests, all passed** —
+`tests/nl-parser.test.ts` 413/413, `tests/nl-semantic-mapping.test.ts` (DB-free variant) 167/167,
+`tests/nl-regression-corpus.test.ts` 163/163, `tests/nl-audit-acceptance.test.ts` 10/10,
+`tests/nl-plan.test.ts` 182/182, `tests/integration/nl-semantic-mapping.test.ts` 29/29.
+
+`npx tsc --noEmit`: clean / exit 0.
+
+### Resolution
+
+Resolved 2026-09-16. Root cause: `candidateNameWords`'s defence-in-depth re-check tokenised a
+candidate's name by plain `.split(/\s+/)`, which does not treat a hyphen as a word boundary the way
+SQL's `afldb_normalise_name` (and the `search_name`/`search_alias` columns `resolvePlayerFamily`
+reads) already does — so a real 13-member Jones family (confirmed against the live resolver:
+`resolvePlayerFamily(['jones'])` returns 13, including `Darcy Byrne-Jones` and `David Rhys-Jones`)
+undercounted to 11 under the parser's own re-check, crossed back under
+`NL_LIMITS.maxPlayerCandidates` (12), and ranked a confident wrong answer instead of declining. A
+related instance at `candidatePlayerSpan` rejected any hyphen/apostrophe-bearing token outright,
+so a full-name mention of such a player could lose the surname before any resolver ran.
+
+Fix: one small shared helper, `splitNameWords`, mirroring exactly `afldb_normalise_name`'s
+documented punctuation contract (hyphens/underscores/slashes are word breaks; apostrophes/full
+stops are deletions), plus `tokenJustifiedBy` built on it. Used in `candidateNameWords`, the
+accept-branch `justified`/`nameMatches` checks, the ambiguity-branch `lookupTokens`, and
+`candidatePlayerSpan`'s widened acceptance test. One implementation-time deviation from the
+runbook's literal §5 Option C sketch: `candidatePlayerSpan` widens its acceptance test via
+`splitNameWords` but returns the original punctuation-bearing token unexploded, rather than
+exploding it into separate words — exploding it broke the end-of-pipeline confidence accounting,
+which builds `totalTokens` from the original query via a plain `\s+` split (see "Implementation"
+above for the full account). No `resolve.ts`/SQL/migration change — matches the runbook's non-goal.
+
+`PARSER_VERSION` 49 -> 50.
+
+Validation: DB-backed integration 29/29, combined focused suite 964/964 (6 files), clean
+`npx tsc --noEmit` (all operator-run, above). No corpus row touched by this issue.
+
+Follow-up, tracked separately, not blocking this resolution: the unchanged V1 12k-row corpus
+re-run on parser v50 (expected to clear the five Jones rows, 11626-11630) and the subsequent
+corpus-expectation cleanup (Ablett rows, team-streak/coach rows) remain outstanding Stage 2 steps —
+see `IssuesIndex.md`.
