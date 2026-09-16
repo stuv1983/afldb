@@ -234,6 +234,90 @@ describe('2. team queries', () => {
   });
 });
 
+// AFLDB-ISSUE-205: extractScoreCheckpoint's '3QT' entry used to consume
+// "three quarter time" before extractTeamMetric (step 11) ever saw it,
+// leaving the orphaned word "comeback" as an unsupported_term leftover --
+// even though q3_deficit_overcome (team-match.ts) already implements
+// exactly this metric end-to-end. The fix withholds that consumption only
+// when "comeback(s)" immediately follows; genuine score-checkpoint
+// questions ("leading at three quarter time") are unaffected.
+describe('2a. AFLDB-ISSUE-205: three-quarter-time comeback vs score-checkpoint collision', () => {
+  it('adelaide biggest three quarter time comeback -> q3_deficit_overcome, not a decline', async () => {
+    const p = await plan('Adelaide biggest three quarter time comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('adelaide biggest three quarter time comeback since 2000 -> season bound preserved', async () => {
+    const p = await plan('Adelaide biggest three quarter time comeback since 2000');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.seasonMin).toBe(2000);
+  });
+
+  it('who has the biggest three quarter time comeback for adelaide -> same metric, trailing club phrasing', async () => {
+    const p = await plan('who has the biggest three quarter time comeback for Adelaide');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('adelaide three quarter time comeback -> metric still resolves with no explicit superlative word', async () => {
+    const p = await plan('Adelaide three quarter time comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+  });
+
+  it('adelaide 3qt comeback -> short form, was never affected by the checkpoint collision (no "time" word to collide with)', async () => {
+    const p = await plan('Adelaide 3qt comeback');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('q3_deficit_overcome');
+  });
+
+  it('negative: "adelaide score at three quarter time" keeps the genuine checkpoint reading, not q3_deficit_overcome', async () => {
+    const p = await plan('Adelaide score at three quarter time');
+    expect(p.scoreCheckpoint).toBe('3QT');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('negative: "who was leading at three quarter time" never reads as q3_deficit_overcome regardless of how it otherwise resolves', async () => {
+    const result = await parse('who was leading at three quarter time');
+    const metric = result.status === 'plan' ? result.plan.metric : undefined;
+    expect(metric).not.toBe('q3_deficit_overcome');
+  });
+
+  // Operator-validation follow-up: the first 3QT-only guard left the
+  // generic 'QT' entry free to match the nested substring "quarter time"
+  // inside "three quarter time comeback", stripping it and leaving "three
+  // comeback" -- still two orphaned tokens instead of the intact phrase.
+  // 'QT' now also refuses a checkpoint word directly preceded by
+  // "three "/"three-"; these two controls prove that refusal is narrow and
+  // does not disturb a genuine, standalone Q1 checkpoint.
+  it('negative: "adelaide score at quarter time" keeps the genuine Q1 checkpoint reading, unaffected by the "three "-exclusion guard', async () => {
+    const p = await plan('Adelaide score at quarter time');
+    expect(p.scoreCheckpoint).toBe('QT');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('negative: "who was leading at quarter time" never reads as a comeback metric, and the Q1 checkpoint still resolves where a metric word is present', async () => {
+    const result = await parse('who was leading at quarter time');
+    const metric = result.status === 'plan' ? result.plan.metric : undefined;
+    expect(metric).not.toBe('q3_deficit_overcome');
+    expect(metric).not.toBe('q1_deficit_overcome');
+  });
+
+  it('negative: "adelaide largest comeback from quarter time" (Q1, not Q3) still declines unsupported_term -- no q1_deficit_overcome metric exists, and AFLDB-ISSUE-205 does not add one', async () => {
+    const result = await parse('Adelaide largest comeback from quarter time');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms.join(' ')).toContain('comeback');
+  });
+});
+
 describe('3. venue queries', () => {
   it('most goals at the mcg -> ranks every player, summed at that venue', async () => {
     const p = await plan('most goals at the mcg');

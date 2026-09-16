@@ -184,6 +184,29 @@ describe('team_match matches hand-written SQL', () => {
     expect(lead!.value).toBe(expected.max);
   });
 
+  it('AFLDB-ISSUE-205: q3_deficit_overcome answers the biggest three-quarter-time deficit the eventual winner overcame', async () => {
+    // Proves the metric's SQL path (team-match.ts's metricValueExpr
+    // 'q3_deficit_overcome' case) is actually reachable now that the
+    // parser-level extraction-order bug is fixed -- this metric had zero
+    // live-answer coverage before AFLDB-ISSUE-205.
+    const { lead } = await teamMatch({ metric: 'q3_deficit_overcome', agg: { kind: 'max' } });
+    expect(lead).not.toBeNull();
+
+    const [expected] = await sql<{ max: number }[]>`
+      SELECT max(
+        CASE
+          WHEN m.winner_club_id = m.home_club_id AND aq.points > hq.points THEN aq.points - hq.points
+          WHEN m.winner_club_id = m.away_club_id AND hq.points > aq.points THEN hq.points - aq.points
+        END
+      )::int AS max
+        FROM matches m
+        JOIN match_period_scores hq ON hq.match_id = m.id AND hq.club_id = m.home_club_id AND hq.period = 3
+        JOIN match_period_scores aq ON aq.match_id = m.id AND aq.club_id = m.away_club_id AND aq.period = 3
+       WHERE m.winner_club_id IS NOT NULL
+    `;
+    expect(lead!.value).toBe(expected.max);
+  });
+
   it('derives half-time margin from cumulative checkpoints', async () => {
     const { lead } = await teamMatch({ metric: 'win_margin', scoreCheckpoint: 'HT', agg: { kind: 'max' } });
     expect(lead).not.toBeNull();

@@ -34208,3 +34208,244 @@ Retained external artefacts: `/home/arm/nl-stress-corpus-v3.csv`, `/home/arm/nl-
 
 Removed from `IssuesIndex.md` and the Open Issues table above (1 -> 0). `CHANGELOG.md` updated under
 `Unreleased`.
+
+## AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows (parser defect + genuine feature gap)
+
+- **Status:** RESOLVED 2026-09-16 (Sonnet 5, operator-validated). Opened as a planning/audit task for
+  AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON` `TAXONOMY_DRIFT` rows (Stage 2 next-task item 6).
+  The audit disproved ISSUE-200's own disposition for this cluster: it was not one homogeneous
+  diagnostic-label mismatch, but two unrelated families with two different root causes -- a real
+  parser-ordering defect (42 rows) and a genuine unsupported-feature gap (28 rows). Runtime fix
+  (`PARSER_VERSION` 53→54) and the guarded V4→V5 corpus correction are both operator-validated
+  end-to-end; the stable 12,000-row corpus now scores 12000/12000 clean, 0 soft, 0 failed under parser
+  v54. Two correction-tool validation defects (over-broad candidacy; a synthetic-fixture leak) were found
+  and fixed along the way, both test/tooling-only. See "Resolution" below and `AFLDB-ISSUE-205.md` §11
+  for the full closing evidence.
+
+### Audit: the 70 rows are two unrelated families, not one taxonomy-drift cluster
+
+Real parser-v53/V4 evidence (`/home/arm/nl-stress-v53-v4/failures.csv`, operator-supplied): all 70 rows
+carry `expected_status=decline`, `expected_failure_reason=unsupported_topic`,
+`detail="WRONG_FAILURE_REASON: unsupported_topic -> unsupported_term"`, `actual grain=""`,
+`actual metric=""`. `unsupportedTerms` splits exactly two ways: `comeback` (42 rows) and `comeback from`
+(28 rows) — two distinct phrase families, not one:
+
+- **Family A (42 rows):** "Adelaide biggest three quarter time comeback" and its "since 2000"/trailing-
+  club-phrasing variants ("who has the biggest three quarter time comeback for Adelaide").
+- **Family B (28 rows):** "Adelaide largest comeback from quarter time" (Q1, not Q3).
+
+### Family A root cause: genuine parser-ordering defect, not corpus drift
+
+`q3_deficit_overcome` is a real, fully implemented team_match metric — `TEAM_METRIC_WORDS`
+(`src/search/nl/vocab.ts:229`, regex `/\b(?:3qt|three[- ]quarter time) comebacks?\b/`), compiled through
+`plan.ts:983` to real SQL in `team-match.ts:64-65`
+(`q3_score_against - q3_score_for` when the club won despite trailing at three-quarter time) — but was
+unreachable. `extractScoreCheckpoint`'s `'3QT'` entry (`parser.ts:1442-1453`, step 6.5) unconditionally
+consumed `"three quarter time"`/`"3qt time"` before `extractTeamMetric` (step 11, `parser.ts:2565-2566`)
+ever saw the text, leaving only the orphaned word `"comeback"` — which matches no `TEAM_METRIC_WORDS`
+entry — so grain election (`parser.ts:2982-2984`) never fired and the row declined generically with
+`unsupported_term`. `validatePlan` (`plan.ts:1995-1999`) independently forbids `scoreCheckpoint`
+co-occurring with `q3_deficit_overcome`, confirming these are two genuinely different plan shapes
+competing for the same surface phrase, not a case where both could coexist. No unit test previously
+exercised this collision (`tests/nl-parser.test.ts`/`tests/nl-plan.test.ts` had zero `scoreCheckpoint`
+text-extraction coverage; the only "comeback" hits in `tests/` were an unrelated club-comparison UI
+feature). **These 42 questions should answer, not decline** — both the runtime and the corpus's own
+`expected_status=decline` were wrong.
+
+### Family B root cause: genuinely unsupported feature gap, not corpus drift either
+
+"Comeback from quarter time" means a Q1 (end-of-first-term), not three-quarter-time, deficit overcome —
+AFL terminology distinguishes quarter time / half time / three-quarter time, and AFLDB's own
+club-comparison feature (`src/db/queries/club-comparison.ts:2699-2706`,
+`biggest-comeback-from-quarter-time-a/b`) already models them as three separate stats. NL search
+implements only the Q3 metric; no `q1_deficit_overcome` exists in `TEAM_METRIC_WORDS` or
+`team-match.ts`. Same extraction-order collision applies (the `'QT'` entry in `extractScoreCheckpoint`
+consumes bare `"quarter time"` the same way), but there is no metric for `extractTeamMetric` to recover
+even once unblocked — this is a real capability gap, not a bug in an existing feature.
+`expected_failure_reason=unsupported_topic` was stale regardless: `UNANSWERABLE_TOPICS`
+(`src/search/nl/vocab.ts:1542-1600`) has no comeback entry of any kind, so `unsupported_topic` was never
+a live label for this phrase. **Decision (operator-directed): do not implement Q1 comeback support under
+this issue.** These 28 rows stay declines; only the stale failure-reason label is corrected to the
+runtime's own honest `unsupported_term`.
+
+### Runtime fix (Family A only)
+
+`extractScoreCheckpoint`'s `'3QT'` entry (`src/search/nl/parser.ts:1442-1453`) gained a negative
+lookahead so it no longer consumes `"three quarter time"`/
+`"3qt time"` when immediately followed by `comeback(s)`, letting `extractTeamMetric` see the intact
+phrase. Only this one entry changed — `'HT'`/`'QT'` are untouched, so Family B's behaviour (and every
+genuine score-checkpoint question, e.g. "leading at three quarter time") is unaffected by construction.
+Smallest safe change, no broader parser-stage reordering. `PARSER_VERSION` 53 -> 54
+(`src/search/nl/plan.ts`), with a version-history comment in the established style.
+
+### First operator-validation run: the '3QT'-only guard was incomplete (found and fixed, same pass)
+
+Operator results: `tests/integration/nl-answers-team-club.test.ts` 35/35 passed, confirming
+`q3_deficit_overcome`'s SQL path (independent of the parser question) was never the problem. But
+`tests/nl-parser.test.ts` reported 440/444 passed, 4 failed -- all four Family A comeback cases now
+failing with `unsupportedTerms: "three comeback"` instead of resolving to a plan (`Adelaide 3qt comeback`
+still passed).
+
+Root cause: the `'3QT'` guard only withheld its *own* match on `"three quarter time comeback"`.
+`extractScoreCheckpoint`'s `for` loop tries each entry against the same original text and returns on the
+first match; when `'3QT'` declines (comeback follows), `'HT'` (no match) then `'QT'`
+(`/\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/`, the generic Q1 checkpoint) gets a turn against the
+still-full text and matches the *nested substring* `"quarter time"` inside `"three quarter time
+comeback"` unconditionally, stripping it and leaving `"three"` and `"comeback"` both orphaned. Two
+checkpoint patterns were competing for the same surface phrase; only one had been guarded.
+
+**Fix:** `'QT'`'s regex (`src/search/nl/parser.ts`) gained a negative lookbehind refusing a
+`"quarter"`/`"qtr"`/`"quatre"` checkpoint word directly preceded by `"three "`/`"three-"`, so it can never
+re-consume what `'3QT'`'s guard just withheld, regardless of loop order:
+
+```diff
+- [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
++ [/\bat (?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+```
+
+Traced by hand: genuine Q1 checkpoints ("Adelaide score at quarter time", no "three" present) are
+unaffected; Family B ("comeback from quarter time", preceded by "from ", not "three ") is unaffected --
+its decline behaviour stays byte-for-byte unchanged. Still no metric-regex change, no `'HT'` change, no
+stage reordering; the fix stays inside `extractScoreCheckpoint`'s own entry list. `PARSER_VERSION` stays
+54 -- this refines the same unmerged behaviour change, not a second bump. 2 new regression tests added
+(`tests/nl-parser.test.ts`: "adelaide score at quarter time" and "who was leading at quarter time", both
+proving the new exclusion is scoped narrowly). Full account: `AFLDB-ISSUE-205.md` §5a.
+
+**Re-validated by the operator: GREEN** (446/446, plus integration 35/35 and `tsc --noEmit` clean -- see
+"Runtime validation: GREEN" below).
+
+### Corpus scorer contract (established before touching any expectation, per the operator's explicit request)
+
+`tools/nl/corpus.ts`'s `scoreRow`: every plan-shape check (grain, mode, metric, aggregation, top_n,
+player/club/opponent/venue identity, season range, match type/boundary, career conditions, coverage
+caveat, confidence floor) runs unconditionally on any `expected_status=success` row. The verified-answer
+checks (`expected_answer_primary`/`expected_answer_value`/`expected_tie_count`/`expected_result_count`,
+i.e. `WRONG_VERIFIED_ANSWER`/`WRONG_VERIFIED_VALUE`/`WRONG_TIE_COUNT`) are gated behind
+`actual.executed` (`corpus.ts:611-632`, `"a --parse-only run has a plan and no answer, and scoring a
+missing answer as a wrong one would fail all 51 hand-verified rows for the wrong reason"`) **and** the
+corpus row supplying that field at all. **Finding: the 42 Family A corrections need no real DB answer
+value.** Leaving `expected_answer_primary`/`expected_answer_value`/`expected_result_count`/
+`expected_tie_count` blank (i.e. `verification_level=SEMANTIC`, the same level most of the corpus's
+existing success rows already use) is sufficient and scorer-correct regardless of whether the
+stress run itself executes SQL or is `--parse-only`. No DB answer values were invented or populated.
+
+### Tests added
+
+- `tests/nl-parser.test.ts`, new describe block `2a. AFLDB-ISSUE-205: three-quarter-time comeback vs
+  score-checkpoint collision`: 8 cases covering the 5 required Family-A/control probes
+  ("Adelaide biggest three quarter time comeback", its "since 2000" and trailing-club-phrasing variants,
+  the bare and `3qt`-short-form variants), 2 score-checkpoint negative controls ("Adelaide score at three
+  quarter time" — asserts `scoreCheckpoint='3QT'`, `metric='team_score'`, never `q3_deficit_overcome`;
+  "who was leading at three quarter time" — asserts the metric is never `q3_deficit_overcome` regardless
+  of how the rest of the question resolves), and 1 Family-B negative control ("Adelaide largest comeback
+  from quarter time" still declines `unsupported_term` unchanged).
+- `tests/integration/nl-answers-team-club.test.ts`: one DB-backed test proving `q3_deficit_overcome`'s
+  SQL path (`team-match.ts`'s `metricValueExpr`) is actually reachable, checked against an independently
+  hand-written SQL comparison (the same discipline every other test in that file uses) — this metric had
+  zero live-answer coverage before this issue.
+- No Q1 SQL added; no Q1 vocab added; no `UNANSWERABLE_TOPICS` entry added (deliberate — an
+  `UNANSWERABLE_TOPICS` entry was considered and rejected per the operator's explicit instruction not to
+  add one merely to preserve a stale corpus label).
+
+### Corpus correction (written, NOT yet run against the real corpus)
+
+New guarded script `tools/nl/fix-issue-205-comeback-taxonomy.ts`, following the established
+`tools/nl/fix-issue-20{1,4}-*.ts` fail-closed precedent, with one deliberate departure: unlike those
+scripts (pure, DB-free), this one is DB-backed and re-parses every Family A candidate through the real,
+fixed parser (`loadEngine`'s `parseNlQuestion`, `tools/nl/engine.ts` — the same engine
+`stress-test.ts`/`v2-runner.ts` use) rather than hand-authoring club/season/aggregation values this issue
+has no independent evidence for beyond the 3 sampled rows. Every Family A row must re-parse to exactly
+`grain=team_match`/`metric=q3_deficit_overcome`/`agg.kind=max` with no unexpected player, checkpoint or
+match type, or the whole run aborts. Family B rows are independently re-verified to still decline with an
+honest `unsupported_term` post-fix before their failure-reason label is corrected. Fail-closed invariants:
+exact row count (12000), exact target count (70) split exactly 42/28 by a regex mirroring
+`TEAM_METRIC_WORDS`' own `q3_deficit_overcome` pattern (never a separately maintained guess), before-state
+agreement (`decline`/`unsupported_topic`, blank plan-shape fields) per candidate, and a post-hoc
+self-check that exactly 70 rows changed and nothing else. Run against the real V4 corpus after the
+candidacy fix below (§ "Correction-tool candidacy defect") and the fixture fix (§ "First test run") --
+see "Resolution" for the final, successful run.
+
+### Runtime validation: GREEN
+
+Second operator-validation pass, after the §5a follow-up fix: `tests/nl-parser.test.ts` 446/446 passed,
+`tests/integration/nl-answers-team-club.test.ts` 35/35 passed (including the `q3_deficit_overcome` SQL
+test), `npx tsc --noEmit` passed. Do not modify parser/runtime again unless new evidence demands it;
+`PARSER_VERSION` remains 54.
+
+### Correction-tool candidacy defect found and fixed (first V4->V5 attempt)
+
+Running the correction script against the real V4 corpus failed closed on:
+
+```text
+Row 11819: matches the audited before-state (decline/unsupported_topic)
+but its question text matches neither comeback family regex.
+Question: "Adelaide highest fantasy score". Refusing to run.
+```
+
+A real, correctly-triggered abort (no V5 written), but it exposes an over-broad candidacy design: the
+script gated candidacy on `expected_status==='decline' && expected_failure_reason==='unsupported_topic'`
+first, then classified the surviving rows' question text -- treating "matches neither family regex" as
+an error. `decline`+`unsupported_topic` is an OLD-STATE fact, not a target-IDENTITY fact: the real V4
+corpus legitimately carries several other decline/unsupported_topic families sharing that exact shape
+(fantasy/SuperCoach, rebound 50s, youngest/oldest, position, averages, subjective ranking --
+`UNANSWERABLE_TOPICS`, `src/search/nl/vocab.ts:1542-1600`), and AFLDB-ISSUE-205 must never inspect any of
+them as candidates.
+
+**Fix:** candidacy is now decided by the row's own question text against the two family regexes
+**before** any old-state field is read; a row neither regex names is simply not a candidate and is never
+asserted against. Only a row already identified as Family A/B by its text then has its audited old-state
+verified; only a genuine Family A/B row with drift aborts. Mirrors the "identity first, old-state second"
+lesson `tools/nl/fix-issue-204-stale-coverage-expectations.ts` reached after its own first-run over-match
+on category+template alone (AFLDB-ISSUE-204.md §0a). Correction-tool-only; no parser/runtime file
+touched, `PARSER_VERSION` unchanged. 15 new DB-free tests added,
+`tests/nl-issue-205-corpus-fix.test.ts` (a fake `ParseEngine` stands in for `loadEngine()`'s real
+DB-backed engine, keyed by exact question text -- no database), proving the row-11819-style ignore, a
+missing-target aggregate abort for each family, a drifted-old-state abort for each family, and the exact
+42/28/70 distribution with 0 non-target modification. Full account: `AFLDB-ISSUE-205.md` §7a.
+
+### First test run: synthetic fixture error, not a correction-tool defect (found and fixed, test-only)
+
+4/15 passed, 11 failed -- all stopping on row 5000's old-state check: `expected_grain=""` (blank)
+expected, `"player_game"` found. Root cause was entirely in the test fixture: `declineRow()` spread
+`...baseRow(id)`, and `baseRow()`'s `expected_grain: 'player_game'` (correct for its own `success`-status
+filler-row purpose) was never overridden back to blank for a decline row. `correctCorpus()`'s fail-closed
+old-state assertion caught this exactly as designed -- **not a correction-tool or runtime defect, no
+production file touched.** Fix: `declineRow()` now explicitly sets `expected_grain: ''`; every other
+checked field was already correctly blank via `baseRow()`. Full trace of why exactly 4 of 15 passed (the
+candidacy loop processes ascending ids, so row 5000 -- the lowest target id -- threw before most tests
+ever reached their own intended assertion): `AFLDB-ISSUE-205.md` §7a.
+
+**Re-run: GREEN.** `tests/nl-issue-205-corpus-fix.test.ts` 15/15 passed after the fixture fix.
+
+### Resolution (2026-09-16)
+
+All seven validation steps completed end-to-end:
+
+1-3. `tests/nl-parser.test.ts` 446/446, `tests/integration/nl-answers-team-club.test.ts` 35/35
+   (incl. the `q3_deficit_overcome` SQL test), `tsc --noEmit` clean.
+4. `tests/nl-issue-205-corpus-fix.test.ts` 15/15 passed.
+5. Real V4 → V5 correction: `input rows: 12000`, `output rows: 12000`, `target rows expected: 70`
+   (family A 42 / family B 28), `target rows modified: 70`, `non-target rows modified: 0`.
+6. Independent operator-run V4 → V5 diff (separate from the tool's own self-check): same 12000-row id
+   set, exactly 70 changed rows, `A/B overlap: 0`, `Unexpected changed IDs: []`. New statuses `success 42
+   / decline 28`; new grains `team_match 42 / blank 28`; new metrics `q3_deficit_overcome 42 / blank 28`;
+   new failure reasons `blank 42 / unsupported_term 28`. `expected_season_from` touched on 38 of the 42
+   Family A rows (the other 4 rows' real re-parsed plans carried no season bound -- the plain, non-"since
+   YEAR" phrasing).
+7. Parser-v54 parse-only run against V5: **12000 scored / 12000 clean (100.0%) / 0 soft / 0 failed** —
+   the ideal target reached exactly.
+
+V5 (`/home/arm/nl-stress-corpus-v5.csv`) is now the stable regression-corpus baseline, superseding V4.
+`PARSER_VERSION` is 54. Stage 2 remains closed, not reopened by this issue. `CHANGELOG.md` updated under
+`Unreleased`. Full closing evidence: `AFLDB-ISSUE-205.md` §11.
+
+### Correction to AFLDB-ISSUE-200's record
+
+AFLDB-ISSUE-200's `TAXONOMY_DRIFT` disposition for this cluster ("Three-quarter-time comeback questions
+... correctly decline in both expected and actual output; only the failure-reason label differs. No
+semantic-correctness defect.") is **incomplete, not merely imprecise**: 42 of the 70 rows do have a real
+semantic-correctness defect (a reachable, already-implemented metric silently discarded by extraction
+order), and the remaining 28 are a genuine feature gap rather than a diagnostic label difference. Stage 2
+itself is not reopened by this finding — AFLDB-ISSUE-200 is not redefined, and its closure stands; this
+is recorded as a correction to that issue's evidence, per the instruction not to reopen or redefine
+Stage 2.

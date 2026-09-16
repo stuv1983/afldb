@@ -540,7 +540,26 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // of the bare-number default 'gte' -- "zero goals" means goals = 0, not
 // the trivially-true "goals >= 0" -- while an explicit comparator on zero
 // ("at least zero", "exactly zero") still wins, same as any other value.
-export const PARSER_VERSION = 53;
+// v54 -- AFLDB-ISSUE-205: extractScoreCheckpoint's '3QT' entry (nl/parser.ts)
+// no longer consumes "three quarter time"/"3qt time" when immediately
+// followed by "comeback(s)". The already-implemented team_match metric
+// q3_deficit_overcome ("Adelaide biggest three quarter time comeback") was
+// unreachable because this earlier extraction stage ate the phrase its own
+// TEAM_METRIC_WORDS entry needed intact, leaving only the orphaned word
+// "comeback" for extractTeamMetric to see. Genuine score-checkpoint
+// questions ("leading at three quarter time") are unaffected -- the guard
+// only withholds the match when a comeback word directly follows.
+//
+// v54 refinement (same operator-validation pass, no further version bump):
+// the 3QT guard alone was incomplete -- it only stopped its OWN entry from
+// matching "three quarter time comeback"; extractScoreCheckpoint's generic
+// 'QT' entry then matched the nested substring "quarter time" inside that
+// same phrase and stripped it anyway, leaving "three comeback" (still two
+// orphaned tokens, not the intact phrase extractTeamMetric needs). The 'QT'
+// entry now also refuses a checkpoint word directly preceded by
+// "three "/"three-", so it can never re-consume what the 3QT guard just
+// withheld. Genuine Q1 checkpoints ("at quarter time") are unaffected.
+export const PARSER_VERSION = 54;
 
 // ------------------------------------------------------------------ grain
 
