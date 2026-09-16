@@ -67,15 +67,50 @@
  * `unsupported_term`. Every field this script does not name is preserved
  * unchanged.
  *
+ * FIRST OPERATOR RUN'S FAILURE, AND WHY CANDIDACY MUST NOT START FROM OLD-STATE
+ *
+ * The first version of this script gated candidacy on
+ * `expected_status==='decline' && expected_failure_reason==='unsupported_topic'`
+ * FIRST, then classified the surviving rows' question text into Family
+ * A/B, treating "matches neither family regex" as an abort. That correctly
+ * failed closed on the real V4 corpus (row 11819, "Adelaide highest
+ * fantasy score" -- refusing to run rather than silently mistargeting)
+ * but for the wrong structural reason: `decline`+`unsupported_topic` is an
+ * OLD-STATE fact this issue's two families happen to share, not a
+ * target-IDENTITY fact unique to them. The real V4 corpus legitimately
+ * carries several other `decline`/`unsupported_topic` families sharing
+ * that exact old-state shape -- fantasy/SuperCoach, rebound 50s,
+ * youngest/oldest, position, averages, subjective ranking
+ * (UNANSWERABLE_TOPICS, src/search/nl/vocab.ts) -- and AFLDB-ISSUE-205
+ * must never inspect any of them as candidates, let alone assert an
+ * old-state against them this issue never audited.
+ *
+ * Fix: candidacy is now decided by `classify()` -- the question's own
+ * text against the two family regexes -- BEFORE any old-state field is
+ * ever read. A row neither family regex names is simply not a candidate
+ * at all and passes through completely uninspected (not merely
+ * unmodified). Only a row already identified as Family A/B by its own
+ * text then has its audited old-state (status/failure-reason/blank
+ * plan-shape fields) verified, and only a genuine Family A/B row with
+ * drift aborts the run. This is the same "identity first, old-state
+ * second" separation `tools/nl/fix-issue-204-stale-coverage-
+ * expectations.ts` reached after its own first operator run over-matched
+ * on category+template alone (AFLDB-ISSUE-204.md S0a) -- the identity
+ * signal that discriminates a real target from a same-shaped sibling must
+ * gate candidacy itself, not just filter it after the fact.
+ *
  * FAIL-CLOSED, NOT PARTIAL
  *
  * Every invariant below aborts the whole run with a non-zero exit and
- * writes nothing: a wrong row count, a duplicate id, a candidate whose
- * pre-state disagrees with the audited before-state, a candidate question
- * matching both/neither family regex, a derived family count other than
- * exactly 42/28, a Family A row whose real re-parsed plan does not match
- * the audited shape exactly, or (as a final self-check) any row outside
- * the derived 70 changing at all.
+ * writes nothing: a wrong row count, a duplicate id, a comeback-family
+ * candidate whose pre-state disagrees with the audited before-state, a
+ * candidate question matching both family regexes at once, a derived
+ * family count other than exactly 42/28 (or a total other than 70), a
+ * nonzero intersection between the two family id sets, a Family A row
+ * whose real re-parsed plan does not match the audited shape exactly, or
+ * (as a final self-check) any row outside the derived 70 changing at
+ * all. A row matching NEITHER family regex is not an error -- it is
+ * correctly not a candidate, and is never asserted against or touched.
  *
  * See AFLDB-ISSUE-205.md for the full audit record and operator
  * validation procedure.
@@ -83,6 +118,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import type { NlParse } from '@/search/nl/plan';
+import type { NlParseContext } from '@/search/nl/parser';
 
 import { toCsv } from '@/lib/csv';
 
@@ -159,7 +197,20 @@ function isHonestUnsupportedTermDecline(report: { ambiguousPlayer?: unknown; uns
   return report.ambiguousPlayer === undefined && report.unsupportedTerms.length > 0;
 }
 
-type Engine = Awaited<ReturnType<typeof loadEngine>>;
+/**
+ * The narrow slice of `loadEngine()`'s real DB-backed engine this script
+ * actually calls -- `ctx` plus `parseNlQuestion`, nothing else. Kept
+ * separate from `loadEngine()`'s full return type (which also carries
+ * `sql`, `executePlan`, `clubByName`, etc., only `main()` below needs) so
+ * `correctCorpus()` can be unit tested DB-free with a lightweight fake
+ * (`tests/nl-issue-205-corpus-fix.test.ts`) instead of a real database
+ * connection. `loadEngine()`'s actual return value structurally satisfies
+ * this type without any cast.
+ */
+export type ParseEngine = {
+  ctx: NlParseContext;
+  parseNlQuestion: (question: string, ctx: NlParseContext) => Promise<NlParse>;
+};
 
 export type CorrectionSummary = {
   inputRows: number;
@@ -179,7 +230,7 @@ export type CorrectionSummary = {
  * (never partially applies) on any invariant failure; returns the
  * rewritten CSV text and a summary otherwise.
  */
-export async function correctCorpus(inputCsvText: string, engine: Engine): Promise<{ outputCsvText: string; summary: CorrectionSummary }> {
+export async function correctCorpus(inputCsvText: string, engine: ParseEngine): Promise<{ outputCsvText: string; summary: CorrectionSummary }> {
   const rows = parseCsv(inputCsvText);
   if (rows.length === 0) throw new Error('Corpus file is empty.');
   const header = rows[0];
@@ -213,18 +264,48 @@ export async function correctCorpus(inputCsvText: string, engine: Engine): Promi
     if (!toExpectation(record)) throw new Error(`Row at data line ${index + 2} has no question text.`);
   });
 
-  // ---- derive candidates from the audited before-state, then classify
-  // each candidate's own question text into exactly one family. A
-  // candidate matching neither or both family regexes aborts the whole
-  // run rather than being silently dropped or guessed.
+  // ---- STEP 1: candidacy is decided by the row's own question-text
+  // family signature ALONE -- never by expected_status/
+  // expected_failure_reason. AFLDB-ISSUE-205's first real run gated
+  // candidacy on decline/unsupported_topic first and only then checked
+  // the question text, which correctly aborted the whole run (writing no
+  // V5) rather than silently mistargeting, but for the wrong structural
+  // reason: `decline`+`unsupported_topic` is an OLD-STATE fact, not a
+  // target-IDENTITY fact. The real V4 corpus carries several other
+  // legitimate `decline`/`unsupported_topic` families sharing that exact
+  // old-state shape -- fantasy/SuperCoach, rebound 50s, youngest/oldest,
+  // position, averages, subjective ranking (UNANSWERABLE_TOPICS,
+  // src/search/nl/vocab.ts) -- and the operator's run correctly hit one,
+  // row 11819 ("Adelaide highest fantasy score"). classify() below is run
+  // against EVERY row's question text regardless of its expected_status;
+  // a row this issue's two families do not name is simply not a
+  // candidate at all and is never inspected further, let alone asserted
+  // against an old-state this issue never audited for it.
   const familyA: { id: number; question: string }[] = [];
   const familyB: { id: number; question: string }[] = [];
 
   for (const record of originalRecords) {
-    if (record.expected_status !== VERIFIED_OLD_STATUS || record.expected_failure_reason !== VERIFIED_OLD_FAILURE_REASON) continue;
     const id = Number(record.id);
     const question = (record.question ?? '').trim();
 
+    const family = classify(question);
+    if (family === 'neither') continue; // not one of this issue's two families -- pass through untouched, no assertion made about it
+    if (family === 'both') {
+      throw new Error(`Row ${id}: question text matches BOTH comeback family regexes -- the mutual-exclusivity assumption broke. Question: "${question}". Refusing to run.`);
+    }
+
+    // ---- STEP 2: ONLY NOW, having identified this row as a genuine
+    // Family A/B candidate by its own question text, assert the audited
+    // V4 before-state. A comeback-family row that does not match the
+    // audited old-state is real drift and aborts the whole run -- it is
+    // never silently skipped or silently corrected. An unrelated row
+    // (fantasy, rebound-50, etc.) never reaches this block at all.
+    if (record.expected_status !== VERIFIED_OLD_STATUS) {
+      throw new Error(`Row ${id}: Family ${family} candidate (by question text) has expected_status="${record.expected_status}", audited before-state expects "${VERIFIED_OLD_STATUS}". Question: "${question}". Refusing to run.`);
+    }
+    if (record.expected_failure_reason !== VERIFIED_OLD_FAILURE_REASON) {
+      throw new Error(`Row ${id}: Family ${family} candidate (by question text) has expected_failure_reason="${record.expected_failure_reason}", audited before-state expects "${VERIFIED_OLD_FAILURE_REASON}". Question: "${question}". Refusing to run.`);
+    }
     // A candidate's plan-shape fields (grain/metric/club/etc.) must
     // already be blank -- the corpus's own "blank asserts nothing"
     // convention for a decline row (tools/nl/corpus.ts header). A
@@ -233,28 +314,30 @@ export async function correctCorpus(inputCsvText: string, engine: Engine): Promi
     // than silently overwriting an unaudited value.
     for (const field of ['expected_grain', 'expected_metric', 'expected_aggregation', 'expected_club', 'expected_opponent', 'expected_venue', 'expected_match_type'] as const) {
       if ((record[field] ?? '') !== '') {
-        throw new Error(`Row ${id}: audited before-state expects "${field}"="" (blank) for a decline row, found "${record[field]}". Refusing to run.`);
+        throw new Error(`Row ${id}: Family ${family} candidate's audited before-state expects "${field}"="" (blank), found "${record[field]}". Question: "${question}". Refusing to run.`);
       }
     }
 
-    const family = classify(question);
-    if (family === 'neither') {
-      throw new Error(`Row ${id}: matches the audited before-state (decline/unsupported_topic) but its question text matches neither comeback family regex. Question: "${question}". Refusing to run.`);
-    }
-    if (family === 'both') {
-      throw new Error(`Row ${id}: question text matches BOTH comeback family regexes -- the mutual-exclusivity assumption broke. Question: "${question}". Refusing to run.`);
-    }
     (family === 'A' ? familyA : familyB).push({ id, question });
   }
 
-  if (familyA.length + familyB.length !== EXPECTED_TARGET_COUNT) {
-    throw new Error(`Expected exactly ${EXPECTED_TARGET_COUNT} rows matching the audited before-state (status="${VERIFIED_OLD_STATUS}" failure_reason="${VERIFIED_OLD_FAILURE_REASON}"), found ${familyA.length + familyB.length}. Refusing to run.`);
+  // ---- distribution self-check: the two families' identity-derived
+  // candidate sets, not the old-state filter (which by design now
+  // matches only these two families' rows, never fantasy/rebound-50/etc.)
+  const familyAIds = new Set(familyA.map((t) => t.id));
+  const familyBIds = new Set(familyB.map((t) => t.id));
+  const intersection = [...familyAIds].filter((id) => familyBIds.has(id));
+  if (intersection.length > 0) {
+    throw new Error(`Internal error: id(s) classified into both Family A and Family B: ${intersection.join(', ')}.`);
   }
   if (familyA.length !== EXPECTED_FAMILY_A_COUNT) {
-    throw new Error(`Expected exactly ${EXPECTED_FAMILY_A_COUNT} Family A (three-quarter-time comeback) rows, found ${familyA.length}. Refusing to run.`);
+    throw new Error(`Expected exactly ${EXPECTED_FAMILY_A_COUNT} Family A (three-quarter-time comeback) candidates identified by question text, found ${familyA.length}. Refusing to run.`);
   }
   if (familyB.length !== EXPECTED_FAMILY_B_COUNT) {
-    throw new Error(`Expected exactly ${EXPECTED_FAMILY_B_COUNT} Family B (quarter-time comeback) rows, found ${familyB.length}. Refusing to run.`);
+    throw new Error(`Expected exactly ${EXPECTED_FAMILY_B_COUNT} Family B (quarter-time comeback) candidates identified by question text, found ${familyB.length}. Refusing to run.`);
+  }
+  if (familyA.length + familyB.length !== EXPECTED_TARGET_COUNT) {
+    throw new Error(`Expected exactly ${EXPECTED_TARGET_COUNT} total candidates (Family A + Family B), found ${familyA.length + familyB.length}. Refusing to run.`);
   }
 
   const idToIndex = new Map<number, number>();

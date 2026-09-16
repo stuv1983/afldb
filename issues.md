@@ -34211,12 +34211,14 @@ Removed from `IssuesIndex.md` and the Open Issues table above (1 -> 0). `CHANGEL
 
 ## AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows (parser defect + genuine feature gap)
 
-- **Status:** IN PROGRESS (Sonnet 5), **not yet operator-validated, not resolved**. Opened as a
-  planning/audit task for AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON` `TAXONOMY_DRIFT` rows
-  (Stage 2 next-task item 6). The audit disproved ISSUE-200's own disposition for this cluster: it is not
-  one homogeneous diagnostic-label mismatch. The first operator-validation run found the initial runtime
-  fix incomplete (see "First operator-validation run" below); a targeted follow-up fix has been applied
-  in the same unmerged change. Full runbook: `AFLDB-ISSUE-205.md`.
+- **Status:** IN PROGRESS (Sonnet 5), **not resolved**. Opened as a planning/audit task for
+  AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON` `TAXONOMY_DRIFT` rows (Stage 2 next-task item 6).
+  The audit disproved ISSUE-200's own disposition for this cluster: it is not one homogeneous
+  diagnostic-label mismatch. Runtime is now fully validated and green (parser 446/446, integration
+  35/35, `tsc --noEmit` clean) after a two-stage parser fix (see "First operator-validation run" below).
+  The first real corpus-correction attempt then correctly failed closed on an over-broad candidacy design
+  in the correction tool itself, unrelated to the runtime (see "Correction-tool candidacy defect" below);
+  fixed in the same script, not yet re-run. Full runbook: `AFLDB-ISSUE-205.md`.
 
 ### Audit: the 70 rows are two unrelated families, not one taxonomy-drift cluster
 
@@ -34307,7 +34309,8 @@ stage reordering; the fix stays inside `extractScoreCheckpoint`'s own entry list
 (`tests/nl-parser.test.ts`: "adelaide score at quarter time" and "who was leading at quarter time", both
 proving the new exclusion is scoped narrowly). Full account: `AFLDB-ISSUE-205.md` §5a.
 
-**Not yet re-validated by the operator.** Exact rerun command: `npx vitest run tests/nl-parser.test.ts`.
+**Re-validated by the operator: GREEN** (446/446, plus integration 35/35 and `tsc --noEmit` clean -- see
+"Runtime validation: GREEN" below).
 
 ### Corpus scorer contract (established before touching any expectation, per the operator's explicit request)
 
@@ -34360,25 +34363,63 @@ self-check that exactly 70 rows changed and nothing else. **Not yet run against 
 requires `--conditions=react-server` and a real `DATABASE_URL`; the operator runs it once the runtime
 tests below are green.
 
-### Validation sequence (not yet run by the operator)
+### Runtime validation: GREEN
 
-1. `npx vitest run tests/nl-parser.test.ts`
-2. `npx vitest run tests/integration/nl-answers-team-club.test.ts` (requires `AFLDB_TEST_DATABASE_URL`)
-3. `npx tsc --noEmit`
-4. `npx tsx --conditions=react-server tools/nl/fix-issue-205-comeback-taxonomy.ts --corpus
-   ~/nl-stress-corpus-v4.csv --out ~/nl-stress-corpus-v5.csv` — confirm `input rows: 12000`,
-   `output rows: 12000`, `target rows expected: 70` (family A 42 / family B 28), `target rows modified:
-   70`, `non-target rows modified: 0`.
-5. Parser-v54 parse-only (or full) run against V5 — target result, if every check above passes with no
+Second operator-validation pass, after the §5a follow-up fix: `tests/nl-parser.test.ts` 446/446 passed,
+`tests/integration/nl-answers-team-club.test.ts` 35/35 passed (including the `q3_deficit_overcome` SQL
+test), `npx tsc --noEmit` passed. Do not modify parser/runtime again unless new evidence demands it;
+`PARSER_VERSION` remains 54.
+
+### Correction-tool candidacy defect found and fixed (first V4->V5 attempt)
+
+Running the correction script against the real V4 corpus failed closed on:
+
+```text
+Row 11819: matches the audited before-state (decline/unsupported_topic)
+but its question text matches neither comeback family regex.
+Question: "Adelaide highest fantasy score". Refusing to run.
+```
+
+A real, correctly-triggered abort (no V5 written), but it exposes an over-broad candidacy design: the
+script gated candidacy on `expected_status==='decline' && expected_failure_reason==='unsupported_topic'`
+first, then classified the surviving rows' question text -- treating "matches neither family regex" as
+an error. `decline`+`unsupported_topic` is an OLD-STATE fact, not a target-IDENTITY fact: the real V4
+corpus legitimately carries several other decline/unsupported_topic families sharing that exact shape
+(fantasy/SuperCoach, rebound 50s, youngest/oldest, position, averages, subjective ranking --
+`UNANSWERABLE_TOPICS`, `src/search/nl/vocab.ts:1542-1600`), and AFLDB-ISSUE-205 must never inspect any of
+them as candidates.
+
+**Fix:** candidacy is now decided by the row's own question text against the two family regexes
+**before** any old-state field is read; a row neither regex names is simply not a candidate and is never
+asserted against. Only a row already identified as Family A/B by its text then has its audited old-state
+verified; only a genuine Family A/B row with drift aborts. Mirrors the "identity first, old-state second"
+lesson `tools/nl/fix-issue-204-stale-coverage-expectations.ts` reached after its own first-run over-match
+on category+template alone (AFLDB-ISSUE-204.md §0a). Correction-tool-only; no parser/runtime file
+touched, `PARSER_VERSION` unchanged. 16 new DB-free tests added,
+`tests/nl-issue-205-corpus-fix.test.ts` (a fake `ParseEngine` stands in for `loadEngine()`'s real
+DB-backed engine, keyed by exact question text -- no database), proving the row-11819-style ignore, a
+missing-target aggregate abort for each family, a drifted-old-state abort for each family, and the exact
+42/28/70 distribution with 0 non-target modification. Full account: `AFLDB-ISSUE-205.md` §7a.
+
+**Not yet re-run against the real V4 corpus.**
+
+### Validation sequence
+
+Steps 1-3 DONE (above). Not yet run:
+
+4. `npx vitest run tests/nl-issue-205-corpus-fix.test.ts` (new correction-tool DB-free tests)
+5. `npx tsx --conditions=react-server tools/nl/fix-issue-205-comeback-taxonomy.ts --corpus
+   /home/arm/nl-stress-corpus-v4.csv --out /home/arm/nl-stress-corpus-v5.csv` (re-run, with the
+   candidacy fix) — confirm `input rows: 12000`, `output rows: 12000`, `target rows expected: 70`
+   (family A 42 / family B 28), `target rows modified: 70`, `non-target rows modified: 0`.
+6. Parser-v54 parse-only (or full) run against V5 — target result, if every check above passes with no
    surprises: **12000 scored / ~11958-12000 clean / 0-28 soft / 0 failed** (see `AFLDB-ISSUE-205.md` for
-   why the exact soft count depends on which Family B disposition — `unsupported_term` corpus correction
-   included — the operator confirms; the ideal `0 soft` is reached once Family B's corrected expectation
-   also scores clean).
-6. Direct V4 -> V5 row-by-row comparison (not the retired `nl:stress:compare`) confirming no collateral
+   why the exact soft count depends on which Family B disposition the operator confirms).
+7. Direct V4 -> V5 row-by-row comparison (not the retired `nl:stress:compare`) confirming no collateral
    movement outside the audited 70 ids.
 
-Until all six pass, this issue is **not** resolved, `CHANGELOG.md` is **not** updated, and V4 remains the
-stable baseline (V5 is a candidate, not yet promoted).
+Until all seven pass, this issue is **not** resolved, `CHANGELOG.md` is **not** updated, and V4 remains
+the stable baseline (V5 is a candidate, not yet promoted).
 
 ### Correction to AFLDB-ISSUE-200's record
 
