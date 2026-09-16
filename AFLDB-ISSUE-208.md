@@ -1,11 +1,10 @@
 # AFLDB-ISSUE-208 — Club-role ownership: `extractClubs`'s lookback window is not anchored to the nearest preposition
 
-Status: Fix implemented and focused-tested on `sonnet/issue-208-club-role-ownership`
-(base `ca17277f` on `main`, unmerged). Parser version 56. **Not resolved** — the two
-required operator-run checks (frozen V5 stable-corpus gate; direct structured-plan
-diff of the confirmed 251-row exploratory family) have not yet been run on the Linux
-development host (streamanator). See "Operator validation" below for the exact
-commands.
+Status: **RESOLVED 2026-09-17** (Sonnet 5, operator-validated on streamanator).
+Fix implemented and focused-tested on `sonnet/issue-208-club-role-ownership`
+(base `ca17277f` on `main`, unmerged; implementation commit `70b72df`). Parser
+version 56. Both required operator checks passed — see "Operator validation"
+below.
 
 This is follow-on item (2) of `AFLDB-ISSUE-206.md`'s six proposals, directly from
 that issue's final triage of the 29,030-row independent exploratory corpus.
@@ -198,50 +197,75 @@ npx vitest run tests/nl-plan.test.ts tests/nl-semantic-mapping.test.ts \
 -> 574/574 passed
 ```
 
-## Operator validation (required before resolution — not yet run)
+## Operator validation
+
+Both required checks were run on the Linux development host (streamanator, checked
+out at commit `70b72df`, `PARSER_VERSION` = 56) and passed.
 
 **1. Frozen V5 stable-regression gate** (parser v56, corpus unchanged):
 
-```bash
-npm run nl:stress -- --corpus /home/arm/nl-stress-corpus-v5.csv --parse-only --out /home/arm/nl-stress-v56-v5
+```text
+Corpus: /home/arm/nl-stress-corpus-v5.csv
+Run:    /home/arm/nl-stress-v56-v5
+Result: 12000 scored / 12000 clean / 0 soft / 0 failed
 ```
 
-Expected: `12000 scored / 12000 clean / 0 soft / 0 failed` (no regression to the
-stable baseline).
+No regression to the stable baseline.
 
-**2. ISSUE-206 exploratory 251-row club-role family recheck.** Run parser v56
-against the retained exploratory corpus:
-
-```bash
-npm run nl:stress -- --corpus /home/arm/nl-exploratory-v1.csv --parse-only --out /home/arm/nl-exploratory-v56-validation
-```
-
-Then diff the resulting structured plans against the retained pre-fix (v55)
-results at `/home/arm/nl-exploratory-v55-validation/results.jsonl`. Expected:
+**2. ISSUE-206 exploratory 251-row club-role family recheck.** A direct
+structured-plan comparison between the retained pre-fix (v55) and post-fix (v56)
+exploratory runs — both 29,030 rows / 29,030 unique IDs
+(`/home/arm/nl-exploratory-v55-validation/results.jsonl` vs
+`/home/arm/nl-exploratory-v56-validation/results.jsonl`) — found:
 
 ```text
 changed plans: 251
+134 after_siren
+117 team_checkpoint_collision
 ```
 
-with only `scope.clubFor`/`scope.clubAgainst` fields moving, in exactly these
-directions:
+exactly matching the two families identified by AFLDB-ISSUE-206, with no other
+structured-plan field changed anywhere in the 29,030-row corpus (no collateral
+movement).
 
-- Family A (134 rows): `clubAgainst = Club, clubFor = absent` becomes
-  `clubFor = Club, clubAgainst = absent` (unless the row explicitly names an
-  opponent, per the runbook's exception).
-- Family B (117 rows): `clubAgainst = Opponent, clubFor = absent` becomes
-  `clubAgainst = Opponent, clubFor = Subject`.
+**Family A — after-siren.** Representative: "Which player kicked the most behinds
+after the siren to win for North Melbourne between 2005 and 2015".
 
-No other structured-plan field should change anywhere in the 29,030-row corpus. If
-more than 251 plans move, or fewer, investigate before closeout — do not assume the
-number in advance (per the runbook's explicit caution). The aggregate exploratory
-scorer totals (pre-fix: 27530 scored / 1500 audit-required / 10874 clean / 15275
-soft / 1381 failed, of which 251 were confirmed parser defects) may improve as a
-side effect, since the scorer does check dropped club filters for these rows
-(unlike ISSUE-207's numeric-operator family); report the actual post-fix totals
-rather than assuming `1381 -> 1130` in advance.
+```text
+Before v56: scope.clubAgainst = North Melbourne, scope.clubFor = absent
+After  v56: scope.clubFor = North Melbourne, scope.clubAgainst = absent
+```
 
-## Resolution
+The incorrect opponent role is removed and the named club is correctly restored as
+the subject club.
 
-Not yet resolved. This issue is resolved only once both operator-run checks above
-are confirmed and any unexpected collateral movement is investigated and explained.
+**Family B — leading opponent checkpoint.** Representative: "Against Fremantle,
+what was Melbourne's largest lead at three quarter time since 2000".
+
+```text
+Before v56: scope.clubAgainst = Fremantle, scope.clubFor = absent
+After  v56: scope.clubAgainst = Fremantle, scope.clubFor = Melbourne
+```
+
+The correctly identified opponent is retained while the previously dropped subject
+club is restored.
+
+**Aggregate exploratory result.**
+
+```text
+Pre-fix  v55: 27530 scored / 1500 audit-required / 10874 clean / 15275 soft / 1381 failed / 97 diagnostic groups
+Post-fix v56: 27530 scored / 1500 audit-required / 11125 clean / 15275 soft / 1130 failed / 95 diagnostic groups
+
+Movement: clean +251, soft 0, failed -251
+```
+
+This exactly removes the 251 genuine parser hard failures identified during
+ISSUE-206. The remaining 1130 hard failures are the already-audited ISSUE-206
+corpus/scorer artifacts (496 symmetric-versus corpus-oracle rows, 283
+achievement-summary aggregation corpus/scorer rows, 351 Gary Ablett identity scorer
+rows) — out of scope for ISSUE-208, not addressed here.
+
+**Resolution:** both required checks confirm the fix produces the intended
+club-role reassignment for all 251 known rows with zero collateral movement.
+Resolved 2026-09-17. The `assignCrossDomainClubs` out-of-scope finding above
+remains open for separate consideration; no ISSUE-209 has been opened for it.
