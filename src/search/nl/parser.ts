@@ -61,7 +61,7 @@ import {
 import {
   ACHIEVEMENT_SUMMARY_CUES,
   AGAINST_PREPOSITION, FOR_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
-  BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
+  AFTER_RE, BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
@@ -418,6 +418,20 @@ function extractSeasons(text: string): SeasonExtraction {
     seasonMin = Number(since[1]);
     consumed.push(since[0]);
     working = working.replace(SINCE_RE, ' ');
+  } else {
+    // AFLDB-ISSUE-211: "after YEAR" is an EXCLUSIVE lower bound, distinct
+    // from "since YEAR" (inclusive) -- seasons run in whole years, so the
+    // inclusive plan bound is YEAR + 1. Checked only when "since" didn't
+    // already claim a lower bound; the two words never co-occur as two
+    // competing lower bounds in practice, and AFTER_RE only ever matches a
+    // literal year immediately after the word, so "after the siren" and
+    // other non-temporal "after" phrasing are never touched.
+    const after = AFTER_RE.exec(working);
+    if (after) {
+      seasonMin = Number(after[1]) + 1;
+      consumed.push(after[0]);
+      working = working.replace(AFTER_RE, ' ');
+    }
   }
   const before = BEFORE_RE.exec(working);
   if (before) {

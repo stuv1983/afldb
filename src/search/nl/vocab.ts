@@ -713,6 +713,14 @@ export const AT_PREPOSITION = /\b(?:at|on)\b/;
 
 export const SINCE_RE = /\bsince (\d{4})\b/;
 export const BEFORE_RE = /\bbefore (\d{4})\b/;
+/**
+ * AFLDB-ISSUE-211: an exclusive lower bound ("after 2019" means seasons
+ * 2020 onward). Anchored to a literal 4-digit year immediately after the
+ * word, exactly like SINCE_RE/BEFORE_RE -- this is what keeps it from ever
+ * touching "after the siren" or any other domain use of "after", which
+ * never has a year in that position.
+ */
+export const AFTER_RE = /\bafter (\d{4})\b/;
 export const BETWEEN_RE = /\bbetween (\d{4}) and (\d{4})\b/;
 /**
  * "in the 1990s" (group 1, the decade's first year) or "in the 90s"
