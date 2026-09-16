@@ -4,17 +4,21 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 1
 
-No currently open issues.
+- AFLDB-ISSUE-202 (Medium, NL search / `src/search/nl/`) -- GWS club identity leaks into
+  unsupported-term detection on `team_match` margin questions. Implemented (`vocab.ts` combined
+  `gws giants` alias, `PARSER_VERSION` 51->52), pending operator test/typecheck/corpus validation.
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
 unsupported-term leakage, `PARSER_BUG` word-form "zero", and a guarded corpus correction for
 `STALE_CORPUS_EXPECTATION` pre-1965 stats) are recorded but not yet opened as tracked issues.
 AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of these, resolved
-2026-09-16 (Sonnet 5) -- see its detailed entry below. The remaining three follow-on items (GWS
-unsupported-term, "zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not
+2026-09-16 (Sonnet 5) -- see its detailed entry below.
+AFLDB-ISSUE-202 opened 2026-09-16 (Sonnet 5, planning only) for the second follow-on (GWS
+unsupported-term leakage, 128 manifestations) -- see its detailed entry below. The remaining two
+follow-on items ("zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not
 yet opened as tracked issues.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
@@ -33772,3 +33776,123 @@ Full evidence, correction-script design and the resolution record are in `AFLDB-
 `CHANGELOG.md` updated under `[Unreleased]`. Removed from `IssuesIndex.md`'s open-issues list and from
 the Open Issues table below (Stage 2 next-task item 5a is now done; items 5b-5d remain open, not yet
 tracked issues).
+
+---
+
+## AFLDB-ISSUE-202 — GWS club identity leaks into unsupported-term detection
+
+**Opened:** 2026-09-16 (Sonnet 5, planning only). **Status:** Open, implemented, pending operator
+validation. Second of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item
+5b). Runbook: `AFLDB-ISSUE-202.md`.
+
+### Evidence
+AFLDB-ISSUE-200's real-audit cluster `unsupported_term|tm|gws` (128 rows, disposition `PARSER_BUG`,
+`tools/nl/issue-200-dispositions.csv` row 4): `team_match`/head-to-head margin questions naming "GWS
+Giants" (e.g. "Adelaide biggest win versus GWS Giants", "Adelaide worst loss to GWS Giants") decline
+with failure reason `unsupported_term` / term `gws`, even though GWS Giants is resolved correctly as
+the opponent club for the same question. Corpus convention (`tools/nl/corpus.ts:167-169`,
+`CORPUS_CLUB_SPELLINGS`) always spells this club "GWS Giants" in the stress corpus; the corpus file's
+own comment records that "the parser resolves 'GWS Giants' from them perfectly well" for identity
+purposes, which is true for `clubFor`/`clubAgainst` binding but not for token consumption (see below).
+Distribution of the 128 rows (win/loss, versus/against/to, season/no-season) is to be confirmed by the
+operator per `AFLDB-ISSUE-202.md` §6 before implementation; all evidence inspected so far is one shape.
+
+### Root cause (confirmed by direct source inspection)
+Three cooperating facts, all in the club-resolution path, not in unsupported-term detection itself:
+
+1. **The GWS club directory entry has no combined two-word alias.** `clubs`/`club_organizations`
+   give the GWS organization the names `"greater western sydney"` (name) and `"gws"` (short_name and
+   abbreviation, `tools/migration/import_legacy_afl.py:84`). `CLUB_NICKNAMES`
+   (`src/search/nl/vocab.ts:1470-1471`) separately adds the single-word nicknames `gws` (redundant with
+   the abbreviation) and `giants`, both merged onto the same canonical `"greater western sydney"` by
+   `buildClubDirectory` (`src/db/queries/nl/resolve.ts:57-82`). No entry anywhere in the directory is
+   the two-word string `"gws giants"` itself — every other club's common colloquial multi-word form is
+   either the literal db name/short_name already (`"western bulldogs"`, `"port adelaide"`, `"brisbane
+   lions"`) or a single nickname word layered onto a name the corpus never pairs with a second alias
+   word in the same question. GWS is the one club whose corpus-conventional form needs two *separate*
+   single-word directory entries (`gws` + `giants`) to cover it.
+2. **`extractClubs` (`src/search/nl/parser.ts:189-238`) matches at most two club-alias spans per
+   question**, one per side (subject/opponent), via `findClub`/`findLongestMatch`
+   (`src/search/nl/entities.ts:43-64`), which picks the single GLOBALLY longest matching alias string
+   still present in the working text on each of the two iterations. For "Adelaide biggest win versus
+   GWS Giants": iteration 1 matches `"adelaide"` (8 chars, longest candidate in the full text);
+   iteration 2, on the remaining text, compares `"gws"` (3 chars) against `"giants"` (6 chars) and
+   picks `"giants"` — correctly binding `clubAgainst` to the GWS organization, but the loop has now
+   spent both of its two match slots. The literal token `"gws"` is never claimed by anything.
+3. **Unsupported-term detection runs after entity spans are removed, over whatever's left.**
+   `consumedSet` (`parser.ts:3779-3783`) is built from `consumedTokens` plus
+   `clubExtraction.consumed` (which contains `"adelaide"` and `"giants"`, not `"gws"`).
+   `leftoverTokens` (`parser.ts:3837-3839`) then correctly identifies `"gws"` as a real, non-stopword,
+   unclaimed token and `report.unsupportedTerms` (`parser.ts:3853`) records it. The extra leftover
+   token depresses `ratio`/`confidence` (`parser.ts:3810,3827,3843`) below `NL_CONFIDENCE.clarify`, so
+   `tryParse` declines with `reason: 'low_confidence'`
+   (`parser.ts:3891`); `declineFailureReason` (`src/db/queries/nl/answer.ts:57-62`) then reports the
+   coarse failure reason as `unsupported_term` because `report.unsupportedTerms.length > 0`, surfacing
+   the literal string `gws` as "the" unsupported term even though the same question's club identity
+   was already resolved correctly.
+
+### Classification
+This is root-cause category 3 (from the runbook's framing): a **normalization/directory-completeness
+gap**, not a GWS-specific special case in the matching *code*, and not a generic entity-span
+consumption defect in `extractClubs`'s two-slot design (that cap is intentional and correct for the
+subject/opponent match structure — every other club's colloquial form fits inside it because it is
+already representable as a single alias string). GWS is the only club whose common corpus-conventional
+name is split across two independent single-word directory entries with no combined form; the fix is a
+missing dictionary entry, not a code change to token consumption, matching, or unsupported-term
+detection. `CLUB_NICKNAMES` already supports multi-word keys (`'same olds': 'essendon'`,
+`vocab.ts:1458`), so this is a precedented, narrow data addition, not a new mechanism.
+
+### Smallest correct fix (proposed, not implemented)
+Add `'gws giants': 'greater western sydney'` to `CLUB_NICKNAMES` (`src/search/nl/vocab.ts`). This
+becomes one 10-character directory name for the GWS organization; `findLongestMatch` will select it
+as the single longest match in one iteration (it is also longer than `"adelaide"`, so slot order is
+irrelevant), consuming both words at once and leaving no leftover token. No change to
+`extractClubs`, `findClub`/`findLongestMatch`, `consumedSet`/`leftoverTokens`, or
+`declineFailureReason`. `gws` and `giants` remain independently valid single-word nicknames for every
+other phrasing (bare "GWS", bare "Giants", "GWS" paired with a different second club, etc.).
+
+Full analysis, files-expected-to-change, regression-test plan, stable-corpus validation plan and
+parser-version recommendation are in `AFLDB-ISSUE-202.md`.
+
+### Implementation (2026-09-16, Sonnet 5)
+Added `'gws giants': 'greater western sydney'` to `CLUB_NICKNAMES` (`src/search/nl/vocab.ts`,
+alongside the existing independent `gws`/`giants` entries), exactly the fix scoped above. No change
+to `extractClubs`, `findClub`/`findLongestMatch`, `consumedSet`/`leftoverTokens`,
+`declineFailureReason`, or any grain/metric/margin code. `PARSER_VERSION` bumped 51 -> 52
+(`src/search/nl/plan.ts`) with a v52 history comment, since this changes which plan a previously-
+declining question resolves to. Added nine regression cases to `tests/nl-parser.test.ts`'s
+`describe('2. team queries', ...)` block (the closest existing team_match/club-resolution home) and
+a `gws`/`Greater Western Sydney` fixture entry (`organizationId: 7`) to that file's `CLUBS` array,
+covering: against/versus/over/to phrasing, `highest score against`, a `since YEAR` season-bound case,
+bare `GWS` and bare `Giants` still resolving unchanged, and a negative case (`"GWS reserves"`) proving
+`gws` is not globally suppressed -- an adjacent genuinely-unsupported word still declines
+`unsupported_term`. Also corrected a now-stale fixture comment at the pre-existing "a rivalry whose
+clubs are not in the directory declines instead of guessing" test (it previously said the fixture had
+no Sydney *or GWS*; GWS is now present, Sydney is not).
+
+**Not yet done (operator-gated):** focused test run, `npx tsc --noEmit`, parser-v52 stress-corpus
+re-run and before/after soft-row comparison against the retained V3 corpus, `CHANGELOG.md` entry
+(deferred to resolution per repository policy), and marking this issue resolved. See "Operator
+validation commands" below.
+
+### Operator validation commands
+1. Focused tests: `npx vitest run tests/nl-parser.test.ts`
+2. Typecheck: `npx tsc --noEmit`
+3. Parser-v52 corpus run: re-run the stress harness against
+   `/home/arm/nl-stress-corpus-v3.csv` (same command used for the v51/V3 benchmark quoted in
+   `AFLDB-ISSUE-202.md`), capturing the new scored/clean/soft/failed totals and soft-class
+   breakdown.
+4. v51->v52 soft-row ID diff: compare the two runs' soft-row ID sets (same technique used for
+   ISSUE-199/ISSUE-201) and confirm the only rows that disappear are exactly the 128
+   `unsupported_term|tm|gws` cluster's IDs (~7488-7615 per the operator's corpus-shape
+   verification).
+5. Confirm all 128 GWS rows disappeared: the `unsupported_term|tm|gws` cluster count goes 128 -> 0
+   with no residual GWS-named row still soft.
+6. Confirm zero new soft rows: total soft count goes 465 -> 337 exactly (not lower or higher), and
+   no row outside the 128-row GWS cluster changes status.
+7. Confirm no semantic changes among the remaining 337 soft rows: `STALE_CORPUS_EXPECTATION` stays
+   180, `PARSER_BUG` zero stays 15, `GRAIN_EQUIVALENT` stays 72, `TAXONOMY_DRIFT` stays 70 -- same
+   IDs, same dispositions, not just the same counts.
+
+Do not mark this issue resolved until all seven commands' evidence is returned and matches the
+expected corpus movement above.
