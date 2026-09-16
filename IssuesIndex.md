@@ -14,14 +14,21 @@
   (`tools/nl/fix-issue-204-stale-coverage-expectations.ts`) and tests
   (`tests/nl-issue-204-corpus-fix.test.ts`) now gate candidacy on the row's full structural signature
   (grain=player_game, mode=single, aggregation=max, metric in disposals/marks/tackles, match_type in
-  final/grand_final, season in 1897-1926 — see `AFLDB-ISSUE-204.md` §0a/§5), not a hardcoded id list (a
-  later 3-block id sample the operator quoted has no constant inter-season stride and could not be
-  extended to 180 without guessing). The second operator run confirmed this targeting on the real
-  corpus (reached row 8919) then exposed an unrelated correction-tool bug: `assertQuestionMatchesRow`'s
-  plain-finals check was singular-only (`/\bfinal\b/i`) and rejected the corpus's plural "...in finals
-  in YEAR" wording; now `/\bfinals?\b/i` (§0b). Next action: operator runs `AFLDB-ISSUE-204.md` §8's
-  commands (focused tests, `tsc --noEmit`, the real V3→V4 correction with both fixes in place,
-  parser-v53 rerun against V4, before/after row comparison).
+  final/grand_final, and a season shape proper to that match type — `expected_season_from` an integer
+  year in 1897-1926, with `expected_season_to=""` for grand_final rows and
+  `expected_season_to=expected_season_from` for final rows; see `AFLDB-ISSUE-204.md` §0a/§0c/§5), not a
+  hardcoded id list (a later 3-block id sample the operator quoted has no constant inter-season stride
+  and could not be extended to 180 without guessing). The second operator run confirmed this targeting
+  on the real corpus (reached row 8919) then exposed an unrelated correction-tool bug:
+  `assertQuestionMatchesRow`'s plain-finals check was singular-only (`/\bfinal\b/i`) and rejected the
+  corpus's plural "...in finals in YEAR" wording; now `/\bfinals?\b/i` (§0b). The third operator run
+  then reached aggregate target selection and found only 90 targets, not 180: the season gate wrongly
+  required `expected_season_from === expected_season_to` for every row, but the corpus records a Grand
+  Final's season only in `expected_season_from` (blank `expected_season_to`) while a plain-finals row
+  repeats it in both fields — fixed by branching the season-shape check on `expected_match_type` (§0c).
+  Next action: operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real
+  V3→V4 correction with all three fixes in place, parser-v53 rerun against V4, before/after row
+  comparison).
 
 AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
 (Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72

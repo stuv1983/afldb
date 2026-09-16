@@ -80,7 +80,13 @@ function questionFor(metric: string, matchType: 'final' | 'grand_final', season:
     : `Most ${metric} by a player in finals in ${season}`;
 }
 
-/** The exact audited pre-state shape for one AFLDB-ISSUE-204 target row. */
+/**
+ * The exact audited pre-state shape for one AFLDB-ISSUE-204 target row.
+ * The real corpus represents the two match types asymmetrically: a Grand
+ * Final is a single match (expected_season_to blank), while plain-finals
+ * rows repeat expected_season_from in expected_season_to (AFLDB-ISSUE-204
+ * third operator-validation finding, 2026-09-16).
+ */
 function targetRow(id: number, metric: string, matchType: 'final' | 'grand_final', season: number): Row {
   return {
     ...baseRow(id),
@@ -92,7 +98,7 @@ function targetRow(id: number, metric: string, matchType: 'final' | 'grand_final
     expected_metric: metric,
     expected_aggregation: 'max',
     expected_season_from: String(season),
-    expected_season_to: String(season),
+    expected_season_to: matchType === 'grand_final' ? '' : String(season),
     expected_match_type: matchType,
     expected_failure_reason: '',
     expected_coverage_behavior: 'full',
@@ -142,7 +148,7 @@ function goalsSiblingRow(id: number, matchType: 'final' | 'grand_final', season:
     expected_metric: 'goals',
     expected_aggregation: 'max',
     expected_season_from: String(season),
-    expected_season_to: String(season),
+    expected_season_to: matchType === 'grand_final' ? '' : String(season),
     expected_match_type: matchType,
     expected_failure_reason: '',
     expected_coverage_behavior: 'full',
@@ -278,7 +284,7 @@ describe('AFLDB-ISSUE-204 correctCorpus', () => {
       expect(row.expected_metric).toBe(def.metric);
       expect(row.expected_aggregation).toBe('max');
       expect(row.expected_season_from).toBe(String(def.season));
-      expect(row.expected_season_to).toBe(String(def.season));
+      expect(row.expected_season_to).toBe(def.matchType === 'grand_final' ? '' : String(def.season));
       expect(row.expected_match_type).toBe(def.matchType);
     }
   });
@@ -378,6 +384,55 @@ describe('AFLDB-ISSUE-204 correctCorpus', () => {
     const id = TARGET_DEFS[0].id;
     const index = findRowIndex(rows, id);
     rows[index] = { ...rows[index], expected_match_type: 'finals' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
+  });
+
+  // ---- asymmetric season-shape regressions (AFLDB-ISSUE-204 third
+  // operator-validation finding, 2026-09-16): Grand Final rows carry a
+  // blank expected_season_to (a Grand Final is a single match, not a
+  // season range) while plain-finals rows repeat expected_season_from in
+  // expected_season_to. isCandidateTarget() must accept both real shapes
+  // and reject either one used for the wrong match type.
+
+  it('includes a valid Grand Final target row with blank expected_season_to', () => {
+    const grandFinalDef = TARGET_DEFS.find((d) => d.matchType === 'grand_final')!;
+    const { outputCsvText, summary } = correctCorpus(buildCsv());
+    expect(summary.targetRowsModified).toBe(180);
+    const row = parseBack(outputCsvText)[findRowIndex(buildRows(), grandFinalDef.id)];
+    expect(row.expected_status).toBe('decline');
+    expect(row.expected_season_to).toBe('');
+  });
+
+  it('excludes (and refuses to run) a Grand Final target row whose expected_season_to is nonblank', () => {
+    const rows = buildRows();
+    const grandFinalDef = TARGET_DEFS.find((d) => d.matchType === 'grand_final')!;
+    const index = findRowIndex(rows, grandFinalDef.id);
+    rows[index] = { ...rows[index], expected_season_to: String(grandFinalDef.season) };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
+  });
+
+  it('includes a valid plain-finals target row with matching expected_season_from/to', () => {
+    const finalDef = TARGET_DEFS.find((d) => d.matchType === 'final')!;
+    const { outputCsvText, summary } = correctCorpus(buildCsv());
+    expect(summary.targetRowsModified).toBe(180);
+    const row = parseBack(outputCsvText)[findRowIndex(buildRows(), finalDef.id)];
+    expect(row.expected_status).toBe('decline');
+    expect(row.expected_season_to).toBe(String(finalDef.season));
+  });
+
+  it('excludes (and refuses to run) a plain-finals target row whose expected_season_to is blank', () => {
+    const rows = buildRows();
+    const finalDef = TARGET_DEFS.find((d) => d.matchType === 'final')!;
+    const index = findRowIndex(rows, finalDef.id);
+    rows[index] = { ...rows[index], expected_season_to: '' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
+  });
+
+  it('excludes (and refuses to run) a plain-finals target row whose expected_season_to mismatches expected_season_from', () => {
+    const rows = buildRows();
+    const finalDef = TARGET_DEFS.find((d) => d.matchType === 'final')!;
+    const index = findRowIndex(rows, finalDef.id);
+    rows[index] = { ...rows[index], expected_season_to: String(finalDef.season + 1) };
     expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
   });
 

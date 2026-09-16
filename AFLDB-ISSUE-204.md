@@ -1,10 +1,12 @@
 # AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
 **Status:** Targeting fixed and confirmed against the real corpus (reached row 8919); a second,
-independent correction-tool bug then failed closed on question-text validation, now fixed, pending
-operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families
-(Stage 2 next-task item 5d). Correction tool and tests corrected; not yet run end-to-end against the
-real corpus; not resolved.
+independent correction-tool bug on question-text validation was fixed and reached aggregate target
+selection; a third, independent correction-tool bug then failed closed on the corpus's asymmetric
+Grand-Final/plain-finals season representation (found 90 targets, not 180), now fixed, pending operator
+re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families (Stage 2
+next-task item 5d). Correction tool and tests corrected; not yet run end-to-end against the real corpus;
+not resolved.
 
 ## 0. Naming correction
 
@@ -82,6 +84,45 @@ singular *or* plural), while still requiring the OR-condition that rejects any q
 fix — target selection (§0a), corpus semantics, and parser/runtime code are all untouched;
 `PARSER_VERSION` remains 53.
 
+## 0c. Third operator run: targeting reached aggregate selection, found 90 not 180 (2026-09-16)
+
+With the §0b question-text fix in place, the operator's validation run passed row-by-row question-text
+checking and reached the tool's aggregate target-count invariant, which then failed:
+
+```text
+Expected exactly 180 rows matching the audited structural signature (...), found 90. Refusing to run.
+```
+
+Not corpus drift and not a repeat of §0a's over-broad selector — the structural signature itself was
+narrowed correctly (§0a); the defect was `isCandidateTarget()`'s season-shape gate, which required
+`expected_season_from === expected_season_to` for every row regardless of match type. The real corpus
+represents the two match types' seasons asymmetrically:
+
+```text
+Grand Final rows (e.g. "most disposals in the 1897 Grand Final"):
+  expected_match_type = grand_final
+  expected_season_from = 1897
+  expected_season_to   = "" (blank -- a Grand Final is a single match, not a season range)
+
+Plain-finals rows (e.g. "most disposals in finals in 1897"):
+  expected_match_type = final
+  expected_season_from = 1897
+  expected_season_to   = 1897 (repeats expected_season_from)
+```
+
+The equality requirement matched only the 90 plain-finals rows and excluded all 90 Grand Final rows
+(whose `expected_season_to` is blank, not equal to `expected_season_from`), leaving exactly 90 — the
+operator's evidence.
+
+**Fix:** `isCandidateTarget()`'s season gate now requires `expected_season_from` to be an integer year in
+`[1897, 1926]` for every candidate, then branches by `expected_match_type`: `grand_final` requires
+`expected_season_to === ""`; `final` requires `expected_season_to === expected_season_from`. Neither field
+is normalized or mutated anywhere in the tool — both remain exactly as read, for every row, target or
+not. The semantic season used for question-text validation and the distribution self-checks is unchanged:
+`Number(expected_season_from)` (`assertAuditedCoveragePreState`). This is a correction-tool-only fix —
+target selection's other gates (§0a), question-text checking (§0b), corpus semantics, and parser/runtime
+code are all untouched; `PARSER_VERSION` remains 53.
+
 ## 1. Operator-verified evidence (2026-09-16, superseding the prior planning session's re-derivation plan)
 
 The earlier planning-session draft of this issue proposed a new `audit-issue-204-extract.ts` tool to
@@ -102,6 +143,9 @@ actual match-type distribution: grand_final 90, finals 90 (parser vocabulary)
 expected match-type distribution: grand_final 90, final 90 (corpus's own vocabulary --
   tools/nl/corpus.ts's MATCH_TYPES maps corpus 'final' -> parser NlMatchType 'finals')
 season: 1897 through 1926 inclusive, 6 rows per season (30 seasons x 3 metrics x 2 match types = 180)
+season representation (asymmetric by match type -- §0c):
+  grand_final rows: expected_season_from = YEAR, expected_season_to = "" (blank)
+  final rows:       expected_season_from = YEAR, expected_season_to = YEAR (repeats from)
 
 stale expectation fields on all 180 rows (before correction):
   expected_status = success
@@ -181,8 +225,11 @@ selector matched 996 rows instead of 180 — see §0a):
    template prefix (`fgf` — the same signature `audit-issue-200-extract.ts`'s `templatePrefix()` already
    uses to build the `coverage_unavailable|fgf` cluster key), `expected_grain` (`player_game`),
    `expected_mode` (`single`), `expected_aggregation` (`max`), `expected_metric` (disposals/marks/
-   tackles), `expected_match_type` (final/grand_final), and a single pinned season in [1897, 1926]
-   (`isCandidateTarget`). This structurally excludes the real corpus's 816 category/template siblings
+   tackles), `expected_match_type` (final/grand_final), and a season shape proper to that match type
+   (`isCandidateTarget`): `expected_season_from` an integer year in [1897, 1926], with
+   `expected_season_to === ""` for `grand_final` rows and `expected_season_to === expected_season_from`
+   for `final` rows (§0c — the two match types are not recorded the same way; neither field is
+   normalized or mutated). This structurally excludes the real corpus's 816 category/template siblings
    (636 `team_match`-grain rows on grain; 180 more `player_game` rows that are goals questions on
    metric, or top-5-listing questions on mode/aggregation).
 2. Every candidate is then individually re-verified against every audited *mutable* old-field value from
@@ -225,7 +272,10 @@ fixture shape (a synthetic 12,000-row corpus with the 180-row target family buil
 one `team_match` row mirroring the real corpus's row 8910, two goals rows, three top-5-listing rows —
 plus filler rows for the rest). The 90 plain-finals target rows' question text uses the real corpus's
 plural "...in finals in YEAR" wording (row 8919's shape, §0b), not a singular "a ... final" paraphrase,
-so the full happy-path run is itself an end-to-end regression for the §0b fix. Covers:
+so the full happy-path run is itself an end-to-end regression for the §0b fix. The 90 Grand Final target
+rows carry `expected_season_to=""` (blank) and the 90 plain-finals target rows carry
+`expected_season_to` equal to `expected_season_from` — the real corpus's asymmetric season shape (§0c) —
+so the full happy-path run is also an end-to-end regression for the §0c fix. Covers:
 
 1. exactly 180 rows corrected to the established decline shape, non-target rows untouched;
 2. input/output row count stays 12000;
@@ -251,7 +301,16 @@ so the full happy-path run is itself an end-to-end regression for the §0b fix. 
 19. `assertQuestionMatchesRow` accepts `expected_match_type="final"` with the corpus's plural "finals"
     wording (row 8919's exact shape) and with a legitimate singular "final" wording, still rejects
     "Grand Final" wording for the plain-finals type, and `expected_match_type="grand_final"` still
-    requires "grand final" (rejecting a plural-only "finals" question) — the §0b fix.
+    requires "grand final" (rejecting a plural-only "finals" question) — the §0b fix;
+20. a valid Grand Final target row with blank `expected_season_to` is included (covered by the main
+    happy-path run, §0c);
+21. a Grand Final target row whose `expected_season_to` is nonblank is excluded from candidacy and the
+    resulting 179-count refuses — the §0c fix;
+22. a valid plain-finals target row with `expected_season_to === expected_season_from` is included
+    (covered by the main happy-path run, §0c);
+23. a plain-finals target row whose `expected_season_to` is blank, or mismatches
+    `expected_season_from`, is excluded from candidacy and the resulting 179-count refuses in both
+    cases — the §0c fix.
 
 ## 7. Parser/runtime
 
@@ -330,13 +389,20 @@ per command 7 above, not just totals.
   aborts naming the offending row rather than silently accepting or rejecting it.
 - The retargeting in §0a is now confirmed against the real V3 corpus (the second operator run reached
   row 8919, past the earlier 996-candidate over-match point) — but the run has not yet completed
-  end-to-end with the §0b question-text fix in place. The operator's next re-run (§8) is the first
-  real-corpus proof that the fully corrected tool yields exactly 180 and writes a valid V4.
+  end-to-end with the §0b question-text fix and the §0c season-shape fix both in place. The operator's
+  next re-run (§8) is the first real-corpus proof that the fully corrected tool yields exactly 180 and
+  writes a valid V4.
 - The §0b fix only widens the plain-finals question-text check from singular to singular-or-plural; it
   does not relax the "no 'grand final' wording" rejection or touch the `grand_final` branch. If the real
   corpus contains some other finals-wording variant not covered by `/\bfinals?\b/i`, the tool will again
   fail closed rather than silently guess — report the exact new wording rather than loosening the regex
   further ad hoc.
+- The §0c fix only widens the season-shape candidacy gate to the two real per-match-type shapes
+  (grand_final blank-to, final matching-to); it does not relax the season-range check ([1897, 1926]) or
+  normalize/mutate either field. If the real corpus contains some other season-field shape not covered
+  by either branch (e.g. a Grand Final row with a non-blank, non-matching `expected_season_to`), the
+  tool will again fail closed on the 180-count invariant rather than silently guess — report the exact
+  new shape rather than loosening the gate further ad hoc.
 - The 70 `WRONG_FAILURE_REASON` taxonomy-drift rows, parser/runtime code, `PARSER_VERSION`, and any
   other historical coverage floor are explicitly out of scope and untouched by this tool.
 - `CHANGELOG.md` is intentionally not yet updated — pending operator validation per task instruction.

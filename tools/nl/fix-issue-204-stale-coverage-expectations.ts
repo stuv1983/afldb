@@ -62,6 +62,20 @@
  * still aborts the whole run rather than being silently corrected or
  * skipped.
  *
+ * THE SECOND RUN'S FAILURE: THE CORPUS'S ASYMMETRIC SEASON REPRESENTATION
+ *
+ * A second version required `expected_season_from === expected_season_to`
+ * as part of candidacy, on the assumption both match types record the
+ * question's season the same way. The real corpus does not: a Grand Final
+ * is a single match, so its row carries `expected_season_to=""` (blank),
+ * while a plain-finals row ("most X in finals in YEAR") repeats the season
+ * in both `expected_season_from` and `expected_season_to`. That equality
+ * requirement silently excluded every one of the 90 Grand Final rows,
+ * leaving exactly the other 90 (AFLDB-ISSUE-204 third operator-validation
+ * finding, 2026-09-16). isCandidateTarget() now requires the shape proper
+ * to each match type instead of a single shared rule, and neither field is
+ * ever normalized or mutated -- only checked.
+ *
  * FAIL-CLOSED, NOT PARTIAL
  *
  * Every invariant below aborts the whole run with a non-zero exit and
@@ -155,10 +169,22 @@ function isCandidateTarget(record: Record<string, string>): boolean {
   if (!VERIFIED_MATCH_TYPES.includes(record.expected_match_type as VerifiedMatchType)) return false;
 
   const seasonFrom = record.expected_season_from;
-  const seasonTo = record.expected_season_to;
-  if (!seasonFrom || seasonFrom !== seasonTo) return false;
+  const seasonTo = record.expected_season_to ?? '';
+  if (!seasonFrom) return false;
   const season = Number(seasonFrom);
   if (!Number.isInteger(season) || season < VERIFIED_SEASON_MIN || season > VERIFIED_SEASON_MAX) return false;
+
+  // The audited corpus represents the two match types asymmetrically: a
+  // Grand Final row's expected_season_to is blank (a Grand Final is a
+  // single match, not a season range), while a plain-finals row's
+  // expected_season_to repeats expected_season_from. Neither field is
+  // normalized/mutated by this script -- only checked here as a candidacy
+  // gate -- so each match type's real shape is required exactly.
+  if (record.expected_match_type === 'grand_final') {
+    if (seasonTo !== '') return false;
+  } else if (seasonTo !== seasonFrom) {
+    return false;
+  }
 
   return true;
 }

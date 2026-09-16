@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Targeting confirmed on real corpus (reached row 8919); question-text checker bug fixed; pending re-validation | Operator runs `AFLDB-ISSUE-204.md` §8's commands against the corrected tool |
+| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Targeting confirmed on real corpus (reached row 8919); question-text checker bug fixed (reached aggregate selection); season-shape bug fixed (found 90 not 180); pending re-validation | Operator runs `AFLDB-ISSUE-204.md` §8's commands against the corrected tool |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -28,7 +28,11 @@ guarded V3->V4 corpus correction for the 180-row `coverage_unavailable|fgf` stal
 cluster (disposals/marks/tackles in finals/Grand Finals, seasons 1897-1926) -- see its detailed
 entry below and `AFLDB-ISSUE-204.md` for the full runbook. Implemented, but the first operator
 validation run failed closed on an over-broad category+template-only selector (996 candidates, not
-180); retargeted to the row's full structural signature same-day, pending operator re-validation.
+180); retargeted to the row's full structural signature same-day. The second operator run then failed
+closed on a question-text checker bug (singular-only "final" regex); fixed same-day. The third operator
+run then failed closed on a season-shape candidacy bug (found 90 targets, not 180, from the corpus's
+asymmetric Grand-Final/plain-finals season representation); fixed same-day, pending operator
+re-validation.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -34025,11 +34029,13 @@ Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELO
 
 - **Status:** Targeting fixed and confirmed against the real corpus (second run reached row 8919); a
   second, independent correction-tool bug then failed closed on question-text validation
-  (singular-only "final" regex rejecting the corpus's plural "finals" wording), now fixed, pending
-  operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's three candidate
-  defect follow-ons plus its one guarded-correction follow-on (Stage 2 next-task item 5d). Full runbook:
-  `AFLDB-ISSUE-204.md` (see §0b for the second finding). Correction tool and tests corrected this
-  session; not yet run end-to-end against the real corpus.
+  (singular-only "final" regex rejecting the corpus's plural "finals" wording), fixed and reached
+  aggregate target selection; a third, independent correction-tool bug then failed closed on the
+  corpus's asymmetric Grand-Final/plain-finals season representation (found 90 targets, not 180), now
+  fixed, pending operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's
+  three candidate defect follow-ons plus its one guarded-correction follow-on (Stage 2 next-task item
+  5d). Full runbook: `AFLDB-ISSUE-204.md` (see §0b for the second finding, §0c for the third).
+  Correction tool and tests corrected this session; not yet run end-to-end against the real corpus.
 
 ### First operator run: failed closed, retargeted (2026-09-16)
 
@@ -34058,6 +34064,25 @@ correct, the checker's regex was incomplete. Fix: the plain-finals branch now us
 (singular or plural), still rejecting any question containing "grand final"; the `grand_final` branch is
 unchanged. Correction-tool-only; target selection, corpus semantics, and parser/runtime are untouched;
 `PARSER_VERSION` remains 53. Full account: `AFLDB-ISSUE-204.md` §0b.
+
+### Third operator run: aggregate selection found 90 not 180, season-shape bug found and fixed (2026-09-16)
+
+With the §0b question-text fix in place, the operator's third run passed row-by-row question-text
+checking and reached the tool's aggregate target-count invariant, which then failed: "Expected exactly
+180 rows ... found 90." Not a repeat of the §0a over-broad selector -- the defect was
+`isCandidateTarget()`'s season gate, which required `expected_season_from === expected_season_to` for
+every row regardless of match type. The real corpus represents the two match types' seasons
+asymmetrically: Grand Final rows carry `expected_season_from=YEAR`, `expected_season_to=""` (blank -- a
+Grand Final is a single match, not a season range); plain-finals rows carry
+`expected_season_from=YEAR`, `expected_season_to=YEAR` (repeats from). The equality requirement matched
+only the 90 plain-finals rows and excluded all 90 Grand Final rows, leaving exactly 90. Fix: the season
+gate now requires `expected_season_from` an integer year in [1897,1926], then branches by
+`expected_match_type` -- `grand_final` requires `expected_season_to === ""`; `final` requires
+`expected_season_to === expected_season_from`. Neither field is normalized or mutated anywhere in the
+tool. The semantic season used for validation/distribution checks is unchanged:
+`Number(expected_season_from)`. Correction-tool-only; target selection's other gates (§0a), question-text
+checking (§0b), corpus semantics, and parser/runtime are untouched; `PARSER_VERSION` remains 53. Full
+account: `AFLDB-ISSUE-204.md` §0c.
 
 ### Naming correction
 
@@ -34113,19 +34138,23 @@ fail-closed, self-verifying). Unlike ISSUE-199/201, which hardcoded an audited l
 tool *derives* its 180 targets from each row's own full structural signature — `category`
 (`finals_grand_final`), `equivalence_group` template (`fgf`), `expected_grain` (`player_game`),
 `expected_mode` (`single`), `expected_aggregation` (`max`), `expected_metric` (disposals/marks/
-tackles), `expected_match_type` (final/grand_final), and a single pinned season in [1897,1926] — and
-then individually re-verifies every candidate against the audited *mutable* old-field shape
-(status/failure-reason/coverage-behavior/min-confidence) and its own question text before accepting it,
-aborting on any mismatch, missing/duplicate id, or a derived count/distribution other than the audited
-180 (60/60/60 metric, 90/90 match-type, 30 seasons of 6). The signature was tightened from
+tackles), `expected_match_type` (final/grand_final), and a season shape proper to that match type --
+`expected_season_from` an integer year in [1897,1926], with `expected_season_to=""` for `grand_final`
+rows and `expected_season_to=expected_season_from` for `final` rows (§0c; neither field is normalized or
+mutated) -- and then individually re-verifies every candidate against the audited *mutable* old-field
+shape (status/failure-reason/coverage-behavior/min-confidence) and its own question text before
+accepting it, aborting on any mismatch, missing/duplicate id, or a derived count/distribution other than
+the audited 180 (60/60/60 metric, 90/90 match-type, 30 seasons of 6). The signature was tightened from
 category+template alone to the full structural signature above after the first operator run showed
 category+template matched 996 rows, not 180 (see the retargeting note above and `AFLDB-ISSUE-204.md`
-§0a). Corrected fields: `expected_status=decline`, `verification_level=EXPECTED_DECLINE`,
-`expected_failure_reason=coverage_unavailable`, `expected_coverage_behavior`/`expected_min_confidence`
-cleared; grain/mode/metric/aggregation/season/match-type preserved. Focused DB-free tests:
-`tests/nl-issue-204-corpus-fix.test.ts` (18 cases: happy path, row-count/ordering/non-target-identity
-invariants including 6 category/template sibling rows that must be ignored, and one refusal/exclusion
-case per fail-closed invariant). `PARSER_VERSION` unchanged at 53; no `src/search/nl/` or `src/db/` file
+§0a), then further corrected for the real corpus's asymmetric per-match-type season shape after the
+third operator run found 90 targets, not 180 (§0c). Corrected fields: `expected_status=decline`,
+`verification_level=EXPECTED_DECLINE`, `expected_failure_reason=coverage_unavailable`,
+`expected_coverage_behavior`/`expected_min_confidence` cleared; grain/mode/metric/aggregation/season/
+match-type preserved. Focused DB-free tests: `tests/nl-issue-204-corpus-fix.test.ts` (23 cases: happy
+path, row-count/ordering/non-target-identity invariants including 6 category/template sibling rows that
+must be ignored, one refusal/exclusion case per fail-closed invariant, and the §0c asymmetric
+season-shape regressions). `PARSER_VERSION` unchanged at 53; no `src/search/nl/` or `src/db/` file
 touched. Full design, operator commands, and expected V4 benchmark: `AFLDB-ISSUE-204.md` §5-§9.
 
 ### Scope
@@ -34138,8 +34167,9 @@ coverage policy.
 ### Next action
 
 Operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real V3->V4
-correction with both the §0a targeting fix and the §0b question-text fix in place, the parser-v53 rerun
-against V4, and the row-id-level before/after comparison) and reports results before this issue is
-marked resolved or `CHANGELOG.md` is updated. Targeting is now confirmed reaching row 8919 on the real
-corpus; watch for whether the full run now completes end-to-end at exactly 180 rows, and for any further
-question-text wording the checker does not yet recognise.
+correction with the §0a targeting fix, the §0b question-text fix, and the §0c season-shape fix all in
+place, the parser-v53 rerun against V4, and the row-id-level before/after comparison) and reports
+results before this issue is marked resolved or `CHANGELOG.md` is updated. Targeting is now confirmed
+reaching row 8919 on the real corpus and question-text checking is confirmed reaching aggregate target
+selection; watch for whether the full run now completes end-to-end at exactly 180 rows, and for any
+further season-field shape or question-text wording the tool does not yet recognise.
