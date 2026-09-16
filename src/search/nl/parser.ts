@@ -107,8 +107,19 @@ export type NlParseContext = {
    * identity. Production wires it in buildNlParseContext.
    */
   coaches?: NlCoachDirectoryEntry[];
-  /** The one async dependency. Delegates to searchPlayers in production; tests inject a fake. */
+  /** Delegates to searchPlayers in production; tests inject a fake. */
   resolvePlayer: (name: string) => Promise<NlPlayerCandidate[]>;
+  /**
+   * AFLDB-ISSUE-197: the complete set of plausible identities for a bare
+   * surname/family mention, up to `NL_LIMITS.maxPlayerCandidates + 1` --
+   * NOT resolvePlayer's 5-row cap, which silently truncated real families
+   * (Ablett) and made the parser's own >12-decline rule unreachable.
+   * Required, not optional: an absent implementation must be a compile
+   * error, not a silent fall-back to the truncated candidate set that
+   * caused this issue. Production wires resolvePlayerFamily
+   * (resolve.ts); tests inject a fake.
+   */
+  resolvePlayerFamily: (tokens: string[]) => Promise<NlPlayerCandidate[]>;
 };
 
 /** A player mention is trusted at prefix-match strength or better -- the same threshold searchPlayers's own ranking uses to mean "clearly this one". */
@@ -2668,6 +2679,23 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     );
     const candidates = await ctx.resolvePlayer(lookupName);
     const top = candidates[0];
+    // AFLDB-ISSUE-197: which branch governs a bare-surname mention is
+    // decided HERE, by resolvePlayer's own top score, before
+    // resolvePlayerFamily is ever consulted. For a real "Given Surname"
+    // player, a bare-surname mention can only reach searchPlayers's
+    // substring tier (250) at best -- 250 + max similarity (100) + max
+    // prominence (40) tops out at 390, structurally below
+    // PLAYER_ACCEPT_SCORE (500), src/db/queries/search.ts:91-95 -- so a
+    // genuine family mention reliably falls to the else-branch below,
+    // where resolvePlayerFamily governs completeness. Only an exact/prefix
+    // tier match (>=500: the mention text itself, or an unusual alias,
+    // starting with it) reaches PLAYER_ACCEPT_SCORE and lands here instead,
+    // where `nameMatches` is intentionally still computed from
+    // resolvePlayer's 5-capped `candidates` -- a narrow, unreproduced,
+    // out-of-scope certainty-calibration gap this issue's runbook (§15)
+    // explicitly did not fix. Do not reproduce a "family" test fixture
+    // with a surname-first synthetic name: that shape crosses this exact
+    // threshold and gets decided here instead of by resolvePlayerFamily.
     if (top && top.score >= PLAYER_ACCEPT_SCORE) {
       player = top.ref;
 
@@ -2737,8 +2765,20 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // nameMatches above, and require TWO genuine matches -- candidates
       // that do not even plausibly spell the mention are the resolver
       // casting a wide net, not competing readings of the question.
+      //
+      // AFLDB-ISSUE-197: `candidates` here is `resolvePlayer`'s 5-row cap,
+      // tuned for confident single-player lookup -- filtering IT for
+      // plausibility can never see more than 5 of a real family (Ablett
+      // is 7) and can never reach the >12 decline below (bounded by 5).
+      // `resolvePlayerFamily` is a second, dedicated data source that
+      // enumerates every plausible identity (up to the cap) directly, so
+      // the completeness/decline decision below sees the true family size
+      // rather than a fixed 5-row window. The whole-word-prefix filter is
+      // still applied to whatever it returns -- defence-in-depth against a
+      // resolver bug, not a substitute for the resolver's own predicate.
       const lookupTokens = lookupName.split(' ');
-      const plausible = candidates.filter((c) => {
+      const familyCandidates = await ctx.resolvePlayerFamily(lookupTokens);
+      const plausible = familyCandidates.filter((c) => {
         const words = candidateNameWords(c);
         return lookupTokens.every((t) => words.some((w) => w.startsWith(t)));
       });

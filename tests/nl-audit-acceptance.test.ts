@@ -30,7 +30,7 @@ const venues: NlVenueDirectoryEntry[] = [
   { id: 8, slug: 'gabba', name: 'The Gabba', names: ['gabba', 'the gabba'] },
 ];
 
-const ctx: NlParseContext = { clubs, venues, resolvePlayer: async () => [] };
+const ctx: NlParseContext = { clubs, venues, resolvePlayer: async () => [], resolvePlayerFamily: async () => [] };
 
 const questions = [
   'most hit out Richmond v Essendon Round 5 1984',
@@ -208,7 +208,7 @@ const coaches: NlCoachDirectoryEntry[] = [
   { id: 266, slug: 'charlie-pannam', name: 'Charlie Pannam', playerId: 701, playerSlug: 'charlie-pannam', names: ['charlie pannam'] },
 ];
 
-const coachCtx: NlParseContext = { clubs, venues, coaches, resolvePlayer: async () => [] };
+const coachCtx: NlParseContext = { clubs, venues, coaches, resolvePlayer: async () => [], resolvePlayerFamily: async () => [] };
 
 const coachingQuestions: [string, Record<string, unknown>][] = [
   ['who coached Richmond', { grain: 'coach_record', metric: null, agg: { kind: 'list' }, scope: { clubFor: { slug: 'richmond' } } }],
@@ -283,6 +283,7 @@ const sirenCtx: NlParseContext = {
   venues,
   coaches,
   resolvePlayer: async (name: string) => (sirenPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+  resolvePlayerFamily: async () => [],
 };
 
 const sirenQuestions: [string, Record<string, unknown>][] = [
@@ -383,6 +384,7 @@ const fkgCtx: NlParseContext = {
   venues,
   coaches,
   resolvePlayer: async (name: string) => (fkgPlayers[name.toLowerCase()] ?? []).map((ref) => ({ ref, score: 1000 })),
+  resolvePlayerFamily: async () => [],
 };
 
 /** Every supported Phase E form, with the plan it must produce. */

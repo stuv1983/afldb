@@ -1,7 +1,14 @@
 # AFLDB-ISSUE-197 — NL surname candidate resolution is truncated before ambiguity checks
 
-Status: **Planning complete, not implemented.** This runbook is the implementation contract once
-approved. No production code or test was modified while writing it. Git was not run.
+Status: **Resolved** 2026-09-16 (Sonnet 5, worktree `afldb-issue-197`), operator-validated: 25/25
+`tests/integration/nl-semantic-mapping.test.ts`, 951/951 across the full focused NL suite set, clean
+`npx tsc --noEmit`. This runbook was the implementation contract; see `issues.md`'s AFLDB-ISSUE-197
+entry for the "Implementation"/"Validation"/"Resolution" sections recording what was actually built,
+the two test files touched beyond §8's list, a test-fixture `player_career_stats` NOT-NULL
+correction, and an integration-path control-flow investigation (fixture defect, not a production
+defect — see that entry for the full trace). Not committed, not merged — Git remains user-operated
+per `CLAUDE.md`. Corpus relabelling (§12) is a separate follow-up, tracked under Stage 2's next task
+in `IssuesIndex.md`, not part of this resolution.
 
 ## 1. Problem statement
 
