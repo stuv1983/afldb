@@ -56,6 +56,28 @@ const FAMILY_SURNAME = 'zqfamseven';
 const CLASH_SURNAME = 'zqclash';
 const PAIR_SURNAME = 'zqpair';
 
+// AFLDB-ISSUE-198: same rationale as the ISSUE-197 surnames above (unique,
+// unpronounceable, "Given Surname" shape), but two members of each family
+// carry a HYPHENATED compound surname whose bare mention is the word AFTER
+// the hyphen -- exactly "Darcy Byrne-Jones"/"jones"'s own shape. This is
+// the real defect: afldb_normalise_name (and the search_name/search_alias
+// columns resolvePlayerFamily reads) treats the hyphen as a word break, so
+// these two rows' `search_name` ends in "... byrne zqhyphenclash", not
+// "...-zqhyphenclash" -- the bare surname mention must still reach and
+// count them, through the real resolver, not a hand-built fake.
+const HYPHEN_CLASH_SURNAME = 'Zqhyphenclash';
+const HYPHEN_RANK_SURNAME = 'Zqhyphenrank';
+// Full-name accept-branch fixtures: a given name shared with a DECOY of
+// more career games but a DIFFERENT surname, so a correct answer can only
+// come from the hyphenated/apostrophe surname actually being read, not
+// from falling back to a given-name-only guess and picking whoever has
+// more games (the exact wrong-answer risk candidatePlayerSpan's old
+// `^[a-z]+$` filter created -- see AFLDB-ISSUE-198.md §4).
+const HYPHEN_FULLNAME_GIVEN = 'Zqfullhyphen';
+const HYPHEN_FULLNAME_SURNAME = 'Byrne-Zqjoneshyphen';
+const APOSTROPHE_FULLNAME_GIVEN = 'Zqfullapos';
+const APOSTROPHE_FULLNAME_SURNAME = "O'Brienzqapos";
+
 type FamilySurnameFixture = {
   /** All 6 "zqfamseven" identities. */
   familyIds: number[];
@@ -66,6 +88,21 @@ type FamilySurnameFixture = {
   clashIds: number[];
   /** 2 "zqpair" identities: the smallest genuinely ambiguous family. */
   pairIds: number[];
+  /** 13 "zqhyphenclash" identities, 2 with a hyphenated compound surname. */
+  hyphenClashIds: number[];
+  /** 12 "zqhyphenrank" identities, 2 with a hyphenated compound surname. */
+  hyphenRankIds: number[];
+  /** Highest games among the 12 -- deliberately one of the hyphenated pair. */
+  hyphenRankLeaderId: number;
+  hyphenRankLeaderGames: number;
+  /** "Zqfullhyphen Byrne-Zqjoneshyphen" -- the target of the full-name hyphen test. */
+  hyphenFullNameId: number;
+  /** "Zqfullhyphen Different", same given name, MORE games, wrong surname. */
+  hyphenFullNameDecoyId: number;
+  /** "Zqfullapos O'Brienzqapos" -- the target of the full-name apostrophe test. */
+  apostropheFullNameId: number;
+  /** "Zqfullapos Different", same given name, MORE games, wrong surname. */
+  apostropheFullNameDecoyId: number;
 };
 
 let fixture: SemanticFixture;
@@ -116,7 +153,53 @@ async function createFamilySurnameFixtures(): Promise<FamilySurnameFixture> {
       pairIds.push(await insertPlayer(`Member${i} Zqpair`, `zqpair-${i}`, 10 + i));
     }
 
-    return { familyIds, trueLeaderId, trueLeaderGames, clashIds, pairIds };
+    // 13 "zqhyphenclash" identities (11 plain + 2 hyphenated-surname) --
+    // one past NL_LIMITS.maxPlayerCandidates, proving the true count (13)
+    // rather than the pre-fix undercount (11, the 2 hyphenated members
+    // silently dropped by candidateNameWords's plain `\s+` split) governs
+    // the ambiguity decision.
+    const hyphenClashIds: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      hyphenClashIds.push(await insertPlayer(`Member${i} ${HYPHEN_CLASH_SURNAME}`, `zqhyphenclash-${i}`));
+    }
+    hyphenClashIds.push(await insertPlayer(`Member11 Byrne-${HYPHEN_CLASH_SURNAME}`, 'zqhyphenclash-11'));
+    hyphenClashIds.push(await insertPlayer(`Member12 Rhys-${HYPHEN_CLASH_SURNAME}`, 'zqhyphenclash-12'));
+
+    // 12 "zqhyphenrank" identities (10 plain + 2 hyphenated-surname), the
+    // low boundary -- ranks completely, and the TRUE leader is one of the
+    // hyphenated pair, proving a hyphenated member counts toward the
+    // family AND can win the ranking, not merely avoid being dropped.
+    const hyphenRankIds: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      hyphenRankIds.push(await insertPlayer(`Member${i} ${HYPHEN_RANK_SURNAME}`, `zqhyphenrank-${i}`, 20 + i * 5));
+    }
+    hyphenRankIds.push(await insertPlayer(`Member9 ${HYPHEN_RANK_SURNAME}`, 'zqhyphenrank-9', 60));
+    const hyphenRankLeaderGames = 250;
+    const hyphenRankLeaderId = await insertPlayer(
+      `Member10 Byrne-${HYPHEN_RANK_SURNAME}`, 'zqhyphenrank-10', hyphenRankLeaderGames,
+    );
+    hyphenRankIds.push(hyphenRankLeaderId);
+    hyphenRankIds.push(await insertPlayer(`Member11 Rhys-${HYPHEN_RANK_SURNAME}`, 'zqhyphenrank-11', 70));
+
+    const hyphenFullNameId = await insertPlayer(
+      `${HYPHEN_FULLNAME_GIVEN} ${HYPHEN_FULLNAME_SURNAME}`, 'zqhyphen-fullname-target', 50,
+    );
+    const hyphenFullNameDecoyId = await insertPlayer(
+      `${HYPHEN_FULLNAME_GIVEN} Different`, 'zqhyphen-fullname-decoy', 400,
+    );
+
+    const apostropheFullNameId = await insertPlayer(
+      `${APOSTROPHE_FULLNAME_GIVEN} ${APOSTROPHE_FULLNAME_SURNAME}`, 'zqapos-fullname-target', 50,
+    );
+    const apostropheFullNameDecoyId = await insertPlayer(
+      `${APOSTROPHE_FULLNAME_GIVEN} Different2`, 'zqapos-fullname-decoy', 400,
+    );
+
+    return {
+      familyIds, trueLeaderId, trueLeaderGames, clashIds, pairIds,
+      hyphenClashIds, hyphenRankIds, hyphenRankLeaderId, hyphenRankLeaderGames,
+      hyphenFullNameId, hyphenFullNameDecoyId, apostropheFullNameId, apostropheFullNameDecoyId,
+    };
   });
 }
 
@@ -795,5 +878,67 @@ describe('AFLDB-ISSUE-197 surname/family candidate completeness', () => {
     if (parsed.status !== 'plan') return;
     expect(parsed.plan.scope.playerIdIn).toHaveLength(2);
     expect(parsed.plan.scope.playerIdIn).toEqual(expect.arrayContaining(familyFixture.pairIds));
+  });
+});
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-198 -- hyphen/apostrophe word-boundary consistency, proved
+// through the real production resolver boundary (buildNlParseContext ->
+// resolvePlayer/resolvePlayerFamily), mirroring why ISSUE-197 required
+// this level for its own fix rather than trusting the parser-only fakes
+// above. A hyphenated-surname player's `search_name` is produced by the
+// real `afldb_normalise_name` (hyphen -> space), so only a real DB round
+// trip proves candidateNameWords/candidatePlayerSpan actually agree with
+// it, not merely with a hand-written synthetic string.
+// -----------------------------------------------------------------------
+describe('AFLDB-ISSUE-198 hyphen/apostrophe word-boundary consistency', () => {
+  it('a 13-identity family with 2 hyphenated-surname members declines as ambiguous through the real resolver boundary', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(`${HYPHEN_CLASH_SURNAME.toLowerCase()} most games`, ctx);
+    expect(parsed.status, JSON.stringify(parsed.status === 'plan' ? parsed.plan : parsed.report)).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe(HYPHEN_CLASH_SURNAME.toLowerCase());
+  });
+
+  it('a 12-identity family with 2 hyphenated-surname members ranks completely, and a hyphenated member is the true leader', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(`${HYPHEN_RANK_SURNAME.toLowerCase()} most games`, ctx);
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player).toBeUndefined();
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(12);
+    expect(parsed.plan.scope.playerIdIn).toEqual(expect.arrayContaining(familyFixture.hyphenRankIds));
+
+    const validated = validatePlan(parsed.plan);
+    if ('error' in validated) throw new Error(validated.error);
+    const payload = await answerPlayerCareer(validated, 25);
+    if (payload.kind !== 'player_career' || !payload.lead) throw new Error('expected a career leader');
+    expect(payload.lead.playerId).toBe(familyFixture.hyphenRankLeaderId);
+    expect(payload.lead.games).toBe(familyFixture.hyphenRankLeaderGames);
+  });
+
+  it('a full-name mention of a hyphenated-surname player resolves to that player, not a same-given-name decoy with more games', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(
+      `${HYPHEN_FULLNAME_GIVEN} ${HYPHEN_FULLNAME_SURNAME} most games`, ctx,
+    );
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.id).toBe(familyFixture.hyphenFullNameId);
+    expect(parsed.plan.player?.id).not.toBe(familyFixture.hyphenFullNameDecoyId);
+    expect(parsed.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('a full-name mention of an apostrophe-surname player resolves to that player, not a same-given-name decoy with more games', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(
+      `${APOSTROPHE_FULLNAME_GIVEN} ${APOSTROPHE_FULLNAME_SURNAME} most games`, ctx,
+    );
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player?.id).toBe(familyFixture.apostropheFullNameId);
+    expect(parsed.plan.player?.id).not.toBe(familyFixture.apostropheFullNameDecoyId);
+    expect(parsed.report.unsupportedTerms).toEqual([]);
   });
 });

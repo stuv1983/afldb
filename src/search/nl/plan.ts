@@ -497,7 +497,22 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // identities) now declines as ambiguous instead of answering a confident but
 // wrong top-5 subset -- the >12 branch was previously unreachable because
 // the candidate set could never exceed 5.
-export const PARSER_VERSION = 49;
+// v50 -- AFLDB-ISSUE-198: a tokenisation-boundary correction, not a
+// vocabulary change. candidateNameWords and candidatePlayerSpan now split
+// on the same word-boundary contract afldb_normalise_name already applies
+// to players.search_name/player_name_aliases.search_alias (hyphens,
+// underscores and slashes are additional word breaks; apostrophes and full
+// stops are deletions, not breaks), via a small shared splitNameWords
+// helper. A hyphenated surname used to be one TypeScript word and two SQL
+// words, so the family-ambiguity re-check silently dropped hyphenated
+// members (Jones: 13 real identities undercounted to 11, ranking a
+// confident wrong answer instead of declining); the same gap let a
+// full-name mention of a hyphenated/apostrophe-surnamed player lose its
+// surname before any resolver ran. Generic hyphenated/apostrophe-inclusive
+// surname families that previously ranked a wrong answer now correctly
+// decline; full-name mentions of such players that previously degraded to
+// a given-name-only guess now resolve to the named player.
+export const PARSER_VERSION = 50;
 
 // ------------------------------------------------------------------ grain
 

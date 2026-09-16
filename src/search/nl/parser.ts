@@ -1805,7 +1805,21 @@ function extractByClubPlayer(
  */
 function candidatePlayerSpan(text: string): string | null {
   const tokens = text.split(/\s+/).filter(Boolean);
-  const alphaRun = tokens.filter((t) => /^[a-z]+$/.test(t) && !STOPWORDS.has(t));
+  // A raw token survives as a name-word candidate when every word it
+  // contains under the shared word-boundary contract (splitNameWords) is
+  // plain alphabetic -- "byrne-jones" and "o'brien" both qualify (two
+  // words and one respectively), a bare "-" or a digit-bearing token does
+  // not. The ORIGINAL punctuation-bearing token is kept, not its exploded
+  // words: this keeps candidateRaw's tokenisation aligned with
+  // meaningfulTokens' plain `\s+` split elsewhere in the parser (the
+  // confidence/leftover-token accounting at the end of parseNlQuestion),
+  // so a hyphenated name is consumed as the one token it already is there
+  // instead of silently reappearing as an unmatched leftover.
+  const alphaRun = tokens.filter((t) => {
+    if (STOPWORDS.has(t)) return false;
+    const words = splitNameWords(t);
+    return words.length > 0 && words.every((w) => /^[a-z]+$/.test(w));
+  });
   if (alphaRun.length === 0) return null;
   return alphaRun.slice(0, 4).join(' ');
 }
@@ -1818,6 +1832,29 @@ function normalisePlayerSuffixes(name: string): string {
 }
 
 /**
+ * Word-boundary contract for player-name comparison, mirroring
+ * `afldb_normalise_name`'s documented punctuation handling (SQL, migration
+ * `099_normalise_unicode_whitespace.sql:71-91`; restated by its own
+ * `COMMENT ON FUNCTION`): apostrophes and full stops are deletions, not
+ * breaks ("O'Brien" stays one word, "obrien"), while hyphens, underscores
+ * and slashes are additional word boundaries alongside whitespace
+ * ("Byrne-Jones" is two words, matching `players.search_name`/
+ * `player_name_aliases.search_alias`, which are that SQL function's
+ * output). `afldb_normalise_name` remains the single canonical
+ * implementation (AFLDB-ISSUE-164) -- this mirrors only its punctuation
+ * class, not its Unicode-whitespace handling, which JS's own `\s` already
+ * covers. If a future migration adds a new punctuation class there, this
+ * must change with it.
+ */
+function splitNameWords(name: string): string[] {
+  return name
+    .replace(/['’.]/g, '')
+    .replace(/[-_/]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
  * Every word a candidate can justify a mention token against: the words
  * of its canonical name plus, when the resolver matched a different form
  * (an alias), the words of that matched form. The alias is ADDITIONAL
@@ -1827,11 +1864,25 @@ function normalisePlayerSuffixes(name: string): string {
  * and is left in the text for the decline gate.
  */
 function candidateNameWords(c: NlPlayerCandidate): string[] {
-  const words = new Set(normalisePlayerSuffixes(c.ref.name.toLowerCase()).split(/\s+/));
+  const words = new Set(splitNameWords(normalisePlayerSuffixes(c.ref.name.toLowerCase())));
   if (c.matchedName) {
-    for (const w of normalisePlayerSuffixes(c.matchedName.toLowerCase()).split(/\s+/)) words.add(w);
+    for (const w of splitNameWords(normalisePlayerSuffixes(c.matchedName.toLowerCase()))) words.add(w);
   }
   return [...words];
+}
+
+/**
+ * A raw mention token (possibly, under splitNameWords, more than one
+ * SQL-comparable word -- "byrne-jones") is justified against a
+ * candidate's name words when EVERY one of its words is a whole-word
+ * prefix of some name word. A plain single-word token behaves exactly as
+ * before this contract existed.
+ */
+function tokenJustifiedBy(token: string, nameWords: readonly string[]): boolean {
+  const words = splitNameWords(token);
+  return words.length > 0 && words.every(
+    (w) => nameWords.some((nw) => nw.startsWith(normalisePlayerSuffixes(w))),
+  );
 }
 
 // -------------------------------------------------------------- main entry
@@ -2711,7 +2762,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       const nicknameTokens = new Set(nicknameKey !== null ? nicknameKey.split(' ') : []);
       const spanTokens = candidateRaw.split(' ');
       const justified = spanTokens.filter(
-        (t) => nicknameTokens.has(t) || nameWords.some((w) => w.startsWith(normalisePlayerSuffixes(t))),
+        (t) => nicknameTokens.has(t) || tokenJustifiedBy(t, nameWords),
       );
       const mention = justified.length > 0 ? justified.join(' ') : candidateRaw;
 
@@ -2727,7 +2778,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       const mentionTokens = justified.length > 0 ? justified : spanTokens;
       const nameMatches = nicknameKey !== null ? 1 : candidates.filter((c) => {
         const words = candidateNameWords(c);
-        return mentionTokens.every((t) => words.some((w) => w.startsWith(normalisePlayerSuffixes(t))));
+        return mentionTokens.every((t) => tokenJustifiedBy(t, words));
       }).length;
 
       const second = candidates[1];
@@ -2776,7 +2827,12 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
       // rather than a fixed 5-row window. The whole-word-prefix filter is
       // still applied to whatever it returns -- defence-in-depth against a
       // resolver bug, not a substitute for the resolver's own predicate.
-      const lookupTokens = lookupName.split(' ');
+      // Flattened to plain single words (splitNameWords), not just
+      // whitespace-split: resolvePlayerFamily normalises each element of
+      // `tokens` INDIVIDUALLY as one SQL term (resolve.ts's `q` CTE), so a
+      // hyphenated mention word ("byrne-jones") must already be two
+      // elements here, or it becomes one unmatchable multi-word term.
+      const lookupTokens = lookupName.split(' ').flatMap(splitNameWords);
       const familyCandidates = await ctx.resolvePlayerFamily(lookupTokens);
       const plausible = familyCandidates.filter((c) => {
         const words = candidateNameWords(c);
