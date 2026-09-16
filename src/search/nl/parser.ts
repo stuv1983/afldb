@@ -1168,6 +1168,13 @@ function extractCareerConditions(text: string): {
 
     const plus = NUMBER_PLUS_RE.exec(window);
     let op: NlCompareOp = 'gte';
+    // Distinct from `op` itself, which cannot tell an explicit "at least"/
+    // "no fewer than" `gte` apart from the implicit bare-number default
+    // `gte` -- needed below to know whether a bound zero was stated with a
+    // comparator or is bare "zero"/"0", which must default to equality
+    // instead ("zero goals" means goals = 0, not goals >= 0, which is
+    // trivially true for every player).
+    let explicitComparator = false;
     let value: number | null = null;
     // Spans are recorded as absolute positions in `working` rather than as
     // text to search for again. "players with 3 games and exactly 3 clubs"
@@ -1187,11 +1194,12 @@ function extractCareerConditions(text: string): {
     if (plus) {
       value = Number(plus[1]);
       op = 'gte';
+      explicitComparator = true;
       spans.push(spanFrom(plus, plus[0].replace(/\+$/, '')));
     } else {
       for (const [opRe, opKind] of COMPARE_OP_WORDS) {
         const opMatch = opRe.exec(window);
-        if (opMatch) { op = opKind; spans.push(spanFrom(opMatch)); break; }
+        if (opMatch) { op = opKind; explicitComparator = true; spans.push(spanFrom(opMatch)); break; }
       }
       const digits = /\b(\d{1,4})\b/.exec(window);
       if (digits) {
@@ -1205,6 +1213,13 @@ function extractCareerConditions(text: string): {
       }
     }
     if (value === null) continue;
+
+    // A bound zero with no stated comparator means equality ("zero goals"
+    // = "goals = 0"), not the bare-number default above, which is only
+    // correct for a positive count ("300 games" = "at least 300"). An
+    // explicit comparator (including "0+") still wins, same as any other
+    // value.
+    if (value === 0 && !explicitComparator) op = 'eq';
 
     // The `_min` builders only express a floor ("X+"/"at least"/a bare
     // number, which all default to 'gte' above); "fewer than 2 grand

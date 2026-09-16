@@ -15,9 +15,12 @@ AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of the
 AFLDB-ISSUE-202 opened 2026-09-16 (Sonnet 5, planning only) for the second follow-on (GWS
 unsupported-term leakage, 128 manifestations), resolved 2026-09-16 (Sonnet 5, operator-validated;
 also normalized 72 previously grain-equivalent GWS player-season rows to exact expected semantics
-as a byproduct of the same fix) -- see its detailed entry below. The remaining two follow-on items
-("zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not yet opened as
-tracked issues.
+as a byproduct of the same fix) -- see its detailed entry below.
+AFLDB-ISSUE-203 opened 2026-09-16 (Sonnet 5, planning only) for the third follow-on ("zero"
+word-form not bound as numeric equality in career conditions, 15 manifestations), resolved
+2026-09-16 (Sonnet 5, operator-validated) -- see its detailed entry below. The remaining follow-on
+item (pre-1965 stale-coverage corpus correction) remains open but not yet opened as a tracked
+issue.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33910,3 +33913,100 @@ Final 265 soft findings: `UNEXPECTED_DECLINE` 195 (180 stale pre-1965 coverage e
 `WRONG_FAILURE_REASON` 70 (pre-existing taxonomy-drift family, unchanged in count and identity). No
 GWS-related soft findings remain. `CHANGELOG.md` updated under `[Unreleased]`. Removed from
 `IssuesIndex.md`'s open-issues list and the Open Issues table below.
+
+---
+
+## AFLDB-ISSUE-203 — Numeric word "zero" is not bound as equality in career conditions
+
+- **Status:** Resolved 2026-09-16 (Sonnet 5, operator-validated). Third of AFLDB-ISSUE-200's three
+  candidate defect follow-ons (Stage 2 next-task item 5c, `PARSER_BUG` / `unsupported_term|pc|zero`,
+  15 rows). Root cause: two cooperating gaps in `extractCareerConditions` -- `NUMBER_WORDS` had no
+  `zero` entry, and the function's comparator-less numeric default (`gte`) was wrong for a bound
+  zero (needed `eq`); both landed together per plan since fixing the vocabulary gap alone would have
+  converted the 15 declines into 15 silent wrong answers rather than 15 correct ones. Fix: `zero: 0`
+  added to `NUMBER_WORDS` (`vocab.ts`); `extractCareerConditions` now tracks whether a comparator was
+  explicit and forces `op = 'eq'` for a comparator-less zero-valued clause; `PARSER_VERSION` 52 -> 53.
+  Runbook `AFLDB-ISSUE-203.md` §12 records the implementation; §13 records the operator validation
+  below. No Git operation performed by Claude.
+
+### Evidence
+AFLDB-ISSUE-200's real-audit cluster `unsupported_term|pc|zero` (`tools/nl/issue-200-dispositions.csv`):
+`player_career` games/list questions with a numeric zero-goal condition (e.g. "players with 4 games
+and zero goals") decline with `unsupported_term`="zero" — the word-form "zero" is not bound to the
+numeric literal 0 for an equality condition and survives into unsupported-term detection.
+
+### Confirmed root cause (two cooperating gaps, both in `extractCareerConditions`)
+1. **Missing vocabulary entry.** `NUMBER_WORDS` (`src/search/query-intent.ts:185-192`, re-exported as
+   a superset by `src/search/nl/vocab.ts:21-25`, imported by `src/search/nl/parser.ts:83`) has no
+   `zero` key. Every number-word fallback loop that reads this shared map (`parser.ts:932`, `:1201`,
+   `:1522`, `:1670`, `:1763`; `vocab.ts:31`'s `readCount`; `semantic-intents.ts:20`'s
+   `RESULT_COUNT_GOVERNS`) therefore cannot recognise "zero". In `extractCareerConditions`
+   (`parser.ts:1102-1227`), when the "goals" stat word's value search fails, `value` stays `null`,
+   `pending.delete` has already removed the entry, and `if (value === null) continue;`
+   (`parser.ts:1207`) skips stripping the clause — "goals" is left for a later, more general pass to
+   consume (why only "zero" is reported unsupported, not "zero goals"), while "zero" matches no
+   vocabulary anywhere and survives into `leftoverTokens` (`parser.ts:3837-3839`) and
+   `report.unsupportedTerms` (`parser.ts:3853`) — the identical downstream mechanism as
+   AFLDB-ISSUE-202's `gws` defect, different upstream cause.
+2. **Comparator-default gap, currently latent.** `extractCareerConditions` defaults a
+   comparator-less numeric clause to `op: 'gte'` — correct for positive counts ("300 games" = "at
+   least 300"), but wrong for zero: the corpus's expected semantics for "zero goals" is `goals = 0`
+   (equality), not `goals >= 0` (trivially true for every player). This is not a falsy-value bug —
+   `validateCondition` (`plan.ts:1563-1575`) checks `Number.isFinite`, and
+   `src/db/queries/nl/player-career.ts:100-110` interpolates the value with no truthy guard — the gap
+   is purely that nothing forces `op = 'eq'` for a comparator-less zero. It is unobserved today only
+   because "zero" was never recognised as a value at all (defect 1 masks it); once fixed alone,
+   defect 2 would convert the 15 declines into 15 silent wrong answers rather than 15 correct ones.
+   The existing `eq: 0` test coverage in `tests/nl-parser.test.ts` all goes through the separate
+   `no <stat>` / `never <stat>` / `without <stat>` negative-trigger machinery
+   (`parser.ts:1043-1085`), which pushes `eq: 0` directly and is unaffected by either defect.
+
+Full root-cause trace, classification (not zero-specific vocabulary alone and not a truthiness bug —
+option 5 in the issue framing, specifically options 1+2), required semantics, proposed
+implementation, files expected to change, corpus-shape verification command, regression-test plan,
+stable-corpus validation plan, parser-version recommendation, and risk analysis: `AFLDB-ISSUE-203.md`
+(full runbook).
+
+### Scope
+In scope: `NUMBER_WORDS` gains a `zero` entry (`vocab.ts`, not `query-intent.ts` — keeps the Grid
+Solver's own `readCount`/`parsePlayerQuestion` untouched); `extractCareerConditions` forces
+`op = 'eq'` for a comparator-less, zero-valued clause. Out of scope: the `no`/`never`/`without`
+negative-trigger machinery (already correct); the four other number-word loops' own comparator
+defaults (none of the 15 rows exercise them; flagged as a collateral-vocabulary side effect in
+`AFLDB-ISSUE-203.md` §10, not fixed); the 180 pre-1965 stale-coverage rows; the 70 taxonomy-drift
+rows; AFLDB-ISSUE-201/202 behaviour.
+
+### Operator validation (2026-09-16)
+
+`tests/nl-parser.test.ts` and `tsc --noEmit` passed. Parser v53 run against the unchanged
+`/home/arm/nl-stress-corpus-v3.csv` (v52 baseline: 12000 scored / 11735 clean / 265 soft / 0 failed;
+`UNEXPECTED_DECLINE` 195 = 180 stale pre-1965 + 15 zero-word; `WRONG_FAILURE_REASON` 70):
+
+```text
+12000 scored / 11750 clean / 250 soft / 0 failed
+UNEXPECTED_DECLINE 180, WRONG_FAILURE_REASON 70
+```
+
+v52 -> v53 diff: removed IDs exactly `8833, 8842, 8847, 8852, 8857, 8862, 8867, 8872, 8877, 8882,
+8887, 8892, 8897, 8902, 8907` (the exact pre-implementation ISSUE-203 family); zero new soft rows;
+zero semantic changes among the rows that remained soft. 15 zero-word parser defects fixed, 15
+total soft findings cleared, 0 hard failures.
+
+### Remaining known soft findings
+
+250 soft findings remain, both pre-existing and out of scope for this issue: 180
+`UNEXPECTED_DECLINE` (stale pre-1965 coverage expectations) and 70 `WRONG_FAILURE_REASON`
+(taxonomy-drift family, unchanged in count and identity). No known parser bug family remains from
+the ISSUE-200 audit.
+
+### Residual edge (not exercised, not fixed)
+
+The `op = 'eq'` override for a comparator-less zero runs before the `qualifierBuilder`'s
+`grand_finals`/`prelim_finals` check, so a hypothetical "0 grand finals"-shaped clause would now
+read as a plain `{ column: 'finals', op: 'eq', value: 0 }` condition instead of a
+`grand_finals_played_min` predicate. Not exercised by the stable corpus and caused no regression in
+operator validation. Recorded as a residual risk, not broadened into this issue's scope; see
+`AFLDB-ISSUE-203.md` §10.
+
+Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELOG.md` updated under
+`Unreleased`.

@@ -15,6 +15,32 @@ commit.
 
 ## [Unreleased]
 
+### NL search: "zero" now parses as an exact-equality career condition (AFLDB-ISSUE-203) - 16 September 2026
+
+- `NUMBER_WORDS` (`src/search/nl/vocab.ts`) had no `zero` entry, so the word survived into
+  `unsupportedTerms` for `player_career` questions such as "players with 4 games and zero goals" —
+  15 corpus rows declined with `unsupported_term`="zero".
+- Added `zero: 0` to `NUMBER_WORDS`. On its own this would have converted the 15 declines into 15
+  silently wrong answers, because `extractCareerConditions` defaults a comparator-less numeric
+  clause to `op: 'gte'` (correct for positive counts, but `goals >= 0` is trivially true for every
+  player). `extractCareerConditions` now tracks whether a comparator was explicit and forces
+  `op = 'eq'` for a comparator-less zero-valued clause; explicit-comparator semantics (e.g. "at
+  least zero", "more than zero") are unchanged. The existing `no`/`never`/`without` negative-trigger
+  paths were already correct and are unaffected.
+- `PARSER_VERSION` 52 → 53.
+- Regression coverage added to `tests/nl-parser.test.ts` (the bug's exact shape, a bare
+  single-condition control, a digit-`0` control, a positive-number-word control, explicit-comparator
+  cases, the existing negative-trigger forms, and an unrelated unsupported-word control).
+- Operator-validated: `tests/nl-parser.test.ts` and `tsc --noEmit` passed. Stable V3 stress corpus
+  moved 12,000 scored / 11,735 clean / 265 soft / 0 failed (v52) → 12,000 / 11,750 / 250 / 0 (v53):
+  exactly the 15 known zero-word soft failures cleared, zero new soft rows, zero semantic changes
+  among the 250 rows that remained soft (180 pre-existing stale pre-1965 coverage expectations, 70
+  pre-existing taxonomy-drift rows).
+- Residual, unexercised edge noted for future reference: the `eq` override runs before the
+  `grand_finals`/`prelim_finals` qualifier-builder check, so a hypothetical "0 grand finals"-shaped
+  clause would read as a plain equality condition rather than a `grand_finals_played_min`
+  predicate. Not exercised by the corpus, not fixed, not a regression.
+
 ### NL search: "GWS Giants" no longer strands "gws" as an unsupported term (AFLDB-ISSUE-202) - 16 September 2026
 
 - `CLUB_NICKNAMES` (`src/search/nl/vocab.ts`) had only the independent single-word nicknames `gws`

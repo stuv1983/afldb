@@ -20,6 +20,7 @@ import type { NlCompareOp } from '@/search/nl/plan';
 /** Superset of query-intent.ts's NUMBER_WORDS -- "a dozen" and "hundred" are questions this parser reaches that the grid-question parser never needed to. */
 export const NUMBER_WORDS: Record<string, number> = {
   ...PLAYER_QUESTION_NUMBER_WORDS,
+  zero: 0,
   dozen: 12,
   hundred: 100,
 };
