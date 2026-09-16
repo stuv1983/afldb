@@ -34211,14 +34211,16 @@ Removed from `IssuesIndex.md` and the Open Issues table above (1 -> 0). `CHANGEL
 
 ## AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows (parser defect + genuine feature gap)
 
-- **Status:** IN PROGRESS (Sonnet 5), **not resolved**. Opened as a planning/audit task for
+- **Status:** RESOLVED 2026-09-16 (Sonnet 5, operator-validated). Opened as a planning/audit task for
   AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON` `TAXONOMY_DRIFT` rows (Stage 2 next-task item 6).
-  The audit disproved ISSUE-200's own disposition for this cluster: it is not one homogeneous
-  diagnostic-label mismatch. Runtime is now fully validated and green (parser 446/446, integration
-  35/35, `tsc --noEmit` clean) after a two-stage parser fix (see "First operator-validation run" below).
-  The first real corpus-correction attempt then correctly failed closed on an over-broad candidacy design
-  in the correction tool itself, unrelated to the runtime (see "Correction-tool candidacy defect" below);
-  fixed in the same script, not yet re-run. Full runbook: `AFLDB-ISSUE-205.md`.
+  The audit disproved ISSUE-200's own disposition for this cluster: it was not one homogeneous
+  diagnostic-label mismatch, but two unrelated families with two different root causes -- a real
+  parser-ordering defect (42 rows) and a genuine unsupported-feature gap (28 rows). Runtime fix
+  (`PARSER_VERSION` 53→54) and the guarded V4→V5 corpus correction are both operator-validated
+  end-to-end; the stable 12,000-row corpus now scores 12000/12000 clean, 0 soft, 0 failed under parser
+  v54. Two correction-tool validation defects (over-broad candidacy; a synthetic-fixture leak) were found
+  and fixed along the way, both test/tooling-only. See "Resolution" below and `AFLDB-ISSUE-205.md` §11
+  for the full closing evidence.
 
 ### Audit: the 70 rows are two unrelated families, not one taxonomy-drift cluster
 
@@ -34359,9 +34361,9 @@ honest `unsupported_term` post-fix before their failure-reason label is correcte
 exact row count (12000), exact target count (70) split exactly 42/28 by a regex mirroring
 `TEAM_METRIC_WORDS`' own `q3_deficit_overcome` pattern (never a separately maintained guess), before-state
 agreement (`decline`/`unsupported_topic`, blank plan-shape fields) per candidate, and a post-hoc
-self-check that exactly 70 rows changed and nothing else. **Not yet run against the real V4 corpus** —
-requires `--conditions=react-server` and a real `DATABASE_URL`; the operator runs it once the runtime
-tests below are green.
+self-check that exactly 70 rows changed and nothing else. Run against the real V4 corpus after the
+candidacy fix below (§ "Correction-tool candidacy defect") and the fixture fix (§ "First test run") --
+see "Resolution" for the final, successful run.
 
 ### Runtime validation: GREEN
 
@@ -34413,25 +34415,29 @@ checked field was already correctly blank via `baseRow()`. Full trace of why exa
 candidacy loop processes ascending ids, so row 5000 -- the lowest target id -- threw before most tests
 ever reached their own intended assertion): `AFLDB-ISSUE-205.md` §7a.
 
-**Not yet re-run.** Neither the DB-free tests nor the real V4 corpus correction have been re-attempted.
+**Re-run: GREEN.** `tests/nl-issue-205-corpus-fix.test.ts` 15/15 passed after the fixture fix.
 
-### Validation sequence
+### Resolution (2026-09-16)
 
-Steps 1-3 DONE (above). Not yet run:
+All seven validation steps completed end-to-end:
 
-4. `npx vitest run tests/nl-issue-205-corpus-fix.test.ts` (new correction-tool DB-free tests)
-5. `npx tsx --conditions=react-server tools/nl/fix-issue-205-comeback-taxonomy.ts --corpus
-   /home/arm/nl-stress-corpus-v4.csv --out /home/arm/nl-stress-corpus-v5.csv` (re-run, with the
-   candidacy fix) — confirm `input rows: 12000`, `output rows: 12000`, `target rows expected: 70`
+1-3. `tests/nl-parser.test.ts` 446/446, `tests/integration/nl-answers-team-club.test.ts` 35/35
+   (incl. the `q3_deficit_overcome` SQL test), `tsc --noEmit` clean.
+4. `tests/nl-issue-205-corpus-fix.test.ts` 15/15 passed.
+5. Real V4 → V5 correction: `input rows: 12000`, `output rows: 12000`, `target rows expected: 70`
    (family A 42 / family B 28), `target rows modified: 70`, `non-target rows modified: 0`.
-6. Parser-v54 parse-only (or full) run against V5 — target result, if every check above passes with no
-   surprises: **12000 scored / ~11958-12000 clean / 0-28 soft / 0 failed** (see `AFLDB-ISSUE-205.md` for
-   why the exact soft count depends on which Family B disposition the operator confirms).
-7. Direct V4 -> V5 row-by-row comparison (not the retired `nl:stress:compare`) confirming no collateral
-   movement outside the audited 70 ids.
+6. Independent operator-run V4 → V5 diff (separate from the tool's own self-check): same 12000-row id
+   set, exactly 70 changed rows, `A/B overlap: 0`, `Unexpected changed IDs: []`. New statuses `success 42
+   / decline 28`; new grains `team_match 42 / blank 28`; new metrics `q3_deficit_overcome 42 / blank 28`;
+   new failure reasons `blank 42 / unsupported_term 28`. `expected_season_from` touched on 38 of the 42
+   Family A rows (the other 4 rows' real re-parsed plans carried no season bound -- the plain, non-"since
+   YEAR" phrasing).
+7. Parser-v54 parse-only run against V5: **12000 scored / 12000 clean (100.0%) / 0 soft / 0 failed** —
+   the ideal target reached exactly.
 
-Until all seven pass, this issue is **not** resolved, `CHANGELOG.md` is **not** updated, and V4 remains
-the stable baseline (V5 is a candidate, not yet promoted).
+V5 (`/home/arm/nl-stress-corpus-v5.csv`) is now the stable regression-corpus baseline, superseding V4.
+`PARSER_VERSION` is 54. Stage 2 remains closed, not reopened by this issue. `CHANGELOG.md` updated under
+`Unreleased`. Full closing evidence: `AFLDB-ISSUE-205.md` §11.
 
 ### Correction to AFLDB-ISSUE-200's record
 

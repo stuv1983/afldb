@@ -549,6 +549,16 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // "comeback" for extractTeamMetric to see. Genuine score-checkpoint
 // questions ("leading at three quarter time") are unaffected -- the guard
 // only withholds the match when a comeback word directly follows.
+//
+// v54 refinement (same operator-validation pass, no further version bump):
+// the 3QT guard alone was incomplete -- it only stopped its OWN entry from
+// matching "three quarter time comeback"; extractScoreCheckpoint's generic
+// 'QT' entry then matched the nested substring "quarter time" inside that
+// same phrase and stripped it anyway, leaving "three comeback" (still two
+// orphaned tokens, not the intact phrase extractTeamMetric needs). The 'QT'
+// entry now also refuses a checkpoint word directly preceded by
+// "three "/"three-", so it can never re-consume what the 3QT guard just
+// withheld. Genuine Q1 checkpoints ("at quarter time") are unaffected.
 export const PARSER_VERSION = 54;
 
 // ------------------------------------------------------------------ grain

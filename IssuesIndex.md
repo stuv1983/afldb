@@ -4,23 +4,28 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
-**AFLDB-ISSUE-205 opened 2026-09-16, IN PROGRESS (Sonnet 5)** — severity: medium; area: NL search
-(`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`, `tools/nl/`). Audit of the 70 remaining
-`WRONG_FAILURE_REASON` rows found AFLDB-ISSUE-200's `TAXONOMY_DRIFT` disposition was incomplete: they are
-two unrelated families, not one benign label mismatch. **Family A (42 rows,** "biggest three quarter
-time comeback" **):** genuine parser-ordering defect — `extractScoreCheckpoint` consumed "three quarter
-time" before `extractTeamMetric` could match the already-implemented `q3_deficit_overcome` team_match
-metric, so a real, working feature silently declined. **Family B (28 rows,** "comeback from quarter
-time" **):** genuine Q1/quarter-time feature gap (no `q1_deficit_overcome` metric exists); stays
-declined, only the stale `unsupported_topic`→`unsupported_term` label needs correcting. Runtime fix
-implemented (`PARSER_VERSION` 53→54), 8 parser tests + 1 DB-backed integration test added, a guarded
-DB-backed V4→V5 corpus-correction script written (`tools/nl/fix-issue-205-comeback-taxonomy.ts`) but
-**not yet run**. **Next action:** operator runs the 6-step validation sequence in `AFLDB-ISSUE-205.md`
-§8 (`vitest run tests/nl-parser.test.ts`; the integration test; `tsc --noEmit`; the correction script
-against the real V4 corpus; a parser-v54 rerun against V5; a direct V4→V5 diff). Not resolved until all
-six pass. See `issues.md` and `AFLDB-ISSUE-205.md` for the full record.
+**AFLDB-ISSUE-205 resolved 2026-09-16** (Sonnet 5, operator-validated) — AFLDB-ISSUE-200's
+`TAXONOMY_DRIFT` disposition for the remaining 70 `WRONG_FAILURE_REASON` rows was incomplete: two
+unrelated families, not one benign label mismatch. **Family A (42 rows,** "biggest three quarter time
+comeback" **):** genuine parser-ordering defect — `extractScoreCheckpoint` consumed "three quarter time"
+before `extractTeamMetric` could match the already-implemented `q3_deficit_overcome` team_match metric.
+Fix required two rounds (a `'3QT'`-entry guard, then a `'QT'`-entry follow-up after the operator's first
+run found the first guard incomplete — a second, independent fall-through matching the same nested
+substring); `PARSER_VERSION` 53→54. **Family B (28 rows,** "comeback from quarter time" **):** genuine
+Q1/quarter-time feature gap (no `q1_deficit_overcome` metric exists, and none was added — deliberate
+scope decision); stays declined, `expected_failure_reason` corrected `unsupported_topic`→
+`unsupported_term`. Two correction-tool validation defects found and fixed along the way (both
+test/tooling-only, no parser/runtime defect): an over-broad candidacy design gated on old-state
+(`decline`+`unsupported_topic`) before question-text identity, wrongly flagging an unrelated live
+fantasy-score row; and a DB-free test fixture that leaked a filler-row default
+(`expected_grain='player_game'`) into synthetic decline rows. Operator-validated end-to-end: 446/446
+parser tests, 35/35 integration tests (incl. new `q3_deficit_overcome` SQL coverage), clean
+`tsc --noEmit`, 15/15 correction-tool tests, real V4→V5 correction (70/70 targets, 0 non-targets
+touched, independently re-verified), parser-v54 rerun against V5 = **12000 scored / 12000 clean / 0 soft
+/ 0 failed**. V5 is now the stable regression-corpus baseline, superseding V4. Stage 2 remains closed,
+not reopened. See `issues.md` and `AFLDB-ISSUE-205.md` §11 for the full record.
 
 **AFLDB-ISSUE-204 resolved 2026-09-16** (Sonnet 5, operator-validated) — guarded V3→V4 corpus
 correction for the 180-row `coverage_unavailable|fgf` stale pre-1965/1987 finals-stat coverage
@@ -185,9 +190,11 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `UNEXPECTED_DECLINE` rows removed and zero new soft rows, `PARSER_VERSION` unchanged at 53).
    **Stage 2 is now closed** — (a)-(d) all resolved. The fresh exploratory Codex corpus sweep is now in
    scope, per the original Stage 2 boundary, as a separate not-yet-opened task.
-6. **Opened 2026-09-16 as AFLDB-ISSUE-205, IN PROGRESS.** The 70 `TAXONOMY_DRIFT` rows were **not**
-   accepted diagnostic drift after all — AFLDB-ISSUE-205's audit found a real parser-ordering defect
-   silencing an already-implemented team_match metric (42 rows) plus a genuine Q1-comeback feature gap
-   (28 rows). This corrects, but does not reopen, Stage 2 itself. See `AFLDB-ISSUE-205.md`.
+6. **Opened 2026-09-16 as AFLDB-ISSUE-205, resolved 2026-09-16.** The 70 `TAXONOMY_DRIFT` rows were
+   **not** accepted diagnostic drift after all — the audit found a real parser-ordering defect silencing
+   an already-implemented team_match metric (42 rows, fixed, `PARSER_VERSION` 53→54) plus a genuine
+   Q1-comeback feature gap (28 rows, stays declined with a corrected failure-reason label). Corrects, but
+   does not reopen, Stage 2 itself. V5 corpus: 12000/12000 clean, 0 soft, 0 failed. See
+   `AFLDB-ISSUE-205.md`.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

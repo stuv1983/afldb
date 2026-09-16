@@ -1,11 +1,8 @@
 # AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows
 
-**Status:** IN PROGRESS (Sonnet 5). **Runtime is fully validated and green** (§5a): parser 446/446,
-integration 35/35 (including the `q3_deficit_overcome` SQL test), `tsc --noEmit` clean. Do not modify
-parser/runtime again unless new evidence demands it; `PARSER_VERSION` stays 54. The first real corpus-
-correction attempt then correctly failed closed on an over-broad candidacy design in the correction tool
-itself (§7a) — unrelated to the runtime fix, and fixed in the same script. **Not yet resolved.** Do not
-mark resolved, update `CHANGELOG.md`, or regenerate V5 until the validation sequence in §8 passes.
+**Status:** **RESOLVED 2026-09-16** (Sonnet 5, operator-validated). Runtime fix (`PARSER_VERSION` 53→54)
+and the guarded V4→V5 corpus correction are both operator-validated end-to-end — see §11 for the final
+closing evidence. V5 is now the stable regression-corpus baseline, superseding V4.
 
 Opened as AFLDB-ISSUE-200's Stage 2 next-task item 6 (the 70 `WRONG_FAILURE_REASON`/`TAXONOMY_DRIFT`
 rows left unaudited when Stage 2 closed). Stage 2 itself is not reopened or redefined by this issue.
@@ -364,15 +361,11 @@ blank-grain check for that same row). Every other test failed purely because of 
 `verification_level='EXPECTED_DECLINE'` was kept as a reasonable real-V4-consistent value, though
 `correctCorpus()` does not actually assert it (not one of the 7 checked fields).
 
-**Not yet re-run** — I cannot execute tests. Exact command: `npx vitest run tests/nl-issue-205-corpus-fix.test.ts`.
+**Re-run by the operator: GREEN.** `tests/nl-issue-205-corpus-fix.test.ts` 15/15 passed.
 
-**Corpus correction itself has not been re-run against the real V4 file.** Once the new DB-free tests are
-green, the next step is the real, DB-backed run (§8 step 4) — still pending.
+**Corpus correction then re-run against the real V4 file: GREEN.** See §11 for the full closing evidence.
 
-## 8. Validation sequence
-
-Steps 1-3 are **DONE, GREEN** (§5a). Steps 4-7 are not yet run; run in order, stop and report back at the
-first failure rather than proceeding.
+## 8. Validation sequence — ALL SEVEN STEPS COMPLETE, GREEN (§11)
 
 ```bash
 # 1. Focused parser tests (DB-free) -- DONE: 446/446 passed
@@ -384,41 +377,37 @@ npx vitest run tests/integration/nl-answers-team-club.test.ts
 # 3. Typecheck -- DONE: passed
 npx tsc --noEmit
 
-# 4. NEW -- correction-tool DB-free regression tests (§7a), not yet run
+# 4. Correction-tool DB-free regression tests (§7a) -- DONE: 15/15 passed
 npx vitest run tests/nl-issue-205-corpus-fix.test.ts
 
-# 5. Corpus correction — DB-backed, needs a real DATABASE_URL and
-#    --conditions=react-server (see the script's header for why).
-#    This is a RE-RUN: the first attempt correctly failed closed on
-#    row 11819 (§7a) before the candidacy fix; not yet re-attempted.
+# 5. Corpus correction — DB-backed. This is the RE-RUN after the §7a
+#    candidacy fix (the first attempt correctly failed closed on row
+#    11819 before that fix). DONE: exactly as expected below.
 npx tsx --conditions=react-server tools/nl/fix-issue-205-comeback-taxonomy.ts \
   --corpus /home/arm/nl-stress-corpus-v4.csv --out /home/arm/nl-stress-corpus-v5.csv
 
-#    Expect exactly:
-#      input rows:                12000
-#      output rows:               12000
-#      target rows expected:      70
-#        family A (Q3, expected):   42
-#        family B (Q1, expected):   28
-#      target rows modified:      70
-#      non-target rows modified:  0
+#    input rows:                12000
+#    output rows:               12000
+#    target rows expected:      70
+#      family A (Q3, expected):   42
+#      family B (Q1, expected):   28
+#    target rows modified:      70
+#    non-target rows modified:  0
 
-# 6. Parser-v54 run against V5 (parse-only or full, matching however
-#    the v53/V4 baseline run was taken)
+# 6. Parser-v54 parse-only run against V5 -- DONE: 12000 scored / 12000
+#    clean / 0 soft / 0 failed.
 npm run nl:stress -- --corpus ~/nl-stress-corpus-v5.csv --out ~/nl-stress-v54-v5
 
-# 7. Direct V4 -> V5 row-by-row comparison (not the retired
-#    nl:stress:compare) -- confirm the changed-id set is exactly the
-#    70 audited ids and nothing else moved.
+# 7. Direct V4 -> V5 row-by-row comparison -- DONE: same 12000-row id
+#    set, exactly 70 changed rows (42 A + 28 B), 0 unexpected changed
+#    ids, 0 A/B overlap.
 ```
 
-**Expected post-correction stable result**, if every step above passes with no surprises: **12000
-scored / 12000 clean / 0 soft / 0 failed.** This is reachable because both families' corrections are
-scorer-complete: Family A's plan-shape fields (§6) are exactly what the scorer checks for a `SEMANTIC`
-success row, and Family B's corrected `unsupported_term` matches the runtime's actual (unchanged, still
-correct) decline reason. If step 5 shows any Family A row still soft/failed, or any Family B row not
-exactly `unsupported_term`, treat that as new evidence — do not force the corpus green to match a wrong
-runtime result.
+**Achieved result: 12000 scored / 12000 clean / 0 soft / 0 failed** — the ideal target stated in §1 was
+reached exactly. This was reachable because both families' corrections were scorer-complete: Family A's
+plan-shape fields (§6) are exactly what the scorer checks for a `SEMANTIC` success row, and Family B's
+corrected `unsupported_term` matches the runtime's actual (unchanged, still correct) decline reason.
+Full closing evidence: §11.
 
 ## 9. Deliverable summary
 
@@ -430,9 +419,9 @@ runtime result.
    inside the same entry list; no metric regex change, no `'HT'` change, no stage reordering.
 2. **Parser version change:** `PARSER_VERSION` 53 → 54 (`src/search/nl/plan.ts`), version-history
    comment added.
-3. **Tests added:** 10 parser cases (`tests/nl-parser.test.ts`, 446/446 total suite passed) + 1
-   integration case (`tests/integration/nl-answers-team-club.test.ts`, 35/35 passed) + 16 DB-free
-   correction-tool cases (`tests/nl-issue-205-corpus-fix.test.ts`, §7a — not yet run).
+3. **Tests added, all GREEN:** 10 parser cases (`tests/nl-parser.test.ts`, 446/446 total suite passed) +
+   1 integration case (`tests/integration/nl-answers-team-club.test.ts`, 35/35 passed) + 15 DB-free
+   correction-tool cases (`tests/nl-issue-205-corpus-fix.test.ts`, 15/15 passed, §7a).
 4. **Parse-only corpus scorer requirement:** plan-shape fields only; verified-answer fields
    (`answerPrimary`/`answerValue`/`tieCount`/`resultCount`) are never required for a `SEMANTIC` row and
    are gated behind `actual.executed` even when supplied. No DB answer values needed or invented (§6).
@@ -446,13 +435,10 @@ runtime result.
    - **Family B (28 rows):** only `expected_failure_reason: unsupported_topic→unsupported_term`. Every
      other field unchanged.
 6. **Parser version stays 53 or moves to 54?** Moves to 54 — real runtime behaviour changed (§5).
-7. **Proposed worktree/branch:** `sonnet/issue-205-team-match-comeback-parser-defect` (this worktree,
-   `D:\dev\afldb-issue-205`, is already on branch `sonnet/issue-205-wrong-failure-reason-audit` — the
-   operator may rename or continue on it; the working title in `CLAUDE.md`-tracked docs has been updated
-   to reflect the real scope).
-8. **Remaining operator commands required:** steps 4-7 of §8's sequence (correction-tool DB-free tests,
-   the real V4→V5 correction re-run, the v54-vs-V5 stress run, the direct V4→V5 diff) — steps 1-3 are
-   already done and green. None of these I can run myself.
+7. **Worktree/branch:** `D:\dev\afldb-issue-205`, branch `sonnet/issue-205-wrong-failure-reason-audit` (the
+   working title predates the audit's real finding; content reflects the real scope throughout).
+8. **Operator commands:** all seven steps of §8's sequence are complete and green (§11). Nothing further
+   required to close this issue; the operator still owns commit/push per this repository's Git policy.
 
 ## 10. Risks / edge cases carried forward
 
@@ -470,3 +456,113 @@ runtime result.
 - I have not swept for other latent `TEAM_METRIC_WORDS`-vs-`extractScoreCheckpoint`/`extractPeriodSplit`/
   `extractBoundary` collisions beyond the comeback path this audit was pointed at — that would be new
   scope.
+
+## 11. Resolution (2026-09-16, operator-validated)
+
+All seven validation steps (§8) completed end-to-end with no surprises.
+
+**Runtime:**
+
+```text
+tests/nl-parser.test.ts:                            446/446 passed
+tests/integration/nl-answers-team-club.test.ts:       35/35 passed (incl. q3_deficit_overcome SQL test)
+npx tsc --noEmit:                                    passed
+```
+
+**Correction tool:**
+
+```text
+tests/nl-issue-205-corpus-fix.test.ts:                15/15 passed
+```
+
+**Real V4 → V5 correction:**
+
+```text
+input rows:                12000
+output rows:               12000
+target rows expected:      70  (family A 42, family B 28)
+target rows modified:      70
+non-target rows modified:  0
+```
+
+**Independent V4 → V5 diff** (operator-run, separate from the correction tool's own self-check):
+
+```text
+Old rows: 12000 | New rows: 12000 | Same ID set: True | Changed rows: 70
+New statuses:            success 42, decline 28
+New verification levels: SEMANTIC 42, EXPECTED_DECLINE 28
+New failure reasons:     blank 42, unsupported_term 28
+New grains:               team_match 42, blank 28
+New metrics:               q3_deficit_overcome 42, blank 28
+New aggregations:          max 42, blank 28
+Family A derived: 42 | Family B derived: 28 | A/B overlap: 0 | A+B total: 70
+Unexpected changed IDs: []
+Fields touched: expected_failure_reason 70; verification_level 42; expected_status 42;
+                expected_grain 42; expected_metric 42; expected_aggregation 42;
+                expected_club 42; expected_season_from 38
+```
+
+(`expected_season_from` touched on 38 of the 42 Family A rows, not 42 — the remaining 4 rows' real
+re-parsed plans carried no season bound, i.e. the plain, non-"since YEAR" phrasing variant. Consistent
+with the audit: only some Family A rows named a season at all.)
+
+**Parser-v54, parse-only, against V5:**
+
+```text
+12000 scored: 12000 clean (100.0%), 0 soft, 0 failed (0.0%).
+```
+
+The ideal target stated in this runbook's §1 baseline was reached exactly. V5
+(`/home/arm/nl-stress-corpus-v5.csv`) is now the stable regression-corpus baseline, superseding V4.
+
+### Summary of record
+
+1. AFLDB-ISSUE-200's original `TAXONOMY_DRIFT` disposition for these 70 rows was **incomplete**: not one
+   homogeneous benign label mismatch.
+2. **42 rows** were a real parser-ordering defect: `extractScoreCheckpoint` (checkpoint-lead extraction)
+   consumed the "three quarter time" phrase before `extractTeamMetric` could match the already-
+   implemented `q3_deficit_overcome` team_match metric against it.
+3. The first fix (a guard on the `'3QT'` entry alone) was incomplete — it exposed a second, independent
+   fall-through in the generic `'QT'` entry matching the same nested substring. Both entries now carry a
+   targeted exclusion; found and fixed within the same unmerged change.
+4. **28 rows** were genuine unsupported Q1-comeback requests ("comeback from quarter time" — end of Q1,
+   not three-quarter time). They remain declines, with `expected_failure_reason` corrected from the stale
+   `unsupported_topic` to the runtime's actual, honest `unsupported_term`.
+5. **No Q1 comeback feature was added** — a deliberate scope decision; `q1_deficit_overcome` does not
+   exist in NL search.
+6. `PARSER_VERSION` is now **54** (53 → 54, one bump covering both the initial fix and its follow-up
+   refinement).
+7. **V5 is the new clean stable regression-corpus baseline**, superseding V4.
+8. **Stage 2 remains closed** and was not reopened by this issue — this is a correction to AFLDB-ISSUE-
+   200's evidence record, not a reversal of Stage 2's closure.
+9. The stable 12,000-row corpus now scores **12000/12000 clean, 0 soft, 0 failed** under parser v54.
+
+**Two correction-tool validation defects were also found and fixed during this issue** (both test/tooling-
+only, neither a parser or runtime defect):
+
+- **Over-broad candidacy** (§7a): the correction script originally gated target candidacy on the old-state
+  fact `decline`+`unsupported_topic` before checking question-text identity, which correctly failed closed
+  on an unrelated, legitimate `unsupported_topic` family (fantasy/SuperCoach, real V4 row 11819) sharing
+  that same old-state shape. Fixed by deciding candidacy from the row's own question-text family signature
+  first, and only then verifying old-state on an already-identified candidate.
+- **Synthetic test-fixture leak** (§7a): the DB-free correction-tool test fixture's `declineRow()` helper
+  inherited a filler-row default (`expected_grain='player_game'`) into its synthetic decline rows, which
+  the correction tool's own fail-closed old-state assertion correctly caught. Fixed in the test file only;
+  no production code changed.
+
+Both are useful evidence that the correction tooling's fail-closed design worked exactly as intended at
+every stage — catching a real targeting risk (the first) and a test-data defect (the second) before
+either could reach production data.
+
+### Files changed (this issue, cumulative)
+
+- `src/search/nl/parser.ts` — `extractScoreCheckpoint`'s `'3QT'` and `'QT'` entries (runtime fix + follow-up).
+- `src/search/nl/plan.ts` — `PARSER_VERSION` 53 → 54, version-history comment.
+- `tests/nl-parser.test.ts` — 10 new cases (describe block `2a`).
+- `tests/integration/nl-answers-team-club.test.ts` — 1 new case (`q3_deficit_overcome` SQL proof).
+- `tools/nl/fix-issue-205-comeback-taxonomy.ts` — new guarded V4→V5 correction script.
+- `tests/nl-issue-205-corpus-fix.test.ts` — new, 15 DB-free correction-tool cases.
+- `AFLDB-ISSUE-205.md` — this runbook.
+- `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` — issue tracking and changelog.
+- External (not in this repository): `/home/arm/nl-stress-corpus-v5.csv`, `/home/arm/nl-stress-v54-v5/`
+  (operator-generated, retained artefacts).
