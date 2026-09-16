@@ -4,7 +4,11 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+| ID | Severity | Area | Current state | Key files / next action |
+| --- | --- | --- | --- | --- |
+| AFLDB-ISSUE-206 | High (discovery) | NL search / exploratory corpus | 29,030-row independent V1 corpus generated; parser-v54 parse-only run and ranked triage complete. 705 accepted rows show likely silent semantic errors; scorer/corpus artifacts are separated. | `AFLDB-ISSUE-206.md`, `tools/nl/generate-exploratory-corpus.mjs`, `tools/nl/triage-exploratory-corpus.mjs`. Operator validates on branch checkout and selects follow-on defects; no parser fix in this issue. |
 
 **AFLDB-ISSUE-205 resolved 2026-09-16** (Sonnet 5, operator-validated) — AFLDB-ISSUE-200's
 `TAXONOMY_DRIFT` disposition for the remaining 70 `WRONG_FAILURE_REASON` rows was incomplete: two

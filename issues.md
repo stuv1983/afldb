@@ -4,10 +4,11 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 0
+**Open issues:** 1
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
+| AFLDB-ISSUE-206 | High | NL search / exploratory corpus | First 29,030-row exploratory run and triage complete; focused test/typecheck passed | Run updated parse-only scorer on a development-host checkout with this branch, then review ranked follow-on proposals in `AFLDB-ISSUE-206.md`. |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -34449,3 +34450,14 @@ order), and the remaining 28 are a genuine feature gap rather than a diagnostic 
 itself is not reopened by this finding — AFLDB-ISSUE-200 is not redefined, and its closure stands; this
 is recorded as a correction to that issue's evidence, per the instruction not to reopen or redefine
 Stage 2.
+
+## AFLDB-ISSUE-206 — Independent large-scale NL exploratory corpus
+
+- **Status:** OPEN, discovery complete 2026-09-16; operator validation and follow-on selection pending. Severity: high because the run found accepted plans with likely wrong semantics. Area: deterministic NL search tooling and parser discovery.
+- **Baseline:** `cd0b3921`, parser v54, frozen V5 corpus 12,000 clean. V5 remains unchanged and is only an overlap reference.
+- **Implementation:** `tools/nl/generate-exploratory-corpus.mjs` produced 29,030 independent, deterministic rows (seed `2060542026`) across 25 families; 24,680 intended supported, 2,850 intentionally unsupported, 1,500 audit-required. Exact/normalized duplicates and V5 overlap are all zero. SHA256 `45c4dabb48703b4b32dcd708ec670dba4524899adf81cfd90dc843ea28229bd0`. `tools/nl/corpus.ts` and `stress-test.ts` gained audit-row handling; the existing scorer test was extended. `tools/nl/triage-exploratory-corpus.mjs` groups first-run evidence without editing expectations. Coverage map, full distribution, ranked triage and validation commands are in `AFLDB-ISSUE-206.md`.
+- **First run:** parse-only on `afldb_dev` entity directory, corpus `/home/arm/nl-exploratory-v1.csv`, output `/home/arm/nl-exploratory-v1-run`. The host checkout differed in commit but selected parser-semantic source hashes matched local v54. Its older scorer included audit rows; corrected headline after excluding them is **27,530 scored / 10,874 clean / 15,275 soft / 1,381 failed**, with 1,500 audit-required rows unscored.
+- **Ranked discoveries:** 281 accepted grouped-result plans swapped `≥` and `>` between the result count and margin filter; 134 accepted after-siren plans assigned a `for` club as opponent; 117 accepted checkpoint plans dropped the subject club after a leading opponent; 173 accepted head-to-head questions requesting the winner used a generic record intent. These are 705 unique likely silent semantic errors, subject to focused follow-on verification. Honest declines are separate. The 1,381 old-scorer hard rows include 779 generator specification errors and 351 canonical-name scorer artifacts, all documented rather than called parser bugs.
+- **Known generator limitation:** `after YEAR` was asserted as supported in some success templates, but `extractSeasons` does not implement it. Symmetric “versus” was wrongly asserted as directional, and achievement summaries asserted `agg=count` where the descriptor is the contract. Do not adjust V1 expectations to fit the observed parser; any correction belongs in a versioned next corpus.
+- **Validation:** deterministic CSV replay and Node syntax checks passed; the focused stress-corpus suite passed 53/53 and `npm run typecheck` passed after an offline local install. The updated scorer still needs a parse-only run on a development-host checkout containing this branch; automatic approval review rejected transferring repository source for that run. The first-run triage artifacts are `/home/arm/nl-exploratory-v1-run/triage.md` and `triage.json`.
+- **Next action:** operator runs the updated scorer on a checkout containing this branch, then reviews the ordered follow-on proposals in `AFLDB-ISSUE-206.md`. No ISSUE-207+ IDs are created yet. No parser behaviour, `PARSER_VERSION`, V5 row or production data changed.

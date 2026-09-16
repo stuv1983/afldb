@@ -97,7 +97,7 @@ export type StressExpectation = {
   verificationLevel: StressVerificationLevel;
   equivalenceGroup: string;
   question: string;
-  status: 'success' | 'decline';
+  status: 'success' | 'decline' | 'audit';
   grain?: NlGrain;
   mode?: 'single' | 'sum';
   /** Already translated into this codebase's metric names. */
@@ -132,6 +132,7 @@ const FIRST_SEASON = 1897;
 const MATCH_TYPES: Record<string, NlMatchType> = {
   final: 'finals',
   finals: 'finals',
+  wildcard_final: 'wildcard_final',
   grand_final: 'grand_final',
   preliminary_final: 'preliminary_final',
   semi_final: 'semi_final',
@@ -202,7 +203,8 @@ export function toExpectation(row: Record<string, string>): StressExpectation | 
   const question = (row.question ?? '').trim();
   if (!question) return null;
 
-  const status = row.expected_status === 'decline' ? 'decline' : 'success';
+  const status = row.expected_status === 'audit' ? 'audit'
+    : row.expected_status === 'decline' ? 'decline' : 'success';
   const rawMetric = row.expected_metric || undefined;
   const resultSide = row.expected_result || undefined;
 
@@ -409,6 +411,10 @@ export function scoreRow(
     findings.push(finding(cls, 'hard', expected.status, actual.errorMessage ?? 'error'));
     return findings;
   }
+
+  // Exploratory rows with an unresolved interpretation are observations,
+  // never a semantic pass/fail oracle. Parser crashes remain reportable.
+  if (expected.status === 'audit') return findings;
 
   // ---- status ------------------------------------------------------------
 

@@ -19,6 +19,7 @@ next-env.d.ts
 
 # Agent/editor session state
 .claude/
+/.tmp/issue-206/
 
 # Environment / secrets — never commit
 .env

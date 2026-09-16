@@ -120,6 +120,7 @@ describe('corpus vocabulary is translated into plan vocabulary', () => {
   it('match type "final" is this codebase\'s "finals"', () => {
     expect(toExpectation({ id: '1', question: 'q', expected_match_type: 'final' })?.matchType).toBe('finals');
     expect(toExpectation({ id: '1', question: 'q', expected_match_type: 'grand_final' })?.matchType).toBe('grand_final');
+    expect(toExpectation({ id: '1', question: 'q', expected_match_type: 'wildcard_final' })?.matchType).toBe('wildcard_final');
   });
 
   it('boundary "first" is the debut event', () => {
@@ -153,6 +154,13 @@ describe('corpus vocabulary is translated into plan vocabulary', () => {
     const corpus = readCorpus('id,question,expected_status\n7,most goals,success\n');
     expect(corpus).toHaveLength(1);
     expect(corpus[0]).toMatchObject({ id: 7, question: 'most goals', status: 'success' });
+  });
+
+  it('keeps uncertain exploratory rows unscored even when parsing differs', () => {
+    const e = toExpectation({ id: '2', question: 'ambiguous surname', expected_status: 'audit' });
+    expect(e?.status).toBe('audit');
+    expect(scoreRow(e!, observed({ status: 'decline', plan: null }))).toEqual([]);
+    expect(classes(e!, observed({ status: 'error', plan: null, errorMessage: 'probe' }))).toEqual(['INTERNAL_ERROR']);
   });
 });
 

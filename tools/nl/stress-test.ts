@@ -271,12 +271,12 @@ function spread<T>(items: T[], count: number): T[] {
 
 // ---------------------------------------------------------------- reporting
 
-type Scored = RunRecord & { findings: StressFinding[]; verdict: ReturnType<typeof verdict> };
+type Scored = RunRecord & { findings: StressFinding[]; verdict: ReturnType<typeof verdict> | 'audit' };
 
 function score(records: RunRecord[], index?: EntityIndex): Scored[] {
   return records.map((record) => {
     const findings = scoreRow(record.expected, record.actual, index);
-    return { ...record, findings, verdict: verdict(findings) };
+    return { ...record, findings, verdict: record.expected.status === 'audit' && findings.length === 0 ? 'audit' : verdict(findings) };
   });
 }
 
@@ -328,6 +328,8 @@ function table(header: string[], rows: (string | number)[][]): string {
 }
 
 function buildReport(scored: Scored[], meta: Record<string, string | number>): string {
+  const audit = scored.filter((s) => s.verdict === 'audit').length;
+  scored = scored.filter((s) => s.verdict !== 'audit');
   const total = scored.length;
   const passed = scored.filter((s) => s.verdict === 'pass').length;
   const softFailed = scored.filter((s) => s.verdict === 'soft_fail').length;
@@ -351,6 +353,7 @@ function buildReport(scored: Scored[], meta: Record<string, string | number>): s
       ['Total', total, '100%'],
     ],
   ));
+  if (audit > 0) out.push(`\n${audit} audit-required rows were parsed and recorded but were not scored.`);
   out.push('');
   out.push(
     'A row fails only on a **hard** finding -- an interpretation that was confidently wrong. '
@@ -496,7 +499,7 @@ function buildReport(scored: Scored[], meta: Record<string, string | number>): s
 
 function buildFailuresCsv(scored: Scored[]): string {
   const rows = scored
-    .filter((s) => s.verdict !== 'pass')
+    .filter((s) => s.verdict === 'soft_fail' || s.verdict === 'fail')
     .map((s) => ({
       id: s.expected.id,
       verdict: s.verdict,
@@ -532,6 +535,9 @@ function buildFailuresCsv(scored: Scored[]): string {
 }
 
 function buildSummary(scored: Scored[], meta: Record<string, string | number>) {
+  const inputRows = scored.length;
+  const auditRequired = scored.filter((s) => s.verdict === 'audit').length;
+  scored = scored.filter((s) => s.verdict !== 'audit');
   const total = scored.length;
   const byClass: Record<string, number> = {};
   for (const s of scored) {
@@ -542,6 +548,8 @@ function buildSummary(scored: Scored[], meta: Record<string, string | number>) {
   }
   return {
     ...meta,
+    inputRows,
+    auditRequired,
     total,
     pass: scored.filter((s) => s.verdict === 'pass').length,
     softFail: scored.filter((s) => s.verdict === 'soft_fail').length,
@@ -562,12 +570,13 @@ function writeOutputs(
   writeFileSync(join(OUT_DIR, 'failures.csv'), `﻿${buildFailuresCsv(scored)}`, 'utf8');
   writeFileSync(join(OUT_DIR, 'summary.json'), `${JSON.stringify(buildSummary(scored, meta), null, 2)}\n`, 'utf8');
 
-  const total = scored.length;
+  const audit = scored.filter((s) => s.verdict === 'audit').length;
+  const total = scored.length - audit;
   const pass = scored.filter((s) => s.verdict === 'pass').length;
   const soft = scored.filter((s) => s.verdict === 'soft_fail').length;
   const fail = scored.filter((s) => s.verdict === 'fail').length;
   process.stdout.write(
-    `\n${total} scored: ${pass} clean (${pct(pass, total)}), ${soft} soft, ${fail} failed (${pct(fail, total)}).\n`
+    `\n${total} scored (${audit} audit-required unscored): ${pass} clean (${pct(pass, total)}), ${soft} soft, ${fail} failed (${pct(fail, total)}).\n`
     + `Report: ${join(OUT_DIR, 'report.md')}\n`,
   );
 }
