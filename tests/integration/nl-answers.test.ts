@@ -364,6 +364,95 @@ describe('player_career: boundary questions match hand-written SQL', () => {
   });
 });
 
+// AFLDB-ISSUE-201: a season range beside a boundary must be evaluated
+// against the player's TRUE debut/last-game season (c.debut_season /
+// c.final_season), never against "does this player have any match in the
+// season range" -- the latter would silently answer a different, broader
+// question for anyone with a long career spanning the requested range. The
+// counter-example queries below are existence-checked against the real
+// afldb_test fixture (like the boundary block above) precisely so this
+// cannot pass by accident: if such a player exists in the data, a plan
+// that filtered matches before selecting the boundary would wrongly
+// include them, and this test would catch it.
+describe('AFLDB-ISSUE-201: boundary questions carry a season range against the true boundary', () => {
+  it('debut/grand_final "since" matches c.debut_season, not any match in range', async () => {
+    const { total, rows } = await career(plan({
+      boundary: { event: 'debut', where: 'grand_final' },
+      scope: { seasonMin: 2000 },
+    }), 200);
+
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT pms.player_id) FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE pms.career_game_no = 1 AND m.round_type = 'grand_final' AND c.debut_season >= 2000
+    `;
+    expect(total).toBe(Number(expected.count));
+
+    const [counterExample] = await sql<{ playerId: number }[]>`
+      SELECT pms.player_id AS "playerId" FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE pms.career_game_no = 1 AND m.round_type = 'grand_final'
+         AND c.debut_season < 2000
+         AND EXISTS (
+           SELECT 1 FROM player_match_stats pms2 JOIN matches m2 ON m2.id = pms2.match_id
+            WHERE pms2.player_id = pms.player_id AND m2.season >= 2000
+         )
+       LIMIT 1
+    `;
+    if (counterExample) {
+      expect(rows.some((row) => row.playerId === counterExample.playerId)).toBe(false);
+    }
+  });
+
+  it('last_game/grand_final "before" matches c.final_season, not any match in range', async () => {
+    const { total, rows } = await career(plan({
+      boundary: { event: 'last_game', where: 'grand_final' },
+      scope: { seasonMax: 1949 },
+    }), 200);
+
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT pms.player_id) FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE m.match_date = c.last_match_date AND m.round_type = 'grand_final' AND c.final_season <= 1949
+    `;
+    expect(total).toBe(Number(expected.count));
+
+    const [counterExample] = await sql<{ playerId: number }[]>`
+      SELECT pms.player_id AS "playerId" FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE m.match_date = c.last_match_date AND m.round_type = 'grand_final'
+         AND c.final_season > 1949
+         AND EXISTS (
+           SELECT 1 FROM player_match_stats pms2 JOIN matches m2 ON m2.id = pms2.match_id
+            WHERE pms2.player_id = pms.player_id AND m2.season <= 1949
+         )
+       LIMIT 1
+    `;
+    if (counterExample) {
+      expect(rows.some((row) => row.playerId === counterExample.playerId)).toBe(false);
+    }
+  });
+
+  it('exact-year debut/final (non-grand) also carries the range', async () => {
+    const { total } = await career(plan({
+      boundary: { event: 'debut', where: 'final' },
+      scope: { seasonMin: 1990, seasonMax: 1990 },
+    }), 200);
+
+    const [expected] = await sql<{ count: string }[]>`
+      SELECT count(DISTINCT pms.player_id) FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN player_career_stats c ON c.player_id = pms.player_id
+       WHERE pms.career_game_no = 1 AND m.is_finals_series AND c.debut_season = 1990
+    `;
+    expect(total).toBe(Number(expected.count));
+  });
+});
+
 describe('player_career: live_only stat metrics use the correct SUM path', () => {
   it('"most clangers" (a live_only stat) matches a hand-written SUM over player_match_stats', async () => {
     const { lead } = await career(plan({

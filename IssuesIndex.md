@@ -4,7 +4,20 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-201** — Career-boundary season ranges rejected by the `player_career` validator.
+Severity: medium (598-row corpus-confirmed correctness defect; no data-integrity/security exposure).
+Area: natural-language search (`src/search/nl/plan.ts`, `src/db/queries/nl/player-career.ts`). State:
+**implemented 2026-09-16 (Sonnet 5), awaiting operator validation** — `validatePlan` now exempts a
+`raw.boundary` plan from the season-range rejection, `player-career.ts` now compiles the range
+against `c.debut_season`/`c.final_season`, `PARSER_VERSION` 50 → 51, regression tests added to
+`tests/nl-parser.test.ts`/`tests/nl-plan.test.ts`/`tests/integration/nl-answers.test.ts`. First of
+AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item 5a). Next action: operator
+runs `AFLDB-ISSUE-201.md` §7 (focused unit tests, DB-backed integration test, `tsc --noEmit`, stable
+v51 corpus rerun) and confirms `PLANNER_VALIDATOR_BUG`/`coverage_unavailable|boundary` 598 → 0 with no
+collateral movement in the other five ISSUE-200 clusters; then mark resolved and add the
+`CHANGELOG.md` entry. See `issues.md` and `AFLDB-ISSUE-201.md` for the full record.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search

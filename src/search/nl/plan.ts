@@ -512,7 +512,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // surname families that previously ranked a wrong answer now correctly
 // decline; full-name mentions of such players that previously degraded to
 // a given-name-only guess now resolve to the named player.
-export const PARSER_VERSION = 50;
+// v51 -- AFLDB-ISSUE-201: a player_career plan carrying raw.boundary is now
+// exempt from the generic season-range rejection (validatePlan), and
+// player-career.ts's conditionsWhere now compiles that range against
+// c.debut_season (event 'debut') or c.final_season (event 'last_game') --
+// the same precomputed true-boundary columns debuted_between already
+// trusts. "players whose first game was a grand final in/since/before
+// YEAR" now succeeds instead of declining coverage_unavailable ("A career
+// question cannot be restricted to a season range."); an ordinary career
+// aggregate with a season range and no boundary (e.g. "most career goals
+// since 2000") is unaffected and still refuses.
+export const PARSER_VERSION = 51;
 
 // ------------------------------------------------------------------ grain
 
@@ -2236,8 +2246,21 @@ export function validatePlan(raw: NlQueryPlan): NlQueryPlan | NlValidationError 
   // that merely exists consumes nothing, which is how "players with at least
   // 3 grand finals since 2000" came to count grand finals over whole careers
   // (ISSUE-110 finding A).
+  //
+  // AFLDB-ISSUE-201: raw.boundary is a second, independent range-owning
+  // mechanism, invisible to careerPredicatesOwnSeasonRange because it is not
+  // a GridAxisState/careerPredicates entry. "players whose first game was a
+  // grand final since 2000" names *when the true debut occurred*, not a
+  // career-aggregation window -- the range belongs to the boundary event
+  // (compiled in player-career.ts against c.debut_season/c.final_season),
+  // never to an unrelated condition/predicate that happens to sit alongside
+  // it. raw.boundary is independently validated a few lines above (event/
+  // where/grain), so this cannot be spoofed into exempting an ordinary
+  // aggregate: a plan with no boundary still falls through to the rejection
+  // below exactly as before.
   if (
     raw.grain === 'player_career' && !careerPredicatesOwnSeasonRange(raw.careerPredicates)
+    && !raw.boundary
     && (raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined)
   ) {
     return { error: 'A career question cannot be restricted to a season range.' };

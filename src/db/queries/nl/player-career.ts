@@ -132,9 +132,31 @@ function boundarySql(boundary: NlBoundary): SqlFragment {
                        WHERE pms.player_id = p.id AND m.match_date = c.last_match_date AND ${finalCondition})`;
 }
 
+/**
+ * AFLDB-ISSUE-201: "since"/"before"/"in" YEAR beside a boundary names when
+ * the player's TRUE debut/last game happened, not a window to search
+ * matches in before picking one. c.debut_season/c.final_season are
+ * precomputed, single-valued facts about that real boundary (the same
+ * columns careerRowSelect already projects and debuted_between already
+ * filters in grid-solver.ts), so ANDing a range onto one of them can only
+ * additionally require the already-fixed true boundary to fall in range --
+ * it cannot change which game the boundary is, unlike a range applied to
+ * player_match_stats/matches rows before the boundary is chosen.
+ */
+function boundarySeasonWhere(boundary: NlBoundary, scope: NlQueryPlan['scope']): SqlFragment[] {
+  const seasonColumn = boundary.event === 'debut' ? sql`c.debut_season` : sql`c.final_season`;
+  const clauses: SqlFragment[] = [];
+  if (scope.seasonMin !== undefined) clauses.push(sql`${seasonColumn} >= ${scope.seasonMin}`);
+  if (scope.seasonMax !== undefined) clauses.push(sql`${seasonColumn} <= ${scope.seasonMax}`);
+  return clauses;
+}
+
 function conditionsWhere(plan: NlQueryPlan): SqlFragment[] {
   const clauses: SqlFragment[] = plan.careerConditions.map((condition) => conditionSql(condition, plan));
-  if (plan.boundary) clauses.push(boundarySql(plan.boundary));
+  if (plan.boundary) {
+    clauses.push(boundarySql(plan.boundary));
+    clauses.push(...boundarySeasonWhere(plan.boundary, plan.scope));
+  }
   // A single named player ("Nick Dal Santo most games", "Dusty's debut
   // was a grand final"). Pre-existing gap, not new: player_career had no
   // player filter at all before CAREER_ONLY_METRICS started routing

@@ -391,6 +391,57 @@ describe('validatePlan', () => {
     }))).toHaveProperty('error');
   });
 
+  // AFLDB-ISSUE-201: the season range names when the boundary event itself
+  // happened, not a career-aggregation window -- raw.boundary must exempt
+  // the plan from the generic player_career season-range rejection
+  // (plan.ts:2239-2244) the same way an owning careerPredicates builder
+  // (e.g. debuted_between) already does. Uses metric: null / agg: list,
+  // the real shape parseNlQuestion produces for these questions (see
+  // tests/nl-parser.test.ts "AFLDB-ISSUE-201: boundary plus a season
+  // range").
+  describe('AFLDB-ISSUE-201: a boundary owns its own season range', () => {
+    const boundaryListPlan = { metric: null, agg: { kind: 'list' as const } };
+
+    it.each([
+      ['exact year', { seasonMin: 1897, seasonMax: 1897 }],
+      ['since', { seasonMin: 2000 }],
+      ['before', { seasonMax: 1949 }],
+    ] as const)('accepts a debut/grand_final boundary with a season range (%s)', (_label, scope) => {
+      const result = validatePlan(basePlan({
+        ...boundaryListPlan,
+        boundary: { event: 'debut', where: 'grand_final' },
+        scope,
+      }));
+      expect('error' in result).toBe(false);
+    });
+
+    it('accepts last_game with a season range', () => {
+      const result = validatePlan(basePlan({
+        ...boundaryListPlan,
+        boundary: { event: 'last_game', where: 'grand_final' },
+        scope: { seasonMin: 2000 },
+      }));
+      expect('error' in result).toBe(false);
+    });
+
+    it('accepts the plain "final" boundary target with a season range', () => {
+      const result = validatePlan(basePlan({
+        ...boundaryListPlan,
+        boundary: { event: 'debut', where: 'final' },
+        scope: { seasonMin: 2000 },
+      }));
+      expect('error' in result).toBe(false);
+    });
+
+    // The exception is boundary-only: no career predicate gained a new
+    // season-owning path, and a plan with neither a boundary nor an
+    // owning predicate must still refuse exactly as before.
+    it('does not broaden the exemption to a boundary-free plan', () => {
+      const result = validatePlan(basePlan({ ...boundaryListPlan, scope: { seasonMin: 2000 } }));
+      expect(result).toEqual({ error: 'A career question cannot be restricted to a season range.' });
+    });
+  });
+
   it('rejects a malformed entity reference', () => {
     expect(validatePlan(basePlan({
       scope: { clubFor: { organizationId: 0, slug: 'x', name: 'X' } },
