@@ -25,10 +25,15 @@
  * (a plan.ts metric key, a grain name). Two examples:
  *
  *   - The Ablett per-row metric (goals/games/disposals/marks/tackles) is
- *     not invented here: it is copied verbatim from the corresponding
- *     Jones row (id + 25), which the runbook records as laid out in the
- *     identical one-metric-per-id order and which this script never
- *     modifies.
+ *     read from that row's OWN question text (a strict, single-word match
+ *     against the five audited metric words), then cross-checked against
+ *     an explicit audited id-to-metric map before being used. Operator
+ *     validation on the real corpus (2026-09-16) disproved an earlier
+ *     version of this script that read the metric from the corresponding
+ *     Jones row instead -- Jones rows carry no machine-readable
+ *     expected_metric at all, decline or otherwise. Jones is never read
+ *     for this or any other purpose; it stays a genuine, untouched
+ *     decline.
  *   - expected_mode, and whether a row should rank with 'max' or a
  *     question-stated 'top N', is confirmed against an already-passing
  *     "mirror" row elsewhere in the same corpus with the same grain
@@ -42,9 +47,11 @@
  * Every invariant below aborts the whole run with a non-zero exit and
  * writes nothing: a wrong row count, a duplicate or missing id, a target
  * row not currently expected_status=decline, a target id colliding with
- * one of the seven surname groups the issue explicitly keeps untouched, a
- * missing mirror row, or (as a final self-check) any row outside the 173
- * changing at all.
+ * one of the seven surname groups the issue explicitly keeps untouched, an
+ * Ablett question naming zero or more than one audited metric word, an
+ * Ablett question's derived metric disagreeing with the audited id-to-
+ * metric map, a missing mirror row, or (as a final self-check) any row
+ * outside the 173 changing at all.
  *
  * See AFLDB-ISSUE-199.md and tools/nl/README.md for the full corpus
  * schema and the operator's before/after validation procedure.
@@ -77,8 +84,6 @@ type TargetRow = {
   club?: string;
   /** coach_record only -- a literal plan.ts metric key (plan.ts:972-973), never aliased. */
   metric?: 'games' | 'wins';
-  /** player_career (Ablett) only -- the Jones row this id mirrors one-for-one. */
-  jonesTemplateId?: number;
 };
 
 function range(from: number, to: number): number[] {
@@ -90,23 +95,44 @@ function range(from: number, to: number): number[] {
 const ABLETT_IDS = range(11601, 11605);
 
 /**
+ * The five metric words this issue's evidence audits, and exactly which
+ * Ablett id each one belongs to (AFLDB-ISSUE-199.md S4a: "Ablett most
+ * goals" / "Ablett most games" / ... one row per metric). A row's own
+ * question text must name exactly one of these words, and it must be the
+ * one this map says that id carries -- both read from the corpus at run
+ * time, this map only confirms them, per the issue's own instruction not
+ * to let an unexpected corpus text be silently overridden.
+ */
+const ABLETT_METRIC_WORDS = ['goals', 'games', 'disposals', 'marks', 'tackles'] as const;
+
+const AUDITED_ABLETT_METRIC_BY_ID: Readonly<Record<number, (typeof ABLETT_METRIC_WORDS)[number]>> = {
+  11601: 'goals',
+  11602: 'games',
+  11603: 'disposals',
+  11604: 'marks',
+  11605: 'tackles',
+};
+
+/**
  * Rows the issue explicitly requires to stay untouched (genuine declines).
  * Checked defensively against TARGETS below so a range typo cannot make
- * this script silently correct a row it was told to leave alone.
+ * this script silently correct a row it was told to leave alone. Jones
+ * (11626-11630) is never read by this script for any purpose -- it is
+ * listed here only as a preserved id range, the same as the other six.
  */
 const PRESERVED_DECLINE_RANGES: readonly (readonly [number, number])[] = [
   [11606, 11610], // Johnson
   [11611, 11615], // Brown
   [11616, 11620], // Smith
   [11621, 11625], // Williams
-  [11626, 11630], // Jones (also the Ablett metric-order template, read-only)
+  [11626, 11630], // Jones
   [11636, 11640], // Wilson
   [11646, 11650], // Anderson
 ];
 
 const TARGETS = new Map<number, TargetRow>();
 for (const id of ABLETT_IDS) {
-  TARGETS.set(id, { group: 'ablett', grain: 'player_career', jonesTemplateId: id + 25 });
+  TARGETS.set(id, { group: 'ablett', grain: 'player_career' });
 }
 for (const id of range(11651, 11678)) TARGETS.set(id, { group: 'adelaide_winning_streak', grain: 'team_streak', club: 'Adelaide' });
 for (const id of range(11679, 11706)) TARGETS.set(id, { group: 'adelaide_losing_streak', grain: 'team_streak', club: 'Adelaide' });
@@ -121,6 +147,33 @@ for (const id of range(11791, 11818)) TARGETS.set(id, { group: 'adelaide_wins_co
 export function detectAggregation(question: string): { aggregation: 'max' | 'top_n'; topN?: number } {
   const match = question.match(/\btop\s+(\d+)\b/i);
   return match ? { aggregation: 'top_n', topN: Number(match[1]) } : { aggregation: 'max' };
+}
+
+/**
+ * The Ablett row's own question text is the only source for its metric --
+ * never a sibling row, never this file's own audited map by itself. The
+ * map (AUDITED_ABLETT_METRIC_BY_ID) only verifies what the question said;
+ * an unexpected word, more than one word, or a word that disagrees with
+ * the audited id all fail closed rather than pick a side.
+ */
+export function deriveAblettMetric(id: number, question: string): (typeof ABLETT_METRIC_WORDS)[number] {
+  const found = ABLETT_METRIC_WORDS.filter((word) => new RegExp(`\\b${word}\\b`, 'i').test(question));
+  if (found.length !== 1) {
+    throw new Error(
+      `Ablett row ${id}: question must name exactly one of goals/games/disposals/marks/tackles, found `
+      + `[${found.join(', ') || 'none'}] in "${question}". Refusing to guess.`,
+    );
+  }
+  const derived = found[0];
+  const audited = AUDITED_ABLETT_METRIC_BY_ID[id];
+  if (!audited) throw new Error(`Internal error: id ${id} has no audited Ablett metric mapping.`);
+  if (derived !== audited) {
+    throw new Error(
+      `Ablett row ${id}: question names metric "${derived}", but the audited id-to-metric map expects `
+      + `"${audited}" for this id. Refusing to guess.`,
+    );
+  }
+  return derived;
 }
 
 export type CorrectionSummary = {
@@ -226,17 +279,11 @@ export function correctCorpus(inputCsvText: string): { outputCsvText: string; su
     let topN: number | undefined;
 
     if (target.grain === 'player_career') {
-      const jonesIndex = idToIndex.get(target.jonesTemplateId!);
-      if (jonesIndex === undefined) throw new Error(`Ablett row ${id}: template row ${target.jonesTemplateId} not found in corpus.`);
-      const jonesRawMetric = originalRecords[jonesIndex].expected_metric;
-      const jonesMetric = expectations[jonesIndex].metric;
-      if (!jonesRawMetric || !jonesMetric) {
-        throw new Error(`Ablett row ${id}: template row ${target.jonesTemplateId} carries no expected_metric to mirror. Refusing to guess.`);
-      }
-      metricRaw = jonesRawMetric;
-      mirrorIndex = findMirror((exp) => exp.grain === 'player_career' && exp.metric === jonesMetric && exp.aggregation === 'max');
+      const derivedMetric = deriveAblettMetric(id, question);
+      metricRaw = derivedMetric;
+      mirrorIndex = findMirror((exp) => exp.grain === 'player_career' && exp.metric === derivedMetric && exp.aggregation === 'max');
       if (mirrorIndex === undefined) {
-        throw new Error(`Ablett row ${id}: no already-passing player_career/max/${jonesMetric} row exists to confirm this shape. Refusing to guess.`);
+        throw new Error(`Ablett row ${id}: no already-passing player_career/max/${derivedMetric} row exists to confirm this shape. Refusing to guess.`);
       }
     } else if (target.grain === 'team_streak') {
       ({ aggregation, topN } = detectAggregation(question));

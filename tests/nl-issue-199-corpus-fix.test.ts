@@ -14,7 +14,7 @@ import { toCsv } from '@/lib/csv';
 
 import { parseCsv } from '../tools/nl/corpus';
 import {
-  assertOutputPathIsSafe, correctCorpus, detectAggregation,
+  assertOutputPathIsSafe, correctCorpus, deriveAblettMetric, detectAggregation,
 } from '../tools/nl/fix-issue-199-stale-expectations';
 
 // ------------------------------------------------------------------ fixture
@@ -87,13 +87,14 @@ function buildRows(): Row[] {
     });
   }
 
-  // Jones -- 11626-11630, a genuine decline the script must never touch, and the Ablett metric template.
+  // Jones -- 11626-11630, a genuine decline the script must never touch or read from. Real operator
+  // validation (2026-09-16) found Jones rows carry no machine-readable expected_metric at all, decline
+  // or otherwise -- reproduced here as a blank column so a regression back to reading it is caught.
   for (const [index, id] of range(11626, 11630).entries()) {
     rows.set(id, {
       ...baseRow(id),
       question: `Who among the Joneses has the most ${ABLETT_METRIC_BY_OFFSET[index]}?`,
-      expected_status: 'decline', expected_grain: '', expected_mode: '',
-      expected_metric: ABLETT_METRIC_BY_OFFSET[index],
+      expected_status: 'decline', expected_grain: '', expected_mode: '', expected_metric: '',
       expected_aggregation: '', verification_level: 'EXPECTED_DECLINE', expected_failure_reason: 'ambiguity',
     });
   }
@@ -163,7 +164,7 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     const outputRows = parseBack(outputCsvText);
     const byId = new Map(outputRows.map((row) => [Number(row.id), row]));
 
-    // Ablett goals row mirrors the Jones template's metric verbatim.
+    // Ablett goals row derives its metric from its own question text.
     const ablettGoals = byId.get(11601)!;
     expect(ablettGoals.expected_status).toBe('success');
     expect(ablettGoals.expected_grain).toBe('player_career');
@@ -175,10 +176,10 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     const ablettTackles = byId.get(11605)!;
     expect(ablettTackles.expected_metric).toBe('tackles');
 
-    // Jones (the template) is a preserved decline and must not have moved.
+    // Jones is a preserved decline, untouched and never read for its (blank) expected_metric.
     const jonesGoals = byId.get(11626)!;
     expect(jonesGoals.expected_status).toBe('decline');
-    expect(jonesGoals.expected_metric).toBe('goals');
+    expect(jonesGoals.expected_metric).toBe('');
 
     const adelaideStreak = byId.get(11651)!;
     expect(adelaideStreak.expected_status).toBe('success');
@@ -257,6 +258,67 @@ describe('AFLDB-ISSUE-199 correctCorpus', () => {
     const mirrorIndex = rows.findIndex((row) => row.id === '6');
     rows[mirrorIndex] = { ...rows[mirrorIndex], expected_grain: 'player_game' };
     expect(() => correctCorpus(buildCsv(rows))).toThrow(/team_streak.*Refusing to guess/s);
+  });
+
+  it('derives all five Ablett metrics from their own question text, ignoring blank Jones expected_metric', () => {
+    const rows = buildRows();
+    // Confirms the fixture actually reproduces the real DEV failure mode: Jones carries no metric.
+    for (const id of range(11626, 11630)) {
+      expect(rows.find((row) => row.id === String(id))!.expected_metric).toBe('');
+    }
+
+    const { outputCsvText } = correctCorpus(buildCsv(rows));
+    const byId = new Map(parseBack(outputCsvText).map((row) => [Number(row.id), row]));
+    const expectedByOffset = ABLETT_METRIC_BY_OFFSET;
+    range(11601, 11605).forEach((id, offset) => {
+      expect(byId.get(id)!.expected_metric).toBe(expectedByOffset[offset]);
+    });
+  });
+
+  it('fails closed when an Ablett question names an unaudited metric', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11601');
+    rows[index] = { ...rows[index], question: 'Who among the Abletts has the most kicks?' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11601.*exactly one of goals\/games\/disposals\/marks\/tackles/s);
+  });
+
+  it('fails closed when an Ablett question names more than one audited metric', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11601');
+    rows[index] = { ...rows[index], question: 'Who among the Abletts has the most goals and games?' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11601.*exactly one of/s);
+  });
+
+  it('fails closed when a question-derived metric disagrees with the audited id-to-metric map', () => {
+    const rows = buildRows();
+    const index = rows.findIndex((row) => row.id === '11601'); // audited as "goals"
+    rows[index] = { ...rows[index], question: 'Who among the Abletts has the most tackles?' };
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/11601.*names metric "tackles".*expects "goals"/s);
+  });
+
+  it('leaves Jones rows byte-identical regardless of their blank expected_metric', () => {
+    const rows = buildRows();
+    const { outputCsvText } = correctCorpus(buildCsv(rows));
+    const outputRows = parseBack(outputCsvText);
+    for (const id of range(11626, 11630)) {
+      const index = rows.findIndex((row) => row.id === String(id));
+      expect(outputRows[index]).toEqual(rows[index]);
+    }
+  });
+});
+
+describe('deriveAblettMetric', () => {
+  it('reads the metric from the question and confirms it against the audited map', () => {
+    expect(deriveAblettMetric(11602, 'Who among the Abletts has played the most games?')).toBe('games');
+  });
+
+  it('refuses a question naming zero audited metric words', () => {
+    expect(() => deriveAblettMetric(11601, 'Who among the Abletts was best?')).toThrow(/exactly one of/);
+  });
+
+  it('refuses a question whose named metric disagrees with the audited id', () => {
+    expect(() => deriveAblettMetric(11601, 'Who among the Abletts has the most marks?'))
+      .toThrow(/names metric "marks".*expects "goals"/s);
   });
 });
 

@@ -33021,9 +33021,14 @@ gaps requiring implementation-time DB verification (not fabricated): `AFLDB-ISSU
 target ids from this issue's audited groups and, for every field the runbook could not evidence
 directly from this Windows session, derives it at *run time* from the real corpus rather than from a
 guess:
-- **Ablett metric** (goals/games/disposals/marks/tackles per id): copied verbatim from the
-  corresponding Jones row (`id + 25`), which the runbook records as laid out in the same one-metric-
-  per-id order and which the script never modifies.
+- **Ablett metric** (goals/games/disposals/marks/tackles per id): read from that Ablett row's OWN
+  question text (a strict single-word match against the five audited metric words), then verified
+  against an explicit audited id-to-metric map before being used; the map only confirms what the
+  question said, it never overrides it. **Revised 2026-09-16** after real operator validation on the
+  dev host failed closed as designed: `Ablett row 11601: template row 11626 carries no expected_metric
+  to mirror.` The original design read the metric from the corresponding Jones row (`id + 25`); Jones
+  rows carry no machine-readable `expected_metric` at all, decline or otherwise, so that assumption was
+  false. Jones is no longer read by the script for any purpose.
 - **`expected_mode`, and `max` vs. a question-stated `top N`:** confirmed against an already-passing
   "mirror" row elsewhere in the same corpus with the same grain (and, for coach rows, the same metric);
   a group with no such mirror in the file fails closed rather than writing an unconfirmed shape. `top N`
@@ -33031,15 +33036,18 @@ guess:
 - **Coach metric literals** (`games`/`wins`) are hardcoded, cited directly from `plan.ts:972-973`'s
   `coach_record` metrics table, which carries no alias for either name.
 
-All twelve of §5's fail-closed conditions are implemented as invariant checks (row count, duplicate
-ids, missing target ids, before-state, target count, plus a post-hoc self-check that no row outside the
-173 changed). DB-free unit tests (`tests/nl-issue-199-corpus-fix.test.ts`) build a synthetic 12,000-row
-corpus with the exact id layout and prove: the happy path changes exactly 173 rows (5/112/56 split);
-non-target rows are untouched; each of wrong-before-state, missing-target, duplicate-id, wrong-row-
-count, and missing-mirror refuses; `detectAggregation`'s question-text parsing; and the
-`--out`-equals-`--corpus` guard (`assertOutputPathIsSafe`) refuses without `--allow-overwrite-input`.
-Not yet run against the real canonical CSV — that is user-executed on the dev host per §7, updated to
-use `--out ~/nl-stress-corpus-v2.csv` (not overwriting `~/nl-stress-corpus.csv` until validated).
+All of §5's fail-closed conditions are implemented as invariant checks (row count, duplicate ids,
+missing target ids, before-state, target count, an Ablett question naming zero/multiple/wrong metric
+words, missing mirror, plus a post-hoc self-check that no row outside the 173 changed). DB-free unit
+tests (`tests/nl-issue-199-corpus-fix.test.ts`) build a synthetic 12,000-row corpus (Jones rows fixture
+with a **blank** `expected_metric`, reproducing the real failure) and prove: the happy path changes
+exactly 173 rows (5/112/56 split); non-target rows, including Jones, are untouched byte-for-byte; each
+of wrong-before-state, missing-target, duplicate-id, wrong-row-count, missing-mirror, unaudited-metric,
+ambiguous-metric, and metric-disagrees-with-audited-map refuses; `detectAggregation`'s question-text
+parsing; and the `--out`-equals-`--corpus` guard (`assertOutputPathIsSafe`) refuses without
+`--allow-overwrite-input`. Not yet run to completion against the real canonical CSV — that is
+user-executed on the dev host per §7, updated to use `--out ~/nl-stress-corpus-v2.csv` (not overwriting
+`~/nl-stress-corpus.csv` until validated).
 
 ### Non-goals
 Parser/application code changes; AFLW; the fresh Codex exploratory corpus (separate future phase);
