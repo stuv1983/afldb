@@ -117,6 +117,40 @@ describe('AFLDB-ISSUE-094 semantic mappings', () => {
     expect(validatePlan(p)).not.toHaveProperty('error');
   });
 
+  // AFLDB-ISSUE-209: the 173-row exploratory defect family is generated
+  // from exactly one template -- "Which of A and B has more wins head to
+  // head [temporal]" (tools/nl/generate-exploratory-corpus.mjs:362-371,
+  // head_to_head template index 2) -- so the fix is scoped to "has/have
+  // (more|the most) wins head to head", not a general "more wins" rewrite.
+  // "has the most wins head to head" is not in the generated corpus but is
+  // a same-anchor natural equivalent the issue's product semantics ask for
+  // explicitly. Club pairs are varied (not just Richmond/Carlton) to prove
+  // the fix is a structural pattern, not tied to one club pair.
+  //
+  // Two wordings from the issue's illustrative examples were tried and
+  // dropped from this matrix after the RED run: "has more wins between A
+  // and B" and "has more wins against the other" both fall into
+  // extractClubSeasonMetric's "most wins" club_season ranking cue
+  // (parser.ts:2700-2709) and decline there, never reaching
+  // extractHeadToHeadCue's family list at all -- a different mechanism,
+  // out of scope for this issue's minimal fix. See AFLDB-ISSUE-209.md.
+  it.each([
+    ['Which of Richmond and Carlton has more wins head to head', 'richmond', 'carlton'],
+    ['Which of Richmond and Carlton has more wins head to head in 2023', 'richmond', 'carlton'],
+    ['Which club has more wins head to head, Carlton or Richmond', 'carlton', 'richmond'],
+    ['Who has more wins head to head, Carlton or Geelong', 'carlton', 'geelong'],
+    ['Which of Richmond and Carlton has the most wins head to head', 'richmond', 'carlton'],
+    ['Who has won more, Carlton or Richmond?', 'carlton', 'richmond'],
+    ['Which team has won more head to head, Carlton or Richmond?', 'carlton', 'richmond'],
+  ] as const)('AFLDB-ISSUE-209: maps %s to compare_wins (%s v %s)', async (question, clubA, clubB) => {
+    const p = await plan(question);
+    expect(p.grain).toBe('head_to_head');
+    expect(p.headToHead).toEqual({ kind: 'compare_wins' });
+    expect(validatePlan(p)).not.toHaveProperty('error');
+    const slugs = [p.scope.matchup?.clubA.slug, p.scope.matchup?.clubB.slug].sort();
+    expect(slugs).toEqual([clubA, clubB].sort());
+  });
+
   it.each([
     ['how many draws between Richmond and Carlton', 'draw_count'],
     ['Richmond draws against Carlton', 'draw_count'],

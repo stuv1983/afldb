@@ -8,6 +8,25 @@
 
 _No open issues._
 
+**AFLDB-ISSUE-209 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(3) of `AFLDB-ISSUE-206.md`'s six proposals: `extractHeadToHeadCue`'s `compare_wins` family
+(`src/search/nl/semantic-intents.ts`) recognized only past-tense "won more", so present-tense "has/have
+more wins ... head to head" fell through to the generic `head to head` → `record` cue and answered with
+a full record instead of naming the leader. Fix added a dedicated "has/have (more|the most) wins head to
+head" pattern plus a trailing-"head to head" extension to the existing "won more" pattern, both checked
+before the generic record families; `PARSER_VERSION` 56→57. Operator-validated on streamanator (commit
+`f2e067f`): frozen V5 stable-corpus rerun stayed **12000/12000/0/0**, and a direct structured-plan diff
+of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v56 vs post-fix v57) found exactly
+**199 changed plans**, all `headToHead.kind: record→compare_wins` in the same wording family — 173
+matching ISSUE-206's direct estimate, plus 26 that also carried a mechanically-linked `between YEAR and
+YEAR` season/havingClause correction (the same atomic "wins" consumption fix incidentally resolved a
+misread grouped-threshold on those 26 rows) — zero collateral movement elsewhere, so **the validated
+affected surface is 199 rows, not 173**. Implementation commit `f2e067f`, unmerged on
+`sonnet/issue-209-head-to-head-more-wins`. Two adjacent wordings ("has more wins between A/B", "has more
+wins against the other") investigated and deliberately not fixed — claimed earlier by
+`extractClubSeasonMetric`'s "most wins" club_season ranking cue, a different mechanism. See `issues.md`
+and `AFLDB-ISSUE-209.md` for the full record.
+
 **AFLDB-ISSUE-208 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (2) of `AFLDB-ISSUE-206.md`'s six proposals: `extractClubs`'s club-role lookback (`src/search/nl/parser.ts`)
 tested "does an against-like token exist anywhere in a fixed 20-character window", not "what is the

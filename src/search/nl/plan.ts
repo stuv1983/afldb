@@ -593,7 +593,25 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // two-club phrasing ("Adelaide biggest win against GWS Giants") and the
 // unordered "A versus B" -> scope.matchup reading are both unaffected --
 // neither depended on the window's width.
-export const PARSER_VERSION = 56;
+// v57 -- AFLDB-ISSUE-209: extractHeadToHeadCue (nl/semantic-intents.ts) now
+// recognizes present-tense "has/have (more|the most) wins head to head" as
+// compare_wins, and the existing "won more" entry optionally absorbs a
+// trailing "head to head" too. Previously only past-tense "who has won
+// more" was recognized; "has more wins ... head to head" fell through to
+// the generic head-to-head cue and answered with a full record instead of
+// naming the leader -- the exact wording of a 173-row corpus defect family
+// traced to AFLDB-ISSUE-206 (one generator template, "Which of A and B has
+// more wins head to head [temporal]"). Both new patterns are checked before
+// the generic head-to-head/record families, so an unambiguous two-club win
+// comparison always wins over the generic record reading; the comparison
+// still only commits once extractClubs resolves exactly two real clubs
+// around it, so a lone "most wins" ranking question is unaffected. "has
+// more wins between A/B" and "has more wins against the other" wordings
+// were investigated and deliberately NOT added -- they are claimed earlier
+// by extractClubSeasonMetric's "most wins" club_season ranking cue
+// (nl/parser.ts) and decline there, a different mechanism outside this
+// fix's scope.
+export const PARSER_VERSION = 57;
 
 // ------------------------------------------------------------------ grain
 
