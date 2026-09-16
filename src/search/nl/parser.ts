@@ -1446,11 +1446,23 @@ function extractScoreCheckpoint(text: string): { text: string; scoreCheckpoint?:
     // different plan shape validatePlan refuses to combine with
     // scoreCheckpoint (plan.ts's checkpoint-metric gate). Left unclaimed
     // here so extractTeamMetric (step 11) sees the intact phrase instead of
-    // just the orphaned word "comeback". Only this entry needs the guard --
-    // 'HT'/'QT' below have no comeback metric of their own to protect.
+    // just the orphaned word "comeback".
     [/\bat (?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)|\b(?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)/, '3QT'],
     [/\bat half[- ]time\b|\bhalf[- ]time\b/, 'HT'],
-    [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+    // AFLDB-ISSUE-205 (operator-validation follow-up): the 3QT guard above
+    // only withholds ITS OWN match on "three quarter time comeback" -- it
+    // does not stop this entry's generic "quarter time" pattern from then
+    // matching the nested substring "quarter time" inside "three quarter
+    // time comeback" and stripping it, leaving "three comeback" (still two
+    // orphaned, unmatched tokens instead of the intact metric phrase). This
+    // entry's own negative lookbehind is required too: it refuses a
+    // "quarter"/"qtr"/"quatre" checkpoint word directly preceded by
+    // "three "/"three-", so the two entries never fight over the same
+    // substring regardless of which one the loop reaches. Genuine Q1
+    // checkpoints ("at quarter time", "leading at quarter time") are
+    // unaffected -- the exclusion only fires when "three" immediately
+    // precedes the checkpoint word.
+    [/\bat (?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
   ];
   for (const [re, checkpoint] of entries) {
     const match = re.exec(text);

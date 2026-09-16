@@ -1,8 +1,10 @@
 # AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows
 
-**Status:** IN PROGRESS (Sonnet 5). Implementation complete (runtime fix, tests, correction script,
-documentation). **Not yet operator-validated. Not resolved.** Do not mark resolved, update
-`CHANGELOG.md`, or promote V5 over V4 until the validation sequence in §8 passes.
+**Status:** IN PROGRESS (Sonnet 5). Runtime fix, tests, correction script and documentation implemented.
+First operator-validation pass (§5a) found the initial `3QT`-only guard incomplete; a targeted follow-up
+fix to the `QT` entry has been applied in the same unmerged change (`PARSER_VERSION` stays 54 — this is
+refinement, not a second bump). **Not yet re-validated. Not resolved.** Do not mark resolved, update
+`CHANGELOG.md`, or run corpus correction until the validation sequence in §8 passes.
 
 Opened as AFLDB-ISSUE-200's Stage 2 next-task item 6 (the 70 `WRONG_FAILURE_REASON`/`TAXONOMY_DRIFT`
 rows left unaudited when Stage 2 closed). Stage 2 itself is not reopened or redefined by this issue.
@@ -130,6 +132,61 @@ operator's explicit preference.
 `PARSER_VERSION` 53 → 54 (`src/search/nl/plan.ts`), with a version-history comment in the file's
 established style (mirrors the v52/v53 entries immediately above it).
 
+## 5a. First operator-validation run: the 3QT-only guard was incomplete (found and fixed, same pass)
+
+Operator results against the §5 fix:
+
+```text
+tests/integration/nl-answers-team-club.test.ts: 35/35 passed
+  including "AFLDB-ISSUE-205: q3_deficit_overcome answers the biggest
+  three-quarter-time deficit the eventual winner overcame"
+
+tests/nl-parser.test.ts: 444 tests, 440 passed, 4 failed
+  Adelaide biggest three quarter time comeback
+  Adelaide biggest three quarter time comeback since 2000
+  who has the biggest three quarter time comeback for Adelaide
+  Adelaide three quarter time comeback
+  -> all four now fail with unsupportedTerms: "three comeback"
+  (Adelaide 3qt comeback still passes)
+```
+
+The integration SQL result is significant: it independently confirms `q3_deficit_overcome`'s SQL path
+(§3) was never the problem, isolating the remaining defect entirely to parser extraction — no SQL/schema
+change is implicated by this finding.
+
+**Root cause of the incompleteness:** the §5 fix only withheld the `'3QT'` entry's *own* match on
+"three quarter time comeback". It did not stop `extractScoreCheckpoint`'s next entry, `'QT'`
+(`/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|.../`, generic Q1 checkpoint), from then matching
+the *nested substring* `"quarter time"` inside `"three quarter time comeback"` and stripping it anyway —
+`extractScoreCheckpoint`'s `for` loop tries each entry against the same original text in order and
+returns on the first match, so when `'3QT'` declines, `'HT'` (no match) then `'QT'` gets a turn against
+the still-full text and matches `"quarter time"` unconditionally. Result: `"three quarter time comeback"`
+→ `"three"` + `"comeback"` both orphaned (`unsupportedTerms: "three comeback"`), exactly matching the
+operator's observed regression. Two checkpoint patterns were competing for the same surface phrase; only
+one of them had been guarded.
+
+**Fix (same file, same entry group, `src/search/nl/parser.ts`):**
+
+```diff
+- [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
++ [/\bat (?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+```
+
+A negative lookbehind refuses a `"quarter"`/`"qtr"`/`"quatre"` checkpoint word directly preceded by
+`"three "`/`"three-"`, so `'QT'` can never re-consume what `'3QT'`'s own guard just withheld — regardless
+of which entry the loop reaches first. Traced by hand against every named case: for
+`"...three quarter time comeback"`, `'3QT'` declines (comeback follows) and `'QT'`'s lookbehind now also
+declines (immediately preceded by `"three "`) — the full phrase survives intact for `extractTeamMetric`
+at step 11. For `"Adelaide score at quarter time"` (no `"three"` present), the lookbehind never triggers
+and `'QT'` fires exactly as before. For `"Adelaide largest comeback from quarter time"` (Family B),
+`"quarter time"` is preceded by `"from "`, not `"three "` — the exclusion does not apply, `'QT'` still
+fires and consumes it, so Family B's decline behaviour is byte-for-byte unchanged from before this
+fix. Still no metric regex change (`TEAM_METRIC_WORDS[0]` untouched), no `HT` change, no stage reordering
+— the fix stays inside `extractScoreCheckpoint`'s own entry list, per the operator's explicit constraint.
+
+`PARSER_VERSION` remains 54: this refines the same unmerged behaviour change from §5, not a second
+independent parser-semantics change.
+
 ## 6. Corpus scorer contract (established before touching any expectation)
 
 Read `tools/nl/corpus.ts`'s `scoreRow` (the function every `nl:stress` run scores against) directly:
@@ -156,7 +213,7 @@ computed, or populated anywhere in this issue's correction.
 ## 7. Tests added
 
 **`tests/nl-parser.test.ts`**, new describe block `2a. AFLDB-ISSUE-205: three-quarter-time comeback vs
-score-checkpoint collision` (8 cases), DB-free, inserted after the existing `2. team queries` block:
+score-checkpoint collision` (10 cases), DB-free, inserted after the existing `2. team queries` block:
 
 1. `adelaide biggest three quarter time comeback` → `grain='team_match'`, `metric='q3_deficit_overcome'`,
    `agg={kind:'max'}`, `scope.clubFor.name='Adelaide'`.
@@ -170,8 +227,19 @@ score-checkpoint collision` (8 cases), DB-free, inserted after the existing `2. 
    how the rest of the question resolves (written defensively — "leading" is an `AGG_WORDS` superlative,
    not a `TEAM_METRIC_WORDS` entry, so this question's exact resolved shape was not independently
    re-derived by static reading; the invariant that matters for this fix is asserted unconditionally).
-8. Negative (Family B control): `adelaide largest comeback from quarter time` → still declines,
-   `status='none'`, `unsupportedTerms` still contains `comeback`.
+8. Negative (§5a follow-up): `adelaide score at quarter time` → `scoreCheckpoint='QT'`,
+   `metric='team_score'`, proving the `'QT'` entry's new `"three "`-exclusion lookbehind does not disturb
+   a genuine, standalone Q1 checkpoint.
+9. Negative (§5a follow-up): `who was leading at quarter time` → metric never `q3_deficit_overcome` or a
+   hypothetical `q1_deficit_overcome`.
+10. Negative (Family B control): `adelaide largest comeback from quarter time` → still declines,
+    `status='none'`, `unsupportedTerms` still contains `comeback` — proves the `'QT'` exclusion is scoped
+    to `"three "`/`"three-"` only and does not affect Family B's `"comeback from quarter time"` phrasing
+    (preceded by `"from "`, not `"three "`).
+
+Cases 1-5 and 6-7 (originally written against the §5-only fix) are what caught the §5a incompleteness —
+they were correct expectations from the start; the first operator run's 4 failures were the runtime
+still being wrong, not the tests. Cases 8-10 are new, added for the §5a follow-up specifically.
 
 **`tests/integration/nl-answers-team-club.test.ts`**, one DB-backed test inserted after "derives Q3 as
 the three-quarter checkpoint minus half-time": ranks `q3_deficit_overcome` via `answerTeamMatch` directly
@@ -234,8 +302,11 @@ runtime result.
 ## 9. Deliverable summary
 
 1. **Exact runtime change:** `src/search/nl/parser.ts`, `extractScoreCheckpoint`'s `'3QT'` entry gains a
-   negative lookahead excluding a trailing `comeback(s)`. One line, one regex. `HT`/`QT` entries
-   untouched.
+   negative lookahead excluding a trailing `comeback(s)` (§5); its `'QT'` entry gains a negative
+   lookbehind excluding a checkpoint word directly preceded by `"three "`/`"three-"` (§5a, added after
+   the first operator run found the `'3QT'`-only guard incomplete — `'QT'` was still matching the nested
+   `"quarter time"` substring inside `"three quarter time comeback"`). Two small, targeted regex changes
+   inside the same entry list; no metric regex change, no `'HT'` change, no stage reordering.
 2. **Parser version change:** `PARSER_VERSION` 53 → 54 (`src/search/nl/plan.ts`), version-history
    comment added.
 3. **Tests added:** 8 parser cases (`tests/nl-parser.test.ts`) + 1 integration case

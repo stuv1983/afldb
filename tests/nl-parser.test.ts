@@ -290,6 +290,27 @@ describe('2a. AFLDB-ISSUE-205: three-quarter-time comeback vs score-checkpoint c
     expect(metric).not.toBe('q3_deficit_overcome');
   });
 
+  // Operator-validation follow-up: the first 3QT-only guard left the
+  // generic 'QT' entry free to match the nested substring "quarter time"
+  // inside "three quarter time comeback", stripping it and leaving "three
+  // comeback" -- still two orphaned tokens instead of the intact phrase.
+  // 'QT' now also refuses a checkpoint word directly preceded by
+  // "three "/"three-"; these two controls prove that refusal is narrow and
+  // does not disturb a genuine, standalone Q1 checkpoint.
+  it('negative: "adelaide score at quarter time" keeps the genuine Q1 checkpoint reading, unaffected by the "three "-exclusion guard', async () => {
+    const p = await plan('Adelaide score at quarter time');
+    expect(p.scoreCheckpoint).toBe('QT');
+    expect(p.metric).toBe('team_score');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+  });
+
+  it('negative: "who was leading at quarter time" never reads as a comeback metric, and the Q1 checkpoint still resolves where a metric word is present', async () => {
+    const result = await parse('who was leading at quarter time');
+    const metric = result.status === 'plan' ? result.plan.metric : undefined;
+    expect(metric).not.toBe('q3_deficit_overcome');
+    expect(metric).not.toBe('q1_deficit_overcome');
+  });
+
   it('negative: "adelaide largest comeback from quarter time" (Q1, not Q3) still declines unsupported_term -- no q1_deficit_overcome metric exists, and AFLDB-ISSUE-205 does not add one', async () => {
     const result = await parse('Adelaide largest comeback from quarter time');
     expect(result.status).toBe('none');

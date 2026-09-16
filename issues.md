@@ -34211,10 +34211,12 @@ Removed from `IssuesIndex.md` and the Open Issues table above (1 -> 0). `CHANGEL
 
 ## AFLDB-ISSUE-205 — Two-family root cause for the 70 remaining WRONG_FAILURE_REASON rows (parser defect + genuine feature gap)
 
-- **Status:** IN PROGRESS (Sonnet 5), implementation complete, **not yet operator-validated, not resolved**.
-  Opened as a planning/audit task for AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON`
-  `TAXONOMY_DRIFT` rows (Stage 2 next-task item 6). The audit disproved ISSUE-200's own disposition for
-  this cluster: it is not one homogeneous diagnostic-label mismatch. Full runbook: `AFLDB-ISSUE-205.md`.
+- **Status:** IN PROGRESS (Sonnet 5), **not yet operator-validated, not resolved**. Opened as a
+  planning/audit task for AFLDB-ISSUE-200's remaining 70 `WRONG_FAILURE_REASON` `TAXONOMY_DRIFT` rows
+  (Stage 2 next-task item 6). The audit disproved ISSUE-200's own disposition for this cluster: it is not
+  one homogeneous diagnostic-label mismatch. The first operator-validation run found the initial runtime
+  fix incomplete (see "First operator-validation run" below); a targeted follow-up fix has been applied
+  in the same unmerged change. Full runbook: `AFLDB-ISSUE-205.md`.
 
 ### Audit: the 70 rows are two unrelated families, not one taxonomy-drift cluster
 
@@ -34271,6 +34273,41 @@ phrase. Only this one entry changed — `'HT'`/`'QT'` are untouched, so Family B
 genuine score-checkpoint question, e.g. "leading at three quarter time") is unaffected by construction.
 Smallest safe change, no broader parser-stage reordering. `PARSER_VERSION` 53 -> 54
 (`src/search/nl/plan.ts`), with a version-history comment in the established style.
+
+### First operator-validation run: the '3QT'-only guard was incomplete (found and fixed, same pass)
+
+Operator results: `tests/integration/nl-answers-team-club.test.ts` 35/35 passed, confirming
+`q3_deficit_overcome`'s SQL path (independent of the parser question) was never the problem. But
+`tests/nl-parser.test.ts` reported 440/444 passed, 4 failed -- all four Family A comeback cases now
+failing with `unsupportedTerms: "three comeback"` instead of resolving to a plan (`Adelaide 3qt comeback`
+still passed).
+
+Root cause: the `'3QT'` guard only withheld its *own* match on `"three quarter time comeback"`.
+`extractScoreCheckpoint`'s `for` loop tries each entry against the same original text and returns on the
+first match; when `'3QT'` declines (comeback follows), `'HT'` (no match) then `'QT'`
+(`/\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/`, the generic Q1 checkpoint) gets a turn against the
+still-full text and matches the *nested substring* `"quarter time"` inside `"three quarter time
+comeback"` unconditionally, stripping it and leaving `"three"` and `"comeback"` both orphaned. Two
+checkpoint patterns were competing for the same surface phrase; only one had been guarded.
+
+**Fix:** `'QT'`'s regex (`src/search/nl/parser.ts`) gained a negative lookbehind refusing a
+`"quarter"`/`"qtr"`/`"quatre"` checkpoint word directly preceded by `"three "`/`"three-"`, so it can never
+re-consume what `'3QT'`'s guard just withheld, regardless of loop order:
+
+```diff
+- [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
++ [/\bat (?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?<!three[- ])(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
+```
+
+Traced by hand: genuine Q1 checkpoints ("Adelaide score at quarter time", no "three" present) are
+unaffected; Family B ("comeback from quarter time", preceded by "from ", not "three ") is unaffected --
+its decline behaviour stays byte-for-byte unchanged. Still no metric-regex change, no `'HT'` change, no
+stage reordering; the fix stays inside `extractScoreCheckpoint`'s own entry list. `PARSER_VERSION` stays
+54 -- this refines the same unmerged behaviour change, not a second bump. 2 new regression tests added
+(`tests/nl-parser.test.ts`: "adelaide score at quarter time" and "who was leading at quarter time", both
+proving the new exclusion is scoped narrowly). Full account: `AFLDB-ISSUE-205.md` §5a.
+
+**Not yet re-validated by the operator.** Exact rerun command: `npx vitest run tests/nl-parser.test.ts`.
 
 ### Corpus scorer contract (established before touching any expectation, per the operator's explicit request)
 
