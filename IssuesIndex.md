@@ -4,20 +4,17 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
-
-- **AFLDB-ISSUE-203** — Numeric word "zero" not bound as equality in `player_career` conditions.
-  Severity: low (15 corpus rows, decline-only — no wrong answers shipped today). Area: NL search
-  parser (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). State: implemented pending operator
-  validation (2026-09-16); runbook `AFLDB-ISSUE-203.md` §12. Root cause: `NUMBER_WORDS` had no
-  `zero` entry, AND `extractCareerConditions`'s comparator default (`gte`) was wrong for a bound
-  zero (needed `eq`) — both landed together per plan. `PARSER_VERSION` 52→53. Next action: operator
-  runs `tests/nl-parser.test.ts` + `tsc --noEmit` + the parser-v53 stress comparison
-  (`issues.md`'s AFLDB-ISSUE-203 entry has the exact commands), then reports results for resolution.
+**Open issues:** 0
 
 AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
 (Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
 grain-equivalent GWS player-season rows normalized as a byproduct of the same fix.
+
+AFLDB-ISSUE-203 (numeric word "zero" not bound as equality in `player_career` conditions) resolved
+2026-09-16 (Sonnet 5, operator-validated) -- root cause was two cooperating gaps in
+`extractCareerConditions` (missing `zero` vocabulary entry, and a comparator default wrong for a
+bound zero); `PARSER_VERSION` 52→53; 15 zero-word soft findings cleared, 0 new soft rows, 0
+semantic changes among the 250 remaining soft rows -- see `issues.md` for the full record.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search

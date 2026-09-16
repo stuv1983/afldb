@@ -4,7 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1 (AFLDB-ISSUE-203)
+**Open issues:** 0
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -16,10 +16,11 @@ AFLDB-ISSUE-202 opened 2026-09-16 (Sonnet 5, planning only) for the second follo
 unsupported-term leakage, 128 manifestations), resolved 2026-09-16 (Sonnet 5, operator-validated;
 also normalized 72 previously grain-equivalent GWS player-season rows to exact expected semantics
 as a byproduct of the same fix) -- see its detailed entry below.
-AFLDB-ISSUE-203 opened 2026-09-16 (Sonnet 5, planning only) for the third follow-on ("zero" word-form
-not bound as numeric equality in career conditions, 15 manifestations) -- see its detailed entry
-below. `AFLDB-ISSUE-203.md` runbook written; not yet implemented. The remaining follow-on item
-(pre-1965 stale-coverage corpus correction) remains open but not yet opened as a tracked issue.
+AFLDB-ISSUE-203 opened 2026-09-16 (Sonnet 5, planning only) for the third follow-on ("zero"
+word-form not bound as numeric equality in career conditions, 15 manifestations), resolved
+2026-09-16 (Sonnet 5, operator-validated) -- see its detailed entry below. The remaining follow-on
+item (pre-1965 stale-coverage corpus correction) remains open but not yet opened as a tracked
+issue.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33917,11 +33918,16 @@ GWS-related soft findings remain. `CHANGELOG.md` updated under `[Unreleased]`. R
 
 ## AFLDB-ISSUE-203 — Numeric word "zero" is not bound as equality in career conditions
 
-- **Status:** Open, implemented pending operator validation (2026-09-16, Sonnet 5). Operator
-  confirmed the §6 corpus-shape verification before implementation proceeded. Third of
-  AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item 5c, `PARSER_BUG` /
-  `unsupported_term|pc|zero`, 15 rows). Runbook `AFLDB-ISSUE-203.md` §12 records the implementation.
-  Not resolved yet -- pending the operator validation commands below. No Git operation performed.
+- **Status:** Resolved 2026-09-16 (Sonnet 5, operator-validated). Third of AFLDB-ISSUE-200's three
+  candidate defect follow-ons (Stage 2 next-task item 5c, `PARSER_BUG` / `unsupported_term|pc|zero`,
+  15 rows). Root cause: two cooperating gaps in `extractCareerConditions` -- `NUMBER_WORDS` had no
+  `zero` entry, and the function's comparator-less numeric default (`gte`) was wrong for a bound
+  zero (needed `eq`); both landed together per plan since fixing the vocabulary gap alone would have
+  converted the 15 declines into 15 silent wrong answers rather than 15 correct ones. Fix: `zero: 0`
+  added to `NUMBER_WORDS` (`vocab.ts`); `extractCareerConditions` now tracks whether a comparator was
+  explicit and forces `op = 'eq'` for a comparator-less zero-valued clause; `PARSER_VERSION` 52 -> 53.
+  Runbook `AFLDB-ISSUE-203.md` §12 records the implementation; §13 records the operator validation
+  below. No Git operation performed by Claude.
 
 ### Evidence
 AFLDB-ISSUE-200's real-audit cluster `unsupported_term|pc|zero` (`tools/nl/issue-200-dispositions.csv`):
@@ -33970,21 +33976,37 @@ defaults (none of the 15 rows exercise them; flagged as a collateral-vocabulary 
 `AFLDB-ISSUE-203.md` §10, not fixed); the 180 pre-1965 stale-coverage rows; the 70 taxonomy-drift
 rows; AFLDB-ISSUE-201/202 behaviour.
 
-### Next action
-Operator runs the validation commands below (`AFLDB-ISSUE-203.md` §12): the focused unit test, a
-typecheck, the parser-v53 stress run against `/home/arm/nl-stress-corpus-v3.csv`, and the v52->v53
-failure-ID/soft-row comparison, then reports results here for resolution.
+### Operator validation (2026-09-16)
+
+`tests/nl-parser.test.ts` and `tsc --noEmit` passed. Parser v53 run against the unchanged
+`/home/arm/nl-stress-corpus-v3.csv` (v52 baseline: 12000 scored / 11735 clean / 265 soft / 0 failed;
+`UNEXPECTED_DECLINE` 195 = 180 stale pre-1965 + 15 zero-word; `WRONG_FAILURE_REASON` 70):
 
 ```text
-npx vitest run tests/nl-parser.test.ts
-npx tsc --noEmit
+12000 scored / 11750 clean / 250 soft / 0 failed
+UNEXPECTED_DECLINE 180, WRONG_FAILURE_REASON 70
 ```
 
-Parser-v53 stress run and comparison against the retained v52/V3 baseline (12000 scored / 11735
-clean / 265 soft / 0 failed; `UNEXPECTED_DECLINE` 195 = 180 stale pre-1965 + 15 zero-word;
-`WRONG_FAILURE_REASON` 70) -- run whatever v52 used against
-`/home/arm/nl-stress-corpus-v3.csv`, tagged v53, then diff the two failure-ID sets and confirm:
-removed IDs are exactly `8833, 8842, 8847, 8852, 8857, 8862, 8867, 8872, 8877, 8882, 8887, 8892,
-8897, 8902, 8907`; no new soft rows appeared; the remaining 250 soft rows (180 stale pre-1965 + 70
-taxonomy-drift) show no semantic change. Expected result: 12000 scored / 11750 clean / 250 soft / 0
-failed.
+v52 -> v53 diff: removed IDs exactly `8833, 8842, 8847, 8852, 8857, 8862, 8867, 8872, 8877, 8882,
+8887, 8892, 8897, 8902, 8907` (the exact pre-implementation ISSUE-203 family); zero new soft rows;
+zero semantic changes among the rows that remained soft. 15 zero-word parser defects fixed, 15
+total soft findings cleared, 0 hard failures.
+
+### Remaining known soft findings
+
+250 soft findings remain, both pre-existing and out of scope for this issue: 180
+`UNEXPECTED_DECLINE` (stale pre-1965 coverage expectations) and 70 `WRONG_FAILURE_REASON`
+(taxonomy-drift family, unchanged in count and identity). No known parser bug family remains from
+the ISSUE-200 audit.
+
+### Residual edge (not exercised, not fixed)
+
+The `op = 'eq'` override for a comparator-less zero runs before the `qualifierBuilder`'s
+`grand_finals`/`prelim_finals` check, so a hypothetical "0 grand finals"-shaped clause would now
+read as a plain `{ column: 'finals', op: 'eq', value: 0 }` condition instead of a
+`grand_finals_played_min` predicate. Not exercised by the stable corpus and caused no regression in
+operator validation. Recorded as a residual risk, not broadened into this issue's scope; see
+`AFLDB-ISSUE-203.md` §10.
+
+Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELOG.md` updated under
+`Unreleased`.

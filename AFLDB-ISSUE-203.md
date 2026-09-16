@@ -1,11 +1,10 @@
 # AFLDB-ISSUE-203 — Numeric word "zero" is not bound as equality in career conditions
 
-**Status:** Implemented, pending operator validation (2026-09-16, Sonnet 5). Operator confirmed the
+**Status:** Resolved 2026-09-16 (Sonnet 5, operator-validated). Operator confirmed the
 corpus-shape verification in §6 (all 15 rows are `player_career`/`pc` grain, word "zero" governing
 `goals`, no digit-`0` row already present) before implementation proceeded. Third of
 AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item 5c, `PARSER_BUG` /
-`unsupported_term|pc|zero`, 15 rows). Not yet marked resolved -- pending the operator validation
-commands in §12.
+`unsupported_term|pc|zero`, 15 rows). Operator validation recorded in §13.
 
 ## 12. Implementation record (2026-09-16)
 
@@ -28,8 +27,34 @@ Both parts of §4 implemented exactly as proposed, plus §7's regression tests a
   unsupported-word control. No new test file; no existing test removed or weakened.
 
 Not run in this session (CLAUDE.md's command-execution boundary): `npx vitest run
-tests/nl-parser.test.ts`, `npx tsc --noEmit`, and the stress/corpus comparison in §12 below --
-operator commands are listed there.
+tests/nl-parser.test.ts`, `npx tsc --noEmit`, and the stress/corpus comparison -- operator ran
+these; results recorded in §13.
+
+## 13. Operator validation and closeout (2026-09-16)
+
+`tests/nl-parser.test.ts` and `tsc --noEmit` passed. Parser v53 run against the unchanged
+`/home/arm/nl-stress-corpus-v3.csv` (v52 baseline: 12000 scored / 11735 clean / 265 soft / 0 failed):
+
+```text
+12000 scored / 11750 clean / 250 soft / 0 failed
+UNEXPECTED_DECLINE 180, WRONG_FAILURE_REASON 70
+```
+
+v52 -> v53 diff: removed IDs exactly `8833, 8842, 8847, 8852, 8857, 8862, 8867, 8872, 8877, 8882,
+8887, 8892, 8897, 8902, 8907` -- exactly the pre-implementation ISSUE-203 family. Zero new soft
+rows; zero semantic changes among the rows that remained soft. Accounting: 15 zero-word parser
+defects fixed, 15 total soft findings cleared, 0 new soft findings, 0 semantic changes among
+remaining soft rows, 0 hard failures.
+
+Remaining 250 soft findings are pre-existing and out of scope: 180 `UNEXPECTED_DECLINE` (stale
+pre-1965 coverage expectations) and 70 `WRONG_FAILURE_REASON` (taxonomy-drift family). No known
+parser bug family remains from the ISSUE-200 audit.
+
+§10's "0 grand finals" edge (the `eq` override runs before the `grand_finals`/`prelim_finals`
+qualifier-builder check) remains an unexercised residual risk -- not broadened into this issue's
+scope, no code change made for it, no regression observed in operator validation.
+
+Resolved. `issues.md`, `IssuesIndex.md`, and `CHANGELOG.md` updated accordingly.
 
 ## 1. Confirmed root cause (direct source inspection)
 
