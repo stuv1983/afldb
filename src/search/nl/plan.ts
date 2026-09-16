@@ -559,7 +559,22 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // entry now also refuses a checkpoint word directly preceded by
 // "three "/"three-", so it can never re-consume what the 3QT guard just
 // withheld. Genuine Q1 checkpoints ("at quarter time") are unaffected.
-export const PARSER_VERSION = 54;
+// v55 -- AFLDB-ISSUE-207: extractHavingClause's operator search (nl/parser.ts)
+// is now bounded to the text up to and including the count it already
+// matched, never past it. The previous full +-20-character window could
+// reach across "by ... points" into an adjacent margin clause's own
+// operator word (e.g. "over" in "by over 50 points"), and since
+// COMPARE_OP_WORDS is tested in a fixed vocabulary order rather than
+// leftmost-in-text order, a later-listed entry belonging to the wins/
+// losses clause itself could even lose to an earlier-listed entry
+// belonging to the margin clause. Either mechanism silently swapped the
+// two clauses' comparators while both fields still validated -- "7 or more
+// wins by over 50 points" used to parse as wins > 7, margin >= 50 instead
+// of wins >= 7, margin > 50. Every supported comparator form (bare number,
+// "at least"/"at most", "more/less/fewer than", "no more/fewer/less/
+// greater than", "over"/"under" before digits, "exactly") is unaffected
+// when it genuinely governs the clause it appears in.
+export const PARSER_VERSION = 55;
 
 // ------------------------------------------------------------------ grain
 

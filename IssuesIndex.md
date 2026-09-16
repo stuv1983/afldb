@@ -6,8 +6,24 @@
 
 **Open issues:** 0
 
-| ID | Severity | Area | Current state | Key files / next action |
-| --- | --- | --- | --- | --- |
+_No open issues._
+
+**AFLDB-ISSUE-207 resolved 2026-09-16** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(1) of `AFLDB-ISSUE-206.md`'s six proposals, the highest-severity finding (281 silently-wrong-answer
+corpus rows). Root cause: `extractHavingClause`'s operator search used an unbounded `±20`-character
+window that could reach past a grouped wins/losses/draws/games threshold's own count into an adjacent
+margin clause's operator word, and separately let `COMPARE_OP_WORDS`' fixed vocabulary order outrank the
+clause's own, correctly-positioned operator word. Both effects silently swapped the two clauses'
+comparators while still passing `validatePlan`. Fix bounded the operator search to
+`window.slice(0, countEnd)` — no vocabulary added, no stage reordered, no default changed;
+`PARSER_VERSION` 54→55. Operator-validated on streamanator: frozen V5 stable-corpus rerun stayed
+**12000/12000/0/0**, and a direct structured-plan diff of the retained ISSUE-206 29,030-row exploratory
+corpus (pre-fix v54 vs post-fix v55) found exactly **281 changed plans**, all
+`havingClause.op: gt->gte` paired with `matchFilter.op: gte->gt` (the intended pairing), zero collateral
+movement elsewhere in the corpus. Implementation commit `4ecdd77a`, unmerged on
+`sonnet/issue-207-numeric-operator-ownership`. One pre-existing, out-of-scope gap documented but not
+fixed: `extractMatchFilter` has no form for trailing "by 50 or more/fewer points". See `issues.md` and
+`AFLDB-ISSUE-207.md` for the full record.
 
 **AFLDB-ISSUE-206 resolved 2026-09-16** (Sonnet 5) — final triage of the 29,030-row independent V1
 exploratory corpus, re-verified against current branch source rather than taken on the first-pass
