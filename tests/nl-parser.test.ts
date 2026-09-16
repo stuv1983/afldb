@@ -1035,6 +1035,141 @@ describe('AFLDB-ISSUE-207: numeric operator ownership between having clause and 
   });
 });
 
+// AFLDB-ISSUE-208: extractClubs' role-assignment lookback (nl/parser.ts)
+// tested "does an against-like token exist anywhere in a fixed
+// 20-character window before this club", not "what is the nearest
+// preposition governing it". Two families of ISSUE-206 hard failures
+// traced to that one mechanism:
+//
+// Family A (134 rows) -- "to win FOR North Melbourne" reads the earlier,
+// unrelated "to" (from "to win") as governing, instead of the immediately
+// adjacent "for" -- clubAgainst=Club/clubFor=absent instead of
+// clubFor=Club/clubAgainst=absent.
+//
+// Family B (117 rows) -- "Against Fremantle, ... Melbourne's largest
+// lead": once "Fremantle" is stripped out of the working text, the
+// window before "Melbourne" shrinks enough to pull Fremantle's own
+// "against" into range, marking Melbourne against-governed too --
+// clubFor silently disappears instead of naming the subject club.
+describe('AFLDB-ISSUE-208: club-role ownership -- nearest governing preposition, not a fixed lookback window', () => {
+  describe('Family A: after-siren "to win for CLUB" must not read "to" as governing', () => {
+    it('who kicked the most behinds after the siren to win for Geelong between 2005 and 2015 -> subject club, no opponent', async () => {
+      const p = await plan('who kicked the most behinds after the siren to win for Geelong between 2005 and 2015');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'behind', kickEffect: 'won' });
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.clubAgainst).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2005);
+      expect(p.scope.seasonMax).toBe(2015);
+    });
+
+    it('who kicked the most goals after the siren to win for Carlton -> subject club, no opponent', async () => {
+      const p = await plan('who kicked the most goals after the siren to win for Carlton');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren).toEqual({ subject: 'player', kickScored: 'goal', kickEffect: 'won' });
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('who had the most kicks after the siren to win for Richmond -> subject club, no opponent', async () => {
+      const p = await plan('who had the most kicks after the siren to win for Richmond');
+      expect(p.grain).toBe('after_siren');
+      expect(p.afterSiren?.kickEffect).toBe('won');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('control: an explicit opponent alongside "for" still resolves both roles correctly', async () => {
+      const p = await plan('who kicked the most goals after the siren to win for Carlton against Richmond');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Richmond');
+    });
+  });
+
+  describe('Family B: leading "Against OPPONENT, ... SUBJECT\'s ..." must not lose the subject club', () => {
+    it("against Collingwood, what was Carlton's largest lead at three quarter time since 2000 -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Collingwood, what was Carlton's largest lead at three quarter time since 2000");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scoreCheckpoint).toBe('3QT');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it("against Richmond, what was Carlton's score at half time in 2017 -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Richmond, what was Carlton's score at half time in 2017");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('team_score');
+      expect(p.scoreCheckpoint).toBe('HT');
+      expect(p.scope.clubFor?.name).toBe('Carlton');
+      expect(p.scope.clubAgainst?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("against Collingwood, what was Geelong's largest lead at quarter time -> subject club survives stripping the opponent", async () => {
+      const p = await plan("Against Collingwood, what was Geelong's largest lead at quarter time");
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.scoreCheckpoint).toBe('QT');
+      expect(p.scope.clubFor?.name).toBe('Geelong');
+      expect(p.scope.clubAgainst?.name).toBe('Collingwood');
+    });
+  });
+
+  describe('controls: ordinary opponent extraction and word-order defaults are unaffected', () => {
+    it('Richmond biggest win against Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win against Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win versus Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win versus Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win vs Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win vs Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win v Carlton -> unchanged', async () => {
+      const p = await plan('Richmond biggest win v Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond worst loss to Carlton -> "to" still governs the opponent when it genuinely is the nearest word', async () => {
+      const p = await plan('Richmond worst loss to Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('Richmond biggest win over Carlton -> "over" still governs the opponent when it genuinely is the nearest word', async () => {
+      const p = await plan('Richmond biggest win over Carlton');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('richmond biggest loss -> a single, ungoverned club still defaults to the subject side', async () => {
+      const p = await plan('richmond biggest loss');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('who has the biggest three quarter time comeback for Adelaide -> trailing "for" still governs the subject, not the opponent', async () => {
+      const p = await plan('who has the biggest three quarter time comeback for Adelaide');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+  });
+});
+
 describe('AFLDB-ISSUE-189: club/team subject election', () => {
   // R2: a club_season plan with no metric and no conditions -- there is no
   // club-lineage totals grain (all-time premierships, all-time wins).

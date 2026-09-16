@@ -60,7 +60,7 @@ import {
 } from '@/search/nl/entities';
 import {
   ACHIEVEMENT_SUMMARY_CUES,
-  AGAINST_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
+  AGAINST_PREPOSITION, FOR_PREPOSITION, AGG_WORDS, AGGREGATE_TOTAL_WORDS, AWARD_WORDS,
   BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
@@ -170,7 +170,38 @@ function phraseEnd(text: string, phrase: string): number {
 }
 
 /**
- * Finds up to two club mentions and assigns each a role by the
+ * The nearest preposition governing a club mention: the FOR_PREPOSITION or
+ * AGAINST_PREPOSITION token immediately before it (through at most one
+ * determiner "the"/"a"/"an"), not any against-like token merely present
+ * somewhere in a fixed lookback window.
+ *
+ * AFLDB-ISSUE-208: the previous test (`AGAINST_PREPOSITION.test(before)`
+ * against a fixed 20-character window) asked "does an against-like token
+ * exist anywhere in this window", not "what governs this club". That could
+ * not tell "to win FOR North Melbourne" (the immediately preceding word is
+ * "for"; "to" is just an earlier, unrelated word the window also happened
+ * to contain) from "biggest loss TO Carlton" (the immediately preceding
+ * word genuinely is "to") -- 134 after-siren rows lost their subject club
+ * this way. Anchoring to the single nearest token fixes it, and as a
+ * side effect also makes the check immune to `working`'s own mutation: a
+ * second club's window used to shrink as earlier matches were spliced out
+ * of `working`, which could pull an already-consumed club's own "against"
+ * into range of a later, unrelated club ("Against Fremantle, ... what was
+ * Melbourne's largest lead" read Melbourne as against-governed too, once
+ * stripping "Fremantle" closed the gap) -- 117 team-checkpoint rows lost
+ * their subject club this way. Checked against the ORIGINAL text handed to
+ * extractClubs, which this function never mutates, so the answer no longer
+ * depends on what has or hasn't been stripped from `working` yet.
+ */
+function nearestGoverningPreposition(before: string): 'for' | 'against' | undefined {
+  const trimmed = before.replace(/\s+$/, '').replace(/\s+(?:the|an?)$/, '');
+  if (new RegExp(`${AGAINST_PREPOSITION.source}$`).test(trimmed)) return 'against';
+  if (new RegExp(`${FOR_PREPOSITION.source}$`).test(trimmed)) return 'for';
+  return undefined;
+}
+
+/**
+ * Finds up to two club mentions and assigns each a role by the nearest
  * preposition governing it: "against/versus/vs/v/to/over" -> the
  * opponent, "for/by/from" or no preposition at all -> the subject side.
  * "richmond biggest loss to carlton" and "biggest win for richmond
@@ -196,16 +227,16 @@ function extractClubs(text: string, clubs: readonly NlClubDirectoryEntry[]): Clu
     if (!match) break;
     consumed.push(match.matchedText);
 
-    // Look at a short window before the match for a governing preposition.
-    const idx = working.toLowerCase().indexOf(match.matchedText);
-    const before = idx >= 0 ? working.slice(Math.max(0, idx - 20), idx) : '';
+    // Measured against the ORIGINAL text, never `working`: `working` has
+    // had earlier matches spliced out, so both its offsets AND the words
+    // that end up adjacent to this mention no longer describe the
+    // question the reader typed (see nearestGoverningPreposition above).
+    const at = phrasePosition(text, match.matchedText);
+    const before = at !== Number.MAX_SAFE_INTEGER ? text.slice(Math.max(0, at - 20), at) : '';
     found.push({
       match,
-      governedAgainst: AGAINST_PREPOSITION.test(before),
-      // Measured against the ORIGINAL text: `working` has had earlier
-      // matches spliced out, so its offsets no longer describe the
-      // question the reader typed.
-      at: phrasePosition(text, match.matchedText),
+      governedAgainst: nearestGoverningPreposition(before) === 'against',
+      at,
       end: phraseEnd(text, match.matchedText),
     });
     working = stripMatch(working, match.matchedText);

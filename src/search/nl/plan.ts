@@ -574,7 +574,26 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // "at least"/"at most", "more/less/fewer than", "no more/fewer/less/
 // greater than", "over"/"under" before digits, "exactly") is unaffected
 // when it genuinely governs the clause it appears in.
-export const PARSER_VERSION = 55;
+// v56 -- AFLDB-ISSUE-208: extractClubs's role-assignment lookback (nl/parser.ts)
+// now asks "what is the nearest preposition immediately before this club
+// mention" (nearestGoverningPreposition) instead of "does an against-like
+// token exist anywhere in a fixed 20-character window before it". The old
+// window test could not tell a genuinely governing "to"/"over" from an
+// unrelated one the window merely also contained -- "after the siren TO WIN
+// FOR North Melbourne" read "to" as governing even though "for" (immediately
+// adjacent) was the real governor, dropping the subject club on 134
+// after-siren rows. The same broad test also depended on `working`'s own
+// mutation: once an earlier club's matched text was spliced out, a later
+// club's shrunken window could pull the EARLIER club's own "against" into
+// range -- "Against Fremantle, ... what was Melbourne's largest lead"
+// mis-governed Melbourne too, once stripping "Fremantle" closed the gap,
+// dropping the subject club on 117 team-checkpoint rows. Anchoring to the
+// nearest token, checked against the text extractClubs was originally
+// handed (never the mutated copy), fixes both in one mechanism. Ordinary
+// two-club phrasing ("Adelaide biggest win against GWS Giants") and the
+// unordered "A versus B" -> scope.matchup reading are both unaffected --
+// neither depended on the window's width.
+export const PARSER_VERSION = 56;
 
 // ------------------------------------------------------------------ grain
 

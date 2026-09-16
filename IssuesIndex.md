@@ -4,9 +4,21 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
 
-_No open issues._
+**AFLDB-ISSUE-208** — High severity, NL search parser. Follow-on item (2) of `AFLDB-ISSUE-206.md`'s
+six proposals: `extractClubs`'s club-role lookback (`src/search/nl/parser.ts`) tested "does an
+against-like token exist anywhere in a fixed 20-character window", not "what is the nearest
+preposition governing this club" — losing the subject club on 134 after-siren rows ("to win FOR
+Club" mis-read the earlier, unrelated "to" as governing) and 117 leading-opponent/checkpoint rows
+("Against Opponent, ... Subject's ..." let the opponent's own stripped-out "against" leak into the
+subject's shrunken window). One shared mechanism, fixed by a `nearestGoverningPreposition` helper
+anchored to the immediately-preceding token, checked against the pre-mutation text. `PARSER_VERSION`
+55→56. Fix implemented and focused-tested (472/472 `nl-parser.test.ts`, 53/53
+`nl-stress-corpus.test.ts`, clean `tsc --noEmit`) on `sonnet/issue-208-club-role-ownership` (base
+`ca17277f`, unmerged) — **not yet operator-validated**. Next action: operator runs the frozen V5
+stable-corpus gate and a structured-plan diff of the confirmed 251-row exploratory family on
+streamanator. See `issues.md` and `AFLDB-ISSUE-208.md`.
 
 **AFLDB-ISSUE-207 resolved 2026-09-16** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (1) of `AFLDB-ISSUE-206.md`'s six proposals, the highest-severity finding (281 silently-wrong-answer
