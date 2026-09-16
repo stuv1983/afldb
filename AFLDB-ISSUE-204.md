@@ -1,8 +1,8 @@
 # AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
-**Status:** Implementation complete, pending operator validation (2026-09-16, Sonnet 5). Fourth and
-final of AFLDB-ISSUE-200's follow-on families (Stage 2 next-task item 5d). Correction tool and tests
-written; not yet run against the real corpus; not resolved.
+**Status:** Retargeted after a failed-closed first operator run, pending operator re-validation
+(2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families (Stage 2 next-task
+item 5d). Correction tool and tests corrected; not yet run against the real corpus; not resolved.
 
 ## 0. Naming correction
 
@@ -22,6 +22,39 @@ That title is not accurate:
 - `fgf` = "Finals/Grand Final" (the match-type scope of the template), not "first goal final."
 
 Ledger title: **"Correct stale pre-1965/1987 finals-stat coverage expectations."**
+
+## 0a. First operator run: failed closed as designed, retargeted (2026-09-16)
+
+The first implementation derived candidates from `category === 'finals_grand_final'` AND
+equivalence-group template prefix `fgf` alone. Against the real V3 corpus that signature matched **996
+rows**, not 180: 636 `team_match`-grain rows (e.g. row 8910, "biggest Grand Final win since 1897") plus
+another 180 `player_game`-grain rows that are goals questions (e.g. row 8914, "most goals in the 1897
+Grand Final") or top-5-listing questions (e.g. row 8920, "top 5 disposals games in finals since 1897"),
+alongside the true 180-row target family. The tool's own fail-closed re-verification of every candidate
+against the audited old-state correctly aborted the whole run on the first mismatching candidate (row
+8910: `expected_grain="team_match"` where the audit requires `player_game`) rather than silently
+including or excluding it. No V4 was written. This was the intended fail-closed behaviour, not a bug.
+
+An id-list alternative was considered and rejected: a later 3-block sample of ids the operator quoted
+(`8918,8919,8921,8922,8924,8925 | 8968,8969,8971,8972,8974,8975 | 9001,9002,9004,9005,9007,9008`) has no
+constant inter-season stride (+50 then +33 between block starts), so the remaining 27 season blocks'
+ids cannot be reconstructed deterministically from it. Hardcoding a fabricated completion of that list
+would have been exactly the kind of guess this tool's own fail-closed discipline forbids, and would have
+silently written wrong ids into a supposedly-verified 180-row set — worse than the original over-broad
+selector, because it would not have failed closed.
+
+**Fix:** candidate derivation (`isCandidateTarget()`) now gates on the row's full structural signature,
+not just category+template: `expected_grain === 'player_game'`, `expected_mode === 'single'`,
+`expected_aggregation === 'max'`, `expected_metric` in `{disposals, marks, tackles}`,
+`expected_match_type` in `{final, grand_final}`, and a single pinned season in `[1897, 1926]` — the same
+fields already used to *verify* candidates, now also used to *select* them. This structurally excludes
+all 816 non-target siblings (team_match rows on grain; goals rows on metric; top-5 rows on
+mode/aggregation) without needing any id list, real or fabricated. `assertAuditedCoveragePreState()` is
+narrowed to only the fields that describe mutable "old state" that could have drifted from a prior
+partial run — `expected_status`, `expected_failure_reason`, `expected_coverage_behavior`,
+`expected_min_confidence`, and question-text agreement — since the structural fields are now guaranteed
+by candidacy itself. See `tools/nl/fix-issue-204-stale-coverage-expectations.ts`'s header comment for
+the full before/after rationale.
 
 ## 1. Operator-verified evidence (2026-09-16, superseding the prior planning session's re-derivation plan)
 
@@ -112,20 +145,25 @@ any mismatch, self-verifying post-check that nothing else moved).
 
 **Targeting strategy — deliberately not a hardcoded id list.** AFLDB-ISSUE-199/201 hardcoded explicit
 id lists/ranges because their audits named exact ids. This issue's operator evidence (§1) names the
-family's exact composition but not a literal id list, and this repository's own V3 corpus is not
-carried in-repo to read ids from directly. Hardcoding a fabricated range would be exactly the kind of
-guess this script's own discipline forbids. Instead:
+family's exact composition but not a literal id list, and (per §0a) a later 3-block id sample the
+operator quoted cannot be extended to the full 180 without guessing. Hardcoding a fabricated range would
+be exactly the kind of guess this script's own discipline forbids. Instead, **candidacy itself is gated
+on the row's full structural signature** (revised after the first run's over-broad category+template-only
+selector matched 996 rows instead of 180 — see §0a):
 
-1. Candidates are *derived* from each row's own `category` (`finals_grand_final`) and
-   `equivalence_group` template prefix (`fgf`) — the same signature
-   `audit-issue-200-extract.ts`'s `templatePrefix()` already uses to build the
-   `coverage_unavailable|fgf` cluster key this issue corrects.
-2. Every candidate is then individually re-verified against every audited old-field value from §1
-   (`assertAuditedCoveragePreState`) — old status/grain/mode/aggregation/failure-reason/coverage-
-   behavior/min-confidence, metric in {disposals, marks, tackles}, match type in {final, grand_final},
-   a single pinned season in [1897, 1926] — and against its own question text agreeing with its
-   metric/match-type/season fields (`assertQuestionMatchesRow`). A candidate that disagrees with the
-   audited shape in any way aborts the whole run.
+1. Candidates are *derived* from each row's own `category` (`finals_grand_final`), `equivalence_group`
+   template prefix (`fgf` — the same signature `audit-issue-200-extract.ts`'s `templatePrefix()` already
+   uses to build the `coverage_unavailable|fgf` cluster key), `expected_grain` (`player_game`),
+   `expected_mode` (`single`), `expected_aggregation` (`max`), `expected_metric` (disposals/marks/
+   tackles), `expected_match_type` (final/grand_final), and a single pinned season in [1897, 1926]
+   (`isCandidateTarget`). This structurally excludes the real corpus's 816 category/template siblings
+   (636 `team_match`-grain rows on grain; 180 more `player_game` rows that are goals questions on
+   metric, or top-5-listing questions on mode/aggregation).
+2. Every candidate is then individually re-verified against every audited *mutable* old-field value from
+   §1 (`assertAuditedCoveragePreState`) — old status/failure-reason/coverage-behavior/min-confidence —
+   and against its own question text agreeing with its metric/match-type/season fields
+   (`assertQuestionMatchesRow`). A candidate that disagrees with the audited shape in any way aborts the
+   whole run.
 3. The accepted target set must be exactly 180, with exactly the audited 60/60/60 metric split, 90/90
    match-type split, and 30 seasons of exactly 6 rows each — the full composition from §1, not just the
    total.
@@ -157,22 +195,30 @@ Refuses to overwrite `--corpus` unless `--allow-overwrite-input` is passed. Neve
 
 `tests/nl-issue-204-corpus-fix.test.ts`, DB-free, mirroring `tests/nl-issue-201-corpus-fix.test.ts`'s
 fixture shape (a synthetic 12,000-row corpus with the 180-row target family built at ids 5000-5179,
-30 seasons x 3 metrics x 2 match types, plus filler rows for the rest). Covers:
+30 seasons x 3 metrics x 2 match types, plus 6 category/template *sibling* rows at ids 6000-6005 —
+one `team_match` row mirroring the real corpus's row 8910, two goals rows, three top-5-listing rows —
+plus filler rows for the rest). Covers:
 
 1. exactly 180 rows corrected to the established decline shape, non-target rows untouched;
 2. input/output row count stays 12000;
 3. row ordering preserved;
-4. every non-target row byte-identical at the parsed field level;
+4. every non-target row byte-identical at the parsed field level (including the 6 siblings);
 5. input row count != 12000 refuses;
 6. a target row missing (derived count drops to 179) refuses;
 7. a duplicate id refuses;
 8. old `expected_status` drift refuses;
 9. old `expected_coverage_behavior` drift refuses;
 10. question text disagreeing with its own metric/season/match-type fields refuses;
-11. `expected_metric` outside disposals/marks/tackles refuses;
-12. season outside 1897-1926 refuses;
-13. `expected_match_type` outside final/grand_final refuses;
-14. `assertAuditedCoveragePreState`/`assertQuestionMatchesRow`/`assertOutputPathIsSafe` unit-level
+11. a target row's `expected_metric` mutated outside disposals/marks/tackles is excluded from candidacy
+    (not a field-specific error) and the resulting 179-count refuses;
+12. a target row's season mutated outside 1897-1926 is excluded from candidacy and refuses the same way;
+13. a target row's `expected_match_type` mutated outside final/grand_final is excluded from candidacy
+    and refuses the same way;
+14. a non-target `fgf` `team_match` row (the row-8910 shape) is ignored without aborting;
+15. non-target `fgf` goals rows are ignored without aborting;
+16. non-target `fgf` top-5 disposals/marks/tackles rows are ignored without aborting;
+17. a genuine missing target row still refuses even with siblings present;
+18. `assertAuditedCoveragePreState`/`assertQuestionMatchesRow`/`assertOutputPathIsSafe` unit-level
     checks (accept/reject cases, including the `expected_min_confidence` drift case).
 
 ## 7. Parser/runtime
@@ -242,12 +288,17 @@ per command 7 above, not just totals.
 
 ## 10. Residual risks / stop conditions
 
-- If the real V3 corpus's `finals_grand_final`/`fgf` candidate count is not exactly 180, or the
-  metric/match-type/season distribution does not match §1 exactly, the tool aborts and writes nothing
-  — this is the intended fail-closed behaviour, not a bug to work around by loosening the derivation.
-- If any candidate's old expectation fields have already drifted from §1's exact values (e.g. a prior
-  partial correction), the tool aborts naming the offending row rather than silently accepting or
-  rejecting it.
+- If the real V3 corpus's full-structural-signature candidate count (§5, post-§0a retargeting) is not
+  exactly 180, or the metric/match-type/season distribution does not match §1 exactly, the tool aborts
+  and writes nothing — this is the intended fail-closed behaviour, not a bug to work around by loosening
+  the derivation. This is what happened on the first run (§0a); it must not recur under the corrected
+  signature, but if it does, stop and re-audit rather than loosening the derivation further.
+- If any candidate's old *mutable* expectation fields (status/failure-reason/coverage-behavior/min-
+  confidence) have already drifted from §1's exact values (e.g. a prior partial correction), the tool
+  aborts naming the offending row rather than silently accepting or rejecting it.
+- The retargeting in §0a was verified only against the synthetic test fixture (`tests/nl-issue-204-
+  corpus-fix.test.ts`), not yet against the real V3 corpus — the operator's re-run (§8) is the first
+  real-corpus proof that the corrected signature yields exactly 180 and nothing else.
 - The 70 `WRONG_FAILURE_REASON` taxonomy-drift rows, parser/runtime code, `PARSER_VERSION`, and any
   other historical coverage floor are explicitly out of scope and untouched by this tool.
 - `CHANGELOG.md` is intentionally not yet updated — pending operator validation per task instruction.

@@ -29,16 +29,38 @@
  * operator's audit named exact ids. This issue's operator evidence names
  * the family's exact composition (category, template, metric/match-type/
  * season distribution, and every stale field's exact old value) but not a
- * literal id list. Hardcoding a fabricated id range here would be a guess
- * this script's own fail-closed discipline forbids. Instead, targets are
- * *derived* from the row's own category and equivalence-group template --
- * the same signature `tools/nl/audit-issue-200-extract.ts`'s
+ * literal id list, and a later 3-sample fragment of ids the operator quoted
+ * has no constant inter-season stride, so it cannot be extended to the full
+ * 180 without guessing. Hardcoding a fabricated id range here would be
+ * exactly the kind of guess this script's own fail-closed discipline
+ * forbids. Instead, targets are *derived* from each row's own structural
+ * signature: category (`finals_grand_final`), equivalence-group template
+ * prefix (`fgf` -- the same signature `tools/nl/audit-issue-200-extract.ts`'s
  * `templatePrefix()` already uses to build the `coverage_unavailable|fgf`
- * cluster key -- and every derived candidate is then re-verified against
- * every audited old-field value before anything is written. A row that
- * matches the category/template signature but disagrees with the audited
- * shape in any way aborts the whole run rather than being silently
- * included or excluded.
+ * cluster key), grain (`player_game`), mode (`single`), aggregation
+ * (`max`), metric (disposals/marks/tackles), match type (final/
+ * grand_final), and a single pinned season in [1897, 1926].
+ *
+ * THE FIRST RUN'S FAILURE, AND WHY CATEGORY+TEMPLATE ALONE WAS NOT ENOUGH
+ *
+ * An earlier version of this script derived candidates from category+
+ * template alone (996 rows: 636 `team_match`-grain rows plus 180 more
+ * `player_game` rows that are goals/top-5-listing questions, alongside the
+ * true 180) and re-verified every candidate against the full audited old-
+ * state, aborting on any mismatch. That correctly failed closed on the
+ * first real operator run (row 8910, a `team_match` "biggest Grand Final
+ * win" row, aborted the whole run rather than being silently included or
+ * excluded) but for the wrong reason: category+template is only a broad
+ * corpus template family, not this family's identifying signature.
+ * Grain/mode/aggregation/metric-set/match-type-set/season-range are *also*
+ * part of what distinguishes the 180-row family from its siblings in the
+ * same `fgf` template (team-match margin questions, goals questions,
+ * top-5-listing questions), so they now gate *candidacy* itself rather than
+ * only post-candidacy drift detection. A row that matches the full
+ * structural signature but disagrees with the audited old-state (status/
+ * failure-reason/coverage-behavior/min-confidence/question-text) in any way
+ * still aborts the whole run rather than being silently corrected or
+ * skipped.
  *
  * FAIL-CLOSED, NOT PARTIAL
  *
@@ -112,10 +134,33 @@ const VERIFIED_OLD_COVERAGE_BEHAVIOR = 'full';
 
 // ----------------------------------------------------------------- helpers
 
-/** True for a row whose category + equivalence-group template matches this issue's audited cluster signature. */
+/**
+ * True for a row whose full structural signature matches this issue's
+ * audited 180-row family: category + equivalence-group template alone are
+ * a broad corpus template family (996 rows in the real corpus, per the
+ * first operator run) shared with `team_match`-grain rows and other
+ * `player_game` rows (goals questions, top-5-listing questions) that are
+ * not part of this family. Grain/mode/aggregation/metric-set/match-type-set
+ * /season-range are what actually distinguishes the 180-row family from
+ * those siblings, so every one of them gates candidacy here -- not just the
+ * old-state fields checked afterward in assertAuditedCoveragePreState.
+ */
 function isCandidateTarget(record: Record<string, string>): boolean {
-  return record.category === VERIFIED_CATEGORY
-    && templatePrefix(record.equivalence_group ?? '') === VERIFIED_TEMPLATE;
+  if (record.category !== VERIFIED_CATEGORY) return false;
+  if (templatePrefix(record.equivalence_group ?? '') !== VERIFIED_TEMPLATE) return false;
+  if (record.expected_grain !== VERIFIED_OLD_GRAIN) return false;
+  if (record.expected_mode !== VERIFIED_OLD_MODE) return false;
+  if (record.expected_aggregation !== VERIFIED_OLD_AGGREGATION) return false;
+  if (!VERIFIED_METRICS.includes(record.expected_metric as VerifiedMetric)) return false;
+  if (!VERIFIED_MATCH_TYPES.includes(record.expected_match_type as VerifiedMatchType)) return false;
+
+  const seasonFrom = record.expected_season_from;
+  const seasonTo = record.expected_season_to;
+  if (!seasonFrom || seasonFrom !== seasonTo) return false;
+  const season = Number(seasonFrom);
+  if (!Number.isInteger(season) || season < VERIFIED_SEASON_MIN || season > VERIFIED_SEASON_MAX) return false;
+
+  return true;
 }
 
 /**
@@ -155,24 +200,19 @@ export type VerifiedTarget = {
 };
 
 /**
- * Confirms one candidate row's full old-expectation shape matches this
- * issue's audit exactly before it is accepted as a target. Reads only the
- * row itself -- never a sibling row or an assumption -- and fails closed on
- * any mismatch rather than silently correcting or silently skipping a row
- * this issue's evidence does not cleanly cover.
+ * Confirms one candidate row's old-expectation "state" fields -- the ones
+ * this correction actually mutates or that could have drifted from a prior
+ * partial run -- match this issue's audit exactly before it is accepted as
+ * a target. The row's structural identity (category/template/grain/mode/
+ * aggregation/metric/match-type/season) is already guaranteed by
+ * isCandidateTarget() before this runs, so it is not re-checked here.
+ * Reads only the row itself -- never a sibling row or an assumption -- and
+ * fails closed on any mismatch rather than silently correcting or silently
+ * skipping a row this issue's evidence does not cleanly cover.
  */
 export function assertAuditedCoveragePreState(id: number, record: Record<string, string>): VerifiedTarget {
   if (record.expected_status !== VERIFIED_OLD_STATUS) {
     throw new Error(`Row ${id}: audited before-state expects expected_status="${VERIFIED_OLD_STATUS}", found "${record.expected_status}". Refusing to run.`);
-  }
-  if (record.expected_grain !== VERIFIED_OLD_GRAIN) {
-    throw new Error(`Row ${id}: audited before-state expects expected_grain="${VERIFIED_OLD_GRAIN}", found "${record.expected_grain}". Refusing to run.`);
-  }
-  if (record.expected_mode !== VERIFIED_OLD_MODE) {
-    throw new Error(`Row ${id}: audited before-state expects expected_mode="${VERIFIED_OLD_MODE}", found "${record.expected_mode}". Refusing to run.`);
-  }
-  if (record.expected_aggregation !== VERIFIED_OLD_AGGREGATION) {
-    throw new Error(`Row ${id}: audited before-state expects expected_aggregation="${VERIFIED_OLD_AGGREGATION}", found "${record.expected_aggregation}". Refusing to run.`);
   }
   if ((record.expected_failure_reason ?? '') !== '') {
     throw new Error(`Row ${id}: audited before-state expects expected_failure_reason="" (empty), found "${record.expected_failure_reason}". Refusing to run.`);
@@ -185,24 +225,8 @@ export function assertAuditedCoveragePreState(id: number, record: Record<string,
   }
 
   const metric = record.expected_metric as VerifiedMetric;
-  if (!VERIFIED_METRICS.includes(metric)) {
-    throw new Error(`Row ${id}: expected_metric "${record.expected_metric}" is not one of ${VERIFIED_METRICS.join('/')}. Refusing to guess.`);
-  }
-
   const matchType = record.expected_match_type as VerifiedMatchType;
-  if (!VERIFIED_MATCH_TYPES.includes(matchType)) {
-    throw new Error(`Row ${id}: expected_match_type "${record.expected_match_type}" is not one of ${VERIFIED_MATCH_TYPES.join('/')}. Refusing to guess.`);
-  }
-
-  const seasonFrom = record.expected_season_from;
-  const seasonTo = record.expected_season_to;
-  if (!seasonFrom || seasonFrom !== seasonTo) {
-    throw new Error(`Row ${id}: expected a single pinned season (expected_season_from === expected_season_to), found from="${seasonFrom}" to="${seasonTo}". Refusing to guess.`);
-  }
-  const season = Number(seasonFrom);
-  if (!Number.isInteger(season) || season < VERIFIED_SEASON_MIN || season > VERIFIED_SEASON_MAX) {
-    throw new Error(`Row ${id}: season ${seasonFrom} is outside the audited ${VERIFIED_SEASON_MIN}-${VERIFIED_SEASON_MAX} range. Refusing to guess.`);
-  }
+  const season = Number(record.expected_season_from);
 
   assertQuestionMatchesRow(id, (record.question ?? '').trim(), metric, matchType, season);
 
@@ -271,7 +295,7 @@ export function correctCorpus(inputCsvText: string): { outputCsvText: string; su
   });
 
   if (targets.length !== EXPECTED_TARGET_COUNT) {
-    throw new Error(`Expected exactly ${EXPECTED_TARGET_COUNT} rows matching category="${VERIFIED_CATEGORY}" template="${VERIFIED_TEMPLATE}", found ${targets.length}. Refusing to run.`);
+    throw new Error(`Expected exactly ${EXPECTED_TARGET_COUNT} rows matching the audited structural signature (category="${VERIFIED_CATEGORY}" template="${VERIFIED_TEMPLATE}" grain="${VERIFIED_OLD_GRAIN}" mode="${VERIFIED_OLD_MODE}" aggregation="${VERIFIED_OLD_AGGREGATION}" metric in ${VERIFIED_METRICS.join('/')} match_type in ${VERIFIED_MATCH_TYPES.join('/')} season ${VERIFIED_SEASON_MIN}-${VERIFIED_SEASON_MAX}), found ${targets.length}. Refusing to run.`);
   }
 
   // ---- distribution self-check: the audited 3x2x30 composition, not just the total

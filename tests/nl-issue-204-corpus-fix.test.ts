@@ -6,12 +6,18 @@
  * does not carry) with the exact 180-row `coverage_unavailable|fgf` target
  * family the operator's AFLDB-ISSUE-204 audit verified (disposals/marks/
  * tackles x finals/grand_final x seasons 1897-1926, 6 rows per season),
- * then proves the invariants
+ * PLUS a set of non-target rows that share the same `finals_grand_final`
+ * category and `fgf` equivalence-group template but differ in grain/metric/
+ * mode/aggregation (team-match margin questions, goals questions, top-5-
+ * listing questions -- the real corpus's other 816 `fgf`-template rows, per
+ * the first operator run that correctly aborted on one of them, row 8910).
+ * Proves the invariants
  * tools/nl/fix-issue-204-stale-coverage-expectations.ts's own header comment
- * promises: it derives exactly those 180 rows from their category/template
- * signature, corrects them to the established coverage_unavailable decline
- * shape, refuses on any before-state/count/distribution/question-wording
- * mismatch, and never touches anything else.
+ * promises: it derives exactly the 180 target rows from their full
+ * structural signature (not just category/template), leaves every
+ * category/template sibling untouched, corrects the 180 to the established
+ * coverage_unavailable decline shape, refuses on any before-state/count/
+ * distribution/question-wording mismatch, and never touches anything else.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -87,6 +93,81 @@ function targetRow(id: number, metric: string, matchType: 'final' | 'grand_final
   };
 }
 
+/**
+ * A `finals_grand_final`/`fgf`-template sibling row that is NOT part of the
+ * 180-row target family: `team_match` grain (e.g. "biggest Grand Final win
+ * since 1897", real-corpus row 8910). Shares category+template with the
+ * targets but must be excluded on grain alone.
+ */
+function teamMatchSiblingRow(id: number, season: number): Row {
+  return {
+    ...baseRow(id),
+    category: 'finals_grand_final',
+    equivalence_group: 'fgf|coverage_margin',
+    question: `Biggest Grand Final win since ${season}`,
+    expected_grain: 'team_match',
+    expected_mode: 'single',
+    expected_metric: 'margin',
+    expected_aggregation: 'max',
+    expected_season_from: String(season),
+    expected_season_to: '2024',
+    expected_match_type: 'grand_final',
+    expected_failure_reason: '',
+    expected_coverage_behavior: 'full',
+    expected_min_confidence: '0.80',
+  };
+}
+
+/**
+ * A `finals_grand_final`/`fgf`-template sibling row that is NOT part of the
+ * 180-row target family: a goals question (e.g. "most goals in the 1897
+ * Grand Final"). Shares category+template+grain+mode+aggregation with the
+ * targets but must be excluded on metric alone.
+ */
+function goalsSiblingRow(id: number, matchType: 'final' | 'grand_final', season: number): Row {
+  return {
+    ...baseRow(id),
+    category: 'finals_grand_final',
+    equivalence_group: 'fgf|coverage_boundary',
+    question: questionFor('goals', matchType, season),
+    expected_grain: 'player_game',
+    expected_mode: 'single',
+    expected_metric: 'goals',
+    expected_aggregation: 'max',
+    expected_season_from: String(season),
+    expected_season_to: String(season),
+    expected_match_type: matchType,
+    expected_failure_reason: '',
+    expected_coverage_behavior: 'full',
+    expected_min_confidence: '0.80',
+  };
+}
+
+/**
+ * A `finals_grand_final`/`fgf`-template sibling row that is NOT part of the
+ * 180-row target family: a top-5-listing question (e.g. "top 5 disposals
+ * games in finals since 1897"). Shares category+template+grain+metric with
+ * the targets but must be excluded on mode/aggregation alone.
+ */
+function topFiveSiblingRow(id: number, metric: string, matchType: 'final' | 'grand_final', season: number): Row {
+  return {
+    ...baseRow(id),
+    category: 'finals_grand_final',
+    equivalence_group: 'fgf|coverage_boundary',
+    question: `Top 5 ${metric} games in ${matchType === 'grand_final' ? 'Grand Finals' : 'finals'} since ${season}`,
+    expected_grain: 'player_game',
+    expected_mode: 'multi',
+    expected_metric: metric,
+    expected_aggregation: 'top_n',
+    expected_season_from: String(season),
+    expected_season_to: '2024',
+    expected_match_type: matchType,
+    expected_failure_reason: '',
+    expected_coverage_behavior: 'full',
+    expected_min_confidence: '0.80',
+  };
+}
+
 /** The 180 (id -> definition) target rows: 30 seasons x 3 metrics x 2 match types. */
 function buildTargetDefs(): { id: number; metric: string; matchType: 'final' | 'grand_final'; season: number }[] {
   const defs: { id: number; metric: string; matchType: 'final' | 'grand_final'; season: number }[] = [];
@@ -104,11 +185,39 @@ function buildTargetDefs(): { id: number; metric: string; matchType: 'final' | '
 const TARGET_DEFS = buildTargetDefs();
 const TARGET_IDS = TARGET_DEFS.map((d) => d.id);
 
+/**
+ * Ids for the 6 category/template siblings that are NOT part of the 180-row
+ * target family -- the real corpus's other 816 `fgf`-template rows, per the
+ * first operator run (996 broad candidates, 180 real targets).
+ */
+const SIBLING_TEAM_MATCH_ID = 6000;
+const SIBLING_GOALS_FINAL_ID = 6001;
+const SIBLING_GOALS_GRAND_FINAL_ID = 6002;
+const SIBLING_TOP5_DISPOSALS_ID = 6003;
+const SIBLING_TOP5_MARKS_ID = 6004;
+const SIBLING_TOP5_TACKLES_ID = 6005;
+const SIBLING_IDS = [
+  SIBLING_TEAM_MATCH_ID, SIBLING_GOALS_FINAL_ID, SIBLING_GOALS_GRAND_FINAL_ID,
+  SIBLING_TOP5_DISPOSALS_ID, SIBLING_TOP5_MARKS_ID, SIBLING_TOP5_TACKLES_ID,
+];
+
+function buildSiblingRows(): Row[] {
+  return [
+    teamMatchSiblingRow(SIBLING_TEAM_MATCH_ID, 1900),
+    goalsSiblingRow(SIBLING_GOALS_FINAL_ID, 'final', 1900),
+    goalsSiblingRow(SIBLING_GOALS_GRAND_FINAL_ID, 'grand_final', 1900),
+    topFiveSiblingRow(SIBLING_TOP5_DISPOSALS_ID, 'disposals', 'final', 1900),
+    topFiveSiblingRow(SIBLING_TOP5_MARKS_ID, 'marks', 'grand_final', 1900),
+    topFiveSiblingRow(SIBLING_TOP5_TACKLES_ID, 'tackles', 'final', 1900),
+  ];
+}
+
 function buildRows(overrides?: { defs?: typeof TARGET_DEFS }): Row[] {
   const defs = overrides?.defs ?? TARGET_DEFS;
   const rows = new Map<number, Row>();
   for (let id = 1; id <= 12000; id++) rows.set(id, baseRow(id));
   for (const def of defs) rows.set(def.id, targetRow(def.id, def.metric, def.matchType, def.season));
+  for (const row of buildSiblingRows()) rows.set(Number(row.id), row);
   return [...rows.entries()].sort(([a], [b]) => a - b).map(([, row]) => row);
 }
 
@@ -233,28 +342,81 @@ describe('AFLDB-ISSUE-204 correctCorpus', () => {
     expect(() => correctCorpus(buildCsv(rows))).toThrow(new RegExp(`${id}.*question`, 's'));
   });
 
-  it('refuses when a target row\'s expected_metric is not one of disposals/marks/tackles', () => {
+  // expected_metric/expected_match_type/expected_season are structural
+  // signature fields gated by isCandidateTarget() itself (see the tool's
+  // "THE FIRST RUN'S FAILURE" header comment), not post-candidacy drift
+  // checks -- so mutating one on a target row makes that row silently drop
+  // out of candidacy rather than raising a field-specific error. That
+  // surfaces as the same "missing target" count mismatch as an outright
+  // removed row, which is the correct fail-closed outcome: an ambiguous row
+  // must never be silently folded into or dropped from the family.
+  it('excludes (and refuses to run) a target row whose expected_metric is not one of disposals/marks/tackles', () => {
     const rows = buildRows();
     const id = TARGET_DEFS[0].id;
     const index = findRowIndex(rows, id);
     rows[index] = { ...rows[index], expected_metric: 'kicks' };
-    expect(() => correctCorpus(buildCsv(rows))).toThrow(new RegExp(`${id}.*expected_metric`, 's'));
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
   });
 
-  it('refuses when a target row\'s season is outside the audited 1897-1926 range', () => {
+  it('excludes (and refuses to run) a target row whose season is outside the audited 1897-1926 range', () => {
     const rows = buildRows();
     const id = TARGET_DEFS[0].id;
     const index = findRowIndex(rows, id);
     rows[index] = { ...rows[index], expected_season_from: '1930', expected_season_to: '1930', question: questionFor(TARGET_DEFS[0].metric, TARGET_DEFS[0].matchType, 1930) };
-    expect(() => correctCorpus(buildCsv(rows))).toThrow(new RegExp(`${id}.*outside the audited`, 's'));
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
   });
 
-  it('refuses when a target row\'s expected_match_type is not final/grand_final', () => {
+  it('excludes (and refuses to run) a target row whose expected_match_type is not final/grand_final', () => {
     const rows = buildRows();
     const id = TARGET_DEFS[0].id;
     const index = findRowIndex(rows, id);
     rows[index] = { ...rows[index], expected_match_type: 'finals' };
-    expect(() => correctCorpus(buildCsv(rows))).toThrow(new RegExp(`${id}.*expected_match_type`, 's'));
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
+  });
+
+  // ---- category/template siblings (the real corpus's other 816 `fgf` rows)
+
+  it('ignores a non-target fgf team_match row (the real-corpus row-8910 shape) without aborting', () => {
+    const rows = buildRows();
+    const { outputCsvText, summary } = correctCorpus(buildCsv(rows));
+    expect(summary.targetRowsModified).toBe(180);
+    expect(summary.nonTargetRowsModified).toBe(0);
+    const outputRows = parseBack(outputCsvText);
+    expect(outputRows[findRowIndex(rows, SIBLING_TEAM_MATCH_ID)]).toEqual(rows[findRowIndex(rows, SIBLING_TEAM_MATCH_ID)]);
+  });
+
+  it('ignores non-target fgf goals rows without aborting', () => {
+    const rows = buildRows();
+    const { outputCsvText, summary } = correctCorpus(buildCsv(rows));
+    expect(summary.targetRowsModified).toBe(180);
+    expect(summary.nonTargetRowsModified).toBe(0);
+    const outputRows = parseBack(outputCsvText);
+    for (const id of [SIBLING_GOALS_FINAL_ID, SIBLING_GOALS_GRAND_FINAL_ID]) {
+      expect(outputRows[findRowIndex(rows, id)]).toEqual(rows[findRowIndex(rows, id)]);
+    }
+  });
+
+  it('ignores non-target fgf top-5 disposals/marks/tackles rows without aborting', () => {
+    const rows = buildRows();
+    const { outputCsvText, summary } = correctCorpus(buildCsv(rows));
+    expect(summary.targetRowsModified).toBe(180);
+    expect(summary.nonTargetRowsModified).toBe(0);
+    const outputRows = parseBack(outputCsvText);
+    for (const id of [SIBLING_TOP5_DISPOSALS_ID, SIBLING_TOP5_MARKS_ID, SIBLING_TOP5_TACKLES_ID]) {
+      expect(outputRows[findRowIndex(rows, id)]).toEqual(rows[findRowIndex(rows, id)]);
+    }
+  });
+
+  it('still refuses when a genuine target row is missing, even with siblings present', () => {
+    const rows = buildRows();
+    const index = findRowIndex(rows, TARGET_DEFS[0].id);
+    rows[index] = baseRow(99999);
+    expect(() => correctCorpus(buildCsv(rows))).toThrow(/Expected exactly 180.*found 179/s);
+  });
+
+  it('fixture sanity: sibling ids do not collide with target ids', () => {
+    const targetIdSet = new Set(TARGET_IDS);
+    for (const id of SIBLING_IDS) expect(targetIdSet.has(id)).toBe(false);
   });
 });
 
