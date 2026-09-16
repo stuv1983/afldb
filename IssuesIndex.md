@@ -4,7 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -68,6 +68,14 @@ unchanged at 72/921/70; DB-free unit suite 28/28; `PARSER_VERSION` unchanged at 
 all now resolved. Stage 2 is **not** closed by this: the three soft classes remain open and unaudited
 (item 4 below), and the rest of the Stage 2 closeout sequence remains outstanding.
 
+**AFLDB-ISSUE-200 opened 2026-09-16** (planning only, Sonnet 5) for item 4's soft-class audit. Runbook
+`AFLDB-ISSUE-200.md` written; classification schema, audit tooling proposal (`tools/nl/
+audit-issue-200-extract.ts` + `audit-issue-200-cluster.ts`, not yet written), and a finding that
+`failures.csv` lacks the `expected_*` fields this audit needs (use `results.jsonl` instead) are all
+recorded there. No parser/planner/scorer code changed; no DEV commands run this session (no DEV file
+access from this Windows session). Next: an implementation session with DEV file access writes the
+tooling and performs the actual 1,063-row classification per the runbook.
+
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
 ## Stage 2 next task
@@ -86,9 +94,12 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    (`tools/nl/fix-issue-199-stale-expectations.ts`), operator-run against the real canonical CSV
    (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
    173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
-4. **Next.** A fresh exploratory stress sweep to identify any remaining NL coverage/safety gaps beyond
-   this triage, plus a decision on whether the three remaining soft classes (`GRAIN_EQUIVALENT` 72,
-   `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70 — unaudited, unrelated to ISSUE-199, unchanged by
-   its fix) need their own triage before Stage 2 can be declared complete. No issue number assigned yet.
+4. **In progress — AFLDB-ISSUE-200** (opened 2026-09-16, planning done, implementation not started).
+   Audit and classify all 1,063 soft rows (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
+   `WRONG_FAILURE_REASON` 70) into stale-expectation / genuine-defect / intentional-decline /
+   taxonomy-drift / scorer-artifact / duplicate-manifestation clusters before deciding what, if
+   anything, needs fixing. Not the same task as the fresh exploratory Codex corpus sweep, which
+   remains a separate, later Stage 2 phase gated on this audit's genuine-defect follow-ons and any
+   justified corpus corrections landing first. Runbook: `AFLDB-ISSUE-200.md`.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

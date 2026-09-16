@@ -8,6 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
+| AFLDB-ISSUE-200 | Low | Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`) | Planning runbook approved-pending; audit tooling not yet written | Operator/implementation session with DEV file access: write + run `tools/nl/audit-issue-200-extract.ts` and `tools/nl/audit-issue-200-cluster.ts` per `AFLDB-ISSUE-200.md` §4 against `/home/arm/nl-stress-v50-cleaned/` |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33152,3 +33153,95 @@ script, no parser code), but correctness depends on reading the real canonical C
 before writing the script's assumptions; recommend running the implementation session where the file
 is directly readable (the dev host) rather than carrying this plan's Windows-session inferences forward
 unverified. Full runbook: `AFLDB-ISSUE-199.md`.
+
+## AFLDB-ISSUE-200 — Audit remaining NL V2 soft findings
+
+- **Severity:** Low — test-tooling/corpus-audit task, not an application defect. No parser/planner/
+  application behaviour is in scope; this issue only classifies the 1,063 soft rows the V1 stress
+  harness has reported, unchanged, since before AFLDB-ISSUE-199.
+- **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
+  canonical corpus file itself (`/home/arm/nl-stress-corpus-v2.csv`, outside this repository), and
+  the DEV artifact directory `/home/arm/nl-stress-v50-cleaned/`.
+- **Status:** **Planning** 2026-09-16 (Sonnet 5). Runbook `AFLDB-ISSUE-200.md` written this session;
+  audit tooling proposed but not yet written, and the actual per-row/per-cluster classification has
+  not been performed (this session has no DEV file access, so it could not read
+  `nl-stress-v50-cleaned/results.jsonl`/`failures.csv`/`report.md` or the corpus file directly).
+- **Found:** 2026-09-16, opened by the user directly (not from a triage). Corresponds to
+  `IssuesIndex.md`'s Stage 2 next-task item 4 (the three soft classes flagged as unaudited when
+  AFLDB-ISSUE-199 resolved) — this issue is that follow-up audit, now with a tracked number.
+- **Key files:** `tools/nl/corpus.ts` (`scoreRow`, `StressExpectation`, `verdict`),
+  `tools/nl/stress-test.ts` (`RunRecord`, `writeOutputs`, `loadEntityIndex`/`saveEntityIndex`),
+  `tools/nl/README.md`, `src/db/queries/nl/log.ts` (`NlFailureReason`), `AFLDB-ISSUE-200.md` (full
+  runbook).
+
+### Symptom / starting point
+`npm run nl:stress` against the corrected V1 12,000-row corpus on parser v50 reports 0 hard failures
+and 1,063 soft findings, unchanged since before the ISSUE-199 correction: `GRAIN_EQUIVALENT` 72,
+`UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70 (`72 + 921 + 70 = 1063` exactly). None of the
+three classes has ever been individually audited — ISSUE-199 explicitly scoped them out.
+
+### Terminology finding (this session)
+"NL V2" in this issue's title refers to the corpus file's own version suffix
+(`nl-stress-corpus-v2.csv`, the AFLDB-ISSUE-199 correction output of the V1-schema 12k corpus), **not**
+`tools/nl/v2.ts`/`v2-runner.ts`, which is a separate, unrelated scorer for the 250,000-question
+qualification suite with its own finding-class enum (no `GRAIN_EQUIVALENT`). That scorer and suite are
+out of scope for this issue. Full explanation: `AFLDB-ISSUE-200.md` §0.
+
+### Tooling gap finding (this session)
+`tools/nl/stress-test.ts`'s `failures.csv` writer (`buildFailuresCsv`) sources
+`grain`/`metric`/`aggregation`/entity columns from `actual.plan` only, which is `null` for every
+`UNEXPECTED_DECLINE` row (921 of the 1,063) — exactly the rows where the corpus's *expected*
+grain/metric/aggregation/entities are what this audit needs, and `failures.csv` never writes any
+`expected_*` column at all. The correct source is `results.jsonl` (already written by the v50 run,
+alongside `entity-index.json`), which carries the complete `StressExpectation` and `StressObservation`
+for every row and supports DB-free re-scoring via the existing `scoreRow`/`loadEntityIndex` exports —
+the same mechanism `--report-only` already uses. Full detail: `AFLDB-ISSUE-200.md` §3.
+
+### Proposed design (not yet implemented)
+Two new, isolated, DB-free `tools/nl/` scripts, calling the existing unmodified `scoreRow`/`verdict`
+exports so classification stays identical to the real run (no scorer changes):
+
+1. `tools/nl/audit-issue-200-extract.ts` — reads `results.jsonl` + `entity-index.json`, re-scores,
+   keeps only the 1,063 soft rows (asserting exactly one soft finding per row, per §1's mutual-
+   exclusivity proof), writes a per-row audit CSV with every relevant expected/actual field plus a
+   mechanical `auto_cluster_key` heuristic column.
+2. `tools/nl/audit-issue-200-cluster.ts` — groups the audit CSV by `(class, auto_cluster_key)` into a
+   markdown summary for human/agent review, then (`--apply-dispositions`) left-joins a small
+   hand-written per-cluster disposition mapping back onto all 1,063 rows, refusing to finish if any
+   cluster key in the data is missing from the mapping — bounding the judgement work to "one row per
+   cluster" while still mechanically guaranteeing full per-row accounting.
+
+Full column list, heuristic definitions, classification schema (8 dispositions), promotion rules for
+when a cluster becomes a follow-on issue vs. a corpus correction vs. no change, the audit gate, and
+the recommended follow-on sequence: `AFLDB-ISSUE-200.md` §4-9.
+
+### Non-goals
+Parser/planner/scorer code changes; `PARSER_VERSION` changes; modifying either external corpus file;
+relabelling any row to reduce the soft count without cited evidence; opening follow-on issue numbers
+before clustering; AFLW; the large fresh Codex exploratory corpus (separate future Stage 2 phase).
+
+### Acceptance criteria
+- All 1,063 soft rows accounted for exactly once; class counts reconcile to 72/921/70; disposition
+  counts sum to 1,063.
+- Every genuine defect cluster (`PARSER_BUG`/`PLANNER_VALIDATOR_BUG`/`SCORER_HARNESS_ARTIFACT`) has
+  evidence sufficient for a separate follow-on issue (row count, 3+ worked examples, a root-cause
+  hypothesis citing specific code).
+- Every `STALE_CORPUS_EXPECTATION`/`INTENTIONAL_CONSERVATIVE_DECLINE` disposition cites the current
+  supported semantics that make it correct, not merely that it reduces the soft count.
+- No application/parser/scorer behaviour changed as part of the audit; `PARSER_VERSION` unchanged.
+- `IssuesIndex.md`'s Stage 2 next-task item 4 updated to point at this issue.
+
+### Operator verification expectations
+User/implementation session on the dev host per `CLAUDE.md` §9 (this session made no DEV command
+requests and executed no shell commands): write and unit-test the two scripts, then run them against
+the existing `/home/arm/nl-stress-v50-cleaned/` artifacts (no new stress run needed — the baseline is
+already current). Exact commands: `AFLDB-ISSUE-200.md` §4a/§4c.
+
+### Migration/schema implications
+None.
+
+### Implementation recommendation
+Sonnet 5, Medium effort, on a session with direct DEV file read access — the extraction/cluster
+scripts are mechanically simple (same shape as `fix-issue-199-stale-expectations.ts`), but the actual
+per-cluster classification judgement in §4c genuinely needs the real 1,063-row data in hand, which
+this Windows planning session did not have. Full runbook: `AFLDB-ISSUE-200.md`.
