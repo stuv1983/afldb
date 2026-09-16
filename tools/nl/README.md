@@ -213,3 +213,24 @@ name the directories do not recognise is reported before the run starts.
 
 The scoring rules have their own tests in `tests/nl-stress-corpus.test.ts`;
 a harness that mis-scores is worse than no harness.
+
+## The V1 corpus has no in-repo generator
+
+`~/nl-stress-corpus.csv` (V1, 12,000 rows) is an externally-authored CSV;
+nothing in this repository generates it. `tools/nl/afldb_nl_mass_generator.py`
+and `tools/nl/generate-expanded-ui-corpus.mjs` produce two different,
+unrelated corpora (a 5-column discovery corpus and the ~501-row expanded UI
+corpus respectively) and neither carries the V1 expectation schema above.
+`corpus.ts` is a reader/scorer for the canonical file, not a generator.
+
+Because there is no generator to rerun, a stale-oracle defect in the V1
+corpus (a row labelled `expected_status=decline` before a feature it now
+exercises correctly was shipped -- see AFLDB-ISSUE-070 and AFLDB-ISSUE-199)
+is fixed by a small, checked-in, self-verifying correction script, not by
+hand-editing the CSV or regenerating it. `tools/nl/fix-issue-199-stale-
+expectations.ts` is the pattern: it reads the canonical file, asserts the
+exact before-state of every row it intends to change, rewrites only the
+audited rows' expectation columns, and refuses (writing nothing) if any
+row count, id, or before-state assumption does not hold. Run it against a
+copy, never against the canonical file in place, and validate with
+`npm run nl:stress` on the corrected copy before promoting it.
