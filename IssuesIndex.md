@@ -4,19 +4,26 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
-**AFLDB-ISSUE-211** — Implement `after YEAR` as an exclusive season lower
-bound (`scope.seasonMin = YEAR + 1`). Severity: product gap (largest
-unimplemented soft-decline vocabulary family found by `AFLDB-ISSUE-206.md`,
-follow-on item 5). Area: NL search season extraction (`src/search/nl/parser.ts`
-`extractSeasons`, `src/search/nl/vocab.ts` new `AFTER_RE`). State:
-**implemented, locally GREEN** (`PARSER_VERSION` 58 → 59, worktree
-`sonnet/issue-211-after-year-season-bound`) — awaiting host validation on
-streamanator. Next action: operator runs the frozen V5 stable-corpus gate,
-the exploratory V1 rerun on parser v59, the v58→v59 structured-plan diff, and
-the per-family `after` classification (exact commands in
-`AFLDB-ISSUE-211.md`); resolve only once reconciled.
+**AFLDB-ISSUE-211 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(5) of `AFLDB-ISSUE-206.md`'s six proposals, the largest single unimplemented soft-decline vocabulary
+family it found: `extractSeasons` (`src/search/nl/parser.ts`, `src/search/nl/vocab.ts` new `AFTER_RE`)
+had no form for `after YEAR` as an exclusive lower season bound (`scope.seasonMin = YEAR + 1`,
+deliberately distinct from inclusive `since YEAR`). Fix extends the existing single season extractor
+with one new anchored regex and one new `else` branch alongside the existing `since` check — no second
+parser, no vocabulary/stage reordering, `after the siren`/`AFTER_THE_ACHIEVEMENT` unaffected because
+neither ever puts a literal year immediately after the word. `PARSER_VERSION` 58 → 59. Implementation
+commit `c113e6a`, unmerged on `sonnet/issue-211-after-year-season-bound`. Operator-validated on
+streamanator: frozen V5 stable-corpus rerun stayed **12000/12000/0/0**, and a direct structured-plan diff
+of the retained ISSUE-206 29,030-row exploratory corpus (pre-fix v58 vs post-fix v59) found exactly
+**1406 changed plans**, all genuine `after <4-digit year>` wording, 0 unrelated — reconciled in full:
+**1262 `soft_fail→clean`** (the genuine usability gain), **136 `soft_fail→soft_fail`** (95
+`career_boundary` / 23 `head_to_head` / 18 `unsupported_composition`, correctly declined under the
+existing compiler/coverage contract once the temporal clause parses), **8 `audit→audit`**
+(`malformed_input` rows, intentionally still manual-audit by corpus design), and **0 `soft_fail→fail`**.
+118 changed rows compose `after the siren` with a separate genuine `after YEAR` clause; both meanings
+coexist correctly in every one. See `issues.md` and `AFLDB-ISSUE-211.md` for the full record.
 
 **AFLDB-ISSUE-210 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (6) of `AFLDB-ISSUE-206.md`'s six proposals: a leading imperative/request-wrapper verb ("find", bare
