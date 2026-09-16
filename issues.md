@@ -4,11 +4,7 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
-
-- AFLDB-ISSUE-202 (Medium, NL search / `src/search/nl/`) -- GWS club identity leaks into
-  unsupported-term detection on `team_match` margin questions. Implemented (`vocab.ts` combined
-  `gws giants` alias, `PARSER_VERSION` 51->52), pending operator test/typecheck/corpus validation.
+**Open issues:** 0
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -17,9 +13,11 @@ unsupported-term leakage, `PARSER_BUG` word-form "zero", and a guarded corpus co
 AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of these, resolved
 2026-09-16 (Sonnet 5) -- see its detailed entry below.
 AFLDB-ISSUE-202 opened 2026-09-16 (Sonnet 5, planning only) for the second follow-on (GWS
-unsupported-term leakage, 128 manifestations) -- see its detailed entry below. The remaining two
-follow-on items ("zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not
-yet opened as tracked issues.
+unsupported-term leakage, 128 manifestations), resolved 2026-09-16 (Sonnet 5, operator-validated;
+also normalized 72 previously grain-equivalent GWS player-season rows to exact expected semantics
+as a byproduct of the same fix) -- see its detailed entry below. The remaining two follow-on items
+("zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not yet opened as
+tracked issues.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33781,9 +33779,9 @@ tracked issues).
 
 ## AFLDB-ISSUE-202 — GWS club identity leaks into unsupported-term detection
 
-**Opened:** 2026-09-16 (Sonnet 5, planning only). **Status:** Open, implemented, pending operator
-validation. Second of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item
-5b). Runbook: `AFLDB-ISSUE-202.md`.
+**Opened:** 2026-09-16 (Sonnet 5, planning only). **Resolved:** 2026-09-16 (Sonnet 5,
+operator-validated). Second of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2
+next-task item 5b). Runbook: `AFLDB-ISSUE-202.md`.
 
 ### Evidence
 AFLDB-ISSUE-200's real-audit cluster `unsupported_term|tm|gws` (128 rows, disposition `PARSER_BUG`,
@@ -33870,29 +33868,45 @@ bare `GWS` and bare `Giants` still resolving unchanged, and a negative case (`"G
 clubs are not in the directory declines instead of guessing" test (it previously said the fixture had
 no Sydney *or GWS*; GWS is now present, Sydney is not).
 
-**Not yet done (operator-gated):** focused test run, `npx tsc --noEmit`, parser-v52 stress-corpus
-re-run and before/after soft-row comparison against the retained V3 corpus, `CHANGELOG.md` entry
-(deferred to resolution per repository policy), and marking this issue resolved. See "Operator
-validation commands" below.
+Commit under validation: `96e40e7` — "Fix AFLDB-ISSUE-202 GWS club alias parsing".
 
-### Operator validation commands
-1. Focused tests: `npx vitest run tests/nl-parser.test.ts`
-2. Typecheck: `npx tsc --noEmit`
-3. Parser-v52 corpus run: re-run the stress harness against
-   `/home/arm/nl-stress-corpus-v3.csv` (same command used for the v51/V3 benchmark quoted in
-   `AFLDB-ISSUE-202.md`), capturing the new scored/clean/soft/failed totals and soft-class
-   breakdown.
-4. v51->v52 soft-row ID diff: compare the two runs' soft-row ID sets (same technique used for
-   ISSUE-199/ISSUE-201) and confirm the only rows that disappear are exactly the 128
-   `unsupported_term|tm|gws` cluster's IDs (~7488-7615 per the operator's corpus-shape
-   verification).
-5. Confirm all 128 GWS rows disappeared: the `unsupported_term|tm|gws` cluster count goes 128 -> 0
-   with no residual GWS-named row still soft.
-6. Confirm zero new soft rows: total soft count goes 465 -> 337 exactly (not lower or higher), and
-   no row outside the 128-row GWS cluster changes status.
-7. Confirm no semantic changes among the remaining 337 soft rows: `STALE_CORPUS_EXPECTATION` stays
-   180, `PARSER_BUG` zero stays 15, `GRAIN_EQUIVALENT` stays 72, `TAXONOMY_DRIFT` stays 70 -- same
-   IDs, same dispositions, not just the same counts.
+### Validation (2026-09-16, operator-run)
+- Focused tests: `tests/nl-parser.test.ts` 428/428 passed.
+- Typecheck: `npx tsc --noEmit` clean.
+- Stable V3 stress corpus, parser v51 (pre-fix baseline): 12,000 scored / 11,535 clean / 465 soft /
+  0 failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70).
+- Stable V3 stress corpus, parser v52 (post-fix, corpus unchanged): 12,000 scored / 11,735 clean /
+  265 soft / 0 failed (`UNEXPECTED_DECLINE` 195, `WRONG_FAILURE_REASON` 70, `GRAIN_EQUIVALENT` 0).
+- v51->v52 comparison: 200 soft rows removed, 0 added, 0 semantic changes among rows still soft.
+  Removed `UNEXPECTED_DECLINE`: 128, all with `unsupportedTerms = ['gws']` and no other failure
+  cause — exactly AFLDB-ISSUE-200's `unsupported_term|tm|gws` cluster. Removed `GRAIN_EQUIVALENT`:
+  72 (see below).
 
-Do not mark this issue resolved until all seven commands' evidence is returned and matches the
-expected corpus movement above.
+### Result vs. planning estimate — the extra 72 rows explained
+Planning (`AFLDB-ISSUE-202.md` §8) forecast only the 128-row `unsupported_term|tm|gws` cluster
+clearing (465 -> 337 soft). The actual run also cleared all 72 pre-existing `GRAIN_EQUIVALENT`
+rows (465 -> 265 soft), which planning did not anticipate. Operator evidence traces this to the
+same root cause and the same fix, not a second change: those 72 rows are GWS Giants player-season
+leading-goalkicker questions (e.g. "GWS Giants player with most goals in 1897", repeated across
+seasons through 1920). Before the fix, "GWS Giants" never resolved as one full club mention, so
+these were accepted only as an equivalent `player_season -> player_game/sum` grain substitution
+(a soft pass, not a decline). With the combined `'gws giants'` alias in place, the full phrase now
+resolves as a single entity and these questions match the corpus's exact expected semantics
+directly, so they move from `GRAIN_EQUIVALENT` (soft) to clean rather than from soft to soft. This
+is a normalization improvement from the same directory-completeness fix, not a separate change,
+a regression, or scope creep — no code outside the one `CLUB_NICKNAMES` entry changed.
+
+### Final accounting
+```text
+128 GWS unsupported-term defects fixed
+72 GWS grain-equivalent mismatches normalized to exact expected semantics
+200 total soft findings cleared
+0 new soft findings
+0 semantic changes among remaining soft findings
+0 hard failures
+```
+Final 265 soft findings: `UNEXPECTED_DECLINE` 195 (180 stale pre-1965 coverage expectations + 15
+`zero` word-form parser defect, both pre-existing, both out of scope for this issue) and
+`WRONG_FAILURE_REASON` 70 (pre-existing taxonomy-drift family, unchanged in count and identity). No
+GWS-related soft findings remain. `CHANGELOG.md` updated under `[Unreleased]`. Removed from
+`IssuesIndex.md`'s open-issues list and the Open Issues table below.

@@ -4,18 +4,11 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
-- **AFLDB-ISSUE-202** — GWS club identity leaks into unsupported-term detection. Severity: Medium.
-  Area: NL search (`src/search/nl/vocab.ts`, `plan.ts`; `tests/nl-parser.test.ts`). State:
-  implemented (Sonnet 5, 2026-09-16), pending operator validation. Root cause: the GWS club
-  directory had no combined `"gws giants"` alias — only the separate single-word entries `gws`
-  (abbreviation) and `giants` (nickname) — so `extractClubs`'s two-match-slot budget was spent on
-  the subject club plus `giants`, leaving the literal token `gws` unconsumed and reported as
-  `unsupported_term`. Fix: added `'gws giants': 'greater western sydney'` to `CLUB_NICKNAMES`;
-  bumped `PARSER_VERSION` 51→52; added 9 regression cases + a GWS fixture entry to
-  `tests/nl-parser.test.ts`. Next action: operator runs the 7 validation commands in `issues.md`'s
-  AFLDB-ISSUE-202 entry (focused tests, tsc, v52 corpus re-run, soft-row diff), then resolve.
+AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
+(Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
+grain-equivalent GWS player-season rows normalized as a byproduct of the same fix.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -133,19 +126,20 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
    `intentional_conservative_decline`/`scorer_harness_artifact`/`duplicate_manifestation` clusters
    turned up in the real data. See `issues.md` for full evidence. Runbook: `AFLDB-ISSUE-200.md`.
-5. **(a) done, resolved 2026-09-16 — AFLDB-ISSUE-201.** **(b) opened 2026-09-16 —
-   AFLDB-ISSUE-202**, implemented 2026-09-16, pending operator validation: a `PARSER_BUG` fix for
-   "GWS"/"GWS Giants" leaking into unsupported-term detection on `team_match` margin questions (128
-   manifestations). Root cause confirmed as a missing combined alias (see
-   `issues.md`/`AFLDB-ISSUE-202.md`); fix applied is the one-line `CLUB_NICKNAMES` addition. Stage 2
-   is **not yet** closed: two of the four candidate
+5. **(a) done, resolved 2026-09-16 — AFLDB-ISSUE-201.** **(b) done, resolved 2026-09-16 —
+   AFLDB-ISSUE-202**: a `PARSER_BUG` fix for "GWS"/"GWS Giants" leaking into unsupported-term
+   detection on `team_match` margin questions (128 manifestations). Root cause was a missing
+   combined alias (see `issues.md`/`AFLDB-ISSUE-202.md`); fix applied was the one-line
+   `CLUB_NICKNAMES` addition, operator-validated against the retained V3 corpus (465 → 265 soft).
+   The same fix also normalized all 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows (GWS Giants player-season
+   leading-goalkicker questions) to exact expected semantics as a byproduct, so that class is now 0.
+   Stage 2 is **not yet** closed: two of the four candidate
    follow-on work items remain, not yet opened as tracked issues: (c) a `PARSER_BUG` fix for the word
    "zero" not binding as numeric-zero in career conditions (15 manifestations); (d) a separate, guarded
    corpus-correction task for the 180 pre-1965 finals/Grand Final disposals/marks/tackles rows
-   currently asserting a stale `expected_status=success`. The 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows
-   need no behaviour fix. The 70 `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness
-   blocker, unless a later diagnostic-taxonomy cleanup is deliberately opened. Only after (b)-(c)
-   resolve and (d) lands is the fresh exploratory Codex corpus sweep in scope, per the original Stage 2
-   boundary.
+   currently asserting a stale `expected_status=success`. The 70 `TAXONOMY_DRIFT` rows are accepted
+   diagnostic drift, not a correctness blocker, unless a later diagnostic-taxonomy cleanup is
+   deliberately opened. Only after (c) resolves and (d) lands is the fresh exploratory Codex corpus
+   sweep in scope, per the original Stage 2 boundary.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

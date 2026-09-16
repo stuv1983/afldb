@@ -1,10 +1,10 @@
 # AFLDB-ISSUE-202 — GWS club identity leaks into unsupported-term detection
 
-**Status:** Implemented 2026-09-16 (Sonnet 5) per this runbook's §4/§7/§9, pending operator
-validation (focused tests, `tsc`, v52 corpus re-run, soft-row diff — see `issues.md`'s
-AFLDB-ISSUE-202 entry for the exact commands). This document remains the implementation contract;
-the sections below are unchanged from planning and describe the fix as designed, which matches what
-was applied.
+**Status:** Resolved 2026-09-16 (planning 2026-09-16, implementation 2026-09-16, all Sonnet 5), on
+operator validation. Second of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2
+next-task item 5b, `PARSER_BUG` / `unsupported_term|tm|gws`, 128 rows). Implementation commit
+`96e40e7`. The sections below are unchanged from planning and describe the fix as designed, which
+matches what was applied; see §12 for the closeout/validation record.
 
 ## 1. Confirmed root cause (planning session, direct source inspection)
 
@@ -296,3 +296,47 @@ dictionary entry, add the fixture, add the six regression cases in §7, run the 
 not materially improve the outcome. The one genuine judgement call — confirming the 128-row shape
 distribution before trusting the "one shape" assumption (§6) — depends on operator-run corpus
 evidence, not model capability.
+
+## 12. Closeout and validation record (2026-09-16)
+
+Implemented exactly as designed in §4/§7/§9: `'gws giants': 'greater western sydney'` added to
+`CLUB_NICKNAMES`; `PARSER_VERSION` 51 → 52 with a history comment; nine regression cases plus a GWS
+fixture entry added to `tests/nl-parser.test.ts`. No change to `extractClubs`, `findClub`/
+`findLongestMatch`, `consumedSet`/`leftoverTokens`, `declineFailureReason`, or any grain/metric/
+margin code. Commit `96e40e7`.
+
+**Local validation:** `tests/nl-parser.test.ts` 428/428 passed; `npx tsc --noEmit` clean.
+
+**Stable V3 corpus, v51 (pre-fix baseline):** 12,000 scored / 11,535 clean / 465 soft / 0 failed
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70).
+
+**Stable V3 corpus, v52 (post-fix, corpus unchanged):** 12,000 scored / 11,735 clean / 265 soft / 0
+failed (`UNEXPECTED_DECLINE` 195, `WRONG_FAILURE_REASON` 70, `GRAIN_EQUIVALENT` 0).
+
+**v51→v52 diff:** 200 soft rows removed, 0 added, 0 semantic changes among rows still soft. Removed
+`UNEXPECTED_DECLINE`: exactly the 128-row `unsupported_term|tm|gws` cluster, each confirmed
+`unsupportedTerms = ['gws']` with no other failure cause. Removed `GRAIN_EQUIVALENT`: all 72
+pre-existing rows.
+
+**§8/§10 estimate vs. actual — recorded, not silently reconciled:** this runbook's stable-corpus
+target (§8 item 5) forecast 337 soft (465 − 128), assuming only the `unsupported_term|tm|gws`
+cluster would move and that the 72 `GRAIN_EQUIVALENT` rows were an unrelated, unaffected family
+(§10's risk list explicitly says "none touch club/entity resolution" for the other soft families,
+which undersold this one). The actual result cleared those 72 rows too. Operator evidence traces
+this to the same fix, not a second change: the 72 rows are GWS Giants player-season
+leading-goalkicker questions (e.g. "GWS Giants player with most goals in 1897", repeated through
+1920) that previously accepted only as an equivalent `player_season -> player_game/sum` grain
+substitution because "GWS Giants" never resolved as one full club mention. With the combined alias
+in place the full phrase resolves as a single entity and these questions now match the corpus's
+exact expected semantics, moving from `GRAIN_EQUIVALENT` (soft) directly to clean. This is a
+normalization improvement from the same directory-completeness root cause, not scope creep — no
+code outside the one `CLUB_NICKNAMES` entry changed, and the collateral-effect analysis in §10
+should have anticipated it for any grain that calls the shared club-extraction path, not just
+`team_match`.
+
+**Final soft composition (265):** `UNEXPECTED_DECLINE` 195 (180 stale pre-1965 coverage
+expectations + 15 `zero` word-form parser defect, both pre-existing and out of scope for this
+issue) and `WRONG_FAILURE_REASON` 70 (pre-existing taxonomy-drift family, unchanged in count and
+row identity). No GWS-related soft findings remain in either class.
+
+Resolved. `issues.md`, `IssuesIndex.md` and `CHANGELOG.md` updated accordingly.
