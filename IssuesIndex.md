@@ -4,7 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -68,22 +68,20 @@ unchanged at 72/921/70; DB-free unit suite 28/28; `PARSER_VERSION` unchanged at 
 all now resolved. Stage 2 is **not** closed by this: the three soft classes remain open and unaudited
 (item 4 below), and the rest of the Stage 2 closeout sequence remains outstanding.
 
-**AFLDB-ISSUE-200 opened 2026-09-16** (planning only, Sonnet 5) for item 4's soft-class audit. Runbook
-`AFLDB-ISSUE-200.md` written; classification schema, audit tooling proposal, and a finding that
-`failures.csv` lacks the `expected_*` fields this audit needs (use `results.jsonl` instead) are all
-recorded there. **Implementation session, 2026-09-16 (Sonnet 5):** `tools/nl/audit-issue-200-extract.ts`
-and `tools/nl/audit-issue-200-cluster.ts` (plus a shared constants module) written, with DB-free unit
-tests against synthetic fixtures. **Disposition session, 2026-09-16 (Sonnet 5):** the operator ran
-both scripts against the real `/home/arm/nl-stress-v50-cleaned/` artifacts and found exactly six
-auto-clusters covering all 1,063 rows; this session recorded evidence-backed dispositions for all
-six in a checked-in mapping (`tools/nl/issue-200-dispositions.csv`: `PLANNER_VALIDATOR_BUG` 598,
-`STALE_CORPUS_EXPECTATION` 180, `PARSER_BUG` 143, `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT`
-70 — reconciling to 1063) and added tests proving the mapping reconciles against that real shape. No
-parser/planner/scorer code changed. Next: the operator runs
-`audit-issue-200-cluster.ts --apply-dispositions` against the real
-`/home/arm/issue-200-soft-audit.csv` and confirms the printed reconciliation, which discharges this
-issue; only then are the three candidate defect follow-ons and the one guarded corpus-correction task
-(named in `issues.md`) scoped as separate tracked issues.
+**AFLDB-ISSUE-200 opened 2026-09-16, resolved 2026-09-16** (all Sonnet 5) for item 4's soft-class
+audit. Runbook `AFLDB-ISSUE-200.md` written (planning); `tools/nl/audit-issue-200-extract.ts` and
+`tools/nl/audit-issue-200-cluster.ts` (plus a shared constants module) written with DB-free unit
+tests (implementation); the operator ran both scripts against the real
+`/home/arm/nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering all 1,063
+rows, and evidence-backed dispositions for all six were recorded in a checked-in mapping
+(`tools/nl/issue-200-dispositions.csv`); **operator-validated resolution:** the final
+`audit-issue-200-cluster.ts --apply-dispositions` run against the real
+`/home/arm/issue-200-soft-audit.csv` reconciled exactly -- 1063 rows in, 1063 classified, 0
+unmapped, 0 stale, `PLANNER_VALIDATOR_BUG` 598 / `STALE_CORPUS_EXPECTATION` 180 / `PARSER_BUG` 143 /
+`GRAIN_EQUIVALENT_LEGITIMATE` 72 / `TAXONOMY_DRIFT` 70; local `tsc --noEmit` clean,
+37/37 DB-free tests passed. No parser/planner/scorer code changed; neither external corpus file
+modified. The three candidate defect follow-ons and the one guarded corpus-correction task (named in
+`issues.md`) are recorded but not opened as tracked issues in this closeout.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -103,15 +101,24 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    (`tools/nl/fix-issue-199-stale-expectations.ts`), operator-run against the real canonical CSV
    (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
    173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
-4. **In progress — AFLDB-ISSUE-200** (opened 2026-09-16, planning done, audit tooling implemented
-   and unit-tested 2026-09-16, real six-cluster shape found and all six dispositions assigned
-   2026-09-16, final apply-dispositions run pending). All 1,063 soft rows
-   (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) are now classified
-   on paper into exactly six clusters: `PLANNER_VALIDATOR_BUG` 598, `STALE_CORPUS_EXPECTATION` 180,
-   `PARSER_BUG` 143, `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
+4. **Done, resolved 2026-09-16 — AFLDB-ISSUE-200.** All 1,063 soft rows (`GRAIN_EQUIVALENT` 72,
+   `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) are classified into exactly six real
+   clusters, operator-confirmed via the tool's own final `--apply-dispositions` run:
+   `PLANNER_VALIDATOR_BUG` 598, `STALE_CORPUS_EXPECTATION` 180, `PARSER_BUG` 143,
+   `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
    `intentional_conservative_decline`/`scorer_harness_artifact`/`duplicate_manifestation` clusters
-   turned up in the real data. Not the same task as the fresh exploratory Codex corpus sweep, which
-   remains a separate, later Stage 2 phase gated on this audit's genuine-defect follow-ons and any
-   justified corpus corrections landing first. Runbook: `AFLDB-ISSUE-200.md`.
+   turned up in the real data. See `issues.md` for full evidence. Runbook: `AFLDB-ISSUE-200.md`.
+5. **Not started.** Stage 2 is **not** closed by ISSUE-200 resolving. Four candidate follow-on work
+   items are identified but not yet opened as tracked issues: (a) a `PLANNER_VALIDATOR_BUG` fix for
+   career-boundary queries rejected by the generic `player_career` season-range validator (598
+   manifestations); (b) a `PARSER_BUG` fix for "GWS"/"GWS Giants" leaking into unsupported-term
+   detection on `team_match` margin questions (128 manifestations); (c) a `PARSER_BUG` fix for the
+   word "zero" not binding as numeric-zero in career conditions (15 manifestations); (d) a separate,
+   guarded corpus-correction task for the 180 pre-1965 finals/Grand Final disposals/marks/tackles
+   rows currently asserting a stale `expected_status=success`. The 72 `GRAIN_EQUIVALENT_LEGITIMATE`
+   rows need no behaviour fix. The 70 `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a
+   correctness blocker, unless a later diagnostic-taxonomy cleanup is deliberately opened. Only after
+   (a)-(c) resolve and (d) lands is the fresh exploratory Codex corpus sweep in scope, per the
+   original Stage 2 boundary.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

@@ -8,7 +8,11 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-200 | Low | Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`) | Real 6-cluster shape found and all 6 dispositions assigned in `tools/nl/issue-200-dispositions.csv` (Sonnet 5, 2026-09-16); final `--apply-dispositions` run against the real audit CSV not yet performed | Operator, on `streamanator`: run `audit-issue-200-cluster.ts --audit /home/arm/issue-200-soft-audit.csv --apply-dispositions tools/nl/issue-200-dispositions.csv --out-final /home/arm/issue-200-soft-audit-final.csv` and report the printed reconciliation |
+
+AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
+families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
+unsupported-term leakage, `PARSER_BUG` word-form "zero", and a guarded corpus correction for
+`STALE_CORPUS_EXPECTATION` pre-1965 stats) are recorded but not yet opened as tracked issues.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33162,17 +33166,14 @@ unverified. Full runbook: `AFLDB-ISSUE-199.md`.
 - **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
   canonical corpus file itself (`/home/arm/nl-stress-corpus-v2.csv`, outside this repository), and
   the DEV artifact directory `/home/arm/nl-stress-v50-cleaned/`.
-- **Status:** **Dispositions assigned, final apply-dispositions run pending** 2026-09-16 (Sonnet 5).
-  Runbook `AFLDB-ISSUE-200.md` written in the prior planning session; tooling implemented and
-  unit-tested in the following session. The operator has since run the extraction/cluster scripts
-  against the real `nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering
-  all 1,063 rows; this session recorded evidence-backed dispositions for all six in a checked-in
-  mapping file (`tools/nl/issue-200-dispositions.csv`) and added DB-free tests proving that mapping
-  reconciles against the real cluster shape. **Not yet done:** the operator has not yet run
-  `audit-issue-200-cluster.ts --apply-dispositions` against the real
-  `/home/arm/issue-200-soft-audit.csv` to produce and confirm the final classified file -- this
-  issue stays open until that run reports the exact reconciliation in the Required accounting table
-  below. This (Windows) session still has no DEV file access.
+- **Status:** **Resolved 2026-09-16** (Sonnet 5). Runbook `AFLDB-ISSUE-200.md` written in the
+  planning session; tooling implemented and unit-tested in the following session; dispositions for
+  the real six-cluster shape recorded in a checked-in mapping in the next; the operator's final
+  `--apply-dispositions` run against the real 1,063-row audit CSV is now reported below and
+  reconciles exactly. All 1,063 soft rows are classified into evidence-backed dispositions; four
+  candidate follow-on work items are named (Candidate follow-on defect families below) but not yet
+  opened as tracked issues, per instruction. This (Windows) session still has no DEV file access;
+  all real-run evidence below is operator-supplied.
 - **Found:** 2026-09-16, opened by the user directly (not from a triage). Corresponds to
   `IssuesIndex.md`'s Stage 2 next-task item 4 (the three soft classes flagged as unaudited when
   AFLDB-ISSUE-199 resolved) — this issue is that follow-up audit, now with a tracked number.
@@ -33342,22 +33343,54 @@ six clusters and proves `applyDispositions` reconciles it to the exact per-dispo
 the Required accounting table, with zero unmapped/stale rows -- in addition to, not replacing, the
 pre-existing generic-shape invariant tests.
 
-### DEV operator command (final pass -- not yet run)
+### Final operator validation (2026-09-16) -- RESOLUTION EVIDENCE
+
+**Baseline** (re-confirmed): `/home/arm/nl-stress-corpus-v2.csv`, `PARSER_VERSION` 50 --
+total 12000, clean 10937, soft 1063, hard 0 (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
+`WRONG_FAILURE_REASON` 70). Unchanged since AFLDB-ISSUE-199.
+
+**Extraction:**
+```
+npx tsx tools/nl/audit-issue-200-extract.ts \
+  --results /home/arm/nl-stress-v50-cleaned/results.jsonl \
+  --entity-index /home/arm/nl-stress-v50-cleaned/entity-index.json \
+  --out /home/arm/issue-200-soft-audit.csv
+```
+Result: records read 12000, excluded (non-target) 10937, `GRAIN_EQUIVALENT` 72,
+`UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70, total extracted 1063.
+
+**Mechanical clustering:**
+```
+npx tsx tools/nl/audit-issue-200-cluster.ts \
+  --audit /home/arm/issue-200-soft-audit.csv \
+  --out-summary /home/arm/issue-200-clusters.md
+```
+Result: exactly 6 auto-clusters, exactly 1063 rows accounted for -- confirming the six-cluster shape
+this issue's dispositions (above) and `tools/nl/issue-200-dispositions.csv` were written against.
+
+**Final disposition application:**
 ```
 npx tsx tools/nl/audit-issue-200-cluster.ts \
   --audit /home/arm/issue-200-soft-audit.csv \
   --apply-dispositions tools/nl/issue-200-dispositions.csv \
   --out-final /home/arm/issue-200-soft-audit-final.csv
 ```
-Expected final reconciliation: 1,063 input rows read from `/home/arm/issue-200-soft-audit.csv`,
-1,063 classified rows written to `issue-200-soft-audit-final.csv`, 0 unmapped clusters, 0 stale
-mapping entries, and disposition totals exactly `PLANNER_VALIDATOR_BUG` 598 /
-`STALE_CORPUS_EXPECTATION` 180 / `PARSER_BUG` 143 / `GRAIN_EQUIVALENT_LEGITIMATE` 72 /
-`TAXONOMY_DRIFT` 70. Any deviation (a seventh cluster, a different per-cluster count) means the real
-audit CSV no longer matches the shape this mapping was written against, and the mismatch should be
-reported rather than the mapping silently widened. Once this command succeeds, ISSUE-200 can move
-to closeout per §9 (open the three follow-on `PARSER_BUG`/`PLANNER_VALIDATOR_BUG` issues, then the
-separate guarded corpus-correction task for the 180 `STALE_CORPUS_EXPECTATION` rows).
+Result: 6 auto-clusters found, final classified audit written successfully, 1063 final rows.
+Operator's independent reconciliation against `issue-200-soft-audit-final.csv`: rows 1063,
+`GRAIN_EQUIVALENT_LEGITIMATE` 72, `PARSER_BUG` 143, `PLANNER_VALIDATOR_BUG` 598,
+`STALE_CORPUS_EXPECTATION` 180, `TAXONOMY_DRIFT` 70, unclassified 0. Matches this entry's Required
+accounting table exactly. No seventh cluster and no stale mapping entry appeared -- the real audit
+CSV matched the shape `tools/nl/issue-200-dispositions.csv` was written against exactly, with zero
+widening or reinterpretation needed.
+
+**Local test validation** (operator, before the DEV run above): `npx tsc --noEmit` clean;
+`npx vitest run tests/nl-issue-200-audit-extract.test.ts tests/nl-issue-200-audit-cluster.test.ts`
+— 2 test files, 37/37 tests passed.
+
+This is the resolution evidence for ISSUE-200: every one of the 1,063 soft rows now carries an
+evidence-backed disposition, confirmed by the tool's own real run against the real DEV artifacts,
+not merely by the hand-reconciled table above. No parser/planner/scorer/runtime behaviour changed
+and neither external corpus file was modified in resolving this issue.
 
 ### Non-goals
 Parser/planner/scorer code changes; `PARSER_VERSION` changes; modifying either external corpus file;
@@ -33366,9 +33399,8 @@ before clustering; AFLW; the large fresh Codex exploratory corpus (separate futu
 
 ### Acceptance criteria
 - All 1,063 soft rows accounted for exactly once; class counts reconcile to 72/921/70; disposition
-  counts sum to 1,063. **Dispositions recorded and reconciled on paper** (Required accounting
-  table above); **the actual `--apply-dispositions` run against the real 1,063-row audit CSV, and
-  its printed reconciliation, is still outstanding** (see DEV operator command (final pass) above).
+  counts sum to 1,063. **Done** -- confirmed by the operator's real `--apply-dispositions` run
+  (Final operator validation above): rows 1063, unclassified 0.
 - Every genuine defect cluster (`PARSER_BUG`/`PLANNER_VALIDATOR_BUG`/`SCORER_HARNESS_ARTIFACT`) has
   evidence sufficient for a separate follow-on issue (row count, 3+ worked examples, a root-cause
   hypothesis citing specific code). **Done** for all three defect clusters (598/128/15 rows) --
@@ -33377,25 +33409,39 @@ before clustering; AFLW; the large fresh Codex exploratory corpus (separate futu
   supported semantics that make it correct, not merely that it reduces the soft count. **Done** for
   the one `STALE_CORPUS_EXPECTATION` cluster (180 rows, pre-1965 stat coverage).
 - No application/parser/scorer behaviour changed as part of the audit; `PARSER_VERSION` unchanged.
-  **Held** this session -- only tooling, tests and documentation changed.
-- `IssuesIndex.md`'s Stage 2 next-task item 4 updated to point at this issue. **Done.**
+  **Held** -- only tooling, tests and documentation changed across every session of this issue.
+- `IssuesIndex.md`'s Stage 2 next-task item 4 updated to point at this issue, and now to record its
+  resolution. **Done.**
 
 ### Operator verification expectations
-Extraction and cluster-summary pass: **done**, on the dev host, per `AFLDB-ISSUE-200.md` §4a/§4c --
-the operator reported the real six-cluster shape this session's dispositions are based on.
-Remaining: run the final pass (DEV operator command (final pass) above) and report its printed
-reconciliation (row counts in, rows classified, unmapped/stale counts, per-disposition totals) so
-this issue's evidence can be closed against real tool output rather than the hand-reconciled table
-above. This (Windows) session made no DEV command requests and executed no shell commands itself
+All done. Extraction, cluster-summary and final `--apply-dispositions` passes run on the dev host
+per `AFLDB-ISSUE-200.md` §4a/§4c/§13; DB-free unit suite (`npx tsc --noEmit`,
+`npx vitest run tests/nl-issue-200-audit-extract.test.ts tests/nl-issue-200-audit-cluster.test.ts`)
+run and passed (37/37) before the DEV run. Full output recorded in Final operator validation above.
+This (Windows) session made no DEV command requests and executed no shell commands itself
 (`CLAUDE.md` §9).
 
 ### Migration/schema implications
 None.
 
-### Implementation recommendation
-Tooling and dispositions are complete. Next session (any effort level) needs only: run the final
-pass command above, paste its output into this entry, update `IssuesIndex.md`/`issues.md` to
-**Resolved** once reconciliation is confirmed, and then scope the three follow-on defect issues and
-the one corpus-correction task named in Candidate follow-on defect families above -- each as its own
-small, separately-sequenced piece of work (mirroring the ISSUE-197→198→199 precedent), not bundled
-into this issue's closeout.
+### Resolution (2026-09-16)
+**Root cause of the issue's existence:** AFLDB-ISSUE-199 resolved every hard failure in the V1
+12,000-row stress corpus but explicitly scoped out its 1,063 soft findings, leaving three finding
+classes (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) unaudited.
+
+**Fix:** built two small, DB-free, read-only `tools/nl/` scripts
+(`audit-issue-200-extract.ts`/`audit-issue-200-cluster.ts`, plus a shared constants module) that
+re-score every row with the real, unmodified `scoreRow` and mechanically cluster the results, then
+used the operator's real DEV run to record evidence-backed dispositions for the resulting six real
+clusters in a checked-in mapping (`tools/nl/issue-200-dispositions.csv`).
+
+**Validation:** the operator's own `--apply-dispositions` run against the real 1,063-row audit CSV
+reconciles exactly (Final operator validation above) -- 1063 rows in, 1063 classified, 0 unmapped, 0
+stale, disposition totals `PLANNER_VALIDATOR_BUG` 598 / `STALE_CORPUS_EXPECTATION` 180 /
+`PARSER_BUG` 143 / `GRAIN_EQUIVALENT_LEGITIMATE` 72 / `TAXONOMY_DRIFT` 70.
+
+**Follow-up, recorded separately, not opened as issues in this closeout:** see Candidate follow-on
+defect families above (three code defect families, one guarded corpus-correction task). Per §9,
+these are scoped as their own tracked issues in a later session, smallest/most-isolated first,
+mirroring the ISSUE-197→198→199 precedent -- not bundled into this closeout. Stage 2 itself is
+**not** resolved by this issue; see `IssuesIndex.md`.

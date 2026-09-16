@@ -1,14 +1,15 @@
 # AFLDB-ISSUE-200 — Audit remaining NL V2 soft findings
 
-Status: **Dispositions assigned, final apply-dispositions run pending** (planning 2026-09-16,
-tooling implemented 2026-09-16, real-evidence dispositions recorded 2026-09-16, all Sonnet 5). §4's
-two scripts are written and unit-tested; the operator has run the extraction/cluster-summary pass
-against the real `nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering all
-1,063 rows. This session recorded evidence-backed dispositions for all six in the checked-in
-`tools/nl/issue-200-dispositions.csv`. **Not yet done:** the final `--apply-dispositions` run
-against the real audit CSV, and its printed reconciliation. No parser/planner/scorer code changes
-are proposed or made here or by the tooling. See §13 below and `issues.md` for the full evidence and
-implementation notes.
+Status: **Resolved 2026-09-16** (planning 2026-09-16, tooling implemented 2026-09-16, real-evidence
+dispositions recorded 2026-09-16, resolution confirmed 2026-09-16, all Sonnet 5). §4's two scripts
+are written and unit-tested; the operator ran the extraction/cluster-summary pass against the real
+`nl-stress-v50-cleaned/` artifacts and found exactly six auto-clusters covering all 1,063 rows; this
+issue recorded evidence-backed dispositions for all six in the checked-in
+`tools/nl/issue-200-dispositions.csv`; the operator's final `--apply-dispositions` run against the
+real audit CSV reconciles exactly (§13). No parser/planner/scorer code changes were proposed or made
+here or by the tooling, and neither external corpus file was modified. Candidate follow-on defect
+families are named in §13 but not opened as tracked issues in this closeout. See `issues.md` for the
+full evidence and implementation notes.
 
 **Deviation from this runbook, found during implementation:** §4a describes `groupPrefix` as
 "already exported logic in stress-test.ts, reused." `tools/nl/stress-test.ts`'s `groupPrefix` is
@@ -331,18 +332,19 @@ soft count.
 Per §9: no follow-on issue numbers are opened by this disposition-recording pass. The four candidate
 defect/correction families (§9 items 3-4, i.e. the three code follow-ons plus the one guarded
 corpus-correction task) are named in `issues.md` but not yet scoped as separate tracked issues --
-that happens only after the final `--apply-dispositions` run below confirms the real audit CSV
-matches this six-cluster shape exactly.
+per §9 they are scoped only after this closeout, smallest/most-isolated first.
 
-**Final DEV command (not yet run):**
+**Final DEV command (run 2026-09-16, RESOLVED):**
 ```
 npx tsx tools/nl/audit-issue-200-cluster.ts \
   --audit /home/arm/issue-200-soft-audit.csv \
   --apply-dispositions tools/nl/issue-200-dispositions.csv \
   --out-final /home/arm/issue-200-soft-audit-final.csv
 ```
-Expected: 1,063 rows in, 1,063 classified, 0 unmapped, 0 stale, and the per-disposition totals
-above. If the real audit CSV has drifted from this six-cluster shape (a seventh cluster, or a
-different per-cluster count), `applyDispositions` refuses to finish rather than silently
-misclassifying -- that refusal should be reported back rather than the mapping widened to force a
-pass.
+Result: 6 auto-clusters found, final classified audit written successfully, 1,063 final rows. The
+operator's independent reconciliation against `issue-200-soft-audit-final.csv` confirmed: rows 1063,
+`GRAIN_EQUIVALENT_LEGITIMATE` 72, `PARSER_BUG` 143, `PLANNER_VALIDATOR_BUG` 598,
+`STALE_CORPUS_EXPECTATION` 180, `TAXONOMY_DRIFT` 70, unclassified 0 -- matching the table above
+exactly, with no seventh cluster and no stale mapping entry. This is ISSUE-200's resolution
+evidence; see `issues.md`'s "Final operator validation" section for the full trail including the
+extraction and cluster-summary passes and the local `tsc`/`vitest` results that preceded it.
