@@ -29,7 +29,96 @@ const ALIASED_CANONICAL = 'Semanticfixture Robert Aliasholder';
 const ALIASED_ALIAS = 'Semanticfixture Bob Aliasholder';
 const PLAIN_CANONICAL = 'Semanticfixture Bruce Plainname';
 
+// AFLDB-ISSUE-197: deliberately unpronounceable, made-up surnames so a
+// bare-surname mention cannot ever collide with a real player and the
+// plausible-family count is exactly what this file inserts, nothing more.
+// candidatePlayerSpan only ever hands the resolver tokens matching
+// /^[a-z]+$/ (parser.ts:1795-1800), so these carry no digits.
+//
+// Every synthetic display name below puts the surname LAST ("Member0
+// Zqfamseven", not "Zqfamseven Member0") -- the same "Given Surname" shape
+// every real AFL player's display_name/search_name already has. This is
+// load-bearing, not cosmetic: searchPlayers's own CASE WHEN
+// (src/db/queries/search.ts:91-95) only awards the >=500 prefix/exact tier
+// when search_name STARTS WITH the query term, which a bare-surname mention
+// can never do against a "Given Surname" name. Surname-first synthetic
+// names were tried in an earlier version of this fixture and it broke: the
+// >=500 prefix tier pushed resolvePlayer's own top score at/above
+// PLAYER_ACCEPT_SCORE (parser.ts:115), so the mention was decided by the
+// UNCHANGED accept-branch nameMatches check (parser.ts:2711-2714, which
+// still reads resolvePlayer's 5-capped `candidates`, exactly the
+// runbook's §15 out-of-scope observation) instead of ever reaching
+// resolvePlayerFamily at all. A substring-tier match (250) plus maximum
+// similarity (100) plus maximum prominence (40) tops out at 390 --
+// mathematically below 500 regardless of name length or games -- so this
+// shape is the one that actually represents a bare-surname family mention.
+const FAMILY_SURNAME = 'zqfamseven';
+const CLASH_SURNAME = 'zqclash';
+const PAIR_SURNAME = 'zqpair';
+
+type FamilySurnameFixture = {
+  /** All 6 "zqfamseven" identities. */
+  familyIds: number[];
+  /** Highest games (300) of the six -- the correct "most games" answer. */
+  trueLeaderId: number;
+  trueLeaderGames: number;
+  /** 13 "zqclash" identities: one past NL_LIMITS.maxPlayerCandidates. */
+  clashIds: number[];
+  /** 2 "zqpair" identities: the smallest genuinely ambiguous family. */
+  pairIds: number[];
+};
+
 let fixture: SemanticFixture;
+let familyFixture: FamilySurnameFixture;
+
+async function createFamilySurnameFixtures(): Promise<FamilySurnameFixture> {
+  return sql.begin(async (tx) => {
+    async function insertPlayer(displayName: string, slugSuffix: string, games?: number): Promise<number> {
+      const [row] = await tx<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${displayName}, ${displayName}, afldb_normalise_name(${displayName}),
+                ${`${FIXTURE_PREFIX}-${slugSuffix}`})
+        RETURNING id
+      `;
+      if (games !== undefined) {
+        // clubs_played/seasons_played are NOT NULL with no default (unlike
+        // finals/premierships/wins/... below them, which default to 0) --
+        // this fixture's ranking only reads `games`, so 1/1 is the same
+        // established "value doesn't matter, must not be null" placeholder
+        // tests/integration/admin-awards.test.ts:1376-1378 already uses.
+        await tx`
+          INSERT INTO player_career_stats (player_id, games, clubs_played, seasons_played)
+          VALUES (${row.id}, ${games}, 1, 1)
+        `;
+      }
+      return row.id;
+    }
+
+    // 6 identities: resolvePlayer's own `searchPlayers(name, 5)` LIMIT 5
+    // makes incompleteness a mathematical certainty here (pigeonhole: 6
+    // rows can never fit in a 5-row result), independent of which one the
+    // old resolver's tie-break happened to keep or drop.
+    const familyIds: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      familyIds.push(await insertPlayer(`Member${i} Zqfamseven`, `zqfamseven-${i}`, 50 + i * 10));
+    }
+    const trueLeaderGames = 300;
+    const trueLeaderId = await insertPlayer('Member5 Zqfamseven', 'zqfamseven-5', trueLeaderGames);
+    familyIds.push(trueLeaderId);
+
+    const clashIds: number[] = [];
+    for (let i = 0; i < 13; i++) {
+      clashIds.push(await insertPlayer(`Member${i} Zqclash`, `zqclash-${i}`));
+    }
+
+    const pairIds: number[] = [];
+    for (let i = 0; i < 2; i++) {
+      pairIds.push(await insertPlayer(`Member${i} Zqpair`, `zqpair-${i}`, 10 + i));
+    }
+
+    return { familyIds, trueLeaderId, trueLeaderGames, clashIds, pairIds };
+  });
+}
 
 /**
  * Production NL query functions use the shared sql client, so uncommitted rows
@@ -238,6 +327,7 @@ async function createSemanticFixtures(): Promise<SemanticFixture> {
 beforeAll(async () => {
   await cleanupSemanticFixtures();
   fixture = await createSemanticFixtures();
+  familyFixture = await createFamilySurnameFixtures();
 });
 
 afterAll(async () => {
@@ -643,5 +733,67 @@ describe('AFLDB-ISSUE-110 alias-aware player search', () => {
     const ctx = await buildNlParseContext();
     const parsed = await parseNlQuestion(`${ALIASED_ALIAS} banana career goals`, ctx);
     expect(parsed.status).not.toBe('plan');
+  });
+});
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-197 -- surname/family candidate completeness, proved through
+// the real production resolver boundary (buildNlParseContext ->
+// resolvePlayerFamily), not a hand-built parser-only fake. This is exactly
+// the gap the Stage 2 audit found: every prior ambiguity/family test
+// exercised the parser's own branch logic with an unbounded injected
+// candidate array, never the resolver that production actually calls,
+// which was hard-capped at 5 rows.
+// -----------------------------------------------------------------------
+describe('AFLDB-ISSUE-197 surname/family candidate completeness', () => {
+  it('ranks the complete 6-identity family and picks the true leader; the old 5-row resolver could not have', async () => {
+    // Incompleteness proof for the OLD resolver, needing no assumption
+    // about tier/similarity ordering: resolvePlayer(name, 5) is
+    // `searchPlayers(name, 5)` (resolve.ts:171-172), and `LIMIT 5` against
+    // 6 real rows is a pigeonhole certainty, not an empirical one -- at
+    // least one of the 6 was always silently dropped, whichever the SQL
+    // happened to rank last.
+    const truncated = await searchPlayers(FAMILY_SURNAME, 5);
+    expect(truncated.length).toBeLessThanOrEqual(5);
+    expect(truncated.length).toBeLessThan(familyFixture.familyIds.length);
+
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(`${FAMILY_SURNAME} most games`, ctx);
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+
+    // Completeness: none of the 6 silently omitted, none of them are the
+    // resolved single `player` (this stays a family-scope ranking).
+    expect(parsed.plan.player).toBeUndefined();
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(6);
+    expect(parsed.plan.scope.playerIdIn).toEqual(expect.arrayContaining(familyFixture.familyIds));
+
+    // The fixed system answers across the complete family, so the true
+    // highest-games member is found regardless of which member the OLD
+    // 5-row resolver would have kept or dropped above.
+    const validated = validatePlan(parsed.plan);
+    if ('error' in validated) throw new Error(validated.error);
+    const payload = await answerPlayerCareer(validated, 25);
+    if (payload.kind !== 'player_career' || !payload.lead) throw new Error('expected a career leader');
+    expect(payload.lead.playerId).toBe(familyFixture.trueLeaderId);
+    expect(payload.lead.games).toBe(familyFixture.trueLeaderGames);
+  });
+
+  it('more than 12 plausible identities declines as ambiguous through the real resolver boundary', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(`${CLASH_SURNAME} most games`, ctx);
+    expect(parsed.status, JSON.stringify(parsed.status === 'plan' ? parsed.plan : parsed.report)).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe(CLASH_SURNAME);
+  });
+
+  it('a 2-identity family (the smallest ambiguous case) resolves through the real resolver boundary', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(`${PAIR_SURNAME} most games`, ctx);
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(2);
+    expect(parsed.plan.scope.playerIdIn).toEqual(expect.arrayContaining(familyFixture.pairIds));
   });
 });

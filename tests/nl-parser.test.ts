@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseNlQuestion, type NlParseContext, type NlPlayerCandidate } from '@/search/nl/parser';
-import { describePlan, NL_CONFIDENCE, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
+import { describePlan, NL_CONFIDENCE, NL_LIMITS, NL_METRICS, validatePlan, type NlParse, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlClubDirectoryEntry, NlCoachDirectoryEntry, NlVenueDirectoryEntry } from '@/search/nl/entities';
 
 const CLUBS: NlClubDirectoryEntry[] = [
@@ -76,7 +76,19 @@ function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
   return Promise.resolve(PLAYERS[name.toLowerCase()] ?? []);
 }
 
-const ctx: NlParseContext = { clubs: CLUBS, venues: VENUES, coaches: COACHES, resolvePlayer: fakeResolvePlayer };
+// AFLDB-ISSUE-197: no case in this file's existing PLAYERS map resolves
+// below PLAYER_ACCEPT_SCORE with 2+ candidates, so the shared fake never
+// needs a non-empty family; the dedicated family-resolver behaviour (2-12
+// ranks, >12 declines, defence-in-depth filtering) is exercised below with
+// its own per-test fakes, next to the production resolver's contract.
+function fakeResolvePlayerFamily(): Promise<NlPlayerCandidate[]> {
+  return Promise.resolve([]);
+}
+
+const ctx: NlParseContext = {
+  clubs: CLUBS, venues: VENUES, coaches: COACHES,
+  resolvePlayer: fakeResolvePlayer, resolvePlayerFamily: fakeResolvePlayerFamily,
+};
 
 async function parse(question: string): Promise<NlParse> {
   return parseNlQuestion(question, ctx);
@@ -1716,7 +1728,9 @@ describe('coaching questions (AFLDB-ISSUE-152 Phase B)', () => {
   });
 
   it('an absent coach directory declines rather than half-resolving a coaching question', async () => {
-    const noCoaches: NlParseContext = { clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer };
+    const noCoaches: NlParseContext = {
+      clubs: CLUBS, venues: VENUES, resolvePlayer: fakeResolvePlayer, resolvePlayerFamily: fakeResolvePlayerFamily,
+    };
     const result = await parseNlQuestion('damien hardwick coaching record', noCoaches);
     expect(result.status).not.toBe('plan');
   });
@@ -2761,5 +2775,153 @@ describe('played and also coached (AFLDB-ISSUE-152 Phase F)', () => {
       if (parsed.status !== 'plan') return;
       expect(validatePlan(parsed.plan)).toHaveProperty('error');
     });
+  });
+});
+
+// -----------------------------------------------------------------------
+// AFLDB-ISSUE-197 -- surname/family candidate completeness
+// -----------------------------------------------------------------------
+// resolvePlayer's 5-row cap was the SOLE candidate source for both the
+// accept branch and this ambiguity/family branch, so the real Ablett
+// family (7) was silently truncated to 5 and the documented >12 decline
+// (a generic surname clash: Brown, Smith, Johnson, ...) could never fire --
+// `plausible` was always a subset of a <=5-row array. A dedicated
+// resolvePlayerFamily resolver now supplies this branch's candidates
+// instead, fetching up to NL_LIMITS.maxPlayerCandidates + 1 under the
+// parser's own whole-word-prefix predicate (mirrored in SQL in production,
+// see db/queries/nl/resolve.ts). These cases are DB-free: a fake
+// resolvePlayerFamily stands in for the query, proving the parser's own
+// branch logic against the new data source. The production resolver
+// boundary itself -- the real query returning the true, complete family --
+// is proved separately in tests/integration/nl-semantic-mapping.test.ts.
+describe('AFLDB-ISSUE-197: surname/family candidate completeness', () => {
+  function familyOf(n: number, idBase = 9000): NlPlayerCandidate[] {
+    return Array.from({ length: n }, (_, i) => ({
+      ref: { id: idBase + i, slug: `ablett-fixture-${i}`, name: `Ablett Fixture${i}` },
+      score: 300,
+    }));
+  }
+
+  function ctxWithFamily(family: NlPlayerCandidate[]): NlParseContext {
+    return {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([]),
+      resolvePlayerFamily: () => Promise.resolve(family),
+    };
+  }
+
+  it('2 plausible candidates ranks the complete family', async () => {
+    const family = familyOf(2);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+    expect(parsed.plan.player).toBeUndefined();
+  });
+
+  it('exactly 12 plausible candidates (the low boundary) ranks the complete family', async () => {
+    const family = familyOf(NL_LIMITS.maxPlayerCandidates);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toHaveLength(NL_LIMITS.maxPlayerCandidates);
+    expect(parsed.plan.scope.playerIdIn).toEqual(family.map((c) => c.ref.id));
+  });
+
+  it('exactly 13 plausible candidates (the high boundary) declines as ambiguous, not >= 12', async () => {
+    const family = familyOf(NL_LIMITS.maxPlayerCandidates + 1);
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    expect(parsed.report.ambiguousPlayer).toBe('ablett');
+  });
+
+  it('0 or 1 plausible family candidates stays an unknown-spelling decline, not ambiguity', async () => {
+    // "smoth" -> one weak fuzzy John Smith match via the ordinary resolver,
+    // but the family resolver -- run against the SAME whole-word-prefix
+    // rule -- finds only that one genuine match too. One plausible
+    // candidate is an unresolved/unknown spelling, never ambiguity
+    // (parser.ts's NL-022 contract), regardless of which resolver supplied
+    // the count.
+    const weakMatch: NlPlayerCandidate = {
+      ref: { id: 500, slug: 'john-smith', name: 'John Smith' }, score: 410,
+    };
+    const parsed = await parseNlQuestion('smoth most goals', {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([weakMatch]),
+      resolvePlayerFamily: () => Promise.resolve([weakMatch]),
+    });
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.report.ambiguousPlayer).toBeUndefined();
+    expect(parsed.report.unsupportedTerms).toContain('smoth');
+  });
+
+  it('a candidate that does not satisfy the whole-word-prefix predicate is dropped before ranking (defence-in-depth)', async () => {
+    // A deliberately wrong test double: resolvePlayerFamily returns a
+    // candidate ("Bogus Player") that does not plausibly spell "ablett" at
+    // all. The retained candidateNameWords filter must still apply to
+    // whatever the resolver returns rather than trusting it unconditionally
+    // -- production's own SQL mirrors the same predicate, but this proves
+    // the parser does not blindly rank a resolver's raw output.
+    const family = [
+      ...familyOf(2),
+      { ref: { id: 9999, slug: 'bogus-player', name: 'Bogus Player' }, score: 300 },
+    ];
+    const parsed = await parseNlQuestion('ablett most goals', ctxWithFamily(family));
+    expect(parsed.status).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.scope.playerIdIn).toEqual([9000, 9001]);
+    expect(parsed.plan.scope.playerIdIn).not.toContain(9999);
+  });
+
+  // Full-name/accept-branch behaviour is untouched by this issue:
+  // resolvePlayer's 5-row cap and PLAYER_ACCEPT_SCORE gate are unchanged,
+  // and the existing corpus above (e.g. "dustin martin", and the
+  // duplicate-canonical-name "gary ablett" case) already pins it -- nothing
+  // new is asserted here, this note only records why (§9 item 5).
+
+  // An operator DB-backed run caught this exact boundary: an earlier
+  // version of the integration fixture (tests/integration/nl-semantic-mapping.test.ts)
+  // used a surname-FIRST synthetic name ("Zqfamseven Player0"), which
+  // scores at searchPlayers's prefix tier (>=500) and so crossed
+  // PLAYER_ACCEPT_SCORE -- landing in the ACCEPT branch's own nameMatches
+  // check (which still reads resolvePlayer's 5-capped `candidates`, never
+  // resolvePlayerFamily) instead of ever reaching the family branch this
+  // issue fixes. That branch-selection gate is deliberate, existing,
+  // unchanged-by-this-issue behaviour (parser.ts's §15 out-of-scope
+  // observation) -- not a defect resolvePlayerFamily should have caught.
+  // Pinned here so a future fixture cannot reintroduce the same mistake
+  // without a DB-backed test run to catch it.
+  it('a resolvePlayer top score at/above PLAYER_ACCEPT_SCORE still commits via the accept branch, never reaching resolvePlayerFamily', async () => {
+    let familyCalled = false;
+    const acceptCtx: NlParseContext = {
+      ...ctx,
+      resolvePlayer: () => Promise.resolve([
+        { ref: { id: 7001, slug: 'prefix-match-one', name: 'Prefixmatch One' }, score: 500 },
+        { ref: { id: 7002, slug: 'prefix-match-two', name: 'Prefixmatch Two' }, score: 480 },
+      ]),
+      // A complete, well-formed 2-candidate family -- if this were ever
+      // consulted, the mention would rank as a family instead of
+      // committing to one player at reduced certainty.
+      resolvePlayerFamily: () => {
+        familyCalled = true;
+        return Promise.resolve([
+          { ref: { id: 7001, slug: 'prefix-match-one', name: 'Prefixmatch One' }, score: 500 },
+          { ref: { id: 7002, slug: 'prefix-match-two', name: 'Prefixmatch Two' }, score: 480 },
+        ]);
+      },
+    };
+    const parsed = await parseNlQuestion('prefixmatch most goals', acceptCtx);
+    expect(familyCalled).toBe(false);
+    expect(parsed.status).toBe('none');
+    if (parsed.status !== 'none') return;
+    expect(parsed.reason).toBe('ambiguous');
+    // Declined via the accept branch's own nameMatches path, not the
+    // family branch: no scope.playerIdIn was ever built, so there is
+    // nothing for report.ambiguousPlayer (the family branch's own field)
+    // to carry.
+    expect(parsed.report.ambiguousPlayer).toBeUndefined();
   });
 });

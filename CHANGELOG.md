@@ -15,6 +15,31 @@ commit.
 
 ## [Unreleased]
 
+### NL search: bare-surname family ranking no longer resolves against a silently truncated 5-candidate list (AFLDB-ISSUE-197) - 16 September 2026
+
+- `resolvePlayer` (`src/db/queries/nl/resolve.ts`) hard-capped every surname/family candidate lookup
+  at 5 rows via `searchPlayers`, and that same 5-row array was the *only* candidate source the
+  parser's ambiguity branch had to decide "2–12 plausible identities, rank the complete family" vs.
+  ">12 plausible identities, decline as a generic surname clash" (`NL_LIMITS.maxPlayerCandidates`).
+  Because the array could never exceed 5 rows, the documented `> 12` decline was unreachable in
+  production, and a real family larger than 5 (Ablett: 7) silently ranked over an incomplete subset.
+- A new dedicated resolver, `resolvePlayerFamily` (`src/db/queries/nl/resolve.ts`), implements the
+  parser's own whole-word-prefix plausibility predicate directly in SQL against
+  `players`/`player_name_aliases` — not `searchPlayers`'s looser substring/trigram ranking, which can
+  let an unrelated substring match crowd a true family member out of a bounded result window — and
+  fetches `NL_LIMITS.maxPlayerCandidates + 1` (13) deduplicated-per-player rows, letting the parser
+  tell "≤12, complete" from ">12, decline" from one call. The parser's ambiguity branch
+  (`src/search/nl/parser.ts`) now reads this instead of filtering `resolvePlayer`'s 5-capped array,
+  keeping the existing whole-word-prefix filter as a defence-in-depth check on whatever the resolver
+  returns.
+- "Ablett most goals"/"most games" now ranks across the complete 7-player family instead of a
+  5-player subset that could omit the true career leader. Generic surnames past the 12-candidate cap
+  (Brown, Smith, Johnson, Williams, Jones, Wilson, Anderson, ...) now decline as ambiguous instead of
+  answering confidently over an arbitrary 5-player subset — for example "Brown most goals" no longer
+  answers "Ben Brown, 360" when the true surname-family leader is Jonathan Brown at 594.
+- `resolvePlayer`'s 5-row cap and the accept branch (a single confident name match) are unchanged.
+  No schema/migration change. `PARSER_VERSION` bumped 48 → 49.
+
 ### NL search: a club-season "won the premiership" no longer strands its condition when conjoined with another (AFLDB-ISSUE-195) - 16 September 2026
 
 - `CLUB_SEASON_CONDITION_WORDS`' `premier` entry (`src/search/nl/vocab.ts`) now also accepts plural

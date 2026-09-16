@@ -487,7 +487,17 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // subject-noun collision) now declines rather than being silently dropped --
 // "teams that won the premiership and the wooden spoon" now carries both
 // conditions instead of only wooden_spoon.
-export const PARSER_VERSION = 48;
+// v49 -- AFLDB-ISSUE-197: the bare-surname/family ambiguity branch now reads
+// candidates from a dedicated resolvePlayerFamily resolver (up to
+// maxPlayerCandidates + 1, matched by the parser's own whole-word-prefix
+// predicate directly in SQL) instead of filtering resolvePlayer's 5-row
+// cap. A genuine small family (Ablett, 7 identities) now ranks across every
+// member instead of a silently truncated 5; a generic surname clash (Brown,
+// Smith, Johnson, Williams, Jones, Wilson, Anderson, all >12 plausible
+// identities) now declines as ambiguous instead of answering a confident but
+// wrong top-5 subset -- the >12 branch was previously unreachable because
+// the candidate set could never exceed 5.
+export const PARSER_VERSION = 49;
 
 // ------------------------------------------------------------------ grain
 
@@ -1333,10 +1343,11 @@ export const NL_LIMITS = {
   minSeason: 1897,
   maxSeason: 2100,
   /**
-   * scope.playerIdIn's cap. The real cases are small -- five Abletts is
-   * the widest genuine one seen -- so a plan naming more than this is
-   * treated as a bug in whatever built it (a stray "found everything"
-   * candidate list, not a real ambiguous surname) rather than answered.
+   * scope.playerIdIn's cap. The real cases are small -- seven Abletts is
+   * the widest genuine one seen (AFLDB-ISSUE-197; a prior "five" here was
+   * itself an artefact of the resolver truncation that issue fixed) -- so
+   * a plan naming more than this is treated as a generic surname clash
+   * (Brown, Smith, ...) rather than answered.
    */
   maxPlayerCandidates: 12,
 } as const;

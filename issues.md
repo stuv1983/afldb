@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 0
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-197 | High (P1) | NL resolver/parser boundary — surname candidate truncation | Planning complete, runbook written, not implemented | Implement `AFLDB-ISSUE-197.md` (Option C: dedicated `resolvePlayerFamily`), then run the unit + DB-backed test matrix |
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -32531,7 +32530,9 @@ merged by this session — Git remains user-operated per `CLAUDE.md`.
 
 - **Severity:** High (P1) — fail-open: confident (certainty 1.0), factually wrong answers.
 - **Area:** NL resolver/parser boundary — `src/db/queries/nl/resolve.ts`, `src/search/nl/parser.ts`.
-- **Status:** Open — planning complete, runbook `AFLDB-ISSUE-197.md` written, not implemented.
+- **Status:** **Resolved** 2026-09-16 (Sonnet 5, from the approved runbook `AFLDB-ISSUE-197.md`),
+  operator-validated. Not merged, not Git-committed by this session; see Implementation and
+  Validation below.
 - **Found:** 2026-09-16, Stage 2 closeout audit of the 208 V1 `AMBIGUITY_NOT_DETECTED` hard
   failures (40 rows classified `GENUINE_FAIL_OPEN`, all one root cause).
 - **Key files:** `src/db/queries/nl/resolve.ts` `resolvePlayer` (`searchPlayers(name, 5)`);
@@ -32629,3 +32630,113 @@ family; the remaining 168 stale streak/coaching rows are a separate, unrelated c
 Sonnet 5, High effort — matches the complexity class of AFLDB-ISSUE-195/196 (NL resolver/parser
 boundary safety fix, cross-file contract, an explicitly-rejected naive option, DB-backed regression
 requirement). Full runbook: `AFLDB-ISSUE-197.md`.
+
+### Implementation (2026-09-16, Sonnet 5, worktree `afldb-issue-197`)
+Built exactly per the runbook's Option C. `resolvePlayerFamily(tokens: string[])`
+(`src/db/queries/nl/resolve.ts`) pre-filters `players`/`player_name_aliases` on a raw
+all-tokens-as-substring test (reuses the existing `gin_trgm_ops` indexes), then keeps only rows
+where every token whole-word-prefixes some `regexp_split_to_array`-split word of that row's own
+matched text — the exact predicate `candidateNameWords` applies in TypeScript, not an
+approximation. Deduplicated per player with `DISTINCT ON (player_id)` (mirrors `searchPlayers`'s own
+`best`-form pattern) before `LIMIT NL_LIMITS.maxPlayerCandidates + 1`, so a player matching through
+both a canonical name and an alias consumes one slot, not two. `NlParseContext.resolvePlayerFamily`
+is a required field (an absent wiring must be a compile error, not a silent fall-back to the
+truncated behaviour this issue fixes); the parser's else-branch (`parser.ts:2762-2766`) now calls it
+instead of filtering `resolvePlayer`'s 5-capped array, keeping the existing `candidateNameWords`
+filter afterward as defence-in-depth. `PARSER_VERSION` 48 → 49 with a `v49` history comment;
+`NL_LIMITS.maxPlayerCandidates`'s stale "five Abletts" comment corrected to seven.
+
+**Deviation from the runbook's §8 file list:** making `resolvePlayerFamily` required broke
+TypeScript compilation everywhere an `NlParseContext` object literal existed, and two files outside
+the runbook's expected list (`tests/nl-regression-corpus.test.ts`, `tests/nl-semantic-mapping.test.ts`)
+turned out to already exercise this exact branch with hand-built multi-candidate `resolvePlayer`
+fakes (the NL-018 "Ablett ranks" case and the 13-candidate ">12 declines" case) — both would have
+silently kept passing for the wrong reason (falling through to a default empty family) rather than
+genuinely exercising the new resolver, had they not been updated to fake `resolvePlayerFamily`
+instead. `tests/nl-audit-acceptance.test.ts` needed only mechanical `resolvePlayerFamily: async () =>
+[]` additions (4 literals, no behaviour touched). All eight changed files are listed in the final
+report; the runbook's core three (`resolve.ts`, `parser.ts`, `plan.ts`) plus its two named test files
+are unchanged in intent.
+
+Unit matrix (`tests/nl-parser.test.ts`, new describe block "AFLDB-ISSUE-197: surname/family candidate
+completeness") and the DB-backed matrix (`tests/integration/nl-semantic-mapping.test.ts`, new describe
+block "AFLDB-ISSUE-197 surname/family candidate completeness", synthetic `zqfamseven`/`zqclash`/`zqpair`
+surnames engineered so the true games-leader sits outside `searchPlayers`'s own top-5 text-rank
+window) both implemented per the runbook's §9. `npx tsc --noEmit` clean; the DB-free suites
+(`nl-parser.test.ts`, `nl-regression-corpus.test.ts`, `nl-semantic-mapping.test.ts`,
+`nl-audit-acceptance.test.ts`, `nl-plan.test.ts` — 1,251 tests) pass in this session. The DB-backed
+integration suite requires the operator's `afldb_test` tunnel and is not run here; see Operator
+verification expectations above.
+
+**Fixture correction (2026-09-16, same session, test-only):** the first operator run aborted suite
+setup before any ISSUE-197 test body executed —
+`insertPlayer` (`tests/integration/nl-semantic-mapping.test.ts`) inserted `player_career_stats` rows
+with only `(player_id, games)`, but `clubs_played`/`seasons_played` are `smallint NOT NULL` with no
+default (unlike `finals`/`premierships`/`wins`/... below them in the schema, which default to 0).
+This was a gap in this session's own new helper, not a pre-existing stale fixture exposed by the new
+setup, and not a production defect — the schema, `resolvePlayerFamily`, and the parser are unchanged.
+Fixed to supply all four columns (`clubs_played`/`seasons_played` = 1, the same
+value-doesn't-matter-but-must-not-be-null placeholder `tests/integration/admin-awards.test.ts:1376-1378`
+already uses), matching the established convention already used elsewhere in this same file
+(`createSemanticFixtures`'s own `player_career_stats` insert). Cleanup is unaffected (keys off
+`slug LIKE`, unchanged). `npx tsc --noEmit` clean; DB-free suites re-run green (925/925).
+
+**Integration-path control-flow investigation (2026-09-16, same session, test-only + one
+documentation-only code comment):** with fixture setup fixed, the operator's next run reached all 3
+new ISSUE-197 integration tests but failed all 3 — `zqfamseven`/`zqpair` resolved as a single
+low-certainty player ("matched more than one player; using the closest", certainty 0.7) instead of
+family-ranking, and `zqclash` declined with `report.ambiguousPlayer` undefined instead of set. Traced
+via `src/db/queries/search.ts:91-95`'s scoring `CASE WHEN` and `parser.ts:2669-2682`
+(`PLAYER_ACCEPT_SCORE`, `parser.ts:115`): the fixture's synthetic names put the surname FIRST
+("Zqfamseven Player0"), so `search_name LIKE 'zqfamseven%'` hit searchPlayers's >=500 prefix tier —
+at or above `PLAYER_ACCEPT_SCORE` — routing the mention into the pre-existing, UNCHANGED accept
+branch (`parser.ts:2682-2718`), whose own `nameMatches` ambiguity check still reads
+`resolvePlayer`'s 5-capped `candidates`, never `resolvePlayerFamily`. This is exactly the runbook's
+§15 out-of-scope observation (a certainty-calibration gap in the accept branch, "no reproduction,
+only a theoretical parallel") — my synthetic fixture accidentally manufactured that theoretical case.
+Confirmed this cannot happen for a real bare-surname mention against a real "Given Surname" player
+name: the best a pure substring-tier match can score is 250 + 100 (max similarity) + 40 (max
+prominence) = 390, structurally below 500 — and the original audit's own real-Ablett evidence (scores
+400/380, both below `PLAYER_ACCEPT_SCORE`) independently confirms production actually behaves this
+way. **Conclusion: fixture defect, not a production control-flow defect** — the family resolver was
+never "bypassed" by production logic; the fixture's unrealistic naming crossed a threshold that gates
+which branch runs at all, a threshold this issue was never scoped to touch. No production behaviour
+changed. Fix: renamed every synthetic identity to the realistic surname-LAST shape ("Member0
+Zqfamseven"), which cannot cross the prefix tier; replaced the tier-crowding "wrong-answer" narrative
+with a pigeonhole-certain incompleteness proof (`searchPlayers(term, 5)`'s own `LIMIT 5` against 6
+inserted rows) that needs no assumption about tie-break ordering. Added one documentation-only code
+comment at `parser.ts:2680` explaining the branch-selection boundary (no logic changed) and one new
+DB-free unit test in `tests/nl-parser.test.ts` pinning that a >=`PLAYER_ACCEPT_SCORE` mention still
+commits via the accept branch and never calls `resolvePlayerFamily`, so this exact fixture mistake is
+caught next time without a DB round-trip. `PARSER_VERSION` stays 49 (no parser semantics changed).
+`npx tsc --noEmit` clean; DB-free suites green (926/926, +1 new pinning test).
+
+### Validation (2026-09-16, operator, GREEN — resolving evidence)
+
+- `npx vitest run tests/integration/nl-semantic-mapping.test.ts` — 25/25 passed.
+- Focused NL validation (`tests/nl-parser.test.ts`, `tests/nl-regression-corpus.test.ts`,
+  `tests/nl-semantic-mapping.test.ts`, `tests/nl-audit-acceptance.test.ts`, `tests/nl-plan.test.ts`,
+  `tests/integration/nl-semantic-mapping.test.ts`) — 951/951 passed.
+- `npx tsc --noEmit` — clean.
+- The ISSUE-197 DB-backed tests specifically confirmed, through the real production resolver
+  boundary (`buildNlParseContext` → `resolvePlayerFamily`): a complete ≤12 surname-family ranks
+  (the 6-identity `zqfamseven` fixture, none silently omitted, correct highest-games leader chosen);
+  a >12 surname family (`zqclash`, 13 identities) declines as ambiguous with
+  `report.ambiguousPlayer` set; a 2-identity family (`zqpair`) resolves as the smallest genuinely
+  ambiguous case. Existing integration behaviour (head-to-head, club-scoped career games, Bulldogs
+  alias, Ablett Jnr/Snr suffix disambiguation, alias-aware `searchPlayers`) remained green throughout.
+
+### Resolution
+
+- **Status:** Resolved 2026-09-16.
+- **Root cause:** `resolvePlayer`'s hard 5-row cap was the sole candidate source for the parser's
+  surname/family ambiguity branch, making the documented `>12` decline unreachable and letting a
+  ≤12 real family (Ablett) rank over a silently truncated subset.
+- **Fix:** dedicated `resolvePlayerFamily` resolver (Option C), mirroring the parser's own
+  whole-word-prefix predicate in SQL, deduplicated per player, capped at
+  `NL_LIMITS.maxPlayerCandidates + 1`; parser's ambiguity branch reads it instead of filtering
+  `resolvePlayer`'s 5-capped array. `PARSER_VERSION` 48 → 49.
+- **Validation:** unit + DB-backed integration matrix above, all green; `npx tsc --noEmit` clean.
+- **Follow-up preserved separately (not part of this issue's resolution):** corpus relabelling
+  (35 generic-surname rows, 5 Ablett rows) and the 168 stale streak/coaching rows — tracked under
+  Stage 2's next task in `IssuesIndex.md`, not reopened here.

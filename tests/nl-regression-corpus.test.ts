@@ -60,6 +60,13 @@ const ctx: NlParseContext = {
   clubs: CLUBS,
   venues: VENUES,
   resolvePlayer: (name) => Promise.resolve(PLAYERS[name.toLowerCase()] ?? []),
+  // AFLDB-ISSUE-197: the same fixture keyed the other way the real
+  // resolvePlayerFamily is called -- by the mention's tokens, not a single
+  // name string. Reusing PLAYERS (rather than a second map) keeps the
+  // Ablett/Thomas/Pendlebury fixtures below the single source of truth for
+  // both entry points, exactly as production's two resolvers both read
+  // from the same players/player_name_aliases tables.
+  resolvePlayerFamily: (tokens) => Promise.resolve(PLAYERS[tokens.join(' ').toLowerCase()] ?? []),
 };
 
 async function plan(question: string): Promise<NlQueryPlan> {
@@ -671,15 +678,22 @@ describe('NL-018: a mention matching two players is ambiguous however lopsided t
     // players is a generic clash, not a family of same-named footballers,
     // and ranking across that many was never the point -- asking the
     // reader to narrow it down still is.
+    //
+    // AFLDB-ISSUE-197: this is the production boundary the family-ranking
+    // decision actually reads, so the fake goes on resolvePlayerFamily, not
+    // resolvePlayer -- exercising the 13-row cap the real resolver applies,
+    // not a hand-built candidate array the parser's own filter happened to
+    // pass through unbounded.
     const many = Array.from({ length: 13 }, (_, i) => ({
       ref: { id: 700 + i, slug: `smith-${i}`, name: `Smith Player${i}` },
       score: 400,
     }));
     const result = await parseNlQuestion('smith most goals', {
       ...ctx,
-      resolvePlayer: () => Promise.resolve(many),
+      resolvePlayerFamily: () => Promise.resolve(many),
     });
     expect(result.status).toBe('none');
+    expect(result.report.ambiguousPlayer).toBe('smith');
   });
 
   it('a unique surname still resolves -- surname-only is how readers type', async () => {

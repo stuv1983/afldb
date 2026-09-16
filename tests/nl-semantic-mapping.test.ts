@@ -61,6 +61,12 @@ const ctx: NlParseContext = {
   clubs,
   venues: [{ id: 30, slug: 'mcg', name: 'MCG', names: ['mcg', 'melbourne cricket ground'] }],
   resolvePlayer: async (name) => players[name] ?? [],
+  // AFLDB-ISSUE-197: reuses the same fixture, keyed by the mention's joined
+  // tokens -- the "ablett" bare-surname entry below is exactly what the
+  // real resolvePlayerFamily would return for this fixture's two-Ablett
+  // family, now that the family branch reads from it instead of filtering
+  // resolvePlayer's own result.
+  resolvePlayerFamily: async (tokens) => players[tokens.join(' ')] ?? [],
 };
 
 async function plan(question: string) {
