@@ -1587,8 +1587,22 @@ function extractHavingClause(text: string, clubSubject: boolean, playerSubject: 
 
       if (value !== null) {
         let matchedOperator: string | null = null;
+        // AFLDB-ISSUE-207: bounded to the text up to and including the
+        // count just matched, never past it. Every COMPARE_OP_WORDS phrase
+        // governs a number that follows it immediately, so a genuine
+        // operator for THIS clause can never sit to the right of the count
+        // it was found with. Searching the full +-20 `window` here used to
+        // let an adjacent margin clause's own operator word ("by OVER 50
+        // points") leak in -- and, since COMPARE_OP_WORDS is tested in a
+        // fixed list order rather than leftmost-in-text order, a later-
+        // listed entry belonging to THIS clause (e.g. "more than") could
+        // even lose to an earlier-listed entry from the OTHER clause (e.g.
+        // "at least") despite appearing later in the sentence. Either way
+        // the wrong operator was claimed and stripped, silently swapping
+        // the wins/losses threshold's comparator with the margin filter's.
+        const operatorWindow = window.slice(0, countEnd);
         for (const [operatorPattern, parsedOp] of COMPARE_OP_WORDS) {
-          const operatorMatch = operatorPattern.exec(window);
+          const operatorMatch = operatorPattern.exec(operatorWindow);
           if (!operatorMatch) continue;
           op = parsedOp;
           matchedOperator = operatorMatch[0];

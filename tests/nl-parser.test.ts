@@ -923,6 +923,115 @@ describe('regression: extractHavingClause requires a club/team subject (AFLDB-IS
     const p = await plan('teams to lose 5 times by more than 100 points');
     expect(p.grain).toBe('team_match');
     expect(p.havingClause).toEqual({ metric: 'losses', op: 'gte', value: 5 });
+    // AFLDB-ISSUE-207: this exact row is the shape ISSUE-206's exploratory
+    // scorer missed -- it only checked grain/metric, never matchFilter's
+    // own operator, so a "more than" leaking across from here into the
+    // wins/losses threshold (or vice versa) went undetected. Asserted
+    // explicitly below so this suite can no longer pass with a silently
+    // swapped comparator.
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gt', value: 100 });
+  });
+});
+
+// AFLDB-ISSUE-207: extractHavingClause's operator search used to scan a
+// fixed +-20-character window around the wins/losses/draws/games noun,
+// wide enough on short questions to reach across "by ... points" into the
+// margin clause's own comparator word (e.g. "over" in "by over 50
+// points"). Worse, COMPARE_OP_WORDS is tested in a fixed vocabulary order,
+// not leftmost-in-text order, so even when the window happened to be wide
+// enough to contain both clauses' operator words, an earlier-listed entry
+// belonging to the OTHER clause (e.g. "at least") could beat a later-listed
+// entry that actually governed THIS clause (e.g. "more than"), regardless
+// of which one appeared first in the sentence. Either mechanism let the
+// having-clause extractor claim -- and strip -- an operator word that
+// belonged to the margin filter, leaving extractMatchFilter to see a bare
+// number and fall back to its own default ('gte'). The result was a
+// silently swapped pair of comparators: this scored `clean` under
+// ISSUE-206's field-blind checks (grain/metric matched) despite answering
+// a different question in 281 corpus rows. The fix (parser.ts,
+// extractHavingClause) bounds the operator search to the text up to and
+// including the count this clause already matched -- never past it, since
+// every COMPARE_OP_WORDS phrase governs a number that follows it
+// immediately, and none of that vocabulary's forms ever apply to this
+// family from the far side of the noun.
+describe('AFLDB-ISSUE-207: numeric operator ownership between having clause and margin filter', () => {
+  it('7 or more wins by over 50 points -> wins keeps the bare-number default, margin keeps "over"', async () => {
+    const p = await plan('Teams with 7 or more wins by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('7 or more losses by over 50 points -> same shape, losses metric', async () => {
+    const p = await plan('Teams with 7 or more losses by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gt', value: 50 });
+  });
+
+  it('at least 7 wins by more than 50 points -> wins keeps "at least", margin keeps "more than"', async () => {
+    const p = await plan('Teams with at least 7 wins by more than 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('more than 7 wins by at least 50 points -> the reverse pairing, proving list-order does not decide it', async () => {
+    const p = await plan('Teams with more than 7 wins by at least 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gte', value: 50 });
+  });
+
+  it('over 7 wins by over 50 points -> the same operator word on both sides still binds independently', async () => {
+    const p = await plan('Teams with over 7 wins by over 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'win_margin', op: 'gt', value: 50 });
+  });
+
+  it('fewer than 7 losses by at least 50 points', async () => {
+    const p = await plan('Teams with fewer than 7 losses by at least 50 points');
+    expect(p.grain).toBe('team_match');
+    expect(p.havingClause).toEqual({ metric: 'losses', op: 'lt', value: 7 });
+    expect(p.matchFilter).toEqual({ metric: 'loss_margin', op: 'gte', value: 50 });
+  });
+
+  it('control: at least 7 wins alone -> unaffected by there being no margin clause', async () => {
+    const p = await plan('Teams with at least 7 wins');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gte', value: 7 });
+    expect(p.matchFilter).toBeUndefined();
+  });
+
+  it('control: more than 7 wins alone -> unaffected by there being no margin clause', async () => {
+    const p = await plan('Teams with more than 7 wins');
+    expect(p.havingClause).toEqual({ metric: 'wins', op: 'gt', value: 7 });
+    expect(p.matchFilter).toBeUndefined();
+  });
+
+  // These two decline today with no wins/losses count in the sentence at
+  // all (extractMatchFilter requires resultMetric to be 'wins'/'losses',
+  // which extractHavingClause never provides here) -- unrelated to the
+  // ownership fix, and unaffected by it. Asserted so a future change to
+  // this decline behaviour is a deliberate, visible choice.
+  it('control: "won by over 50 points" with no explicit wins count still declines, unaffected by the fix', async () => {
+    const result = await parse('Teams that won by over 50 points');
+    expect(result.status).not.toBe('plan');
+  });
+
+  it('control: "won by at least 50 points" with no explicit wins count still declines, unaffected by the fix', async () => {
+    const result = await parse('Teams that won by at least 50 points');
+    expect(result.status).not.toBe('plan');
+  });
+
+  // Known, separate gap -- NOT in scope for ISSUE-207 and not fixed here:
+  // extractMatchFilter's regex has no form for a trailing "or more"/"or
+  // fewer" after the margin number ("by 50 or more points"), so this
+  // declines today for a different reason (no matchFilter match at all,
+  // not an ownership swap). Documented, not fixed, per ISSUE-207's scope.
+  it('known gap (out of scope): "7 wins by 50 or more points" still declines -- trailing margin operator wording is unsupported, not an ownership defect', async () => {
+    const result = await parse('Teams with 7 wins by 50 or more points');
+    expect(result.status).not.toBe('plan');
   });
 });
 

@@ -4,10 +4,11 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
 
 | ID | Severity | Area | Current state | Key files / next action |
 | --- | --- | --- | --- | --- |
+| AFLDB-ISSUE-207 | High (silent wrong answer, 281 corpus rows) | NL search parser | Implemented on `sonnet/issue-207-numeric-operator-ownership` (unmerged); operator validation pending | `src/search/nl/parser.ts` (`extractHavingClause`), `src/search/nl/plan.ts` (`PARSER_VERSION` 54→55); next: operator runs the V5 stable-corpus rerun + ISSUE-206 281-row exploratory recheck on the dev host, see `AFLDB-ISSUE-207.md` |
 
 **AFLDB-ISSUE-206 resolved 2026-09-16** (Sonnet 5) — final triage of the 29,030-row independent V1
 exploratory corpus, re-verified against current branch source rather than taken on the first-pass

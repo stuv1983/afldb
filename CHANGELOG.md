@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### NL search: fixed numeric operator ownership crossing between a grouped wins/losses threshold and its margin filter (AFLDB-ISSUE-207) - 16 September 2026
+
+- Questions combining a grouped result count with a per-match margin filter — "teams with 7 or more wins by over 50 points" — could silently swap the two clauses' comparators: `extractHavingClause`'s operator search scanned a fixed-width window wide enough to reach across "by ... points" into the adjacent margin clause, and separately gave a fixed vocabulary-list-order match priority over the clause's own, correctly-positioned operator word. Both mechanisms let the wins/losses threshold claim an operator that belonged to the margin filter (or vice versa), leaving the other clause to fall back to its own default. Both fields still validated, so the defect was silent (found by AFLDB-ISSUE-206's exploratory corpus in 281 rows, undetected by earlier grain/metric-only scoring).
+- `extractHavingClause`'s operator search (`src/search/nl/parser.ts`) is now bounded to the text up to and including the count it already matched for that clause, never past it — every supported comparator word governs a number immediately after it, so this cannot reach into a neighbouring clause. No vocabulary added, no defaults changed, no parser stage reordered. `PARSER_VERSION` 54 → 55.
+- Implemented on `sonnet/issue-207-numeric-operator-ownership` (unmerged); operator validation against the frozen V5 stable corpus and the ISSUE-206 281-row exploratory family is still pending.
+
 ### NL search: deterministic large-scale exploratory corpus and audit-aware stress reporting (AFLDB-ISSUE-206) - 16 September 2026
 
 - Added a seeded 29,030-row exploratory NL corpus generator, V5 overlap/duplicate guard and distribution manifest, plus parse-only triage tooling that groups findings without using parser output as expected truth.
