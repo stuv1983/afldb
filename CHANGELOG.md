@@ -15,6 +15,32 @@ commit.
 
 ## [Unreleased]
 
+### NL stress corpus: all 1,063 remaining soft findings audited and classified (AFLDB-ISSUE-200) - 16 September 2026
+
+- AFLDB-ISSUE-199 resolved every hard failure in the V1 12,000-row NL stress corpus but explicitly
+  left its 1,063 soft findings (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
+  `WRONG_FAILURE_REASON` 70) unaudited. Every one of those 1,063 rows now carries an evidence-backed
+  disposition, confirmed by the audit tool's own run against the real DEV artifacts.
+- Added two checked-in, DB-free `tools/nl/` scripts (plus a shared constants module) that re-score
+  every row with the existing, unmodified `scoreRow`/`verdict` exports (so classification can never
+  diverge from a real stress run) and mechanically cluster the results:
+  `audit-issue-200-extract.ts` (results.jsonl -> per-row audit CSV) and
+  `audit-issue-200-cluster.ts` (audit CSV -> cluster summary, and `--apply-dispositions` -> final
+  classified CSV). Added `tools/nl/issue-200-dispositions.csv`, the checked-in six-cluster
+  disposition mapping.
+- The real DEV run found exactly six clusters partitioning all 1,063 rows:
+  `PLANNER_VALIDATOR_BUG` 598 (career-boundary questions wrongly rejected by the generic
+  `player_career` season-range validator), `STALE_CORPUS_EXPECTATION` 180 (pre-1965 disposals/
+  marks/tackles finals questions the corpus still expects to succeed), `PARSER_BUG` 143
+  ("GWS"/"GWS Giants" leaking into unsupported-term detection, 128; the word "zero" not binding as
+  numeric-zero in career conditions, 15), `GRAIN_EQUIVALENT_LEGITIMATE` 72 (an intentionally
+  accepted scorer leniency, no defect), and `TAXONOMY_DRIFT` 70 (a correct decline under the wrong
+  diagnostic label, no semantic defect).
+- No parser, planner, scorer or runtime behaviour changed, `PARSER_VERSION` unchanged, and neither
+  external corpus file was modified — this is audit/classification tooling and its recorded
+  evidence only. The three defect families and the one guarded corpus-correction task identified
+  above are recorded for future follow-on issues, not opened as tracked issues in this closeout.
+
 ### NL stress corpus: 173 stale hard-failure expectations corrected after Stage 2 parser hardening (AFLDB-ISSUE-199) - 16 September 2026
 
 - The external V1 12,000-row NL stress corpus (`~/nl-stress-corpus.csv`, outside this Git repository)
