@@ -34395,13 +34395,25 @@ asserted against. Only a row already identified as Family A/B by its text then h
 verified; only a genuine Family A/B row with drift aborts. Mirrors the "identity first, old-state second"
 lesson `tools/nl/fix-issue-204-stale-coverage-expectations.ts` reached after its own first-run over-match
 on category+template alone (AFLDB-ISSUE-204.md §0a). Correction-tool-only; no parser/runtime file
-touched, `PARSER_VERSION` unchanged. 16 new DB-free tests added,
+touched, `PARSER_VERSION` unchanged. 15 new DB-free tests added,
 `tests/nl-issue-205-corpus-fix.test.ts` (a fake `ParseEngine` stands in for `loadEngine()`'s real
 DB-backed engine, keyed by exact question text -- no database), proving the row-11819-style ignore, a
 missing-target aggregate abort for each family, a drifted-old-state abort for each family, and the exact
 42/28/70 distribution with 0 non-target modification. Full account: `AFLDB-ISSUE-205.md` §7a.
 
-**Not yet re-run against the real V4 corpus.**
+### First test run: synthetic fixture error, not a correction-tool defect (found and fixed, test-only)
+
+4/15 passed, 11 failed -- all stopping on row 5000's old-state check: `expected_grain=""` (blank)
+expected, `"player_game"` found. Root cause was entirely in the test fixture: `declineRow()` spread
+`...baseRow(id)`, and `baseRow()`'s `expected_grain: 'player_game'` (correct for its own `success`-status
+filler-row purpose) was never overridden back to blank for a decline row. `correctCorpus()`'s fail-closed
+old-state assertion caught this exactly as designed -- **not a correction-tool or runtime defect, no
+production file touched.** Fix: `declineRow()` now explicitly sets `expected_grain: ''`; every other
+checked field was already correctly blank via `baseRow()`. Full trace of why exactly 4 of 15 passed (the
+candidacy loop processes ascending ids, so row 5000 -- the lowest target id -- threw before most tests
+ever reached their own intended assertion): `AFLDB-ISSUE-205.md` §7a.
+
+**Not yet re-run.** Neither the DB-free tests nor the real V4 corpus correction have been re-attempted.
 
 ### Validation sequence
 

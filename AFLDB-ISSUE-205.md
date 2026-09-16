@@ -297,7 +297,7 @@ This is **correction-tool-only** — no parser/runtime file touched, no `PARSER_
 does not alter §3/§4/§5/§5a's root-cause conclusions in any way. The `q3_deficit_overcome` SQL and parser
 fix are proven correct independently of this finding (§5a's integration/parser results).
 
-**New DB-free regression tests**, `tests/nl-issue-205-corpus-fix.test.ts` (16 cases), following
+**New DB-free regression tests**, `tests/nl-issue-205-corpus-fix.test.ts` (15 cases), following
 `tests/nl-issue-204-corpus-fix.test.ts`'s established fixture/fake pattern — a synthetic 12,000-row
 corpus (7 clubs × 6 Family-A phrasings = 42, 7 clubs × 4 Family-B phrasings = 28) plus 3 unrelated
 decline/unsupported_topic siblings (fantasy, rebound-50, youngest), and a fake `ParseEngine` (`{ ctx,
@@ -319,14 +319,52 @@ engine:
 12. a Family B row that unexpectedly re-parses to a plan aborts (Q1-support-added guard);
 13. wrong total row count aborts;
 14. duplicate id aborts;
-15-16. `assertOutputPathIsSafe` accepts/refuses the `--out === --corpus` case.
+15. `assertOutputPathIsSafe` accepts/refuses the `--out === --corpus` case (a single test covering both
+    branches, not two).
 
 `correctCorpus()`'s signature was narrowed from the full `loadEngine()` return type to a new exported
 `ParseEngine` type (`{ ctx: NlParseContext; parseNlQuestion }`) to make this DB-free testing possible —
 `loadEngine()`'s real return value still structurally satisfies it with no cast, so `main()`/the real
 corpus run are unaffected.
 
-**Not yet run** — I cannot execute tests. Exact command: `npx vitest run tests/nl-issue-205-corpus-fix.test.ts`.
+### First test run: synthetic fixture did not reproduce the audited V4 before-state (test-only, fixed)
+
+Operator result: 4/15 passed, 11 failed, nearly all stopping on the first Family A row:
+
+```text
+Row 5000: Family A candidate's audited before-state expects
+"expected_grain"="" (blank), found "player_game".
+Question: "Adelaide biggest three quarter time comeback".
+Refusing to run.
+```
+
+**Root cause, confirmed by inspection, is entirely in the test fixture, not `correctCorpus()`.** The
+fixture's `declineRow()` helper spread `...baseRow(id)`, and `baseRow()` sets `expected_grain:
+'player_game'` (a plausible value for its OWN purpose — a `success`-status filler row) without ever
+being overridden back to blank for a decline row. Every synthetic Family A/B row therefore started with
+a fabricated plan-shape field a real V4 decline row never carries (the corpus's "blank asserts nothing"
+convention — there is no plan until the fixed parser produces one). `correctCorpus()`'s fail-closed
+old-state assertion caught this exactly as designed; **this is not a correction-tool or runtime defect,
+and no production file was touched.**
+
+Traced precisely why only 4 of 15 passed: the candidacy loop processes rows in ascending id order, and
+row 5000 (`FAMILY_A_DEFS[0]`) is the lowest-id target, so any test using the unmodified full fixture threw
+on row 5000 before ever reaching its own intended assertion — including the two sibling-ignore tests,
+which never got to see their own siblings because the function rejected before the loop ever reached
+their higher ids. Only the 4 tests whose failure trigger fires strictly *before* row 5000's blank-grain
+check (or that never touch the candidacy loop at all) survived: the input-row-count check, the duplicate-
+id check, `assertOutputPathIsSafe` (does not call `correctCorpus` at all), and the "drifted
+`expected_status`" test (which corrupts row 5000 itself, so its own intended check fires before the
+blank-grain check for that same row). Every other test failed purely because of this one fixture field.
+
+**Fix (test file only):** `declineRow()` now explicitly sets `expected_grain: ''`, overriding
+`baseRow()`'s filler default. Every other field `correctCorpus()`'s old-state assertion checks
+(`expected_metric`/`expected_aggregation`/`expected_club`/`expected_opponent`/`expected_venue`/
+`expected_match_type`) was already correctly blank via `baseRow()` and needed no change.
+`verification_level='EXPECTED_DECLINE'` was kept as a reasonable real-V4-consistent value, though
+`correctCorpus()` does not actually assert it (not one of the 7 checked fields).
+
+**Not yet re-run** — I cannot execute tests. Exact command: `npx vitest run tests/nl-issue-205-corpus-fix.test.ts`.
 
 **Corpus correction itself has not been re-run against the real V4 file.** Once the new DB-free tests are
 green, the next step is the real, DB-backed run (§8 step 4) — still pending.

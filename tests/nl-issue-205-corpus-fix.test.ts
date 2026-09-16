@@ -66,7 +66,22 @@ function baseRow(id: number): Row {
   };
 }
 
-/** The audited AFLDB-ISSUE-205 before-state shared by every Family A/B target row. */
+/**
+ * The audited AFLDB-ISSUE-205 before-state shared by every Family A/B
+ * target row (and the unrelated decline/unsupported_topic siblings, which
+ * share the exact same old-state shape -- that is the whole point of §7a's
+ * fix). `baseRow()`'s `expected_grain: 'player_game'` is a plausible-looking
+ * filler value for a `success`-status filler row; a real V4 decline row has
+ * NO plan-shape fields at all (the corpus's "blank asserts nothing"
+ * convention -- there is no plan to describe until the fixed parser
+ * produces one). Every one of `correctCorpus()`'s 7 blank-field checks
+ * (`expected_grain`/`metric`/`aggregation`/`club`/`opponent`/`venue`/
+ * `match_type`) must be explicitly cleared here, not just inherited from
+ * `baseRow()`'s already-blank defaults for the other 6 -- `expected_grain`
+ * was the one silently overridden, causing every real Family A/B candidate
+ * to fail its own old-state assertion (`found "player_game"`) before this
+ * fix.
+ */
 function declineRow(id: number, question: string): Row {
   return {
     ...baseRow(id),
@@ -75,6 +90,7 @@ function declineRow(id: number, question: string): Row {
     question,
     expected_status: 'decline',
     verification_level: 'EXPECTED_DECLINE',
+    expected_grain: '',
     expected_failure_reason: 'unsupported_topic',
   };
 }
