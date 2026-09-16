@@ -6,13 +6,16 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 **Open issues:** 0
 
-| ID | Severity | Area | State | Next action |
-|---|---|---|---|---|
+No currently open issues.
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
 unsupported-term leakage, `PARSER_BUG` word-form "zero", and a guarded corpus correction for
 `STALE_CORPUS_EXPECTATION` pre-1965 stats) are recorded but not yet opened as tracked issues.
+AFLDB-ISSUE-201 opened 2026-09-16 (Sonnet 5, planning only) for the first of these, resolved
+2026-09-16 (Sonnet 5) -- see its detailed entry below. The remaining three follow-on items (GWS
+unsupported-term, "zero" word-form, pre-1965 stale-coverage corpus correction) remain open but not
+yet opened as tracked issues.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -33445,3 +33448,327 @@ defect families above (three code defect families, one guarded corpus-correction
 these are scoped as their own tracked issues in a later session, smallest/most-isolated first,
 mirroring the ISSUE-197→198→199 precedent -- not bundled into this closeout. Stage 2 itself is
 **not** resolved by this issue; see `IssuesIndex.md`.
+
+---
+
+## AFLDB-ISSUE-201 — Career-boundary season ranges rejected by the player_career validator
+
+**Opened:** 2026-09-16 (Sonnet 5, planning only). **Status:** Open, implemented 2026-09-16
+(Sonnet 5), **awaiting operator validation** -- not resolved until the operator runs the commands in
+`AFLDB-ISSUE-201.md` §7 and confirms the stable-corpus movement. First of AFLDB-ISSUE-200's three
+candidate defect follow-ons (Stage 2 next-task item 5a). Runbook: `AFLDB-ISSUE-201.md`.
+
+### Evidence
+AFLDB-ISSUE-200's real-audit evidence for `auto_cluster_key = coverage_unavailable|boundary` (598
+rows, disposition `PLANNER_VALIDATOR_BUG`): id 9908, "players whose first game was a Grand Final in
+1897", parses correctly to grain `player_career`, `boundary: {event: 'debut', where: 'grand_final'}`,
+`scope.seasonMin = scope.seasonMax = 1897`, then `validatePlan` declines it with `coverage_unavailable`
+/ "A career question cannot be restricted to a season range." Confirmed to reproduce identically for
+`since`/`before` variants and is not specific to Grand Final debut wording.
+
+### Root cause (confirmed by direct source inspection)
+`src/search/nl/plan.ts:2239-2244` (inside `validatePlan`):
+```ts
+if (
+  raw.grain === 'player_career' && !careerPredicatesOwnSeasonRange(raw.careerPredicates)
+  && (raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined)
+) {
+  return { error: 'A career question cannot be restricted to a season range.' };
+}
+```
+This is the AFLDB-ISSUE-110 season-ownership backstop: a season range at career grain is only
+allowed through when some mechanism in the plan actually *consumes* it (`careerPredicatesOwnSeasonRange`,
+`plan.ts:1508`, checks `raw.careerPredicates` membership in `NL_CAREER_SEASON_OWNING_BUILDERS`, e.g.
+`debuted_between`). `raw.boundary` (`NlBoundary`, `plan.ts:1198-1201`, validated independently at
+`plan.ts:2037-2041`) is a separate top-level plan field, not a `GridAxisState` career predicate, so it
+is invisible to `careerPredicatesOwnSeasonRange` — a boundary plan with a season range always falls
+into this rejection even though the boundary *does* own the range (it names when the debut/last-game
+event happened). The gate does not distinguish "season restricts the boundary event" from "season
+restricts an ordinary career aggregate" because it never looks at `raw.boundary` at all.
+
+Corroborating detail: `src/search/nl/parser.ts:2582-2597` already special-cases the sibling wording
+without a Grand Final/final target ("debuted in the 1990s") by building a `debuted_between` career
+predicate instead, explicitly gated `!boundary` — the parser comment there records that a genuine
+boundary question ("debuted in a grand final") has already claimed the debut word before this step
+runs, i.e. the parser already anticipated that boundary + season needed separate handling; only the
+validator/compiler side was never built out.
+
+### End-to-end semantic flow
+1. `extractSeasons` (`parser.ts:348`) parses `since`/`before`/bare-year independently of boundary
+   detection and runs first (step ~5, `parser.ts:2007`); `extractBoundary` (`parser.ts:1313`, called at
+   `parser.ts:2513`) runs later and reads the already-boundary-stripped text. Both fields populate
+   correctly and independently — this stage is not defective.
+2. `validatePlan` rejects the combination per the root cause above.
+3. If validation passed, execution is `src/db/queries/nl/player-career.ts`: `conditionsWhere`
+   (line 135) pushes `boundarySql(plan.boundary)` (line 121) as an `EXISTS` clause anchored on
+   `pms.career_game_no = 1` (debut) or `m.match_date = c.last_match_date` (last_game) AND the
+   Grand Final/final predicate. **This function currently never reads
+   `plan.scope.seasonMin`/`seasonMax` at all** — there is no season-scope wiring for boundary plans
+   in this file today (confirmed: no other `seasonMin`/`seasonMax` reference exists in
+   `player-career.ts`). So even if the validator were relaxed with no compiler change, the season
+   restriction would be silently dropped and the boundary query would answer across all eras — the
+   same class of silent-scope defect ISSUE-110 fixed elsewhere.
+4. `player_career_stats c` (aliased `c`, joined once per query, e.g. `player-career.ts:238`) already
+   carries precomputed `c.debut_season` and `c.final_season` columns for every player
+   (`player-career.ts:191`, already selected and labelled `debutSeason`/`finalSeason`). These are the
+   same "true boundary" facts `debuted_between` filters on (`c.debut_season BETWEEN lo AND hi`,
+   `src/db/queries/grid-solver.ts:450-452`) for the plain-debut-window wording.
+
+### Whether validator relaxation alone is sufficient
+**No.** Relaxing only the `plan.ts:2239` gate (e.g. treating `raw.boundary` as season-range-owning)
+would let the plan through but the SQL in `player-career.ts` would still ignore the season entirely,
+so "players whose first game was a Grand Final in 1897" would answer with every Grand Final debutant
+ever, not just 1897's. A compiler change in `player-career.ts` is required as well as the validator
+change.
+
+### Ordering risk (whether the season could be applied before the true boundary is selected)
+Checked directly against the required order (find true boundary → test boundary predicate → test
+boundary season) and confirmed safe by construction, **provided the season filter is attached to the
+same per-player boundary fact, not to a generic match-scope filter**:
+- `c.debut_season` / `c.final_season` are precomputed, single-valued facts about each player's real
+  career boundary (project already relies on this: `debuted_between` filters `c.debut_season` the
+  same way). Adding `c.debut_season >= X`/`<= Y` (or `c.final_season` for last_game) as an additional
+  `AND`ed clause cannot change which game is "the debut" — it can only additionally require that the
+  (already-fixed) true debut fall in range. There is no way for this to become "first game inside the
+  season range" because nothing about which row is the debut is being searched or ranked; it is a
+  precomputed per-player scalar.
+- Equally safe alternative considered: filtering inside `boundarySql`'s own `EXISTS` (`AND m.season
+  BETWEEN ...`) — also safe because that `EXISTS` is already anchored to exactly one candidate row
+  (`career_game_no = 1` / `match_date = c.last_match_date`) before any season condition would be
+  added. Either implementation preserves correct semantics; `c.debut_season`/`c.final_season` is
+  preferred as the smaller diff and because it reuses an already-selected, already-trusted column
+  (`careerRowSelect`, `player-career.ts:188-196`) instead of adding a second join condition to the
+  `EXISTS`.
+
+### Smallest correct fix
+1. **`src/search/nl/plan.ts`** — narrow the season-range gate at line 2239-2244 to also treat
+   `raw.boundary` as season-owning, e.g.:
+   ```ts
+   if (
+     raw.grain === 'player_career'
+     && !careerPredicatesOwnSeasonRange(raw.careerPredicates) && !raw.boundary
+     && (raw.scope.seasonMin !== undefined || raw.scope.seasonMax !== undefined)
+   ) {
+     return { error: 'A career question cannot be restricted to a season range.' };
+   }
+   ```
+   This is narrowly scoped: it only exempts plans that actually carry `raw.boundary` (itself locked to
+   `event ∈ {debut, last_game}`, `where ∈ {grand_final, final}`, `grain === player_career` by the
+   independent check at line 2037-2041). It does not broaden the exemption for any career predicate
+   that does not itself own the range — "players with the most career games in 2005" carries no
+   `raw.boundary` and is unaffected (existing test: `tests/nl-semantic-mapping.test.ts:638-649`,
+   "most career goals since 2000"/"most career goals in 2000" must keep failing with the same error).
+2. **`src/db/queries/nl/player-career.ts`** — in `conditionsWhere` (line 135), when `plan.boundary` is
+   present, push additional clauses reading `plan.scope.seasonMin`/`seasonMax` against
+   `c.debut_season` (event `debut`) or `c.final_season` (event `last_game`), using the same
+   `>=`/`<=` construction every other grain already uses for `seasonMin`/`seasonMax` (e.g.
+   `src/db/queries/nl/player-game.ts:67-68`). No change to `boundarySql`'s signature is required if
+   the season clauses are added as siblings in `conditionsWhere` rather than inside `boundarySql`.
+3. **`src/search/nl/plan.ts` `describePlan`** (line 2464-2468) already prints a generic
+   `Seasons: X-Y.` line whenever `seasonMin`/`seasonMax` are set, ahead of the `Boundary: …` line
+   (line 2490-2493) — this already renders correctly once validation passes and needs no code change.
+   Worth a one-line judgement call during implementation: the generic "Seasons: 1897-1897." wording
+   does not say "of the debut", whereas the existing father-son-selection case earns a bespoke label
+   ("Draft years: …") for exactly this kind of ambiguity (line 2465-2466). Decide during
+   implementation whether a boundary-specific label is warranted or whether the existing "Boundary:"
+   line immediately below already makes the pairing unambiguous; not required for correctness either
+   way.
+
+### Files expected to change
+- `src/search/nl/plan.ts` — `validatePlan` gate (line ~2240); `PARSER_VERSION` + history comment
+  (line ~515).
+- `src/db/queries/nl/player-career.ts` — `conditionsWhere`/season handling for boundary plans
+  (line ~135-137).
+- `tests/nl-plan.test.ts` and/or `tests/nl-semantic-mapping.test.ts` — validator acceptance tests.
+- `tests/nl-parser.test.ts` — parser-shape tests for the three date forms with a boundary.
+- `tests/integration/nl-answers.test.ts` — extend the existing
+  `'player_career: boundary questions match hand-written SQL'` describe block (line 314-365) with
+  season-scoped hand-written-SQL comparisons.
+- `IssuesIndex.md`, `issues.md` (this entry), `CHANGELOG.md` on resolution.
+
+### Regression-test plan
+Extend the existing homes rather than creating new files.
+
+**Parser shape** (`tests/nl-parser.test.ts`, describe `'7. career-boundary queries'`, ~line 338):
+add cases asserting `p.boundary` AND `p.scope.seasonMin`/`seasonMax` are both populated for:
+- `players whose first game was a Grand Final in 1897` → `boundary: {debut, grand_final}`,
+  `seasonMin: 1897, seasonMax: 1897`.
+- `players whose first game was a Grand Final since 2000` → `seasonMin: 2000, seasonMax: undefined`.
+- `players whose first game was a Grand Final before 1950` → `seasonMax: 1949` (existing `before`
+  convention, `parser.ts:391-393`, is `year - 1`; not boundary-specific).
+- Equivalent `last game`/`final` combinations if the parser already supports that wording (verify
+  against the existing "last game was a grand final" case at `nl-parser.test.ts:348` before writing
+  new corpus text — use only wording already proven to parse, per the task's instruction not to
+  invent unsupported phrasing).
+
+**Validator acceptance** (`tests/nl-plan.test.ts` and/or `tests/nl-semantic-mapping.test.ts`, beside
+the existing boundary-rejection test at `nl-plan.test.ts:383-392`): assert `validatePlan` no longer
+errors for a `player_career` plan carrying both `boundary` and `seasonMin`/`seasonMax`, for `in`,
+`since`, and `before` shapes, for both `debut` and `last_game` (if supported), and for both
+`grand_final` and `final` boundary targets (`raw.boundary.where` supports both per
+`plan.ts:2039`, so both need coverage, not just Grand Final).
+
+**Negative regression (must keep failing):** re-run/keep
+`tests/nl-semantic-mapping.test.ts:626-632` ("players with more than 500 career goals since 2000")
+and `:638-649` ("most career goals since 2000"/"most career goals in 2000") — these carry no
+`raw.boundary` and must still return the `SEASON_ERROR`. This is the concrete, already-supported
+wording satisfying the task's request for a negative example equivalent to "most career games in
+2005" (that exact phrase is not in the corpus; the existing `most career goals since 2000` case is
+the real, already-tested equivalent and should be cited rather than invented text added).
+
+**Integration/DB-backed** (`tests/integration/nl-answers.test.ts`, describe
+`'player_career: boundary questions match hand-written SQL'`, line 314-365): add season-scoped
+variants of both existing tests, comparing against hand-written SQL that adds
+`AND c.debut_season BETWEEN lo AND hi` (debut) / `AND c.final_season BETWEEN lo AND hi` (last_game)
+to the existing hand-written comparison queries, using a real season range against `afldb_test` data
+(e.g. a Grand Final debut year already known to have at least one and at least one excluded row, to
+prove the filter actually narrows the result and does not just pass through).
+
+### Stable corpus validation plan
+Re-run the parser-v50 (or whatever version the fix ships under) stress corpus and confirm the
+`PLANNER_VALIDATOR_BUG` / `coverage_unavailable|boundary` manifestation count moves 598 → 0 with zero
+collateral movement in the other five ISSUE-200 clusters (`STALE_CORPUS_EXPECTATION` 180, the two
+`PARSER_BUG` clusters 128 GWS + 15 zero, `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70) —
+mirroring the AFLDB-ISSUE-199 differential-comparison method (compare the fresh run's semantic rows
+against the pre-fix baseline, not just the hard-failure count). Do not touch or re-triage the other
+four follow-on families in this issue.
+
+### Risks / collateral cases
+- `raw.boundary.where` supports both `grand_final` and `final` (`plan.ts:2039`) — the fix must not be
+  written or tested Grand-Final-only.
+- `raw.boundary.event` supports both `debut` and `last_game` — both need the season column swap
+  (`c.debut_season` vs `c.final_season`); a fix that only wires `debut_season` would silently leave
+  `last_game` broken (or worse, silently apply the wrong column).
+- Must not touch `NL_CAREER_SEASON_OWNING_BUILDERS` / `careerPredicatesOwnSeasonRange` — those already
+  work correctly for the non-boundary "debuted in the 1990s" wording and are out of scope.
+- Must not weaken the ISSUE-110 backstop for plain career aggregates (see negative regression above).
+- `describePlan`'s generic "Seasons: X-Y." label is a judgement call, not a defect — see Smallest
+  correct fix item 3.
+
+### Parser version
+**Recommend incrementing `PARSER_VERSION`.** Project precedent (AFLDB-ISSUE-110, e.g.
+`issues/closed/AFLDB-ISSUE-110.md:1214-1215`, "Increment `PARSER_VERSION` ... because parser outcomes
+and plan shapes change") treats any change to what plan shape a question resolves to — including a
+validator decline flipping to a validator accept — as a version-worthy change, not just tokenisation
+changes. ISSUE-110 bumped `PARSER_VERSION` repeatedly for validator-only changes to this exact
+season-ownership mechanism (27→28, 30→31, 33→34, per its changelog entries). This issue changes a
+previously-declining outcome to a successful one for a real corpus-sized population (598 rows), which
+is squarely inside that precedent. Not incremented in this planning session per instruction.
+
+### Proposed `IssuesIndex.md` update (superseded by the Implementation section below)
+Add AFLDB-ISSUE-201 as the sole open issue: severity medium (598-row corpus-confirmed correctness
+defect, no data-integrity/security exposure), area natural-language search
+(`src/search/nl/plan.ts`, `src/db/queries/nl/player-career.ts`), state "root cause confirmed,
+implementation not started," next action "implement validator + compiler fix per this entry's
+Smallest correct fix, then regression-test and re-run the stress corpus per Stable corpus validation
+plan." See below for the literal edit.
+
+### Implementation (2026-09-16, Sonnet 5)
+Implemented exactly the two-part fix above, no redesign. Full detail (diffs, files, test list,
+operator commands) is in `AFLDB-ISSUE-201.md`; summary:
+
+- `src/search/nl/plan.ts`: `validatePlan`'s season-range gate (`plan.ts:2239-2244`) now also checks
+  `!raw.boundary`, exempting exactly (and only) plans carrying a boundary. `PARSER_VERSION` 50 → 51
+  with a version-history comment, per the ISSUE-110 precedent recorded above.
+- `src/db/queries/nl/player-career.ts`: new `boundarySeasonWhere(boundary, scope)` helper compiles
+  `scope.seasonMin`/`seasonMax` against `c.debut_season` (event `debut`) or `c.final_season` (event
+  `last_game`) using the project's standard `>=`/`<=` convention; called from `conditionsWhere`
+  immediately after `boundarySql`, as separate `AND`ed clauses (not folded into `boundarySql`'s
+  `EXISTS`).
+- Regression tests added to `tests/nl-parser.test.ts` (parser shape: in/since/before ×
+  debut/last_game × grand_final/final), `tests/nl-plan.test.ts` (validator acceptance, plus a
+  boundary-free negative case proving the exemption doesn't broaden), and
+  `tests/integration/nl-answers.test.ts` (DB-backed: hand-written-SQL total comparison against
+  `c.debut_season`/`c.final_season`, plus an existence-guarded counter-example query that would catch
+  a "filter matches, then pick first/last" regression). The pre-existing negative regressions at
+  `tests/nl-semantic-mapping.test.ts:626-632`/`:638-649` were re-inspected, confirmed to carry no
+  `raw.boundary`, and left untouched.
+- `CHANGELOG.md` deliberately not updated yet — deferred to resolution, per ISSUE-195/197/198/199
+  precedent (entries added when the issue is marked resolved, not at implementation).
+
+**Not yet done:** operator validation (`AFLDB-ISSUE-201.md` §7 — focused unit tests, the DB-backed
+integration test, `tsc --noEmit`, the stable v51 corpus rerun, and the before/after 598 → 0
+comparison). Do not mark this issue resolved until that evidence is recorded here.
+
+### Closeout correction (2026-09-16, Sonnet 5)
+The operator's local validation of §1–§5 passed (774/774 focused unit tests, 33/33 DB-backed
+`tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`) and the stable v51 corpus rerun moved
+12000/10937/1063/0 (v50) → 12000/11533/467/0 (v51). Cross-referencing AFLDB-ISSUE-200's exact 598
+`PLANNER_VALIDATOR_BUG` ids against v51: 596 cleared, 2 still soft — id 9907 ("players whose first
+game was a Grand Final before 1897") and id 10294 ("players whose debut was a Grand Final before
+1897"). Both resolve to `scope.seasonMax = 1896`, one season before `NL_LIMITS.minSeason` (1897, the
+first VFL season), so v51's validator correctly declines both `coverage_unavailable` / "Season is out
+of range." — not a remaining implementation defect. AFLDB-ISSUE-200's `PLANNER_VALIDATOR_BUG`
+disposition for exactly these 2 ids is corrected to `STALE_CORPUS_EXPECTATION`, consistent with the
+already-established disposition for the separate 180-row pre-1965-coverage family (`coverage_unavailable|fgf`,
+not touched here).
+
+A new guarded correction script, `tools/nl/fix-issue-201-stale-boundary-expectations.ts` (pattern:
+`tools/nl/fix-issue-199-stale-expectations.ts` — auditable, self-verifying, fail-closed, never a
+hand-edit of the canonical CSV), corrects exactly these 2 rows: asserts each row's question text,
+`expected_status=success`, and translated `seasonTo=1896`/`boundaryEvent=debut`/`matchType=grand_final`
+before writing anything; rewrites `expected_status` → `decline`, `verification_level` →
+`EXPECTED_DECLINE` (this repository's established decline-row convention, per
+`tests/nl-issue-199-corpus-fix.test.ts`'s fixtures), `expected_failure_reason` → `coverage_unavailable`,
+clears `expected_coverage_behavior`/`expected_min_confidence` (both described a successful answer);
+preserves `expected_grain`/`expected_season_to`/`expected_match_type`/`expected_boundary` unchanged
+(the plan still parses to exactly that shape); self-checks that exactly these 2 rows changed. Unit
+tests: `tests/nl-issue-201-corpus-fix.test.ts`.
+
+Corrected final accounting for the 598-row `PLANNER_VALIDATOR_BUG` disposition:
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects (fixed)
+  2 stale corpus expectations (reclassified STALE_CORPUS_EXPECTATION, corrected)
+  0 genuine AFLDB-ISSUE-201 implementation defects remain
+```
+
+Expected benchmark after the two-row correction, on rerun: 12000 scored / 11535 clean / 465 soft / 0
+failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70). Full detail,
+correction-script design, and the exact operator commands are in `AFLDB-ISSUE-201.md` §9–§10.
+
+### Final resolution (2026-09-16, Sonnet 5)
+
+**Resolved 2026-09-16**, on operator validation. Implementation commit `366475e1`; closeout-correction
+commit `9533aed0`.
+
+Final local validation: `tests/nl-parser.test.ts`/`tests/nl-plan.test.ts`/`tests/nl-semantic-mapping.test.ts`
+774/774 passed; `tests/integration/nl-answers.test.ts` 33/33 passed; `tests/nl-issue-201-corpus-fix.test.ts`
+17/17 passed; `npx tsc --noEmit` clean.
+
+The guarded correction script (`tools/nl/fix-issue-201-stale-boundary-expectations.ts`) was run
+`/home/arm/nl-stress-corpus-v2.csv` → `/home/arm/nl-stress-corpus-v3.csv`: target rows modified 2,
+non-target rows modified 0, independently confirmed by a V2 → V3 diff (changed ids exactly `[9907,
+10294]`). The parser-v51 rerun against V3 produced the expected final benchmark:
+
+```text
+12000 scored
+11535 clean
+ 465 soft
+   0 failed
+```
+
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70). Both corrected ids are
+absent from `failures.csv`. The v51-on-V2 → v51-on-V3 soft-row diff shows old soft 467, new soft 465,
+removed `[9907, 10294]`, added `[]`, and **zero semantic changes among rows that remained soft** — the
+definitive no-collateral-change proof required before resolution.
+
+**Final accounting:**
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects fixed
+  2 stale corpus expectations corrected
+  0 genuine AFLDB-ISSUE-201 defects remain
+  0 new soft findings
+  0 semantic changes to remaining soft findings
+  0 hard failures
+```
+
+The remaining 465 soft findings are all already-known, out-of-scope families untouched by this issue:
+180 stale pre-1965 FGF coverage expectations, 128 GWS unsupported-term parser bug, 15 `zero` word-form
+parser bug, 72 accepted grain equivalence, 70 accepted taxonomy drift.
+
+Full evidence, correction-script design and the resolution record are in `AFLDB-ISSUE-201.md` §8–§10.
+`CHANGELOG.md` updated under `[Unreleased]`. Removed from `IssuesIndex.md`'s open-issues list and from
+the Open Issues table below (Stage 2 next-task item 5a is now done; items 5b-5d remain open, not yet
+tracked issues).

@@ -378,6 +378,70 @@ describe('7. career-boundary queries', () => {
     expect(p.grain).toBe('player_career');
     expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
   });
+
+  // AFLDB-ISSUE-201: a season range beside a boundary is parsed exactly
+  // like it is everywhere else (extractSeasons runs well before
+  // extractBoundary and strips its own tokens first) -- the parser was
+  // never the defective stage; validatePlan/player-career.ts were. These
+  // prove the plan shape both fields need to reach that fix.
+  describe('AFLDB-ISSUE-201: boundary plus a season range', () => {
+    it('"in" YEAR names one exact debut season', async () => {
+      const p = await plan('players whose first game was a grand final in 1897');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBe(1897);
+      expect(p.scope.seasonMax).toBe(1897);
+    });
+
+    it('"since" YEAR is a lower bound only', async () => {
+      const p = await plan('players whose first game was a grand final since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('"before" YEAR is an upper bound of year - 1, the existing convention', async () => {
+      const p = await plan('players whose first game was a grand final before 1950');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'grand_final' });
+      expect(p.scope.seasonMin).toBeUndefined();
+      expect(p.scope.seasonMax).toBe(1949);
+    });
+
+    it('last_game takes the same three date forms', async () => {
+      const exact = await plan('players whose last game was a grand final in 1997');
+      expect(exact.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+      expect(exact.scope.seasonMin).toBe(1997);
+      expect(exact.scope.seasonMax).toBe(1997);
+
+      const since = await plan('players whose last game was a grand final since 2000');
+      expect(since.boundary).toEqual({ event: 'last_game', where: 'grand_final' });
+      expect(since.scope.seasonMin).toBe(2000);
+      expect(since.scope.seasonMax).toBeUndefined();
+    });
+
+    // Bare "final"/"finals" (MATCH_TYPE_WORDS' 'finals' entry) is a
+    // distinct, independently-accepted boundary target from "grand
+    // final" -- both must carry the season range, not just the Grand
+    // Final wording.
+    it('the plain "final" boundary target also carries the season range', async () => {
+      const p = await plan('players whose first game was a final since 2000');
+      expect(p.grain).toBe('player_career');
+      expect(p.boundary).toEqual({ event: 'debut', where: 'final' });
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    // The exception is boundary-only: an ordinary career aggregate must
+    // still lose nothing here (extractSeasons/validatePlan are unchanged
+    // for non-boundary plans) -- the negative case itself is exercised in
+    // nl-semantic-mapping.test.ts against validatePlan.
+    it('a plain career aggregate in the same season range carries no boundary', async () => {
+      const p = await plan('most career goals since 2000');
+      expect(p.boundary).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+  });
 });
 
 describe('8. compound queries', () => {

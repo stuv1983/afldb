@@ -6,6 +6,8 @@
 
 **Open issues:** 0
 
+No currently open issues.
+
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
 (`src/search/nl/`, `src/db/queries/nl/`). AFLDB-ISSUE-190 resolved 2026-09-15 (Sonnet 5);
@@ -83,6 +85,20 @@ unmapped, 0 stale, `PLANNER_VALIDATOR_BUG` 598 / `STALE_CORPUS_EXPECTATION` 180 
 modified. The three candidate defect follow-ons and the one guarded corpus-correction task (named in
 `issues.md`) are recorded but not opened as tracked issues in this closeout.
 
+**AFLDB-ISSUE-201 opened 2026-09-16, resolved 2026-09-16** (all Sonnet 5) for the first of those
+follow-ons: the `PLANNER_VALIDATOR_BUG` `coverage_unavailable|boundary` cluster (598 rows).
+`validatePlan` now exempts a `raw.boundary` plan from the career season-range rejection;
+`player-career.ts` compiles the range against `c.debut_season`/`c.final_season`; `PARSER_VERSION`
+50 → 51. Operator-validated: 774/774 focused unit tests, 33/33
+`tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`; stable-corpus rerun cleared 596 of the
+598 rows, and the remaining 2 (id 9907, id 10294 — both "... Grand Final before 1897", `seasonMax`
+genuinely one season before `NL_LIMITS.minSeason`) were confirmed stale corpus expectations, not
+implementation defects, and corrected by a new guarded, self-verifying script,
+`tools/nl/fix-issue-201-stale-boundary-expectations.ts` (17/17 unit tests passed). Final stable-corpus
+result: 12,000 scored / 11,535 clean / 465 soft / 0 failed, with an independent diff confirming zero
+collateral movement anywhere else in the corpus. See `issues.md` and `AFLDB-ISSUE-201.md` for the full
+record. AFLDB-ISSUE-187..201 all now resolved.
+
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
 ## Stage 2 next task
@@ -108,17 +124,15 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
    `intentional_conservative_decline`/`scorer_harness_artifact`/`duplicate_manifestation` clusters
    turned up in the real data. See `issues.md` for full evidence. Runbook: `AFLDB-ISSUE-200.md`.
-5. **Not started.** Stage 2 is **not** closed by ISSUE-200 resolving. Four candidate follow-on work
-   items are identified but not yet opened as tracked issues: (a) a `PLANNER_VALIDATOR_BUG` fix for
-   career-boundary queries rejected by the generic `player_career` season-range validator (598
-   manifestations); (b) a `PARSER_BUG` fix for "GWS"/"GWS Giants" leaking into unsupported-term
-   detection on `team_match` margin questions (128 manifestations); (c) a `PARSER_BUG` fix for the
-   word "zero" not binding as numeric-zero in career conditions (15 manifestations); (d) a separate,
-   guarded corpus-correction task for the 180 pre-1965 finals/Grand Final disposals/marks/tackles
-   rows currently asserting a stale `expected_status=success`. The 72 `GRAIN_EQUIVALENT_LEGITIMATE`
-   rows need no behaviour fix. The 70 `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a
-   correctness blocker, unless a later diagnostic-taxonomy cleanup is deliberately opened. Only after
-   (a)-(c) resolve and (d) lands is the fresh exploratory Codex corpus sweep in scope, per the
-   original Stage 2 boundary.
+5. **(a) done, resolved 2026-09-16 — AFLDB-ISSUE-201.** Stage 2 is **not yet** closed: three of the
+   four candidate follow-on work items remain, not yet opened as tracked issues: (b) a `PARSER_BUG`
+   fix for "GWS"/"GWS Giants" leaking into unsupported-term detection on `team_match` margin questions
+   (128 manifestations); (c) a `PARSER_BUG` fix for the word "zero" not binding as numeric-zero in
+   career conditions (15 manifestations); (d) a separate, guarded corpus-correction task for the 180
+   pre-1965 finals/Grand Final disposals/marks/tackles rows currently asserting a stale
+   `expected_status=success`. The 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows need no behaviour fix. The 70
+   `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness blocker, unless a later
+   diagnostic-taxonomy cleanup is deliberately opened. Only after (b)-(c) resolve and (d) lands is the
+   fresh exploratory Codex corpus sweep in scope, per the original Stage 2 boundary.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

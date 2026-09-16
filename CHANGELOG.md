@@ -15,6 +15,50 @@ commit.
 
 ## [Unreleased]
 
+### NL search: career-boundary questions now accept a season range owned by the boundary itself (AFLDB-ISSUE-201) - 16 September 2026
+
+- `validatePlan` (`src/search/nl/plan.ts`) rejected any `player_career` plan carrying a season range
+  unless a career predicate/condition owned it, which made no exception for `raw.boundary`
+  (`NlBoundary`, e.g. "first game" / "last game" at a final or Grand Final) — a separate, already
+  independently-validated top-level plan field. A boundary question naming a year or range ("players
+  whose first game was a Grand Final in 1897") always hit the generic rejection, even though the range
+  names when the boundary event happened, not a career-aggregation window. The validator now also
+  exempts a plan carrying `raw.boundary`, unchanged for every other `player_career` season-range case.
+- `conditionsWhere` (`src/db/queries/nl/player-career.ts`) never read the season range for boundary
+  plans at all, so relaxing the validator alone would have silently ignored the requested year. A new
+  `boundarySeasonWhere` helper now ANDs the range against the boundary-appropriate precomputed column
+  (`c.debut_season` for a `debut` boundary, `c.final_season` for `last_game`), applied to the player's
+  true boundary game, never to "search matches in range, then pick the first/last one."
+- `PARSER_VERSION` 50 → 51, per the AFLDB-ISSUE-110 precedent that a validator-only change to plan
+  outcomes is version-worthy.
+- Regression tests added to `tests/nl-parser.test.ts`, `tests/nl-plan.test.ts` (including a negative
+  regression proving the exemption is boundary-only) and `tests/integration/nl-answers.test.ts`
+  (DB-backed, including an existence-guarded counter-example proving the fix filters on the true
+  boundary, not on matches-in-range).
+- Operator-validated: 774/774 focused unit tests (`nl-parser.test.ts`, `nl-plan.test.ts`,
+  `nl-semantic-mapping.test.ts`), 33/33 `tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`.
+  Stable V2-derived stress corpus moved 12,000 scored / 10,937 clean / 1,063 soft / 0 failed (v50) →
+  12,000 / 11,533 / 467 / 0 (v51): 596 of AFLDB-ISSUE-200's 598 `PLANNER_VALIDATOR_BUG`
+  `coverage_unavailable|boundary` manifestations cleared, with zero new soft findings and zero
+  collateral movement in the other five ISSUE-200 clusters.
+- The remaining 2 of those 598 (id 9907 "players whose first game was a Grand Final before 1897", id
+  10294 "players whose debut was a Grand Final before 1897") both resolve to `seasonMax = 1896`, one
+  season before `NL_LIMITS.minSeason` (1897, the first VFL season) — v51 correctly declines both
+  `coverage_unavailable` / "Season is out of range.", so these were stale corpus expectations, not
+  implementation defects. Corrected with a new checked-in, self-verifying script,
+  `tools/nl/fix-issue-201-stale-boundary-expectations.ts` (pattern: AFLDB-ISSUE-199's
+  `fix-issue-199-stale-expectations.ts`), which asserts each row's exact question text and pre-state
+  before rewriting it to this repository's established `EXPECTED_DECLINE`/`coverage_unavailable`
+  shape, refusing to run on any mismatch. Unit tests: `tests/nl-issue-201-corpus-fix.test.ts` (17/17
+  passed).
+- Final stable-corpus result after both corrections: 12,000 scored / 11,535 clean / 465 soft / 0
+  failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70), with an
+  independent before/after row-diff confirming the only two ids that moved were 9907 and 10294, and
+  zero semantic changes among the rows that remained soft. The 465 remaining soft findings are all
+  already-known, out-of-scope families (180 stale pre-1965 FGF coverage expectations, 128 GWS
+  unsupported-term parser bug, 15 `zero` word-form parser bug, 72 accepted grain equivalence, 70
+  accepted taxonomy drift).
+
 ### NL stress corpus: all 1,063 remaining soft findings audited and classified (AFLDB-ISSUE-200) - 16 September 2026
 
 - AFLDB-ISSUE-199 resolved every hard failure in the V1 12,000-row NL stress corpus but explicitly
