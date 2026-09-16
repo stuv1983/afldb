@@ -1,12 +1,11 @@
 # AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
-**Status:** Targeting fixed and confirmed against the real corpus (reached row 8919); a second,
-independent correction-tool bug on question-text validation was fixed and reached aggregate target
-selection; a third, independent correction-tool bug then failed closed on the corpus's asymmetric
-Grand-Final/plain-finals season representation (found 90 targets, not 180), now fixed, pending operator
-re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families (Stage 2
-next-task item 5d). Correction tool and tests corrected; not yet run end-to-end against the real corpus;
-not resolved.
+**Status:** RESOLVED 2026-09-16 (Sonnet 5, operator-validated). Fourth and final of AFLDB-ISSUE-200's
+follow-on families (Stage 2 next-task item 5d). Three fail-closed correction-tool defects were found and
+fixed across three operator runs (§0a broad category+template selector matching 996 rows not 180; §0b
+singular-only "final" question-text regex; §0c season-shape gate requiring `expected_season_from ===
+expected_season_to` for every row) before the fourth run completed end-to-end. See §11 for the closing
+evidence.
 
 ## 0. Naming correction
 
@@ -405,4 +404,29 @@ per command 7 above, not just totals.
   new shape rather than loosening the gate further ad hoc.
 - The 70 `WRONG_FAILURE_REASON` taxonomy-drift rows, parser/runtime code, `PARSER_VERSION`, and any
   other historical coverage floor are explicitly out of scope and untouched by this tool.
-- `CHANGELOG.md` is intentionally not yet updated — pending operator validation per task instruction.
+
+## 11. Resolution (2026-09-16)
+
+The fourth operator run, with the §0a/§0b/§0c fixes all in place, completed end-to-end and matched §9's
+benchmark exactly:
+
+- Focused tests: `tests/nl-issue-204-corpus-fix.test.ts` 34/34 passed (grew from 23 during the §0b/§0c
+  fixes). `npx tsc --noEmit` passed.
+- Real V3 → V4 correction: input 12000 rows, output 12000 rows, target rows expected 180, target rows
+  modified 180, non-target rows modified 0.
+- Independent V3 → V4 verification (outside the tool's own summary): same 12000-row id set, 180 changed
+  rows, no unexpected changed fields, all 180 moved `status: decline` /
+  `verification: EXPECTED_DECLINE` / `failure reason: coverage_unavailable`.
+- Parser-v53 rerun against V4: 12000 scored / 11930 clean / 70 soft / 0 failed —
+  `PARSER_VERSION` unchanged at 53.
+- Soft-row comparison V3 → V4: 250 → 70 soft, all 180 removed rows were `UNEXPECTED_DECLINE`, no rows
+  added, zero semantic changes among the rows that remained soft. The remaining 70 are exactly the
+  pre-existing `WRONG_FAILURE_REASON` taxonomy-drift family (AFLDB-ISSUE-200), untouched by this issue.
+
+This is the fourth and last of AFLDB-ISSUE-200's follow-on families; Stage 2 (the AFLDB-ISSUE-200 corpus
+audit and its follow-ons) is now closed. No parser/runtime code was changed and `PARSER_VERSION` was not
+bumped, per task instruction. The remaining 70 `WRONG_FAILURE_REASON` rows are tracked as a separate,
+not-yet-opened cleanup/audit task (see `issues.md`/`IssuesIndex.md`).
+
+Retained external artefacts: `/home/arm/nl-stress-corpus-v3.csv`, `/home/arm/nl-stress-corpus-v4.csv`,
+`/home/arm/nl-stress-v53-v3`, `/home/arm/nl-stress-v53-v4`.

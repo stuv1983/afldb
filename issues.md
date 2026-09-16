@@ -4,11 +4,10 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Open issues:** 1
+**Open issues:** 0
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Targeting confirmed on real corpus (reached row 8919); question-text checker bug fixed (reached aggregate selection); season-shape bug fixed (found 90 not 180); pending re-validation | Operator runs `AFLDB-ISSUE-204.md` §8's commands against the corrected tool |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -31,8 +30,10 @@ validation run failed closed on an over-broad category+template-only selector (9
 180); retargeted to the row's full structural signature same-day. The second operator run then failed
 closed on a question-text checker bug (singular-only "final" regex); fixed same-day. The third operator
 run then failed closed on a season-shape candidacy bug (found 90 targets, not 180, from the corpus's
-asymmetric Grand-Final/plain-finals season representation); fixed same-day, pending operator
-re-validation.
+asymmetric Grand-Final/plain-finals season representation); fixed same-day. **Resolved 2026-09-16**
+(Sonnet 5, operator-validated) -- the fourth run completed end-to-end at exactly 180 rows corrected,
+0 non-targets touched; see its detailed entry below. AFLDB-ISSUE-187..204 all now resolved. Stage 2
+(the AFLDB-ISSUE-200 corpus audit and its four follow-ons) is now closed.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.
 
@@ -34027,15 +34028,10 @@ Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELO
 
 ## AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
-- **Status:** Targeting fixed and confirmed against the real corpus (second run reached row 8919); a
-  second, independent correction-tool bug then failed closed on question-text validation
-  (singular-only "final" regex rejecting the corpus's plural "finals" wording), fixed and reached
-  aggregate target selection; a third, independent correction-tool bug then failed closed on the
-  corpus's asymmetric Grand-Final/plain-finals season representation (found 90 targets, not 180), now
-  fixed, pending operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's
+- **Status:** RESOLVED 2026-09-16 (Sonnet 5, operator-validated). Fourth and final of AFLDB-ISSUE-200's
   three candidate defect follow-ons plus its one guarded-correction follow-on (Stage 2 next-task item
-  5d). Full runbook: `AFLDB-ISSUE-204.md` (see §0b for the second finding, §0c for the third).
-  Correction tool and tests corrected this session; not yet run end-to-end against the real corpus.
+  5d). Full runbook: `AFLDB-ISSUE-204.md` (see §0a/§0b/§0c for the three fail-closed correction-tool
+  findings encountered during validation, §11 for the closing evidence).
 
 ### First operator run: failed closed, retargeted (2026-09-16)
 
@@ -34160,16 +34156,55 @@ touched. Full design, operator commands, and expected V4 benchmark: `AFLDB-ISSUE
 ### Scope
 
 In scope (implemented): the new guarded correction script and its DB-free unit tests; V3->V4 corpus
-output (operator-run, not yet executed). Out of scope: parser/runtime code; `PARSER_VERSION`; the 70
-`WRONG_FAILURE_REASON` taxonomy-drift rows; AFLDB-ISSUE-201/202/203 behaviour; any other historical
-coverage policy.
+output. Out of scope: parser/runtime code; `PARSER_VERSION`; the 70 `WRONG_FAILURE_REASON`
+taxonomy-drift rows; AFLDB-ISSUE-201/202/203 behaviour; any other historical coverage policy.
 
-### Next action
+### Fail-closed correction-tool findings (operator validation)
 
-Operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real V3->V4
-correction with the §0a targeting fix, the §0b question-text fix, and the §0c season-shape fix all in
-place, the parser-v53 rerun against V4, and the row-id-level before/after comparison) and reports
-results before this issue is marked resolved or `CHANGELOG.md` is updated. Targeting is now confirmed
-reaching row 8919 on the real corpus and question-text checking is confirmed reaching aggregate target
-selection; watch for whether the full run now completes end-to-end at exactly 180 rows, and for any
-further season-field shape or question-text wording the tool does not yet recognise.
+Three correction-tool-only defects were found and fixed during operator validation, each caught by the
+tool's own fail-closed checks before any V4 was written on the failing run:
+
+1. §0a — the broad `category=finals_grand_final` + `fgf`-template selector matched 996 real-corpus
+   rows, not the audited 180 (636 `team_match`-grain team-margin rows + 180 `player_game`-grain
+   goals/top-5-listing rows sharing the same category/template were legitimate non-targets). Fixed by
+   gating candidacy on the row's full structural signature instead of category+template alone.
+2. §0b — `assertQuestionMatchesRow()`'s plain-finals branch used a singular-only `/\bfinal\b/i` test
+   and rejected the corpus's plural "...in finals in YEAR" wording, which is real, correct corpus text.
+   Fixed to `/\bfinals?\b/i`.
+3. §0c — the season-shape gate required `expected_season_from === expected_season_to` for every row,
+   but the real corpus represents a Grand Final's season only in `expected_season_from` (blank
+   `expected_season_to`) while a plain-finals row repeats it in both fields; this found 90 targets
+   instead of 180. Fixed by branching the season-shape check on `expected_match_type`.
+
+All three were correction-tool-only (candidate derivation / question-text validation / season-shape
+gating); no parser or runtime defect was found, and none of the three affected the eventual 180-row
+correction's correctness once fixed -- each was caught and blocked by the tool's existing fail-closed
+invariants before any incorrect V4 could be written.
+
+### Resolution (2026-09-16)
+
+The fourth operator run, with all three fixes in place, completed end-to-end and matched the stated
+benchmark exactly:
+
+- `tests/nl-issue-204-corpus-fix.test.ts` 34/34 passed; `npx tsc --noEmit` passed.
+- Real V3 -> V4 correction: input 12000 rows, output 12000 rows, target rows expected 180, target rows
+  modified 180, non-target rows modified 0.
+- Independent V3 -> V4 verification: same 12000-row id set, 180 changed rows, no unexpected changed
+  fields, all 180 moved to `status=decline` / `verification=EXPECTED_DECLINE` /
+  `failure_reason=coverage_unavailable`.
+- Parser-v53 rerun against V4: 12000 scored / 11930 clean / 70 soft / 0 failed. `PARSER_VERSION`
+  unchanged at 53.
+- Soft-row comparison V3 -> V4: 250 -> 70 soft; all 180 removed rows were `UNEXPECTED_DECLINE`, zero
+  rows added, zero semantic changes among rows that remained soft. The remaining 70 are exactly the
+  pre-existing `WRONG_FAILURE_REASON` taxonomy-drift family (AFLDB-ISSUE-200), untouched by this issue.
+
+No parser/runtime code was changed; `PARSER_VERSION` remains 53; the 70 `WRONG_FAILURE_REASON` rows were
+not altered. This is the fourth and last of AFLDB-ISSUE-200's follow-on families -- Stage 2 (the
+AFLDB-ISSUE-200 corpus audit and its follow-ons) is now closed. The 70 remaining taxonomy-drift rows are
+a separate, not-yet-opened cleanup/audit task.
+
+Retained external artefacts: `/home/arm/nl-stress-corpus-v3.csv`, `/home/arm/nl-stress-corpus-v4.csv`,
+`/home/arm/nl-stress-v53-v3`, `/home/arm/nl-stress-v53-v4`.
+
+Removed from `IssuesIndex.md` and the Open Issues table above (1 -> 0). `CHANGELOG.md` updated under
+`Unreleased`.

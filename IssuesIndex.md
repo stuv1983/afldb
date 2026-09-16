@@ -4,31 +4,25 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
+**Open issues:** 0
 
-- **AFLDB-ISSUE-204** — Low severity, NL search stress corpus (`tools/nl/`, corpus-only, no runtime
-  code implicated). Retargeted 2026-09-16 (Sonnet 5) after the first operator validation run failed
-  closed as designed: the original category+equivalence-group-template-only candidate selector matched
-  996 real-corpus rows, not 180 (636 `team_match`-grain rows + 180 goals/top-5 `player_game` rows are
-  legitimate non-targets sharing the same `fgf` template). Guarded V3→V4 correction tool
-  (`tools/nl/fix-issue-204-stale-coverage-expectations.ts`) and tests
-  (`tests/nl-issue-204-corpus-fix.test.ts`) now gate candidacy on the row's full structural signature
-  (grain=player_game, mode=single, aggregation=max, metric in disposals/marks/tackles, match_type in
-  final/grand_final, and a season shape proper to that match type — `expected_season_from` an integer
-  year in 1897-1926, with `expected_season_to=""` for grand_final rows and
-  `expected_season_to=expected_season_from` for final rows; see `AFLDB-ISSUE-204.md` §0a/§0c/§5), not a
-  hardcoded id list (a later 3-block id sample the operator quoted has no constant inter-season stride
-  and could not be extended to 180 without guessing). The second operator run confirmed this targeting
-  on the real corpus (reached row 8919) then exposed an unrelated correction-tool bug:
-  `assertQuestionMatchesRow`'s plain-finals check was singular-only (`/\bfinal\b/i`) and rejected the
-  corpus's plural "...in finals in YEAR" wording; now `/\bfinals?\b/i` (§0b). The third operator run
-  then reached aggregate target selection and found only 90 targets, not 180: the season gate wrongly
-  required `expected_season_from === expected_season_to` for every row, but the corpus records a Grand
-  Final's season only in `expected_season_from` (blank `expected_season_to`) while a plain-finals row
-  repeats it in both fields — fixed by branching the season-shape check on `expected_match_type` (§0c).
-  Next action: operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real
-  V3→V4 correction with all three fixes in place, parser-v53 rerun against V4, before/after row
-  comparison).
+**AFLDB-ISSUE-204 resolved 2026-09-16** (Sonnet 5, operator-validated) — guarded V3→V4 corpus
+correction for the 180-row `coverage_unavailable|fgf` stale pre-1965/1987 finals-stat coverage
+expectations (disposals/marks/tackles, finals/Grand Finals, seasons 1897-1926). Three fail-closed
+correction-tool defects were found and fixed across three operator runs before the fourth completed
+end-to-end: (1) an over-broad category+template-only selector matched 996 rows, not 180, retargeted to
+the row's full structural signature; (2) a singular-only `/\bfinal\b/i` question-text check rejected
+real plural "finals" wording, widened to `/\bfinals?\b/i`; (3) a season-shape gate wrongly required
+`expected_season_from === expected_season_to` for every row, fixed by branching on
+`expected_match_type` (Grand Final rows carry a blank `expected_season_to`). All three were
+correction-tool-only; no parser/runtime defect was found. Final run: 180/180 targets corrected, 0
+non-targets touched, parser-v53 rerun against V4 = 12000 scored / 11930 clean / 70 soft / 0 failed
+(down from 250 soft), the 180 `UNEXPECTED_DECLINE` rows removed with zero new soft rows and zero
+semantic changes among the rest; `PARSER_VERSION` unchanged at 53. See `issues.md` and
+`AFLDB-ISSUE-204.md` §11 for the full record. AFLDB-ISSUE-187..204 all now resolved. **Stage 2 (the
+AFLDB-ISSUE-200 corpus audit and its four follow-ons) is now closed**; the remaining 70
+`WRONG_FAILURE_REASON` taxonomy-drift rows are a separate, not-yet-opened cleanup/audit task (see
+Stage 2 next task below).
 
 AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
 (Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
@@ -163,16 +157,19 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `CLUB_NICKNAMES` addition, operator-validated against the retained V3 corpus (465 → 265 soft).
    The same fix also normalized all 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows (GWS Giants player-season
    leading-goalkicker questions) to exact expected semantics as a byproduct, so that class is now 0.
-   Stage 2 is **not yet** closed: **(c) opened 2026-09-16 as AFLDB-ISSUE-203, resolved 2026-09-16**
-   (`PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions, 15
-   manifestations, operator-validated, `PARSER_VERSION` 52→53); **(d) opened 2026-09-16 as
-   AFLDB-ISSUE-204** (guarded corpus correction for the 180 `coverage_unavailable|fgf`
-   disposals/marks/tackles finals/Grand Final rows currently asserting a stale
+   Stage 2 was **not yet** closed after (c): **(c) opened 2026-09-16 as AFLDB-ISSUE-203, resolved
+   2026-09-16** (`PARSER_BUG` fix for the word "zero" not binding as numeric-zero in career conditions,
+   15 manifestations, operator-validated, `PARSER_VERSION` 52→53); **(d) opened 2026-09-16 as
+   AFLDB-ISSUE-204, resolved 2026-09-16** (guarded corpus correction for the 180
+   `coverage_unavailable|fgf` disposals/marks/tackles finals/Grand Final rows that asserted a stale
    `expected_status=success` — two coverage floors, not one: disposals/marks before 1965, tackles
-   before 1987 — retargeted same-day after the first operator run failed closed on an over-broad
-   996-row selector, pending operator re-validation). The 70 `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not
-   a correctness blocker, unless a later diagnostic-taxonomy cleanup is deliberately opened. Only after
-   (d) resolves is the fresh exploratory Codex corpus sweep in scope, per the original Stage 2
-   boundary.
+   before 1987 — retargeted after the first operator run failed closed on an over-broad 996-row
+   selector, then two further fail-closed correction-tool bugs found and fixed; operator-validated:
+   180/180 targets corrected, 0 non-targets touched, parser-v53 rerun 250→70 soft with the 180
+   `UNEXPECTED_DECLINE` rows removed and zero new soft rows, `PARSER_VERSION` unchanged at 53). The 70
+   `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness blocker, unless a later
+   diagnostic-taxonomy cleanup is deliberately opened. **Stage 2 is now closed** — (a)-(d) all resolved.
+   The fresh exploratory Codex corpus sweep is now in scope, per the original Stage 2 boundary, as a
+   separate not-yet-opened task.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

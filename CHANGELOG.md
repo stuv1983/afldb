@@ -15,6 +15,41 @@ commit.
 
 ## [Unreleased]
 
+### NL search stress corpus: corrected 180 stale pre-1965/1987 finals-stat coverage expectations (AFLDB-ISSUE-204) - 16 September 2026
+
+- 180 rows of the retained V3 NL stress corpus (disposals/marks/tackles, single-player `max`
+  questions, finals/Grand Finals, seasons 1897-1926) still asserted `expected_status=success`, a stale
+  expectation predating the coverage floors in `NL_COVERAGE` (`src/search/nl/plan.ts`):
+  disposals/marks are covered from 1965, tackles from 1987 (two separate floors, not one). For every
+  row in this family the requested season is before both floors, so `nlCoverageGap` already declines
+  correctly at runtime — this was a corpus-only correction, not a parser/runtime defect.
+- Corrected via a new guarded, self-verifying script,
+  `tools/nl/fix-issue-204-stale-coverage-expectations.ts` (following the ISSUE-201 precedent), which
+  derives its 180 targets from each row's own structural signature rather than a hardcoded id list, and
+  aborts writing anything if the derived count/distribution doesn't match the audited 180 exactly.
+  Corrected fields: `expected_status=decline`, `verification_level=EXPECTED_DECLINE`,
+  `expected_failure_reason=coverage_unavailable`, coverage-behaviour/min-confidence fields cleared.
+- Regression coverage: `tests/nl-issue-204-corpus-fix.test.ts` (34 cases).
+- Operator validation surfaced and fixed three independent, correction-tool-only defects during
+  candidate targeting (no parser/runtime defect in any of the three): (1) a category+template-only
+  candidate selector matched 996 real-corpus rows instead of 180, requiring targeting on the row's full
+  structural signature (grain/mode/aggregation/metric/match-type/season-shape); (2) the question-text
+  checker's plain-finals regex was singular-only (`/\bfinal\b/i`) and rejected the corpus's real plural
+  "...in finals in YEAR" wording, widened to `/\bfinals?\b/i`; (3) the season-shape candidacy gate
+  wrongly required `expected_season_from === expected_season_to` for every row, but the corpus records
+  a Grand Final's season only in `expected_season_from` (blank `expected_season_to`), fixed by branching
+  the check on `expected_match_type`.
+- `PARSER_VERSION` unchanged at 53; no `src/search/nl/` or `src/db/` file touched.
+- Operator-validated: focused tests and `tsc --noEmit` passed. Real V3 → V4 correction: 180/180 target
+  rows modified, 0 non-target rows touched (independently re-verified against the raw CSV, same 12000-row
+  id set, no unexpected changed fields). Parser-v53 rerun against V4: 12000 scored / 11930 clean / 70
+  soft / 0 failed (down from 250 soft on V3) — the 180 `UNEXPECTED_DECLINE` rows cleared, zero new soft
+  rows, zero semantic changes among rows that remained soft. The remaining 70 soft rows are the
+  pre-existing `WRONG_FAILURE_REASON` taxonomy-drift family (AFLDB-ISSUE-200), tracked separately and
+  unaffected by this change.
+- This resolves the fourth and last of AFLDB-ISSUE-200's follow-on families; the Stage 2 NL corpus audit
+  is now closed.
+
 ### NL search: "zero" now parses as an exact-equality career condition (AFLDB-ISSUE-203) - 16 September 2026
 
 - `NUMBER_WORDS` (`src/search/nl/vocab.ts`) had no `zero` entry, so the word survived into
