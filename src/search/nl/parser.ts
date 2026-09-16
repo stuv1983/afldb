@@ -1441,7 +1441,14 @@ function extractPeriodSplit(text: string): { text: string; periodSplit?: NlQuery
 
 function extractScoreCheckpoint(text: string): { text: string; scoreCheckpoint?: NlQueryPlan['scoreCheckpoint']; consumed: string[] } {
   const entries: [RegExp, NonNullable<NlQueryPlan['scoreCheckpoint']>][] = [
-    [/\bat (?:3qt|three[- ]quarter)[- ]time\b|\b(?:3qt|three[- ]quarter)[- ]time\b/, '3QT'],
+    // AFLDB-ISSUE-205: a trailing "comeback(s)" makes this TEAM_METRIC_WORDS'
+    // own q3_deficit_overcome phrase ("three quarter time comeback"), a
+    // different plan shape validatePlan refuses to combine with
+    // scoreCheckpoint (plan.ts's checkpoint-metric gate). Left unclaimed
+    // here so extractTeamMetric (step 11) sees the intact phrase instead of
+    // just the orphaned word "comeback". Only this entry needs the guard --
+    // 'HT'/'QT' below have no comeback metric of their own to protect.
+    [/\bat (?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)|\b(?:3qt|three[- ]quarter)[- ]time\b(?!\s+comebacks?\b)/, '3QT'],
     [/\bat half[- ]time\b|\bhalf[- ]time\b/, 'HT'],
     [/\bat (?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b|\b(?:q(?:uarter)?|qtr|quarter|quatre)[- ]time\b/, 'QT'],
   ];
