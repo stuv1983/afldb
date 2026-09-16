@@ -6,7 +6,9 @@
 
 **Open issues:** 0
 
-No currently open issues.
+AFLDB-ISSUE-202 (GWS club identity leaks into unsupported-term detection) resolved 2026-09-16
+(Sonnet 5, operator-validated) -- see `issues.md` for the full record, including the additional 72
+grain-equivalent GWS player-season rows normalized as a byproduct of the same fix.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -124,15 +126,20 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    `GRAIN_EQUIVALENT_LEGITIMATE` 72, `TAXONOMY_DRIFT` 70 — no
    `intentional_conservative_decline`/`scorer_harness_artifact`/`duplicate_manifestation` clusters
    turned up in the real data. See `issues.md` for full evidence. Runbook: `AFLDB-ISSUE-200.md`.
-5. **(a) done, resolved 2026-09-16 — AFLDB-ISSUE-201.** Stage 2 is **not yet** closed: three of the
-   four candidate follow-on work items remain, not yet opened as tracked issues: (b) a `PARSER_BUG`
-   fix for "GWS"/"GWS Giants" leaking into unsupported-term detection on `team_match` margin questions
-   (128 manifestations); (c) a `PARSER_BUG` fix for the word "zero" not binding as numeric-zero in
-   career conditions (15 manifestations); (d) a separate, guarded corpus-correction task for the 180
-   pre-1965 finals/Grand Final disposals/marks/tackles rows currently asserting a stale
-   `expected_status=success`. The 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows need no behaviour fix. The 70
-   `TAXONOMY_DRIFT` rows are accepted diagnostic drift, not a correctness blocker, unless a later
-   diagnostic-taxonomy cleanup is deliberately opened. Only after (b)-(c) resolve and (d) lands is the
-   fresh exploratory Codex corpus sweep in scope, per the original Stage 2 boundary.
+5. **(a) done, resolved 2026-09-16 — AFLDB-ISSUE-201.** **(b) done, resolved 2026-09-16 —
+   AFLDB-ISSUE-202**: a `PARSER_BUG` fix for "GWS"/"GWS Giants" leaking into unsupported-term
+   detection on `team_match` margin questions (128 manifestations). Root cause was a missing
+   combined alias (see `issues.md`/`AFLDB-ISSUE-202.md`); fix applied was the one-line
+   `CLUB_NICKNAMES` addition, operator-validated against the retained V3 corpus (465 → 265 soft).
+   The same fix also normalized all 72 `GRAIN_EQUIVALENT_LEGITIMATE` rows (GWS Giants player-season
+   leading-goalkicker questions) to exact expected semantics as a byproduct, so that class is now 0.
+   Stage 2 is **not yet** closed: two of the four candidate
+   follow-on work items remain, not yet opened as tracked issues: (c) a `PARSER_BUG` fix for the word
+   "zero" not binding as numeric-zero in career conditions (15 manifestations); (d) a separate, guarded
+   corpus-correction task for the 180 pre-1965 finals/Grand Final disposals/marks/tackles rows
+   currently asserting a stale `expected_status=success`. The 70 `TAXONOMY_DRIFT` rows are accepted
+   diagnostic drift, not a correctness blocker, unless a later diagnostic-taxonomy cleanup is
+   deliberately opened. Only after (c) resolves and (d) lands is the fresh exploratory Codex corpus
+   sweep in scope, per the original Stage 2 boundary.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

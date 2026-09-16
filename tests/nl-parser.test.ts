@@ -19,6 +19,10 @@ const CLUBS: NlClubDirectoryEntry[] = [
   { organizationId: 4, slug: 'geelong', name: 'Geelong', names: ['geelong', 'cats'] },
   { organizationId: 5, slug: 'adelaide', name: 'Adelaide', names: ['adelaide', 'crows'] },
   { organizationId: 6, slug: 'port-adelaide', name: 'Port Adelaide', names: ['port adelaide', 'power'] },
+  // AFLDB-ISSUE-202: mirrors the real merged directory (clubs + CLUB_NICKNAMES),
+  // which carries 'gws' and 'giants' as independent one-word nicknames plus
+  // the combined 'gws giants' alias added for this issue.
+  { organizationId: 7, slug: 'gws', name: 'Greater Western Sydney', names: ['greater western sydney', 'gws', 'giants', 'gws giants'] },
 ];
 
 const VENUES: NlVenueDirectoryEntry[] = [
@@ -155,6 +159,78 @@ describe('2. team queries', () => {
     expect(p.metric).toBe('loss_margin');
     expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
     expect(p.scope.clubFor).toBeUndefined();
+  });
+
+  // AFLDB-ISSUE-202: "GWS Giants" is assembled in the corpus from two
+  // independently-aliased single words ('gws', 'giants'), so extractClubs's
+  // two-slot-per-question span matcher spent one slot on 'giants' (correctly
+  // resolving clubAgainst) while leaving 'gws' unclaimed -- and 128 stress
+  // rows declined unsupported_term on that leftover token even though the
+  // club identity had already resolved. The fix is a combined 'gws giants'
+  // alias in CLUB_NICKNAMES that findLongestMatch selects as one span.
+  it('adelaide biggest win against gws giants -> clubAgainst resolves and no leftover "gws"', async () => {
+    const result = await parse('Adelaide biggest win against GWS Giants');
+    expect(result.status).toBe('plan');
+    if (result.status !== 'plan') return;
+    const p = result.plan;
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('win_margin');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(result.report.unsupportedTerms).not.toContain('gws');
+    expect(result.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('adelaide biggest win versus gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide biggest win versus GWS Giants');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide biggest win over gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide biggest win over GWS Giants');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide worst loss to gws giants -> same identity behaviour', async () => {
+    const p = await plan('Adelaide worst loss to GWS Giants');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('loss_margin');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide highest score against gws giants -> score metric intact, identity fully consumed', async () => {
+    const p = await plan('Adelaide highest score against GWS Giants');
+    expect(p.grain).toBe('team_match');
+    expect(p.metric).toBe('team_score');
+    expect(p.agg).toEqual({ kind: 'max' });
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('adelaide biggest win against gws giants since 2000 -> season bound preserved, identity fully consumed', async () => {
+    const p = await plan('Adelaide biggest win against GWS Giants since 2000');
+    expect(p.scope.clubFor?.name).toBe('Adelaide');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    expect(p.scope.seasonMin).toBe(2000);
+  });
+
+  it('bare "GWS" alone still resolves (unchanged single-word alias)', async () => {
+    const p = await plan('Adelaide biggest win against GWS');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('bare "Giants" alone still resolves (unchanged single-word alias)', async () => {
+    const p = await plan('Adelaide biggest win against Giants');
+    expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+  });
+
+  it('negative: "gws" adjacent to a genuinely unsupported word still declines unsupported_term -- proves this is not a blanket ignore of "gws"', async () => {
+    const result = await parse('Adelaide biggest win against GWS reserves');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms).toContain('reserves');
   });
 });
 
@@ -1601,8 +1677,9 @@ describe('16. marquee matches, rivalries and debut windows (parser v15)', () => 
   });
 
   it('a rivalry whose clubs are not in the directory declines instead of guessing', async () => {
-    // The fixture directory has no Sydney or GWS, so the phrase cannot
-    // resolve; its words stay leftover and the question declines.
+    // The fixture directory has no Sydney (GWS was added for AFLDB-ISSUE-202,
+    // but Sydney remains absent), so the phrase cannot resolve; its words
+    // stay leftover and the question declines.
     const result = await parse('players who played in a sydney derby');
     expect(result.status).toBe('none');
   });

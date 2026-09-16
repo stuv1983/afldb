@@ -1469,6 +1469,7 @@ export const CLUB_NICKNAMES: Record<string, string> = {
   suns: 'gold coast',
   giants: 'greater western sydney',
   gws: 'greater western sydney',
+  'gws giants': 'greater western sydney',
   lions: 'brisbane lions',
   bears: 'brisbane lions',
   gorillas: 'brisbane lions',

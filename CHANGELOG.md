@@ -15,6 +15,38 @@ commit.
 
 ## [Unreleased]
 
+### NL search: "GWS Giants" no longer strands "gws" as an unsupported term (AFLDB-ISSUE-202) - 16 September 2026
+
+- `CLUB_NICKNAMES` (`src/search/nl/vocab.ts`) had only the independent single-word nicknames `gws`
+  and `giants`, both merged onto the Greater Western Sydney organization but with no combined
+  two-word alias. `extractClubs`'s two-match-slot-per-question span matcher spent one slot on the
+  subject club and the other on `giants`, correctly resolving `clubAgainst` but leaving the literal
+  token `gws` unconsumed; it surfaced in `report.unsupportedTerms` and the question declined
+  `unsupported_term` even though the club identity had already resolved correctly. Added a combined
+  `'gws giants': 'greater western sydney'` entry, the same multi-word-alias mechanism already used
+  for `'same olds': 'essendon'`. No change to `extractClubs`, `findClub`/`findLongestMatch`,
+  `consumedSet`/`leftoverTokens`, or `declineFailureReason` — this is a directory-completeness fix,
+  not a matching-code or unsupported-term-detection change.
+- `PARSER_VERSION` 51 → 52, since this changes which plan a previously-declining question resolves
+  to.
+- Regression tests added to `tests/nl-parser.test.ts` (against/versus/over/to phrasing, a `score`
+  metric case, a `since YEAR` case, bare `GWS`/`Giants` still resolving unchanged, and a negative
+  case proving an unrelated unsupported word adjacent to `gws` still declines).
+- Operator-validated: 428/428 `tests/nl-parser.test.ts`, clean `tsc --noEmit`. Stable V3 stress
+  corpus moved 12,000 scored / 11,535 clean / 465 soft / 0 failed (v51) → 12,000 / 11,735 / 265 / 0
+  (v52): all 128 `unsupported_term|tm|gws` manifestations cleared (`UNEXPECTED_DECLINE` 323 → 195),
+  with zero new soft findings and zero semantic changes among the rows that remained soft.
+- The same alias also fully resolved all 72 pre-existing `GRAIN_EQUIVALENT` rows (GWS Giants
+  player-season leading-goalkicker questions, e.g. "GWS Giants player with most goals in 1897"):
+  previously accepted only as an equivalent `player_season -> player_game/sum` grain substitution
+  because "GWS Giants" did not fully resolve as a single club mention, they now match the corpus's
+  exact expected semantics once the full phrase resolves as one entity. This is a normalization
+  improvement from the same root cause, not a separate change or a regression.
+- Final soft composition (265): `UNEXPECTED_DECLINE` 195 (180 stale pre-1965 coverage expectations +
+  15 `zero` word-form parser defect, both pre-existing and out of scope for this issue) and
+  `WRONG_FAILURE_REASON` 70 (pre-existing taxonomy-drift family, unchanged). No GWS-related soft
+  findings remain.
+
 ### NL search: career-boundary questions now accept a season range owned by the boundary itself (AFLDB-ISSUE-201) - 16 September 2026
 
 - `validatePlan` (`src/search/nl/plan.ts`) rejected any `player_career` plan carrying a season range

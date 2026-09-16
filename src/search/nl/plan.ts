@@ -522,7 +522,18 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // question cannot be restricted to a season range."); an ordinary career
 // aggregate with a season range and no boundary (e.g. "most career goals
 // since 2000") is unaffected and still refuses.
-export const PARSER_VERSION = 51;
+// v52 -- AFLDB-ISSUE-202: CLUB_NICKNAMES gained a combined 'gws giants'
+// alias alongside the existing independent 'gws' and 'giants' entries.
+// extractClubs's two-slot-per-question span matcher previously spent one
+// slot on 'giants' (correctly resolving clubAgainst to Greater Western
+// Sydney) while leaving the leftover 'gws' token unclaimed, so it surfaced
+// in report.unsupportedTerms and the question declined unsupported_term
+// even though the club identity had already resolved correctly. The
+// combined alias is the single longest candidate span for "GWS Giants" and
+// is matched as one unit, consuming both words. Bare 'gws' and bare
+// 'giants' remain valid independent nicknames; a genuinely unsupported
+// token adjacent to 'gws' still declines unsupported_term.
+export const PARSER_VERSION = 52;
 
 // ------------------------------------------------------------------ grain
 
