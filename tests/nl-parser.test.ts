@@ -290,6 +290,77 @@ describe('4. career filters', () => {
     p = await plan('2 drawn matches');
     expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'draws', op: 'gte', value: 2 });
   });
+
+  // AFLDB-ISSUE-203: "zero" had no NUMBER_WORDS entry, so "zero goals"
+  // left the word unclaimed -- it declined unsupported_term instead of
+  // binding goals = 0.
+  it('AFLDB-ISSUE-203: players with 200 games and zero goals', async () => {
+    const result = await parse('players with 200 games and zero goals');
+    expect(result.status).toBe('plan');
+    const p = (result as Extract<NlParse, { status: 'plan' }>).plan;
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+    expect(result.report.unsupportedTerms).not.toContain('zero');
+    expect(result.report.unsupportedTerms).toEqual([]);
+  });
+
+  it('AFLDB-ISSUE-203: single-condition control -- a bare "zero goals" clause still binds eq 0', async () => {
+    const p = await plan('players with zero goals');
+    expect(p.grain).toBe('player_career');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  // The digit form reaches the identical default-op branch as the word
+  // form (NUMBER_WORDS is only consulted when no digit was found), so
+  // without the comparator-default fix this would have bound 'gte' 0 --
+  // trivially true for every player -- rather than declining, which is
+  // why this case was unproven before AFLDB-ISSUE-203 (no corpus row used
+  // digit "0").
+  it('AFLDB-ISSUE-203: digit "0" reaches the same eq-default fix as the word "zero"', async () => {
+    const p = await plan('players with 200 games and 0 goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: a positive number word keeps its existing gte default -- zero is the only value whose default op changes', async () => {
+    const p = await plan('players with 200 games and two clubs');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'games', op: 'gte', value: 200 });
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'clubs_played', op: 'gte', value: 2 });
+  });
+
+  it('AFLDB-ISSUE-203: an explicit comparator on zero wins over the eq default', async () => {
+    let p = await plan('players with 200 games and exactly zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+
+    p = await plan('players with 200 games and at least zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gte', value: 0 });
+
+    p = await plan('players with 200 games and more than zero goals');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'gt', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: existing negative-trigger zero forms are unaffected', async () => {
+    let p = await plan('players with 200 games and no premiership');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'premierships', op: 'eq', value: 0 });
+
+    p = await plan('most games without kicking a goal');
+    expect(p.careerConditions).toContainEqual({ kind: 'column', column: 'goals', op: 'eq', value: 0 });
+  });
+
+  it('AFLDB-ISSUE-203: a bound zero does not get dropped through a truthiness check', async () => {
+    const p = await plan('players with 200 games and zero goals');
+    const goalsCondition = p.careerConditions.find(c => c.kind === 'column' && c.column === 'goals');
+    expect(goalsCondition).toBeDefined();
+    expect(goalsCondition?.value).toBe(0);
+  });
+
+  it('AFLDB-ISSUE-203: a genuinely unsupported word next to "zero" still declines unsupported_term, and not on "zero"', async () => {
+    const result = await parse('players with zero goals and flibbertigibbet');
+    expect(result.status).toBe('none');
+    expect(result.report.unsupportedTerms).toContain('flibbertigibbet');
+    expect(result.report.unsupportedTerms).not.toContain('zero');
+  });
 });
 
 describe('5. awards', () => {

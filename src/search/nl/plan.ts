@@ -533,7 +533,14 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // is matched as one unit, consuming both words. Bare 'gws' and bare
 // 'giants' remain valid independent nicknames; a genuinely unsupported
 // token adjacent to 'gws' still declines unsupported_term.
-export const PARSER_VERSION = 52;
+// v53 -- AFLDB-ISSUE-203: NUMBER_WORDS gained a 'zero' entry (nl/vocab.ts),
+// so "players with 4 games and zero goals" no longer leaves 'zero'
+// unclaimed in leftoverTokens/unsupportedTerms. extractCareerConditions
+// also now forces a comparator-less, zero-valued clause to op 'eq' instead
+// of the bare-number default 'gte' -- "zero goals" means goals = 0, not
+// the trivially-true "goals >= 0" -- while an explicit comparator on zero
+// ("at least zero", "exactly zero") still wins, same as any other value.
+export const PARSER_VERSION = 53;
 
 // ------------------------------------------------------------------ grain
 
