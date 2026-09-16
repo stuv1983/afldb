@@ -1,11 +1,9 @@
 # AFLDB-ISSUE-207 — Numeric operator ownership between grouped result threshold and margin filter
 
-Status: IMPLEMENTED 2026-09-16 (Sonnet 5). Fix applied and focused-tested on
-`sonnet/issue-207-numeric-operator-ownership` (base `51e94370`, unmerged).
-Operator validation on the Linux development host (frozen V5 stable-corpus
-rerun, ISSUE-206 281-row exploratory family recheck) is still outstanding —
-see "Operator validation still required" below. Do not treat this issue as
-resolved until that validation lands.
+Status: RESOLVED 2026-09-16 (Sonnet 5, operator-validated on streamanator).
+Fix applied and focused-tested on `sonnet/issue-207-numeric-operator-ownership`
+(base `51e94370`, unmerged; implementation commit `4ecdd77a`). Parser version
+55. Both required operator checks passed — see "Operator validation" below.
 
 This is follow-on item (1) of `AFLDB-ISSUE-206.md`'s six proposals: the
 highest-severity finding from that corpus (281 accepted, silently
@@ -182,28 +180,49 @@ clusters (club-role ownership / `AGAINST_PREPOSITION`, head-to-head
 "has more wins", imperative vocabulary, `after YEAR`, and the
 `career_boundary` compiler restriction) were not touched.
 
-## Operator validation still required
+## Operator validation
 
-Not runnable from this Windows workstation (no access to the Linux
-development host's `/home/arm/` paths). Exact commands for the operator:
+Both required checks were run on the Linux development host (streamanator)
+and passed.
 
-```bash
-# 1. Frozen V5 stable-regression gate must stay green (parser v55 now,
-#    not v54 — the corpus itself is untouched):
-npm run nl:stress -- --corpus /home/arm/nl-stress-corpus-v5.csv --parse-only --out /home/arm/nl-stress-v55-v5
-# expected: 12000 scored / 12000 clean / 0 soft / 0 failed
+**1. Frozen V5 stable-regression gate** (parser v55, corpus unchanged):
 
-# 2. ISSUE-206 exploratory 281-row numeric-operator family: rerun the
-#    existing exploratory parse-only pass and re-triage against the
-#    retained /home/arm/nl-exploratory-v1.csv (unedited); confirm the 281
-#    rows previously flagged for swapped havingClause/matchFilter operators
-#    now parse with the intended pairing, and that no other row in that
-#    corpus changed status (no collateral movement). tools/nl/triage-
-#    exploratory-corpus.mjs and the retained .tmp/issue-206/ artifacts are
-#    the starting point for isolating exactly those 281 rows rather than
-#    re-scoring the full 29,030-row corpus.
+```text
+Corpus: /home/arm/nl-stress-corpus-v5.csv
+Run:    /home/arm/nl-stress-v55-v5
+Result: 12000 scored / 12000 clean / 0 soft / 0 failed
 ```
 
-Resolve this issue only once both are confirmed; if either shows collateral
-movement or a still-wrong pairing, stop and report the contradiction rather
-than resolving.
+No regression to the stable baseline.
+
+**2. ISSUE-206 exploratory 281-row numeric-operator family recheck.** A
+direct structured-plan comparison between the retained pre-fix (v54) and
+post-fix (v55) exploratory runs — both 29,030 rows / 29,030 unique IDs
+(`/home/arm/nl-exploratory-v1-validation/results.jsonl` vs
+`/home/arm/nl-exploratory-v55-validation/results.jsonl`) — found:
+
+```text
+changed plans: 281
+281 havingClause.op: "gt" -> "gte"
+281 matchFilter.op:  "gte" -> "gt"
+```
+
+All 281 changes are exactly the ISSUE-207 defect family, and no other
+structured-plan field changed across the entire 29,030-row corpus (no
+collateral movement). Representative row (id 20600048, "Teams with 7 or
+more losses by over 60 points in 2017"): before the fix,
+`havingClause = {losses, gt, 7}` / `matchFilter = {loss_margin, gte, 60}`
+(swapped); after, `havingClause = {losses, gte, 7}` /
+`matchFilter = {loss_margin, gt, 60}` (intended pairing).
+
+The aggregate exploratory scorer result (27530 scored / 1500 audit-required
+/ 10874 clean / 15275 soft / 1381 failed) is unchanged by this fix, as
+expected: the ISSUE-206 scorer does not assert comparator fields, so these
+281 rows were already scored `clean` before and after — the decisive
+evidence is the direct structured-plan diff above, not the scorer's
+aggregate counts. The scorer's diagnostic-group count moved 99 -> 97 as a
+side effect of the plan changes; this is not separately investigated as it
+carries no additional evidence beyond the field-level diff.
+
+**Resolution:** both checks confirm the fix produces the intended operator
+pairing with zero collateral movement. Issue resolved.
