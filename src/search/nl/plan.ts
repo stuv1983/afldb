@@ -611,7 +611,19 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // by extractClubSeasonMetric's "most wins" club_season ranking cue
 // (nl/parser.ts) and decline there, a different mechanism outside this
 // fix's scope.
-export const PARSER_VERSION = 57;
+// v58 -- AFLDB-ISSUE-210: canonicalise() (nl/vocab.ts) now consumes a
+// leading imperative/request wrapper -- "find", "show", "list" or "give
+// me" as the very first word(s) of the question -- before any extraction
+// stage sees the text. This was the dominant soft-decline mechanism found
+// by ISSUE-206 (~10,000+ exploratory-corpus rows): the leftover verb
+// tripped the generic unmatched-token decline even though grain/metric/
+// scope were otherwise fully resolvable. Anchored to the start of the
+// string only (never a global strip), so the same words inside a
+// meaningful clause are untouched; "find" additionally carries a negative
+// lookahead so it does not consume the unrelated "find the (big) sticks"
+// goals idiom. "show me" and "(please )?tell me" were already handled
+// (unanchored) by CONVERSATIONAL_FILLER and are unchanged by this fix.
+export const PARSER_VERSION = 58;
 
 // ------------------------------------------------------------------ grain
 

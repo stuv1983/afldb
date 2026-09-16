@@ -8,6 +8,26 @@
 
 _No open issues._
 
+**AFLDB-ISSUE-210 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
+(6) of `AFLDB-ISSUE-206.md`'s six proposals: a leading imperative/request-wrapper verb ("find", bare
+"show", "list", "give me" — "show me"/"tell me" already worked) survived `canonicalise()`
+(`src/search/nl/vocab.ts`) as an unmatched leftover token and tripped the generic decline gate even when
+the rest of the question was otherwise fully supported — the dominant soft-decline mechanism ISSUE-206
+found (~10,000+ of 15,275 soft-decline exploratory rows). Fix: one new anchored
+`LEADING_REQUEST_PREFIX_RE`, consumed at most once at the very start of the string; `find` carries a
+negative lookahead protecting the pre-existing "find the (big) sticks" goals idiom, the one real
+vocabulary collision found. `PARSER_VERSION` 57→58. Implementation commit `8324d2a`, unmerged on
+`sonnet/issue-210-imperative-nl-phrasing`. Operator-validated on streamanator: frozen V5 stable-corpus
+rerun stayed **12000/12000/0/0**, and a direct structured-plan diff of the retained ISSUE-206 29,030-row
+exploratory corpus (pre-fix v57 vs post-fix v58) found exactly **1408 changed plans**
+(`663 find / 378 list / 367 show / 0 other`, zero unrelated wording family), reconciled in full: **1288
+`soft_fail→clean`** (the genuine usability gain), **48 `soft_fail→fail`** (all `show`-prefixed
+`player_game_single` rows, all the pre-existing Gary Ablett Jnr/Snr canonical-display-name scorer
+artifact from `AFLDB-ISSUE-206.md`, exposed by new reachability rather than caused by this fix), and
+**72 audit-required `decline→success`** ("List sons of X with Y" `relationship_conditions` rows, now
+valid typed `player_career` plans but still intentionally manual-audit by corpus design). See
+`issues.md` and `AFLDB-ISSUE-210.md` for the full record.
+
 **AFLDB-ISSUE-209 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) — follow-on item
 (3) of `AFLDB-ISSUE-206.md`'s six proposals: `extractHeadToHeadCue`'s `compare_wins` family
 (`src/search/nl/semantic-intents.ts`) recognized only past-tense "won more", so present-tense "has/have
