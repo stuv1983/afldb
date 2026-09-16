@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-201 | Medium | NL search (`src/search/nl/plan.ts`, `src/db/queries/nl/player-career.ts`) | Implemented, awaiting operator validation | Run `AFLDB-ISSUE-201.md` §7 (unit/integration tests, `tsc --noEmit`, stable v51 corpus rerun); confirm 598 → 0 |
+| AFLDB-ISSUE-201 | Medium | NL search (`src/search/nl/plan.ts`, `src/db/queries/nl/player-career.ts`) | Implemented + 2-row corpus correction added, awaiting operator validation | Run `AFLDB-ISSUE-201.md` §7 (unit/integration tests, `tsc --noEmit`, stable v51 corpus rerun) and §10 (guarded-script tests, corpus regeneration, v51-on-v3 rerun); confirm 465 soft / 0 hard |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -33689,3 +33689,45 @@ operator commands) is in `AFLDB-ISSUE-201.md`; summary:
 **Not yet done:** operator validation (`AFLDB-ISSUE-201.md` §7 — focused unit tests, the DB-backed
 integration test, `tsc --noEmit`, the stable v51 corpus rerun, and the before/after 598 → 0
 comparison). Do not mark this issue resolved until that evidence is recorded here.
+
+### Closeout correction (2026-09-16, Sonnet 5)
+The operator's local validation of §1–§5 passed (774/774 focused unit tests, 33/33 DB-backed
+`tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`) and the stable v51 corpus rerun moved
+12000/10937/1063/0 (v50) → 12000/11533/467/0 (v51). Cross-referencing AFLDB-ISSUE-200's exact 598
+`PLANNER_VALIDATOR_BUG` ids against v51: 596 cleared, 2 still soft — id 9907 ("players whose first
+game was a Grand Final before 1897") and id 10294 ("players whose debut was a Grand Final before
+1897"). Both resolve to `scope.seasonMax = 1896`, one season before `NL_LIMITS.minSeason` (1897, the
+first VFL season), so v51's validator correctly declines both `coverage_unavailable` / "Season is out
+of range." — not a remaining implementation defect. AFLDB-ISSUE-200's `PLANNER_VALIDATOR_BUG`
+disposition for exactly these 2 ids is corrected to `STALE_CORPUS_EXPECTATION`, consistent with the
+already-established disposition for the separate 180-row pre-1965-coverage family (`coverage_unavailable|fgf`,
+not touched here).
+
+A new guarded correction script, `tools/nl/fix-issue-201-stale-boundary-expectations.ts` (pattern:
+`tools/nl/fix-issue-199-stale-expectations.ts` — auditable, self-verifying, fail-closed, never a
+hand-edit of the canonical CSV), corrects exactly these 2 rows: asserts each row's question text,
+`expected_status=success`, and translated `seasonTo=1896`/`boundaryEvent=debut`/`matchType=grand_final`
+before writing anything; rewrites `expected_status` → `decline`, `verification_level` →
+`EXPECTED_DECLINE` (this repository's established decline-row convention, per
+`tests/nl-issue-199-corpus-fix.test.ts`'s fixtures), `expected_failure_reason` → `coverage_unavailable`,
+clears `expected_coverage_behavior`/`expected_min_confidence` (both described a successful answer);
+preserves `expected_grain`/`expected_season_to`/`expected_match_type`/`expected_boundary` unchanged
+(the plan still parses to exactly that shape); self-checks that exactly these 2 rows changed. Unit
+tests: `tests/nl-issue-201-corpus-fix.test.ts`.
+
+Corrected final accounting for the 598-row `PLANNER_VALIDATOR_BUG` disposition:
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects (fixed)
+  2 stale corpus expectations (reclassified STALE_CORPUS_EXPECTATION, corrected)
+  0 genuine AFLDB-ISSUE-201 implementation defects remain
+```
+
+Expected benchmark after the two-row correction, on rerun: 12000 scored / 11535 clean / 465 soft / 0
+failed (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70). Full detail,
+correction-script design, and the exact operator commands are in `AFLDB-ISSUE-201.md` §9–§10.
+
+**Still not done:** the operator has not yet run `AFLDB-ISSUE-201.md` §10 (guarded-script unit tests,
+corpus regeneration, v51-on-v3 rerun, class-count verification, and the two-id clean proof). Do not
+mark this issue resolved, update `IssuesIndex.md`'s open-issue count, or add the `CHANGELOG.md` entry
+until that evidence is recorded here.

@@ -12,11 +12,16 @@ Area: natural-language search (`src/search/nl/plan.ts`, `src/db/queries/nl/playe
 **implemented 2026-09-16 (Sonnet 5), awaiting operator validation** — `validatePlan` now exempts a
 `raw.boundary` plan from the season-range rejection, `player-career.ts` now compiles the range
 against `c.debut_season`/`c.final_season`, `PARSER_VERSION` 50 → 51, regression tests added to
-`tests/nl-parser.test.ts`/`tests/nl-plan.test.ts`/`tests/integration/nl-answers.test.ts`. First of
-AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item 5a). Next action: operator
-runs `AFLDB-ISSUE-201.md` §7 (focused unit tests, DB-backed integration test, `tsc --noEmit`, stable
-v51 corpus rerun) and confirms `PLANNER_VALIDATOR_BUG`/`coverage_unavailable|boundary` 598 → 0 with no
-collateral movement in the other five ISSUE-200 clusters; then mark resolved and add the
+`tests/nl-parser.test.ts`/`tests/nl-plan.test.ts`/`tests/integration/nl-answers.test.ts`. Operator's
+v51 corpus rerun confirmed 596 of the 598 `PLANNER_VALIDATOR_BUG` rows cleared; the remaining 2 (id
+9907, id 10294, both "... Grand Final before 1897") are stale corpus expectations, not implementation
+defects — `seasonMax=1896` is genuinely before `NL_LIMITS.minSeason`. A guarded correction script,
+`tools/nl/fix-issue-201-stale-boundary-expectations.ts` (+ `tests/nl-issue-201-corpus-fix.test.ts`),
+was added to correct exactly those 2 rows to an `EXPECTED_DECLINE`/`coverage_unavailable` shape.
+First of AFLDB-ISSUE-200's three candidate defect follow-ons (Stage 2 next-task item 5a). Next action:
+operator runs `AFLDB-ISSUE-201.md` §7 (focused unit tests, DB-backed integration test, `tsc --noEmit`,
+stable v51 corpus rerun) and §10 (guarded-script unit tests, corpus regeneration, v51-on-v3 rerun,
+class-count verification — expect 11535 clean / 465 soft / 0 hard); then mark resolved and add the
 `CHANGELOG.md` entry. See `issues.md` and `AFLDB-ISSUE-201.md` for the full record.
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,

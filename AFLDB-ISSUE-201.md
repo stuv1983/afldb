@@ -121,6 +121,8 @@ pairing unambiguous, and no test or product requirement calls for a different la
 - `tests/nl-parser.test.ts` — parser-shape regressions (§5).
 - `tests/nl-plan.test.ts` — validator-acceptance regressions (§5).
 - `tests/integration/nl-answers.test.ts` — DB-backed regressions (§5).
+- `tools/nl/fix-issue-201-stale-boundary-expectations.ts` — guarded two-row corpus correction (§9).
+- `tests/nl-issue-201-corpus-fix.test.ts` — unit tests for the correction script (§9).
 - `issues.md` — this issue's ledger entry (root cause + runbook cross-reference), Open Issues table
   row.
 - `IssuesIndex.md` — open-issue summary.
@@ -222,8 +224,152 @@ npx tsx tools/nl/audit-issue-200-cluster.ts --in /home/arm/issue-201-recheck.csv
 (confirm exact flags against `tools/nl/README.md`/the scripts' own `--help` before running — this
 runbook does not invent flags beyond what ISSUE-200 already used).
 
+## 9. Closeout: two stale corpus expectations corrected (2026-09-16, Sonnet 5)
+
+After the operator's local validation of §1–§5 (774/774 focused unit tests, 33/33 DB-backed
+`tests/integration/nl-answers.test.ts`, clean `tsc --noEmit`), the operator ran the stable V2-derived
+corpus against parser v51 and compared it against v50:
+
+```text
+v50: 12000 scored, 10937 clean, 1063 soft, 0 failed
+v51: 12000 scored, 11533 clean,  467 soft, 0 failed
+```
+
+Cross-referencing the exact 598 ids AFLDB-ISSUE-200 classified `PLANNER_VALIDATOR_BUG` against the
+fresh v51 output: **596 cleared, 2 still soft** — id 9907 ("players whose first game was a Grand Final
+before 1897") and id 10294 ("players whose debut was a Grand Final before 1897"). Both resolve to
+`scope.seasonMax = 1896` (the parser's `before YEAR` → `seasonMax = YEAR - 1` convention), one season
+before `NL_LIMITS.minSeason` (1897, the first VFL season) — v51's validator correctly declines both
+with `coverage_unavailable` / "Season is out of range." (`plan.ts:2314-2320`), which is the same
+season-bounds check every other grain is subject to, not a boundary-specific defect.
+
+The corpus's own expectation for both rows (`expected_status=success`, `coverageBehaviour=full`,
+`minConfidence=0.78`) predates this issue's fix and is the stale side, exactly as AFLDB-ISSUE-200's
+`STALE_CORPUS_EXPECTATION` disposition already established for the separate 180-row pre-1965-coverage
+family (`coverage_unavailable|fgf`, not touched by this closeout). AFLDB-ISSUE-200's human disposition
+of these 2 ids as `PLANNER_VALIDATOR_BUG` (bundled into the 598-row `coverage_unavailable|boundary`
+cluster before the validator fix existed to test against) is corrected here to
+`STALE_CORPUS_EXPECTATION`.
+
+**Do not weaken the coverage guard to make these two questions return success** — 1897 is a real,
+already-relied-upon coverage boundary (`NL_LIMITS.minSeason`, and the `FIRST_SEASON` constant
+`tools/nl/corpus.ts:130`), not an artefact of this fix.
+
+### Correction mechanism
+
+Following the AFLDB-ISSUE-199 precedent (`tools/nl/fix-issue-199-stale-expectations.ts` — an
+auditable, self-verifying, fail-closed script, never a hand-edit of the canonical CSV), a new sibling
+script was added: `tools/nl/fix-issue-201-stale-boundary-expectations.ts`.
+
+It corrects exactly ids 9907 and 10294:
+
+1. asserts each row's own question text matches this issue's audited text verbatim;
+2. asserts each row's current `expected_status` is `success`;
+3. asserts each row's translated (`toExpectation`) `seasonTo === 1896`, `boundaryEvent === 'debut'`,
+   `matchType === 'grand_final'`;
+4. rewrites `expected_status` → `decline`, `verification_level` → `EXPECTED_DECLINE`,
+   `expected_failure_reason` → `coverage_unavailable`, and clears `expected_coverage_behavior` /
+   `expected_min_confidence` (both described a successful answer and no longer apply);
+5. **preserves** `expected_grain` (`player_career`), `expected_season_to` (`1896`),
+   `expected_match_type` (`grand_final`), `expected_boundary` (`first`) unchanged — the plan still
+   parses to exactly that shape, only the season range has no coverage;
+6. self-checks that exactly these 2 rows changed and refuses (writing nothing) on any invariant
+   failure, row-count mismatch, or unexpected change elsewhere in the file.
+
+`verification_level: 'EXPECTED_DECLINE'` for a corrected decline row is this repository's own
+established convention, not invented here — see the Ablett/Jones/streak/coach fixtures in
+`tests/nl-issue-199-corpus-fix.test.ts`.
+
+Unit tests: `tests/nl-issue-201-corpus-fix.test.ts` (new file, mirroring
+`tests/nl-issue-199-corpus-fix.test.ts`'s structure) — successful correction and field-shape
+assertions, row-ordering and byte-identical-non-target-row checks, and one refusal test per audited
+invariant (question text, status, seasonTo, boundaryEvent, matchType, missing id, duplicate id, wrong
+row count).
+
+### Expected benchmark after the two-row correction
+
+Re-running parser v51 against the corrected corpus should move the headline from 467 → 465 soft, with
+0 hard and 0 newly-clean-then-failing rows:
+
+```text
+12000 scored
+11535 clean
+ 465 soft
+   0 failed
+```
+
+Soft classes:
+
+```text
+GRAIN_EQUIVALENT:    72
+UNEXPECTED_DECLINE: 323
+WRONG_FAILURE_REASON: 70
+```
+
+The 323 remaining `UNEXPECTED_DECLINE` rows are the three already-known, unresolved families —
+stale pre-1965 FGF coverage expectations (180), the GWS unsupported-term parser bug (128), and the
+`zero` word-form parser bug (15) — none of which this closeout touches.
+
+`tools/nl/audit-issue-200-extract.ts` remains hard-coded to the original AFLDB-ISSUE-200 baseline
+(`UNEXPECTED_DECLINE` 921) and is expected to keep failing closed against any post-v51 corpus; this is
+by design (see its own module comment) and is not weakened here. Comparing v51 before/after this
+closeout uses direct row-ID/class comparison against the recorded 598-id list instead.
+
+### Corrected final accounting for AFLDB-ISSUE-200's `PLANNER_VALIDATOR_BUG` disposition
+
+```text
+598 originally attributed to PLANNER_VALIDATOR_BUG
+596 genuine validator/compiler defects — fixed by this issue's §3 implementation
+  2 stale corpus expectations — reclassified STALE_CORPUS_EXPECTATION, corrected by §9's guarded script
+  0 genuine AFLDB-ISSUE-201 implementation defects remain
+  0 new soft regressions
+  0 hard failures
+```
+
+## 10. Operator validation commands (closeout)
+
+Run from `D:\dev\afldb-issue-201`. §7's commands (focused unit/integration tests, `tsc --noEmit`, the
+v51 corpus rerun) must already be green before these.
+
+1. Unit tests for the guarded two-row correction script:
+   ```
+   npx vitest run tests/nl-issue-201-corpus-fix.test.ts
+   ```
+2. Typecheck (already covered by §7's `npx tsc --noEmit`; re-run only if this closeout's new files
+   were not yet included):
+   ```
+   npx tsc --noEmit
+   ```
+3. Regenerate the corrected V2 corpus from the retained v2 file (never overwrite it in place):
+   ```
+   npx tsx tools/nl/fix-issue-201-stale-boundary-expectations.ts \
+     --corpus /home/arm/nl-stress-corpus-v2.csv --out /home/arm/nl-stress-corpus-v3.csv
+   ```
+   Confirm the script's own summary reports `target rows modified: 2` and
+   `non-target rows modified: 0` before proceeding.
+4. Parser-v51 stress rerun against the corrected v3 corpus:
+   ```
+   npm run nl:stress -- --corpus /home/arm/nl-stress-corpus-v3.csv --parse-only --out /home/arm/nl-stress-v51-v3
+   ```
+5. Exact class-count verification against §9's expected benchmark (11535 clean / 465 soft / 0 failed;
+   `GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 323, `WRONG_FAILURE_REASON` 70) — read
+   `/home/arm/nl-stress-v51-v3/summary.json` and `report.md`.
+6. Proof that ids 9907 and 10294 are now clean — confirm both are absent from
+   `/home/arm/nl-stress-v51-v3/failures.csv`:
+   ```
+   grep -E '^(9907|10294),' /home/arm/nl-stress-v51-v3/failures.csv
+   ```
+   (expect no output).
+7. Proof that no other row changed unexpectedly — compare the v51-on-v2 run already taken for §7
+   against this v51-on-v3 run; the only ids whose verdict may move are 9907 and 10294:
+   ```
+   npm run nl:stress:compare -- /home/arm/nl-stress-v51-cleaned /home/arm/nl-stress-v51-v3
+   ```
+   Confirm the listed movements are exactly `{9907, 10294}` from soft to clean, nothing else.
+
 ## 8. Resolution
 
 Not yet resolved. Record actual command output, pass/fail counts, and the before/after corpus
-comparison here (and in `issues.md`) once the operator runs §7, then update `IssuesIndex.md` and add
-the `CHANGELOG.md` entry.
+comparison here (and in `issues.md`) once the operator runs §7 and §10, then update `IssuesIndex.md`
+and add the `CHANGELOG.md` entry. Per repo precedent (ISSUE-195/197/198/199), the `CHANGELOG.md` entry
+is deferred to this resolution step, not added at implementation/closeout-authoring time.
