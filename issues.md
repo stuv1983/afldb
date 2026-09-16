@@ -8,7 +8,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 
 | ID | Severity | Area | State | Next action |
 |---|---|---|---|---|
-| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Retargeted after a failed-closed first operator run (996-row over-broad selector); pending re-validation | Operator runs `AFLDB-ISSUE-204.md` §8's commands against the retargeted tool |
+| AFLDB-ISSUE-204 | Low (corpus-only, runtime already correct) | NL search stress corpus | Targeting confirmed on real corpus (reached row 8919); question-text checker bug fixed; pending re-validation | Operator runs `AFLDB-ISSUE-204.md` §8's commands against the corrected tool |
 
 AFLDB-ISSUE-200 resolved 2026-09-16 (Sonnet 5) -- see its detailed entry below. Follow-on defect
 families it identified (`PLANNER_VALIDATOR_BUG` career-boundary season ranges, `PARSER_BUG` GWS
@@ -34023,10 +34023,13 @@ Removed from `IssuesIndex.md` and the Open Issues note above (1 -> 0). `CHANGELO
 
 ## AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
-- **Status:** Retargeted after a failed-closed first operator run, pending operator re-validation
-  (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's three candidate defect follow-ons plus
-  its one guarded-correction follow-on (Stage 2 next-task item 5d). Full runbook: `AFLDB-ISSUE-204.md`.
-  Correction tool and tests corrected this session; not yet run against the real corpus.
+- **Status:** Targeting fixed and confirmed against the real corpus (second run reached row 8919); a
+  second, independent correction-tool bug then failed closed on question-text validation
+  (singular-only "final" regex rejecting the corpus's plural "finals" wording), now fixed, pending
+  operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's three candidate
+  defect follow-ons plus its one guarded-correction follow-on (Stage 2 next-task item 5d). Full runbook:
+  `AFLDB-ISSUE-204.md` (see §0b for the second finding). Correction tool and tests corrected this
+  session; not yet run end-to-end against the real corpus.
 
 ### First operator run: failed closed, retargeted (2026-09-16)
 
@@ -34043,6 +34046,18 @@ structural signature (grain=player_game, mode=single, aggregation=max, metric in
 {disposals,marks,tackles}, match_type in {final,grand_final}, season in [1897,1926]), not just
 category+template, which structurally excludes all 816 non-targets without any id list. Full account:
 `AFLDB-ISSUE-204.md` §0a.
+
+### Second operator run: targeting confirmed, question-text checker bug found and fixed (2026-09-16)
+
+With the retargeted signature in place, the operator's second run reached row 8919 -- confirming the
+full structural signature now selects the intended 180-row family, not the earlier 996-row over-match.
+Row 8919 then exposed an unrelated defect: `assertQuestionMatchesRow()`'s plain-finals branch used a
+singular-only `/\bfinal\b/i` test, which does not match the corpus's plural general-finals-scope wording
+("most disposals in finals in 1897"). Not corpus drift, not a targeting problem -- the row's data is
+correct, the checker's regex was incomplete. Fix: the plain-finals branch now uses `/\bfinals?\b/i`
+(singular or plural), still rejecting any question containing "grand final"; the `grand_final` branch is
+unchanged. Correction-tool-only; target selection, corpus semantics, and parser/runtime are untouched;
+`PARSER_VERSION` remains 53. Full account: `AFLDB-ISSUE-204.md` §0b.
 
 ### Naming correction
 
@@ -34123,8 +34138,8 @@ coverage policy.
 ### Next action
 
 Operator runs `AFLDB-ISSUE-204.md` §8's commands (focused tests, `tsc --noEmit`, the real V3->V4
-correction under the retargeted signature, the parser-v53 rerun against V4, and the row-id-level
-before/after comparison) and reports results before this issue is marked resolved or `CHANGELOG.md` is
-updated. Since the retargeted signature has not yet been run against the real corpus, watch specifically
-for whether it now yields exactly 180 candidates (not 996, and not fewer than 180 if some real target
-row's shape differs from the synthetic test fixture in an unanticipated way).
+correction with both the §0a targeting fix and the §0b question-text fix in place, the parser-v53 rerun
+against V4, and the row-id-level before/after comparison) and reports results before this issue is
+marked resolved or `CHANGELOG.md` is updated. Targeting is now confirmed reaching row 8919 on the real
+corpus; watch for whether the full run now completes end-to-end at exactly 180 rows, and for any further
+question-text wording the checker does not yet recognise.

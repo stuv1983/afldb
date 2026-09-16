@@ -67,10 +67,17 @@ function baseRow(id: number): Row {
   };
 }
 
+/**
+ * The plain-finals branch uses the real corpus's general-finals-scope
+ * wording ("most X in finals in YEAR", plural, no "a"/"the") -- the exact
+ * shape of real-corpus row 8919, whose plural "finals" the original
+ * assertQuestionMatchesRow() singular-only regex rejected (AFLDB-ISSUE-204
+ * second operator-validation finding, 2026-09-16).
+ */
 function questionFor(metric: string, matchType: 'final' | 'grand_final', season: number): string {
   return matchType === 'grand_final'
     ? `Most ${metric} by a player in the ${season} Grand Final`
-    : `Most ${metric} by a player in a ${season} final`;
+    : `Most ${metric} by a player in finals in ${season}`;
 }
 
 /** The exact audited pre-state shape for one AFLDB-ISSUE-204 target row. */
@@ -448,6 +455,26 @@ describe('assertQuestionMatchesRow', () => {
 
   it('refuses a question missing the season', () => {
     expect(() => assertQuestionMatchesRow(1, 'Most marks in a final', 'marks', 'final', 1910)).toThrow(/does not name season/);
+  });
+
+  // AFLDB-ISSUE-204 second operator-validation finding (2026-09-16): the
+  // real corpus's general-finals-scope wording is plural ("in finals"), not
+  // singular -- the checker must accept both, and still reject "grand
+  // final" wording for the plain-finals type.
+  it('accepts expected_match_type="final" with the corpus\'s plural "finals" wording', () => {
+    expect(() => assertQuestionMatchesRow(8919, 'most disposals in finals in 1897', 'disposals', 'final', 1897)).not.toThrow();
+  });
+
+  it('accepts expected_match_type="final" with singular "final" wording', () => {
+    expect(() => assertQuestionMatchesRow(1, 'Most marks in a final in 1910', 'marks', 'final', 1910)).not.toThrow();
+  });
+
+  // Requirement 3 (still rejects "Grand Final" for expected_match_type=
+  // "final") is already covered above by 'refuses a "final" question that
+  // actually says "grand final"'.
+
+  it('refuses expected_match_type="grand_final" with only plural "finals" wording (no "grand")', () => {
+    expect(() => assertQuestionMatchesRow(1, 'Most marks in finals in 1910', 'marks', 'grand_final', 1910)).toThrow(/does not say "grand final"/);
   });
 });
 

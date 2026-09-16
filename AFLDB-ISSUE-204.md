@@ -1,8 +1,10 @@
 # AFLDB-ISSUE-204 — Correct stale pre-1965/1987 finals-stat coverage expectations (180-row family)
 
-**Status:** Retargeted after a failed-closed first operator run, pending operator re-validation
-(2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families (Stage 2 next-task
-item 5d). Correction tool and tests corrected; not yet run against the real corpus; not resolved.
+**Status:** Targeting fixed and confirmed against the real corpus (reached row 8919); a second,
+independent correction-tool bug then failed closed on question-text validation, now fixed, pending
+operator re-validation (2026-09-16, Sonnet 5). Fourth and final of AFLDB-ISSUE-200's follow-on families
+(Stage 2 next-task item 5d). Correction tool and tests corrected; not yet run end-to-end against the
+real corpus; not resolved.
 
 ## 0. Naming correction
 
@@ -55,6 +57,30 @@ partial run — `expected_status`, `expected_failure_reason`, `expected_coverage
 `expected_min_confidence`, and question-text agreement — since the structural fields are now guaranteed
 by candidacy itself. See `tools/nl/fix-issue-204-stale-coverage-expectations.ts`'s header comment for
 the full before/after rationale.
+
+## 0b. Second operator run: targeting confirmed, question-text checker bug found and fixed (2026-09-16)
+
+With the §0a retargeting in place, the real corpus's candidate derivation succeeded — the operator's
+validation run reached row 8919, confirming the full structural signature now selects the intended
+180-row family rather than the earlier 996-row over-match. Row 8919 then exposed a second, unrelated
+defect in `assertQuestionMatchesRow()`:
+
+```text
+Row 8919: expected_match_type="final" but question does not say "final" without "grand final". Refusing to guess.
+Question: "most disposals in finals in 1897"
+```
+
+This is not corpus drift and not a targeting problem. The corpus's general-finals-scope wording is
+plural ("...in finals in 1897"), while the checker's plain-finals branch used a singular-only
+word-boundary test (`/\bfinal\b/i`), which does not match "finals". `expected_match_type="final"` is
+the corpus's own general-finals-scope value (§0's naming-correction evidence already established this
+vocabulary point); the row's data is correct, the checker's regex was incomplete.
+
+**Fix:** the plain-finals branch of `assertQuestionMatchesRow()` now uses `/\bfinals?\b/i` (accepting
+singular *or* plural), while still requiring the OR-condition that rejects any question containing
+"grand final". The `grand_final` branch (`/grand final/i`) is unchanged. This is a correction-tool-only
+fix — target selection (§0a), corpus semantics, and parser/runtime code are all untouched;
+`PARSER_VERSION` remains 53.
 
 ## 1. Operator-verified evidence (2026-09-16, superseding the prior planning session's re-derivation plan)
 
@@ -197,7 +223,9 @@ Refuses to overwrite `--corpus` unless `--allow-overwrite-input` is passed. Neve
 fixture shape (a synthetic 12,000-row corpus with the 180-row target family built at ids 5000-5179,
 30 seasons x 3 metrics x 2 match types, plus 6 category/template *sibling* rows at ids 6000-6005 —
 one `team_match` row mirroring the real corpus's row 8910, two goals rows, three top-5-listing rows —
-plus filler rows for the rest). Covers:
+plus filler rows for the rest). The 90 plain-finals target rows' question text uses the real corpus's
+plural "...in finals in YEAR" wording (row 8919's shape, §0b), not a singular "a ... final" paraphrase,
+so the full happy-path run is itself an end-to-end regression for the §0b fix. Covers:
 
 1. exactly 180 rows corrected to the established decline shape, non-target rows untouched;
 2. input/output row count stays 12000;
@@ -219,7 +247,11 @@ plus filler rows for the rest). Covers:
 16. non-target `fgf` top-5 disposals/marks/tackles rows are ignored without aborting;
 17. a genuine missing target row still refuses even with siblings present;
 18. `assertAuditedCoveragePreState`/`assertQuestionMatchesRow`/`assertOutputPathIsSafe` unit-level
-    checks (accept/reject cases, including the `expected_min_confidence` drift case).
+    checks (accept/reject cases, including the `expected_min_confidence` drift case);
+19. `assertQuestionMatchesRow` accepts `expected_match_type="final"` with the corpus's plural "finals"
+    wording (row 8919's exact shape) and with a legitimate singular "final" wording, still rejects
+    "Grand Final" wording for the plain-finals type, and `expected_match_type="grand_final"` still
+    requires "grand final" (rejecting a plural-only "finals" question) — the §0b fix.
 
 ## 7. Parser/runtime
 
@@ -296,9 +328,15 @@ per command 7 above, not just totals.
 - If any candidate's old *mutable* expectation fields (status/failure-reason/coverage-behavior/min-
   confidence) have already drifted from §1's exact values (e.g. a prior partial correction), the tool
   aborts naming the offending row rather than silently accepting or rejecting it.
-- The retargeting in §0a was verified only against the synthetic test fixture (`tests/nl-issue-204-
-  corpus-fix.test.ts`), not yet against the real V3 corpus — the operator's re-run (§8) is the first
-  real-corpus proof that the corrected signature yields exactly 180 and nothing else.
+- The retargeting in §0a is now confirmed against the real V3 corpus (the second operator run reached
+  row 8919, past the earlier 996-candidate over-match point) — but the run has not yet completed
+  end-to-end with the §0b question-text fix in place. The operator's next re-run (§8) is the first
+  real-corpus proof that the fully corrected tool yields exactly 180 and writes a valid V4.
+- The §0b fix only widens the plain-finals question-text check from singular to singular-or-plural; it
+  does not relax the "no 'grand final' wording" rejection or touch the `grand_final` branch. If the real
+  corpus contains some other finals-wording variant not covered by `/\bfinals?\b/i`, the tool will again
+  fail closed rather than silently guess — report the exact new wording rather than loosening the regex
+  further ad hoc.
 - The 70 `WRONG_FAILURE_REASON` taxonomy-drift rows, parser/runtime code, `PARSER_VERSION`, and any
   other historical coverage floor are explicitly out of scope and untouched by this tool.
 - `CHANGELOG.md` is intentionally not yet updated — pending operator validation per task instruction.

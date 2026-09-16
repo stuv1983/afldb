@@ -166,9 +166,12 @@ function isCandidateTarget(record: Record<string, string>): boolean {
 /**
  * Confirms a candidate row's own question text agrees with its structured
  * metric/match-type/season fields -- never asserted from the fields alone.
- * "final" and "grand_final" both contain the substring "final", so a
- * grand-final row is required to say "grand final" and a plain-finals row
- * is required to say "final" without "grand final" alongside it.
+ * "final"/"finals" and "grand_final" both contain the substring "final", so
+ * a grand-final row is required to say "grand final" and a plain-finals row
+ * is required to say "final" or "finals" (the corpus's general-finals-scope
+ * wording, e.g. "most disposals in finals in 1897" -- AFLDB-ISSUE-204
+ * second operator-validation finding, 2026-09-16) without "grand final"
+ * alongside it.
  */
 export function assertQuestionMatchesRow(
   id: number,
@@ -184,8 +187,8 @@ export function assertQuestionMatchesRow(
     if (!/grand final/i.test(question)) {
       throw new Error(`Row ${id}: expected_match_type="grand_final" but question does not say "grand final". Refusing to guess. Question: "${question}"`);
     }
-  } else if (!/\bfinal\b/i.test(question) || /grand final/i.test(question)) {
-    throw new Error(`Row ${id}: expected_match_type="final" but question does not say "final" without "grand final". Refusing to guess. Question: "${question}"`);
+  } else if (!/\bfinals?\b/i.test(question) || /grand final/i.test(question)) {
+    throw new Error(`Row ${id}: expected_match_type="final" but question does not say "final"/"finals" without "grand final". Refusing to guess. Question: "${question}"`);
   }
   if (!new RegExp(`\\b${season}\\b`).test(question)) {
     throw new Error(`Row ${id}: question does not name season ${season}. Refusing to guess. Question: "${question}"`);
