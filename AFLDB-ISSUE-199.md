@@ -1,7 +1,46 @@
 # AFLDB-ISSUE-199 — NL stress corpus expectation cleanup after Stage 2 parser hardening
 
-Status: **Open — planning complete** (2026-09-16, Sonnet 5). No code, corpus, or Git change made by
-this session. Planning only, per the issue's own constraint. See `issues.md` for the ledger entry.
+Status: **Resolved 2026-09-16** (Sonnet 5), on operator DEV acceptance. See `issues.md` for the
+authoritative ledger entry (Implementation, Final-patch revision, and Operator validation sections).
+
+## Resolution summary (2026-09-16)
+
+Implemented as `tools/nl/fix-issue-199-stale-expectations.ts`, a self-verifying correction script, per
+§5 below — with one material design revision made during implementation, after two real-DEV validation
+failures:
+
+1. The original §5/§4a design assumed the Ablett rows' per-metric shape could be read from the
+   corresponding Jones row (`id + 25`). Real-DEV validation found Jones rows carry no machine-readable
+   `expected_metric` at all, decline or otherwise. Fixed: each Ablett row's metric is now derived
+   strictly from that row's own question text (a single-word match against the five audited metric
+   words: goals/games/disposals/marks/tackles), cross-checked against an explicit audited id-to-metric
+   map. Jones is never read by the script for any purpose.
+2. The original §4b/§4c design assumed an already-passing "mirror" row elsewhere in the corpus could
+   confirm each streak/coach row's non-status shape (`expected_mode`, `max` vs. `top N`). A second
+   real-DEV validation found the real corpus has **zero** already-passing `team_streak` or
+   `coach_record` rows anywhere in its 12,000 rows, so this requirement could never be satisfied. Fixed:
+   the script now writes a shape hardcoded from a direct operator audit of parser-v50's actual output
+   for all 173 target rows (aggregation always `max`, mode/limit always blank, streak metric blank,
+   coach metric `games`/`wins` per group) — evidence, not invention — and instead validates each
+   target row's own question text against its audited winning/losing (streak) or games/wins (coach)
+   and club group, failing closed on any disagreement.
+
+Both revisions are recorded in full, with the exact failure messages that surfaced them, in `issues.md`'s
+Implementation and "Final-patch revision" sections for this issue.
+
+**Final operator evidence** (`/home/arm/nl-stress-corpus.csv` → `/home/arm/nl-stress-corpus-v2.csv`):
+correction-tool summary 173/173 target rows modified (5 Ablett + 112 streak + 56 coach), 0 non-target
+rows touched; parser-v50 `nl:stress --parse-only` re-run on the corrected corpus:
+`AMBIGUITY_NOT_DETECTED`/hard-fail 173 → 0, clean 10764 → 10937, the three soft classes
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) unchanged to the row.
+`PARSER_VERSION` unchanged at 50. DB-free unit suite (`tests/nl-issue-199-corpus-fix.test.ts`): 28/28.
+
+**Stage 2 is not closed by this resolution.** The three soft classes above remain open and unaudited —
+see §11 below and `IssuesIndex.md`'s Stage 2 next-task item 4.
+
+The rest of this document is the original planning runbook, retained as historical design record; §§4–8
+describe the design as originally proposed, not the as-built shape (see the revisions above and
+`issues.md` for the as-built detail).
 
 ## 1. Problem statement
 

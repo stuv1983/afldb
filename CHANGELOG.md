@@ -15,6 +15,29 @@ commit.
 
 ## [Unreleased]
 
+### NL stress corpus: 173 stale hard-failure expectations corrected after Stage 2 parser hardening (AFLDB-ISSUE-199) - 16 September 2026
+
+- The external V1 12,000-row NL stress corpus (`~/nl-stress-corpus.csv`, outside this Git repository)
+  carried 173 rows still labelled `expected_status=decline` from before three features they now exercise
+  successfully had shipped: the true 7-identity Ablett family (AFLDB-ISSUE-197), team-streak questions
+  (parser v16), and coach-record questions (parser v35, migration 087). Parser v50 correctly answers all
+  173; the corpus's own expectations were stale, not the parser.
+- Added `tools/nl/fix-issue-199-stale-expectations.ts`, a checked-in, self-verifying correction script
+  (reusing `tools/nl/corpus.ts`'s CSV reader): it asserts the corpus has exactly 12,000 rows and that
+  the 173 audited target ids are currently `expected_status=decline`, rewrites only those rows'
+  expectation columns to the audited success shape (each row's own question text is checked against its
+  audited metric/group before being corrected), leaves every other row and column byte-identical, and
+  refuses to run — writing nothing — if any assumption does not hold. Run by the operator against the
+  real canonical CSV, producing a separate corrected file rather than overwriting the input.
+- No parser/planner/application code changed; `PARSER_VERSION` stays 50. This is a test-tooling/corpus
+  data fix only.
+- Operator-validated on the dev host: correction tool changed exactly the 173 target rows and no others
+  (5 Ablett + 112 team-streak + 56 coach-record); re-running `npm run nl:stress` against the corrected
+  corpus on parser v50 moved `AMBIGUITY_NOT_DETECTED`/hard failures 173 → 0 with the three unrelated soft
+  classes (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70) unchanged.
+- Stage 2 remains open: those three soft classes (1,063 rows) are unaudited and may hide their own stale
+  expectations, a decision for a future triage.
+
 ### NL search: hyphenated/apostrophe-surname family members no longer silently dropped from the ambiguity re-check (AFLDB-ISSUE-198) - 16 September 2026
 
 - `candidateNameWords` (`src/search/nl/parser.ts`), the parser's defence-in-depth re-check on

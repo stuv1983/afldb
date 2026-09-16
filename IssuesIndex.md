@@ -4,15 +4,7 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 1
-
-- **AFLDB-ISSUE-199** — NL stress corpus expectation cleanup after Stage 2 parser hardening.
-  Severity: Low (test-tooling/corpus-oracle, not application). Area: Test Tooling, `tools/nl/`,
-  canonical corpus `~/nl-stress-corpus.csv` (dev host, outside this repo). State: implemented and
-  unit-tested (DB-free), awaiting operator validation — `tools/nl/fix-issue-199-stale-expectations.ts`
-  exists and is covered by `tests/nl-issue-199-corpus-fix.test.ts`. Next action (operator, dev host):
-  run it against the real canonical CSV to `~/nl-stress-corpus-v2.csv`, then `npm run nl:stress` on the
-  corrected copy and compare against the existing v50 run, per `AFLDB-ISSUE-199.md` §7-8.
+**Open issues:** 0
 
 AFLDB-ISSUE-187..192 were opened 2026-09-15 from the Fable NL Search Stage 1 review (Fable 5.1,
 medium effort), re-verified by Stage 2 on main `8a0c4cb`. Subsystem: natural-language search
@@ -66,8 +58,15 @@ clean `tsc --noEmit`. AFLDB-ISSUE-187..198 all now resolved.
 
 The unchanged V1 12k-row corpus re-run on parser v50 (post-merge Stage 2 step) has now been run: hard
 failures 178 -> 173, confirmed to be exactly the five Jones rows (11626-11630) clearing with zero
-collateral movement. The corpus relabelling that follows (AFLDB-ISSUE-199, planning complete, not yet
-implemented), and the rest of the Stage 2 closeout sequence below, remain outstanding.
+collateral movement. **AFLDB-ISSUE-199 resolved 2026-09-16** (Sonnet 5, from the approved runbook
+`AFLDB-ISSUE-199.md`, revised mid-implementation after two real-DEV validation failures — see
+`issues.md`'s Implementation/Final-patch-revision sections — a self-verifying correction script,
+`tools/nl/fix-issue-199-stale-expectations.ts`, corrected exactly the 173 stale-decline rows; operator-
+validated: correction-tool summary 173/173 targets modified, 0 non-target rows touched, plus a parser-v50
+`nl:stress` re-run showing `AMBIGUITY_NOT_DETECTED`/hard-fail 173 -> 0 with the three soft classes
+unchanged at 72/921/70; DB-free unit suite 28/28; `PARSER_VERSION` unchanged at 50). AFLDB-ISSUE-187..199
+all now resolved. Stage 2 is **not** closed by this: the three soft classes remain open and unaudited
+(item 4 below), and the rest of the Stage 2 closeout sequence remains outstanding.
 
 Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
 
@@ -79,19 +78,17 @@ Full entries, evidence, root causes and acceptance criteria are in `issues.md`.
    1271 -> 1241 non-clean rows, 30 rows became clean, 0 new non-clean rows, 0
    changed-but-still-non-clean rows. This comparison is what surfaced the Jones rows (§ above,
    AFLDB-ISSUE-198) as still-hard rather than clean.
-3. **Done (planning), 2026-09-16** — the V1 12k corpus was re-run on parser v50: hard failures 178 ->
+3. **Done, resolved 2026-09-16** — the V1 12k corpus was re-run on parser v50: hard failures 178 ->
    173 (only the five Jones rows, 11626-11630, moved; confirmed clean via full semantic diff, zero
    collateral movement). The remaining 173 hard failures (5 Ablett + 112 team-streak + 56 coach-record)
-   are all stale expected-decline rows predating shipped features. **AFLDB-ISSUE-199 opened
-   2026-09-16** to track their correction; planning complete, approved runbook `AFLDB-ISSUE-199.md`,
-   not yet implemented. The canonical corpus has no in-repo generator (`~/nl-stress-corpus.csv` on the
-   dev host is itself the source) — do not hand-edit it; the runbook specifies a checked-in correction
-   script instead.
-4. A fresh exploratory stress sweep to identify any remaining NL coverage/safety gaps beyond this
-   triage, plus a decision on whether the three remaining soft classes (`GRAIN_EQUIVALENT` 72,
-   `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70 — unaudited, unrelated to ISSUE-199) need their
-   own triage before Stage 2 can be declared complete.
-
-Do not alter the corpus before AFLDB-ISSUE-199 is implemented.
+   were all stale expected-decline rows predating shipped features. **AFLDB-ISSUE-199 resolved
+   2026-09-16** — corrected via a checked-in, self-verifying script
+   (`tools/nl/fix-issue-199-stale-expectations.ts`), operator-run against the real canonical CSV
+   (`~/nl-stress-corpus.csv` on the dev host, which has no in-repo generator); `AMBIGUITY_NOT_DETECTED`
+   173 -> 0, the three soft classes unchanged. See `issues.md` for full evidence.
+4. **Next.** A fresh exploratory stress sweep to identify any remaining NL coverage/safety gaps beyond
+   this triage, plus a decision on whether the three remaining soft classes (`GRAIN_EQUIVALENT` 72,
+   `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70 — unaudited, unrelated to ISSUE-199, unchanged by
+   its fix) need their own triage before Stage 2 can be declared complete. No issue number assigned yet.
 
 Completed issue runbooks and supporting evidence are archived under `issues/closed/`.

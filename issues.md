@@ -32966,14 +32966,17 @@ see `IssuesIndex.md`.
   behaviour is wrong; the V1 stress harness reports 173 stale hard failures for capability that ships.
 - **Area:** Test Tooling — NL stress corpus (`tools/nl/corpus.ts`, `tools/nl/stress-test.ts`), the
   canonical corpus file itself (`~/nl-stress-corpus.csv`, outside this repository).
-- **Status:** **Open — implemented (mirror-row dependency removed), awaiting operator validation**
-  (2026-09-16, Sonnet 5), from the approved runbook `AFLDB-ISSUE-199.md`.
-  `tools/nl/fix-issue-199-stale-expectations.ts` rewritten to derive the corrected shape for all 173
-  target rows from the operator's real-corpus audit instead of an already-passing "mirror" row (see
-  "Final-patch revision" below); unit-tested against a synthetic corpus (DB-free, 28/28); not yet run
-  against the real canonical CSV, which lives outside this repository on the dev host. No Git action
-  taken by this session (per `CLAUDE.md` §12/§9, this session ran only local vitest and read-only `git
-  status`/`git diff` for repo hygiene, not commit/push).
+- **Status:** **Resolved 2026-09-16** (Sonnet 5), on operator DEV acceptance. Root cause: 173 rows in
+  the external V1 stress corpus were labelled `expected_status=decline` before three features they now
+  exercise successfully shipped (true 7-identity Ablett family, team-streak support, coach-record
+  support) — a stale-oracle defect in the corpus, not the parser (`PARSER_VERSION` unchanged at 50). Fix:
+  `tools/nl/fix-issue-199-stale-expectations.ts`, a self-verifying correction script, rewrote exactly
+  those 173 rows' expectation columns to the audited success shape; run by the operator against the real
+  canonical CSV, producing `/home/arm/nl-stress-corpus-v2.csv`. Validation: correction-tool summary
+  (173/173 targets modified, 0 non-target rows touched, 5/112/56 split) plus a full parser-v50
+  `nl:stress --parse-only` re-run against the corrected corpus, both reported by the operator — see
+  "Operator validation (2026-09-16)" below. DB-free unit suite 28/28. No Git action taken by this
+  session (per `CLAUDE.md` §12, commit/push remain user-operated).
 - **Found:** 2026-09-16, post-ISSUE-198 V1 12k-row corpus re-run on `PARSER_VERSION` 50: hard failures
   178 → 173 (only the five ISSUE-198 Jones rows, 11626-11630, moved; full semantic diff confirms zero
   collateral movement). The remaining 173 `AMBIGUITY_NOT_DETECTED` rows were already flagged as
@@ -33072,6 +33075,44 @@ top-N-in-question-text helper) is removed as dead code — the audit found no to
 173 targets, so `expected_aggregation` is fixed to `max` and `expected_limit` fixed blank for all of
 them, per group, rather than derived per-row. Unit tests: 28/28 passing.
 
+### Operator validation (2026-09-16) — RESOLVED
+Correction tool run against the real canonical corpus (`/home/arm/nl-stress-corpus.csv`), output to
+`/home/arm/nl-stress-corpus-v2.csv`:
+
+| | value |
+|---|---|
+| input rows | 12000 |
+| output rows | 12000 |
+| target rows expected | 173 |
+| target rows modified | 173 |
+| non-target rows modified | 0 |
+| Ablett modifications | 5 |
+| streak modifications | 112 |
+| coach modifications | 56 |
+
+This proves the script changed exactly the audited 173 stale-expectation rows and nothing else.
+
+Parser-v50 re-run against the corrected corpus (`PARSER_VERSION` unchanged at 50), `npm run nl:stress --
+--corpus /home/arm/nl-stress-corpus-v2.csv --parse-only --out /home/arm/nl-stress-v50-cleaned`:
+
+| | v50, unchanged corpus | v50, corrected corpus |
+|---|---|---|
+| total | 12000 | 12000 |
+| clean | 10764 | 10937 |
+| soft | 1063 | 1063 |
+| hard fail | 173 | 0 |
+| `AMBIGUITY_NOT_DETECTED` | 173 | 0 |
+| `GRAIN_EQUIVALENT` | 72 | 72 |
+| `UNEXPECTED_DECLINE` | 921 | 921 |
+| `WRONG_FAILURE_REASON` | 70 | 70 |
+
+`AMBIGUITY_NOT_DETECTED`/hard-fail count moved 173 → 0 exactly as `AFLDB-ISSUE-199.md` §8 predicted, at
+the maximum possible clean count (10937 = 10764 + 173); the three soft classes are unchanged to the row,
+confirming the correction touched no row outside its own 173-row scope and required no parser change.
+DB-free unit suite: `npx vitest run tests/nl-issue-199-corpus-fix.test.ts` — 28/28 passed. This
+satisfies every item in this issue's acceptance criteria below and the runbook's §8 expected-result
+table.
+
 ### Non-goals
 Parser/application code changes; AFLW; the fresh Codex exploratory corpus (separate future phase);
 repairing `npm run nl:stress:compare`; relabelling any `GRAIN_EQUIVALENT`/`UNEXPECTED_DECLINE`/
@@ -33095,13 +33136,15 @@ User-run on the dev host per `CLAUDE.md` §9: back up the canonical CSV, run the
 `report.md` against the existing v50 run (`npm run nl:stress:compare` is known-unreliable for V1 output
 and is not repaired by this issue). Full commands: `AFLDB-ISSUE-199.md` §7.
 
-### Corpus follow-up (not part of this issue)
-This issue discharges the entire current hard-fail class, but Stage 2 is not fully closeable once it
-resolves: the three soft classes (`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921,
-`WRONG_FAILURE_REASON` 70, exactly composing the current 1,063 soft count) remain open, unaudited by
-this issue, and plausibly hide their own stale-corpus population (the AFLDB-ISSUE-070 precedent).
-`IssuesIndex.md`'s Stage 2 next-task item 4 (a fresh exploratory stress sweep) is the recommended next
-step after this issue.
+### Corpus follow-up (not part of this issue — Stage 2 remains open)
+This issue discharged the entire hard-fail class it was scoped to (`AMBIGUITY_NOT_DETECTED` 173 → 0,
+confirmed above), but Stage 2 itself is **not** closed by this resolution: the three soft classes
+(`GRAIN_EQUIVALENT` 72, `UNEXPECTED_DECLINE` 921, `WRONG_FAILURE_REASON` 70, exactly composing the
+current 1,063 soft count, unchanged by this issue's fix) remain open, unaudited by this issue, and
+plausibly hide their own stale-corpus population (the AFLDB-ISSUE-070 precedent). No tracked issue
+number has been assigned to that follow-up audit yet — `IssuesIndex.md`'s Stage 2 next-task item 4 (a
+fresh exploratory stress sweep) is the recommended next step, to be opened as its own issue when work on
+it starts, not folded into this one.
 
 ### Implementation recommendation
 Sonnet 5, Medium effort — mechanism is simpler than AFLDB-ISSUE-197/198 (a self-checking CSV correction
