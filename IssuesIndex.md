@@ -6,6 +6,35 @@
 
 **Open issues:** 0
 
+**AFLDB-ISSUE-217 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
+`player_game_single`'s three large exploratory clusters (`/0` 423 rows "biggest `<metric>` haul in one
+match", `/4` 422 rows "peak single-game `<metric>`", `/3` 409 rows "which match saw `<player>` collect
+the most `<metric>`", combined 1254 rows) share ONE root mechanism, not three, and it is NOT grain/mode
+misrouting — a named player's per-game stat already defaults correctly to `grain='player_game',
+mode='single'`. The defect was in `candidatePlayerSpan` (`src/search/nl/parser.ts`): it greedily takes
+the first four remaining non-stopword alpha tokens with no notion of "stop at a non-name word", so
+unconsumed wrapper vocabulary ("haul", "peak"/"single-game", "match"/"saw"/"collect" — none had any
+vocabulary entry) got swept into the player-name candidate alongside the real name (e.g. "dustin martin
+haul"), which then failed player resolution outright — the polluted span is exactly the reported
+`unsupported_term`. The adjacent `player_game_scope_collision/3` (555 rows, "single-match `<metric>`
+record for...") was inspected and confirmed to share the identical mechanism (bare "single-match" always
+sat immediately before the player name) and was included. Fixed with one generic `IN_ONE_GAME` extension
+(bare "single-game"/"single-match" adjective, not only "in ... game/match") plus three new gated
+wrapper-word consumers (`WHICH_MATCH_SAW_RE`, `PLAYER_GAME_SINGLE_HAUL_RE`, `PLAYER_GAME_SINGLE_PEAK_RE`)
+— no player, club, venue, or metric special-cased. `PARSER_VERSION` 63 → 64. Implementation commit
+`879b0e1` ("Fix player game single match phrasing"),
+`sonnet/issue-217-player-game-single-phrasing`, unmerged. Local: `tests/nl-parser.test.ts` 575/575 (554 +
+21 new), broader gates (`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174, `nl-stress-corpus`
+65/65 = 402/402), `typecheck` clean. Host validation (streamanator, commit `879b0e1`): frozen V5 stayed
+**12000/12000/0/0**; exploratory V2 moved **17612 → 19421 clean (+1809)**, **9918 → 8109 soft (-1809)**,
+0 failed throughout. All four target clusters fully cleared: `player_game_single/0` 423 → 0, `/4` 422 →
+0, `/3` 409 → 0, `player_game_scope_collision/3` 555 → 0. A direct 29,030-row plan-level comparison (v63
+vs. v64) found exactly **1809 changed plans, 0 missing rows**, reconciling exactly to the four target
+clusters, zero unrelated movement. A separate, pre-existing `WRONG_PLAYER` scorer-identity artifact (the
+already-tracked Gary Ablett Jnr/Snr display-name mismatch from AFLDB-ISSUE-206/210) remains present
+across several rows in the affected template families, confirmed independent of this fix and left
+untouched. See `issues.md` and `AFLDB-ISSUE-217.md` for the full record.
+
 **AFLDB-ISSUE-216 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 `player_season_leaderboard`'s two exploratory clusters (`/0` 576 rows "posted the highest season tally
 of `<stat>` for `<club>` `<time>`", `/3` 559 rows "the best seasonal `<stat>` total `<time>`") do NOT

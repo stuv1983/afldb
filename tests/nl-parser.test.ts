@@ -33,6 +33,8 @@ const CLUBS: NlClubDirectoryEntry[] = [
   // AFLDB-ISSUE-213: no name-overlap regression pair for the "v" separator.
   { organizationId: 11, slug: 'essendon', name: 'Essendon', names: ['essendon', 'bombers'] },
   { organizationId: 12, slug: 'hawthorn', name: 'Hawthorn', names: ['hawthorn', 'hawks'] },
+  // AFLDB-ISSUE-217: player_game_scope_collision/3 fixtures.
+  { organizationId: 13, slug: 'brisbane-lions', name: 'Brisbane Lions', names: ['brisbane lions', 'lions'] },
 ];
 
 const VENUES: NlVenueDirectoryEntry[] = [
@@ -40,6 +42,9 @@ const VENUES: NlVenueDirectoryEntry[] = [
   { id: 2, slug: 'docklands', name: 'Docklands Stadium', names: ['docklands', 'marvel', 'etihad'] },
   // AFLDB-ISSUE-213: the venue named in the confirmed defect's exact wording.
   { id: 3, slug: 'adelaide-oval', name: 'Adelaide Oval', names: ['adelaide oval'] },
+  // AFLDB-ISSUE-217: player_game_scope_collision/3 fixtures.
+  { id: 4, slug: 'gabba', name: 'Gabba', names: ['gabba', 'the gabba'] },
+  { id: 5, slug: 'optus-stadium', name: 'Optus Stadium', names: ['optus stadium'] },
 ];
 
 /**
@@ -86,6 +91,14 @@ const PLAYERS: Record<string, NlPlayerCandidate[]> = {
   // to him, and a bare cousin gate would have declined it as a family
   // question AFLDB cannot answer.
   'ben cousins': [{ ref: { id: 1500, slug: 'ben-cousins', name: 'Ben Cousins' }, score: 1000 }],
+  // AFLDB-ISSUE-217: player_game_single "haul"/"peak single-game"/"which
+  // match saw...collect" wrapper-phrasing fixtures.
+  'chris judd': [{ ref: { id: 2001, slug: 'chris-judd', name: 'Chris Judd' }, score: 1000 }],
+  'lance franklin': [{ ref: { id: 2002, slug: 'lance-franklin', name: 'Lance Franklin' }, score: 1000 }],
+  'nat fyfe': [{ ref: { id: 2003, slug: 'nat-fyfe', name: 'Nat Fyfe' }, score: 1000 }],
+  'patrick dangerfield': [{ ref: { id: 2004, slug: 'patrick-dangerfield', name: 'Patrick Dangerfield' }, score: 1000 }],
+  'shane crawford': [{ ref: { id: 2005, slug: 'shane-crawford', name: 'Shane Crawford' }, score: 1000 }],
+  'jason akermanis': [{ ref: { id: 2006, slug: 'jason-akermanis', name: 'Jason Akermanis' }, score: 1000 }],
 };
 
 function fakeResolvePlayer(name: string): Promise<NlPlayerCandidate[]> {
@@ -939,6 +952,221 @@ describe('11. player-season queries', () => {
       const p = await plan('most disposals in a final');
       expect(p.grain).toBe('player_game');
       expect(p.mode).toBe('single');
+    });
+  });
+});
+
+// AFLDB-ISSUE-217. player_game_single/0 ("...biggest <metric> haul in one
+// match..."), /4 ("...peak single-game <metric>...") and /3 ("which match
+// saw <player> collect the most <metric>...") share one root mechanism, not
+// three: grain/mode election was already correct in every case (a named
+// player's per-game stat already defaults to player_game/single -- see "1.
+// player-specific queries" above), but "haul"/"peak"/"single-game"/"match"/
+// "saw"/"collect" had no vocabulary entry, so they survived in `text` when
+// candidatePlayerSpan ran and were swept into the player-name candidate
+// alongside the real name (candidatePlayerSpan takes the first four
+// remaining non-stopword alpha tokens with no notion of "stop at a
+// non-name word"). The polluted multi-word span ("dustin martin haul",
+// "lance franklin peak single-game", "match saw patrick dangerfield") then
+// failed player resolution outright, and the exact polluted span is what
+// the reader saw as the unsupported term -- not a leftover-name-only
+// failure. player_game_scope_collision/3 ("single-match <metric> record
+// for...") shares the identical mechanism: bare "single-match" was the
+// unconsumed word, and it sat immediately before the player name in every
+// row, so it always polluted the span the same way. Fixed with one
+// generic single-game-cue extension (IN_ONE_GAME now also matches the bare
+// "single-game"/"single-match" adjective, not only "in ... game/match")
+// plus three narrow, gated wrapper-word consumers (WHICH_MATCH_SAW_RE,
+// PLAYER_GAME_SINGLE_HAUL_RE, PLAYER_GAME_SINGLE_PEAK_RE) -- no player,
+// club, venue or corpus ID special-cased.
+describe('AFLDB-ISSUE-217: player_game_single "haul" / "peak single-game" / "which match saw...collect" wrapper phrasing', () => {
+  describe('player_game_single/0: "...biggest <metric> haul in one match..."', () => {
+    it("what was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s", async () => {
+      const p = await plan("what was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('brownlow_votes');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+
+    it("what was Chris Judd's biggest goals haul in one match in 2009", async () => {
+      const p = await plan("what was Chris Judd's biggest goals haul in one match in 2009");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('goals');
+      expect(p.player?.name).toBe('Chris Judd');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it("what was Patrick Dangerfield's biggest marks haul in one match since 2000", async () => {
+      const p = await plan("what was Patrick Dangerfield's biggest marks haul in one match since 2000");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('marks');
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('player_game_single/4: "find <player>\'s peak single-game <metric>..."', () => {
+    it("find Lance Franklin's peak single-game clearances in 2017", async () => {
+      const p = await plan("find Lance Franklin's peak single-game clearances in 2017");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('clearances');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Lance Franklin');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it("find Nat Fyfe's peak single-game inside 50s in 2009", async () => {
+      const p = await plan("find Nat Fyfe's peak single-game inside 50s in 2009");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('inside_50s');
+      expect(p.player?.name).toBe('Nat Fyfe');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it("find Dustin Martin's peak single-game kicks since 2000", async () => {
+      const p = await plan("find Dustin Martin's peak single-game kicks since 2000");
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('kicks');
+      expect(p.player?.name).toBe('Dustin Martin');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('player_game_single/3: "which match saw <player> collect the most <metric>..."', () => {
+    it('which match saw Patrick Dangerfield collect the most goal assists since 2000', async () => {
+      const p = await plan('which match saw Patrick Dangerfield collect the most goal assists since 2000');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('goal_assists');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+
+    it('which match saw Patrick Dangerfield collect the most kicks in 2017', async () => {
+      const p = await plan('which match saw Patrick Dangerfield collect the most kicks in 2017');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('kicks');
+      expect(p.player?.name).toBe('Patrick Dangerfield');
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    it('which match saw Chris Judd collect the most handballs during the 2010s', async () => {
+      const p = await plan('which match saw Chris Judd collect the most handballs during the 2010s');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('handballs');
+      expect(p.player?.name).toBe('Chris Judd');
+      expect(p.scope.seasonMin).toBe(2010);
+      expect(p.scope.seasonMax).toBe(2019);
+    });
+  });
+
+  // Optional adjacent cluster: player_game_scope_collision/3 ("find the
+  // single-match <metric> record for <player> against <club> at
+  // <venue>..."). Proven (see the block comment above) to share the exact
+  // same candidatePlayerSpan-pollution mechanism as /4 above -- bare
+  // "single-match" was the unconsumed word in every failing row, and it
+  // always sat immediately before the player name -- so it is included
+  // here, fixed by the same IN_ONE_GAME extension, not a separate change.
+  describe('player_game_scope_collision/3: "find the single-match <metric> record for <player> against <club> at <venue>..."', () => {
+    it('find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009', async () => {
+      const p = await plan('find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('disposals');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.player?.name).toBe('Shane Crawford');
+      expect(p.scope.clubAgainst?.name).toBe('Brisbane Lions');
+      expect(p.scope.venue?.name).toBe('Gabba');
+      expect(p.scope.seasonMin).toBe(2009);
+      expect(p.scope.seasonMax).toBe(2009);
+    });
+
+    it('find the single-match marks record for Jason Akermanis against Port Adelaide at Optus Stadium since 2000', async () => {
+      const p = await plan('find the single-match marks record for Jason Akermanis against Port Adelaide at Optus Stadium since 2000');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('marks');
+      expect(p.player?.name).toBe('Jason Akermanis');
+      expect(p.scope.clubAgainst?.name).toBe('Port Adelaide');
+      expect(p.scope.venue?.name).toBe('Optus Stadium');
+      expect(p.scope.seasonMin).toBe(2000);
+      expect(p.scope.seasonMax).toBeUndefined();
+    });
+  });
+
+  describe('regression controls', () => {
+    it('existing single-game wording ("dusty most disposals") is unchanged', async () => {
+      const p = await plan('dusty most disposals');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('single');
+      expect(p.metric).toBe('disposals');
+    });
+
+    it('"haul" in unrelated text (no single-game cue) still declines', async () => {
+      const result = await parse("Dustin Martin's biggest goals haul this year");
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"peak" in unrelated text (no single-game cue) still declines', async () => {
+      const result = await parse('Dustin Martin peak fitness this season');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('bare "single-game" with no supported player/stat construction still declines', async () => {
+      const result = await parse('single-game trivia');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"record" is not globally ignored -- a bare "record" with no metric/player still declines', async () => {
+      const result = await parse('what is the record');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"collect" outside the "which match saw...collect" construction still declines', async () => {
+      const result = await parse('Dustin Martin collect stamps as a hobby');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('named-player scoped totals still remain player_game/sum, not single', async () => {
+      const p = await plan('dusty total goals against carlton');
+      expect(p.grain).toBe('player_game');
+      expect(p.mode).toBe('sum');
+    });
+
+    it('career record questions remain player_career', async () => {
+      const p = await plan('who has the most career goals');
+      expect(p.grain).toBe('player_career');
+      expect(p.metric).toBe('goals');
+    });
+
+    it('player-season leaderboard wording (AFLDB-ISSUE-216) remains player_season', async () => {
+      const p = await plan('which player posted the highest season tally of handballs for Collingwood during the 2010s');
+      expect(p.grain).toBe('player_season');
+      expect(p.metric).toBe('handballs');
+    });
+
+    it('club/team match records are not hijacked by the new player-game cues', async () => {
+      const p = await plan('richmond biggest win in a final');
+      expect(p.grain).toBe('team_match');
     });
   });
 });
