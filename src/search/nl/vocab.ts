@@ -159,7 +159,14 @@ export function canonicalise(raw: string): string {
 // -------------------------------------------------------------- grain cues
 
 export const IN_ONE_SEASON = /\bin (?:a|one|any|(?:a )?single|the same) season\b/;
-export const IN_ONE_GAME = /\bin (?:a|one|any|(?:a )?single|the same) (?:game|match)\b/;
+// AFLDB-ISSUE-217: the second alternative reads the bare compound
+// adjective ("peak single-game clearances", "the single-match disposals
+// record") -- the same single-game cue as "in a single game", just
+// without the leading "in". Requires "single" immediately adjacent to
+// "game"/"match" (a hyphen or one space, nothing between), so it cannot
+// fire on an unrelated "single" elsewhere in a question ("his single
+// greatest game").
+export const IN_ONE_GAME = /\bin (?:a|one|any|(?:a )?single|the same) (?:game|match)\b|\bsingle[- ](?:game|match)\b/;
 export const IN_A_FINAL = /\bin (?:a|one|any) final\b/;
 export const IN_A_GRAND_FINAL = /\bin (?:a|one|any) grand final\b/;
 export const OVER_CAREER = /\b(?:career|all[ -]time|ever|in (?:his|their|a) career|who has played the most)\b/;
@@ -389,6 +396,45 @@ export const PLAYER_SEASON_LEADERBOARD_SEASONAL_RE = /\bseasonal\b/;
  * and "posted" does not become a universal request wrapper.
  */
 export const PLAYER_SEASON_LEADERBOARD_POSTED_RE = /\bposted\b/;
+
+/**
+ * AFLDB-ISSUE-217. "Which match saw <player> collect the most <metric>"
+ * names the same already-supported single-player, single-match record
+ * "most <metric> in one match" already reads correctly -- the
+ * interrogative just moves the grain cue to the front of the sentence and
+ * adds a verb ("collect") between the player and the metric instead of
+ * after it. Anchored to the very start of the string, the same discipline
+ * LEADING_REQUEST_PREFIX_RE uses for its own request-wrapper verbs, so
+ * this can only ever match this one construction and never an unrelated
+ * "which match ..." or "collect" appearing mid-question.
+ */
+export const WHICH_MATCH_SAW_RE = /^which match saw\b\s*/;
+
+/**
+ * The verb half of WHICH_MATCH_SAW_RE's construction -- "collect" sits
+ * after the player mention, not before it, so it cannot be captured by the
+ * same anchored match. Read only once WHICH_MATCH_SAW_RE has already
+ * matched (parser.ts), so a bare "collect" anywhere else in a question is
+ * left untouched and still declines.
+ */
+export const PLAYER_GAME_SINGLE_COLLECT_RE = /\bcollect(?:s|ed|ing)?\b/;
+
+/**
+ * AFLDB-ISSUE-217. "<metric> haul in one match" and "peak single-game
+ * <metric>" are two more English superlative words for the same
+ * already-supported player_game/single construction "most <metric> in one
+ * match" already reads correctly, not a different grain or mode. Neither
+ * word names anything on its own (a "haul" or a "peak" of what?), so
+ * parser.ts only reads them this way once the single-game cue itself
+ * (IN_ONE_GAME, below -- now also matching the bare "single-game"/
+ * "single-match" adjective) AND an actual player_match_stats METRIC_WORDS
+ * match are both already present in the question -- the same two-part
+ * discipline PLAYER_SEASON_LEADERBOARD_SEASONAL_RE uses, so an unrelated
+ * "haul"/"peak" elsewhere in a question is left untouched and the question
+ * still declines.
+ */
+export const PLAYER_GAME_SINGLE_HAUL_RE = /\bhaul\b/;
+export const PLAYER_GAME_SINGLE_PEAK_RE = /\bpeak\b/;
 
 /**
  * Any coaching cue, and the gate for COACH_METRIC_WORDS below. Nothing in

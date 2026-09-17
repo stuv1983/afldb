@@ -707,7 +707,7 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the second phrasing separately misread as the generic AGGREGATE_TOTAL_WORDS
 // scoped-running-total cue, which misrouted grain election to player_game/sum
 // instead of player_season. See parser.ts's playerSeasonLeaderboardCue.
-export const PARSER_VERSION = 63;
+export const PARSER_VERSION = 64;
 
 // ------------------------------------------------------------------ grain
 

@@ -64,6 +64,7 @@ import {
   AFTER_RE, BARE_YEAR_RE, BEFORE_RE, BETWEEN_RE, CLUB_SEASON_CONDITION_WORDS, CLUB_SEASON_METRIC_WORDS,
   CLUB_SEASON_PREMIERSHIP_SUBJECT_GATED, CLUB_SEASON_RANK_SEASON_CUE_RE, CLUB_SEASON_SEASONAL_ADJECTIVE_RE,
   PLAYER_SEASON_LEADERBOARD_TALLY_RE, PLAYER_SEASON_LEADERBOARD_SEASONAL_RE, PLAYER_SEASON_LEADERBOARD_POSTED_RE,
+  WHICH_MATCH_SAW_RE, PLAYER_GAME_SINGLE_COLLECT_RE, PLAYER_GAME_SINGLE_HAUL_RE, PLAYER_GAME_SINGLE_PEAK_RE,
   AFTER_SIREN_CUE_RE, AFTER_SIREN_EFFECT_WORDS, AFTER_SIREN_KICK_NOUN_RE, AFTER_SIREN_OCCURRENCE_WORDS,
   AFTER_SIREN_PLAYER_SUBJECT_RE, AFTER_SIREN_RESULT_WORDS, AFTER_SIREN_SCORED_WORDS,
   COACH_CUE_RE, COACH_METRIC_WORDS, COACH_NO_QUALIFIER_RE, COACH_WIN_PCT_RE, COACHED_BY_RE, PREMIERSHIP_COACH_RE,
@@ -2691,8 +2692,13 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // match-type scope inherently means individual matches of that type,
   // which is the single-game reading by nature -- "most disposals in a
   // final" ranks individual final performances, not a sum across finals.
+  // AFLDB-ISSUE-217: "which match saw <player> collect the most <metric>"
+  // is itself a single-game grain cue -- it names no other construction --
+  // computed here (before the strip loop consumes IN_ONE_GAME et al) so it
+  // can join inOneGame's own election like every other cue below.
+  const whichMatchSawCue = WHICH_MATCH_SAW_RE.test(text);
   const inOneGame = !!idiomMetric || IN_ONE_GAME.test(text) || !!matchTypeResult.matchType
-    || roundResult.roundNumber !== undefined;
+    || roundResult.roundNumber !== undefined || whichMatchSawCue;
   const inOneSeason = IN_ONE_SEASON.test(text);
   const overCareer = OVER_CAREER.test(text);
   // "dusty TOTAL goals against Carlton" -- overrides the named-player
@@ -2711,6 +2717,43 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
     if (cueMatch) {
       consumedTokens.push(cueMatch[0]);
       text = text.replace(cueRe, ' ');
+    }
+  }
+
+  // AFLDB-ISSUE-217. Consume "which match saw" itself (it sits ahead of
+  // the player mention, so it must go before candidatePlayerSpan runs at
+  // step 12) and the verb half of its construction, "collect", which sits
+  // AFTER the player mention. Both only ever fire together: gated on the
+  // same whichMatchSawCue.
+  if (whichMatchSawCue) {
+    const leadMatch = WHICH_MATCH_SAW_RE.exec(text);
+    if (leadMatch) {
+      consumedTokens.push(leadMatch[0].trim());
+      text = text.slice(leadMatch[0].length);
+    }
+    const collectMatch = PLAYER_GAME_SINGLE_COLLECT_RE.exec(text);
+    if (collectMatch) {
+      consumedTokens.push(collectMatch[0]);
+      text = stripMatch(text, collectMatch[0]);
+    }
+  }
+
+  // AFLDB-ISSUE-217. "<metric> haul in one match", "peak single-game
+  // <metric>" -- see PLAYER_GAME_SINGLE_HAUL_RE/PLAYER_GAME_SINGLE_PEAK_RE
+  // for the two-part gate (single-game cue already present, AND an actual
+  // player stat word already present) that keeps this from becoming a
+  // blanket strip of two common English words.
+  const playerGameSingleMetricWordPresent = METRIC_WORDS.some(([re]) => re.test(text));
+  if (inOneGame && playerGameSingleMetricWordPresent) {
+    const haulMatch = PLAYER_GAME_SINGLE_HAUL_RE.exec(text);
+    if (haulMatch) {
+      consumedTokens.push(haulMatch[0]);
+      text = stripMatch(text, haulMatch[0]);
+    }
+    const peakMatch = PLAYER_GAME_SINGLE_PEAK_RE.exec(text);
+    if (peakMatch) {
+      consumedTokens.push(peakMatch[0]);
+      text = stripMatch(text, peakMatch[0]);
     }
   }
 
