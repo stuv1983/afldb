@@ -707,7 +707,22 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the second phrasing separately misread as the generic AGGREGATE_TOTAL_WORDS
 // scoped-running-total cue, which misrouted grain election to player_game/sum
 // instead of player_season. See parser.ts's playerSeasonLeaderboardCue.
-export const PARSER_VERSION = 64;
+// v65 -- AFLDB-ISSUE-218: team_match_result/1 and /2 exploratory phrasing.
+// `/1` ("at V, find the widest X win/loss to Y...") and `/2` ("by how much
+// did X lose to Y in their most lopsided meeting...") already extracted
+// both clubs and the correct win/loss direction; only wrapper vocabulary
+// was ever missing -- "widest" (AGG_WORDS), a leading "at V, find" request
+// verb (vocab.ts's widened LEADING_SCOPE_CLAUSE_REQUEST_PREFIX_RE), the
+// verb forms "lose"/"lost"/"beat" of the existing win/loss margin nouns
+// (TEAM_METRIC_WORDS), and the decorative "how much"/"lopsided meeting"
+// wrapper around an already-elected result construction (vocab.ts's
+// TEAM_MATCH_RESULT_HOW_MUCH_RE/TEAM_MATCH_RESULT_LOPSIDED_RE, consumed by
+// parser.ts only once a win/loss margin metric and both clubFor/
+// clubAgainst have resolved). `/0` ("what was X' biggest victory...") is a
+// distinct, pre-existing possessive-club-alias defect (the same one
+// AFLDB-ISSUE-214 found for club_season_rank) and is deliberately NOT
+// fixed here.
+export const PARSER_VERSION = 65;
 
 // ------------------------------------------------------------------ grain
 

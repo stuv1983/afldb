@@ -4,7 +4,29 @@
 >
 > `issues.md` is the authoritative detailed ledger.
 
-**Open issues:** 0
+**Open issues:** 1
+
+**AFLDB-ISSUE-218 — IMPLEMENTED, NOT YET RESOLVED** (Sonnet 5) — Severity: low
+(parser feature gap, no data/security impact). Area: NL search
+(`src/search/nl/parser.ts`, `src/search/nl/vocab.ts`). `team_match_result/1`
+("at V, find the widest X win/loss to Y...", 522 rows) and `/2` ("by how much
+did X lose to Y in their most lopsided meeting...", 569 rows) shared one
+wrapper-vocabulary-only mechanism (both already extracted clubs/direction
+correctly); fixed by adding `widest` to `AGG_WORDS`, widening the leading
+scope-clause request-verb strip to `at` as well as `for`, adding verb forms
+`lose`/`lost`/`beat` to `TEAM_METRIC_WORDS`, and gating two new decorative
+wrapper words ("how much"/"lopsided meeting") on an already-recognised
+directional result construction. `team_match_result/0` (56 rows, "Bombers'
+biggest victory...") is a DISTINCT, already-known possessive-club-alias
+defect (same mechanism as AFLDB-ISSUE-214's `club_season_rank` residue) and
+was deliberately deferred, not fixed here. `PARSER_VERSION` 64 → 65.
+Implementation on `sonnet/issue-218-team-match-result-phrasing`, unmerged.
+Local: `tests/nl-parser.test.ts` 595/595 (575 + 20 new), broader gates
+(`nl-regression-corpus` 163/163, `nl-semantic-mapping` 174/174,
+`nl-stress-corpus` 65/65 = 402/402), `typecheck` clean. **Next action:**
+operator host validation on `streamanator` per `AFLDB-ISSUE-218.md` §12
+(frozen V5 rerun, exploratory V2 rescore, target-cluster reconciliation,
+direct v64-vs-v65 plan comparison) before resolution/`CHANGELOG.md` entry.
 
 **AFLDB-ISSUE-217 resolved 2026-09-17** (Sonnet 5, operator-validated on streamanator) —
 `player_game_single`'s three large exploratory clusters (`/0` 423 rows "biggest `<metric>` haul in one

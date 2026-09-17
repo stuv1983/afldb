@@ -4770,3 +4770,201 @@ describe('19. AFLDB-ISSUE-215 career numeric-binding phrasing ("plus"/"among" wr
     });
   });
 });
+
+// AFLDB-ISSUE-218: three exploratory `team_match_result` clusters -- `/2`
+// ("by how much did X lose to Y in their most lopsided meeting..."), `/1`
+// ("at V, find the widest X win/loss to Y...") and `/0` ("what was X'
+// biggest victory against Y..."). Source inspection (parser.ts's
+// extractClubs/nearestGoverningPreposition, vocab.ts's TEAM_METRIC_WORDS/
+// AGG_WORDS) proved `/1` and `/2` already extract both clubs and the
+// correct win/loss direction correctly -- their only defect was leftover
+// WRAPPER vocabulary ("widest", a leading "at V, find" request verb,
+// "how much"/"lopsided meeting"), never a semantic misread. `/0`'s failure
+// is a single, fully unrelated token, "bombers'" -- the trailing-apostrophe
+// plural possessive club alias canonicalise()'s `/['’]s\b/g` strip does not
+// reach (that strip only matches an apostrophe BEFORE a trailing "s", e.g.
+// "richmond's", not one after an already-plural noun) -- the same generic
+// alias defect AFLDB-ISSUE-214 already found and deliberately left
+// unfixed for `club_season_rank`. `/0` is deferred here for the same
+// reason: it shares no mechanism with `/1`/`/2` and belongs in a future
+// cross-family possessive-alias issue instead.
+describe('AFLDB-ISSUE-218: team-match result phrasing', () => {
+  describe('/2: "by how much did X lose to Y in their most lopsided meeting..."', () => {
+    it('Collingwood loses to Carlton at Adelaide Oval after 1999 -- direction, venue and exclusive lower bound all preserved', async () => {
+      const p = await plan('By how much did Pies lose to Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+      // AFLDB-ISSUE-211: "after 1999" is an EXCLUSIVE lower bound.
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('Hawthorn loses to Geelong at the MCG since 2000 -- a different club pair/venue and the inclusive "since" bound', async () => {
+      const p = await plan('By how much did Hawthorn lose to Geelong in their most lopsided meeting at the MCG since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Hawthorn');
+      expect(p.scope.clubAgainst?.name).toBe('Geelong');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('Richmond loses to Carlton in 2017 -- no venue named at all', async () => {
+      const p = await plan('By how much did Richmond lose to Carlton in their most lopsided meeting in 2017');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue).toBeUndefined();
+      expect(p.scope.seasonMin).toBe(2017);
+      expect(p.scope.seasonMax).toBe(2017);
+    });
+
+    // Required by the runbook: "Pies lose to Carlton" and "Pies beat
+    // Carlton" must not collapse to the same reading. Same subject club,
+    // opposite verb -- clubFor stays Collingwood in both, but the metric
+    // (and so the winner/loser direction) flips.
+    it('distinguishes "Pies lose to Carlton" (Collingwood loses) from "Pies beat Carlton" (Collingwood wins)', async () => {
+      const lose = await plan('By how much did Pies lose to Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(lose.scope.clubFor?.name).toBe('Collingwood');
+      expect(lose.scope.clubAgainst?.name).toBe('Carlton');
+      expect(lose.metric).toBe('loss_margin');
+
+      const beat = await plan('By how much did Pies beat Carlton in their most lopsided meeting at Adelaide Oval after 1999');
+      expect(beat.scope.clubFor?.name).toBe('Collingwood');
+      expect(beat.scope.clubAgainst?.name).toBe('Carlton');
+      expect(beat.metric).toBe('win_margin');
+    });
+  });
+
+  describe('/1: "at V, find the widest X win/loss to Y..."', () => {
+    it('Collingwood\'s widest win to North Melbourne at the MCG in 2023', async () => {
+      const p = await plan('At the MCG, find the widest Pies win to North Melbourne in 2023');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Collingwood');
+      expect(p.scope.clubAgainst?.name).toBe('North Melbourne');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+      expect(p.scope.seasonMin).toBe(2023);
+      expect(p.scope.seasonMax).toBe(2023);
+    });
+
+    it('Greater Western Sydney\'s widest loss to Sydney at Docklands in 2017 -- a multi-word club name plus the noun "loss" instead of the verb', async () => {
+      const p = await plan('At Docklands, find the widest Greater Western Sydney loss to Sydney in 2017');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Greater Western Sydney');
+      expect(p.scope.clubAgainst?.name).toBe('Sydney');
+      expect(p.scope.venue?.name).toBe('Docklands Stadium');
+    });
+
+    it('Richmond\'s widest win to Carlton at Adelaide Oval since 2000', async () => {
+      const p = await plan('At Adelaide Oval, find the widest Richmond win to Carlton since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+      expect(p.scope.venue?.name).toBe('Adelaide Oval');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+  });
+
+  describe('/0: deferred -- a distinct, pre-existing possessive-club-alias defect, not fixed by this issue', () => {
+    it('"Bombers\' biggest victory against Pies" still declines exactly as before -- the trailing-apostrophe alias is untouched by this fix', async () => {
+      const result = await parse('What was Bombers\' biggest victory against Pies at Optus Stadium in 2017');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms.join(' ')).toContain('bombers');
+    });
+  });
+
+  describe('regression controls', () => {
+    it('an already-supported directional WIN query is unchanged', async () => {
+      const p = await plan('Richmond biggest win since 2000');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.seasonMin).toBe(2000);
+    });
+
+    it('an already-supported directional LOSS query is unchanged', async () => {
+      const p = await plan('Adelaide worst loss to GWS Giants');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('loss_margin');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    });
+
+    it('an ordinary head-to-head query still reads as head-to-head, not a result-record query', async () => {
+      const p = await plan('Which of Richmond and Carlton has more wins head to head');
+      expect(p.grain).toBe('head_to_head');
+      expect(p.headToHead?.kind).toBe('compare_wins');
+    });
+
+    it('symmetric "versus" matchup parsing (AFLDB-ISSUE-213) is unaffected', async () => {
+      const p = await plan('Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval');
+      expect(p.scope.matchup?.clubA.name).toBe('North Melbourne');
+      expect(p.scope.matchup?.clubB.name).toBe('Melbourne');
+      expect(p.scope.clubFor).toBeUndefined();
+      expect(p.scope.clubAgainst).toBeUndefined();
+    });
+
+    it('venue ownership stays intact alongside the new wrapper consumption', async () => {
+      const p = await plan('At the MCG, find the widest Pies win to North Melbourne in 2023');
+      expect(p.scope.venue?.name).toBe('Melbourne Cricket Ground');
+    });
+
+    it('"find" is still not globally ignored -- a bare mid-sentence "find" with no leading "for"/"at" scope clause still declines', async () => {
+      const result = await parse('since 2000, find the widest richmond win');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('find');
+    });
+
+    it('"widest" contributes aggregation only, exactly like "biggest" -- it does not rescue an otherwise-unsupported question', async () => {
+      const result = await parse('the widest jumper number ever worn by a player');
+      expect(result.status).not.toBe('plan');
+    });
+
+    it('"widest" still generalises beyond this issue\'s two templates -- e.g. "widest lead"', async () => {
+      const p = await plan('Richmond\'s widest lead against Carlton');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('win_margin');
+      expect(p.agg).toEqual({ kind: 'max' });
+      expect(p.scope.clubFor?.name).toBe('Richmond');
+      expect(p.scope.clubAgainst?.name).toBe('Carlton');
+    });
+
+    it('"meeting" is not globally ignored -- only the specific "lopsided meeting" idiom is consumed, a bare "meeting" still declines', async () => {
+      const result = await parse('Richmond biggest win against Carlton in their meeting at the MCG');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('meeting');
+    });
+
+    it('unrelated "lost" usage still declines on its own genuinely unsupported term, not rescued by the new loss_margin verb reading', async () => {
+      const result = await parse('Which player has lost the most hair');
+      expect(result.status).not.toBe('plan');
+      expect(result.report.unsupportedTerms).toContain('hair');
+    });
+
+    it('team score/crowd record queries remain in their own family, unaffected by the new verb vocabulary', async () => {
+      const p = await plan('Adelaide highest score against GWS Giants');
+      expect(p.grain).toBe('team_match');
+      expect(p.metric).toBe('team_score');
+      expect(p.scope.clubFor?.name).toBe('Adelaide');
+      expect(p.scope.clubAgainst?.name).toBe('Greater Western Sydney');
+    });
+
+    it('team streak queries remain unaffected by the new "lose"/"beat" verb vocabulary', async () => {
+      const p = await plan('which team has the longest winning streak');
+      expect(p.grain).toBe('team_streak');
+      expect(p.streakDefinition).toEqual({ kind: 'win' });
+    });
+  });
+});
